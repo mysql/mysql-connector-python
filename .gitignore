@@ -1,0 +1,8 @@
+*.pyc
+.DS_Store
+*__pycache__*
+.idea/
+commit.txt
+*.patch
+*.diff
+
