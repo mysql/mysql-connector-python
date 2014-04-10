@@ -1,0 +1,1739 @@
+# MySQL Connector/Python - MySQL driver written in Python.
+# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+
+# MySQL Connector/Python is licensed under the terms of the GPLv2
+# <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
+# MySQL Connectors. There are special exceptions to the terms and
+# conditions of the GPLv2 as it is applied to this software, see the
+# FOSS License Exception
+# <http://www.mysql.com/about/legal/licensing/foss-exception.html>.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+
+"""Unittests for mysql.connector.connection
+"""
+
+import sys
+import os
+import logging
+import timeit
+import unittest
+from decimal import Decimal
+import io
+
+import tests
+
+try:
+    if sys.version_info[0] == 2:
+        from .py2.connection import *
+    else:
+        from .py3.connection import *
+except ImportError:
+    raise
+
+from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
+from mysql.connector import (connection, network, errors, constants, cursor)
+
+LOGGER = logging.getLogger(tests.LOGGER_NAME)
+
+
+class _DummyMySQLConnection(connection.MySQLConnection):
+
+    def _open_connection(self, *args, **kwargs):
+        pass
+
+    def _post_connection(self, *args, **kwargs):
+        pass
+
+
+class ConnectionTests(tests.MySQLConnectorTests):
+
+    def test_DEFAULT_CONFIGURATION(self):
+        exp = {
+            'database': None,
+            'user': '',
+            'password': '',
+            'host': '127.0.0.1',
+            'port': 3306,
+            'unix_socket': None,
+            'use_unicode': True,
+            'charset': 'utf8',
+            'collation': None,
+            'converter_class': MySQLConverter,
+            'autocommit': False,
+            'time_zone': None,
+            'sql_mode': None,
+            'get_warnings': False,
+            'raise_on_warnings': False,
+            'connection_timeout': None,
+            'client_flags': 0,
+            'compress': False,
+            'buffered': False,
+            'raw': False,
+            'ssl_ca': None,
+            'ssl_cert': None,
+            'ssl_key': None,
+            'ssl_verify_cert': False,
+            'passwd': None,
+            'db': None,
+            'connect_timeout': None,
+            'dsn': None,
+            'force_ipv6': False,
+            'auth_plugin': None,
+        }
+        self.assertEqual(exp, connection.DEFAULT_CONFIGURATION)
+
+
+class MySQLConnectionTests(tests.MySQLConnectorTests):
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+
+    def tearDown(self):
+        try:
+            self.cnx.close()
+        except:
+            pass
+
+    def test_init(self):
+        """MySQLConnection initialization"""
+        cnx = connection.MySQLConnection()
+        exp = {
+            'converter': None,
+            '_converter_class': MySQLConverter,
+            '_client_flags': constants.ClientFlag.get_default(),
+            '_charset_id': 33,
+            '_user': '',
+            '_password': '',
+            '_database': '',
+            '_host': '127.0.0.1',
+            '_port': 3306,
+            '_unix_socket': None,
+            '_use_unicode': True,
+            '_get_warnings': False,
+            '_raise_on_warnings': False,
+            '_connection_timeout': None,
+            '_buffered': False,
+            '_unread_result': False,
+            '_have_next_result': False,
+            '_raw': False,
+            '_client_host': '',
+            '_client_port': 0,
+            '_ssl': {},
+            '_in_transaction': False,
+            '_force_ipv6': False,
+            '_auth_plugin': None,
+            '_pool_config_version': None,
+        }
+        for key, value in exp.items():
+            self.assertEqual(
+                value, cnx.__dict__[key],
+                msg="Default for '{0}' did not match.".format(key))
+
+        # Make sure that when at least one argument is given,
+        # connect() is called
+        class FakeMySQLConnection(connection.MySQLConnection):
+
+            def connect(self, **kwargs):
+                self._database = kwargs['database']
+        exp = 'test'
+        cnx = FakeMySQLConnection(database=exp)
+        self.assertEqual(exp, cnx._database)
+
+    def test__get_self(self):
+        """Return self"""
+        self.assertEqual(self.cnx, self.cnx._get_self())
+
+    def test__send_cmd(self):
+        """Send a command to MySQL"""
+        cmd = constants.ServerCmd.QUERY
+        arg = 'SELECT 1'.encode('utf-8')
+        pktnr = 2
+
+        self.cnx._socket.sock = None
+        self.assertRaises(errors.OperationalError, self.cnx._send_cmd,
+                          cmd, arg, pktnr)
+
+        self.cnx._socket.sock = tests.DummySocket()
+        exp = b'\x07\x00\x00\x03\x00\x00\x00\x02\x00\x00\x00'
+        self.cnx._socket.sock.add_packet(exp)
+        res = self.cnx._send_cmd(cmd, arg, pktnr)
+        self.assertEqual(exp, res)
+
+        # Send an unknown command, the result should be an error packet
+        exp = b'\x18\x00\x00\x01\xff\x17\x04\x23\x30\x38\x53\x30\x31\x55'\
+              b'\x6e\x6b\x6e\x6f\x77\x6e\x20\x63\x6f\x6d\x6d\x61\x6e\x64'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(exp)
+        res = self.cnx._send_cmd(90, b'spam', 0)
+
+    def test__handle_server_status(self):
+        """Handle the server/status flags"""
+        cases = [
+            # (serverflag, attribute_name, value when set, value when unset)
+            (constants.ServerFlag.MORE_RESULTS_EXISTS,
+             '_have_next_result', True, False),
+            (constants.ServerFlag.STATUS_IN_TRANS,
+             '_in_transaction', True, False),
+        ]
+        for (flag, attr, when_set, when_unset) in cases:
+            setattr(self.cnx, attr, when_unset)
+            self.cnx._handle_server_status(flag)
+            self.assertEqual(when_set, getattr(self.cnx, attr))
+            self.cnx._handle_server_status(0)
+            self.assertEqual(when_unset, getattr(self.cnx, attr))
+
+    def test__handle_ok(self):
+        """Handle an OK-packet sent by MySQL"""
+        self.assertEqual(OK_PACKET_RESULT, self.cnx._handle_ok(OK_PACKET))
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx._handle_ok, ERR_PACKET)
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx._handle_ok, EOF_PACKET)
+
+        # Test for multiple results
+        self.cnx._have_next_result = False
+        packet = OK_PACKET[:-4] + b'\x08' + OK_PACKET[-3:]
+        self.cnx._handle_ok(packet)
+        self.assertTrue(self.cnx._have_next_result)
+
+    def test__handle_eof(self):
+        """Handle an EOF-packet sent by MySQL"""
+        self.assertEqual(EOF_PACKET_RESULT, self.cnx._handle_eof(EOF_PACKET))
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx._handle_eof, ERR_PACKET)
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx._handle_eof, OK_PACKET)
+
+        # Test for multiple results
+        self.cnx._have_next_result = False
+        packet = EOF_PACKET[:-2] + b'\x08' + EOF_PACKET[-1:]
+        self.cnx._handle_eof(packet)
+        self.assertTrue(self.cnx._have_next_result)
+
+    def test__handle_result(self):
+        """Handle the result after sending a command to MySQL"""
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_result,
+                          '\x00')
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_result,
+                          None)
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packets([
+            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
+            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+            b'\x00\x00\x00',
+            b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00'])
+
+        exp = {
+            'eof': {'status_flag': 0, 'warning_count': 0},
+            'columns': [('1', 8, None, None, None, None, 0, 129)]
+        }
+        res = self.cnx._handle_result(b'\x01\x00\x00\x01\x01')
+        self.assertEqual(exp, res)
+
+        self.assertEqual(EOF_PACKET_RESULT,
+                         self.cnx._handle_result(EOF_PACKET))
+        self.cnx._unread_result = False
+
+        # Handle LOAD DATA INFILE
+        self.cnx._socket.sock.reset()
+        packet = (
+            b'\x1A\x00\x00\x01\xfb'
+            b'\x74\x65\x73\x74\x73\x2f\x64\x61\x74\x61\x2f\x6c\x6f'
+            b'\x63\x61\x6c\x5f\x64\x61\x74\x61\x2e\x63\x73\x76')
+        self.cnx._socket.sock.add_packet(
+            b'\x37\x00\x00\x04\x00\x06\x00\x01\x00\x00\x00\x2f\x52'
+            b'\x65\x63\x6f\x72\x64\x73\x3a\x20\x36\x20\x20\x44\x65'
+            b'\x6c\x65\x74\x65\x64\x3a\x20\x30\x20\x20\x53\x6b\x69'
+            b'\x70\x70\x65\x64\x3a\x20\x30\x20\x20\x57\x61\x72\x6e'
+            b'\x69\x6e\x67\x73\x3a\x20\x30')
+        exp = {
+            'info_msg': 'Records: 6  Deleted: 0  Skipped: 0  Warnings: 0',
+            'insert_id': 0, 'field_count': 0, 'warning_count': 0,
+            'server_status': 1, 'affected_rows': 6}
+        self.assertEqual(exp, self.cnx._handle_result(packet))
+        exp = [
+            (b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
+             b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
+             b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
+             b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
+             b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
+             b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+            b'\x00\x00\x00\x05']
+        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
+
+        # Column count is invalid (is None)
+        self.cnx._socket.sock.reset()
+        packet = b'\x01\x00\x00\x01\xfa\xa3\x00\xa3'
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx._handle_result, packet)
+
+        # First byte in first packet is wrong
+        self.cnx._socket.sock.add_packets([
+            b'\x00\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
+            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+            b'\x00\x00\x00',
+            b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00'])
+
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx._handle_result, b'\x01\x00\x00\x01\x00')
+
+    def __helper_get_rows_buffer(self, toggle_next_result=False):
+        self.cnx._socket.sock.reset()
+
+        packets = [
+            b'\x07\x00\x00\x04\x06\x4d\x79\x49\x53\x41\x4d',
+            b'\x07\x00\x00\x05\x06\x49\x6e\x6e\x6f\x44\x42',
+            b'\x0a\x00\x00\x06\x09\x42\x4c\x41\x43\x4b\x48\x4f\x4c\x45',
+            b'\x04\x00\x00\x07\x03\x43\x53\x56',
+            b'\x07\x00\x00\x08\x06\x4d\x45\x4d\x4f\x52\x59',
+            b'\x0a\x00\x00\x09\x09\x46\x45\x44\x45\x52\x41\x54\x45\x44',
+            b'\x08\x00\x00\x0a\x07\x41\x52\x43\x48\x49\x56\x45',
+            b'\x0b\x00\x00\x0b\x0a\x4d\x52\x47\x5f\x4d\x59\x49\x53\x41\x4d',
+            b'\x05\x00\x00\x0c\xfe\x00\x00\x20\x00',
+        ]
+
+        if toggle_next_result:
+            packets[-1] = packets[-1][:-2] + b'\x08' + packets[-1][-1:]
+
+        self.cnx._socket.sock.add_packets(packets)
+        self.cnx.unread_result = True
+
+    def test_get_rows(self):
+        """Get rows from the MySQL resultset"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.__helper_get_rows_buffer()
+        exp = (
+            [(b'MyISAM',), (b'InnoDB',), (b'BLACKHOLE',), (b'CSV',),
+             (b'MEMORY',), (b'FEDERATED',), (b'ARCHIVE',), (b'MRG_MYISAM',)],
+            {'status_flag': 32, 'warning_count': 0}
+        )
+        res = self.cnx.get_rows()
+        self.assertEqual(exp, res)
+
+        self.__helper_get_rows_buffer()
+        rows = exp[0]
+        i = 0
+        while i < len(rows):
+            exp = (rows[i:i + 2], None)
+            res = self.cnx.get_rows(2)
+            self.assertEqual(exp, res)
+            i += 2
+        exp = ([], {'status_flag': 32, 'warning_count': 0})
+        self.assertEqual(exp, self.cnx.get_rows())
+
+        # Test unread results
+        self.cnx.unread_result = False
+        self.assertRaises(errors.InternalError, self.cnx.get_rows)
+
+        # Test multiple results
+        self.cnx._have_next_results = False
+        self.__helper_get_rows_buffer(toggle_next_result=True)
+        exp = {'status_flag': 8, 'warning_count': 0}
+        self.assertEqual(exp, self.cnx.get_rows()[-1])
+        self.assertTrue(self.cnx._have_next_result)
+
+    def test_get_row(self):
+        """Get a row from the MySQL resultset"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.__helper_get_rows_buffer()
+        expall = (
+            [(b'MyISAM',), (b'InnoDB',), (b'BLACKHOLE',), (b'CSV',),
+             (b'MEMORY',), (b'FEDERATED',), (b'ARCHIVE',), (b'MRG_MYISAM',)],
+            {'status_flag': 32, 'warning_count': 0}
+        )
+
+        rows = expall[0]
+        for row in rows:
+            res = self.cnx.get_row()
+            exp = (row, None)
+            self.assertEqual(exp, res)
+        exp = ([], {'status_flag': 32, 'warning_count': 0})
+        self.assertEqual(exp, self.cnx.get_rows())
+
+    def test_cmd_init_db(self):
+        """Send the Init_db-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_init_db('test'))
+
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(
+            b'\x2c\x00\x00\x01\xff\x19\x04\x23\x34\x32\x30\x30'
+            b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x64\x61\x74'
+            b'\x61\x62\x61\x73\x65\x20\x27\x75\x6e\x6b\x6e\x6f'
+            b'\x77\x6e\x5f\x64\x61\x74\x61\x62\x61\x73\x65\x27'
+        )
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.cmd_init_db, 'unknown_database')
+
+    def test_cmd_query(self):
+        """Send a query to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        res = self.cnx.cmd_query("SET AUTOCOMMIT = OFF")
+        self.assertEqual(OK_PACKET_RESULT, res)
+
+        packets = [
+            b'\x01\x00\x00\x01\x01',
+            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
+            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+            b'\x00\x00\x00',
+            b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00'
+        ]
+
+        # query = "SELECT 1"
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets(packets)
+        exp = {
+            'eof': {'status_flag': 0, 'warning_count': 0},
+            'columns': [('1', 8, None, None, None, None, 0, 129)]
+        }
+        res = self.cnx.cmd_query("SELECT 1")
+        self.assertEqual(exp, res)
+        self.assertRaises(errors.InternalError,
+                          self.cnx.cmd_query, 'SELECT 2')
+        self.cnx.unread_result = False
+
+        # Forge the packets so the multiple result flag is set
+        packets[-1] = packets[-1][:-2] + b'\x08' + packets[-1][-1:]
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets(packets)
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx.cmd_query, "SELECT 1")
+
+    def test_cmd_query_iter(self):
+        """Send queries to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        res = next(self.cnx.cmd_query_iter(
+            "SET AUTOCOMMIT = OFF"))
+        self.assertEqual(OK_PACKET_RESULT, res)
+
+        packets = [
+            b'\x01\x00\x00\x01\x01',
+            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
+            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+            b'\x00\x00\x00',
+            b'\x05\x00\x00\x03\xfe\x00\x00\x08\x00',
+            b'\x02\x00\x00\x04\x01\x31',
+            b'\x05\x00\x00\x05\xfe\x00\x00\x08\x00',
+            b'\x07\x00\x00\x06\x00\x01\x00\x08\x00\x00\x00',
+            b'\x01\x00\x00\x07\x01',
+            b'\x17\x00\x00\x08\x03\x64\x65\x66\x00\x00\x00\x01'
+            b'\x32\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+            b'\x00\x00\x00',
+            b'\x05\x00\x00\x09\xfe\x00\x00\x00\x00',
+            b'\x02\x00\x00\x0a\x01\x32',
+            b'\x05\x00\x00\x0b\xfe\x00\x00\x00\x00',
+        ]
+        exp = [
+            {'columns': [('1', 8, None, None, None, None, 0, 129)],
+             'eof': {'status_flag': 8, 'warning_count': 0}},
+            ([(b'1',)], {'status_flag': 8, 'warning_count': 0}),
+            {'affected_rows': 1,
+             'field_count': 0,
+             'insert_id': 0,
+             'server_status': 8,
+             'warning_count': 0},
+            {'columns': [('2', 8, None, None, None, None, 0, 129)],
+             'eof': {'status_flag': 0, 'warning_count': 0}},
+            ([(b'2',)], {'status_flag': 0, 'warning_count': 0}),
+        ]
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets(packets)
+        results = []
+        stmt = "SELECT 1; SELECT 2".encode('utf-8')
+        for result in self.cnx.cmd_query_iter(stmt):
+            results.append(result)
+            if 'columns' in result:
+                results.append(self.cnx.get_rows())
+        self.assertEqual(exp, results)
+
+    def test_cmd_refresh(self):
+        """Send the Refresh-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        refresh = constants.RefreshOption.LOG | constants.RefreshOption.THREADS
+
+        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(refresh))
+
+    def test_cmd_quit(self):
+        """Send the Quit-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.assertEqual(b'\x01', self.cnx.cmd_quit())
+
+    def test_cmd_shutdown(self):
+        """Send the Shutdown-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(EOF_PACKET)
+        self.assertEqual(EOF_PACKET_RESULT, self.cnx.cmd_shutdown())
+        exp = [b'\x02\x00\x00\x00\x08\x00']
+        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
+
+        self.cnx._socket.sock.reset()
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx.cmd_shutdown, 99)
+
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(EOF_PACKET)
+        self.cnx.cmd_shutdown(
+            constants.ShutdownType.SHUTDOWN_WAIT_CONNECTIONS)
+        exp = [b'\x02\x00\x00\x00\x08\x01']
+        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
+
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(
+            b'\x4a\x00\x00\x01\xff\xcb\x04\x23\x34\x32\x30\x30'
+            b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'
+            b'\x65\x64\x3b\x20\x79\x6f\x75\x20\x6e\x65\x65\x64'
+            b'\x20\x74\x68\x65\x20\x53\x48\x55\x54\x44\x4f\x57'
+            b'\x4e\x20\x70\x72\x69\x76\x69\x6c\x65\x67\x65\x20'
+            b'\x66\x6f\x72\x20\x74\x68\x69\x73\x20\x6f\x70\x65'
+            b'\x72\x61\x74\x69\x6f\x6e'
+        )
+        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_shutdown)
+
+    def test_cmd_statistics(self):
+        """Send the Statistics-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        goodpkt = b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'\
+            b'\x31\x34\x36\x32\x34\x35\x20\x20\x54\x68\x72\x65'\
+            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'\
+            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'\
+            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'\
+            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'\
+            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'\
+            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'\
+            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'\
+            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'\
+            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'\
+            b'\x76\x67\x3a\x20\x30\x2e\x32\x34'
+        self.cnx._socket.sock.add_packet(goodpkt)
+        exp = {
+            'Uptime': 146245,
+            'Open tables': 64,
+            'Queries per second avg': Decimal('0.24'),
+            'Slow queries': 0,
+            'Threads': 2,
+            'Questions': 3635,
+            'Flush tables': 1,
+            'Opens': 392
+        }
+        self.assertEqual(exp, self.cnx.cmd_statistics())
+
+        badpkt = b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'\
+            b'\x31\x34\x36\x32\x34\x35\x20\x54\x68\x72\x65'\
+            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'\
+            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'\
+            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'\
+            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'\
+            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'\
+            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'\
+            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'\
+            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'\
+            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'\
+            b'\x76\x67\x3a\x20\x30\x2e\x32\x34'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(badpkt)
+        self.assertRaises(errors.InterfaceError, self.cnx.cmd_statistics)
+
+        badpkt = b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'\
+            b'\x55\x70\x36\x32\x34\x35\x20\x20\x54\x68\x72\x65'\
+            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'\
+            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'\
+            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'\
+            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'\
+            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'\
+            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'\
+            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'\
+            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'\
+            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'\
+            b'\x76\x67\x3a\x20\x30\x2e\x32\x34'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(badpkt)
+        self.assertRaises(errors.InterfaceError, self.cnx.cmd_statistics)
+
+    def test_cmd_process_info(self):
+        """Send the Process-Info-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.assertRaises(errors.NotSupportedError, self.cnx.cmd_process_info)
+
+    def test_cmd_process_kill(self):
+        """Send the Process-Kill-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_process_kill(1))
+
+        pkt = b'\x1f\x00\x00\x01\xff\x46\x04\x23\x48\x59\x30\x30'\
+            b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x74\x68\x72'\
+            b'\x65\x61\x64\x20\x69\x64\x3a\x20\x31\x30\x30'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(pkt)
+        self.assertRaises(errors.DatabaseError,
+                          self.cnx.cmd_process_kill, 100)
+
+        pkt = b'\x29\x00\x00\x01\xff\x47\x04\x23\x48\x59\x30\x30'\
+            b'\x30\x59\x6f\x75\x20\x61\x72\x65\x20\x6e\x6f\x74'\
+            b'\x20\x6f\x77\x6e\x65\x72\x20\x6f\x66\x20\x74\x68'\
+            b'\x72\x65\x61\x64\x20\x31\x36\x30\x35'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(pkt)
+        self.assertRaises(errors.DatabaseError,
+                          self.cnx.cmd_process_kill, 1605)
+
+    def test_cmd_debug(self):
+        """Send the Debug-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        pkt = b'\x05\x00\x00\x01\xfe\x00\x00\x00\x00'
+        self.cnx._socket.sock.add_packet(pkt)
+        exp = {
+            'status_flag': 0,
+            'warning_count': 0
+        }
+        self.assertEqual(exp, self.cnx.cmd_debug())
+
+        pkt = b'\x47\x00\x00\x01\xff\xcb\x04\x23\x34\x32\x30\x30'\
+            b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'\
+            b'\x65\x64\x3b\x20\x79\x6f\x75\x20\x6e\x65\x65\x64'\
+            b'\x20\x74\x68\x65\x20\x53\x55\x50\x45\x52\x20\x70'\
+            b'\x72\x69\x76\x69\x6c\x65\x67\x65\x20\x66\x6f\x72'\
+            b'\x20\x74\x68\x69\x73\x20\x6f\x70\x65\x72\x61\x74'\
+            b'\x69\x6f\x6e'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(pkt)
+        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_debug)
+
+    def test_cmd_ping(self):
+        """Send the Ping-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_ping())
+
+        self.assertRaises(errors.Error, self.cnx.cmd_ping)
+
+    def test_cmd_change_user(self):
+        """Send the Change-User-command to MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._handshake = {
+            'protocol': 10,
+            'server_version_original': '5.0.30-enterprise-gpl-log',
+            'charset': 8,
+            'server_threadid': 265,
+            'capabilities': 41516,
+            'server_status': 2,
+            'auth_data': b'h4i6oP!OLng9&PD@WrYH',
+            'auth_plugin': 'mysql_native_password',
+        }
+
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(
+            b'\x45\x00\x00\x01\xff\x14\x04\x23\x34\x32\x30\x30'
+            b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'
+            b'\x65\x64\x20\x66\x6f\x72\x20\x75\x73\x65\x72\x20'
+            b'\x27\x68\x61\x6d\x27\x40\x27\x6c\x6f\x63\x61\x6c'
+            b'\x68\x6f\x73\x74\x27\x20\x74\x6f\x20\x64\x61\x74'
+            b'\x61\x62\x61\x73\x65\x20\x27\x6d\x79\x73\x71\x6c'
+            b'\x27')
+        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_change_user,
+                          username='ham', password='spam', database='mysql')
+
+    def test__do_handshake(self):
+        """Handle the handshake-packet sent by MySQL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        handshake = \
+            b'\x47\x00\x00\x00\x0a\x35\x2e\x30\x2e\x33\x30\x2d'\
+            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'\
+            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'\
+            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'\
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\
+            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'\
+            b'\x59\x48\x00'
+        exp = {
+            'protocol': 10,
+            'server_version_original': b'5.0.30-enterprise-gpl-log',
+            'charset': 8,
+            'server_threadid': 265,
+            'capabilities': 41516,
+            'server_status': 2,
+            'auth_data': b'h4i6oP!OLng9&PD@WrYH',
+            'auth_plugin': 'mysql_native_password',
+        }
+
+        self.cnx._socket.sock.add_packet(handshake)
+        self.cnx._do_handshake()
+        self.assertEqual(exp, self.cnx._handshake)
+
+        self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
+
+        # Handshake with version set to Z.Z.ZZ to simulate bad version
+        false_handshake = \
+            b'\x47\x00\x00\x00\x0a\x5a\x2e\x5a\x2e\x5a\x5a\x2d'\
+            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'\
+            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'\
+            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'\
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\
+            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'\
+            b'\x59\x48\x00'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(false_handshake)
+        self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
+
+        # Handshake with version set to 4.0.23
+        unsupported_handshake = \
+            b'\x47\x00\x00\x00\x0a\x34\x2e\x30\x2e\x32\x33\x2d'\
+            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'\
+            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'\
+            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'\
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\
+            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'\
+            b'\x59\x48\x00'
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(unsupported_handshake)
+        self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
+
+    def test__do_auth(self):
+        """Authenticate with the MySQL server"""
+        self.cnx._socket.sock = tests.DummySocket()
+        flags = constants.ClientFlag.get_default()
+        kwargs = {
+            'username': 'ham',
+            'password': 'spam',
+            'database': 'test',
+            'charset': 33,
+            'client_flags': flags,
+        }
+
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        self.assertEqual(True, self.cnx._do_auth(**kwargs))
+
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(b'\x01\x00\x00\x02\xfe')
+        self.assertRaises(errors.NotSupportedError,
+                          self.cnx._do_auth, **kwargs)
+
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00',
+            b'\x07\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00'])
+        self.cnx.set_client_flags([-constants.ClientFlag.CONNECT_WITH_DB])
+        self.assertEqual(True, self.cnx._do_auth(**kwargs))
+
+        # Using an unknown database should raise an error
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00',
+            b'\x24\x00\x00\x01\xff\x19\x04\x23\x34\x32\x30\x30'
+            b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x64\x61\x74'
+            b'\x61\x62\x61\x73\x65\x20\x27\x61\x73\x64\x66\x61'
+            b'\x73\x64\x66\x27'])
+        flags &= ~constants.ClientFlag.CONNECT_WITH_DB
+        kwargs['client_flags'] = flags
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx._do_auth, **kwargs)
+
+    @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
+    def test__do_auth_ssl(self):
+        """Authenticate with the MySQL server using SSL"""
+        self.cnx._socket.sock = tests.DummySocket()
+        flags = constants.ClientFlag.get_default()
+        flags |= constants.ClientFlag.SSL
+        kwargs = {
+            'username': 'ham',
+            'password': 'spam',
+            'database': 'test',
+            'charset': 33,
+            'client_flags': flags,
+            'ssl_options': {
+                'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
+                'cert': os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'),
+                'key': os.path.join(tests.SSL_DIR, 'tests_client_key.pem'),
+            },
+        }
+
+        self.cnx._handshake['auth_data'] = b'h4i6oP!OLng9&PD@WrYH'
+
+        # We check if do_auth send the autherization for SSL and the
+        # normal authorization.
+        exp = [
+            self.cnx._protocol.make_auth_ssl(
+                charset=kwargs['charset'],
+                client_flags=kwargs['client_flags']),
+            self.cnx._protocol.make_auth(
+                self.cnx._handshake, kwargs['username'],
+                kwargs['password'], kwargs['database'],
+                charset=kwargs['charset'],
+                client_flags=kwargs['client_flags']),
+        ]
+        self.cnx._socket.switch_to_ssl = lambda ca, cert, key: None
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00',
+            b'\x07\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00'])
+        self.cnx._do_auth(**kwargs)
+        self.assertEqual(
+            exp, [p[4:] for p in self.cnx._socket.sock._client_sends])
+
+    def test_config(self):
+        """Configure the MySQL connection
+
+        These tests do not actually connect to MySQL, but they make
+        sure everything is setup before calling _open_connection() and
+        _post_connection().
+        """
+        cnx = _DummyMySQLConnection()
+        default_config = connection.DEFAULT_CONFIGURATION.copy()
+
+        # Should fail because 'dsn' is given
+        self.assertRaises(errors.NotSupportedError, cnx.config,
+                          **default_config)
+
+        # Remove unsupported arguments
+        del default_config['dsn']
+        default_config.update({
+            'ssl_ca': 'CACert',
+            'ssl_cert': 'ServerCert',
+            'ssl_key': 'ServerKey',
+            'ssl_verify_cert': False
+        })
+        try:
+            cnx.config(**default_config)
+        except AttributeError as err:
+            self.fail("Config does not accept a supported"
+                      " argument: {}".format(str(err)))
+
+        # Add an argument which we don't allow
+        default_config['spam'] = 'SPAM'
+        self.assertRaises(AttributeError, cnx.config, **default_config)
+
+        # We do not support dsn
+        self.assertRaises(errors.NotSupportedError, cnx.connect, dsn='ham')
+
+        exp = {
+            'host': 'localhost.local',
+            'port': 3306,
+            'unix_socket': '/tmp/mysql.sock'
+        }
+        cnx.config(**exp)
+        self.assertEqual(exp['port'], cnx._port)
+        self.assertEqual(exp['host'], cnx._host)
+        self.assertEqual(exp['unix_socket'], cnx._unix_socket)
+
+        exp = (None, 'test', 'mysql  ')
+        for database in exp:
+            cnx.config(database=database)
+            if database is not None:
+                database = database.strip()
+            failmsg = "Failed setting database to '{0}'".format(database)
+            self.assertEqual(database, cnx._database, msg=failmsg)
+        cnx.config(user='ham')
+        self.assertEqual('ham', cnx._user)
+
+        cnx.config(raise_on_warnings=True)
+        self.assertEqual(True, cnx._raise_on_warnings)
+        cnx.config(get_warnings=False)
+        self.assertEqual(False, cnx._get_warnings)
+        cnx.config(connection_timeout=123)
+        self.assertEqual(123, cnx._connection_timeout)
+        for toggle in [True, False]:
+            cnx.config(buffered=toggle)
+            self.assertEqual(toggle, cnx._buffered)
+            cnx.config(raw=toggle)
+            self.assertEqual(toggle, cnx._raw)
+        for toggle in [False, True]:
+            cnx.config(use_unicode=toggle)
+            self.assertEqual(toggle, cnx._use_unicode)
+
+        # Test client flags
+        cnx = _DummyMySQLConnection()
+        cnx.set_client_flags(constants.ClientFlag.get_default())
+        flag = exp = constants.ClientFlag.COMPRESS
+        cnx.config(client_flags=flag)
+        self.assertEqual(exp, cnx._client_flags)
+
+        # Setting client flags using a list
+        cnx = _DummyMySQLConnection()
+        cnx.set_client_flags(constants.ClientFlag.get_default())
+        flags = [constants.ClientFlag.COMPRESS,
+                 constants.ClientFlag.FOUND_ROWS]
+        exp = constants.ClientFlag.get_default()
+        for flag in flags:
+            exp |= flag
+        cnx.config(client_flags=flags)
+        self.assertEqual(exp, cnx._client_flags)
+
+        # and unsetting client flags again
+        exp = constants.ClientFlag.get_default()
+        flags = [-constants.ClientFlag.COMPRESS,
+                 -constants.ClientFlag.FOUND_ROWS]
+        cnx.config(client_flags=flags)
+        self.assertEqual(exp, cnx._client_flags)
+
+        # Test compress argument
+        cnx.config(compress=True)
+        exp = constants.ClientFlag.COMPRESS
+        self.assertEqual(exp, cnx._client_flags &
+                         constants.ClientFlag.COMPRESS)
+
+        # Test character set
+        # utf8 is default, which is mapped to 33
+        self.assertEqual(33, cnx._charset_id)
+        cnx.config(charset='latin1')
+        self.assertEqual(8, cnx._charset_id)
+        cnx.config(charset='latin1', collation='latin1_general_ci')
+        self.assertEqual(48, cnx._charset_id)
+        cnx.config(collation='latin1_general_ci')
+        self.assertEqual(48, cnx._charset_id)
+
+        # Test converter class
+        class TestConverter(MySQLConverterBase):
+
+            def __init__(self, charset=None, unicode=True):
+                pass
+
+        self.cnx.config(converter_class=TestConverter)
+        self.assertTrue(isinstance(self.cnx.converter, TestConverter))
+        self.assertEqual(self.cnx._converter_class, TestConverter)
+
+        class TestConverterWrong(object):
+
+            def __init__(self, charset, unicode):
+                pass
+
+        self.assertRaises(AttributeError,
+                          self.cnx.config, converter_class=TestConverterWrong)
+
+        # Test SSL configuration
+        exp = {
+            'ca': 'CACert',
+            'cert': 'ServerCert',
+            'key': 'ServerKey',
+            'verify_cert': False
+        }
+        cnx.config(ssl_ca=exp['ca'], ssl_cert=exp['cert'], ssl_key=exp['key'])
+        self.assertEqual(exp, cnx._ssl)
+
+        exp['verify_cert'] = True
+
+        cnx.config(ssl_ca=exp['ca'], ssl_cert=exp['cert'],
+                   ssl_key=exp['key'], ssl_verify_cert=exp['verify_cert'])
+        self.assertEqual(exp, cnx._ssl)
+
+        # Missing SSL configuration should raise an AttributeError
+        cnx._ssl = {}
+        cases = [
+            {'ssl_key': exp['key']},
+            {'ssl_cert': exp['cert']},
+        ]
+        for case in cases:
+            cnx._ssl = {}
+            try:
+                cnx.config(ssl_ca=exp['ca'], **case)
+            except AttributeError as err:
+               errmsg = str(err)
+               self.assertTrue(list(case.keys())[0] in errmsg)
+            else:
+                self.fail("Testing SSL attributes failed.")
+
+        # Compatibility tests: MySQLdb
+        cnx = _DummyMySQLConnection()
+        cnx.connect(db='mysql', passwd='spam', connect_timeout=123)
+        self.assertEqual('mysql', cnx._database)
+        self.assertEqual('spam', cnx._password)
+        self.assertEqual(123, cnx._connection_timeout)
+
+    def test__get_connection(self):
+        """Get connection based on configuration"""
+        if os.name != 'nt':
+            res = self.cnx._get_connection()
+            self.assertTrue(isinstance(res, network.MySQLUnixSocket))
+
+        self.cnx._unix_socket = None
+        self.cnx._connection_timeout = 123
+        res = self.cnx._get_connection()
+        self.assertTrue(isinstance(res, network.MySQLTCPSocket))
+        self.assertEqual(self.cnx._connection_timeout,
+                         res._connection_timeout)
+
+    def test__open_connection(self):
+        """Open the connection to the MySQL server"""
+        # Force TCP Connection
+        self.cnx._unix_socket = None
+        self.cnx._open_connection()
+        self.assertTrue(isinstance(self.cnx._socket,
+                                   network.MySQLTCPSocket))
+        self.cnx.close()
+
+        self.cnx._client_flags |= constants.ClientFlag.COMPRESS
+        self.cnx._open_connection()
+        self.assertEqual(self.cnx._socket.recv_compressed,
+                         self.cnx._socket.recv)
+        self.assertEqual(self.cnx._socket.send_compressed,
+                         self.cnx._socket.send)
+
+    def test__post_connection(self):
+        """Executes commands after connection has been established"""
+        self.cnx._charset_id = 33
+        self.cnx._autocommit = True
+        self.cnx._time_zone = "-09:00"
+        self.cnx._sql_mode = "STRICT_ALL_TABLES"
+        self.cnx._post_connection()
+        self.assertEqual('utf8', self.cnx.charset)
+        self.assertEqual(self.cnx._autocommit, self.cnx.autocommit)
+        self.assertEqual(self.cnx._time_zone, self.cnx.time_zone)
+        self.assertEqual(self.cnx._sql_mode, self.cnx.sql_mode)
+
+    def test_connect(self):
+        """Connect to the MySQL server"""
+        config = tests.get_mysql_config()
+        config['unix_socket'] = None
+        config['connection_timeout'] = 1
+
+        cnx = connection.MySQLConnection()
+        config['host'] = tests.get_mysql_config()['host']
+        try:
+            cnx.connect(**config)
+            cnx.close()
+        except errors.Error as err:
+            self.fail("Failed connecting to '{}': {}".format(
+                config['host'], str(err)))
+
+        config['host'] = tests.fake_hostname()
+        self.assertRaises(errors.InterfaceError, cnx.connect, **config)
+
+    def test_is_connected(self):
+        """Check connection to MySQL Server"""
+        self.assertEqual(True, self.cnx.is_connected())
+        self.cnx.disconnect()
+        self.assertEqual(False, self.cnx.is_connected())
+
+    def test_reset_session(self):
+        "Resets the active session"
+        config = tests.get_mysql_config()
+        exp = [True, 'STRICT_ALL_TABLES', '-09:00', 33]
+        config['autocommit'] = exp[0]
+        config['sql_mode'] = exp[1]
+        config['time_zone'] = exp[2]
+        config['charset'] = exp[3]
+        self.cnx = connection.MySQLConnection(**config)
+
+        user_variables = {'ham': '1', 'spam': '2'}
+        session_variables = {'wait_timeout': 100000}
+        self.cnx.reset_session(user_variables, session_variables)
+
+        self.assertEqual(exp, [self.cnx.autocommit, self.cnx.sql_mode,
+                               self.cnx.time_zone, self.cnx._charset_id])
+
+        if sys.version_info[0] == 2:
+            exp_user_variables = {'ham': '1', 'spam': '2'}
+            exp_session_variables = {'wait_timeout': '100000'}
+        else:
+            exp_user_variables = {'ham': b'1', 'spam': b'2'}
+            exp_session_variables = {'wait_timeout': b'100000'}
+
+        for key, value in exp_user_variables.items():
+            self.cnx.cmd_query("SELECT @{0}".format(key))
+            self.assertEqual((value,), self.cnx.get_rows()[0][0])
+        for key, value in exp_session_variables.items():
+            self.cnx.cmd_query("SELECT @@session.{0}".format(key))
+            self.assertEqual((value,), self.cnx.get_rows()[0][0])
+
+    def test_reconnect(self):
+        """Reconnecting to the MySQL Server"""
+        supported_arguments = {
+            'attempts': 1,
+            'delay': 0,
+        }
+        self.check_args(self.cnx.reconnect, supported_arguments)
+
+        def _test_reconnect_delay():
+            config = {
+                'unix_socket': None,
+                'host': tests.fake_hostname(),
+                'connection_timeout': 1,
+            }
+            cnx = connection.MySQLConnection()
+            cnx.config(**config)
+            try:
+                cnx.reconnect(attempts=2, delay=3)
+            except:
+                pass
+
+        # Check the delay
+        timer = timeit.Timer(_test_reconnect_delay)
+        result = timer.timeit(number=1)
+        self.assertTrue(result > 3 and result < 12,
+                        "3 <= result < 12, was {0}".format(result))
+
+        # Check reconnect stops when successful
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection()
+        cnx.connect(**config)
+        conn_id = cnx.connection_id
+        cnx.reconnect(attempts=5)
+        exp = conn_id + 1
+        self.assertEqual(exp, cnx.connection_id)
+
+    def test_ping(self):
+        """Ping the MySQL server"""
+        supported_arguments = {
+            'reconnect': False,
+            'attempts': 1,
+            'delay': 0,
+        }
+        self.check_args(self.cnx.ping, supported_arguments)
+
+        try:
+            self.cnx.ping()
+        except errors.InterfaceError:
+            self.fail("Ping should have not raised an error")
+
+        self.cnx.disconnect()
+        self.assertRaises(errors.InterfaceError, self.cnx.ping)
+
+    def test_set_converter_class(self):
+        """Set the converter class"""
+        class TestConverterWrong(object):
+
+            def __init__(self, charset, unicode):
+                pass
+
+        self.assertRaises(TypeError,
+                          self.cnx.set_converter_class, TestConverterWrong)
+
+        class TestConverter(MySQLConverterBase):
+
+            def __init__(self, charset, unicode):
+                pass
+
+        self.cnx.set_converter_class(TestConverter)
+        self.assertTrue(isinstance(self.cnx.converter, TestConverter))
+        self.assertEqual(self.cnx._converter_class, TestConverter)
+
+    def test_get_server_version(self):
+        """Get the MySQL version"""
+        self.assertEqual(self.cnx._server_version,
+                         self.cnx.get_server_version())
+
+    def test_get_server_info(self):
+        """Get the original MySQL version information"""
+        self.assertEqual(self.cnx._handshake['server_version_original'],
+                         self.cnx.get_server_info())
+
+        del self.cnx._handshake['server_version_original']
+        self.assertEqual(None, self.cnx.get_server_info())
+
+    def test_connection_id(self):
+        """MySQL connection ID"""
+        self.assertEqual(self.cnx._handshake['server_threadid'],
+                         self.cnx.connection_id)
+
+        del self.cnx._handshake['server_threadid']
+        self.assertEqual(None, self.cnx.connection_id)
+
+    def test_set_login(self):
+        """Set login information for MySQL"""
+        exp = ('Ham ', ' Spam ')
+        self.cnx.set_login(*exp)
+        self.assertEqual(exp[0].strip(), self.cnx._user)
+        self.assertEqual(exp[1].strip(), self.cnx._password)
+
+        self.cnx.set_login()
+        self.assertEqual('', self.cnx._user)
+        self.assertEqual('', self.cnx._password)
+
+    def test__set_unread_result(self):
+        """Toggle unread result set"""
+        self.cnx._set_unread_result(True)
+        self.assertEqual(True, self.cnx._unread_result)
+        self.cnx._set_unread_result(False)
+        self.assertEqual(False, self.cnx._unread_result)
+        self.assertRaises(ValueError, self.cnx._set_unread_result, 1)
+
+    def test__get_unread_result(self):
+        """Check for unread result set"""
+        self.cnx._unread_result = True
+        self.assertEqual(True, self.cnx._get_unread_result())
+        self.cnx._unread_result = False
+        self.assertEqual(False, self.cnx._get_unread_result())
+
+    def test_unread_results(self):
+        """Check and toggle unread result using property"""
+        self.cnx.unread_result = True
+        self.assertEqual(True, self.cnx._unread_result)
+        self.cnx.unread_result = False
+        self.assertEqual(False, self.cnx._unread_result)
+
+        try:
+            self.cnx.unread_result = 1
+        except ValueError:
+            pass  # Expected
+        except:
+            self.fail("Expected ValueError to be raised")
+
+    def test__set_getwarnings(self):
+        """Toggle whether to get warnings"""
+        self.cnx._set_getwarnings(True)
+        self.assertEqual(True, self.cnx._get_warnings)
+        self.cnx._set_getwarnings(False)
+        self.assertEqual(False, self.cnx._get_warnings)
+        self.assertRaises(ValueError, self.cnx._set_getwarnings, 1)
+
+    def test__get_getwarnings(self):
+        """Check whether we need to get warnings"""
+        self.cnx._get_warnings = True
+        self.assertEqual(True, self.cnx._get_getwarnings())
+        self.cnx._get_warnings = False
+        self.assertEqual(False, self.cnx._get_getwarnings())
+
+    def test_get_warnings(self):
+        """Check and toggle the get_warnings property"""
+        self.cnx.get_warnings = True
+        self.assertEqual(True, self.cnx._get_warnings)
+        self.cnx.get_warnings = False
+        self.assertEqual(False, self.cnx._get_warnings)
+
+        try:
+            self.cnx.get_warnings = 1
+        except ValueError:
+            pass  # Expected
+        except:
+            self.fail("Expected ValueError to be raised")
+
+    def test_set_charset_collation(self):
+        """Set the character set and collation"""
+        self.cnx.set_charset_collation('latin1')
+        self.assertEqual(8, self.cnx._charset_id)
+        self.cnx.set_charset_collation('latin1', 'latin1_general_ci')
+        self.assertEqual(48, self.cnx._charset_id)
+        self.cnx.set_charset_collation('latin1', None)
+        self.assertEqual(8, self.cnx._charset_id)
+
+        self.cnx.set_charset_collation(collation='greek_bin')
+        self.assertEqual(70, self.cnx._charset_id)
+
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.set_charset_collation, 666)
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.set_charset_collation, 'spam')
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.set_charset_collation, 'latin1', 'spam')
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.set_charset_collation, None, 'spam')
+        self.assertRaises(ValueError,
+                          self.cnx.set_charset_collation, object())
+
+    def test_charset(self):
+        """Get character set name"""
+        self.cnx.set_charset_collation('latin1', 'latin1_general_ci')
+        self.assertEqual('latin1', self.cnx.charset)
+        self.cnx._charset_id = 70
+        self.assertEqual('greek', self.cnx.charset)
+        self.cnx._charset_id = 9
+        self.assertEqual('latin2', self.cnx.charset)
+
+        self.cnx._charset_id = 1234567
+        try:
+            self.cnx.charset
+        except errors.ProgrammingError:
+            pass  # This is expected
+        except:
+            self.fail("Expected errors.ProgrammingError to be raised")
+
+    def test_collation(self):
+        """Get collation name"""
+        exp = 'latin2_general_ci'
+        self.cnx.set_charset_collation(collation=exp)
+        self.assertEqual(exp, self.cnx.collation)
+        self.cnx._charset_id = 70
+        self.assertEqual('greek_bin', self.cnx.collation)
+        self.cnx._charset_id = 9
+        self.assertEqual('latin2_general_ci', self.cnx.collation)
+
+        self.cnx._charset_id = 1234567
+        try:
+            self.cnx.collation
+        except errors.ProgrammingError:
+            pass  # This is expected
+        except:
+            self.fail("Expected errors.ProgrammingError to be raised")
+
+    def test_set_client_flags(self):
+        """Set the client flags"""
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.set_client_flags, 'Spam')
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.set_client_flags, 0)
+
+        default_flags = constants.ClientFlag.get_default()
+
+        exp = default_flags
+        self.assertEqual(exp, self.cnx.set_client_flags(exp))
+        self.assertEqual(exp, self.cnx._client_flags)
+
+        exp = default_flags
+        exp |= constants.ClientFlag.SSL
+        exp |= constants.ClientFlag.FOUND_ROWS
+        exp &= ~constants.ClientFlag.MULTI_RESULTS
+        flags = [
+            constants.ClientFlag.SSL,
+            constants.ClientFlag.FOUND_ROWS,
+            -constants.ClientFlag.MULTI_RESULTS
+        ]
+        self.assertEqual(exp, self.cnx.set_client_flags(flags))
+        self.assertEqual(exp, self.cnx._client_flags)
+
+    def test_user(self):
+        exp = 'ham'
+        self.cnx._user = exp
+        self.assertEqual(exp, self.cnx.user)
+
+    def test_host(self):
+        exp = 'ham'
+        self.cnx._host = exp
+        self.assertEqual(exp, self.cnx.server_host)
+
+    def test_port(self):
+        exp = 'ham'
+        self.cnx._port = exp
+        self.assertEqual(exp, self.cnx.server_port)
+
+    def test_unix_socket(self):
+        exp = 'ham'
+        self.cnx._unix_socket = exp
+        self.assertEqual(exp, self.cnx.unix_socket)
+
+    def test_set_database(self):
+        exp = 'mysql'
+        self.cnx.set_database(exp)
+        self.assertEqual(exp, self.cnx._info_query("SELECT DATABASE()")[0])
+
+    def test_get_database(self):
+        exp = self.cnx._info_query("SELECT DATABASE()")[0]
+        self.assertEqual(exp, self.cnx.get_database())
+
+    def test_database(self):
+        exp = 'mysql'
+        self.cnx.database = exp
+        self.assertEqual(exp, self.cnx.database)
+
+    def test_set_time_zone(self):
+        """Set the time zone for current MySQL session"""
+        cnx = _DummyMySQLConnection()
+        exp = "-09:00"
+        cnx.connect(time_zone=exp)
+        self.assertEqual(exp, cnx._time_zone)
+        exp = "+03:00"
+        self.cnx.set_time_zone(exp)
+        self.assertEqual(exp, self.cnx._time_zone)
+        res = self.cnx._info_query("SELECT @@session.time_zone")[0]
+        self.assertEqual(exp, res)
+
+    def test_get_time_zone(self):
+        """Get the time zone from current MySQL Session"""
+        exp = "-08:00"
+        self.cnx._info_query("SET @@session.time_zone = '{0}'".format(exp))
+        self.assertEqual(exp, self.cnx.get_time_zone())
+
+    def test_time_zone(self):
+        """Set and get the time zone through property"""
+        exp = "+05:00"
+        self.cnx.time_zone = exp
+        self.assertEqual(exp, self.cnx._time_zone)
+        self.assertEqual(exp, self.cnx.time_zone)
+        self.assertEqual(self.cnx.get_time_zone(), self.cnx.time_zone)
+
+    def test_set_sql_mode(self):
+        """Set SQL Mode"""
+        # Use an unknown SQL Mode
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.set_sql_mode, 'HAM')
+
+        # Set an SQL Mode
+        try:
+            self.cnx.set_sql_mode('TRADITIONAL')
+        except errors.Error:
+            self.fail("Failed setting SQL Mode")
+
+        # Set SQL Mode to a list of modes
+        if tests.MYSQL_VERSION[0:3] < (5, 7, 4):
+            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,'
+                   'NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,'
+                   'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
+        else:
+            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,'
+                   'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
+
+        try:
+            self.cnx.set_sql_mode(exp)
+            result = self.cnx.get_sql_mode()
+        except errors.Error as err:
+            self.fail(
+                "Failed setting SQL Mode with multiple modes: {0}".format(
+                    str(err)))
+        self.assertEqual(exp, result)
+
+        exp = sorted([
+            constants.SQLMode.STRICT_ALL_TABLES,
+            constants.SQLMode.REAL_AS_FLOAT
+        ])
+        self.cnx.sql_mode = exp
+        self.assertEqual(exp, sorted(self.cnx.sql_mode.split(',')))
+
+    def test_get_sql_mode(self):
+        """Get SQL Mode"""
+        config = tests.get_mysql_config()
+        config['sql_mode'] = ''
+        self.cnx = connection.MySQLConnection(**config)
+
+        # SQL Modes must be empty
+        self.assertEqual('', self.cnx.get_sql_mode())
+
+        # Set SQL Mode and check
+        sql_mode = exp = 'STRICT_ALL_TABLES'
+        self.cnx.set_sql_mode(sql_mode)
+        self.assertEqual(exp, self.cnx.get_sql_mode())
+
+        # Unset the SQL Mode again
+        self.cnx.set_sql_mode('')
+        self.assertEqual('', self.cnx.get_sql_mode())
+
+    def test_sql_mode(self):
+        """Set and get SQL Mode through property"""
+        config = tests.get_mysql_config()
+        config['sql_mode'] = ''
+        self.cnx = connection.MySQLConnection(**config)
+
+        sql_mode = exp = 'STRICT_ALL_TABLES'
+        self.cnx.sql_mode = sql_mode
+        self.assertEqual(exp, self.cnx.sql_mode)
+
+    def test_set_autocommit(self):
+        self.cnx.set_autocommit(True)
+        self.assertEqual(self.cnx._autocommit, True)
+        res = self.cnx._info_query("SELECT @@session.autocommit")[0]
+        self.assertEqual(1, res)
+        self.cnx.set_autocommit(0)
+        res = self.cnx._info_query("SELECT @@session.autocommit")[0]
+        self.assertEqual(0, res)
+
+    def test_get_autocommit(self):
+        cases = [False, True]
+        for exp in cases:
+            self.cnx.set_autocommit(exp)
+            res = self.cnx._info_query("SELECT @@session.autocommit")[0]
+            self.assertEqual(exp, cases[res])
+
+    def test_autocommit(self):
+        for exp in [False, True]:
+            self.cnx.autocommit = exp
+            self.assertEqual(exp, self.cnx.autocommit)
+
+    def test__set_raise_on_warnings(self):
+        """Toggle whether to get warnings"""
+        self.cnx._set_raise_on_warnings(True)
+        self.assertEqual(True, self.cnx._raise_on_warnings)
+        self.cnx._set_raise_on_warnings(False)
+        self.assertEqual(False, self.cnx._raise_on_warnings)
+        self.assertRaises(ValueError, self.cnx._set_raise_on_warnings, 1)
+
+    def test__get_raise_on_warnings(self):
+        """Check whether we need to get warnings"""
+        self.cnx._raise_on_warnings = True
+        self.assertEqual(True, self.cnx._get_raise_on_warnings())
+        self.cnx._raise_on_warnings = False
+        self.assertEqual(False, self.cnx._get_raise_on_warnings())
+
+    def test_raise_on_warnings(self):
+        """Check and toggle the get_warnings property"""
+        self.cnx.raise_on_warnings = True
+        self.assertEqual(True, self.cnx._get_raise_on_warnings())
+        self.cnx.raise_on_warnings = False
+        self.assertEqual(False, self.cnx._get_raise_on_warnings())
+
+        try:
+            self.cnx.raise_on_warnings = 1
+        except ValueError:
+            pass  # Expected
+        except:
+            self.fail("Expected ValueError to be raised")
+
+    def test_cursor(self):
+        class FalseCursor(object):
+            pass
+
+        class TrueCursor(cursor.CursorBase):
+
+            def __init__(self, connection=None):
+                if sys.version_info[0] == 2:
+                    super(TrueCursor, self).__init__()
+                else:
+                    super().__init__()
+
+        self.assertRaises(errors.ProgrammingError, self.cnx.cursor,
+                          cursor_class=FalseCursor)
+        self.assertTrue(isinstance(self.cnx.cursor(cursor_class=TrueCursor),
+                                   TrueCursor))
+
+        cases = [
+            ({}, cursor.MySQLCursor),
+            ({'buffered': True}, cursor.MySQLCursorBuffered),
+            ({'raw': True}, cursor.MySQLCursorRaw),
+            ({'buffered': True, 'raw': True}, cursor.MySQLCursorBufferedRaw),
+        ]
+        for kwargs, exp in cases:
+            self.assertTrue(isinstance(self.cnx.cursor(**kwargs), exp))
+
+        # Test when connection is closed
+        self.cnx.close()
+        self.assertRaises(errors.OperationalError, self.cnx.cursor)
+
+    def test__send_data(self):
+        self.assertRaises(ValueError, self.cnx._send_data, 'spam')
+
+        self.cnx._socket.sock = tests.DummySocket()
+
+        data = b"1\tham\t'ham spam'\n2\tfoo\t'foo bar'"
+
+        fp = io.BytesIO(data)
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        exp = [
+            b"\x20\x00\x00\x02\x31\x09\x68\x61\x6d\x09\x27\x68\x61\x6d"
+            b"\x20\x73\x70\x61\x6d\x27\x0a\x32\x09\x66\x6f\x6f\x09\x27"
+            b"\x66\x6f\x6f\x20\x62\x61\x72\x27"
+        ]
+
+        self.assertEqual(OK_PACKET, self.cnx._send_data(fp, False))
+        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
+
+        fp = io.BytesIO(data)
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packet(OK_PACKET)
+        exp.append(b'\x00\x00\x00\x03')
+        self.assertEqual(OK_PACKET, self.cnx._send_data(fp, True))
+        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
+
+        fp = io.BytesIO(data)
+        self.cnx._socket = None
+        self.assertRaises(errors.OperationalError,
+                          self.cnx._send_data, fp, False)
+        # Nothing to read, but try to send empty packet
+        self.assertRaises(errors.OperationalError,
+                          self.cnx._send_data, fp, True)
+
+    def test_in_transaction(self):
+        self.cnx.cmd_query('START TRANSACTION')
+        self.assertTrue(self.cnx.in_transaction)
+        self.cnx.cmd_query('ROLLBACK')
+        self.assertFalse(self.cnx.in_transaction)
+
+        # AUTO_COMMIT turned ON
+        self.cnx.autocommit = True
+        self.assertFalse(self.cnx.in_transaction)
+
+        self.cnx.cmd_query('START TRANSACTION')
+        self.assertTrue(self.cnx.in_transaction)
+
+    def test_start_transaction(self):
+        self.cnx.start_transaction()
+        self.assertTrue(self.cnx.in_transaction)
+        self.cnx.rollback()
+
+        self.cnx.start_transaction(consistent_snapshot=True)
+        self.assertTrue(self.cnx.in_transaction)
+        self.assertRaises(errors.ProgrammingError, self.cnx.start_transaction)
+        self.cnx.rollback()
+
+        levels = ['READ UNCOMMITTED', 'READ COMMITTED', 'REPEATABLE READ',
+                  'SERIALIZABLE',
+                  'READ-UNCOMMITTED', 'READ-COMMITTED', 'REPEATABLE-READ',
+                  'SERIALIZABLE']
+        for level in levels:
+            level = level.replace(' ', '-')
+            self.cnx.start_transaction(isolation_level=level)
+            self.assertTrue(self.cnx.in_transaction)
+            self.cnx.rollback()
+
+        self.assertRaises(ValueError,
+                          self.cnx.start_transaction, isolation_level='spam')
+
+    def test__handle_binary_ok(self):
+        """Handle a Binary OK packet"""
+        packet = (
+            b'\x0c\x00\x00\x01'
+            b'\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        )
+
+        exp = {
+            'num_params': 0,
+            'statement_id': 1,
+            'warning_count': 0,
+            'num_columns': 0
+        }
+        self.assertEqual(exp, self.cnx._handle_binary_ok(packet))
+
+        # Raise an error
+        packet = (
+            b'\x2a\x00\x00\x01\xff\x19\x05\x23\x34\x32\x30\x30\x30\x46\x55'
+            b'\x4e\x43\x54\x49\x4f\x4e\x20\x74\x65\x73\x74\x2e\x53\x50\x41'
+            b'\x4d\x20\x64\x6f\x65\x73\x20\x6e\x6f\x74\x20\x65\x78\x69\x73\x74'
+        )
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx._handle_binary_ok, packet)
+
+    def test_cmd_stmt_prepare(self):
+        """Prepare a MySQL statement"""
+        self.cnx._socket.sock = tests.DummySocket()
+
+        stmt = b"SELECT CONCAT(?, ?) AS c1"
+        self.cnx._socket.sock.add_packets([
+            b'\x0c\x00\x00\x01\x00\x01\x00\x00\x00\x01\x00\x02\x00\x00\x00\x00',
+            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01\x3f\x00\x0c'
+            b'\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x00\x00\x00',
+            b'\x17\x00\x00\x03\x03\x64\x65\x66\x00\x00\x00\x01\x3f\x00\x0c'
+            b'\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x00\x00\x00',
+            EOF_PACKET,
+            b'\x18\x00\x00\x05\x03\x64\x65\x66\x00\x00\x00\x02\x63\x31\x00'
+            b'\x0c\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x1f\x00\x00',
+            EOF_PACKET
+        ])
+        exp = {
+            'num_params': 2,
+            'statement_id': 1,
+            'parameters': [
+                ('?', 253, None, None, None, None, 1, 128),
+                ('?', 253, None, None, None, None, 1, 128)
+            ],
+            'warning_count': 0,
+            'num_columns': 1,
+            'columns': [('c1', 253, None, None, None, None, 1, 128)]
+        }
+        self.assertEqual(exp, self.cnx.cmd_stmt_prepare(stmt))
+
+        stmt = b"DO 1"
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            b'\x0c\x00\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        ])
+        exp = {
+            'num_params': 0,
+            'statement_id': 1,
+            'parameters': [],
+            'warning_count': 0,
+            'num_columns': 0,
+            'columns': []
+        }
+        self.assertEqual(exp, self.cnx.cmd_stmt_prepare(stmt))
+
+        # Raise an error using illegal SPAM() MySQL function
+        stmt = b"SELECT SPAM(?) AS c1"
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            b'\x2a\x00\x00\x01\xff\x19\x05\x23\x34\x32\x30\x30\x30\x46\x55'
+            b'\x4e\x43\x54\x49\x4f\x4e\x20\x74\x65\x73\x74\x2e\x53\x50\x41'
+            b'\x4d\x20\x64\x6f\x65\x73\x20\x6e\x6f\x74\x20\x65\x78\x69\x73\x74'
+        ])
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx.cmd_stmt_prepare, stmt)
+
+    def test__handle_binary_result(self):
+        self.cnx._socket.sock = tests.DummySocket()
+
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx._handle_binary_result, None)
+        self.assertRaises(errors.InterfaceError,
+                          self.cnx._handle_binary_result, b'\x00\x00\x00')
+
+        self.assertEqual(OK_PACKET_RESULT,
+                         self.cnx._handle_binary_result(OK_PACKET))
+        self.assertEqual(EOF_PACKET_RESULT,
+                         self.cnx._handle_binary_result(EOF_PACKET))
+
+        self.assertRaises(errors.ProgrammingError,
+                          self.cnx._handle_binary_result, ERR_PACKET)
+
+        # handle result set
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            (b'\x18\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x02\x63\x31\x00'
+             b'\x0c\x21\x00\x09\x00\x00\x00\xfd\x01\x00\x00\x00\x00'),
+            EOF_PACKET,
+        ])
+        exp = (
+            1,
+            [('c1', 253, None, None, None, None, 0, 1)],
+            {'status_flag': 0, 'warning_count': 0}
+        )
+        self.assertEqual(
+            exp, self.cnx._handle_binary_result(b'\x01\x00\x00\x01\x01'))
+
+    def test_cmd_stmt_execute(self):
+        stmt = b"SELECT ? as c1"
+        params = (
+            1,
+            ('ham',),
+            [('c1', 253, None, None, None, None, 1, 128)],
+            0
+        )
+
+        # statement does not exists
+        self.assertRaises(errors.DatabaseError, self.cnx.cmd_stmt_execute,
+                          *params)
+
+        # prepare and execute
+        self.cnx.cmd_stmt_prepare(stmt)
+        exp = (
+            1,
+            [('c1', 253, None, None, None, None, 0, 1)],
+            {'status_flag': 0, 'warning_count': 0}
+        )
+        self.assertEqual(exp, self.cnx.cmd_stmt_execute(*params))
+
+    def test_cmd_stmt_close(self):
+        # statement does not exists, does not return or raise anything
+        try:
+            self.cnx.cmd_stmt_close(99)
+        except errors.Error as err:
+            self.fail("cmd_stmt_close raised: {0}".format(err))
+
+        # after closing, should not be able to execute
+        stmt_info = self.cnx.cmd_stmt_prepare(b"SELECT ? as c1")
+        self.cnx.cmd_stmt_close(stmt_info['statement_id'])
+        params = (
+            stmt_info['statement_id'],
+            ('ham',),
+            stmt_info['parameters'],
+            0
+        )
+        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_stmt_execute,
+                          *params)
+
+    def test_cmd_reset_connection(self):
+        """Resets session without re-authenticating"""
+        if tests.MYSQL_VERSION < (5, 7, 3):
+            self.assertRaises(errors.NotSupportedError,
+                              self.cnx.cmd_reset_connection)
+        else:
+            exp_session_id = self.cnx.connection_id
+            self.cnx.cmd_query("SET @ham = 2")
+            self.cnx.cmd_reset_connection()
+
+            self.cnx.cmd_query("SELECT @ham")
+            self.assertEqual(exp_session_id, self.cnx.connection_id)
+            if sys.version_info[0] == 2:
+                self.assertNotEqual(('2',), self.cnx.get_rows()[0][0])
+            else:
+                self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
