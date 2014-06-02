@@ -33,23 +33,43 @@ from decimal import Decimal
 import io
 
 import tests
-
-try:
-    if sys.version_info[0] == 2:
-        from .py2.connection import *
-    else:
-        from .py3.connection import *
-except ImportError:
-    raise
+from . import PY2
 
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connection, network, errors, constants, cursor)
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
+OK_PACKET = bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00')
+OK_PACKET_RESULT = {
+    'insert_id': 0,
+    'affected_rows': 0,
+    'field_count': 0,
+    'warning_count': 0,
+    'server_status': 0
+}
+
+ERR_PACKET = bytearray(
+    b'\x47\x00\x00\x02\xff\x15\x04\x23\x32\x38\x30\x30\x30'
+    b'\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69\x65\x64'
+    b'\x20\x66\x6f\x72\x20\x75\x73\x65\x72\x20\x27\x68\x61'
+    b'\x6d\x27\x40\x27\x6c\x6f\x63\x61\x6c\x68\x6f\x73\x74'
+    b'\x27\x20\x28\x75\x73\x69\x6e\x67\x20\x70\x61\x73\x73'
+    b'\x77\x6f\x72\x64\x3a\x20\x59\x45\x53\x29'
+)
+
+EOF_PACKET = bytearray(b'\x05\x00\x00\x00\xfe\x00\x00\x00\x00')
+EOF_PACKET_RESULT = {'status_flag': 0, 'warning_count': 0}
+
+COLUMNS_SINGLE = bytearray(
+    b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
+    b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+    b'\x00\x00\x00'
+)
+
+COLUMNS_SINGLE_COUNT = bytearray(b'\x01\x00\x00\x01\x01')
 
 class _DummyMySQLConnection(connection.MySQLConnection):
-
     def _open_connection(self, *args, **kwargs):
         pass
 
@@ -58,7 +78,6 @@ class _DummyMySQLConnection(connection.MySQLConnection):
 
 
 class ConnectionTests(tests.MySQLConnectorTests):
-
     def test_DEFAULT_CONFIGURATION(self):
         exp = {
             'database': None,
@@ -96,7 +115,6 @@ class ConnectionTests(tests.MySQLConnectorTests):
 
 
 class MySQLConnectionTests(tests.MySQLConnectorTests):
-
     def setUp(self):
         config = tests.get_mysql_config()
         self.cnx = connection.MySQLConnection(**config)
@@ -145,9 +163,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # Make sure that when at least one argument is given,
         # connect() is called
         class FakeMySQLConnection(connection.MySQLConnection):
-
             def connect(self, **kwargs):
                 self._database = kwargs['database']
+
         exp = 'test'
         cnx = FakeMySQLConnection(database=exp)
         self.assertEqual(exp, cnx._database)
@@ -167,17 +185,17 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                           cmd, arg, pktnr)
 
         self.cnx._socket.sock = tests.DummySocket()
-        exp = b'\x07\x00\x00\x03\x00\x00\x00\x02\x00\x00\x00'
+        exp = OK_PACKET
         self.cnx._socket.sock.add_packet(exp)
         res = self.cnx._send_cmd(cmd, arg, pktnr)
         self.assertEqual(exp, res)
 
         # Send an unknown command, the result should be an error packet
-        exp = b'\x18\x00\x00\x01\xff\x17\x04\x23\x30\x38\x53\x30\x31\x55'\
-              b'\x6e\x6b\x6e\x6f\x77\x6e\x20\x63\x6f\x6d\x6d\x61\x6e\x64'
+        exp = ERR_PACKET
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(exp)
         res = self.cnx._send_cmd(90, b'spam', 0)
+        self.assertEqual(exp, res)
 
     def test__handle_server_status(self):
         """Handle the server/status flags"""
@@ -230,17 +248,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.InterfaceError, self.cnx._handle_result,
                           None)
         self.cnx._socket.sock = tests.DummySocket()
-        self.cnx._socket.sock.add_packets([
-            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
-            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
-            b'\x00\x00\x00',
-            b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00'])
-
+        eof_packet = EOF_PACKET
+        eof_packet[3] = 3
+        self.cnx._socket.sock.add_packets([COLUMNS_SINGLE, eof_packet])
         exp = {
             'eof': {'status_flag': 0, 'warning_count': 0},
             'columns': [('1', 8, None, None, None, None, 0, 129)]
         }
-        res = self.cnx._handle_result(b'\x01\x00\x00\x01\x01')
+        res = self.cnx._handle_result(COLUMNS_SINGLE_COUNT)
         self.assertEqual(exp, res)
 
         self.assertEqual(EOF_PACKET_RESULT,
@@ -249,43 +264,44 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         # Handle LOAD DATA INFILE
         self.cnx._socket.sock.reset()
-        packet = (
+        packet = bytearray(
             b'\x1A\x00\x00\x01\xfb'
             b'\x74\x65\x73\x74\x73\x2f\x64\x61\x74\x61\x2f\x6c\x6f'
             b'\x63\x61\x6c\x5f\x64\x61\x74\x61\x2e\x63\x73\x76')
-        self.cnx._socket.sock.add_packet(
+        self.cnx._socket.sock.add_packet(bytearray(
             b'\x37\x00\x00\x04\x00\x06\x00\x01\x00\x00\x00\x2f\x52'
             b'\x65\x63\x6f\x72\x64\x73\x3a\x20\x36\x20\x20\x44\x65'
             b'\x6c\x65\x74\x65\x64\x3a\x20\x30\x20\x20\x53\x6b\x69'
             b'\x70\x70\x65\x64\x3a\x20\x30\x20\x20\x57\x61\x72\x6e'
-            b'\x69\x6e\x67\x73\x3a\x20\x30')
+            b'\x69\x6e\x67\x73\x3a\x20\x30'))
         exp = {
             'info_msg': 'Records: 6  Deleted: 0  Skipped: 0  Warnings: 0',
             'insert_id': 0, 'field_count': 0, 'warning_count': 0,
             'server_status': 1, 'affected_rows': 6}
         self.assertEqual(exp, self.cnx._handle_result(packet))
         exp = [
-            (b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
-             b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
-             b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
-             b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
-             b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
-             b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
-            b'\x00\x00\x00\x05']
+            bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
+                      b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
+                      b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
+                      b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
+                      b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
+                      b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+            bytearray(b'\x00\x00\x00\x05')
+        ]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
         # Column count is invalid (is None)
         self.cnx._socket.sock.reset()
-        packet = b'\x01\x00\x00\x01\xfa\xa3\x00\xa3'
+        packet = bytearray(b'\x01\x00\x00\x01\xfa\xa3\x00\xa3')
         self.assertRaises(errors.InterfaceError,
                           self.cnx._handle_result, packet)
 
         # First byte in first packet is wrong
         self.cnx._socket.sock.add_packets([
-            b'\x00\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
-            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
-            b'\x00\x00\x00',
-            b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00'])
+            bytearray(b'\x00\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
+                      b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+                      b'\x00\x00\x00'),
+            bytearray(b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00')])
 
         self.assertRaises(errors.InterfaceError,
                           self.cnx._handle_result, b'\x01\x00\x00\x01\x00')
@@ -294,15 +310,18 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.reset()
 
         packets = [
-            b'\x07\x00\x00\x04\x06\x4d\x79\x49\x53\x41\x4d',
-            b'\x07\x00\x00\x05\x06\x49\x6e\x6e\x6f\x44\x42',
-            b'\x0a\x00\x00\x06\x09\x42\x4c\x41\x43\x4b\x48\x4f\x4c\x45',
-            b'\x04\x00\x00\x07\x03\x43\x53\x56',
-            b'\x07\x00\x00\x08\x06\x4d\x45\x4d\x4f\x52\x59',
-            b'\x0a\x00\x00\x09\x09\x46\x45\x44\x45\x52\x41\x54\x45\x44',
-            b'\x08\x00\x00\x0a\x07\x41\x52\x43\x48\x49\x56\x45',
-            b'\x0b\x00\x00\x0b\x0a\x4d\x52\x47\x5f\x4d\x59\x49\x53\x41\x4d',
-            b'\x05\x00\x00\x0c\xfe\x00\x00\x20\x00',
+            bytearray(b'\x07\x00\x00\x04\x06\x4d\x79\x49\x53\x41\x4d'),
+            bytearray(b'\x07\x00\x00\x05\x06\x49\x6e\x6e\x6f\x44\x42'),
+            bytearray(b'\x0a\x00\x00\x06\x09\x42\x4c'
+                      b'\x41\x43\x4b\x48\x4f\x4c\x45'),
+            bytearray(b'\x04\x00\x00\x07\x03\x43\x53\x56'),
+            bytearray(b'\x07\x00\x00\x08\x06\x4d\x45\x4d\x4f\x52\x59'),
+            bytearray(b'\x0a\x00\x00\x09\x09\x46\x45'
+                      b'\x44\x45\x52\x41\x54\x45\x44'),
+            bytearray(b'\x08\x00\x00\x0a\x07\x41\x52\x43\x48\x49\x56\x45'),
+            bytearray(b'\x0b\x00\x00\x0b\x0a\x4d\x52'
+                      b'\x47\x5f\x4d\x59\x49\x53\x41\x4d'),
+            bytearray(b'\x05\x00\x00\x0c\xfe\x00\x00\x20\x00'),
         ]
 
         if toggle_next_result:
@@ -370,11 +389,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_init_db('test'))
 
         self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(
+        self.cnx._socket.sock.add_packet(bytearray(
             b'\x2c\x00\x00\x01\xff\x19\x04\x23\x34\x32\x30\x30'
             b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x64\x61\x74'
             b'\x61\x62\x61\x73\x65\x20\x27\x75\x6e\x6b\x6e\x6f'
-            b'\x77\x6e\x5f\x64\x61\x74\x61\x62\x61\x73\x65\x27'
+            b'\x77\x6e\x5f\x64\x61\x74\x61\x62\x61\x73\x65\x27')
         )
         self.assertRaises(errors.ProgrammingError,
                           self.cnx.cmd_init_db, 'unknown_database')
@@ -387,11 +406,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(OK_PACKET_RESULT, res)
 
         packets = [
-            b'\x01\x00\x00\x01\x01',
-            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
-            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
-            b'\x00\x00\x00',
-            b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00'
+            COLUMNS_SINGLE_COUNT,
+            COLUMNS_SINGLE,
+            bytearray(b'\x05\x00\x00\x03\xfe\x00\x00\x00\x00')
         ]
 
         # query = "SELECT 1"
@@ -423,21 +440,19 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(OK_PACKET_RESULT, res)
 
         packets = [
-            b'\x01\x00\x00\x01\x01',
-            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01'
-            b'\x31\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
-            b'\x00\x00\x00',
-            b'\x05\x00\x00\x03\xfe\x00\x00\x08\x00',
-            b'\x02\x00\x00\x04\x01\x31',
-            b'\x05\x00\x00\x05\xfe\x00\x00\x08\x00',
-            b'\x07\x00\x00\x06\x00\x01\x00\x08\x00\x00\x00',
-            b'\x01\x00\x00\x07\x01',
-            b'\x17\x00\x00\x08\x03\x64\x65\x66\x00\x00\x00\x01'
-            b'\x32\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
-            b'\x00\x00\x00',
-            b'\x05\x00\x00\x09\xfe\x00\x00\x00\x00',
-            b'\x02\x00\x00\x0a\x01\x32',
-            b'\x05\x00\x00\x0b\xfe\x00\x00\x00\x00',
+            COLUMNS_SINGLE_COUNT,
+            COLUMNS_SINGLE,
+            bytearray(b'\x05\x00\x00\x03\xfe\x00\x00\x08\x00'),
+            bytearray(b'\x02\x00\x00\x04\x01\x31'),
+            bytearray(b'\x05\x00\x00\x05\xfe\x00\x00\x08\x00'),
+            bytearray(b'\x07\x00\x00\x06\x00\x01\x00\x08\x00\x00\x00'),
+            bytearray(b'\x01\x00\x00\x07\x01'),
+            bytearray(b'\x17\x00\x00\x08\x03\x64\x65\x66\x00\x00\x00\x01'
+                      b'\x32\x00\x0c\x3f\x00\x01\x00\x00\x00\x08\x81\x00'
+                      b'\x00\x00\x00'),
+            bytearray(b'\x05\x00\x00\x09\xfe\x00\x00\x00\x00'),
+            bytearray(b'\x02\x00\x00\x0a\x01\x32'),
+            bytearray(b'\x05\x00\x00\x0b\xfe\x00\x00\x00\x00'),
         ]
         exp = [
             {'columns': [('1', 8, None, None, None, None, 0, 129)],
@@ -480,7 +495,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock = tests.DummySocket()
         self.cnx._socket.sock.add_packet(EOF_PACKET)
         self.assertEqual(EOF_PACKET_RESULT, self.cnx.cmd_shutdown())
-        exp = [b'\x02\x00\x00\x00\x08\x00']
+        exp = [bytearray(b'\x02\x00\x00\x00\x08\x00')]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
         self.cnx._socket.sock.reset()
@@ -491,36 +506,38 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.add_packet(EOF_PACKET)
         self.cnx.cmd_shutdown(
             constants.ShutdownType.SHUTDOWN_WAIT_CONNECTIONS)
-        exp = [b'\x02\x00\x00\x00\x08\x01']
+        exp = [bytearray(b'\x02\x00\x00\x00\x08\x01')]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
         self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(
+        self.cnx._socket.sock.add_packet(bytearray(
             b'\x4a\x00\x00\x01\xff\xcb\x04\x23\x34\x32\x30\x30'
             b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'
             b'\x65\x64\x3b\x20\x79\x6f\x75\x20\x6e\x65\x65\x64'
             b'\x20\x74\x68\x65\x20\x53\x48\x55\x54\x44\x4f\x57'
             b'\x4e\x20\x70\x72\x69\x76\x69\x6c\x65\x67\x65\x20'
             b'\x66\x6f\x72\x20\x74\x68\x69\x73\x20\x6f\x70\x65'
-            b'\x72\x61\x74\x69\x6f\x6e'
+            b'\x72\x61\x74\x69\x6f\x6e')
         )
         self.assertRaises(errors.ProgrammingError, self.cnx.cmd_shutdown)
 
     def test_cmd_statistics(self):
         """Send the Statistics-command to MySQL"""
         self.cnx._socket.sock = tests.DummySocket()
-        goodpkt = b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'\
-            b'\x31\x34\x36\x32\x34\x35\x20\x20\x54\x68\x72\x65'\
-            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'\
-            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'\
-            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'\
-            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'\
-            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'\
-            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'\
-            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'\
-            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'\
-            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'\
+        goodpkt = bytearray(
+            b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'
+            b'\x31\x34\x36\x32\x34\x35\x20\x20\x54\x68\x72\x65'
+            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'
+            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'
+            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'
+            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'
+            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'
+            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'
+            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'
+            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'
+            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'
             b'\x76\x67\x3a\x20\x30\x2e\x32\x34'
+        )
         self.cnx._socket.sock.add_packet(goodpkt)
         exp = {
             'Uptime': 146245,
@@ -534,34 +551,38 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         }
         self.assertEqual(exp, self.cnx.cmd_statistics())
 
-        badpkt = b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'\
-            b'\x31\x34\x36\x32\x34\x35\x20\x54\x68\x72\x65'\
-            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'\
-            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'\
-            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'\
-            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'\
-            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'\
-            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'\
-            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'\
-            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'\
-            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'\
+        badpkt = bytearray(
+            b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'
+            b'\x31\x34\x36\x32\x34\x35\x20\x54\x68\x72\x65'
+            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'
+            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'
+            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'
+            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'
+            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'
+            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'
+            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'
+            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'
+            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'
             b'\x76\x67\x3a\x20\x30\x2e\x32\x34'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(badpkt)
         self.assertRaises(errors.InterfaceError, self.cnx.cmd_statistics)
 
-        badpkt = b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'\
-            b'\x55\x70\x36\x32\x34\x35\x20\x20\x54\x68\x72\x65'\
-            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'\
-            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'\
-            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'\
-            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'\
-            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'\
-            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'\
-            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'\
-            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'\
-            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'\
+        badpkt = bytearray(
+            b'\x88\x00\x00\x01\x55\x70\x74\x69\x6d\x65\x3a\x20'
+            b'\x55\x70\x36\x32\x34\x35\x20\x20\x54\x68\x72\x65'
+            b'\x61\x64\x73\x3a\x20\x32\x20\x20\x51\x75\x65\x73'
+            b'\x74\x69\x6f\x6e\x73\x3a\x20\x33\x36\x33\x35\x20'
+            b'\x20\x53\x6c\x6f\x77\x20\x71\x75\x65\x72\x69\x65'
+            b'\x73\x3a\x20\x30\x20\x20\x4f\x70\x65\x6e\x73\x3a'
+            b'\x20\x33\x39\x32\x20\x20\x46\x6c\x75\x73\x68\x20'
+            b'\x74\x61\x62\x6c\x65\x73\x3a\x20\x31\x20\x20\x4f'
+            b'\x70\x65\x6e\x20\x74\x61\x62\x6c\x65\x73\x3a\x20'
+            b'\x36\x34\x20\x20\x51\x75\x65\x72\x69\x65\x73\x20'
+            b'\x70\x65\x72\x20\x73\x65\x63\x6f\x6e\x64\x20\x61'
             b'\x76\x67\x3a\x20\x30\x2e\x32\x34'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(badpkt)
         self.assertRaises(errors.InterfaceError, self.cnx.cmd_statistics)
@@ -577,18 +598,22 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.add_packet(OK_PACKET)
         self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_process_kill(1))
 
-        pkt = b'\x1f\x00\x00\x01\xff\x46\x04\x23\x48\x59\x30\x30'\
-            b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x74\x68\x72'\
+        pkt = bytearray(
+            b'\x1f\x00\x00\x01\xff\x46\x04\x23\x48\x59\x30\x30'
+            b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x74\x68\x72'
             b'\x65\x61\x64\x20\x69\x64\x3a\x20\x31\x30\x30'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(pkt)
         self.assertRaises(errors.DatabaseError,
                           self.cnx.cmd_process_kill, 100)
 
-        pkt = b'\x29\x00\x00\x01\xff\x47\x04\x23\x48\x59\x30\x30'\
-            b'\x30\x59\x6f\x75\x20\x61\x72\x65\x20\x6e\x6f\x74'\
-            b'\x20\x6f\x77\x6e\x65\x72\x20\x6f\x66\x20\x74\x68'\
+        pkt = bytearray(
+            b'\x29\x00\x00\x01\xff\x47\x04\x23\x48\x59\x30\x30'
+            b'\x30\x59\x6f\x75\x20\x61\x72\x65\x20\x6e\x6f\x74'
+            b'\x20\x6f\x77\x6e\x65\x72\x20\x6f\x66\x20\x74\x68'
             b'\x72\x65\x61\x64\x20\x31\x36\x30\x35'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(pkt)
         self.assertRaises(errors.DatabaseError,
@@ -597,7 +622,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     def test_cmd_debug(self):
         """Send the Debug-command to MySQL"""
         self.cnx._socket.sock = tests.DummySocket()
-        pkt = b'\x05\x00\x00\x01\xfe\x00\x00\x00\x00'
+        pkt = bytearray(b'\x05\x00\x00\x01\xfe\x00\x00\x00\x00')
         self.cnx._socket.sock.add_packet(pkt)
         exp = {
             'status_flag': 0,
@@ -605,13 +630,15 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         }
         self.assertEqual(exp, self.cnx.cmd_debug())
 
-        pkt = b'\x47\x00\x00\x01\xff\xcb\x04\x23\x34\x32\x30\x30'\
-            b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'\
-            b'\x65\x64\x3b\x20\x79\x6f\x75\x20\x6e\x65\x65\x64'\
-            b'\x20\x74\x68\x65\x20\x53\x55\x50\x45\x52\x20\x70'\
-            b'\x72\x69\x76\x69\x6c\x65\x67\x65\x20\x66\x6f\x72'\
-            b'\x20\x74\x68\x69\x73\x20\x6f\x70\x65\x72\x61\x74'\
+        pkt = bytearray(
+            b'\x47\x00\x00\x01\xff\xcb\x04\x23\x34\x32\x30\x30'
+            b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'
+            b'\x65\x64\x3b\x20\x79\x6f\x75\x20\x6e\x65\x65\x64'
+            b'\x20\x74\x68\x65\x20\x53\x55\x50\x45\x52\x20\x70'
+            b'\x72\x69\x76\x69\x6c\x65\x67\x65\x20\x66\x6f\x72'
+            b'\x20\x74\x68\x69\x73\x20\x6f\x70\x65\x72\x61\x74'
             b'\x69\x6f\x6e'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(pkt)
         self.assertRaises(errors.ProgrammingError, self.cnx.cmd_debug)
@@ -639,28 +666,29 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         }
 
         self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(
+        self.cnx._socket.sock.add_packet(bytearray(
             b'\x45\x00\x00\x01\xff\x14\x04\x23\x34\x32\x30\x30'
             b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'
             b'\x65\x64\x20\x66\x6f\x72\x20\x75\x73\x65\x72\x20'
             b'\x27\x68\x61\x6d\x27\x40\x27\x6c\x6f\x63\x61\x6c'
             b'\x68\x6f\x73\x74\x27\x20\x74\x6f\x20\x64\x61\x74'
             b'\x61\x62\x61\x73\x65\x20\x27\x6d\x79\x73\x71\x6c'
-            b'\x27')
+            b'\x27'))
         self.assertRaises(errors.ProgrammingError, self.cnx.cmd_change_user,
                           username='ham', password='spam', database='mysql')
 
     def test__do_handshake(self):
         """Handle the handshake-packet sent by MySQL"""
         self.cnx._socket.sock = tests.DummySocket()
-        handshake = \
-            b'\x47\x00\x00\x00\x0a\x35\x2e\x30\x2e\x33\x30\x2d'\
-            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'\
-            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'\
-            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'\
-            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\
-            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'\
+        handshake = bytearray(
+            b'\x47\x00\x00\x00\x0a\x35\x2e\x30\x2e\x33\x30\x2d'
+            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'
+            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'
+            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'
             b'\x59\x48\x00'
+        )
         exp = {
             'protocol': 10,
             'server_version_original': b'5.0.30-enterprise-gpl-log',
@@ -679,27 +707,29 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
 
         # Handshake with version set to Z.Z.ZZ to simulate bad version
-        false_handshake = \
-            b'\x47\x00\x00\x00\x0a\x5a\x2e\x5a\x2e\x5a\x5a\x2d'\
-            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'\
-            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'\
-            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'\
-            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\
-            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'\
+        false_handshake = bytearray(
+            b'\x47\x00\x00\x00\x0a\x5a\x2e\x5a\x2e\x5a\x5a\x2d'
+            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'
+            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'
+            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'
             b'\x59\x48\x00'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(false_handshake)
         self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
 
         # Handshake with version set to 4.0.23
-        unsupported_handshake = \
-            b'\x47\x00\x00\x00\x0a\x34\x2e\x30\x2e\x32\x33\x2d'\
-            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'\
-            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'\
-            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'\
-            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\
-            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'\
+        unsupported_handshake = bytearray(
+            b'\x47\x00\x00\x00\x0a\x34\x2e\x30\x2e\x32\x33\x2d'
+            b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'
+            b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'
+            b'\x34\x69\x36\x6f\x50\x21\x4f\x00\x2c\xa2\x08\x02'
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'
             b'\x59\x48\x00'
+        )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(unsupported_handshake)
         self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
@@ -720,25 +750,27 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(True, self.cnx._do_auth(**kwargs))
 
         self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(b'\x01\x00\x00\x02\xfe')
+        self.cnx._socket.sock.add_packet(bytearray(b'\x01\x00\x00\x02\xfe'))
         self.assertRaises(errors.NotSupportedError,
                           self.cnx._do_auth, **kwargs)
 
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
-            b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00',
-            b'\x07\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00'])
+            bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00'),
+            bytearray(b'\x07\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00')
+        ])
         self.cnx.set_client_flags([-constants.ClientFlag.CONNECT_WITH_DB])
         self.assertEqual(True, self.cnx._do_auth(**kwargs))
 
         # Using an unknown database should raise an error
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
-            b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00',
-            b'\x24\x00\x00\x01\xff\x19\x04\x23\x34\x32\x30\x30'
-            b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x64\x61\x74'
-            b'\x61\x62\x61\x73\x65\x20\x27\x61\x73\x64\x66\x61'
-            b'\x73\x64\x66\x27'])
+            bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00'),
+            bytearray(b'\x24\x00\x00\x01\xff\x19\x04\x23\x34\x32\x30\x30'
+                      b'\x30\x55\x6e\x6b\x6e\x6f\x77\x6e\x20\x64\x61\x74'
+                      b'\x61\x62\x61\x73\x65\x20\x27\x61\x73\x64\x66\x61'
+                      b'\x73\x64\x66\x27')
+        ])
         flags &= ~constants.ClientFlag.CONNECT_WITH_DB
         kwargs['client_flags'] = flags
         self.assertRaises(errors.ProgrammingError,
@@ -780,8 +812,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.switch_to_ssl = lambda ca, cert, key: None
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
-            b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00',
-            b'\x07\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00'])
+            bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00'),
+            bytearray(b'\x07\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00')
+        ])
         self.cnx._do_auth(**kwargs)
         self.assertEqual(
             exp, [p[4:] for p in self.cnx._socket.sock._client_sends])
@@ -885,7 +918,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cnx.config(compress=True)
         exp = constants.ClientFlag.COMPRESS
         self.assertEqual(exp, cnx._client_flags &
-                         constants.ClientFlag.COMPRESS)
+                              constants.ClientFlag.COMPRESS)
 
         # Test character set
         # utf8 is default, which is mapped to 33
@@ -942,8 +975,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             try:
                 cnx.config(ssl_ca=exp['ca'], **case)
             except AttributeError as err:
-               errmsg = str(err)
-               self.assertTrue(list(case.keys())[0] in errmsg)
+                errmsg = str(err)
+                self.assertTrue(list(case.keys())[0] in errmsg)
             else:
                 self.fail("Testing SSL attributes failed.")
 
@@ -1036,7 +1069,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, [self.cnx.autocommit, self.cnx.sql_mode,
                                self.cnx.time_zone, self.cnx._charset_id])
 
-        if sys.version_info[0] == 2:
+        if PY2:
             exp_user_variables = {'ham': '1', 'spam': '2'}
             exp_session_variables = {'wait_timeout': '100000'}
         else:
@@ -1105,8 +1138,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_set_converter_class(self):
         """Set the converter class"""
-        class TestConverterWrong(object):
 
+        class TestConverterWrong(object):
             def __init__(self, charset, unicode):
                 pass
 
@@ -1114,7 +1147,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                           self.cnx.set_converter_class, TestConverterWrong)
 
         class TestConverter(MySQLConverterBase):
-
             def __init__(self, charset, unicode):
                 pass
 
@@ -1476,8 +1508,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         class TrueCursor(cursor.CursorBase):
 
-            def __init__(self, connection=None):
-                if sys.version_info[0] == 2:
+            def __init__(self, cnx=None):
+                if PY2:
                     super(TrueCursor, self).__init__()
                 else:
                     super().__init__()
@@ -1510,11 +1542,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         fp = io.BytesIO(data)
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(OK_PACKET)
-        exp = [
+        exp = [bytearray(
             b"\x20\x00\x00\x02\x31\x09\x68\x61\x6d\x09\x27\x68\x61\x6d"
             b"\x20\x73\x70\x61\x6d\x27\x0a\x32\x09\x66\x6f\x6f\x09\x27"
             b"\x66\x6f\x6f\x20\x62\x61\x72\x27"
-        ]
+        )]
 
         self.assertEqual(OK_PACKET, self.cnx._send_data(fp, False))
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
@@ -1522,7 +1554,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         fp = io.BytesIO(data)
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(OK_PACKET)
-        exp.append(b'\x00\x00\x00\x03')
+        exp.append(bytearray(b'\x00\x00\x00\x03'))
         self.assertEqual(OK_PACKET, self.cnx._send_data(fp, True))
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
@@ -1572,7 +1604,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test__handle_binary_ok(self):
         """Handle a Binary OK packet"""
-        packet = (
+        packet = bytearray(
             b'\x0c\x00\x00\x01'
             b'\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         )
@@ -1586,7 +1618,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, self.cnx._handle_binary_ok(packet))
 
         # Raise an error
-        packet = (
+        packet = bytearray(
             b'\x2a\x00\x00\x01\xff\x19\x05\x23\x34\x32\x30\x30\x30\x46\x55'
             b'\x4e\x43\x54\x49\x4f\x4e\x20\x74\x65\x73\x74\x2e\x53\x50\x41'
             b'\x4d\x20\x64\x6f\x65\x73\x20\x6e\x6f\x74\x20\x65\x78\x69\x73\x74'
@@ -1600,14 +1632,19 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         stmt = b"SELECT CONCAT(?, ?) AS c1"
         self.cnx._socket.sock.add_packets([
-            b'\x0c\x00\x00\x01\x00\x01\x00\x00\x00\x01\x00\x02\x00\x00\x00\x00',
-            b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01\x3f\x00\x0c'
-            b'\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x00\x00\x00',
-            b'\x17\x00\x00\x03\x03\x64\x65\x66\x00\x00\x00\x01\x3f\x00\x0c'
-            b'\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x00\x00\x00',
+            bytearray(
+                b'\x0c\x00\x00\x01\x00\x01\x00\x00\x00\x01'
+                b'\x00\x02\x00\x00\x00\x00'),
+            bytearray(
+                b'\x17\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x01\x3f\x00\x0c'
+                b'\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x00\x00\x00'),
+            bytearray(
+                b'\x17\x00\x00\x03\x03\x64\x65\x66\x00\x00\x00\x01\x3f\x00\x0c'
+                b'\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x00\x00\x00'),
             EOF_PACKET,
-            b'\x18\x00\x00\x05\x03\x64\x65\x66\x00\x00\x00\x02\x63\x31\x00'
-            b'\x0c\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x1f\x00\x00',
+            bytearray(
+                b'\x18\x00\x00\x05\x03\x64\x65\x66\x00\x00\x00\x02\x63\x31\x00'
+                b'\x0c\x3f\x00\x00\x00\x00\x00\xfd\x80\x00\x1f\x00\x00'),
             EOF_PACKET
         ])
         exp = {
@@ -1626,7 +1663,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         stmt = b"DO 1"
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
-            b'\x0c\x00\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            bytearray(b'\x0c\x00\x00\x01\x00\x01\x00\x00\x00'
+                      b'\x00\x00\x00\x00\x00\x00\x00')
         ])
         exp = {
             'num_params': 0,
@@ -1642,9 +1680,10 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         stmt = b"SELECT SPAM(?) AS c1"
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
-            b'\x2a\x00\x00\x01\xff\x19\x05\x23\x34\x32\x30\x30\x30\x46\x55'
-            b'\x4e\x43\x54\x49\x4f\x4e\x20\x74\x65\x73\x74\x2e\x53\x50\x41'
-            b'\x4d\x20\x64\x6f\x65\x73\x20\x6e\x6f\x74\x20\x65\x78\x69\x73\x74'
+            bytearray(b'\x2a\x00\x00\x01\xff\x19\x05\x23\x34\x32\x30\x30\x30'
+                      b'\x46\x55\x4e\x43\x54\x49\x4f\x4e\x20\x74\x65\x73\x74'
+                      b'\x2e\x53\x50\x41\x4d\x20\x64\x6f\x65\x73\x20\x6e\x6f'
+                      b'\x74\x20\x65\x78\x69\x73\x74')
         ])
         self.assertRaises(errors.ProgrammingError,
                           self.cnx.cmd_stmt_prepare, stmt)
@@ -1655,7 +1694,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.InterfaceError,
                           self.cnx._handle_binary_result, None)
         self.assertRaises(errors.InterfaceError,
-                          self.cnx._handle_binary_result, b'\x00\x00\x00')
+                          self.cnx._handle_binary_result,
+                          bytearray(b'\x00\x00\x00'))
 
         self.assertEqual(OK_PACKET_RESULT,
                          self.cnx._handle_binary_result(OK_PACKET))
@@ -1668,8 +1708,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # handle result set
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
-            (b'\x18\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x02\x63\x31\x00'
-             b'\x0c\x21\x00\x09\x00\x00\x00\xfd\x01\x00\x00\x00\x00'),
+            bytearray(b'\x18\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x02\x63'
+                      b'\x31\x00\x0c\x21\x00\x09\x00\x00\x00\xfd\x01\x00\x00'
+                      b'\x00\x00'),
             EOF_PACKET,
         ])
         exp = (
@@ -1678,7 +1719,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             {'status_flag': 0, 'warning_count': 0}
         )
         self.assertEqual(
-            exp, self.cnx._handle_binary_result(b'\x01\x00\x00\x01\x01'))
+            exp, self.cnx._handle_binary_result(
+                bytearray(b'\x01\x00\x00\x01\x01'))
+        )
 
     def test_cmd_stmt_execute(self):
         stmt = b"SELECT ? as c1"
@@ -1733,7 +1776,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
             self.cnx.cmd_query("SELECT @ham")
             self.assertEqual(exp_session_id, self.cnx.connection_id)
-            if sys.version_info[0] == 2:
+            if PY2:
                 self.assertNotEqual(('2',), self.cnx.get_rows()[0][0])
             else:
                 self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])

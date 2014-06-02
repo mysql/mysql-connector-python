@@ -24,10 +24,9 @@
 """Unittests code analysis
 
 Requires:
-    pylint v1.0.0 or higher
+    pylint v1.2.0 or higher
 """
 
-import sys
 import os
 import tests
 import logging
@@ -40,6 +39,7 @@ try:
     from pylint import lint
     from pylint.reporters.text import TextReporter
 except ImportError as err:
+    LOGGER.warning("pylint not available")
     _PYLINT_AVAILABLE = False
 
 _CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -55,9 +55,8 @@ class LintTests(tests.MySQLConnectorTests):
 
     def setUp(self):
         self.pylint_rc_path = PYLINTRC
-        self.dir_path = os.path.join(tests.TEST_BUILD_DIR, 'mysql', 'connector')
-        self.output_file_path = os.path.join(
-            _CURRENT_PATH, 'data', 'pylint_output.txt')
+        self.dir_path = os.path.join('lib', 'mysql', 'connector')
+        self.output_file_path = os.path.join(os.getcwd(), 'pylint_output.txt')
         self.pylint_output_file = open(self.output_file_path, "w+")
         self.failed_files = []
 

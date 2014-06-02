@@ -99,8 +99,8 @@ class ErrorsTests(tests.MySQLConnectorTests):
         errors._CUSTOM_ERROR_EXCEPTIONS = {}
 
     def test_get_exception(self):
-        ok_packet = b'\x07\x00\x00\x01\x00\x01\x00\x00\x00\x01\x00'
-        err_packet = (
+        ok_packet = bytearray(b'\x07\x00\x00\x01\x00\x01\x00\x00\x00\x01\x00')
+        err_packet = bytearray(
             b'\x47\x00\x00\x02\xff\x15\x04\x23\x32\x38\x30\x30\x30'
             b'\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69\x65\x64'
             b'\x20\x66\x6f\x72\x20\x75\x73\x65\x72\x20\x27\x68\x61'
@@ -114,7 +114,7 @@ class ErrorsTests(tests.MySQLConnectorTests):
         self.assertRaises(ValueError,
                           errors.get_exception, ok_packet)
 
-        res = errors.get_exception(b'\x47\x00\x00\x02\xff\x15')
+        res = errors.get_exception(bytearray(b'\x47\x00\x00\x02\xff\x15'))
         self.assertTrue(isinstance(res, errors.InterfaceError))
 
 

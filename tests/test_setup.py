@@ -25,7 +25,6 @@
 """
 
 import sys
-import os
 import tests
 import imp
 
@@ -93,9 +92,7 @@ class SetupInfoTests(tests.MySQLConnectorTests):
         """Test the package directory"""
         import setupinfo
         exp = {
-            '': 'python' + str(sys.version_info[0]),
-            'mysql.connector.django': os.path.join('python23', 'django'),
-            'mysql.connector.fabric': os.path.join('python23', 'fabric'),
+            '': 'lib',
         }
         self.assertEqual(exp, setupinfo.package_dir)
 

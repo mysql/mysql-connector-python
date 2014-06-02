@@ -25,7 +25,6 @@
 """
 
 from decimal import Decimal
-import sys
 import uuid
 
 try:
@@ -35,6 +34,7 @@ except ImportError:
     from xmlrpc.client import Fault, ServerProxy  # pylint: disable=F0401
 
 import tests
+from . import PY2
 import mysql.connector
 from mysql.connector import fabric, errorcode, errors
 from mysql.connector.fabric import connection, caching, balancing
@@ -510,7 +510,7 @@ class FabricTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.InterfaceError, fab.get_instance)
 
         fab.seed()
-        if sys.version_info[0] == 2:
+        if PY2:
             instance_list = fab._fabric_instances.keys()
             exp = fab._fabric_instances[instance_list[0]]
         else:

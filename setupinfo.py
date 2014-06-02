@@ -32,28 +32,20 @@ DEVELOPMENT_STATUSES = {
     '': '5 - Production/Stable'
 }
 
-if sys.version_info >= (3, 1):
-    cpy_src = 'python3'
-    package_dir = {'': 'python3'}
-elif (2, 6) <= sys.version_info < (3, 0):
-    cpy_src = 'python2'
-    package_dir = {'': 'python2'}
-else:
+if not (((2, 6) <= sys.version_info < (3, 0)) or sys.version_info >= (3, 3)):
     raise RuntimeError("Python v{major}.{minor} is not supported".format(
         major=sys.version_info[0], minor=sys.version_info[1]
     ))
 
 # Load version information
 VERSION = [999, 0, 0, 'a', 0]  # Set correct after version.py is loaded
-version_py = os.path.join(cpy_src, 'mysql', 'connector', 'version.py')
+version_py = os.path.join('lib', 'mysql', 'connector', 'version.py')
 with open(version_py, 'rb') as fp:
     exec(compile(fp.read(), version_py, 'exec'))
 
 command_classes = {}
 
-package_dir['mysql.connector.django'] = os.path.join('python23', 'django')
-package_dir['mysql.connector.fabric'] = os.path.join('python23', 'fabric')
-
+package_dir = {'': 'lib'}
 name = 'mysql-connector-python'
 version = '{0}.{1}.{2}'.format(*VERSION[0:3])
 
