@@ -36,10 +36,12 @@ import glob
 import logging
 import shutil
 import subprocess
+import errno
 
 
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
+PY2 = sys.version_info[0] == 2
 
 try:
     from unittest.util import strclass
@@ -54,17 +56,12 @@ except ImportError:
         from unittest import SkipTest
     elif sys.version_info[0:2] == (2, 6):
         # Support skipping tests for Python v2.6
-        from tests.py2 import test_skip, test_skip_if, SkipTest
+        from tests.py26 import test_skip, test_skip_if, SkipTest
         unittest.skip = test_skip
         unittest.skipIf = test_skip_if
     else:
         LOGGER.error("Could not initialize Python's unittest module")
         sys.exit(1)
-
-if sys.version_info[0] == 2:
-    from tests.py2 import DummySocket
-else:
-    from tests.py3 import DummySocket
 
 SSL_AVAILABLE = True
 try:
@@ -102,6 +99,8 @@ MYSQL_SERVERS_NEEDED = 1
 MYSQL_SERVERS = []
 MYSQL_VERSION = None
 MYSQL_VERSION_TXT = ''
+MYSQL_DUMMY = None
+MYSQL_DUMMY_THREAD = None
 SSL_DIR = os.path.join('tests', 'data', 'ssl')
 SSL_CA = os.path.abspath(os.path.join(SSL_DIR, 'tests_CA_cert.pem'))
 SSL_CERT = os.path.abspath(os.path.join(SSL_DIR, 'tests_client_cert.pem'))
@@ -123,7 +122,70 @@ __all__ = [
     'TEST_BUILD_DIR',
 ]
 
-# Get all modules which contain tests (prefix is 'test_')
+
+class DummySocket(object):
+
+    """Dummy socket class
+
+    This class helps to test socket connection without actually making any
+    network activity. It is a proxy class using socket.socket.
+    """
+
+    def __init__(self, *args):
+        self._socket = socket.socket(*args)
+        self._server_replies = bytearray(b'')
+        self._client_sends = []
+        self._raise_socket_error = 0
+
+    def __getattr__(self, attr):
+        return getattr(self._socket, attr)
+
+    def raise_socket_error(self, err=errno.EPERM):
+        self._raise_socket_error = err
+
+    def recv(self, bufsize=4096, flags=0):
+        if self._raise_socket_error:
+            raise socket.error(self._raise_socket_error)
+        res = self._server_replies[0:bufsize]
+        self._server_replies = self._server_replies[bufsize:]
+        return res
+
+    def recv_into(self, buffer, nbytes=0, flags=0):
+        if self._raise_socket_error:
+            raise socket.error(self._raise_socket_error)
+        if nbytes == 0:
+            nbytes = len(buffer)
+        try:
+            buffer[0:nbytes] = self._server_replies[0:nbytes]
+        except (IndexError, TypeError, ValueError) as err:
+            return 0
+        self._server_replies = self._server_replies[nbytes:]
+        return len(buffer)
+
+    def send(self, string, flags=0):
+        if self._raise_socket_error:
+            raise socket.error(self._raise_socket_error)
+        self._client_sends.append(bytearray(string))
+        return len(string)
+
+    def sendall(self, string, flags=0):
+        self._client_sends.append(bytearray(string))
+        return None
+
+    def add_packet(self, packet):
+        self._server_replies += packet
+
+    def add_packets(self, packets):
+        for packet in packets:
+            self._server_replies += packet
+
+    def reset(self):
+        self._raise_socket_error = 0
+        self._server_replies = bytearray(b'')
+        self._client_sends = []
+
+    def get_address(self):
+        return 'dummy'
 
 
 def get_test_modules():
@@ -134,8 +196,6 @@ def get_test_modules():
 
     Returns a list of strings.
     """
-    major = sys.version_info[0]
-
     testcases = []
 
     # For all python version
@@ -148,17 +208,6 @@ def get_test_modules():
         testcases.append(
             'tests.{module}'.format(module=module))
         LOGGER.debug('Added tests.{module}'.format(module=module))
-
-    # Version specific tests
-    ver_specific = os.path.join('tests'.format(major),
-                                'py{0}'.format(major),
-                                'test_*.py')
-    for file_ in glob.glob(ver_specific):
-        module = os.path.splitext(os.path.basename(file_))[0]
-        testcases.append(
-            'tests.py{major}.{module}'.format(major=major, module=module))
-        LOGGER.debug('Added tests.py{major}.{module}'.format(
-            major=major, module=module))
 
     _CACHED_TESTCASES = testcases
     return testcases
@@ -205,7 +254,7 @@ def fake_hostname():
 
     Returns a string.
     """
-    if sys.version_info[0] == 2:
+    if PY2:
         return ''.join(["%02x" % ord(c) for c in os.urandom(4)])
     else:
         return ''.join(["%02x" % c for c in os.urandom(4)])
@@ -389,7 +438,7 @@ class MySQLConnectorTests(unittest.TestCase):
                     result.stopTest(self)
                 return
 
-        if sys.version_info[0] == 2:
+        if PY2:
             return super(MySQLConnectorTests, self).run(result)
         else:
             return super().run(result)

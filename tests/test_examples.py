@@ -25,7 +25,10 @@
 """Unittests for examples
 """
 
+from hashlib import md5
+
 import tests
+from . import PY2
 import mysql.connector
 
 
@@ -38,11 +41,20 @@ class TestExamples(tests.MySQLConnectorTests):
     def tearDown(self):
         self.cnx.close()
 
-    def _exec_main(self, example):
+    def _exec_main(self, example, exp=None):
         try:
-            return example.main(tests.get_mysql_config())
+            result = example.main(tests.get_mysql_config())
+            if not exp:
+                return result
         except Exception as err:
             self.fail(err)
+
+        md5_result = md5()
+        output = u'\n'.join(result)
+        md5_result.update(output.encode('utf-8'))
+
+        self.assertEqual(exp, md5_result.hexdigest(),
+                         'Output was not correct')
 
     def test_dates(self):
         """examples/dates.py"""
@@ -84,10 +96,8 @@ class TestExamples(tests.MySQLConnectorTests):
             import examples.inserts as example
         except Exception as err:
             self.fail(err)
-        output = self._exec_main(example)
-        exp = ['1 | Geert | 30\nInfo: c..\n',
-               '2 | Jan | 30\nInfo: c..\n', '3 | Michel | 30\nInfo: c..\n']
-        self.assertEqual(output, exp, 'Output was not correct')
+        exp = '077dcd0139015c0aa6fb82ed932f053e'
+        self._exec_main(example, exp)
 
     def test_transactions(self):
         """examples/transactions.py"""
@@ -101,12 +111,8 @@ class TestExamples(tests.MySQLConnectorTests):
             import examples.transaction as example
         except Exception as e:
             self.fail(e)
-        output = self._exec_main(example)
-        exp = ['Inserting data', 'Rolling back transaction',
-               'No data, all is fine.', 'Data before commit:',
-               '4 | Geert', '5 | Jan', '6 | Michel', 'Data after commit:',
-               '4 | Geert', '5 | Jan', '6 | Michel']
-        self.assertEqual(output, exp, 'Output was not correct')
+        exp = '3bd75261ffeb5624cdd754a43e2fd938'
+        self._exec_main(example, exp)
 
     def test_unicode(self):
         """examples/unicode.py"""
@@ -115,8 +121,12 @@ class TestExamples(tests.MySQLConnectorTests):
         except Exception as e:
             self.fail(e)
         output = self._exec_main(example)
-        exp = ['Unicode string: ¿Habla español?',
-               'Unicode string coming from db: ¿Habla español?']
+        if PY2:
+            exp = [u'Unicode string: ¿Habla español?',
+                   u'Unicode string coming from db: ¿Habla español?']
+        else:
+            exp = ['Unicode string: ¿Habla español?',
+                   'Unicode string coming from db: ¿Habla español?']
         self.assertEqual(output, exp)  # ,'Output was not correct')
 
     def test_warnings(self):

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2014, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -24,9 +24,10 @@
 """Unittests for mysql.connector.locales
 """
 
-import sys
 from datetime import datetime
+
 import tests
+from . import PY2
 from mysql.connector import errorcode, locales
 
 
@@ -127,7 +128,7 @@ class LocalesEngClientErrorTests(tests.MySQLConnectorTests):
                 count += 1
         self.assertEqual(len(errors), count)
 
-        if sys.version_info[0] == 2:
+        if PY2:
             strtype = unicode  # pylint: disable=E0602
         else:
             strtype = str

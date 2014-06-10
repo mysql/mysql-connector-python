@@ -33,6 +33,7 @@ import mysql.connector
 from mysql.connector import authentication
 
 import tests
+from . import PY2
 
 
 _STANDARD_PLUGINS = (
@@ -123,7 +124,7 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertRaises(mysql.connector.InterfaceError,
                           auth_plugin.prepare_password)
 
-        if sys.version_info[0] == 2:
+        if PY2:
             empty = '\x00'
             auth_data = (
                 '\x3b\x55\x78\x7d\x2c\x5f\x7c\x72\x49\x52'
@@ -164,7 +165,7 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(True, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
-        if sys.version_info[0] == 2:
+        if PY2:
             exp = 'spam\x00'
         else:
             exp = b'spam\x00'
@@ -185,7 +186,7 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(True, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
-        if sys.version_info[0] == 2:
+        if PY2:
             exp = 'spam\x00'
         else:
             exp = b'spam\x00'

@@ -30,8 +30,7 @@ options, simply do:
  shell> python unittests.py --help
 
 The unittest.py script will check for tests in Python source files prefixed
-with 'test_' in the folder tests/. Tests and other data specific to a
-Python major version are stored in tests/py2 and tests/py3.
+with 'test_' in the folder tests/.
 
 Examples:
  Running unit tests using MySQL installed under /opt
@@ -57,10 +56,12 @@ unittests.py has exit status 0 when tests were ran successfully, 1 otherwise.
 
 """
 import sys
+import threading
 import os
 import time
 import unittest
 import logging
+
 try:
     from argparse import ArgumentParser
 except ImportError:
@@ -81,17 +82,13 @@ LOGGER = logging.getLogger(tests.LOGGER_NAME)
 tests.setup_logger(LOGGER)
 
 # Only run for supported Python Versions
-if not (((2, 6) <= sys.version_info < (3, 0)) or sys.version_info >= (3, 1)):
+if not (((2, 6) <= sys.version_info < (3, 0)) or sys.version_info >= (3, 3)):
     LOGGER.error("Python v%d.%d is not supported",
                  sys.version_info[0], sys.version_info[1])
+    sys.exit(1)
 else:
-    # The following is only needed for running examples tests
-    sys.path.insert(0, os.path.join(
-        _TOPDIR, 'python{0}'.format(sys.version_info[0])))
-    # Install Connector/Python and add it to sys.path
-    tests.TEST_BUILD_DIR = os.path.join(_TOPDIR, 'build', 'testing')
-    tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR)
-    sys.path.insert(0, tests.TEST_BUILD_DIR)
+    sys.path.insert(0, os.path.join(_TOPDIR, 'lib'))
+    sys.path.insert(0, os.path.join(_TOPDIR))
 
 import mysql.connector
 
@@ -307,6 +304,7 @@ def _get_arg_parser():
 
     It works with both optparse and argparse where available.
     """
+
     def _clean_optparse(adict):
         """Remove items from dictionary ending with _optparse"""
         new_dict = {}
@@ -363,7 +361,6 @@ def get_stats_field(pyver=None, myver=None):
 
 
 class StatsTestResult(TextTestResult):
-
     """Store test results in a database"""
     separator1 = '=' * 78
     separator2 = '-' * 78
@@ -406,8 +403,8 @@ class StatsTestResult(TextTestResult):
             ).format(table=get_stats_tablename(),
                      field=get_stats_field())
             cur.execute(stmt,
-                       (str(test), self.elapsed_time, self.elapsed_time)
-                        )
+                        (str(test), self.elapsed_time, self.elapsed_time)
+            )
             cur.close()
 
     def _save_not_ok(self, test):
@@ -456,7 +453,6 @@ class StatsTestResult(TextTestResult):
 
 
 class StatsTestRunner(unittest.TextTestRunner):
-
     """Committing results test results"""
     resultclass = StatsTestResult
 
@@ -484,7 +480,6 @@ class StatsTestRunner(unittest.TextTestRunner):
 
 
 class BasicTestResult(TextTestResult):
-
     """Basic test result"""
 
     def addSkip(self, test, reason):
@@ -493,7 +488,6 @@ class BasicTestResult(TextTestResult):
 
 
 class BasicTestRunner(unittest.TextTestRunner):
-
     """Basic test runner"""
     resultclass = BasicTestResult
 
@@ -511,7 +505,6 @@ class BasicTestRunner(unittest.TextTestRunner):
 
 
 class Python26TestRunner(unittest.TextTestRunner):
-
     """Python v2.6/3.1 Test Runner backporting needed functionality"""
 
     def __init__(self, stream=sys.stderr, descriptions=True, verbosity=1,
@@ -579,7 +572,7 @@ def init_mysql_server(port, options):
     except tests.mysqld.MySQLBootstrapError as err:
         LOGGER.error("Failed initializing MySQL server "
                      "'{name}': {error}".format(
-                         name=name, error=str(err)))
+            name=name, error=str(err)))
         sys.exit(1)
 
     if len(mysql_server.unix_socket) > 103:
@@ -614,7 +607,7 @@ def init_mysql_server(port, options):
             mysql_server.remove()
 
     tests.MYSQL_VERSION = mysql_server.version
-    tests.MYSQL_VERSION_TXT = '.'.join([ str(i) for i in mysql_server.version])
+    tests.MYSQL_VERSION_TXT = '.'.join([str(i) for i in mysql_server.version])
     tests.MYSQL_SERVERS.append(mysql_server)
 
     mysql_server.client_config = {
@@ -684,6 +677,7 @@ def main():
         sys.path.insert(0, options.django_path)
         try:
             import django
+
             tests.DJANGO_VERSION = django.VERSION[0:3]
         except ImportError:
             msg = "Could not find django package at {0}".format(
@@ -694,6 +688,13 @@ def main():
         if sys.version_info[0] == 3 and tests.DJANGO_VERSION < (1, 5):
             LOGGER.error("Django older than v1.5 will not work with Python 3")
             sys.exit(1)
+
+    # Start Dummy MySQL Server
+    #tests.MYSQL_DUMMY = mysqld.DummyMySQLServer(('127.0.0.1', options.port - 1),
+    #                                            mysqld.DummyMySQLRequestHandler)
+    #tests.MYSQL_DUMMY_THREAD = threading.Thread(
+    #    target=tests.MYSQL_DUMMY.serve_forever)
+    #tests.MYSQL_DUMMY_THREAD.setDaemon(True)
 
     # We have to at least run 1 MySQL server
     init_mysql_server(port=(options.port), options=options)
@@ -769,6 +770,13 @@ def main():
                 LOGGER.info(msg)
 
     # Clean up
+    try:
+        tests.MYSQL_DUMMY_THREAD.join()
+        tests.MYSQL_DUMMY.shutdown()
+        tests.MYSQL_DUMMY.server_close()
+    except:
+        # Is OK when failed
+        pass
     for mysql_server in tests.MYSQL_SERVERS:
         name = mysql_server.name
         if not options.keep:
@@ -785,8 +793,8 @@ def main():
                              "failed to restart")
         else:
             LOGGER.info("MySQL server kept running on %s:%d",
-                mysql_server.bind_address,
-                mysql_server.port
+                        mysql_server.bind_address,
+                        mysql_server.port
             )
 
     # Make sure the DEVNULL file is closed
@@ -802,6 +810,7 @@ def main():
 
     # Return result of tests as exit code
     sys.exit(not was_successful)
+
 
 if __name__ == '__main__':
     main()

@@ -32,11 +32,25 @@ import subprocess
 import logging
 import time
 import ctypes
+import socket
+import errno
+import struct
+
 try:
     from ctypes import wintypes
 except (ImportError, ValueError):
     # We are not on Windows
     pass
+
+try:
+    from socketserver import (
+        ThreadingMixIn, TCPServer, BaseRequestHandler
+    )
+except ImportError:
+    from SocketServer import (
+        ThreadingMixIn, TCPServer, BaseRequestHandler
+    )
+TCPServer.allow_reuse_address = True
 
 import tests
 
@@ -121,19 +135,16 @@ def get_pid(pid_file):
 
 
 class MySQLServerError(Exception):
-
     """Exception for raising errors when managing a MySQL server"""
     pass
 
 
 class MySQLBootstrapError(MySQLServerError):
-
     """Exception for raising errors around bootstrapping a MySQL server"""
     pass
 
 
 class MySQLServerBase(object):
-
     """Base for classes managing a MySQL server"""
 
     def __init__(self, basedir, option_file=None, sharedir=None):
@@ -298,7 +309,6 @@ class MySQLServerBase(object):
 
 
 class MySQLServer(MySQLServerBase):
-
     """Class for managing a MySQL server"""
 
     def __init__(self, basedir, topdir, cnf, bind_address, port,
@@ -622,3 +632,61 @@ class MySQLServer(MySQLServerBase):
             tries -= 1
 
         return not running
+
+
+class DummyMySQLRequestHandler(BaseRequestHandler):
+    def __init__(self, request, client_address, server):
+        super(DummyMySQLRequestHandler, self).__init__(request, client_address,
+                                                       server)
+
+    def read_packet(self):
+        """Read a MySQL packet from the socket.
+
+        :return: Tuple with type and payload of packet.
+        :rtype: tuple
+        """
+        header = bytearray(self.request.recv(4))
+        if not header:
+            return
+        length = struct.unpack('<I', header[0:3] + '\x00')[0]
+        self._curr_pktnr = struct.unpack('B', header[-1])[0]
+        data = self.request.recv(length)
+        return header + data
+
+    def handle(self):
+        if self.server.sock_error:
+            raise socket.error(self.server.socket_error)
+
+        res = self._server_replies[0:bufsize]
+        self._server_replies = self._server_replies[bufsize:]
+        return res
+
+class DummyMySQLServer(ThreadingMixIn, TCPServer):
+    """Class accepting connections for testing MySQL connections"""
+
+    def __init__(self, *args, **kwargs):
+        TCPServer.__init__(self, *args, **kwargs)
+        self._server_replies = bytearray(b'')
+        self._client_sends = []
+
+    def finish_request(self, request, client_address):
+        """Finish one request by instantiating RequestHandlerClass."""
+        self.RequestHandlerClass(request, client_address, self)
+
+    def raise_socket_error(self, err=errno.EPERM):
+        self.socket_error = err
+
+    def add_packet(self, packet):
+        self._server_replies += packet
+
+    def add_packets(self, packets):
+        for packet in packets:
+            self._server_replies += packet
+
+    def reset(self):
+        self._raise_socket_error = 0
+        self._server_replies = bytearray(b'')
+        self._client_sends = []
+
+    def get_address(self):
+        return 'dummy'
