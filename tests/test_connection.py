@@ -1524,9 +1524,23 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             ({'buffered': True}, cursor.MySQLCursorBuffered),
             ({'raw': True}, cursor.MySQLCursorRaw),
             ({'buffered': True, 'raw': True}, cursor.MySQLCursorBufferedRaw),
+            ({'prepared': True}, cursor.MySQLCursorPrepared),
+            ({'dictionary': True}, cursor.MySQLCursorDict),
+            ({'named_tuple': True}, cursor.MySQLCursorNamedTuple),
+            ({'dictionary': True, 'buffered': True},
+             cursor.MySQLCursorBufferedDict),
+            ({'named_tuple': True, 'buffered': True},
+             cursor.MySQLCursorBufferedNamedTuple)
         ]
         for kwargs, exp in cases:
             self.assertTrue(isinstance(self.cnx.cursor(**kwargs), exp))
+
+        self.assertRaises(ValueError, self.cnx.cursor, prepared=True,
+                          buffered=True)
+        self.assertRaises(ValueError, self.cnx.cursor, dictionary=True,
+                          raw=True)
+        self.assertRaises(ValueError, self.cnx.cursor, named_tuple=True,
+                          raw=True)
 
         # Test when connection is closed
         self.cnx.close()
