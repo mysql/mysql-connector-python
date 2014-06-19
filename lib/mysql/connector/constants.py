@@ -29,7 +29,49 @@ from .charsets import MYSQL_CHARACTER_SETS
 
 MAX_PACKET_LENGTH = 16777215
 NET_BUFFER_LENGTH = 8192
+MAX_MYSQL_TABLE_COLUMNS = 4096
 
+DEFAULT_CONFIGURATION = {
+    'database': None,
+    'user': '',
+    'password': '',
+    'host': '127.0.0.1',
+    'port': 3306,
+    'unix_socket': None,
+    'use_unicode': True,
+    'charset': 'utf8',
+    'collation': None,
+    'converter_class': None,
+    'autocommit': False,
+    'time_zone': None,
+    'sql_mode': None,
+    'get_warnings': False,
+    'raise_on_warnings': False,
+    'connection_timeout': None,
+    'client_flags': 0,
+    'compress': False,
+    'buffered': False,
+    'raw': False,
+    'ssl_ca': None,
+    'ssl_cert': None,
+    'ssl_key': None,
+    'ssl_verify_cert': False,
+    'passwd': None,
+    'db': None,
+    'connect_timeout': None,
+    'dsn': None,
+    'force_ipv6': False,
+    'auth_plugin': None,
+    'allow_local_infile': True,
+    'consume_results': False,
+}
+
+CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
+CNX_FABRIC_ARGS = ['fabric_host', 'fabric_username', 'fabric_password',
+                   'fabric_port', 'fabric_connect_attempts',
+                   'fabric_connect_delay', 'fabric_report_errors',
+                   'fabric_ssl_ca', 'fabric_ssl_key', 'fabric_ssl_cert',
+                   'fabric_user']
 
 def flag_is_set(flag, flags):
     """Checks if the flag is set
@@ -468,14 +510,14 @@ class ShutdownType(_Constants):
     Shutdown types used by the COM_SHUTDOWN server command.
     """
     _prefix = ''
-    SHUTDOWN_DEFAULT = b'\x00'
-    SHUTDOWN_WAIT_CONNECTIONS = b'\x01'
-    SHUTDOWN_WAIT_TRANSACTIONS = b'\x02'
-    SHUTDOWN_WAIT_UPDATES = b'\x08'
-    SHUTDOWN_WAIT_ALL_BUFFERS = b'\x10'
-    SHUTDOWN_WAIT_CRITICAL_BUFFERS = b'\x11'
-    KILL_QUERY = b'\xfe'
-    KILL_CONNECTION = b'\xff'
+    SHUTDOWN_DEFAULT = 0
+    SHUTDOWN_WAIT_CONNECTIONS = 1
+    SHUTDOWN_WAIT_TRANSACTIONS = 2
+    SHUTDOWN_WAIT_UPDATES = 8
+    SHUTDOWN_WAIT_ALL_BUFFERS = 16
+    SHUTDOWN_WAIT_CRITICAL_BUFFERS = 17
+    KILL_QUERY = 254
+    KILL_CONNECTION = 255
 
     desc = {
         'SHUTDOWN_DEFAULT': (

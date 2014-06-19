@@ -36,7 +36,7 @@ Story: We keep track of swimmers in a freestyle 4x 100m relay swimming event
 with millisecond precision.
 """
 
-from datetime import time
+from datetime import time, datetime
 
 import mysql.connector
 
@@ -45,6 +45,7 @@ CREATE_TABLE = (
     "teamid TINYINT UNSIGNED NOT NULL, "
     "swimmer TINYINT UNSIGNED NOT NULL, "
     "lap TIME(3), "
+    "start_shot DATETIME(6), "
     "PRIMARY KEY (teamid, swimmer)"
     ") ENGINE=InnoDB"
 )
@@ -68,24 +69,29 @@ def main(config):
     
     teams = {}
     teams[1] = [
-        (1, time(second=47, microsecond=510000)),
-        (2, time(second=47, microsecond=20000)),
-        (3, time(second=47, microsecond=650000)),
-        (4, time(second=46, microsecond=60000)),
+        (1, time(second=47, microsecond=510000),
+            datetime(2009, 6, 7, 9, 15, 2, 234)),
+        (2, time(second=47, microsecond=20000),
+            datetime(2009, 6, 7, 9, 30, 5, 102345)),
+        (3, time(second=47, microsecond=650000),
+            datetime(2009, 6, 7, 9, 50, 23, 2300)),
+        (4, time(second=46, microsecond=60000),
+            datetime(2009, 6, 7, 10, 30, 56, 1)),
     ]
     
-    insert = "INSERT INTO relay_laps (teamid,swimmer,lap) VALUES (%s,%s,%s)"
+    insert = ("INSERT INTO relay_laps (teamid, swimmer, lap, start_shot) "
+              "VALUES (%s, %s, %s, %s)")
     for team, swimmers in teams.items():
         for swimmer in swimmers:
-            cursor.execute(insert, (team, swimmer[0], swimmer[1]))
+            cursor.execute(insert, (team, swimmer[0], swimmer[1], swimmer[2]))
     cnx.commit()
     
     cursor.execute("SELECT * FROM relay_laps")
     for row in cursor:
-        output.append("{0: 2d} | {1: 2d} | {2}".format(*row))
+        output.append("{0: 2d} | {1: 2d} | {2} | {3}".format(*row))
     
     try:
-        cursor.execute("DROP TABLE IF EXISTS relay_laps")
+        cursor.execute("DROP TABLE IF EXISTS relay_lapss")
     except:
         # Ignoring the fact that it was not there
         pass

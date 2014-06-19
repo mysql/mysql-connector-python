@@ -434,23 +434,36 @@ class ShutdownTypeTests(tests.MySQLConnectorTests):
 
     """Test COM_SHUTDOWN types"""
     desc = {
-        'SHUTDOWN_DEFAULT': (b'\x00',
-                             "defaults to SHUTDOWN_WAIT_ALL_BUFFERS"),
+        'SHUTDOWN_DEFAULT': (
+            0,
+            "defaults to SHUTDOWN_WAIT_ALL_BUFFERS"
+        ),
         'SHUTDOWN_WAIT_CONNECTIONS': (
-            b'\x01',
-            "wait for existing connections to finish"),
-        'SHUTDOWN_WAIT_TRANSACTIONS': (b'\x02',
-                                       "wait for existing trans to finish"),
-        'SHUTDOWN_WAIT_UPDATES': (b'\x08',
-                                  "wait for existing updates to finish"),
+            1,
+            "wait for existing connections to finish"
+        ),
+        'SHUTDOWN_WAIT_TRANSACTIONS': (
+            2,
+            "wait for existing trans to finish"
+        ),
+        'SHUTDOWN_WAIT_UPDATES': (
+            8,
+            "wait for existing updates to finish"
+        ),
         'SHUTDOWN_WAIT_ALL_BUFFERS': (
-            b'\x10',
-            "flush InnoDB and other storage engine buffers"),
+            16,
+            "flush InnoDB and other storage engine buffers"
+        ),
         'SHUTDOWN_WAIT_CRITICAL_BUFFERS': (
-            b'\x11',
-            "don't flush InnoDB buffers, flush other storage engines' buffers"),
-        'KILL_QUERY': (b'\xfe', "(no description)"),
-        'KILL_CONNECTION': (b'\xff', "(no description)"),
+            17,
+            "don't flush InnoDB buffers, flush other storage engines' buffers"
+        ),
+        'KILL_QUERY': (
+            254, "(no description)"
+        ),
+        'KILL_CONNECTION': (
+            255, "(no description)"
+        ),
     }
 
     def test_attributes(self):

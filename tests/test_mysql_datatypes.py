@@ -30,6 +30,13 @@ import datetime
 
 from mysql.connector import connection, errors
 import tests
+from tests import foreach_cnx, cnx_config
+
+try:
+    from mysql.connector.connection_cext import CMySQLConnection
+except ImportError:
+    # Test without C Extension
+    CMySQLConnection = None
 
 
 def _get_insert_stmt(tbl, cols):
@@ -59,6 +66,7 @@ class TestsDataTypes(tests.MySQLConnectorTests):
         'decimal': 'myconnpy_mysql_decimal',
         'temporal': 'myconnpy_mysql_temporal',
         'temporal_year': 'myconnpy_mysql_temporal_year',
+        'set': 'myconnpy_mysql_set',
     }
 
     def compare(self, name, val1, val2):
@@ -72,19 +80,25 @@ class TestsDataTypes(tests.MySQLConnectorTests):
             )
         cur.close()
 
+
 class TestsCursor(TestsDataTypes):
 
     def setUp(self):
-        config = tests.get_mysql_config()
-        self.cnx = connection.MySQLConnection(**config)
-        self.drop_tables(self.cnx)
+        pass
+        #self.config = tests.get_mysql_config()
+        #cnx = connection.MySQLConnection(**self.config)
+        #self.drop_tables(cnx)
 
     def tearDown(self):
-        self.drop_tables(self.cnx)
-        self.cnx.close()
+        pass
+        #cnx = connection.MySQLConnection(**self.config)
+        #self.drop_tables(cnx)
+        #cnx.close()
 
+    @foreach_cnx()
     def test_numeric_int(self):
-        """MySQL numeric integer data types"""
+        tbl = self.tables['int']
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tbl))
         cur = self.cnx.cursor()
         columns = [
             'tinyint_signed',
@@ -114,7 +128,7 @@ class TestsCursor(TestsDataTypes):
             "`bigint_signed` BIGINT SIGNED,"
             "`bigint_unsigned` BIGINT UNSIGNED,"
             "PRIMARY KEY (id))"
-          ).format(table=self.tables['int'])
+          ).format(table=tbl)
         )
 
         data = [
@@ -146,8 +160,8 @@ class TestsCursor(TestsDataTypes):
             )
         ]
 
-        insert = _get_insert_stmt(self.tables['int'], columns)
-        select = _get_select_stmt(self.tables['int'], columns)
+        insert = _get_insert_stmt(tbl, columns)
+        select = _get_select_stmt(tbl, columns)
 
         cur.executemany(insert, data)
         cur.execute(select)
@@ -159,8 +173,10 @@ class TestsCursor(TestsDataTypes):
 
         cur.close()
 
+    @foreach_cnx()
     def test_numeric_bit(self):
-        """MySQL numeric bit data type"""
+        tbl = self.tables['bit']
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tbl))
         cur = self.cnx.cursor()
         columns = [
             'c8', 'c16', 'c24', 'c32',
@@ -179,23 +195,24 @@ class TestsCursor(TestsDataTypes):
             "`c63` bit(63) DEFAULT NULL,"
             "`c64` bit(64) DEFAULT NULL,"
             "PRIMARY KEY (id))"
-            ).format(table=self.tables['bit'])
+            ).format(table=tbl)
         )
 
-        insert = _get_insert_stmt(self.tables['bit'], columns)
-        select = _get_select_stmt(self.tables['bit'], columns)
+        insert = _get_insert_stmt(tbl, columns)
+        select = _get_select_stmt(tbl, columns)
 
         data = list()
         data.append(tuple([0] * len(columns)))
 
         values = list()
         for col in columns:
-            values.append(1 << int(col.replace('c', '')) - 1)
+            values.append((1 << int(col.replace('c', ''))) - 1)
         data.append(tuple(values))
 
         values = list()
         for col in columns:
-            values.append((1 << int(col.replace('c', ''))) - 1)
+            bits = int(col.replace('c', ''))
+            values.append((1 << bits) - 1)
         data.append(tuple(values))
 
         cur.executemany(insert, data)
@@ -205,8 +222,10 @@ class TestsCursor(TestsDataTypes):
         self.assertEqual(rows, data)
         cur.close()
 
+    @foreach_cnx()
     def test_numeric_float(self):
-        """MySQL numeric float data type"""
+        tbl = self.tables['float']
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tbl))
         cur = self.cnx.cursor()
         columns = [
             'float_signed',
@@ -222,11 +241,11 @@ class TestsCursor(TestsDataTypes):
             "`double_signed` DOUBLE(15,10) SIGNED,"
             "`double_unsigned` DOUBLE(15,10) UNSIGNED,"
             "PRIMARY KEY (id))"
-            ).format(table=self.tables['float'])
+            ).format(table=tbl)
         )
 
-        insert = _get_insert_stmt(self.tables['float'], columns)
-        select = _get_select_stmt(self.tables['float'], columns)
+        insert = _get_insert_stmt(tbl, columns)
+        select = _get_select_stmt(tbl, columns)
 
         data = [
             (-3.402823466, 0, -1.7976931348623157, 0,),
@@ -245,8 +264,10 @@ class TestsCursor(TestsDataTypes):
                 self.compare(col, round(data[j][i], 10), rows[j][i])
         cur.close()
 
+    @foreach_cnx()
     def test_numeric_decimal(self):
-        """MySQL numeric decimal data type"""
+        tbl = self.tables['decimal']
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tbl))
         cur = self.cnx.cursor()
         columns = [
             'decimal_signed',
@@ -258,11 +279,11 @@ class TestsCursor(TestsDataTypes):
             "`decimal_signed` DECIMAL(65,30) SIGNED,"
             "`decimal_unsigned` DECIMAL(65,30) UNSIGNED,"
             "PRIMARY KEY (id))"
-            ).format(table=self.tables['decimal'])
+            ).format(table=tbl)
         )
 
-        insert = _get_insert_stmt(self.tables['decimal'], columns)
-        select = _get_select_stmt(self.tables['decimal'], columns)
+        insert = _get_insert_stmt(tbl, columns)
+        select = _get_select_stmt(tbl, columns)
 
         data = [
             (Decimal(
@@ -284,8 +305,10 @@ class TestsCursor(TestsDataTypes):
 
         cur.close()
 
+    @foreach_cnx()
     def test_temporal_datetime(self):
-        """MySQL temporal date/time data types"""
+        tbl = self.tables['temporal']
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tbl))
         cur = self.cnx.cursor()
         cur.execute("SET SESSION time_zone = '+00:00'")
         columns = [
@@ -304,11 +327,11 @@ class TestsCursor(TestsDataTypes):
             "`t_timestamp` TIMESTAMP DEFAULT 0,"
             "`t_year_4` YEAR(4),"
             "PRIMARY KEY (id))"
-            ).format(table=self.tables['temporal'])
+            ).format(table=tbl)
         )
 
-        insert = _get_insert_stmt(self.tables['temporal'], columns)
-        select = _get_select_stmt(self.tables['temporal'], columns)
+        insert = _get_insert_stmt(tbl, columns)
+        select = _get_select_stmt(tbl, columns)
 
         data = [
             (datetime.date(2010, 1, 17),
@@ -339,6 +362,7 @@ class TestsCursor(TestsDataTypes):
 
         # Testing YEAR(2), which is now obsolete since MySQL 5.6.6
         tblname = self.tables['temporal_year']
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tblname))
         stmt = (
             "CREATE TABLE {table} ("
             "`id` int NOT NULL AUTO_INCREMENT KEY, "
@@ -357,5 +381,37 @@ class TestsCursor(TestsDataTypes):
                 self.assertEqual(2010, row[0])
             else:
                 self.assertEqual(10, row[0])
+
+        cur.close()
+
+    @cnx_config(consume_results=True)
+    @foreach_cnx()
+    def test_set(self):
+        tbl = self.tables['temporal']
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tbl))
+        cur = self.cnx.cursor()
+
+        cur.execute((
+            "CREATE TABLE {table} ("
+            "`id` int NOT NULL AUTO_INCREMENT,"
+            "c1 SET ('a', 'b', 'c'),"
+            "c2 SET ('1', '2', '3'),"
+            "c3 SET ('ham', 'spam'),"
+            "PRIMARY KEY (id))"
+            ).format(table=tbl)
+        )
+
+        insert = (
+            "INSERT INTO {table} (c1, c2, c3) VALUES "
+            "('a,c', '1,3', 'spam'), ('b', '3,2', 'spam,spam,ham')"
+        ).format(table=tbl)
+        cur.execute(insert)
+        cur.execute("SELECT * FROM {table}".format(table=tbl))
+
+        exp = [
+            (1, set([u'a', u'c']), set([u'1', u'3']), set([u'spam'])),
+            (2, set([u'b']), set([u'3', u'2']), set([u'ham', u'spam']))
+        ]
+        self.assertEqual(exp, cur.fetchall())
 
         cur.close()

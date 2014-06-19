@@ -72,7 +72,6 @@ import argparse
 import logging
 from zipfile import ZipFile
 import tarfile
-import subprocess
 
 
 PYMAJ = sys.version_info[0]
@@ -143,13 +142,21 @@ def get_args():
         '--settings', required=False,
         help="Module containing Django Settings (note: not file)"
     )
+    parser.add_argument(
+        '--failfast', action='store_true',
+        help="fail at first error/failure"
+    )
+    parser.add_argument(
+        '--verbosity', action='store', default=1, type=int,
+        help="verbosity level"
+    )
 
     parser.add_argument(
         '--group', choices=TEST_GROUPS.keys(),
         help=("specify which group of tests to run; other tests on command "
               "line are discarted")
     )
-    args = parser.parse_args()
+    args, tests = parser.parse_known_args()
 
     if args.group and args.tests:
         logger.warning(
@@ -158,6 +165,8 @@ def get_args():
         )
         args.tests = None
 
+    if tests and not args.tests:
+        args.tests = tests
     return args
 
 
@@ -246,7 +255,7 @@ def _unpack(archive_file):
 
 
 def django_tests(django_version, django_root, myconnpy, tests=None, group=None,
-                 settings=None):
+                 settings=None, failfast=False, verbosity=1):
     """Run Django unit tests
     """
     if not (tests or group):
@@ -263,6 +272,8 @@ def django_tests(django_version, django_root, myconnpy, tests=None, group=None,
     }
     if os.environ.get('DYLD_LIBRARY_PATH') is not None:
         env['DYLD_LIBRARY_PATH'] = os.environ.get('DYLD_LIBRARY_PATH')
+    elif os.environ.get('LD_LIBRARY_PATH') is not None:
+        env['LD_LIBRARY_PATH'] = os.environ.get('LD_LIBRARY_PATH')
 
     django_script = 'runtests.py'
 
@@ -272,8 +283,11 @@ def django_tests(django_version, django_root, myconnpy, tests=None, group=None,
         '-W', 'ignore::DeprecationWarning',
         django_script,
         '--noinput',
-        '--verbosity', '1'
+        '--verbosity', str(verbosity),
     ]
+
+    if failfast:
+        args.append('--failfast')
 
     if settings:
         args.extend(['--settings', settings])
@@ -333,10 +347,18 @@ def main():
         logger.error("Need either --django or --django-path")
         sys.exit(1)
 
-    if args.django_path and os.path.isdir(args.django_path):
+    if args.django_path:
+        if not os.path.isdir(args.django_path):
+            logger.error("Path to Django is not valid, was %s",
+                         args.django_path)
+            sys.exit(1)
         django_path = os.path.abspath(args.django_path)
     else:
-        archive, url = DJANGO[args.django]
+        try:
+            archive, url = DJANGO[args.django]
+        except KeyError:
+            logger.error("Django version %s is not valid", args.django)
+            sys.exit(1)
         if not args.offline:
             try:
                 download(url, archive)
@@ -360,7 +382,8 @@ def main():
 
     myconnpy_install = os.path.join(os.getcwd(), '..', '..', 'lib')
     django_tests(django_version, django_path, myconnpy=myconnpy_install,
-                 tests=args.tests, group=args.group, settings=args.settings)
+                 tests=args.tests, group=args.group, settings=args.settings,
+                 failfast=args.failfast, verbosity=args.verbosity)
 
 if __name__ == '__main__':
     main()

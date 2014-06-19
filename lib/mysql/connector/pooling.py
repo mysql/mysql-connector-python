@@ -39,7 +39,6 @@ from . import errors
 from .connection import MySQLConnection
 
 CONNECTION_POOL_LOCK = threading.RLock()
-CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
 CNX_POOL_MAXSIZE = 32
 CNX_POOL_MAXNAMESIZE = 64
 CNX_POOL_NAMEREGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')

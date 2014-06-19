@@ -26,6 +26,7 @@
 """
 
 from hashlib import md5
+import sys
 
 import tests
 from . import PY2
@@ -35,15 +36,16 @@ import mysql.connector
 class TestExamples(tests.MySQLConnectorTests):
 
     def setUp(self):
-        config = tests.get_mysql_config()
-        self.cnx = mysql.connector.connect(**config)
+        self.config = tests.get_mysql_config()
+        self.config['use_pure'] = True
+        self.cnx = mysql.connector.connect(**self.config)
 
     def tearDown(self):
         self.cnx.close()
 
     def _exec_main(self, example, exp=None):
         try:
-            result = example.main(tests.get_mysql_config())
+            result = example.main(self.config)
             if not exp:
                 return result
         except Exception as err:
@@ -62,7 +64,7 @@ class TestExamples(tests.MySQLConnectorTests):
             import examples.dates as example
         except Exception as err:
             self.fail(err)
-        output = example.main(tests.get_mysql_config())
+        output = example.main(self.config)
         exp = ['  1 | 1977-06-14 | 1977-06-14 21:10:00 | 21:10:00 |',
                '  2 |       None |                None |  0:00:00 |',
                '  3 |       None |                None |  0:00:00 |']
@@ -70,7 +72,9 @@ class TestExamples(tests.MySQLConnectorTests):
 
         example.DATA.append(('0000-00-00', None, '00:00:00'),)
         self.assertRaises(mysql.connector.errors.IntegrityError,
-                          example.main, tests.get_mysql_config())
+                          example.main, self.config)
+
+        sys.modules.pop('examples.dates', None)
 
     def test_engines(self):
         """examples/engines.py"""
@@ -90,6 +94,8 @@ class TestExamples(tests.MySQLConnectorTests):
 
         self.assertTrue(found, 'MyISAM engine not found in output')
 
+        sys.modules.pop('examples.engine', None)
+
     def test_inserts(self):
         """examples/inserts.py"""
         try:
@@ -99,9 +105,11 @@ class TestExamples(tests.MySQLConnectorTests):
         exp = '077dcd0139015c0aa6fb82ed932f053e'
         self._exec_main(example, exp)
 
+        sys.modules.pop('examples.inserts', None)
+
     def test_transactions(self):
         """examples/transactions.py"""
-        db = mysql.connector.connect(**tests.get_mysql_config())
+        db = mysql.connector.connect(**self.config)
         r = tests.have_engine(db, 'InnoDB')
         db.close()
         if not r:
@@ -113,6 +121,8 @@ class TestExamples(tests.MySQLConnectorTests):
             self.fail(e)
         exp = '3bd75261ffeb5624cdd754a43e2fd938'
         self._exec_main(example, exp)
+
+        sys.modules.pop('examples.transaction', None)
 
     def test_unicode(self):
         """examples/unicode.py"""
@@ -127,7 +137,9 @@ class TestExamples(tests.MySQLConnectorTests):
         else:
             exp = ['Unicode string: ¿Habla español?',
                    'Unicode string coming from db: ¿Habla español?']
-        self.assertEqual(output, exp)  # ,'Output was not correct')
+        self.assertEqual(output, exp)
+
+        sys.modules.pop('examples.unicode', None)
 
     def test_warnings(self):
         """examples/warnings.py"""
@@ -141,7 +153,9 @@ class TestExamples(tests.MySQLConnectorTests):
         self.assertEqual(output, exp, 'Output was not correct')
 
         example.STMT = "SELECT 'abc'"
-        self.assertRaises(Exception, example.main, tests.get_mysql_config())
+        self.assertRaises(Exception, example.main, self.config)
+
+        sys.modules.pop('examples.warnings', None)
 
     def test_multi_resultsets(self):
         """examples/multi_resultsets.py"""
@@ -153,6 +167,8 @@ class TestExamples(tests.MySQLConnectorTests):
         exp = ['Inserted 1 row', 'Number of rows: 1', 'Inserted 2 rows',
                'Names in table: Geert Jan Michel']
         self.assertEqual(output, exp, 'Output was not correct')
+
+        sys.modules.pop('examples.resultsets', None)
 
     def test_microseconds(self):
         """examples/microseconds.py"""
@@ -167,12 +183,14 @@ class TestExamples(tests.MySQLConnectorTests):
             self.assertTrue(output[0].endswith(exp))
         else:
             exp = [
-                ' 1 |  1 | 0:00:47.510000',
-                ' 1 |  2 | 0:00:47.020000',
-                ' 1 |  3 | 0:00:47.650000',
-                ' 1 |  4 | 0:00:46.060000',
+                ' 1 |  1 | 0:00:47.510000 | 2009-06-07 09:15:02.000234',
+                ' 1 |  2 | 0:00:47.020000 | 2009-06-07 09:30:05.102345',
+                ' 1 |  3 | 0:00:47.650000 | 2009-06-07 09:50:23.002300',
+                ' 1 |  4 | 0:00:46.060000 | 2009-06-07 10:30:56.000001',
             ]
-            self.assertEqual(output, exp, 'Output was not correct')
+            self.assertEqual(output, exp)
+
+        sys.modules.pop('examples.microseconds', None)
 
     def test_prepared_statements(self):
         """examples/prepared_statements.py"""
@@ -189,3 +207,19 @@ class TestExamples(tests.MySQLConnectorTests):
             '3 | Michel',
         ]
         self.assertEqual(output, exp, 'Output was not correct')
+
+        sys.modules.pop('examples.prepared_statements', None)
+
+
+class TestExamplesCExt(TestExamples):
+
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config['use_pure'] = False
+        self.cnx = mysql.connector.connect(**self.config)
+
+    def tearDown(self):
+        self.cnx.close()
+
+    def test_prepared_statements(self):
+        pass

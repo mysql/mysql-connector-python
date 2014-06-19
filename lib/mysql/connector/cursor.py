@@ -29,6 +29,8 @@ import re
 import weakref
 
 from . import errors
+from .abstracts import MySQLCursorAbstract
+from .catch23 import PY2
 
 SQL_COMMENT = r"\/\*.*?\*\/"
 RE_SQL_COMMENT = re.compile(
@@ -47,7 +49,7 @@ RE_SQL_SPLIT_STMTS = re.compile(
 RE_SQL_FIND_PARAM = re.compile(
     b'''%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)''')
 
-_ERR_NO_RESULT_TO_FETCH = "No result set to fetch from."
+ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
 
 class _ParamSubstitutor(object):
@@ -73,7 +75,7 @@ class _ParamSubstitutor(object):
         return len(self.params) - self.index
 
 
-class CursorBase(object):
+class CursorBase(MySQLCursorAbstract):
     """
     Base for defining MySQLCursor. This class is a skeleton and defines
     methods and members as required for the Python Database API
@@ -87,6 +89,7 @@ class CursorBase(object):
         self._rowcount = -1
         self._last_insert_id = None
         self.arraysize = 1
+        super(CursorBase, self).__init__()
 
     def callproc(self, procname, args=()):
         """Calls a stored procedue with the given arguments
@@ -197,7 +200,7 @@ class CursorBase(object):
         """Not Implemented."""
         pass
 
-    def reset(self):
+    def reset(self, free=True):
         """Reset the cursor to default"""
         pass
 
@@ -288,7 +291,7 @@ class MySQLCursor(CursorBase):
         """Set the connection"""
         try:
             self._connection = weakref.proxy(connection)
-            self._connection._protocol  # pylint: disable=W0212,W0104
+            self._connection.is_connected()
         except (AttributeError, TypeError):
             raise errors.InterfaceError(errno=2048)
 
@@ -335,7 +338,9 @@ class MySQLCursor(CursorBase):
         """
         if self._connection is None:
             return False
-        if self._have_unread_result():
+        if self._connection.can_consume_results:
+            self._connection.consume_results()
+        elif self._have_unread_result():
             raise errors.InternalError("Unread result found.")
 
         self._reset_result()
@@ -355,7 +360,10 @@ class MySQLCursor(CursorBase):
                 conv = to_mysql(conv)
                 conv = escape(conv)
                 conv = quote(conv)
-                res["%({0})s".format(key).encode()] = conv
+                if PY2:
+                    res["%({0})s".format(key)] = conv
+                else:
+                    res["%({0})s".format(key).encode()] = conv
         except Exception as err:
             raise errors.ProgrammingError(
                 "Failed processing pyformat-parameters; %s" % err)
@@ -471,9 +479,9 @@ class MySQLCursor(CursorBase):
             return None
 
         if not self._connection:
-            raise errors.ProgrammingError("Cursor is not connected.")
+            raise errors.ProgrammingError("Cursor is not connected")
         if self._connection.unread_result is True:
-            raise errors.InternalError("Unread result found.")
+            raise errors.InternalError("Unread result found")
 
         self._reset_result()
         stmt = ''
@@ -497,12 +505,11 @@ class MySQLCursor(CursorBase):
                     raise errors.ProgrammingError(
                         "Not all parameters were used in the SQL statement")
 
+        self._executed = stmt
         if multi:
-            self._executed = stmt
             self._executed_list = []
             return self._execute_iter(self._connection.cmd_query_iter(stmt))
         else:
-            self._executed = stmt
             try:
                 self._handle_result(self._connection.cmd_query(stmt))
             except errors.InterfaceError:
@@ -792,10 +799,6 @@ class MySQLCursor(CursorBase):
 
         return row
 
-    def fetchwarnings(self):
-        """Returns Warnings."""
-        return self._warnings
-
     def fetchone(self):
         """Returns next row of a query result set
 
@@ -803,8 +806,10 @@ class MySQLCursor(CursorBase):
         """
         row = self._fetch_row()
         if row:
-            return self._connection.converter.row_to_python(
-                row, self.description)
+            if hasattr(self._connection, 'converter'):
+                return self._connection.converter.row_to_python(
+                    row, self.description)
+            return row
         return None
 
     def fetchmany(self, size=None):
@@ -823,14 +828,17 @@ class MySQLCursor(CursorBase):
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
-        res = [self._connection.converter.row_to_python(row, self.description)
-               for row in rows]
+
+        if hasattr(self._connection, 'converter'):
+            row_to_python = self._connection.converter.row_to_python
+            rows = [row_to_python(row, self.description) for row in rows]
+
         self._handle_eof(eof)
         rowcount = len(rows)
         if rowcount >= 0 and self._rowcount == -1:
             self._rowcount = 0
         self._rowcount += rowcount
-        return res
+        return rows
 
     @property
     def column_names(self):
@@ -901,7 +909,7 @@ class MySQLCursorBuffered(MySQLCursor):
         except:
             pass
 
-    def reset(self):
+    def reset(self, free=True):
         self._rows = None
 
     def _fetch_row(self):
@@ -919,9 +927,12 @@ class MySQLCursorBuffered(MySQLCursor):
         if self._rows is None:
             raise errors.InterfaceError("No result set to fetch from.")
         res = []
-        for row in self._rows[self._next_row:]:
-            res.append(self._connection.converter.row_to_python(
-                row, self.description))
+        if hasattr(self._connection, 'converter'):
+            for row in self._rows[self._next_row:]:
+                res.append(self._connection.converter.row_to_python(
+                    row, self.description))
+        else:
+            res = self._rows[self._next_row:]
         self._next_row = len(self._rows)
         return res
 
@@ -1153,9 +1164,14 @@ class MySQLCursorDict(MySQLCursor):
 
         Returns a dictionary.
         """
-        row = self._connection.converter.row_to_python(rowdata, desc)
+        if hasattr(self._connection, 'converter'):
+            row = self._connection.converter.row_to_python(rowdata, desc)
+        else:
+            row = rowdata
+
         if row:
             return dict(zip(self.column_names, row))
+
         return None
 
     def fetchone(self):
@@ -1170,7 +1186,7 @@ class MySQLCursorDict(MySQLCursor):
         """Returns all rows of a query result set
         """
         if not self._have_unread_result():
-            raise errors.InterfaceError(_ERR_NO_RESULT_TO_FETCH)
+            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
@@ -1197,7 +1213,11 @@ class MySQLCursorNamedTuple(MySQLCursor):
 
         Returns a named tuple.
         """
-        row = self._connection.converter.row_to_python(rowdata, desc)
+        if hasattr(self._connection, 'converter'):
+            row = self._connection.converter.row_to_python(rowdata, desc)
+        else:
+            rowdata = row
+
         if row:
             # pylint: disable=W0201
             self.named_tuple = namedtuple('Row', self.column_names)
@@ -1209,25 +1229,31 @@ class MySQLCursorNamedTuple(MySQLCursor):
         """
         row = self._fetch_row()
         if row:
-            return self._row_to_python(row, self.description)
+            if hasattr(self._connection, 'converter'):
+                return self._row_to_python(row, self.description)
+            else:
+                return row
         return None
 
     def fetchall(self):
         """Returns all rows of a query result set
         """
         if not self._have_unread_result():
-            raise errors.InterfaceError(_ERR_NO_RESULT_TO_FETCH)
+            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
-        res = [self._row_to_python(row, self.description)
-               for row in rows]
+
+        if hasattr(self._connection, 'converter'):
+            row_to_python = self._connection.converter.row_to_python
+            rows = [row_to_python(row, self.description) for row in rows]
+
         self._handle_eof(eof)
         rowcount = len(rows)
         if rowcount >= 0 and self._rowcount == -1:
             self._rowcount = 0
         self._rowcount += rowcount
-        return res
+        return rows
 
 
 class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
@@ -1246,7 +1272,7 @@ class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
         """Returns all rows of a query result set
         """
         if self._rows is None:
-            raise errors.InterfaceError(_ERR_NO_RESULT_TO_FETCH)
+            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         res = []
         for row in self._rows[self._next_row:]:
             res.append(self._row_to_python(
@@ -1271,7 +1297,7 @@ class MySQLCursorBufferedNamedTuple(MySQLCursorNamedTuple, MySQLCursorBuffered):
         """Returns all rows of a query result set
         """
         if self._rows is None:
-            raise errors.InterfaceError(_ERR_NO_RESULT_TO_FETCH)
+            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         res = []
         for row in self._rows[self._next_row:]:
             res.append(self._row_to_python(

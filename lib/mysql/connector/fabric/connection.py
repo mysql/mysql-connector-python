@@ -76,7 +76,7 @@ from . import FabricMySQLServer, FabricShard
 from .caching import FabricCache
 from .balancing import WeightedRoundRobin
 from .. import version
-from ..catch23 import PY2, isunicode, UNICODE_TYPES
+from ..catch23 import PY2, isunicode, UNICODE_TYPE
 
 RESET_CACHE_ON_ERROR = (
     errorcode.CR_SERVER_LOST,
@@ -123,7 +123,7 @@ _CNX_PROPERTIES = {
     # name: ((valid_types), description, default)
     'group': ((str,), "Name of group of servers", None),
     'key': (tuple([int, str, datetime.datetime,
-                   datetime.date] + list(UNICODE_TYPES)),
+                   datetime.date] + list(UNICODE_TYPE)),
             "Sharding key", None),
     'tables': ((tuple, list), "List of tables in query", None),
     'mode': ((int,), "Read-Only, Write-Only or Read-Write", MODE_READWRITE),

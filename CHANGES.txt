@@ -1,5 +1,5 @@
 ====================================================
-MySQL Connector/Python 2.0 - Release Notes & Changes
+MySQL Connector/Python 2.1 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
@@ -8,37 +8,8 @@ Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
-v2.0.1
-======
+v2.1.1a
+=======
 
-- WL7954: Add support for RANGE_STRING Fabric sharding type
-- WL7955: Add support for RANGE_DATETIME Fabric sharding type
-- BUG19440592: Fix exception not captured when SSL is unavailable
-- BUG19481761: Fix option files with !include with trailing newline
-- BUG18798953: Add MySQLConnection.shutdown() to abruply close connection
-- BUG19168737: Fix unsupported connection argument error with option files
-- BUG19282158: Fix NULL values to work with prepared statements
-- BUG19179711: Fix using '%s' in django backend
-- BUG19169143: Fix raising error with duplicate option files
-- BUG19170287: Fix duplicate section error with Python v3
-- BUG19163169: Add support for Django 1.7
-- BUG19225481: Fix floating point inaccuracy with Python v2
-- BUG19164627: Fix cursor trying  to decode linestring data as utf-8
-
-
-v2.0.0a1
-========
-
-- BUG19207922: Fix fetching multiple results when executing procedure
-- BUG19184025: Fix results containing NULL
-- BUG19169990: Fix sending/receiving using compressed connection
-- BUG18956789: Fix Django TimeField 00:00:00 converting to MySQL NULL
-- WL7228: Allow Connector/Python to use MySQL option files
-- BUG18843153: Fix Django to check connection on each request
-- WL7937: Allow LOAD DATA LOCAL INFILE by default
-- BUG18742429: Fix prepared statements returning lots of columns
-- BUG18814880: Fix stopping mysqld running unit tests on Windows
-- WL7292: Add cursors returning dict and namedtuple as rows
-- WL7462: Consolidate Python v2 and v3 code
-- WL7716: Move commercial files and distribution to CPYINT
+- WL7643: Add Python C Extension using Connector/C
 
