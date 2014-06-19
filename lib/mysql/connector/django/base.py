@@ -18,7 +18,6 @@ Requires and comes with MySQL Connector/Python v1.1 and later:
 from __future__ import unicode_literals
 
 import sys
-import warnings
 import django
 
 try:
@@ -51,6 +50,12 @@ from mysql.connector.django.client import DatabaseClient
 from mysql.connector.django.creation import DatabaseCreation
 from mysql.connector.django.introspection import DatabaseIntrospection
 from mysql.connector.django.validation import DatabaseValidation
+
+try:
+    import pytz
+    HAVE_PYTZ = True
+except ImportError:
+    HAVE_PYTZ = False
 
 DatabaseError = mysql.connector.DatabaseError
 IntegrityError = mysql.connector.IntegrityError
@@ -163,7 +168,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         self.supports_microsecond_precision = self._microseconds_precision()
 
     def _microseconds_precision(self):
-        if self.connection.get_server_version() >= (5, 6, 3):
+        if self.connection.server_version >= (5, 6, 3):
             return True
         return False
 
@@ -183,7 +188,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         cursor.execute(droptable)
         cursor.execute('CREATE TABLE {table} (X INT)'.format(table=tblname))
 
-        if self.connection.get_server_version() >= (5, 0, 0):
+        if self.connection.server_version >= (5, 0, 0):
             cursor.execute(
                 "SELECT ENGINE FROM INFORMATION_SCHEMA.TABLES "
                 "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
@@ -215,11 +220,12 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         MySQL cannot perform time zone conversions reliably.
         """
         # Django 1.6
-        if pytz is None:
+        if not HAVE_PYTZ:
             return False
 
-        self.connection.cmd_query("SELECT 1 FROM mysql.time_zone LIMIT 1")
-        return self.connection.get_rows()[0] is not []
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT 1 FROM mysql.time_zone LIMIT 1")
+        return cursor.fetchall() != []
 
 
 class DatabaseOperations(BaseDatabaseOperations):
@@ -358,7 +364,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Truncate already resets the AUTO_INCREMENT field from
         # MySQL version 5.0.13 onwards. Refs #16961.
         res = []
-        if self.connection.get_server_version() < (5, 0, 13):
+        if self.connection.server_version < (5, 0, 13):
             fmt = "{alter} {table} {{tablename}} {auto_inc} {field};".format(
                 alter=style.SQL_KEYWORD('ALTER'),
                 table=style.SQL_KEYWORD('TABLE'),
@@ -389,6 +395,13 @@ class DatabaseOperations(BaseDatabaseOperations):
                 raise ValueError(
                     "MySQL backend does not support timezone-aware times."
                 )
+
+        try:
+            # Django 1.6
+            self.connection.ensure_connection()
+        except AttributeError:
+            if not self.connection.connection:
+                self.connection._connect()
         return self.connection.connection.converter._datetime_to_mysql(value)
 
     def value_to_db_time(self, value):
@@ -400,6 +413,12 @@ class DatabaseOperations(BaseDatabaseOperations):
             raise ValueError("MySQL backend does not support timezone-aware "
                              "times.")
 
+        try:
+            # Django 1.6
+            self.connection.ensure_connection()
+        except AttributeError:
+            if not self.connection.connection:
+                self.connection._connect()
         return self.connection.connection.converter._time_to_mysql(value)
 
     def year_lookup_bounds(self, value):
@@ -413,7 +432,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Again, no microseconds
         first, second = super(DatabaseOperations,
             self).year_lookup_bounds_for_datetime_field(value)
-        if self.connection.get_server_version() >= (5, 6, 4):
+        if self.connection.server_version >= (5, 6, 4):
             return [first.replace(microsecond=0), second]
         else:
             return [first.replace(microsecond=0),
@@ -462,10 +481,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.server_version = None
 
         # Since some features depend on the MySQL version, we need to connect
-        self._connect()
+        try:
+            # Django 1.6
+            self.ensure_connection()
+        except AttributeError:
+            self._connect()
 
-        self.features = DatabaseFeatures(self)
         self.ops = DatabaseOperations(self)
+        self.features = DatabaseFeatures(self)
         self.client = DatabaseClient(self)
         self.creation = DatabaseCreation(self)
         self.introspection = DatabaseIntrospection(self)
@@ -530,7 +553,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             self.connection.cmd_query("SET SQL_AUTO_IS_NULL = 0")
 
         if 'AUTOCOMMIT' in self.settings_dict:
-            self.set_autocommit(self.settings_dict['AUTOCOMMIT'])
+            try:
+                # Django 1.6
+                self.set_autocommit(self.settings_dict['AUTOCOMMIT'])
+            except AttributeError:
+                self._set_autocommit(self.settings_dict['AUTOCOMMIT'])
 
     def create_cursor(self):
         # Django 1.6
@@ -560,7 +587,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
         Returns a tuple
         """
-        return self.server_version
+        try:
+            # Django 1.6
+            self.ensure_connection()
+        except AttributeError:
+            if not self.connection:
+                self._connect()
+
+        return self.connection.get_server_version()
 
     def disable_constraint_checking(self):
         """Disables foreign key checks

@@ -24,6 +24,7 @@
 """Unittests for mysql.connector.django
 """
 
+import datetime
 import sys
 
 import tests
@@ -45,6 +46,8 @@ settings.DATABASES = {
         'PORT': DBCONFIG['port'],
         'TEST_CHARSET': 'utf8',
         'TEST_COLLATION': 'utf8_general_ci',
+        'CONN_MAX_AGE': 0,
+        'AUTOCOMMIT': True,
     },
 }
 settings.SECRET_KEY = "django_tests_secret_key"
@@ -80,7 +83,8 @@ import django.db  # pylint: disable=W0611
 if tests.DJANGO_VERSION >= (1, 6):
     from django.db.backends import FieldInfo
 
-from mysql.connector.django.base import DatabaseWrapper
+import mysql.connector
+from mysql.connector.django.base import DatabaseWrapper, DatabaseOperations
 from mysql.connector.django.introspection import DatabaseIntrospection
 
 
@@ -178,3 +182,28 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
         cur = self.cnx.cursor()
         res = self.introspect.get_primary_key_column(cur, 'django_t1')
         self.assertEqual('id', res)
+
+
+class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
+
+    """Test the Django base.DatabaseWrapper class"""
+
+    def setUp(self):
+        dbconfig = tests.get_mysql_config()
+        self.conn = mysql.connector.connect(**dbconfig)
+        self.cnx = DatabaseWrapper(settings.DATABASES['default'])
+
+    def test__init__(self):
+        exp = self.conn.get_server_version()
+        self.assertEqual(exp, self.cnx.server_version)
+
+        value = datetime.time(2, 5, 7)
+        exp = self.conn.converter._time_to_mysql(value)
+        self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
+
+        self.cnx.connection = None
+        value = datetime.time(2, 5, 7)
+        exp = self.conn.converter._time_to_mysql(value)
+        self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
+
+
