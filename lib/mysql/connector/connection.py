@@ -40,7 +40,9 @@ from . import errors
 from .utils import int4store
 from .cursor import (
     CursorBase, MySQLCursor, MySQLCursorRaw,
-    MySQLCursorBuffered, MySQLCursorBufferedRaw, MySQLCursorPrepared)
+    MySQLCursorBuffered, MySQLCursorBufferedRaw, MySQLCursorPrepared,
+    MySQLCursorDict, MySQLCursorBufferedDict, MySQLCursorNamedTuple,
+    MySQLCursorBufferedNamedTuple)
 from .authentication import get_auth_plugin
 from .catch23 import PY2, isstr
 
@@ -1318,16 +1320,24 @@ class MySQLConnection(object):
         doc="Toggle whether to raise on warnings "\
             "(implies retrieving warnings).")
 
-    def cursor(self, buffered=None, raw=None, prepared=None, cursor_class=None):
+    def cursor(self, buffered=None, raw=None, prepared=None, cursor_class=None,
+               dictionary=None, named_tuple=None):
         """Instantiates and returns a cursor
 
         By default, MySQLCursor is returned. Depending on the options
-        while connecting, a buffered and/or raw cursor instantiated
-        instead.
+        while connecting, a buffered and/or raw cursor is instantiated
+        instead. Also depending upon the cursor options, rows can be
+        returned as dictionary or named tuple.
+
+        Dictionary and namedtuple based cursors are available with buffered
+        output but not raw.
 
         It is possible to also give a custom cursor through the
         cursor_class parameter, but it needs to be a subclass of
         mysql.connector.cursor.CursorBase.
+
+        Raises ProgrammingError when cursor_class is not a subclass of
+        CursorBase. Raises ValueError when cursor is not available.
 
         Returns a cursor-object
         """
@@ -1340,8 +1350,6 @@ class MySQLConnection(object):
                 raise errors.ProgrammingError(
                     "Cursor class needs be to subclass of cursor.CursorBase")
             return (cursor_class)(self)
-        if prepared is True:
-            return MySQLCursorPrepared(self)
 
         buffered = buffered or self._buffered
         raw = raw or self._raw
@@ -1351,14 +1359,31 @@ class MySQLConnection(object):
             cursor_type |= 1
         if raw is True:
             cursor_type |= 2
+        if dictionary is True:
+            cursor_type |= 4
+        if named_tuple is True:
+            cursor_type |= 8
+        if prepared is True:
+            cursor_type |= 16
 
-        types = (
-            MySQLCursor,  # 0
-            MySQLCursorBuffered,
-            MySQLCursorRaw,
-            MySQLCursorBufferedRaw,
-        )
-        return (types[cursor_type])(self)
+        types = {
+            0: MySQLCursor,  # 0
+            1: MySQLCursorBuffered,
+            2: MySQLCursorRaw,
+            3: MySQLCursorBufferedRaw,
+            4: MySQLCursorDict,
+            5: MySQLCursorBufferedDict,
+            8: MySQLCursorNamedTuple,
+            9: MySQLCursorBufferedNamedTuple,
+            16: MySQLCursorPrepared
+        }
+        try:
+            return (types[cursor_type])(self)
+        except KeyError:
+            args = ('buffered', 'raw', 'dictionary', 'named_tuple', 'prepared')
+            raise ValueError('Cursor not available with given criteria: ' +
+                             ', '.join([args[i] for i in range(5)
+                                        if cursor_type & (1 << i) != 0]))
 
     def start_transaction(self, consistent_snapshot=False,
                           isolation_level=None, readonly=None):

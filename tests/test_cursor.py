@@ -34,6 +34,7 @@ to be created first.
 """
 
 import datetime
+from collections import namedtuple
 from decimal import Decimal
 import re
 import time
@@ -1243,3 +1244,156 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         self.assertEqual(len(rows), cur._rowcount)
         self.assertEqual(3, cur._warning_count)
         self.assertRaises(errors.InterfaceError, cur.fetchall)
+
+
+class MySQLCursorDictTests(tests.TestsCursor):
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+
+        self.connection = connection.MySQLConnection(**config)
+        self.cur = self.connection.cursor(dictionary=True)
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorDictTests')
+        self.cur.execute('CREATE TABLE MySQLCursorDictTests(id INT(10), name '
+                         'VARCHAR(20), city VARCHAR(20))')
+
+    def tearDown(self):
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorDictTests')
+        self.cur.close()
+        self.connection.close()
+
+    def test_fetchone(self):
+        self.check_method(self.cur, 'fetchone')
+
+        self.assertEqual(None, self.cur.fetchone())
+        self.cur.execute("INSERT INTO MySQLCursorDictTests VALUES(%s, %s, %s)",
+                         (1, 'ham', 'spam'))
+
+
+        self.cur.execute("SELECT * FROM MySQLCursorDictTests")
+        exp = {u'id': 1, u'name': u'ham', u'city': u'spam'}
+        self.assertEqual(exp, self.cur.fetchone())
+
+
+class MySQLCursorBufferedDictTests(tests.TestsCursor):
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+
+        self.connection = connection.MySQLConnection(**config)
+        self.cur = self.connection.cursor(dictionary=True, buffered=True)
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorBufferedDictTests')
+        self.cur.execute('CREATE TABLE MySQLCursorBufferedDictTests(id INT(10),'
+                         'name VARCHAR(20), city VARCHAR(20))')
+
+    def tearDown(self):
+        self.cur.close()
+        self.connection.close()
+
+    def test_fetchone(self):
+        self.check_method(self.cur, 'fetchone')
+
+        self.assertEqual(None, self.cur.fetchone())
+        self.cur.execute("INSERT INTO MySQLCursorBufferedDictTests VALUE"
+                         "(%s, %s, %s)", (1, 'ham', 'spam'))
+
+        self.cur.execute("SELECT * FROM MySQLCursorBufferedDictTests")
+        exp = {u'id': 1, u'name': u'ham', u'city': u'spam'}
+        self.assertEqual(exp, self.cur.fetchone())
+
+    def test_fetchall(self):
+        self.check_method(self.cur, 'fetchall')
+
+        self.assertRaises(errors.InterfaceError, self.cur.fetchall)
+        self.cur.execute("INSERT INTO MySQLCursorBufferedDictTests VALUE"
+                         "(%s, %s, %s)", (1, 'ham', 'spam'))
+
+        self.cur.execute("SELECT * FROM MySQLCursorBufferedDictTests")
+        exp = [{u'id': 1, u'name': u'ham', u'city': u'spam'}]
+        self.assertEqual(exp, self.cur.fetchall())
+
+
+class MySQLCursorNamedTupleTests(tests.TestsCursor):
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+
+        self.connection = connection.MySQLConnection(**config)
+        self.cur = self.connection.cursor(named_tuple=True)
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorNamedTupleTests')
+        self.cur.execute('CREATE TABLE MySQLCursorNamedTupleTests(id INT(10),'
+                         'name VARCHAR(20), city VARCHAR(20))')
+
+    def tearDown(self):
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorNamedTupleTests')
+        self.cur.close()
+        self.connection.close()
+
+    def test_fetchone(self):
+        self.check_method(self.cur, 'fetchone')
+
+        self.assertEqual(None, self.cur.fetchone())
+
+        self.cur.execute("INSERT INTO MySQLCursorNamedTupleTests VALUES"
+                         "(%s, %s, %s)", (1, 'ham', 'spam'))
+
+
+        self.cur.execute("SELECT * FROM MySQLCursorNamedTupleTests")
+        named_tuple = namedtuple('Row', ['id', 'name', 'city'])
+        exp = named_tuple(1, u'ham', u'spam')
+        row = self.cur.fetchone()
+
+        self.assertEqual(exp.id, row.id)
+        self.assertEqual(exp.name, row.name)
+        self.assertEqual(exp.city, row.city)
+
+
+class MySQLCursorBufferedNamedTupleTests(tests.TestsCursor):
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+
+        self.connection = connection.MySQLConnection(**config)
+        self.cur = self.connection.cursor(named_tuple=True, buffered=True)
+        self.cur.execute('DROP TABLE IF EXISTS '
+                         'MySQLCursorBufferedNamedTupleTests')
+        self.cur.execute('CREATE TABLE MySQLCursorBufferedNamedTupleTests('
+                         'id INT(10), name VARCHAR(20), city VARCHAR(20))')
+
+    def tearDown(self):
+        self.cur.close()
+        self.connection.close()
+
+    def test_fetchone(self):
+        self.check_method(self.cur, 'fetchone')
+
+        self.assertEqual(None, self.cur.fetchone())
+        self.cur.execute("INSERT INTO MySQLCursorBufferedNamedTupleTests VALUES"
+                         "(%s, %s, %s)", (1, 'ham', 'spam'))
+
+
+        self.cur.execute("SELECT * FROM MySQLCursorBufferedNamedTupleTests")
+        named_tuple = namedtuple('Row', ['id', 'name', 'city'])
+        exp = named_tuple(1, u'ham', u'spam')
+        row = self.cur.fetchone()
+
+        self.assertEqual(exp.id, row.id)
+        self.assertEqual(exp.name, row.name)
+        self.assertEqual(exp.city, row.city)
+
+    def test_fetchall(self):
+        self.check_method(self.cur, 'fetchall')
+
+        self.assertRaises(errors.InterfaceError, self.cur.fetchall)
+        self.cur.execute("INSERT INTO MySQLCursorBufferedNamedTupleTests VALUES"
+                         "(%s, %s, %s)", (1, 'ham', 'spam'))
+
+
+        self.cur.execute("SELECT * FROM MySQLCursorBufferedNamedTupleTests")
+        named_tuple = namedtuple('Row', ['id', 'name', 'city'])
+        exp = named_tuple(1, u'ham', u'spam')
+        row = self.cur.fetchall()
+
+        self.assertEqual(exp.id, row[0].id)
+        self.assertEqual(exp.name, row[0].name)
+        self.assertEqual(exp.city, row[0].city)
