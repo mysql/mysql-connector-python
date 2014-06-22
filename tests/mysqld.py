@@ -109,14 +109,16 @@ def process_running(pid):
 def process_terminate(pid):
     """Terminates a process
 
-    This function terminates a running process, sending a SIGKILL on
-    Posix systems and using ctypes.windll on Windows.
+    This function terminates a running process using it's pid (process
+    ID), sending a SIGKILL on Posix systems and using ctypes.windll
+    on Windows.
+
+    Raises MySQLServerError on errors.
     """
     if os.name == 'nt':
         winkernel = ctypes.windll.kernel32
-        process = winkernel.OpenProcess(1, 0, pid)
-        winkernel.TerminateProcess(process, -1)
-        winkernel.WaitForSingleObject(process)
+        process = winkernel.OpenProcess(0x0001, 0, pid)  # PROCESS_TERMINATE
+        winkernel.TerminateProcess(process, 1)
         winkernel.CloseHandle(process)
     else:
         os.kill(pid, signal.SIGTERM)
