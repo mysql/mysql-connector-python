@@ -234,6 +234,82 @@ class FieldFlagTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, constants.FieldFlag.get_bit_info(data).sort())
 
 
+class ClientFlagTests(tests.MySQLConnectorTests):
+
+    desc = {
+        'LONG_PASSWD': (1 << 0, 'New more secure passwords'),
+        'FOUND_ROWS': (1 << 1, 'Found instead of affected rows'),
+        'LONG_FLAG': (1 << 2, 'Get all column flags'),
+        'CONNECT_WITH_DB': (1 << 3, 'One can specify db on connect'),
+        'NO_SCHEMA': (1 << 4, "Don't allow database.table.column"),
+        'COMPRESS': (1 << 5, 'Can use compression protocol'),
+        'ODBC': (1 << 6, 'ODBC client'),
+        'LOCAL_FILES': (1 << 7, 'Can use LOAD DATA LOCAL'),
+        'IGNORE_SPACE': (1 << 8, "Ignore spaces before ''"),
+        'PROTOCOL_41': (1 << 9, 'New 4.1 protocol'),
+        'INTERACTIVE': (1 << 10, 'This is an interactive client'),
+        'SSL': (1 << 11, 'Switch to SSL after handshake'),
+        'IGNORE_SIGPIPE': (1 << 12, 'IGNORE sigpipes'),
+        'TRANSACTIONS': (1 << 13, 'Client knows about transactions'),
+        'RESERVED': (1 << 14, 'Old flag for 4.1 protocol'),
+        'SECURE_CONNECTION': (1 << 15, 'New 4.1 authentication'),
+        'MULTI_STATEMENTS': (1 << 16, 'Enable/disable multi-stmt support'),
+        'MULTI_RESULTS': (1 << 17, 'Enable/disable multi-results'),
+        'SSL_VERIFY_SERVER_CERT': (1 << 30, ''),
+        'REMEMBER_OPTIONS': (1 << 31, ''),
+    }
+
+    def test_attributes(self):
+        """Check attributes for ClientFlag"""
+        for key, value in self.desc.items():
+            self.assertTrue(key in constants.ClientFlag.__dict__,
+                            '{0} is not an attribute of FieldFlag'.format(key))
+            self.assertEqual(
+                value[0], constants.ClientFlag.__dict__[key],
+                '{0} attribute of FieldFlag has wrong value'.format(key))
+
+    def test_get_desc(self):
+        """Get client flag by name"""
+        for key, value in self.desc.items():
+            exp = value[1]
+            res = constants.ClientFlag.get_desc(key)
+            self.assertEqual(exp, res)
+
+    def test_get_info(self):
+        """Get client flag by id"""
+        for exp, info in self.desc.items():
+            res = constants.ClientFlag.get_info(info[0])
+            self.assertEqual(exp, res)
+
+    def test_get_bit_info(self):
+        """Get names of the set flags"""
+        data = 0
+        data |= constants.ClientFlag.LONG_FLAG
+        data |= constants.ClientFlag.LOCAL_FILES
+        exp = ['LONG_FLAG', 'LOCAL_FILES'].sort()
+        self.assertEqual(exp, constants.ClientFlag.get_bit_info(data).sort())
+
+    def test_get_default(self):
+        """Get client flags which are set by default.
+        """
+        data = [
+            constants.ClientFlag.LONG_PASSWD,
+            constants.ClientFlag.LONG_FLAG,
+            constants.ClientFlag.CONNECT_WITH_DB,
+            constants.ClientFlag.PROTOCOL_41,
+            constants.ClientFlag.TRANSACTIONS,
+            constants.ClientFlag.SECURE_CONNECTION,
+            constants.ClientFlag.MULTI_STATEMENTS,
+            constants.ClientFlag.MULTI_RESULTS,
+            constants.ClientFlag.LOCAL_FILES,
+        ]
+        exp = 0
+        for option in data:
+            exp |= option
+
+        self.assertEqual(exp, constants.ClientFlag.get_default())
+
+
 class CharacterSetTests(tests.MySQLConnectorTests):
 
     """Tests for constants.CharacterSet"""

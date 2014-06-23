@@ -390,6 +390,7 @@ class ClientFlag(_Flags):
         SECURE_CONNECTION,
         MULTI_STATEMENTS,
         MULTI_RESULTS,
+        LOCAL_FILES,
     ]
 
     @classmethod
