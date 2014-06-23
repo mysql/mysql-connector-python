@@ -110,6 +110,7 @@ class ConnectionTests(tests.MySQLConnectorTests):
             'dsn': None,
             'force_ipv6': False,
             'auth_plugin': None,
+            'allow_local_infile': True,
         }
         self.assertEqual(exp, connection.DEFAULT_CONFIGURATION)
 
@@ -1794,3 +1795,49 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 self.assertNotEqual(('2',), self.cnx.get_rows()[0][0])
             else:
                 self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
+
+
+class WL7937(tests.MySQLConnectorTests):
+    """Allow 'LOAD DATA LOCAL INFILE' by default
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.data_file = os.path.join('tests', 'data', 'local_data.csv')
+
+        self.cur.execute("DROP TABLE IF EXISTS local_data")
+        self.cur.execute(
+            "CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
+
+    def tearDown(self):
+        try:
+            self.cur.execute("DROP TABLE IF EXISTS local_data")
+            self.cur.close()
+            self.cnx.close()
+        except:
+            pass
+
+    def test_load_local_infile(self):
+        sql = ("LOAD DATA LOCAL INFILE '{data_file}' INTO "
+               "TABLE local_data".format(data_file=self.data_file))
+        self.cur.execute(sql)
+        self.cur.execute("SELECT * FROM local_data")
+
+        exp = [
+            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        self.assertEqual(exp, self.cur.fetchall())
+
+    def test_without_load_local_infile(self):
+        config = tests.get_mysql_config()
+        config['allow_local_infile'] = False
+
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        sql = ("LOAD DATA LOCAL INFILE '{data_file}' INTO "
+               "TABLE local_data".format(data_file=self.data_file))
+        self.assertRaises(errors.ProgrammingError, self.cur.execute, sql)

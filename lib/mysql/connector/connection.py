@@ -77,6 +77,7 @@ DEFAULT_CONFIGURATION = {
     'dsn': None,
     'force_ipv6': False,
     'auth_plugin': None,
+    'allow_local_infile': True,
 }
 
 
@@ -149,7 +150,9 @@ class MySQLConnection(object):
         if PY2:
             regex_ver = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{1,3})(.*)")
         else:
+            # pylint: disable=W1401
             regex_ver = re.compile(br"^(\d{1,2})\.(\d{1,2})\.(\d{1,3})(.*)")
+            # pylint: enable=W1401
         match = regex_ver.match(handshake['server_version_original'])
         if not match:
             raise errors.InterfaceError("Failed parsing MySQL version")
@@ -266,6 +269,12 @@ class MySQLConnection(object):
                 self.set_client_flags([ClientFlag.COMPRESS])
         except KeyError:
             pass  # Missing compress argument is OK
+
+        try:
+            if not config['allow_local_infile']:
+                self.set_client_flags([-ClientFlag.LOCAL_FILES])
+        except KeyError:
+            pass  # Missing allow_local_infile argument is OK
 
         # Configure character set and collation
         if 'charset' in config or 'collation' in config:
