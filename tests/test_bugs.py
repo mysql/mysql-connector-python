@@ -2578,3 +2578,38 @@ class Bug499410(tests.MySQLConnectorTests):
 
         self.assertEqual(exp_nonunicode, res_nonunicode)
         self.assertEqual(exp_unicode, res_unicode)
+
+
+class BugOra18742429(tests.MySQLConnectorTests):
+    """BUG#18742429:  CPY FAILS WHEN QUERYING LARGE NUMBER OF COLUMNS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        self.tbl = 'Bug18742429'
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = 'CREATE TABLE {0}({1})'.format(self.tbl, ','.join(
+            ['col'+str(i)+' INT(10)' for i in range(1000)]))
+
+        self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+        self.cursor.close()
+        self.cnx.close()
+
+    def test_columns(self):
+        stmt = "INSERT INTO {0} VALUES({1})".format(self.tbl, ','.join(
+            [str(i) if i%2==0 else 'NULL' for i in range(1000)]
+        ))
+        exp = tuple(i if i%2==0 else None for i in range(1000))
+        self.cursor.execute(stmt)
+
+        self.cursor = self.cnx.cursor(prepared=True)
+        stmt = 'SELECT * FROM {0} WHERE col0=?'.format(self.tbl)
+        self.cursor.execute(stmt, (0,))
+        self.assertEqual(exp, self.cursor.fetchone())
+

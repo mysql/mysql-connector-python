@@ -405,12 +405,12 @@ class MySQLProtocol(object):
     def _parse_binary_values(self, fields, packet):
         """Parse values from a binary result packet"""
         null_bitmap_length = (len(fields) + 7 + 2) // 8
-        null_bitmap = utils.intread(packet[0:null_bitmap_length])
+        null_bitmap = [int(i) for i in packet[0:null_bitmap_length]]
         packet = packet[null_bitmap_length:]
 
         values = []
         for pos, field in enumerate(fields):
-            if null_bitmap & 1 << (pos + 2):
+            if null_bitmap[int((pos+2)/8)] & (1 << (pos + 2) % 8):
                 values.append(None)
                 continue
             elif field[1] in (FieldType.TINY, FieldType.SHORT,
