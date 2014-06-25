@@ -139,7 +139,10 @@ class MySQLClearPasswordAuthPlugin(BaseAuthPlugin):
             return b'\x00'
         password = self._password
 
-        if isinstance(self._password, str):
+        if PY2:
+            if isinstance(password, unicode):  # pylint: disable=E0602
+                password = password.encode('utf8')
+        elif isinstance(password, str):
             password = password.encode('utf8')
 
         return password + b'\x00'
@@ -161,7 +164,10 @@ class MySQLSHA256PasswordAuthPlugin(BaseAuthPlugin):
             return b'\x00'
         password = self._password
 
-        if isinstance(self._password, str):
+        if PY2:
+            if isinstance(password, unicode):  # pylint: disable=E0602
+                password = password.encode('utf8')
+        elif isinstance(password, str):
             password = password.encode('utf8')
 
         return password + b'\x00'

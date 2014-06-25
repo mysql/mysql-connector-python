@@ -1,0 +1,13 @@
+[group1]
+option1 = 15
+option2 = 20
+
+[group2]
+option1 = 20
+option2 = 30
+
+[group4]
+option3 = 200
+
+[client]
+user = spam
