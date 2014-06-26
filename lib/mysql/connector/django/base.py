@@ -385,7 +385,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return value
 
     def value_to_db_datetime(self, value):
-        if not value:
+        if value is None:
             return None
         # MySQL doesn't support tz-aware times
         if timezone.is_aware(value):
@@ -405,7 +405,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return self.connection.connection.converter._datetime_to_mysql(value)
 
     def value_to_db_time(self, value):
-        if not value:
+        if value is None:
             return None
 
         # MySQL doesn't support tz-aware times
