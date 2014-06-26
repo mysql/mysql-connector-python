@@ -207,3 +207,34 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
 
 
+class DjangoDatabaseOperations(tests.MySQLConnectorTests):
+
+    """Test the Django base.DatabaseOperations class"""
+
+    def setUp(self):
+        dbconfig = tests.get_mysql_config()
+        self.conn = mysql.connector.connect(**dbconfig)
+        self.cnx = DatabaseWrapper(settings.DATABASES['default'])
+        self.dbo = DatabaseOperations(self.cnx)
+
+    def test_value_to_db_time(self):
+        self.assertEqual(None, self.dbo.value_to_db_time(None))
+
+        value = datetime.time(0, 0, 0)
+        exp = self.conn.converter._time_to_mysql(value)
+        self.assertEqual(exp, self.dbo.value_to_db_time(value))
+
+        value = datetime.time(2, 5, 7)
+        exp = self.conn.converter._time_to_mysql(value)
+        self.assertEqual(exp, self.dbo.value_to_db_time(value))
+
+    def value_to_db_datetime(self, value):
+        self.assertEqual(None, self.dbo.value_to_db_datetime(None))
+
+        value = datetime.datetime(1, 1, 1)
+        exp = self.conn.converter._datetime_to_mysql(value)
+        self.assertEqual(exp, self.dbo.value_to_db_datetime(value))
+
+        value = datetime.time(2,5,7, 10, 10)
+        exp = self.conn.converter._datetime_to_mysql(value)
+        self.assertEqual(exp, self.dbo.value_to_db_datetime(value))
