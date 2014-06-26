@@ -7,19 +7,9 @@ include version.py
 include unittests.py
 include MANIFEST.in
 
-include python2/__init__.py
-recursive-include python2/examples *.py
-recursive-include python2/mysql *.py
-
-include python3/__init__.py
-recursive-include python3/mysql *.py
-recursive-include python3/examples *.py
-
-include python23/__init__.py
-recursive-include python23/django *.py
-recursive-include python23/fabric *.py
-recursive-include python23/tests23 *.py
-
+recursive-include examples *.py
+recursive-include lib *.py
+recursive-include support
 recursive-include tests *.py *.csv pylint*.rc *.pem
 
 include docs/README_DOCS.txt

@@ -1,19 +1,94 @@
-================================================
-MySQL Connector/Python - Release Notes & Changes
-================================================
+
+MySQL Connector/Python v2.0
+===========================
 
 MySQL Connector/Python
 Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
 
-Full release notes:
+See the 'LICENSE.txt' file for additional license information.
+
+Change history at the bottom of this file or online:
+
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
 
+Requirements & Dependencies
+---------------------------
+
+MySQL Connector/Python v2.0 works with:
+
+- Python v2.6 and v2.7
+- Python v3.3 and later
+
+Although earlier versions of MySQL Server might work, we recommend MySQL 5.6
+or later. Connector/Python will not work with MySQL 4.0 or earlier.
+
+
+Download & Installation
+-----------------------
+
+MySQL Connector/Python comes packaged for a few platforms. You will find
+RPM, Apple OS X, Debian and Windows packages here:
+
+ http://dev.mysql.com/downloads/connector/python/
+
+We also provide Platform Independent packages as ZIP or TAR archives. These,
+when unpacked, can be used to install the connector on any platform on
+which a supported version of Python is installed.
+
+To install Connector/Python using the ZIP or TAR archive, using a Terminal:
+
+  shell> tar xzf mysql-connector-python-2.0.0.tar.gz
+  shell> cd mysql-connector-python-2.0.0/
+  shell> python setup.py install
+
+For Windows, you can use a GUI tool to unarchive the ZIP distribution.
+
+It is also possible to use the Python tool `pip` to install packages through
+the Python Package Index (PyPI).
+
+After installing `pip` (comes with Python 3.4):
+
+  shell> pip install mysql-connector-python
+
+Note that newer `pip` versions require an extra option to allow external
+packages:
+
+  shell> pip install --allow-external mysql-connector-python \
+    mysql-connector-python
+
+
+Documentation & Examples
+------------------------
+
+Documentation for all Connector/Python versions can be found online here:
+
+ http://dev.mysql.com/doc/connector-python/en/index.html
+
+The source distribution of Connector/Python also contains example scripts.
+They can be found in the examples/ directory.
+
+
+Bug reports & Discussion
+------------------------
+
+Please use the following URL to report bugs:
+
+ http://bugs.mysql.com
+
+We also have a forum where you can discuss Connector/Python:
+
+ http://forums.mysql.com/list.php?50
+
+
 v2.0.0a1
-========
+--------
 
-Released on (not yet released)
-
-* (features + bug fixes)
-
+- BUG18843153: Fix Django to check connection on each request
+- WL7937: Allow LOAD DATA LOCAL INFILE by default
+- BUG18742429: Fix prepared statements returning lots of columns
+- BUG18814880: Fix stopping mysqld running unit tests on Windows
+- WL7292: Add cursors returning dict and namedtuple as rows
+- WL7462: Consolidate Python v2 and v3 code
+- WL7716: Move commercial files and distribution to CPYINT
 
