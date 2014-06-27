@@ -9,8 +9,8 @@ include MANIFEST.in
 
 recursive-include examples *.py
 recursive-include lib *.py
-recursive-include support
-recursive-include tests *.py *.csv pylint*.rc *.pem
+recursive-include support *.py pylint*.rc
+recursive-include tests *.py *.csv *.pem
 
 include docs/README_DOCS.txt
 
