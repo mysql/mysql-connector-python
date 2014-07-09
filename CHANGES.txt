@@ -11,6 +11,7 @@ Full release notes:
 v2.0.0a1
 ========
 
+- BUG19169990: Fix sending/receiving using compressed connection
 - BUG18956789: Fix Django TimeField 00:00:00 converting to MySQL NULL
 - WL7228: Allow Connector/Python to use MySQL option files
 - BUG18843153: Fix Django to check connection on each request

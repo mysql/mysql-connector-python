@@ -36,11 +36,11 @@ to be created first.
 """
 
 import os
-import sys
 import gc
 import tempfile
 from datetime import datetime, timedelta
 from threading import Thread
+import traceback
 import time
 import unittest
 
@@ -48,7 +48,6 @@ import tests
 from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
-from mysql.connector import connect, _CONNECTION_POOLS
 import mysql.connector
 
 
@@ -2613,3 +2612,25 @@ class BugOra18742429(tests.MySQLConnectorTests):
         self.cursor.execute(stmt, (0,))
         self.assertEqual(exp, self.cursor.fetchone())
 
+
+class BugOra19169990(tests.MySQLConnectorTests):
+    """BUG#19169990: Issue with compressed cnx using Python 2
+    """
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config['compress'] = True
+
+    def test_compress(self):
+        for charset in ('utf8', 'latin1', 'latin7'):
+            self.config['charset'] = charset
+            try:
+                cnx = connection.MySQLConnection(**self.config)
+                cur = cnx.cursor()
+                cur.execute("SELECT %s", ('mysql'*10000,))
+            except TypeError:
+                traceback.print_exc()
+                self.fail("Failed setting up compressed cnx using {0}".format(
+                    charset
+                ))
+            except errors.Error:
+                self.fail("Failed sending/retrieving compressed data")
