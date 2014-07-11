@@ -45,10 +45,10 @@ DEFAULT_EXTENSIONS = {
 }
 
 
-class MySQLOptionsParser(SafeConfigParser):
+class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
     """This class implements methods to parse MySQL option files"""
 
-    def __init__(self, files=None, keep_dashes=True):
+    def __init__(self, files=None, keep_dashes=True):  # pylint: disable=W0231
         """Initialize
 
         If defaults is True, default option files are read first
@@ -137,7 +137,7 @@ class MySQLOptionsParser(SafeConfigParser):
             raise ValueError("File(s) {0} could not be read.".format(
                 ', '.join(not_read_files)))
 
-    def read(self, filenames):
+    def read(self, filenames):  # pylint: disable=W0221
         """Read and parse a filename or a list of filenames.
 
         Overridden from ConfigParser and modified so as to allow options

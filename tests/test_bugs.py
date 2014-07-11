@@ -2634,3 +2634,25 @@ class BugOra19169990(tests.MySQLConnectorTests):
                 ))
             except errors.Error:
                 self.fail("Failed sending/retrieving compressed data")
+
+
+class BugOra19184025(tests.MySQLConnectorTests):
+    """BUG#19184025: FIRST NULL IN ROW RETURNS REST OF ROW AS NONE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug19184025'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = "CREATE TABLE {0} (c1 INT, c2 INT NOT NULL DEFAULT 2)".format(
+            self.tbl
+        )
+        self.cur.execute(create)
+
+    def test_row_to_python(self):
+        self.cur.execute("INSERT INTO {0} (c1) VALUES (NULL)".format(self.tbl))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((None, 2), self.cur.fetchone())

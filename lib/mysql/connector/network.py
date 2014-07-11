@@ -143,7 +143,7 @@ class BaseMySQLSocket(object):
                 tmpbuf = bytearray()
                 for pkt in pkts:
                     tmpbuf += pkt
-                tmpbuf = buffer(tmpbuf)
+                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
             else:
                 tmpbuf = b''.join(pkts)
             del pkts
@@ -153,7 +153,7 @@ class BaseMySQLSocket(object):
                       + struct.pack('<B', seqid)
                       + b'\x00\x40\x00')
             if PY2:
-                header = buffer(header)
+                header = buffer(header)  # pylint: disable=E0602
             zpkts.append(header + zbuf)
             tmpbuf = tmpbuf[16384:]
             pllen = len(tmpbuf)
@@ -164,7 +164,7 @@ class BaseMySQLSocket(object):
                           + struct.pack('<B', seqid)
                           + b'\xff\xff\xff')
                 if PY2:
-                    header = buffer(header)
+                    header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + zbuf)
                 tmpbuf = tmpbuf[maxpktlen:]
                 pllen = len(tmpbuf)
@@ -175,14 +175,14 @@ class BaseMySQLSocket(object):
                           + struct.pack('<B', seqid)
                           + struct.pack('<I', pllen)[0:3])
                 if PY2:
-                    header = buffer(header)
+                    header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + zbuf)
             del tmpbuf
         else:
             pkt = (struct.pack('<I', pllen)[0:3] +
                    struct.pack('<B', pktnr) + buf)
             if PY2:
-                pkt = buffer(pkt)
+                pkt = buffer(pkt)  # pylint: disable=E0602
             pllen = len(pkt)
             if pllen > 50:
                 zbuf = zlib.compress(pkt)
@@ -195,7 +195,7 @@ class BaseMySQLSocket(object):
                           + struct.pack('<B', 0)
                           + struct.pack('<I', 0)[0:3])
                 if PY2:
-                    header = buffer(header)
+                    header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + pkt)
 
         for zip_packet in zpkts:

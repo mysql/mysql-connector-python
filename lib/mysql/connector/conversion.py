@@ -367,7 +367,8 @@ class MySQLConverter(MySQLConverterBase):
             field_type = field[1]
 
             if (row[i] == 0 and field_type != FieldType.BIT) or row[i] is None:
-                # Don't go further when we hit a NULL value
+                # Don't convert NULL value
+                i += 1
                 continue
 
             try:
@@ -376,7 +377,7 @@ class MySQLConverter(MySQLConverterBase):
                 # If one type is not defined, we just return the value as str
                 result[i] = row[i].decode('utf-8')
             except (ValueError, TypeError) as err:
-                err.message = "{0} (field {1})".format(err.message, field[0])
+                err.message = "{0} (field {1})".format(str(err), field[0])
                 raise
 
             i += 1
