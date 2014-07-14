@@ -185,6 +185,10 @@ class MySQLConverter(MySQLConverterBase):
         """Convert value to bytes"""
         return value
 
+    def _bytearray_to_mysql(self, value):
+        """Convert value to bytes"""
+        return str(value)
+
     def _bool_to_mysql(self, value):
         """Convert value to boolean"""
         if value:

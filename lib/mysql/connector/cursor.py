@@ -434,14 +434,19 @@ class MySQLCursor(CursorBase):
         given query_iter (result of MySQLConnection.cmd_query_iter()) and
         the list of statements that were executed.
         """
-        if not self._executed_list:
-            self._executed_list = RE_SQL_SPLIT_STMTS.split(self._executed)
+        executed_list = RE_SQL_SPLIT_STMTS.split(self._executed)
 
-        for stmt in self._executed_list:
+        i = 0
+        while True:
             result = next(query_iter)
             self._reset_result()
             self._handle_result(result)
-            self._executed = stmt
+            try:
+                self._executed = executed_list[i].strip()
+                i += 1
+            except IndexError:
+                self._executed = executed_list[0]
+
             yield self
 
     def execute(self, operation, params=None, multi=False):
