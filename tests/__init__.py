@@ -205,6 +205,9 @@ def get_test_modules():
             # Skip django testing completely when Django is not available.
             LOGGER.warning("Django tests will not run: Django not available")
             continue
+        if 'fabric' in module:
+            LOGGER.warning("Fabric tests are disabled in full run")
+            continue
         testcases.append(
             'tests.{module}'.format(module=module))
         LOGGER.debug('Added tests.{module}'.format(module=module))
