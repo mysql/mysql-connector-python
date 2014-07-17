@@ -2640,3 +2640,41 @@ class BugOra19164627(tests.MySQLConnectorTests):
         cur.execute('DROP TABLE IF EXISTS BugOra19164627')
         cur.close()
         cnx.close()
+
+
+class BugOra19225481(tests.MySQLConnectorTests):
+    """BUG#19225481: FLOATING POINT INACCURACY WITH PYTHON v2
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        self.tbl = 'Bug19225481'
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = 'CREATE TABLE {0}(col1 DOUBLE)'.format(
+            self.tbl)
+
+        self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+        self.cursor.close()
+        self.cnx.close()
+
+    def test_columns(self):
+        values = [
+            (123.123456789987,),
+            (234.234,),
+            (12.12,),
+            (111.331,),
+            (0.0,),
+            (-99.99999900099,)
+        ]
+        stmt = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        self.cursor.executemany(stmt, values)
+
+        stmt = "SELECT * FROM {0}".format(self.tbl)
+        self.cursor.execute(stmt)
+        self.assertEqual(values, self.cursor.fetchall())
