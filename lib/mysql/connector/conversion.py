@@ -333,7 +333,10 @@ class MySQLConverter(MySQLConverterBase):
             return self._cache_field_types[flddsc[1]](value, flddsc)
         except KeyError:
             # If one type is not defined, we just return the value as str
-            return value.decode('utf-8')
+            try:
+                return value.decode('utf-8')
+            except UnicodeDecodeError:
+                return value
         except ValueError as err:
             raise ValueError("%s (field %s)" % (err, flddsc[0]))
         except TypeError as err:
@@ -374,7 +377,10 @@ class MySQLConverter(MySQLConverterBase):
                 result[i] = self._cache_field_types[field_type](row[i], field)
             except KeyError:
                 # If one type is not defined, we just return the value as str
-                result[i] = row[i].decode('utf-8')
+                try:
+                    result[i] = row[i].decode('utf-8')
+                except UnicodeDecodeError:
+                    result[i] = row[i]
             except (ValueError, TypeError) as err:
                 err.message = "{0} (field {1})".format(err.message, field[0])
                 raise
