@@ -426,6 +426,7 @@ class MySQLTCPSocket(BaseMySQLSocket):
         """Open the TCP/IP connection to the MySQL server
         """
         # Get address information
+        addrinfo = None
         try:
             addrinfos = socket.getaddrinfo(self.server_host,
                                            self.server_port,
