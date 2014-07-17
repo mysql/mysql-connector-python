@@ -25,17 +25,21 @@
 DATABASES = {
     'default': {
         'ENGINE': 'mysql.connector.django',
-        'NAME': 'django_tests',
+        'NAME': 'cpydjango1',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': '127.0.0.1',
         'PORT': 13001,
         'TEST_CHARSET': 'utf8',
         'TEST_COLLATION': 'utf8_general_ci',
+        'TEST': {
+            'CHARSET': 'utf8',
+            'COLLATION': 'utf8_general_ci',
+        }
     },
     'other': {
         'ENGINE': 'mysql.connector.django',
-        'NAME': 'django_tests',
+        'NAME': 'cpydjango1',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': '127.0.0.1',
@@ -43,6 +47,11 @@ DATABASES = {
         'TEST_CHARSET': 'utf8',
         'TEST_COLLATION': 'utf8_general_ci',
         'TEST_MIRROR': 'default',
+        'TEST': {
+            'CHARSET': 'utf8',
+            'COLLATION': 'utf8_general_ci',
+            'MIRROR': 'default',
+        }
     }
 }
 

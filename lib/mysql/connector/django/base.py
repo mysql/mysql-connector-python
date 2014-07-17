@@ -18,7 +18,9 @@ Requires and comes with MySQL Connector/Python v1.1 and later:
 from __future__ import unicode_literals
 
 import sys
+
 import django
+from django.utils.functional import cached_property
 
 try:
     import mysql.connector
@@ -41,7 +43,12 @@ if version < (1, 1):
         "is required; you have %s" % mysql.connector.__version__)
 
 from django.db import utils
-from django.db.backends import *
+if django.VERSION < (1, 7):
+    from django.db.backends import util
+else:
+    from django.db.backends import utils as backend_utils
+from django.db.backends import (BaseDatabaseFeatures, BaseDatabaseOperations,
+                                BaseDatabaseWrapper)
 from django.db.backends.signals import connection_created
 from django.utils import (six, timezone, dateparse)
 from django.conf import settings
@@ -50,6 +57,8 @@ from mysql.connector.django.client import DatabaseClient
 from mysql.connector.django.creation import DatabaseCreation
 from mysql.connector.django.introspection import DatabaseIntrospection
 from mysql.connector.django.validation import DatabaseValidation
+if django.VERSION >= (1, 7):
+    from mysql.connector.django.schema import DatabaseSchemaEditor
 
 try:
     import pytz
@@ -69,7 +78,7 @@ class DjangoMySQLConverter(MySQLConverter):
 
         Returns datetime.time()
         """
-        return dateparse.parse_time(value)
+        return dateparse.parse_time(value.decode('utf-8'))
 
     def _DATETIME_to_python(self, value, dsc=None):
         """Connector/Python always returns naive datetime.datetime
@@ -102,8 +111,10 @@ class CursorWrapper(object):
         """Wrapper around execute() and executemany()"""
         try:
             return method(query, args)
-        except (mysql.connector.ProgrammingError,
-                mysql.connector.IntegrityError) as err:
+        except (mysql.connector.ProgrammingError) as err:
+            six.reraise(utils.ProgrammingError,
+                        utils.ProgrammingError(err.msg), sys.exc_info()[2])
+        except (mysql.connector.IntegrityError) as err:
             six.reraise(utils.IntegrityError,
                         utils.IntegrityError(err.msg), sys.exc_info()[2])
         except mysql.connector.OperationalError as err:
@@ -127,7 +138,7 @@ class CursorWrapper(object):
         This wrapper method around the executemany()-method of the cursor is
         mainly needed to re-raise using different exceptions.
         """
-        return self._execute_wrapper(self.cursor.execute, query, args)
+        return self._execute_wrapper(self.cursor.executemany, query, args)
 
     def __getattr__(self, attr):
         """Return attribute of wrapped cursor"""
@@ -136,6 +147,12 @@ class CursorWrapper(object):
     def __iter__(self):
         """Returns iterator over wrapped cursor"""
         return iter(self.cursor)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.close()
 
 
 class DatabaseFeatures(BaseDatabaseFeatures):
@@ -154,14 +171,19 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_select_for_update_nowait = False
     supports_forward_references = False
     supports_long_model_names = False
+    supports_binary_field = six.PY2
     supports_microsecond_precision = False  # toggled in __init__()
     supports_regex_backreferencing = False
     supports_date_lookup_using_string = False
+    can_introspect_binary_field = False
+    can_introspect_boolean_field = False
     supports_timezones = False
     requires_explicit_null_ordering_when_grouping = True
+    allows_auto_pk_0 = False
     allows_primary_key_0 = False
     uses_savepoints = True
     atomic_transactions = False
+    supports_column_check_constraints = False
 
     def __init__(self, connection):
         super(DatabaseFeatures, self).__init__(connection)
@@ -172,6 +194,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             return True
         return False
 
+    @cached_property
     def _mysql_storage_engine(self):
         """Get default storage engine of MySQL
 
@@ -180,28 +203,30 @@ class DatabaseFeatures(BaseDatabaseFeatures):
 
         Used by Django tests.
         """
-        cursor = self.connection.cursor()
         tblname = 'INTROSPECT_TEST'
 
         droptable = 'DROP TABLE IF EXISTS {table}'.format(table=tblname)
+        with self.connection.cursor() as cursor:
+            cursor.execute(droptable)
+            cursor.execute('CREATE TABLE {table} (X INT)'.format(table=tblname))
 
-        cursor.execute(droptable)
-        cursor.execute('CREATE TABLE {table} (X INT)'.format(table=tblname))
+            if self.connection.server_version >= (5, 0, 0):
+                cursor.execute(
+                    "SELECT ENGINE FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                    (self.connection.settings_dict['NAME'], tblname))
+                engine = cursor.fetchone()[0]
+            else:
+                # Very old MySQL servers..
+                cursor.execute("SHOW TABLE STATUS WHERE Name='{table}'".format(
+                    table=tblname))
+                engine = cursor.fetchone()[1]
+            cursor.execute(droptable)
 
-        if self.connection.server_version >= (5, 0, 0):
-            cursor.execute(
-                "SELECT ENGINE FROM INFORMATION_SCHEMA.TABLES "
-                "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
-                (self.connection.settings_dict['NAME'], tblname))
-            engine = cursor.fetchone()[0]
-        else:
-            # Very old MySQL servers..
-            cursor.execute("SHOW TABLE STATUS WHERE Name='{table}'".format(
-                table=tblname))
-            engine = cursor.fetchone()[1]
-        cursor.execute(droptable)
+        self._cached_storage_engine = engine
         return engine
 
+    @cached_property
     def can_introspect_foreign_keys(self):
         """Confirm support for introspected foreign keys
 
@@ -210,6 +235,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         """
         return self._mysql_storage_engine == 'InnoDB'
 
+    @cached_property
     def has_zoneinfo_database(self):
         """Tests if the time zone definitions are installed
 
@@ -223,13 +249,20 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         if not HAVE_PYTZ:
             return False
 
-        cursor = self.connection.cursor()
-        cursor.execute("SELECT 1 FROM mysql.time_zone LIMIT 1")
-        return cursor.fetchall() != []
+        with self.connection.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM mysql.time_zone LIMIT 1")
+            return cursor.fetchall() != []
 
 
 class DatabaseOperations(BaseDatabaseOperations):
     compiler_module = "mysql.connector.django.compiler"
+
+    # MySQL stores positive fields as UNSIGNED ints.
+    if django.VERSION >= (1, 7):
+        integer_field_ranges = dict(BaseDatabaseOperations.integer_field_ranges,
+                                    PositiveSmallIntegerField=(0, 4294967295),
+                                    PositiveIntegerField=(
+                                        0, 18446744073709551615),)
 
     def date_extract_sql(self, lookup_type, field_name):
         # http://dev.mysql.com/doc/mysql/en/date-and-time-functions.html
@@ -250,7 +283,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         The field_name is returned when lookup_type is not supported.
         """
         fields = ['year', 'month', 'day', 'hour', 'minute', 'second']
-        format = ('%%Y-', '%%m', '-%%d', ' %%H:', '%%i', ':%%s')
+        format = ('%Y-', '%m', '-%d', ' %H:', '%i', ':%s')
         format_def = ('0000-', '01', '-01', ' 00:', '00', ':00')
         try:
             i = fields.index(lookup_type) + 1
@@ -290,7 +323,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             params = []
         fields = ['year', 'month', 'day', 'hour', 'minute', 'second']
-        format_ = ('%%Y-', '%%m', '-%%d', ' %%H:', '%%i', ':%%s')
+        format_ = ('%Y-', '%m', '-%d', ' %H:', '%i', ':%s')
         format_def = ('0000-', '01', '-01', ' 00:', '00', ':00')
         try:
             i = fields.index(lookup_type) + 1
@@ -379,7 +412,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def validate_autopk_value(self, value):
         # MySQLism: zero in AUTO_INCREMENT field does not work. Refs #17653.
-        if not value:
+        if value == 0:
             raise ValueError('The database backend does not accept 0 as a '
                              'value for AutoField.')
         return value
@@ -453,6 +486,15 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def savepoint_rollback_sql(self, sid):
         return "ROLLBACK TO SAVEPOINT {0}".format(sid)
+
+    def combine_expression(self, connector, sub_expressions):
+        """
+        MySQL requires special cases for ^ operators in query expressions
+        """
+        if connector == '^':
+            return 'POW(%s)' % ','.join(sub_expressions)
+        return super(DatabaseOperations, self).combine_expression(
+            connector, sub_expressions)
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):
@@ -681,8 +723,18 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def _set_autocommit(self, autocommit):
         # Django 1.6
-        self.connection.autocommit = autocommit
+        with self.wrap_database_errors:
+            self.connection.autocommit = autocommit
+
+    def schema_editor(self, *args, **kwargs):
+        """Returns a new instance of this backend's SchemaEditor"""
+        # Django 1.7
+        return DatabaseSchemaEditor(self, *args, **kwargs)
 
     def is_usable(self):
         # Django 1.6
         return self.connection.is_connected()
+
+    @property
+    def mysql_version(self):
+        return self.server_version

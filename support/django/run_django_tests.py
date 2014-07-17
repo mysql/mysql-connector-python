@@ -37,9 +37,9 @@ See the MySQL manual for information on how to change the default storage
 engine:
  http://dev.mysql.com/doc/refman/5.6/en/storage-engine-setting.html
 
-Make sure the database 'django_tests' has been created on the Master and is
+Make sure the database 'cpydjango1' has been created on the Master and is
 also available on the slave.
- CREATE DATABASE django_tests DEFAULT CHARACTER SET utf8;
+ CREATE DATABASE cpydjango1 DEFAULT CHARACTER SET utf8;
 
 Test settings
 -------------
@@ -87,8 +87,13 @@ DJANGO = {
     ),
     '1.6': (
         'django-1.6.tar.gz',
-	    'https://www.djangoproject.com/m/releases/1.6/Django-1.6.tar.gz',
+        'https://www.djangoproject.com/m/releases/1.6/Django-1.6.tar.gz',
     ),
+    '1.7': (
+        'django-1.7.tar.gz',
+        'https://www.djangoproject.com/m/releases/1.7/Django-1.7c1.tar.gz',
+    ),
+
 }
 
 PROXIES = {
@@ -97,8 +102,9 @@ PROXIES = {
 }
 
 TEST_GROUPS = {
-    'model': 'modeltests',
-    'regression': 'regressiontests',
+    'basic': ['basic'],
+    'db': ['inspectdb'],
+    'all': [],
 }
 
 logger = logging.getLogger(os.path.basename(__file__).replace('.py', ''))
@@ -125,10 +131,19 @@ def get_args():
         help="don't check online or download any thing"
     )
     parser.add_argument(
-        '--django', required=True, choices=DJANGO.keys(),
+        '--django', required=False, choices=DJANGO.keys(),
         help="Django version to tests, possible values: {versions}".format(
             versions=', '.join(DJANGO.keys()))
     )
+    parser.add_argument(
+        '--django-path', required=False,
+        help="Path to Django source"
+    )
+    parser.add_argument(
+        '--settings', required=False,
+        help="Module containing Django Settings (note: not file)"
+    )
+
     parser.add_argument(
         '--group', choices=TEST_GROUPS.keys(),
         help=("specify which group of tests to run; other tests on command "
@@ -138,7 +153,7 @@ def get_args():
 
     if args.group and args.tests:
         logger.warning(
-            "Executing tests from '{group}'; discarting specific tests."
+            "Executing tests from '{group}'; discarding specific tests."
             "".format(group=args.group)
         )
         args.tests = None
@@ -156,7 +171,6 @@ def download(url, local_file=None):
 
     if not local_file:
         local_file = os.path.basename(url)
-
     # Don't download the same file again, or remove when different
     if os.path.exists(local_file):
         content_length = int(urlfp.info().get('Content-Length'))
@@ -186,7 +200,7 @@ def _check_urls():
     the given URL scheme. If not, a warning will be logged.
     """
     checked = []
-    for info in DJANGO.items()[1]:
+    for info in DJANGO.values():
         url = info[1]
         scheme = urlparse(url).scheme
         try:
@@ -231,62 +245,24 @@ def _unpack(archive_file):
     return rootdir
 
 
-def _install_connector(install_root):
-    """Install Connector/Python in working directory
-    """
-    logfile = 'myconnpy_install.log'
-    logger.info("Installing Connector/Python in {0}".format(install_root))
-    try:
-        # clean up previous run
-        if os.path.exists(logfile):
-            os.unlink(logfile)
-        shutil.rmtree(install_root)
-    except OSError:
-        pass
-    cmd = [
-        sys.executable,
-        'setup.py',
-        'clean', '--all',  # necessary for removing the build/
-        'install',
-        '--root', install_root,
-        '--install-lib', ''
-    ]
-    prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-                           cwd=os.path.join('..', '..'))
-    returncode = prc.wait()
-    if returncode is not 0:
-        stdout = prc.communicate()[0]
-        with open(logfile, 'w') as logfp:
-            logfp.write(stdout.decode('utf8'))
-        logger.error("Failed installing Connector/Python, see {log}".format(
-            log=logfile))
-        sys.exit(1)
-
-
-def django_tests(version, archive, myconnpy, tests=None, group=None):
+def django_tests(django_version, django_root, myconnpy, tests=None, group=None,
+                 settings=None):
     """Run Django unit tests
     """
-    try:
-        django_root = _unpack(archive)
-    except IOError as err:
-        logger.error("Failed unpacking: {err}".format(err=str(err)))
-        sys.exit(1)
-    except AttributeError:
-        logger.error("Failed unpacking: {err}".format(err=str(err)))
-        sys.exit(1)
-
     if not (tests or group):
         logger.info("No specific tests or groups specified; running all tests")
 
     cwd = os.getcwd()
-    os.chdir(os.path.join(cwd, django_root, 'tests'))
+    os.chdir(os.path.join(django_root, 'tests'))
     logger.debug("Running tests from folder {0}".format(os.getcwd()))
     env = {
         'PATH': os.environ.get('PATH'),
-        'PYTHONPATH': '{myconnpy}:../:../..'.format(myconnpy=myconnpy,
-                                                    maj=PYMAJ),
+        'PYTHONPATH': '{myconnpy}:{django_root}:'
+                      '{cwd}:{cwd}/../:{cwd}/../..'.format(
+            myconnpy=myconnpy, cwd=cwd, django_root=django_root),
     }
+    if os.environ.get('DYLD_LIBRARY_PATH') is not None:
+        env['DYLD_LIBRARY_PATH'] = os.environ.get('DYLD_LIBRARY_PATH')
 
     django_script = 'runtests.py'
 
@@ -296,19 +272,33 @@ def django_tests(version, archive, myconnpy, tests=None, group=None):
         '-W', 'ignore::DeprecationWarning',
         django_script,
         '--noinput',
-        '--settings', 'test_mysqlconnector_settings',
         '--verbosity', '1'
     ]
 
-    if group:
-        args += os.walk(TEST_GROUPS[group]).next()[1]
-    elif tests:
-        args += tests
+    if settings:
+        args.extend(['--settings', settings])
+    else:
+        args.extend(['--settings', 'test_mysqlconnector_settings'])
 
-    logger.info("Executing Django {ver} '{script}' script..".format(
-        ver=version, script=django_script)
+    if group:
+        args.extend(TEST_GROUPS[group])
+    elif tests:
+        args.extend(tests)
+
+    logger.info("Executing '{script}' script..".format(
+        script=django_script)
     )
     os.execve(sys.executable, args, env)
+
+
+def get_django_version(path):
+
+    VERSION = [999, 0, 0, 'a', 0]  # Set correct after version.py is loaded
+    py_module = os.path.join(path, 'django', '__init__.py')
+    with open(py_module, 'rb') as fp:
+        exec(compile(fp.read(), py_module, 'exec'))
+
+    return VERSION
 
 
 def main():
@@ -339,20 +329,38 @@ def main():
 
     _check_urls()
 
-    archive, url = DJANGO[args.django]
-    if not args.offline:
-        try:
-            download(url, archive)
-        except (URLError, HTTPError, TypeError) as err:
-            logger.error("Error downloading Django {name}: {error}".format(
-                name=args.django, error=err.reason)
-            )
-            sys.exit(1)
+    if not args.django_path and not args.django:
+        logger.error("Need either --django or --django-path")
+        sys.exit(1)
 
-    myconnpy_install = os.path.join(os.getcwd(), 'test_install')
-    _install_connector(myconnpy_install)
-    django_tests(args.django, archive, myconnpy=myconnpy_install,
-                 tests=args.tests, group=args.group,)
+    if args.django_path and os.path.isdir(args.django_path):
+        django_path = os.path.abspath(args.django_path)
+    else:
+        archive, url = DJANGO[args.django]
+        if not args.offline:
+            try:
+                download(url, archive)
+            except (URLError, HTTPError, TypeError) as err:
+                logger.error("Error downloading Django {name}: {error}".format(
+                    name=args.django, error=err.reason)
+                )
+                sys.exit(1)
+            try:
+                cwd = os.getcwd()
+                django_path = os.path.join(cwd, _unpack(archive))
+            except IOError as err:
+                logger.error("Failed unpacking: {err}".format(err=str(err)))
+                sys.exit(1)
+            except AttributeError:
+                logger.error("Failed unpacking: {err}".format(err=str(err)))
+                sys.exit(1)
+
+    django_version = get_django_version(django_path)
+    logger.info("Using Django %d.%d.%d", *django_version[0:3])
+
+    myconnpy_install = os.path.join(os.getcwd(), '..', '..', 'lib')
+    django_tests(django_version, django_path, myconnpy=myconnpy_install,
+                 tests=args.tests, group=args.group, settings=args.settings)
 
 if __name__ == '__main__':
     main()

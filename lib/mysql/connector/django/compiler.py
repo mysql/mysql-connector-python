@@ -13,7 +13,7 @@ class SQLCompiler(compiler.SQLCompiler):
         bool_fields = ("BooleanField", "NullBooleanField")
         for value, field in zip_longest(row[index_extra_select:], fields):
             if (field and field.get_internal_type() in bool_fields and
-                value in (0, 1)):
+                    value in (0, 1)):
                 value = bool(value)
             values.append(value)
         return row[:index_extra_select] + tuple(values)
