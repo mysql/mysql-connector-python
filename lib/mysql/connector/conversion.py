@@ -138,7 +138,10 @@ class MySQLConverter(MySQLConverterBase):
         """
         if isinstance(buf, NUMERIC_TYPES):
             if PY2:
-                return str(buf)
+                if isinstance(buf, float):
+                    return repr(buf)
+                else:
+                    return str(buf)
             else:
                 return str(buf).encode('ascii')
         elif isinstance(buf, type(None)):
