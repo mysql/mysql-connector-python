@@ -2613,3 +2613,30 @@ class BugOra18742429(tests.MySQLConnectorTests):
         self.cursor.execute(stmt, (0,))
         self.assertEqual(exp, self.cursor.fetchone())
 
+
+class BugOra19164627(tests.MySQLConnectorTests):
+    """BUG#19164627: Cursor tries to decode LINESTRING data as utf-8
+    """
+    def test_linestring(self):
+        config = tests.get_mysql_config()
+        cnx = mysql.connector.connect(**config)
+        cur = cnx.cursor()
+
+        cur.execute('DROP TABLE IF EXISTS BugOra19164627')
+        cur.execute("CREATE TABLE BugOra19164627 ( "
+                    "id SERIAL PRIMARY KEY AUTO_INCREMENT NOT NULL, "
+                    "line LINESTRING NOT NULL "
+                    ") DEFAULT CHARSET=ascii")
+        cur.execute('INSERT IGNORE INTO BugOra19164627(id, line) '
+                    'VALUES (0,LINESTRING(POINT(0, 0), POINT(0, 1)))')
+
+        cur.execute("SELECT * FROM BugOra19164627 LIMIT 1")
+        self.assertEqual(cur.fetchone(), (1, b'\x00\x00\x00\x00\x01\x02\x00\x00'
+                                             b'\x00\x02\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\xf0?', ))
+        cur.execute('DROP TABLE IF EXISTS BugOra19164627')
+        cur.close()
+        cnx.close()
