@@ -26,6 +26,7 @@
 
 import sys
 
+
 class HexLiteral(str):
 
     """Class holding MySQL hex literals"""

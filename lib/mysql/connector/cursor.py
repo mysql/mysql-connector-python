@@ -464,6 +464,9 @@ class MySQLCursor(CursorBase):
         """
         if not operation:
             return None
+
+        if not self._connection:
+            raise errors.ProgrammingError("Cursor is not connected.")
         if self._connection.unread_result is True:
             raise errors.InternalError("Unread result found.")
 

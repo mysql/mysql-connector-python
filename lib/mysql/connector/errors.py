@@ -196,6 +196,8 @@ class Error(Exception):
                 fmt = '{errno}: {msg}'
             self._full_msg = fmt.format(**fields)
 
+        self.args = (self.errno, self._full_msg, self.sqlstate)
+
     def __str__(self):
         return self._full_msg
 
