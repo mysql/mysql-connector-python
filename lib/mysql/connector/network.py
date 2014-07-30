@@ -139,34 +139,50 @@ class BaseMySQLSocket(object):
         maxpktlen = constants.MAX_PACKET_LENGTH
         if pllen > maxpktlen:
             pkts = _prepare_packets(buf, pktnr)
-            tmpbuf = b''.join(pkts)
+            if PY2:
+                tmpbuf = bytearray()
+                for pkt in pkts:
+                    tmpbuf += pkt
+                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
+            else:
+                tmpbuf = b''.join(pkts)
             del pkts
             seqid = 0
             zbuf = zlib.compress(tmpbuf[:16384])
-            zpkts.append(struct.pack('<I', len(zbuf))[0:3]
-                         + struct.pack('<B', seqid)
-                         + b'\x00\x40\x00' + zbuf)
+            header = (struct.pack('<I', len(zbuf))[0:3]
+                      + struct.pack('<B', seqid)
+                      + b'\x00\x40\x00')
+            if PY2:
+                header = buffer(header)  # pylint: disable=E0602
+            zpkts.append(header + zbuf)
             tmpbuf = tmpbuf[16384:]
             pllen = len(tmpbuf)
             seqid = seqid + 1
             while pllen > maxpktlen:
                 zbuf = zlib.compress(tmpbuf[:maxpktlen])
-                zpkts.append(struct.pack('<I', len(zbuf))[0:3]
-                             + struct.pack('<B', seqid)
-                             + b'\xff\xff\xff' + zbuf)
+                header = (struct.pack('<I', len(zbuf))[0:3]
+                          + struct.pack('<B', seqid)
+                          + b'\xff\xff\xff')
+                if PY2:
+                    header = buffer(header)  # pylint: disable=E0602
+                zpkts.append(header + zbuf)
                 tmpbuf = tmpbuf[maxpktlen:]
                 pllen = len(tmpbuf)
                 seqid = seqid + 1
             if tmpbuf:
                 zbuf = zlib.compress(tmpbuf)
-                zpkts.append(struct.pack('<I', len(zbuf))[0:3]
-                             + struct.pack('<B', seqid)
-                             + struct.pack('<I', pllen)[0:3]
-                             + zbuf)
+                header = (struct.pack('<I', len(zbuf))[0:3]
+                          + struct.pack('<B', seqid)
+                          + struct.pack('<I', pllen)[0:3])
+                if PY2:
+                    header = buffer(header)  # pylint: disable=E0602
+                zpkts.append(header + zbuf)
             del tmpbuf
         else:
             pkt = (struct.pack('<I', pllen)[0:3] +
                    struct.pack('<B', pktnr) + buf)
+            if PY2:
+                pkt = buffer(pkt)  # pylint: disable=E0602
             pllen = len(pkt)
             if pllen > 50:
                 zbuf = zlib.compress(pkt)
@@ -175,10 +191,12 @@ class BaseMySQLSocket(object):
                              + struct.pack('<I', pllen)[0:3]
                              + zbuf)
             else:
-                zpkts.append(struct.pack('<I', pllen)[0:3]
-                             + struct.pack('<B', 0)
-                             + struct.pack('<I', 0)[0:3]
-                             + pkt)
+                header = (struct.pack('<I', pllen)[0:3]
+                          + struct.pack('<B', 0)
+                          + struct.pack('<I', 0)[0:3])
+                if PY2:
+                    header = buffer(header)  # pylint: disable=E0602
+                zpkts.append(header + pkt)
 
         for zip_packet in zpkts:
             try:
@@ -228,6 +246,7 @@ class BaseMySQLSocket(object):
         try:
             # Read the header of the MySQL packet, 4 bytes
             header = bytearray(b'')
+
             while len(header) < 4:
                 chunk = self.sock.recv(4)
                 if not chunk:
@@ -273,7 +292,7 @@ class BaseMySQLSocket(object):
         except IndexError:
             pass
 
-        header = init_bytearray(b'')
+        header = bytearray(b'')
         packets = []
         try:
             abyte = self.sock.recv(1)
@@ -308,19 +327,19 @@ class BaseMySQLSocket(object):
             raise errors.OperationalError(
                 errno=2055, values=(self.get_address(), _strioerror(err)))
 
-        tmp = []
+        tmp = init_bytearray(b'')
         for packet in packets:
             payload_length = struct_unpack("<I", header[4:7] + b'\x00')[0]
             if payload_length == 0:
                 tmp.append(packet[7:])
             else:
                 if PY2:
-                    tmp.append(zlib.decompress(
-                        buffer(packet[7:])))  # pylint: disable=E0602
+                    tmp += zlib.decompress(
+                        buffer(packet[7:]))  # pylint: disable=E0602
                 else:
-                    tmp.append(zlib.decompress(packet[7:]))
+                    tmp += zlib.decompress(packet[7:])
 
-        self._split_zipped_payload(b''.join(tmp))
+        self._split_zipped_payload(tmp)
         del tmp
 
         try:
@@ -407,6 +426,7 @@ class MySQLTCPSocket(BaseMySQLSocket):
         """Open the TCP/IP connection to the MySQL server
         """
         # Get address information
+        addrinfo = None
         try:
             addrinfos = socket.getaddrinfo(self.server_host,
                                            self.server_port,

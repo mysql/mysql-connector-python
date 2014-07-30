@@ -3,24 +3,12 @@ include LICENSE.txt
 include CHANGES.txt
 include setup.py
 include setupinfo.py
-include version.py
 include unittests.py
 include MANIFEST.in
 
-include python2/__init__.py
-recursive-include python2/examples *.py
-recursive-include python2/mysql *.py
-
-include python3/__init__.py
-recursive-include python3/mysql *.py
-recursive-include python3/examples *.py
-
-include python23/__init__.py
-recursive-include python23/django *.py
-recursive-include python23/fabric *.py
-recursive-include python23/tests23 *.py
-
-recursive-include tests *.py *.csv pylint*.rc *.pem
+recursive-include examples *.py
+recursive-include lib *.py
+recursive-include tests *.py *.csv *.pem *.cnf
 
 include docs/README_DOCS.txt
 

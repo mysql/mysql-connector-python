@@ -36,11 +36,11 @@ to be created first.
 """
 
 import os
-import sys
 import gc
 import tempfile
 from datetime import datetime, timedelta
 from threading import Thread
+import traceback
 import time
 import unittest
 
@@ -48,7 +48,6 @@ import tests
 from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
-from mysql.connector import connect, _CONNECTION_POOLS
 import mysql.connector
 
 
@@ -2678,3 +2677,48 @@ class BugOra19225481(tests.MySQLConnectorTests):
         stmt = "SELECT * FROM {0}".format(self.tbl)
         self.cursor.execute(stmt)
         self.assertEqual(values, self.cursor.fetchall())
+
+
+class BugOra19169990(tests.MySQLConnectorTests):
+    """BUG#19169990: Issue with compressed cnx using Python 2
+    """
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config['compress'] = True
+
+    def test_compress(self):
+        for charset in ('utf8', 'latin1', 'latin7'):
+            self.config['charset'] = charset
+            try:
+                cnx = connection.MySQLConnection(**self.config)
+                cur = cnx.cursor()
+                cur.execute("SELECT %s", ('mysql'*10000,))
+            except TypeError:
+                traceback.print_exc()
+                self.fail("Failed setting up compressed cnx using {0}".format(
+                    charset
+                ))
+            except errors.Error:
+                self.fail("Failed sending/retrieving compressed data")
+
+
+class BugOra19184025(tests.MySQLConnectorTests):
+    """BUG#19184025: FIRST NULL IN ROW RETURNS REST OF ROW AS NONE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug19184025'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = "CREATE TABLE {0} (c1 INT, c2 INT NOT NULL DEFAULT 2)".format(
+            self.tbl
+        )
+        self.cur.execute(create)
+
+    def test_row_to_python(self):
+        self.cur.execute("INSERT INTO {0} (c1) VALUES (NULL)".format(self.tbl))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((None, 2), self.cur.fetchone())

@@ -39,6 +39,7 @@ from decimal import Decimal
 import re
 import time
 
+from . import PY2
 import tests
 from mysql.connector import (connection, cursor, errors)
 
@@ -566,6 +567,26 @@ class MySQLCursorTests(tests.TestsCursor):
 
         self._test_execute_cleanup(self.cnx, tbl)
         self.cur.close()
+
+        self.cur = self.cnx.cursor()
+        self.cur.execute("DROP PROCEDURE IF EXISTS multi_results")
+        procedure = (
+            "CREATE PROCEDURE multi_results () "
+            "BEGIN SELECT 1; SELECT 'ham'; END"
+        )
+        self.cur.execute(procedure)
+        exp_stmt = "CALL multi_results()"
+        if not PY2:
+            exp_stmt = b"CALL multi_results()"
+        exp_result = [[(1,)], [(u'ham',)]]
+        results = []
+        for result in self.cur.execute(exp_stmt, multi=True):
+            if result.with_rows:
+                self.assertEqual(exp_stmt, result._executed)
+                results.append(result.fetchall())
+
+        self.assertEqual(exp_result, results)
+        self.cur.execute("DROP PROCEDURE multi_results")
 
     def test_executemany(self):
         """MySQLCursor object executemany()-method"""

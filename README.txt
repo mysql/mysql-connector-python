@@ -2,6 +2,23 @@
 MySQL Connector/Python 2.0
 ==========================
 
+MySQL Connector/Python
+Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+
+License information can be found in the LICENSE.txt file.
+
+
+Documentation & Examples
+========================
+
+Documentation for all Connector/Python versions can be found online here:
+
+ http://dev.mysql.com/doc/connector-python/en/index.html
+
+The source distribution of Connector/Python also contains example scripts.
+They can be found in the examples/ directory.
+
+
 License
 =======
 

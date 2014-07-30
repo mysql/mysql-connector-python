@@ -31,6 +31,7 @@ from bisect import bisect
 from hashlib import md5
 import logging
 import socket
+import collections
 
 # pylint: disable=F0401,E0611
 try:
@@ -134,6 +135,64 @@ _CNX_PROPERTIES = {
 }
 
 _LOGGER = logging.getLogger('myconnpy-fabric')
+
+class FabricResponse(object):
+    """Class used to parse a response got from Fabric.
+    """
+
+    SUPPORTED_VERSION = 1
+
+    def __init__(self, data):
+        """Initialize the FabricResponse object
+        """
+        (format_version, fabric_uuid_str, ttl, error, rows) = data
+        if error:
+            raise InterfaceError(error)
+        if format_version != FabricResponse.SUPPORTED_VERSION:
+            raise InterfaceError(
+                "Supported protocol has version {sversion}. Got a response "
+                "from MySQL Fabric with version {gversion}.".format(
+                    sversion=FabricResponse.SUPPORTED_VERSION,
+                    gversion=format_version)
+            )
+        self.format_version = format_version
+        self.fabric_uuid_str = fabric_uuid_str
+        self.ttl = ttl
+        self.coded_rows = rows
+
+class FabricSet(FabricResponse):
+    """Iterator to navigate through the result set returned from Fabric
+    """
+    def __init__(self, data):
+        """Initialize the FabricSet object.
+        """
+        super(FabricSet, self).__init__(data)
+        assert len(self.coded_rows) == 1
+        self.__names = self.coded_rows[0]['info']['names']
+        self.__rows = self.coded_rows[0]['rows']
+        assert all(len(self.__names) == len(row) for row in self.__rows) or \
+               len(self.__rows) == 0
+        self.__result = collections.namedtuple('ResultSet', self.__names)
+
+    def rowcount(self):
+        """The number of rows in the result set.
+        """
+        return len(self.__rows)
+
+    def rows(self):
+        """Iterate over the rows of the result set.
+
+        Each row is a named tuple.
+        """
+        for row in self.__rows:
+            yield self.__result(*row)
+
+    def row(self, index):
+        """Indexing method for a row.
+
+        Each row is a named tuple.
+        """
+        return self.__result(*self.__rows[index])
 
 
 def extra_failure_report(error_codes):
@@ -448,8 +507,10 @@ class Fabric(object):
                           server_uuid)
             inst = self.get_instance()
             try:
-                inst.proxy.threat.report_failure(server_uuid, current_host,
-                                                 errno)
+                data = inst.proxy.threat.report_failure(
+                    server_uuid, current_host, errno
+                )
+                FabricResponse(data)
             except (Fault, socket.error) as exc:
                 _LOGGER.debug("Failed reporting server to Fabric (%s)",
                               str(exc))
@@ -473,15 +534,10 @@ class Fabric(object):
         result = []
         err_msg = "Looking up Fabric servers failed using {host}:{port}: {err}"
         try:
-            (fabric_uuid_str, fabric_version, ttl, addr_list) = \
-                inst.proxy.dump.fabric_nodes()
-            for addr in addr_list:
-                try:
-                    host, port = addr.split(':', 2)
-                    port = int(port)
-                except ValueError:
-                    host, port = addr, MYSQL_FABRIC_PORT
-                result.append({'host': host, 'port': port})
+            data = inst.proxy.dump.fabric_nodes('protocol.xmlrpc')
+            fset = FabricSet(data)
+            for row in fset.rows():
+                result.append({'host': row.host, 'port': row.port})
         except (Fault, socket.error) as exc:
             msg = err_msg.format(err=str(exc), host=inst.host, port=inst.port)
             raise InterfaceError(msg)
@@ -492,11 +548,13 @@ class Fabric(object):
             raise InterfaceError(msg)
 
         try:
-            fabric_uuid = uuid.UUID('{' + fabric_uuid_str + '}')
+            fabric_uuid = uuid.UUID(fset.fabric_uuid_str)
         except TypeError:
             fabric_uuid = uuid.uuid4()
 
-        return fabric_uuid, fabric_version, ttl, result
+        fabric_version = 0
+
+        return fabric_uuid, fabric_version, fset.ttl, result
 
     def get_group_servers(self, group, use_cache=True):
         """Get all MySQL servers in a group
@@ -519,19 +577,21 @@ class Fabric(object):
         inst = self.get_instance()
         result = []
         try:
-            servers = inst.proxy.dump.servers(
-                self._version_token, group)[3]
+            data = inst.proxy.dump.servers(self._version_token, group)
+            fset = FabricSet(data)
         except (Fault, socket.error) as exc:
             msg = ("Looking up MySQL servers failed for group "
                    "{group}: {error}").format(error=str(exc), group=group)
             raise InterfaceError(msg)
 
         weights = []
-        for server in servers:
+        for row in fset.rows():
             # We make sure, when using local groups, we skip the global group
-            if server[1] == group:
-                server[3] = int(server[3])  # port should be an int
-                mysqlserver = FabricMySQLServer(*server)
+            if row.group_id == group:
+                mysqlserver = FabricMySQLServer(
+                    row.server_uuid, row.group_id, row.host, row.port,
+                    row.mode, row.status, row.weight
+                )
                 result.append(mysqlserver)
                 if mysqlserver.status == STATUS_SECONDARY:
                     weights.append((mysqlserver.uuid, mysqlserver.weight))
@@ -639,17 +699,22 @@ class Fabric(object):
             patterns.append("{0}.{1}".format(dbase, tbl))
 
         inst = self.get_instance()
-
         try:
-            result = inst.proxy.dump.sharding_information(
-                self._version_token, ','.join(patterns))
+            data = inst.proxy.dump.sharding_information(
+                self._version_token, ','.join(patterns)
+            )
+            fset = FabricSet(data)
         except (Fault, socket.error) as exc:
             msg = "Looking up sharding information failed : {error}".format(
                 error=str(exc))
             raise InterfaceError(msg)
 
-        for info in result[3]:
-            self._cache.sharding_cache_table(FabricShard(*info))
+        for row in fset.rows():
+            self._cache.sharding_cache_table(
+                FabricShard(row.schema_name, row.table_name, row.column_name,
+                            row.lower_bound, row.shard_id, row.type_name,
+                            row.group_id, row.global_group)
+            )
 
     def get_shard_server(self, tables, key, scope=SCOPE_LOCAL, mode=None):
         """Get MySQL server information for a particular shard
