@@ -1,0 +1,14 @@
+include README.txt
+include LICENSE.txt
+include CHANGES.txt
+include setup.py
+include setupinfo.py
+include unittests.py
+include MANIFEST.in
+
+recursive-include examples *.py
+recursive-include lib *.py
+recursive-include tests *.py *.csv *.pem *.cnf
+
+include docs/README_DOCS.txt
+

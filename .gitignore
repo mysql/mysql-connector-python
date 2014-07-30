@@ -5,4 +5,10 @@
 commit.txt
 *.patch
 *.diff
-
+dist/
+build/
+MANIFEST
+cpy_server*/
+*_output.txt
+tests_*.log
+dev*.py

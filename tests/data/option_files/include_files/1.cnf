@@ -1,0 +1,13 @@
+[group1]
+option1 = 5
+option2 = 10
+
+[group2]
+option1 = 10
+option2 = 20
+
+[group3]
+option3 = 100
+
+[mysql]
+user = ham
