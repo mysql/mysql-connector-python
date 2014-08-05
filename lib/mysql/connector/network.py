@@ -98,6 +98,15 @@ class BaseMySQLSocket(object):
         """Get the location of the socket"""
         raise NotImplementedError
 
+    def shutdown(self):
+        """Shut down the socket before closing it"""
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+            self.sock.close()
+            del self._packet_queue
+        except (socket.error, AttributeError):
+            pass
+
     def close_connection(self):
         """Close the socket"""
         try:
