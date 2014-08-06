@@ -2722,3 +2722,22 @@ class BugOra19184025(tests.MySQLConnectorTests):
         self.cur.execute("INSERT INTO {0} (c1) VALUES (NULL)".format(self.tbl))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual((None, 2), self.cur.fetchone())
+
+
+class BugOra19170287(tests.MySQLConnectorTests):
+    """BUG#19170287: DUPLICATE OPTION_GROUPS RAISING ERROR WITH PYTHON 3
+    """
+    def test_duplicate_groups(self):
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        opt_file = os.path.join(option_file_dir, 'dup_groups.cnf')
+        config = tests.get_mysql_config()
+
+        cnx = mysql.connector.connect(**config)
+        exp = {
+            u'password': u'mypass',
+            u'user': u'mysql',
+            u'database': u'duplicate_data',
+            u'port': 10000
+        }
+        self.assertEqual(exp, cnx._read_option_files(
+            {'option_files': opt_file}))
