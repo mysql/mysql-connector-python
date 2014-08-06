@@ -67,7 +67,11 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         self._options_dict = {}
 
-        SafeConfigParser.__init__(self)
+        if PY2:
+            SafeConfigParser.__init__(self)
+        else:
+            SafeConfigParser.__init__(self, strict=False)
+
         self.default_extension = DEFAULT_EXTENSIONS[os.name]
         self.keep_dashes = keep_dashes
 
