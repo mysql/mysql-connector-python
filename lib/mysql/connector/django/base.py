@@ -283,7 +283,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         The field_name is returned when lookup_type is not supported.
         """
         fields = ['year', 'month', 'day', 'hour', 'minute', 'second']
-        format = ('%Y-', '%m', '-%d', ' %H:', '%i', ':%s')
+        format = ('%Y-', '%m', '-%d', ' %H:', '%i', ':%S')
         format_def = ('0000-', '01', '-01', ' 00:', '00', ':00')
         try:
             i = fields.index(lookup_type) + 1
@@ -323,7 +323,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             params = []
         fields = ['year', 'month', 'day', 'hour', 'minute', 'second']
-        format_ = ('%Y-', '%m', '-%d', ' %H:', '%i', ':%s')
+        format_ = ('%Y-', '%m', '-%d', ' %H:', '%i', ':%S')
         format_def = ('0000-', '01', '-01', ' 00:', '00', ':00')
         try:
             i = fields.index(lookup_type) + 1
