@@ -109,6 +109,9 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         for file_ in files:
             try:
+                if file_ in files[index+1:]:
+                    raise ValueError("Same option file '{0}' occurring more "
+                                     "than once in the list".format(file_))
                 with open(file_, 'r') as op_file:
                     for line in op_file.readlines():
                         if line.startswith('!includedir'):
@@ -129,7 +132,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                                     filename, file_))
                             files.insert(index+1, filename)
 
-                        index += 1
+                    index += 1
 
             except (IOError, OSError) as exc:
                 raise ValueError("Failed reading file '{0}': {1}".format(

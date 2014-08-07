@@ -2741,3 +2741,17 @@ class BugOra19170287(tests.MySQLConnectorTests):
         }
         self.assertEqual(exp, cnx._read_option_files(
             {'option_files': opt_file}))
+
+
+class BugOra19169143(tests.MySQLConnectorTests):
+    """BUG#19169143: FAILURE IN RAISING ERROR WITH DUPLICATE OPTION_FILES
+    """
+    def test_duplicate_optionfiles(self):
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        files = [
+            os.path.join(option_file_dir, 'include_files', '1.cnf'),
+           os.path.join(option_file_dir, 'include_files', '2.cnf'),
+            os.path.join(option_file_dir, 'include_files', '1.cnf'),
+        ]
+        self.assertRaises(ValueError, mysql.connector.connect,
+                          option_files=files)
