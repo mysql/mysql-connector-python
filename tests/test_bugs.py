@@ -2755,3 +2755,42 @@ class BugOra19169143(tests.MySQLConnectorTests):
         ]
         self.assertRaises(ValueError, mysql.connector.connect,
                           option_files=files)
+
+
+class BugOra19282158(tests.MySQLConnectorTests):
+    """BUG#19282158: NULL values with prepared statements
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        self.tbl = 'Bug19282158'
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = ('CREATE TABLE {0}(col1 INT NOT NULL, col2 INT NULL, '
+                  'col3 VARCHAR(10), col4 DECIMAL(4,2) NULL, '
+                  'col5 DATETIME NULL, col6 INT NOT NULL, col7 VARCHAR(10), '
+                  'PRIMARY KEY(col1))'.format(self.tbl))
+
+        self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+        self.cursor.close()
+        self.cnx.close()
+
+    def test_null(self):
+        cur = self.cnx.cursor(prepared=True)
+        sql = ("INSERT INTO {0}(col1, col2, col3, col4, col5, col6, col7) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?)".format(self.tbl))
+        params = (100, None, 'foo', None, datetime(2014, 8, 4, 9, 11, 14),
+                  10, 'bar')
+        exp = (100, None, bytearray(b'foo'), None,
+               datetime(2014, 8, 4, 9, 11, 14), 10, bytearray(b'bar'))
+        cur.execute(sql, params)
+
+        sql = "SELECT * FROM {0}".format(self.tbl)
+        cur.execute(sql)
+        self.assertEqual(exp, cur.fetchone())
+        cur.close()
