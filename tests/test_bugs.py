@@ -48,6 +48,7 @@ import tests
 from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
+from mysql.connector.optionfiles import read_option_files
 import mysql.connector
 
 
@@ -2730,17 +2731,14 @@ class BugOra19170287(tests.MySQLConnectorTests):
     def test_duplicate_groups(self):
         option_file_dir = os.path.join('tests', 'data', 'option_files')
         opt_file = os.path.join(option_file_dir, 'dup_groups.cnf')
-        config = tests.get_mysql_config()
 
-        cnx = mysql.connector.connect(**config)
         exp = {
             u'password': u'mypass',
             u'user': u'mysql',
             u'database': u'duplicate_data',
             u'port': 10000
         }
-        self.assertEqual(exp, cnx._read_option_files(
-            {'option_files': opt_file}))
+        self.assertEqual(exp, read_option_files(option_files=opt_file))
 
 
 class BugOra19169143(tests.MySQLConnectorTests):
@@ -2750,7 +2748,7 @@ class BugOra19169143(tests.MySQLConnectorTests):
         option_file_dir = os.path.join('tests', 'data', 'option_files')
         files = [
             os.path.join(option_file_dir, 'include_files', '1.cnf'),
-           os.path.join(option_file_dir, 'include_files', '2.cnf'),
+            os.path.join(option_file_dir, 'include_files', '2.cnf'),
             os.path.join(option_file_dir, 'include_files', '1.cnf'),
         ]
         self.assertRaises(ValueError, mysql.connector.connect,
@@ -2794,3 +2792,44 @@ class BugOra19282158(tests.MySQLConnectorTests):
         cur.execute(sql)
         self.assertEqual(exp, cur.fetchone())
         cur.close()
+
+
+class BugOra19168737(tests.MySQLConnectorTests):
+    """BUG#19168737: UNSUPPORTED CONNECTION ARGUMENTS WHILE USING OPTION_FILES
+    """
+    def test_unsupported_arguments(self):
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        opt_file = os.path.join(option_file_dir, 'pool.cnf')
+        config = tests.get_mysql_config()
+
+        conn = mysql.connector.connect(option_files=opt_file,
+                                       option_groups=['pooling'], **config)
+        self.assertEqual('my_pool', conn.pool_name)
+        mysql.connector._CONNECTION_POOLS = {}
+        conn.close()
+
+        new_config = read_option_files(option_files=opt_file,
+                                       option_groups=['fabric'], **config)
+
+        exp = {
+            'fabric': {
+                'connect_delay': 3,
+                'host': 'fabric.example.com',
+                'password': 'foo',
+                'ssl_ca': '/path/to/ssl'
+           }
+        }
+        exp.update(config)
+
+        self.assertEqual(exp, new_config)
+
+        new_config = read_option_files(option_files=opt_file,
+                                       option_groups=['failover'], **config)
+
+        exp = {
+            'failover': ({'pool_name': 'failA', 'port': 3306},
+                         {'pool_name': 'failB', 'port': 3307})
+        }
+        exp.update(config)
+
+        self.assertEqual(exp, new_config)

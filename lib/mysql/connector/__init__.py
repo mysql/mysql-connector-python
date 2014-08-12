@@ -38,6 +38,7 @@ from .dbapi import (
     TimestampFromTicks, TimeFromTicks,
     STRING, BINARY, NUMBER, DATETIME, ROWID,
     apilevel, threadsafety, paramstyle)
+from .optionfiles import read_option_files
 
 _CONNECTION_POOLS = {}
 
@@ -129,6 +130,10 @@ def connect(*args, **kwargs):
 
     Returns MySQLConnection or PooledMySQLConnection.
     """
+    # Option files
+    if 'option_files' in kwargs:
+        new_config = read_option_files(**kwargs)
+        return connect(**new_config)
 
     if all(['fabric' in kwargs, 'failover' in kwargs]):
         raise InterfaceError("fabric and failover arguments can not be used")

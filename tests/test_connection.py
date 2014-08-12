@@ -37,6 +37,7 @@ from . import PY2
 
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connection, network, errors, constants, cursor)
+from mysql.connector.optionfiles import read_option_files
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
@@ -820,46 +821,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(
             exp, [p[4:] for p in self.cnx._socket.sock._client_sends])
 
-    def test__read_option_files(self):
-        cnx = _DummyMySQLConnection()
-        self.assertRaises(ValueError, cnx._read_option_files,
-                          {'option_files': 'dummy_file.cnf'})
-
-        option_file_dir = os.path.join('tests', 'data', 'option_files')
-        exp = {
-            'port': 1000,
-            'unix_socket': '/var/run/mysqld/mysqld.sock',
-            'ssl_ca': 'dummyCA',
-            'ssl_cert': 'dummyCert',
-            'ssl_key': 'dummyKey',
-        }
-        result = cnx._read_option_files({'option_files': os.path.join(
-            option_file_dir, 'my.cnf')})
-        self.assertEqual(exp, result)
-        exp = {
-            'port': 1001,
-            'unix_socket': '/var/run/mysqld/mysqld2.sock',
-            'ssl_ca': 'dummyCA',
-            'ssl_cert': 'dummyCert',
-            'ssl_key': 'dummyKey',
-            'user': 'mysql',
-        }
-        result = cnx._read_option_files({'option_files': os.path.join(
-            option_file_dir, 'my.cnf'), 'option_groups': ['client', 'mysqld']})
-        self.assertEqual(exp, result)
-
-        option_file_dir = os.path.join('tests', 'data', 'option_files')
-        files = [
-            os.path.join(option_file_dir, 'include_files', '1.cnf'),
-            os.path.join(option_file_dir, 'include_files', '2.cnf'),
-        ]
-        exp = {
-            'user': 'spam'
-        }
-        result = cnx._read_option_files({'option_files': files,
-                                         'option_groups': ['client', 'mysql']})
-        self.assertEqual(exp, result)
-
     def test_config(self):
         """Configure the MySQL connection
 
@@ -1029,19 +990,21 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(123, cnx._connection_timeout)
 
         # Option Files tests
-        self.assertRaises(ValueError, cnx.config, option_files='dummy_file.cnf')
-
         option_file_dir = os.path.join('tests', 'data', 'option_files')
-        cnx.config(option_files=os.path.join(option_file_dir, 'my.cnf'))
+        cfg = read_option_files(option_files=os.path.join(option_file_dir,
+                                                          'my.cnf'))
+        cnx.config(**cfg)
         self.assertEqual(cnx._port, 1000)
         self.assertEqual(cnx._unix_socket, '/var/run/mysqld/mysqld.sock')
 
-        cnx.config(option_files=os.path.join(option_file_dir, 'my.cnf'),
-                   port=2000)
+        cfg = read_option_files(option_files=os.path.join(option_file_dir,
+                                                          'my.cnf'), port=2000)
+        cnx.config(**cfg)
         self.assertEqual(cnx._port, 2000)
 
-        cnx.config(option_files=os.path.join(option_file_dir, 'my.cnf'),
-                   option_groups=[ 'client', 'mysqld'])
+        cfg = read_option_files(option_files=os.path.join(
+            option_file_dir, 'my.cnf'), option_groups=[ 'client', 'mysqld'])
+        cnx.config(**cfg)
 
         self.assertEqual(cnx._port, 1001)
         self.assertEqual(cnx._unix_socket, '/var/run/mysqld/mysqld2.sock')
@@ -1881,9 +1844,8 @@ class WL7937(tests.MySQLConnectorTests):
             pass
 
     def test_load_local_infile(self):
-        sql = ("LOAD DATA LOCAL INFILE '{data_file}' INTO "
-               "TABLE local_data".format(data_file=self.data_file))
-        self.cur.execute(sql)
+        sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
+        self.cur.execute(sql, (self.data_file, ))
         self.cur.execute("SELECT * FROM local_data")
 
         exp = [
@@ -1899,6 +1861,6 @@ class WL7937(tests.MySQLConnectorTests):
         self.cnx = connection.MySQLConnection(**config)
         self.cur = self.cnx.cursor()
 
-        sql = ("LOAD DATA LOCAL INFILE '{data_file}' INTO "
-               "TABLE local_data".format(data_file=self.data_file))
-        self.assertRaises(errors.ProgrammingError, self.cur.execute, sql)
+        sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
+        self.assertRaises(errors.ProgrammingError, self.cur.execute, sql,
+                          (self.data_file, ))
