@@ -535,13 +535,14 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
 
         # Testing null bitmap
         data = (None, None)
-        exp = bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x03\x01')
+        exp = bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x03\x01\x06'
+                        b'\x00\x06\x00')
         res = self._protocol.make_stmt_execute(statement_id, data, (1, 2))
         self.assertEqual(exp, res)
 
         data = (None, 'Ham')
         exp = bytearray(
-            b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x01\x01\x0f\x00'
+            b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x01\x01\x06\x00\x0f\x00'
             b'\x03\x48\x61\x6d'
         )
         res = self._protocol.make_stmt_execute(statement_id, data, (1, 2))

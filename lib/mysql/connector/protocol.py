@@ -620,6 +620,8 @@ class MySQLProtocol(object):
                 flags = 0
                 if value is None:
                     null_bitmap[(pos // 8)] |= 1 << (pos % 8)
+                    types.append(utils.int1store(FieldType.NULL) +
+                                 utils.int1store(flags))
                     continue
                 elif pos in long_data_used:
                     if long_data_used[pos][0]:
