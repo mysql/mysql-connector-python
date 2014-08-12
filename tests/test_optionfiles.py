@@ -25,7 +25,8 @@ import logging
 import os
 import tests
 
-from mysql.connector.optionfiles import MySQLOptionsParser
+from mysql.connector import connect
+from mysql.connector.optionfiles import MySQLOptionsParser, read_option_files
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
@@ -158,3 +159,45 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
         ])
         self.assertEqual(
             exp, self.option_file_parser.get_groups_as_dict_with_priority())
+
+    def test_read_option_files(self):
+
+        self.assertRaises(ValueError, read_option_files,
+                          option_files='dummy_file.cnf')
+
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        exp = {
+            'port': 1000,
+            'unix_socket': '/var/run/mysqld/mysqld.sock',
+            'ssl_ca': 'dummyCA',
+            'ssl_cert': 'dummyCert',
+            'ssl_key': 'dummyKey',
+        }
+        result = read_option_files(option_files=os.path.join(
+            option_file_dir, 'my.cnf'))
+        self.assertEqual(exp, result)
+        exp = {
+            'port': 1001,
+            'unix_socket': '/var/run/mysqld/mysqld2.sock',
+            'ssl_ca': 'dummyCA',
+            'ssl_cert': 'dummyCert',
+            'ssl_key': 'dummyKey',
+            'user': 'mysql',
+        }
+        result = read_option_files(option_files=os.path.join(
+            option_file_dir, 'my.cnf'), option_groups=['client', 'mysqld'])
+        self.assertEqual(exp, result)
+
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        files = [
+            os.path.join(option_file_dir, 'include_files', '1.cnf'),
+            os.path.join(option_file_dir, 'include_files', '2.cnf'),
+        ]
+        exp = {
+            'user': 'spam'
+        }
+        result = read_option_files(option_files=files,
+                                   option_groups=['client', 'mysql'])
+        self.assertEqual(exp, result)
+
+        self.assertRaises(ValueError, connect, option_files='dummy_file.cnf')

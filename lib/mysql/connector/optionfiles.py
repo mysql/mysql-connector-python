@@ -30,6 +30,9 @@ import os
 import re
 
 from .catch23 import PY2
+from .connection import DEFAULT_CONFIGURATION
+from .pooling import CNX_POOL_ARGS
+from .fabric import CNX_FABRIC_ARGS
 
 # pylint: disable=F0401
 if PY2:
@@ -43,6 +46,80 @@ DEFAULT_EXTENSIONS = {
     'nt': ('ini', 'cnf'),
     'posix': ('cnf',)
 }
+
+
+def read_option_files(**config):
+    """
+    Read option files for connection parameters.
+
+    Checks if connection arguments contain option file arguments, and then
+    reads option files accordingly.
+    """
+    if 'option_files' in config:
+        try:
+            if isinstance(config['option_groups'], str):
+                config['option_groups'] = [config['option_groups']]
+            groups = config['option_groups']
+            del config['option_groups']
+        except KeyError:
+            groups = ['client', 'connector_python']
+
+        if isinstance(config['option_files'], str):
+            config['option_files'] = [config['option_files']]
+        option_parser = MySQLOptionsParser(list(config['option_files']),
+                                           keep_dashes=False)
+        del config['option_files']
+
+        config_from_file = option_parser.get_groups_as_dict_with_priority(
+            *groups)
+        config_options = {}
+        fabric_options = {}
+        for group in groups:
+            try:
+                for option, value in config_from_file[group].items():
+                    try:
+                        if option == 'socket':
+                            option = 'unix_socket'
+
+                        if option in CNX_FABRIC_ARGS:
+                            if (option not in fabric_options or
+                                    fabric_options[option][1] <= value[1]):
+                                fabric_options[option] = value
+                            continue
+
+                        if (option not in CNX_POOL_ARGS and
+                                option not in ['fabric', 'failover']):
+                            # pylint: disable=W0104
+                            DEFAULT_CONFIGURATION[option]
+                            # pylint: enable=W0104
+
+                        if (option not in config_options or
+                                config_options[option][1] <= value[1]):
+                            config_options[option] = value
+                    except KeyError:
+                        if group is 'connector_python':
+                            raise AttributeError("Unsupported argument "
+                                                 "'{0}'".format(option))
+            except KeyError:
+                continue
+
+        for option, value in config_options.items():
+            if option not in config:
+                try:
+                    config[option] = eval(value[0])  # pylint: disable=W0123
+                except (NameError, SyntaxError):
+                    config[option] = value[0]
+
+        if fabric_options:
+            config['fabric'] = {}
+            for option, value in fabric_options.items():
+                try:
+                     # pylint: disable=W0123
+                    config['fabric'][option.split('_', 1)[1]] = eval(value[0])
+                     # pylint: enable=W0123
+                except (NameError, SyntaxError):
+                    config['fabric'][option.split('_', 1)[1]] = value[0]
+    return config
 
 
 class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
