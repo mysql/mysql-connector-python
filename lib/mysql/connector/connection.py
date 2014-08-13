@@ -452,6 +452,17 @@ class MySQLConnection(object):
         self._open_connection()
         self._post_connection()
 
+    def shutdown(self):
+        """Shut down connection to MySQL Server.
+        """
+        if not self._socket:
+            return
+
+        try:
+            self._socket.shutdown()
+        except (AttributeError, errors.Error):
+            pass  # Getting an exception would mean we are disconnected.
+
     def disconnect(self):
         """Disconnect from the MySQL server
         """

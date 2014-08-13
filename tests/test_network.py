@@ -106,6 +106,11 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
         """Get the address of a connection"""
         self.assertRaises(NotImplementedError, self.cnx.get_address)
 
+    def test_shutdown(self):
+        """Shutting down a connection"""
+        self.cnx.shutdown()
+        self.assertEqual(None, self.cnx.sock)
+
     def test_close_connection(self):
         """Closing a connection"""
         self.cnx.close_connection()

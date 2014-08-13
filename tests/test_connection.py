@@ -31,6 +31,7 @@ import timeit
 import unittest
 from decimal import Decimal
 import io
+import socket
 
 import tests
 from . import PY2
@@ -1819,6 +1820,31 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 self.assertNotEqual(('2',), self.cnx.get_rows()[0][0])
             else:
                 self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
+
+    def test_shutdown(self):
+        """Shutting down a connection"""
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        sql = "SHOW GLOBAL STATUS WHERE variable_name LIKE 'Aborted_clients'"
+        cur = cnx.cursor()
+        cur.execute(sql)
+        aborted_clients = cur.fetchone()[1]
+
+        test_close_cnx = connection.MySQLConnection(**config)
+        test_shutdown_cnx = connection.MySQLConnection(**config)
+
+        test_close_cnx.close()
+        cur.execute(sql)
+        self.assertEqual(aborted_clients, cur.fetchone()[1])
+
+        test_shutdown_cnx.shutdown()
+        self.assertRaises(socket.error,
+                          test_shutdown_cnx._socket.sock.getsockname)
+        cur.execute(sql)
+        self.assertEqual(str(int(aborted_clients) + 1), cur.fetchone()[1])
+
+        cur.close()
+        cnx.close()
 
 
 class WL7937(tests.MySQLConnectorTests):
