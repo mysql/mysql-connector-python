@@ -18,6 +18,13 @@ Documentation for all Connector/Python versions can be found online here:
 The source distribution of Connector/Python also contains example scripts.
 They can be found in the examples/ directory.
 
+Bug reports and feature requests
+================================
+
+Please report bugs and submit feature requests at
+
+ http://bugs.mysql.com
+
 
 License
 =======
