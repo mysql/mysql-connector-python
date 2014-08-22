@@ -193,6 +193,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                     for line in op_file.readlines():
                         if line.startswith('!includedir'):
                             _, dir_path = line.split(None, 1)
+                            dir_path = dir_path.strip()
                             for entry in os.listdir(dir_path):
                                 entry = os.path.join(dir_path, entry)
                                 if entry in files:
@@ -204,6 +205,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
                         elif line.startswith('!include'):
                             _, filename = line.split(None, 1)
+                            filename = filename.strip()
                             if filename in files:
                                 raise ValueError(err_msg.format(
                                     filename, file_))
@@ -249,7 +251,6 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                     else:
                         out_file.write(line + '\n')
                 out_file.seek(0)
-                self._read(out_file, filename)
             except IOError:
                 continue
             try:
