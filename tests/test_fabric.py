@@ -40,6 +40,7 @@ import tests
 import mysql.connector
 from mysql.connector import fabric, errorcode
 from mysql.connector.fabric import connection, balancing
+from mysql.connector.catch23 import UNICODE_TYPES, PY2
 
 ERR_NO_FABRIC_CONFIG = "Fabric configuration not available"
 
@@ -148,7 +149,8 @@ class ConnectionModuleTests(tests.MySQLConnectorTests):
         cnxprops = {
             # name: (valid_types, description, default)
             'group': ((str,), "Name of group of servers", None),
-            'key': ((int, str, datetime.datetime, datetime.date),
+            'key': (tuple([int, str, datetime.datetime,
+                     datetime.date] + list(UNICODE_TYPES)),
                     "Sharding key", None),
             'tables': ((tuple, list), "List of tables in query", None),
             'mode': ((int,), "Read-Only, Write-Only or Read-Write",
@@ -365,9 +367,24 @@ class FabricBalancingWeightedRoundRobin(tests.MySQLConnectorTests):
         self.assertFalse(balancer1 == balancer3)
 
 @unittest.skipIf(not tests.FABRIC_CONFIG, ERR_NO_FABRIC_CONFIG)
-class FabricSharding(tests.MySQLConnectorTests):
+class FabricShardingTests(tests.MySQLConnectorTests):
 
     """Test Fabric's sharding"""
+
+    emp_data = {
+        1985: [
+            (10001, datetime.date(1953, 9, 2), u'Georgi', u'Facello', u'M',
+             datetime.date(1986, 6, 26)),
+            (10002, datetime.date(1964, 6, 2), u'Bezalel', u'Simmel', u'F',
+             datetime.date(1985, 11, 21)),
+        ],
+        2000: [
+            (47291, datetime.date(1960, 9, 9), u'Ulf', u'Flexer', u'M',
+             datetime.date(2000, 1, 12)),
+            (60134, datetime.date(1964, 4, 21), u'Seshu', u'Rathonyi', u'F',
+             datetime.date(2000, 1, 2)),
+        ]
+    }
 
     def setUp(self):
         self.cnx = mysql.connector.connect(
@@ -421,27 +438,11 @@ class FabricSharding(tests.MySQLConnectorTests):
         gtid_executed = self._truncate(cur, tbl_name)
         self.cnx.commit()
 
-        employee_data = {
-            1985: [
-                (10001, datetime.date(1953, 9, 2), u'Georgi', u'Facello', u'M',
-                 datetime.date(1986, 6, 26)),
-                (10002, datetime.date(1964, 6, 2), u'Bezalel', u'Simmel', u'F',
-                 datetime.date(1985, 11, 21)),
-            ],
-            2000: [
-                (47291, datetime.date(1960, 9, 9), u'Ulf', u'Flexer', u'M',
-                 datetime.date(2000, 1, 12)),
-                (60134, datetime.date(1964, 4, 21), u'Seshu', u'Rathonyi', u'F',
-                 datetime.date(2000, 1, 2)),
-            ]
-        }
-
         insert = ("INSERT INTO {0} "
                   "VALUES (%s, %s, %s, %s, %s, %s)").format(tbl_name)
 
         self._populate(self.cnx, gtid_executed, tbl_name, insert,
-                       employee_data[1985] + employee_data[2000],
-                       5)
+                       self.emp_data[1985] + self.emp_data[2000], 5)
 
         time.sleep(2)
 
@@ -452,8 +453,60 @@ class FabricSharding(tests.MySQLConnectorTests):
             cur = self.cnx.cursor()
             cur.execute("SELECT * FROM {0}".format(tbl_name))
             rows = cur.fetchall()
-            self.assertEqual(rows, employee_data[hire_date.year])
+            self.assertEqual(rows, self.emp_data[hire_date.year])
 
         self.cnx.set_property(tables=tables,
                               key='2014-01-02', mode=fabric.MODE_READONLY)
         self.assertRaises(ValueError, self.cnx.cursor)
+
+    def test_range_string(self):
+        self.assertTrue(self._check_table(
+            "employees.employees_range_string", 'RANGE_STRING'))
+        tbl_name = "employees_range_string"
+
+        tables = ["employees.{0}".format(tbl_name)]
+
+        self.cnx.set_property(tables=tables,
+                              scope=fabric.SCOPE_GLOBAL,
+                              mode=fabric.MODE_READWRITE)
+        cur = self.cnx.cursor()
+        gtid_executed = self._truncate(cur, tbl_name)
+        self.cnx.commit()
+
+        insert = ("INSERT INTO {0} "
+                  "VALUES (%s, %s, %s, %s, %s, %s)").format(tbl_name)
+
+        self._populate(self.cnx, gtid_executed, tbl_name, insert,
+                       self.emp_data[1985] + self.emp_data[2000], 3)
+
+        time.sleep(2)
+
+        emp_exp_range_string = {
+            'A': [self.emp_data[1985][0],
+                  self.emp_data[2000][0]],
+            'M': [self.emp_data[1985][1],
+                  self.emp_data[2000][1]],
+        }
+
+        str_keys = [u'A', u'M']
+        for str_key in str_keys:
+            self.cnx.set_property(tables=tables,
+                                  key=str_key, mode=fabric.MODE_READONLY)
+            cur = self.cnx.cursor()
+            cur.execute("SELECT * FROM {0}".format(tbl_name))
+            rows = cur.fetchall()
+            self.assertEqual(rows, emp_exp_range_string[str_key])
+
+        self.cnx.set_property(tables=tables,
+                              key=b'not unicode str', mode=fabric.MODE_READONLY)
+        self.assertRaises(ValueError, self.cnx.cursor)
+
+        self.cnx.set_property(tables=tables,
+                              key=12345, mode=fabric.MODE_READONLY)
+        self.assertRaises(ValueError, self.cnx.cursor)
+
+        if PY2:
+            self.cnx.set_property(tables=tables,
+                                  key='not unicode str',
+                                  mode=fabric.MODE_READONLY)
+            self.assertRaises(ValueError, self.cnx.cursor)

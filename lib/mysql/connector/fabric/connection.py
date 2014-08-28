@@ -76,7 +76,7 @@ from . import FabricMySQLServer, FabricShard
 from .caching import FabricCache
 from .balancing import WeightedRoundRobin
 from .. import version
-from ..catch23 import PY2
+from ..catch23 import PY2, isunicode, UNICODE_TYPES
 
 RESET_CACHE_ON_ERROR = (
     errorcode.CR_SERVER_LOST,
@@ -122,7 +122,8 @@ _SERVER_STATUS_FAULTY = 'FAULTY'
 _CNX_PROPERTIES = {
     # name: ((valid_types), description, default)
     'group': ((str,), "Name of group of servers", None),
-    'key': ((int, str, datetime.datetime, datetime.date),
+    'key': (tuple([int, str, datetime.datetime,
+                   datetime.date] + list(UNICODE_TYPES)),
             "Sharding key", None),
     'tables': ((tuple, list), "List of tables in query", None),
     'mode': ((int,), "Read-Only, Write-Only or Read-Write", MODE_READWRITE),
@@ -763,6 +764,16 @@ class Fabric(object):
                 partition_keys = sorted(entry.partitioning.keys(), reverse=True)
                 for partkey in partition_keys:
                     if key >= partkey:
+                        index = partkey
+                        break
+                partition = entry.partitioning[index]
+            elif entry.shard_type == 'RANGE_STRING':
+                if not isunicode(key):
+                    raise ValueError("Key must be a unicode value")
+                partition_keys = sorted(entry.partitioning.keys(), reverse=True)
+                for partkey in partition_keys:
+                    size = len(partkey)
+                    if key[0:size] >= partkey[0:size]:
                         index = partkey
                         break
                 partition = entry.partitioning[index]
