@@ -56,10 +56,14 @@ unittests.py has exit status 0 when tests were ran successfully, 1 otherwise.
 
 """
 import sys
-import threading
 import os
 import time
 import unittest
+try:
+    from urlparse import urlsplit
+except ImportError:
+    # Python 3
+    from urllib.parse import urlsplit
 import logging
 
 try:
@@ -294,11 +298,16 @@ _UNITTESTS_CMD_ARGS = {
         'help': ("Location of Django (none installed source)")
     },
 
+    ('', '--with-fabric'): {
+        'dest': 'fabric_config', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Fabric configuration as URI fabric://user:pass@server:port")
+    },
 }
 
 
 def _get_arg_parser():
-    """Parse comand line ArgumentParser
+    """Parse command line ArgumentParser
 
     This function parses the command line arguments and returns the parser.
 
@@ -689,6 +698,16 @@ def main():
             LOGGER.error("Django older than v1.5 will not work with Python 3")
             sys.exit(1)
 
+    if options.fabric_config:
+        # URL example: fabric://user:pass@mysqlfabric.example.com:32274
+        fab = urlsplit(options.fabric_config)
+        tests.FABRIC_CONFIG = {
+            'host': fab.hostname,
+            'port': fab.port or 32274,
+            'user': fab.username,
+            'password': fab.password,
+        }
+
     # Start Dummy MySQL Server
     #tests.MYSQL_DUMMY = mysqld.DummyMySQLServer(('127.0.0.1', options.port - 1),
     #                                            mysqld.DummyMySQLRequestHandler)
@@ -765,9 +784,8 @@ def main():
     # Show skipped tests
     if len(tests.MESSAGES['SKIPPED']):
         LOGGER.info("Skipped tests: %d", len(tests.MESSAGES['SKIPPED']))
-        if options.verbosity >= 1 or options.debug:
-            for msg in tests.MESSAGES['SKIPPED']:
-                LOGGER.info(msg)
+        for msg in tests.MESSAGES['SKIPPED']:
+            LOGGER.info("Skipped: " + msg)
 
     # Clean up
     try:

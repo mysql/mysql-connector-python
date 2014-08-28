@@ -24,6 +24,7 @@
 """Implementing communication with MySQL Fabric"""
 
 import sys
+import datetime
 import time
 import uuid
 from base64 import b16decode
@@ -121,7 +122,8 @@ _SERVER_STATUS_FAULTY = 'FAULTY'
 _CNX_PROPERTIES = {
     # name: ((valid_types), description, default)
     'group': ((str,), "Name of group of servers", None),
-    'key': ((int, str), "Sharding key", None),
+    'key': ((int, str, datetime.datetime, datetime.date),
+            "Sharding key", None),
     'tables': ((tuple, list), "List of tables in query", None),
     'mode': ((int,), "Read-Only, Write-Only or Read-Write", MODE_READWRITE),
     'shard': ((str,), "Identity of the shard for direct connection", None),
@@ -753,6 +755,17 @@ class Fabric(object):
                 partitions = sorted(entry.partitioning.keys())
                 index = partitions[bisect(partitions, int(key)) - 1]
                 partition = entry.partitioning[index]
+            elif entry.shard_type == 'RANGE_DATETIME':
+                if not isinstance(key, (datetime.date, datetime.datetime)):
+                    raise ValueError(
+                        "Key must be datetime.date or datetime.datetime for "
+                        "RANGE_DATETIME")
+                partition_keys = sorted(entry.partitioning.keys(), reverse=True)
+                for partkey in partition_keys:
+                    if key >= partkey:
+                        index = partkey
+                        break
+                partition = entry.partitioning[index]
             elif entry.shard_type == 'HASH':
                 md5key = md5(str(key))
                 partition_keys = sorted(
@@ -773,6 +786,36 @@ class Fabric(object):
                     "Tables are located in different shards.")
 
         return self.get_group_server(groups[0], mode=mode)
+
+    def execute(self, group, command, *args, **kwargs):
+        """Execute a Fabric command from given group
+
+        This method will execute the given Fabric command from the given group
+        using the given arguments. It returns an instance of FabricSet.
+
+        Raises ValueError when group.command is not valid and raises
+        InterfaceError when an error occurs while executing.
+
+        Returns FabricSet.
+        """
+        inst = self.get_instance()
+        try:
+            grp = getattr(inst.proxy, group)
+            cmd = getattr(grp, command)
+        except AttributeError as exc:
+            raise ValueError("{group}.{command} not available ({err})".format(
+                group=group, command=command, err=str(exc)))
+
+        fab_set = None
+        try:
+            data = cmd(*args, **kwargs)
+            fab_set = FabricSet(data)
+        except (Fault, socket.error, InterfaceError) as exc:
+            msg = "Executing {group}.{command} failed: {error}".format(
+                group=group, command=command, error=str(exc))
+            raise InterfaceError(msg)
+
+        return fab_set
 
 
 class FabricConnection(object):
