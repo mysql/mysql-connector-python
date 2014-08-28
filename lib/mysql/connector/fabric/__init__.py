@@ -50,7 +50,8 @@ from .connection import (
     STATUS_PRIMARY, STATUS_SECONDARY,
     SCOPE_GLOBAL, SCOPE_LOCAL,
     Fabric, FabricConnection,
-    MySQLFabricConnection
+    MySQLFabricConnection,
+    FabricSet,
 )
 
 
@@ -71,4 +72,5 @@ __all__ = [
     'Fabric',
     'FabricConnection',
     'MySQLFabricConnection',
+    'FabricSet',
 ]

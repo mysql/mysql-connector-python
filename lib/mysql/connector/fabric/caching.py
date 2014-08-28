@@ -78,7 +78,7 @@ class CacheShardTable(CacheEntry):
 
     def __init__(self, shard, version=None, fabric_uuid=None):
         if not isinstance(shard, FabricShard):
-            ValueError("shard argument must be a FabricShard instance")
+            raise ValueError("shard argument must be a FabricShard instance")
         super(CacheShardTable, self).__init__(version=version,
                                               fabric_uuid=fabric_uuid)
         self.partitioning = {}
@@ -94,6 +94,21 @@ class CacheShardTable(CacheEntry):
         """Add sharding information for a group"""
         if self.shard_type == 'RANGE':
             key = int(key)
+        elif self.shard_type == 'RANGE_DATETIME':
+            try:
+                if ':' in key:
+                    key = datetime.strptime(key, "%Y-%m-%d %H:%M:%S")
+                else:
+                    key = datetime.strptime(key, "%Y-%m-%d").date()
+            except:
+                raise ValueError(
+                    "RANGE_DATETIME key could not be parsed, was: {0}".format(
+                        key
+                    ))
+        else:
+            raise ValueError("Unsupported sharding type {0}".format(
+                self.shard_type
+            ))
         self.partitioning[key] = {
             'group': group,
         }
