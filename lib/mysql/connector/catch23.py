@@ -35,8 +35,10 @@ PY2 = sys.version_info[0] == 2
 
 if PY2:
     NUMERIC_TYPES = (int, float, Decimal, HexLiteral, long)
+    UNICODE_TYPES = (unicode,)  # This should not contain str
 else:
     NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
+    UNICODE_TYPES = (str,)
 
 def init_bytearray(payload=b'', encoding='utf-8'):
     """Initializes a bytearray from the payload"""
@@ -62,6 +64,13 @@ def isstr(obj):
     """Returns whether a variable is a string"""
     if PY2:
         return isinstance(obj, basestring)
+    else:
+        return isinstance(obj, str)
+
+def isunicode(obj):
+    """Returns whether a variable is a of unicode type"""
+    if PY2:
+        return isinstance(obj, unicode)
     else:
         return isinstance(obj, str)
 

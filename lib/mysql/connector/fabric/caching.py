@@ -105,6 +105,8 @@ class CacheShardTable(CacheEntry):
                     "RANGE_DATETIME key could not be parsed, was: {0}".format(
                         key
                     ))
+        elif self.shard_type == 'RANGE_STRING':
+            pass
         else:
             raise ValueError("Unsupported sharding type {0}".format(
                 self.shard_type
