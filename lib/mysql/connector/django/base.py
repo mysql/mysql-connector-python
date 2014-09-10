@@ -584,7 +584,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         cnx = mysql.connector.connect(**conn_params)
         self.server_version = cnx.get_server_version()
         cnx.set_converter_class(DjangoMySQLConverter)
-        connection_created.send(sender=self.__class__, connection=self)
 
         return cnx
 
@@ -609,6 +608,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def _connect(self):
         """Setup the connection with MySQL"""
         self.connection = self.get_new_connection(self.get_connection_params())
+        connection_created.send(sender=self.__class__, connection=self)
         self.init_connection_state()
 
     def _cursor(self):
