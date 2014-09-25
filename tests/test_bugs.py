@@ -2915,3 +2915,45 @@ class BugOra19584051(tests.MySQLConnectorTests):
         type_codes = [row[1] for row in cur.description]
         self.assertEqual(exp, type_codes)
         cur.close()
+
+
+class BugOra19522948(tests.MySQLConnectorTests):
+    """BUG#19522948: DATA CORRUPTION WITH TEXT FIELDS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug19522948'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = "CREATE TABLE {0} (c1 LONGTEXT NOT NULL)".format(
+            self.tbl
+        )
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_row_to_python(self):
+        cur = self.cnx.cursor(prepared=True)
+
+        data = "test_data"*10
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((data,), self.cur.fetchone())
+        self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+
+        data = "test_data"*1000
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((data,), self.cur.fetchone())
+        self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+
+        data = "test_data"*10000
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((data,), self.cur.fetchone())
