@@ -84,7 +84,8 @@ if tests.DJANGO_VERSION >= (1, 6):
     from django.db.backends import FieldInfo
 
 import mysql.connector
-from mysql.connector.django.base import DatabaseWrapper, DatabaseOperations
+from mysql.connector.django.base import (DatabaseWrapper, DatabaseOperations,
+                                         DjangoMySQLConverter)
 from mysql.connector.django.introspection import DatabaseIntrospection
 
 
@@ -228,13 +229,22 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
         exp = self.conn.converter._time_to_mysql(value)
         self.assertEqual(exp, self.dbo.value_to_db_time(value))
 
-    def value_to_db_datetime(self, value):
+    def test_value_to_db_datetime(self):
         self.assertEqual(None, self.dbo.value_to_db_datetime(None))
 
         value = datetime.datetime(1, 1, 1)
         exp = self.conn.converter._datetime_to_mysql(value)
         self.assertEqual(exp, self.dbo.value_to_db_datetime(value))
 
-        value = datetime.time(2,5,7, 10, 10)
+        value = datetime.datetime(2, 5, 7, 10, 10)
         exp = self.conn.converter._datetime_to_mysql(value)
         self.assertEqual(exp, self.dbo.value_to_db_datetime(value))
+
+
+class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
+    """Test the Django base.DjangoMySQLConverter class"""
+    def test__TIME_to_python(self):
+        value = b'10:11:12'
+        django_converter = DjangoMySQLConverter()
+        self.assertEqual(datetime.time(10, 11, 12),
+                         django_converter._TIME_to_python(value, dsc=None))

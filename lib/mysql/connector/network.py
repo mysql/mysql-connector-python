@@ -98,6 +98,15 @@ class BaseMySQLSocket(object):
         """Get the location of the socket"""
         raise NotImplementedError
 
+    def shutdown(self):
+        """Shut down the socket before closing it"""
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+            self.sock.close()
+            del self._packet_queue
+        except (socket.error, AttributeError):
+            pass
+
     def close_connection(self):
         """Close the socket"""
         try:
@@ -357,12 +366,12 @@ class BaseMySQLSocket(object):
         if not self.sock:
             raise errors.InterfaceError(errno=2048)
 
-        if verify_cert:
-            cert_reqs = ssl.CERT_REQUIRED
-        else:
-            cert_reqs = ssl.CERT_NONE
-
         try:
+            if verify_cert:
+                cert_reqs = ssl.CERT_REQUIRED
+            else:
+                cert_reqs = ssl.CERT_NONE
+
             self.sock = ssl.wrap_socket(
                 self.sock, keyfile=key, certfile=cert, ca_certs=ca,
                 cert_reqs=cert_reqs, do_handshake_on_connect=False,

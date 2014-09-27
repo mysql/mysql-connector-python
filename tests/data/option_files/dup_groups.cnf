@@ -1,0 +1,10 @@
+[connector_python]
+user=root
+password=mypass
+database=cpydata
+port=10000
+
+[connector_python]
+user=mysql
+password=mypass
+database=duplicate_data

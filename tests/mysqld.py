@@ -90,7 +90,8 @@ def process_running(pid):
     """
     if os.name == 'nt':
         # We are on Windows
-        output = subprocess.check_output("tasklist")
+        process = subprocess.Popen(['tasklist'], stdout=subprocess.PIPE)
+        output, _ = process.communicate()
         lines = [line.split(None, 2) for line in output.splitlines() if line]
         for name, apid, _ in lines:
             name = name.decode('utf-8')

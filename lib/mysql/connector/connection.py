@@ -43,7 +43,6 @@ from .cursor import (
     MySQLCursorDict, MySQLCursorBufferedDict, MySQLCursorNamedTuple,
     MySQLCursorBufferedNamedTuple)
 from .network import MySQLUnixSocket, MySQLTCPSocket
-from .optionfiles import MySQLOptionsParser
 from .protocol import MySQLProtocol
 from .utils import int4store
 
@@ -239,59 +238,6 @@ class MySQLConnection(object):
         elif packet[4] == 255:
             raise errors.get_exception(packet)
 
-    def _read_option_files(self, config):
-        """
-        Read option files for connection parameters.
-
-        Checks if connection arguments contain option file arguments, and then
-        reads option files accordingly.
-        """
-        if 'option_files' in config:
-            try:
-                if isinstance(config['option_groups'], str):
-                    config['option_groups'] = [config['option_groups']]
-                groups = config['option_groups']
-                del config['option_groups']
-            except KeyError:
-                groups = ['client', 'connector_python']
-
-            if isinstance(config['option_files'], str):
-                config['option_files'] = [config['option_files']]
-            option_parser = MySQLOptionsParser(list(config['option_files']),
-                                               keep_dashes=False)
-            del config['option_files']
-
-            config_from_file = option_parser.get_groups_as_dict_with_priority(
-                *groups)
-            config_options = {}
-            for group in groups:
-                try:
-                    for option, value in config_from_file[group].items():
-                        try:
-                            if option == 'socket':
-                                option = 'unix_socket'
-                            # pylint: disable=W0104
-                            DEFAULT_CONFIGURATION[option]
-                            # pylint: enable=W0104
-
-                            if (option not in config_options or
-                                    config_options[option][1] <= value[1]):
-                                config_options[option] = value
-                        except KeyError:
-                            if group is 'connector_python':
-                                raise AttributeError("Unsupported argument "
-                                                     "'{0}'".format(option))
-                except KeyError:
-                    continue
-
-            for option, value in config_options.items():
-                if option not in config:
-                    try:
-                        config[option] = eval(value[0])  # pylint: disable=W0123
-                    except (NameError, SyntaxError):
-                        config[option] = value[0]
-        return config
-
     def config(self, **kwargs):
         """Configure the MySQL Connection
 
@@ -302,9 +248,6 @@ class MySQLConnection(object):
         config = kwargs.copy()
         if 'dsn' in config:
             raise errors.NotSupportedError("Data source name is not supported")
-
-        # Read option files
-        self._read_option_files(config)
 
         # Configure how we handle MySQL warnings
         try:
@@ -508,6 +451,17 @@ class MySQLConnection(object):
         self.disconnect()
         self._open_connection()
         self._post_connection()
+
+    def shutdown(self):
+        """Shut down connection to MySQL Server.
+        """
+        if not self._socket:
+            return
+
+        try:
+            self._socket.shutdown()
+        except (AttributeError, errors.Error):
+            pass  # Getting an exception would mean we are disconnected.
 
     def disconnect(self):
         """Disconnect from the MySQL server

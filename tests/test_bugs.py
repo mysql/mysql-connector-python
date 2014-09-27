@@ -35,6 +35,7 @@ in tests/py2/bugs.py or tests/py3/bugs.py. It might be that these files need
 to be created first.
 """
 
+import io
 import os
 import gc
 import tempfile
@@ -48,6 +49,7 @@ import tests
 from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
+from mysql.connector.optionfiles import read_option_files
 import mysql.connector
 
 
@@ -2613,6 +2615,72 @@ class BugOra18742429(tests.MySQLConnectorTests):
         self.assertEqual(exp, self.cursor.fetchone())
 
 
+class BugOra19164627(tests.MySQLConnectorTests):
+    """BUG#19164627: Cursor tries to decode LINESTRING data as utf-8
+    """
+    def test_linestring(self):
+        config = tests.get_mysql_config()
+        cnx = mysql.connector.connect(**config)
+        cur = cnx.cursor()
+
+        cur.execute('DROP TABLE IF EXISTS BugOra19164627')
+        cur.execute("CREATE TABLE BugOra19164627 ( "
+                    "id SERIAL PRIMARY KEY AUTO_INCREMENT NOT NULL, "
+                    "line LINESTRING NOT NULL "
+                    ") DEFAULT CHARSET=ascii")
+        cur.execute('INSERT IGNORE INTO BugOra19164627(id, line) '
+                    'VALUES (0,LINESTRING(POINT(0, 0), POINT(0, 1)))')
+
+        cur.execute("SELECT * FROM BugOra19164627 LIMIT 1")
+        self.assertEqual(cur.fetchone(), (1, b'\x00\x00\x00\x00\x01\x02\x00\x00'
+                                             b'\x00\x02\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\x00\x00\x00\x00\x00'
+                                             b'\x00\x00\x00\xf0?', ))
+        cur.execute('DROP TABLE IF EXISTS BugOra19164627')
+        cur.close()
+        cnx.close()
+
+
+class BugOra19225481(tests.MySQLConnectorTests):
+    """BUG#19225481: FLOATING POINT INACCURACY WITH PYTHON v2
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        self.tbl = 'Bug19225481'
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = 'CREATE TABLE {0}(col1 DOUBLE)'.format(
+            self.tbl)
+
+        self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+        self.cursor.close()
+        self.cnx.close()
+
+    def test_columns(self):
+        values = [
+            (123.123456789987,),
+            (234.234,),
+            (12.12,),
+            (111.331,),
+            (0.0,),
+            (-99.99999900099,)
+        ]
+        stmt = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        self.cursor.executemany(stmt, values)
+
+        stmt = "SELECT * FROM {0}".format(self.tbl)
+        self.cursor.execute(stmt)
+        self.assertEqual(values, self.cursor.fetchall())
+
+
 class BugOra19169990(tests.MySQLConnectorTests):
     """BUG#19169990: Issue with compressed cnx using Python 2
     """
@@ -2656,3 +2724,146 @@ class BugOra19184025(tests.MySQLConnectorTests):
         self.cur.execute("INSERT INTO {0} (c1) VALUES (NULL)".format(self.tbl))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual((None, 2), self.cur.fetchone())
+
+
+class BugOra19170287(tests.MySQLConnectorTests):
+    """BUG#19170287: DUPLICATE OPTION_GROUPS RAISING ERROR WITH PYTHON 3
+    """
+    def test_duplicate_groups(self):
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        opt_file = os.path.join(option_file_dir, 'dup_groups.cnf')
+
+        exp = {
+            u'password': u'mypass',
+            u'user': u'mysql',
+            u'database': u'duplicate_data',
+            u'port': 10000
+        }
+        self.assertEqual(exp, read_option_files(option_files=opt_file))
+
+
+class BugOra19169143(tests.MySQLConnectorTests):
+    """BUG#19169143: FAILURE IN RAISING ERROR WITH DUPLICATE OPTION_FILES
+    """
+    def test_duplicate_optionfiles(self):
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        files = [
+            os.path.join(option_file_dir, 'include_files', '1.cnf'),
+            os.path.join(option_file_dir, 'include_files', '2.cnf'),
+            os.path.join(option_file_dir, 'include_files', '1.cnf'),
+        ]
+        self.assertRaises(ValueError, mysql.connector.connect,
+                          option_files=files)
+
+
+class BugOra19282158(tests.MySQLConnectorTests):
+    """BUG#19282158: NULL values with prepared statements
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        self.tbl = 'Bug19282158'
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = ('CREATE TABLE {0}(col1 INT NOT NULL, col2 INT NULL, '
+                  'col3 VARCHAR(10), col4 DECIMAL(4,2) NULL, '
+                  'col5 DATETIME NULL, col6 INT NOT NULL, col7 VARCHAR(10), '
+                  'PRIMARY KEY(col1))'.format(self.tbl))
+
+        self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+        self.cursor.close()
+        self.cnx.close()
+
+    def test_null(self):
+        cur = self.cnx.cursor(prepared=True)
+        sql = ("INSERT INTO {0}(col1, col2, col3, col4, col5, col6, col7) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?)".format(self.tbl))
+        params = (100, None, 'foo', None, datetime(2014, 8, 4, 9, 11, 14),
+                  10, 'bar')
+        exp = (100, None, bytearray(b'foo'), None,
+               datetime(2014, 8, 4, 9, 11, 14), 10, bytearray(b'bar'))
+        cur.execute(sql, params)
+
+        sql = "SELECT * FROM {0}".format(self.tbl)
+        cur.execute(sql)
+        self.assertEqual(exp, cur.fetchone())
+        cur.close()
+
+
+class BugOra19168737(tests.MySQLConnectorTests):
+    """BUG#19168737: UNSUPPORTED CONNECTION ARGUMENTS WHILE USING OPTION_FILES
+    """
+    def test_unsupported_arguments(self):
+        option_file_dir = os.path.join('tests', 'data', 'option_files')
+        opt_file = os.path.join(option_file_dir, 'pool.cnf')
+        config = tests.get_mysql_config()
+
+        conn = mysql.connector.connect(option_files=opt_file,
+                                       option_groups=['pooling'], **config)
+        self.assertEqual('my_pool', conn.pool_name)
+        mysql.connector._CONNECTION_POOLS = {}
+        conn.close()
+
+        new_config = read_option_files(option_files=opt_file,
+                                       option_groups=['fabric'], **config)
+
+        exp = {
+            'fabric': {
+                'connect_delay': 3,
+                'host': 'fabric.example.com',
+                'password': 'foo',
+                'ssl_ca': '/path/to/ssl'
+           }
+        }
+        exp.update(config)
+
+        self.assertEqual(exp, new_config)
+
+        new_config = read_option_files(option_files=opt_file,
+                                       option_groups=['failover'], **config)
+
+        exp = {
+            'failover': ({'pool_name': 'failA', 'port': 3306},
+                         {'pool_name': 'failB', 'port': 3307})
+        }
+        exp.update(config)
+
+        self.assertEqual(exp, new_config)
+
+
+class BugOra19481761(tests.MySQLConnectorTests):
+    """BUG#19481761: OPTION_FILES + !INCLUDE FAILS WITH TRAILING NEWLINE
+    """
+    def test_option_files_with_include(self):
+        temp_cnf_file = os.path.join(os.getcwd(), 'temp.cnf')
+        temp_include_file = os.path.join(os.getcwd(), 'include.cnf')
+
+        cnf_file = open(temp_cnf_file, "w+")
+        include_file = open(temp_include_file, "w+")
+
+        config = tests.get_mysql_config()
+
+        cnf = "[connector_python]\n"
+        cnf += '\n'.join(['{0} = {1}'.format(key, value)
+                         for key, value in config.items()])
+
+        include_file.write(cnf)
+        cnf_file.write("!include {0}\n".format(temp_include_file))
+
+        cnf_file.close()
+        include_file.close()
+
+        try:
+            conn = mysql.connector.connect(option_files=temp_cnf_file)
+        except:
+            self.fail("Connection failed with option_files argument.")
+
+        self.assertEqual(config, read_option_files(option_files=temp_cnf_file))
+
+        os.remove(temp_cnf_file)
+        os.remove(temp_include_file)
