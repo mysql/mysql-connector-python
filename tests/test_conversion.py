@@ -171,7 +171,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             b'NULL',
             b'128',
             b'1281288',
-            b'3.14',
+            repr(float(3.14)) if PY2 else b'3.14',
             b'3.14',
             b"'string A'",
             b"'string B'",
