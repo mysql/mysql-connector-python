@@ -123,6 +123,18 @@ class UtilsTests(tests.MySQLConnectorTests):
         except ValueError as err:
             self.fail("intstore failed with 'int{0}store: {1}".format(i, err))
 
+    def test_lc_int(self):
+        prefix = (b'', b'\xfc', b'\xfd', b'\xfe')
+        try:
+            for i, j in enumerate((8, 16, 24, 64)):
+                val = 2 ** (j - 1)
+                lenenc = utils.lc_int(val)
+                exp = prefix[i] + \
+                    getattr(utils, 'int{0}store'.format(int(j/8)))(val)
+                self.assertEqual(exp, lenenc)
+        except ValueError as err:
+            self.fail("length_encoded_int failed for size {0}".format(j, err))
+
     def test_read_bytes(self):
         """Read a number of bytes from a buffer"""
         buf = bytearray(b"ABCDEFghijklm")

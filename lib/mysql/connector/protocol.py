@@ -636,24 +636,25 @@ class MySQLProtocol(object):
                     values.append(packed)
                 elif isinstance(value, str):
                     if PY2:
-                        values.append(utils.intstore(len(value)) + value)
+                        values.append(utils.lc_int(len(value)) +
+                                      value)
                     else:
                         value = value.encode(charset)
                         values.append(
-                            utils.intstore(len(value)) + value)
+                            utils.lc_int(len(value)) + value)
                     field_type = FieldType.VARCHAR
                 elif isinstance(value, bytes):
-                    values.append(utils.intstore(len(value)) + value)
+                    values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.BLOB
                 elif PY2 and \
                         isinstance(value, unicode):  # pylint: disable=E0602
                     value = value.encode(charset)
-                    values.append(utils.intstore(len(value)) + value)
+                    values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.VARCHAR
                 elif isinstance(value, Decimal):
                     values.append(
-                        utils.intstore(len(str(value).encode(charset))) +
-                        str(value).encode(charset))
+                        utils.lc_int(len(str(value).encode(
+                            charset))) + str(value).encode(charset))
                     field_type = FieldType.DECIMAL
                 elif isinstance(value, float):
                     values.append(struct.pack('d', value))
