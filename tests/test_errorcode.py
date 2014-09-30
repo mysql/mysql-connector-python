@@ -31,19 +31,6 @@ from mysql.connector import errorcode
 
 class ErrorCodeTests(tests.MySQLConnectorTests):
 
-    def test__GENERATED_ON(self):
-        self.assertTrue(isinstance(errorcode._GENERATED_ON, str))
-        try:
-            generatedon = datetime.strptime(errorcode._GENERATED_ON,
-                                            '%Y-%m-%d').date()
-        except ValueError as err:
-            self.fail(err)
-
-        delta = (datetime.now().date() - generatedon).days
-        self.assertTrue(
-            delta < 120,
-            "errorcode.py is more than 120 days old ({0})".format(delta))
-
     def test__MYSQL_VERSION(self):
         minimum = (5, 6, 6)
         self.assertTrue(isinstance(errorcode._MYSQL_VERSION, tuple))

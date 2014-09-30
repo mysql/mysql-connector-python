@@ -84,25 +84,6 @@ class LocalesEngClientErrorTests(tests.MySQLConnectorTests):
 
     """Testing locales.eng.client_error"""
 
-    def test__GENERATED_ON(self):
-        try:
-            from mysql.connector.locales.eng import client_error
-        except ImportError:
-            self.fail("locales.eng.client_error could not be imported")
-
-        self.assertTrue(isinstance(client_error._GENERATED_ON, str))
-        try:
-            generatedon = datetime.strptime(client_error._GENERATED_ON,
-                                            '%Y-%m-%d').date()
-        except ValueError as err:
-            self.fail(err)
-
-        delta = datetime.now().date() - generatedon
-        self.assertTrue(
-            delta.days < 120,  # pylint disable=E1103
-            "eng/client_error.py is more than 120 days old ({0})".format(
-                delta.days))  # pylint disable=E1103
-
     def test__MYSQL_VERSION(self):
         try:
             from mysql.connector.locales.eng import client_error
