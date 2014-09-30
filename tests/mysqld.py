@@ -419,6 +419,16 @@ class MySQLServer(MySQLServerBase):
             "CREATE DATABASE myconnpy;"
         ]
 
+        if self._version[0:3] >= (5, 7, 5):
+            # MySQL 5.7.5 creates no user while bootstrapping
+            extra_sql.append(
+                "INSERT INTO mysql.user VALUES ('localhost','root','',"
+                "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
+                "@@default_authentication_plugin,'','N',"
+                "CURRENT_TIMESTAMP,NULL);"
+            )
         if self._version[0:3] >= (5, 7, 4):
             # MySQL 5.7.4 only creates root@localhost
             extra_sql.append(
