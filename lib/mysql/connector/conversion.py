@@ -178,10 +178,15 @@ class MySQLConverter(MySQLConverterBase):
 
     def _unicode_to_mysql(self, value):
         """Convert unicode"""
-        encoded = value.encode(self.charset)
-        if self.charset_id in CharacterSet.slash_charsets:
+        charset = self.charset
+        charset_id = self.charset_id
+        if charset == 'binary':
+            charset = 'utf8'
+            charset_id = CharacterSet.get_charset_info(charset)[0]
+        encoded = value.encode(charset)
+        if charset_id in CharacterSet.slash_charsets:
             if b'\x5c' in encoded:
-                return HexLiteral(value, self.charset)
+                return HexLiteral(value, charset)
         return encoded
 
     def _bytes_to_mysql(self, value):
@@ -537,6 +542,8 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.BINARY:
                 return value
 
+        if self.charset == 'binary':
+            return value
         if isinstance(value, (bytes, bytearray)) and self.use_unicode:
             return value.decode(self.charset)
 
