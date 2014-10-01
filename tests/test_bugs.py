@@ -2305,6 +2305,9 @@ class BugOra18389196(tests.MySQLConnectorTests):
                       err)
 
 
+@unittest.skipIf(tests.MYSQL_VERSION >= (5, 7, 5),
+                 "MySQL {0} does not support old password auth".format(
+                     tests.MYSQL_VERSION_TXT))
 class BugOra18415927(tests.MySQLConnectorTests):
     """BUG#18415927: AUTH_RESPONSE VARIABLE INCREMENTED WITHOUT BEING DEFINED
     """
