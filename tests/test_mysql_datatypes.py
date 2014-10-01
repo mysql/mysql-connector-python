@@ -28,7 +28,7 @@ from decimal import Decimal
 import time
 import datetime
 
-from mysql.connector import connection
+from mysql.connector import connection, errors
 import tests
 
 
@@ -339,18 +339,23 @@ class TestsCursor(TestsDataTypes):
 
         # Testing YEAR(2), which is now obsolete since MySQL 5.6.6
         tblname = self.tables['temporal_year']
-        cur.execute(
+        stmt = (
             "CREATE TABLE {table} ("
             "`id` int NOT NULL AUTO_INCREMENT KEY, "
             "`t_year_2` YEAR(2))".format(table=tblname)
-            )
-        cur.execute(_get_insert_stmt(tblname, ['t_year_2']), (10,))
-        cur.execute(_get_select_stmt(tblname, ['t_year_2']))
-        row = cur.fetchone()
-
-        if tests.MYSQL_VERSION >= (5, 6, 6):
-            self.assertEqual(2010, row[0])
+        )
+        if tests.MYSQL_VERSION >= (5, 7, 5):
+            # Support for YEAR(2) removed in MySQL 5.7.5
+            self.assertRaises(errors.DatabaseError, cur.execute, stmt)
         else:
-            self.assertEqual(10, row[0])
+            cur.execute(stmt)
+            cur.execute(_get_insert_stmt(tblname, ['t_year_2']), (10,))
+            cur.execute(_get_select_stmt(tblname, ['t_year_2']))
+            row = cur.fetchone()
+
+            if tests.MYSQL_VERSION >= (5, 6, 6):
+                self.assertEqual(2010, row[0])
+            else:
+                self.assertEqual(10, row[0])
 
         cur.close()
