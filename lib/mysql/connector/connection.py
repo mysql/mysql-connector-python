@@ -1135,7 +1135,7 @@ class MySQLConnection(object):
         Returns a string.
         """
         encoding = CharacterSet.get_info(self._charset_id)[0]
-        if encoding == 'utf8mb4':
+        if encoding in ('utf8mb4', 'binary'):
             return 'utf8'
         else:
             return encoding

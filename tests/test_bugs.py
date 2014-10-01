@@ -2960,3 +2960,48 @@ class BugOra19522948(tests.MySQLConnectorTests):
         cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual((data,), self.cur.fetchone())
+
+
+class BugOra19500097(tests.MySQLConnectorTests):
+    """BUG#19500097: BETTER SUPPORT FOR RAW/BINARY DATA
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug19500097'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 VARCHAR(10), col2 INT) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_binary_charset(self):
+
+        sql = "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl)
+        self.cur.execute(sql, ('foo', 1))
+        self.cur.execute(sql, ('ëëë', 2))
+        self.cur.execute(sql, (u'ááá', 5))
+
+        self.cnx.set_charset_collation('binary')
+        self.cur.execute(sql, ('bar', 3))
+        self.cur.execute(sql, ('ëëë', 4))
+        self.cur.execute(sql, (u'ááá', 6))
+
+        exp = [
+            (bytearray(b'foo'), 1),
+            (bytearray(b'\xeb\xeb\xeb'), 2),
+            (bytearray(b'\xe1\xe1\xe1'), 5),
+            (bytearray(b'bar'), 3),
+            (bytearray(b'\xc3\xab\xc3\xab\xc3\xab'), 4),
+            (bytearray(b'\xc3\xa1\xc3\xa1\xc3\xa1'), 6)
+        ]
+
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, self.cur.fetchall())
