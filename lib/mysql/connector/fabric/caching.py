@@ -24,6 +24,7 @@
 """Implementing caching mechanisms for MySQL Fabric"""
 
 
+import bisect
 from datetime import datetime, timedelta
 from hashlib import sha1
 import logging
@@ -33,6 +34,24 @@ from . import FabricShard
 
 _LOGGER = logging.getLogger('myconnpy-fabric')
 _CACHE_TTL = 1 * 60  # 1 minute
+
+
+def insort_right_rev(a, x, lo=0, hi=None):
+    """Similar to bisect.insort_right but for reverse sorted lists
+
+    This code is similar to the Python code found in Lib/bisect.py.
+    We simply change the comparison from 'less than' to 'greater than'.
+    """
+
+    if lo < 0:
+        raise ValueError('lo must be non-negative')
+    if hi is None:
+        hi = len(a)
+    while lo < hi:
+        mid = (lo+hi)//2
+        if x > a[mid]: hi = mid
+        else: lo = mid+1
+    a.insert(lo, x)
 
 
 class CacheEntry(object):
@@ -83,6 +102,8 @@ class CacheShardTable(CacheEntry):
                                               fabric_uuid=fabric_uuid)
         self.partitioning = {}
         self._shard = shard
+        self.keys = []
+        self.keys_reversed = []
 
         if shard.key and shard.group:
             self.add_partition(shard.key, shard.group)
@@ -115,6 +136,8 @@ class CacheShardTable(CacheEntry):
             'group': group,
         }
         self.reset_ttl()
+        bisect.insort_right(self.keys, key)
+        insort_right_rev(self.keys_reversed, key)
 
     @classmethod
     def hash_index(cls, part1, part2=None):
