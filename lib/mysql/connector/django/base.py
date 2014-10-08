@@ -92,6 +92,8 @@ class DjangoMySQLConverter(MySQLConverter):
         if not value:
             return None
         dt = MySQLConverter._DATETIME_to_python(self, value)
+        if dt is None:
+            return None
         if settings.USE_TZ and timezone.is_naive(dt):
             dt = dt.replace(tzinfo=timezone.utc)
         return dt

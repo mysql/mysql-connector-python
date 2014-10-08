@@ -267,3 +267,16 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
         django_converter = DjangoMySQLConverter()
         self.assertEqual(datetime.time(10, 11, 12),
                          django_converter._TIME_to_python(value, dsc=None))
+
+    def test__DATETIME_to_python(self):
+        value = b'1990-11-12 00:00:00'
+        django_converter = DjangoMySQLConverter()
+        self.assertEqual(datetime.datetime(1990, 11, 12, 0, 0, 0),
+                         django_converter._DATETIME_to_python(value, dsc=None))
+
+        settings.USE_TZ = True
+        value = b'0000-00-00 00:00:00'
+        django_converter = DjangoMySQLConverter()
+        self.assertEqual(None,
+                         django_converter._DATETIME_to_python(value, dsc=None))
+        settings.USE_TZ = False
