@@ -753,36 +753,43 @@ class Fabric(object):
                 return self.get_group_server(entry.global_group, mode=mode)
 
             if entry.shard_type == 'RANGE':
-                partitions = sorted(entry.partitioning.keys())
-                index = partitions[bisect(partitions, int(key)) - 1]
+                try:
+                    range_key = int(key)
+                except ValueError:
+                    raise ValueError("Key must be an integer for RANGE")
+                partitions = entry.keys
+                index = partitions[bisect(partitions, range_key) - 1]
                 partition = entry.partitioning[index]
             elif entry.shard_type == 'RANGE_DATETIME':
                 if not isinstance(key, (datetime.date, datetime.datetime)):
                     raise ValueError(
                         "Key must be datetime.date or datetime.datetime for "
                         "RANGE_DATETIME")
-                partition_keys = sorted(entry.partitioning.keys(), reverse=True)
-                for partkey in partition_keys:
+                index = None
+                for partkey in entry.keys_reversed:
                     if key >= partkey:
                         index = partkey
                         break
-                partition = entry.partitioning[index]
+                try:
+                    partition = entry.partitioning[index]
+                except KeyError:
+                    raise ValueError("Key invalid; was '{0}'".format(key))
             elif entry.shard_type == 'RANGE_STRING':
                 if not isunicode(key):
                     raise ValueError("Key must be a unicode value")
-                partition_keys = sorted(entry.partitioning.keys(), reverse=True)
-                for partkey in partition_keys:
-                    size = len(partkey)
-                    if key[0:size] >= partkey[0:size]:
+                index = None
+                for partkey in entry.keys_reversed:
+                    if key >= partkey:
                         index = partkey
                         break
-                partition = entry.partitioning[index]
+                try:
+                    partition = entry.partitioning[index]
+                except KeyError:
+                    raise ValueError("Key invalid; was '{0}'".format(key))
             elif entry.shard_type == 'HASH':
                 md5key = md5(str(key))
-                partition_keys = sorted(
-                    entry.partitioning.keys(), reverse=True)
-                index = partition_keys[-1]
-                for partkey in partition_keys:
+                index = entry.keys_reversed[-1]
+                for partkey in entry.keys_reversed:
                     if md5key.digest() >= b16decode(partkey):
                         index = partkey
                         break
