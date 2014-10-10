@@ -8,6 +8,21 @@ Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v2.0.2
+======
+
+- BUG19500097: Fix string decoding with binary character set
+- BUG19677659: Move testings of errors to internal repository
+- BUG19549363: Raise error when compression used with reset_session
+- BUG19642249: Improve errors reporting invalid sharding keys
+- BUG19711759: Fix Pylint issue in network module
+- BUG19667984: Fix converting invalid datetime values in Django backend
+- BUG19660283: Fix failing unit tests with MySQL server 5.7.5
+- BUG19584051: Fix comparison of type_code of columns for PEP-249
+- BUG19522948: Fix data corruption with TEXT and prepared statements
+- BUG19584116: Fix extra signal causing runtime error in Django
+
+
 v2.0.1
 ======
 

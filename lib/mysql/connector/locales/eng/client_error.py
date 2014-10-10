@@ -24,8 +24,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA 
 
 # This file was auto-generated.
-_GENERATED_ON = '2014-05-23'
-_MYSQL_VERSION = (5, 7, 4)
+_GENERATED_ON = '2014-10-10'
+_MYSQL_VERSION = (5, 7, 5)
 
 # Start MySQL Error messages
 CR_UNKNOWN_ERROR = u"Unknown MySQL error"
@@ -77,7 +77,7 @@ CR_SHARED_MEMORY_CONNECT_ABANDONED_ERROR = u"Can't open shared memory; no answer
 CR_SHARED_MEMORY_CONNECT_SET_ERROR = u"Can't open shared memory; cannot send request event to server (%s)"
 CR_CONN_UNKNOW_PROTOCOL = u"Wrong or unknown protocol"
 CR_INVALID_CONN_HANDLE = u"Invalid connection handle"
-CR_SECURE_AUTH = u"Connection using old (pre-4.1.1) authentication protocol refused (client option 'secure_auth' enabled)"
+CR_UNUSED_1 = u"Connection using old (pre-4.1.1) authentication protocol refused (client option 'secure_auth' enabled)"
 CR_FETCH_CANCELED = u"Row retrieval was canceled by mysql_stmt_close() call"
 CR_NO_DATA = u"Attempt to read column without prior row fetch"
 CR_NO_STMT_METADATA = u"Prepared statement contains no metadata"
