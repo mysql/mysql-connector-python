@@ -424,6 +424,43 @@ class FabricShardingTests(tests.MySQLConnectorTests):
         cur.execute("SELECT @@global.gtid_executed")
         return cur.fetchone()[0]
 
+    def test_range(self):
+        self.assertTrue(self._check_table("employees.employees_range", 'RANGE'))
+        tbl_name = "employees_range"
+
+        tables = ["employees.{0}".format(tbl_name)]
+
+        self.cnx.set_property(tables=tables,
+                              scope=fabric.SCOPE_GLOBAL,
+                              mode=fabric.MODE_READWRITE)
+        cur = self.cnx.cursor()
+        gtid_executed = self._truncate(cur, tbl_name)
+        self.cnx.commit()
+
+        insert = ("INSERT INTO {0} "
+                  "VALUES (%s, %s, %s, %s, %s, %s)").format(tbl_name)
+
+        self._populate(self.cnx, gtid_executed, tbl_name, insert,
+                       self.emp_data[1985] + self.emp_data[2000], 0)
+
+        time.sleep(2)
+
+        # Year is key of self.emp_data, second value is emp_no for RANGE key
+        exp_keys = [(1985, 10002), (2000, 47291)]
+        for year, emp_no in exp_keys:
+            self.cnx.set_property(tables=tables,
+                                  scope=fabric.SCOPE_LOCAL,
+                                  key=emp_no, mode=fabric.MODE_READONLY)
+            cur = self.cnx.cursor()
+            cur.execute("SELECT * FROM {0}".format(tbl_name))
+            rows = cur.fetchall()
+            self.assertEqual(rows, self.emp_data[year])
+
+        self.cnx.set_property(tables=tables,
+                              key='spam', mode=fabric.MODE_READONLY)
+        self.assertRaises(ValueError, self.cnx.cursor)
+
+
     def test_range_datetime(self):
         self.assertTrue(self._check_table(
             "employees.employees_range_datetime", 'RANGE_DATETIME'))
@@ -510,3 +547,34 @@ class FabricShardingTests(tests.MySQLConnectorTests):
                                   key='not unicode str',
                                   mode=fabric.MODE_READONLY)
             self.assertRaises(ValueError, self.cnx.cursor)
+
+    def test_bug19642249(self):
+        self.assertTrue(self._check_table(
+            "employees.employees_range_string", 'RANGE_STRING'))
+
+        # Invalid key for RANGE_STRING
+        tbl_name = "employees_range_string"
+        tables = ["employees.{0}".format(tbl_name)]
+
+        self.cnx.set_property(tables=tables,
+                              key=u'1', mode=fabric.MODE_READONLY)
+        try:
+            cur = self.cnx.cursor()
+        except ValueError as exc:
+            self.assertEqual("Key invalid; was '1'", str(exc))
+        else:
+            self.fail("ValueError not raised")
+
+        # Invalid key for RANGE_DATETIME
+        tbl_name = "employees_range_datetime"
+        tables = ["employees.{0}".format(tbl_name)]
+
+        self.cnx.set_property(tables=tables,
+                              key=datetime.date(1977, 1, 1),
+                              mode=fabric.MODE_READONLY)
+        try:
+            cur = self.cnx.cursor()
+        except ValueError as exc:
+            self.assertEqual("Key invalid; was '1977-01-01'", str(exc))
+        else:
+            self.fail("ValueError not raised")
