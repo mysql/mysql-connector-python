@@ -123,6 +123,7 @@ class MySQLConnection(object):
         self._ssl_active = False
         self._auth_plugin = None
         self._pool_config_version = None
+        self._compress = False
 
         if len(kwargs) > 0:
             self.connect(**kwargs)
@@ -271,6 +272,7 @@ class MySQLConnection(object):
 
         try:
             if config['compress']:
+                self._compress = True
                 self.set_client_flags([ClientFlag.COMPRESS])
         except KeyError:
             pass  # Missing compress argument is OK
@@ -884,6 +886,10 @@ class MySQLConnection(object):
         if self.unread_result:
             raise errors.InternalError("Unread result found.")
 
+        if self._compress:
+            raise errors.NotSupportedError("Change user is not supported with "
+                                           "compression.")
+
         packet = self._protocol.make_change_user(
             handshake=self._handshake,
             username=username, password=password, database=database,
@@ -943,8 +949,13 @@ class MySQLConnection(object):
         try:
             self.cmd_reset_connection()
         except errors.NotSupportedError:
-            self.cmd_change_user(self._user, self._password,
-                                 self._database, self._charset_id)
+            if self._compress:
+                raise errors.NotSupportedError(
+                    "Reset session is not supported with compression for "
+                    "MySQL server version 5.7.2 or earlier.")
+            else:
+                self.cmd_change_user(self._user, self._password,
+                                     self._database, self._charset_id)
 
         cur = self.cursor()
         if user_variables:

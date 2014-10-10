@@ -3005,3 +3005,25 @@ class BugOra19500097(tests.MySQLConnectorTests):
 
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual(exp, self.cur.fetchall())
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
+                 "MySQL {0} does not support COM_RESET_CONNECTION".format(
+                 tests.MYSQL_VERSION_TXT))
+class BugOra19549363(tests.MySQLConnectorTests):
+    """BUG#19549363: Compression does not work with Change User
+    """
+    def test_compress(self):
+        config = tests.get_mysql_config()
+        config['compress'] = True
+
+        mysql.connector._CONNECTION_POOLS = {}
+        config['pool_name'] = 'mypool'
+        config['pool_size'] = 3
+        config['pool_reset_session'] = True
+        cnx1 = mysql.connector.connect(**config)
+
+        try:
+            cnx1.close()
+        except:
+            self.fail("Reset session with compression test failed.")
