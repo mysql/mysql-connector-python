@@ -36,22 +36,24 @@ _LOGGER = logging.getLogger('myconnpy-fabric')
 _CACHE_TTL = 1 * 60  # 1 minute
 
 
-def insort_right_rev(a, x, lo=0, hi=None):
+def insort_right_rev(alist, new_element, low=0, high=None):
     """Similar to bisect.insort_right but for reverse sorted lists
 
     This code is similar to the Python code found in Lib/bisect.py.
     We simply change the comparison from 'less than' to 'greater than'.
     """
 
-    if lo < 0:
-        raise ValueError('lo must be non-negative')
-    if hi is None:
-        hi = len(a)
-    while lo < hi:
-        mid = (lo+hi)//2
-        if x > a[mid]: hi = mid
-        else: lo = mid+1
-    a.insert(lo, x)
+    if low < 0:
+        raise ValueError('low must be non-negative')
+    if high is None:
+        high = len(alist)
+    while low < high:
+        middle = (low + high) // 2
+        if new_element > alist[middle]:
+            high = middle
+        else:
+            low = middle + 1
+    alist.insert(low, new_element)
 
 
 class CacheEntry(object):
