@@ -103,10 +103,14 @@ def read_option_files(**config):
             except KeyError:
                 continue
 
+        not_evaluate = ('password', 'passwd')
         for option, value in config_options.items():
             if option not in config:
                 try:
-                    config[option] = eval(value[0])  # pylint: disable=W0123
+                    if option in not_evaluate:
+                        config[option] = value[0]
+                    else:
+                        config[option] = eval(value[0])  # pylint: disable=W0123
                 except (NameError, SyntaxError):
                     config[option] = value[0]
 
