@@ -26,6 +26,7 @@
 
 from . import utils
 from .locales import get_client_error
+from .catch23 import PY2
 
 # _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is ued by the
 # function custom_error_exception. _ERROR_EXCEPTIONS (at bottom of module)
@@ -187,7 +188,7 @@ class Error(Exception):
         if self.msg and self.errno != -1:
             fields = {
                 'errno': self.errno,
-                'msg': self.msg
+                'msg': self.msg.encode('utf8') if PY2 else self.msg
             }
             if self.sqlstate:
                 fmt = '{errno} ({state}): {msg}'
