@@ -1,5 +1,5 @@
 ==========================
-MySQL Connector/Python 2.0
+MySQL Connector/Python 2.1
 ==========================
 
 MySQL Connector/Python
