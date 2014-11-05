@@ -58,12 +58,17 @@ LOGGER = logging.getLogger(tests.LOGGER_NAME)
 DEVNULL = open(os.devnull, 'w')
 
 
-# MySQL Server executable used
+# MySQL Server executable name
 if os.name == 'nt':
     EXEC_MYSQLD = 'mysqld.exe'
 else:
     EXEC_MYSQLD = 'mysqld'
 
+# MySQL client executable name
+if os.name == 'nt':
+    EXEC_MYSQL = 'mysql.exe'
+else:
+    EXEC_MYSQL = 'mysql'
 
 def _convert_forward_slash(path):
     """Convert forward slashes with backslashes
@@ -176,6 +181,7 @@ class MySQLServerBase(object):
 
         # Locate mysqld, mysql binaries
         LOGGER.info("Locating mysql binaries (could take a while)")
+        files_to_find = [EXEC_MYSQL, EXEC_MYSQLD]
         for root, dirs, files in os.walk(self._basedir):
             if self._sbindir:
                 break
@@ -183,7 +189,15 @@ class MySQLServerBase(object):
                 if (afile == EXEC_MYSQLD and
                         os.access(os.path.join(root, afile), 0)):
                     self._sbindir = root
+                    files_to_find.remove(EXEC_MYSQLD)
+                elif (afile == EXEC_MYSQL and
+                        os.access(os.path.join(root, afile), 0)):
+                    self._bindir = root
+                    files_to_find.remove(EXEC_MYSQL)
+
+                if not files_to_find:
                     break
+
 
         if not self._sbindir:
             raise MySQLBootstrapError(
@@ -309,6 +323,21 @@ class MySQLServerBase(object):
             raise MySQLServerError(err)
 
         return True
+
+    def get_exec(self, exec_name):
+        """Find executable in the MySQL directories
+
+        Returns the the full path to the executable named exec_name or
+        None when the executable was not found.
+
+        Return str or None.
+        """
+        for location in [self._bindir, self._sbindir]:
+            exec_path = os.path.join(location, exec_name)
+            if os.access(exec_path, 0):
+                return exec_path
+
+        return None
 
 
 class MySQLServer(MySQLServerBase):
@@ -541,9 +570,10 @@ class MySQLServer(MySQLServerBase):
             pid = get_pid(self._pid_file)
             if not pid:
                 LOGGER.error("Failed getting PID of MySQL server "
-                             "'{name}'".format(name=self._name))
+                             "'{name}' (file {pid_file}".format(
+                    name=self._name, pid_file=self._pid_file))
                 sys.exit(1)
-            LOGGER.info("MySQL server started '{name}' "
+            LOGGER.debug("MySQL server started '{name}' "
                         "(pid={pid})".format(pid=pid, name=self._name))
 
     def stop(self):
@@ -576,7 +606,7 @@ class MySQLServer(MySQLServerBase):
             time.sleep(3)
 
         if self.check_running(pid):
-            LOGGER.info("MySQL server stopped '{name}' "
+            LOGGER.debug("MySQL server stopped '{name}' "
                         "(pid={pid})".format(pid=pid, name=self._name))
             return True
 

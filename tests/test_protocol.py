@@ -219,7 +219,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         )
         exp = {
             'protocol': 10,
-            'server_version_original': b'5.0.30-enterprise-gpl-log',
+            'server_version_original': '5.0.30-enterprise-gpl-log',
             'charset': 8,
             'server_threadid': 265,
             'capabilities': 41516,

@@ -38,7 +38,7 @@ import mysql.connector as myconn
 class PEP249Base(tests.MySQLConnectorTests):
 
     def db_connect(self):
-        return myconn.connect(**tests.get_mysql_config())
+        return myconn.connect(use_pure=True, **tests.get_mysql_config())
 
     def get_connection_id(self, cursor):
         cid = None
@@ -69,9 +69,19 @@ class PEP249ModuleTests(PEP249Base):
         """Interface exports the connect()-function"""
         self.assertTrue(inspect.isfunction(myconn.connect),
                         "Module does not export the connect()-function")
-        cnx = myconn.connect(**tests.get_mysql_config())
+        cnx = myconn.connect(use_pure=True, **tests.get_mysql_config())
         self.assertTrue(isinstance(cnx, myconn.connection.MySQLConnection),
                         "The connect()-method returns incorrect instance")
+        cnx = myconn.connect(**tests.get_mysql_config())
+        self.assertTrue(isinstance(cnx, myconn.connection.MySQLConnection),
+                        "connect() not returning by default pure "
+                        "MySQLConnection object")
+
+        if tests.MYSQL_CAPI:
+            cnx = myconn.connect(use_pure=False, **tests.get_mysql_config())
+            self.assertTrue(isinstance(cnx,
+                                       myconn.connection_cext.CMySQLConnection),
+                            "The connect()-method returns incorrect instance")
 
     def test_apilevel(self):
         """Interface sets the API level"""

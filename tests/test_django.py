@@ -25,37 +25,48 @@
 """
 
 import datetime
+import unittest
 import sys
 import unittest
 
 import tests
 
 # Load 3rd party _after_ loading tests
-from django.conf import settings
+try:
+    from django.conf import settings
+except ImportError:
+    DJANGO_AVAILABLE = False
+else:
+    DJANGO_AVAILABLE = True
 
 # Have to setup Django before loading anything else
-settings.configure()
-DBCONFIG = tests.get_mysql_config()
+if DJANGO_AVAILABLE:
+    try:
+        settings.configure()
+    except RuntimeError as exc:
+        if not 'already configured' in str(exc):
+            raise
+    DBCONFIG = tests.get_mysql_config()
 
-settings.DATABASES = {
-    'default': {
-        'ENGINE': 'mysql.connector.django',
-        'NAME': DBCONFIG['database'],
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': DBCONFIG['host'],
-        'PORT': DBCONFIG['port'],
-        'TEST_CHARSET': 'utf8',
-        'TEST_COLLATION': 'utf8_general_ci',
-        'CONN_MAX_AGE': 0,
-        'AUTOCOMMIT': True,
-    },
-}
-settings.SECRET_KEY = "django_tests_secret_key"
-settings.TIME_ZONE = 'UTC'
-settings.USE_TZ = False
-settings.SOUTH_TESTS_MIGRATE = False
-settings.DEBUG = False
+    settings.DATABASES = {
+        'default': {
+            'ENGINE': 'mysql.connector.django',
+            'NAME': DBCONFIG['database'],
+            'USER': 'root',
+            'PASSWORD': '',
+            'HOST': DBCONFIG['host'],
+            'PORT': DBCONFIG['port'],
+            'TEST_CHARSET': 'utf8',
+            'TEST_COLLATION': 'utf8_general_ci',
+            'CONN_MAX_AGE': 0,
+            'AUTOCOMMIT': True,
+        },
+    }
+    settings.SECRET_KEY = "django_tests_secret_key"
+    settings.TIME_ZONE = 'UTC'
+    settings.USE_TZ = False
+    settings.SOUTH_TESTS_MIGRATE = False
+    settings.DEBUG = False
 
 TABLES = {}
 TABLES['django_t1'] = """
@@ -86,11 +97,14 @@ if tests.DJANGO_VERSION >= (1, 6):
 from django.db.backends.signals import connection_created
 
 import mysql.connector
-from mysql.connector.django.base import (DatabaseWrapper, DatabaseOperations,
-                                         DjangoMySQLConverter)
-from mysql.connector.django.introspection import DatabaseIntrospection
+
+if DJANGO_AVAILABLE:
+    from mysql.connector.django.base import (
+        DatabaseWrapper, DatabaseOperations, DjangoMySQLConverter)
+    from mysql.connector.django.introspection import DatabaseIntrospection
 
 
+@unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")
 class DjangoIntrospection(tests.MySQLConnectorTests):
 
     """Test the Django introspection module"""
@@ -187,6 +201,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
         self.assertEqual('id', res)
 
 
+@unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")
 class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
 
     """Test the Django base.DatabaseWrapper class"""

@@ -22,8 +22,16 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 """
-MySQL Connector/Python - MySQL drive written in Python
+MySQL Connector/Python - MySQL driver written in Python
 """
+
+try:
+    import _mysql_connector  # pylint: disable=F0401
+    from .connection_cext import CMySQLConnection
+except ImportError:
+    HAVE_CEXT = False
+else:
+    HAVE_CEXT = True
 
 from . import version
 from .connection import MySQLConnection
@@ -41,7 +49,6 @@ from .dbapi import (
 from .optionfiles import read_option_files
 
 _CONNECTION_POOLS = {}
-
 
 def _get_pooled_connection(**kwargs):
     """Return a pooled MySQL connection"""
@@ -148,15 +155,25 @@ def connect(*args, **kwargs):
 
     # Pooled connections
     try:
-        from .pooling import CNX_POOL_ARGS
+        from .constants import CNX_POOL_ARGS
         if any([key in kwargs for key in CNX_POOL_ARGS]):
             return _get_pooled_connection(**kwargs)
     except NameError:
         # No pooling
         pass
 
-    # Regular connection
-    return MySQLConnection(*args, **kwargs)
+    use_pure = kwargs.setdefault('use_pure', True)
+
+    try:
+        del kwargs['use_pure']
+    except KeyError:
+        # Just making sure 'use_pure' is not kwargs
+        pass
+
+    if HAVE_CEXT and not use_pure:
+        return CMySQLConnection(*args, **kwargs)
+    else:
+        return MySQLConnection(*args, **kwargs)
 Connect = connect  # pylint: disable=C0103
 
 __version_info__ = version.VERSION
@@ -167,6 +184,7 @@ __all__ = [
 
     # Some useful constants
     'FieldType', 'FieldFlag', 'ClientFlag', 'CharacterSet', 'RefreshOption',
+    'HAVE_CEXT',
 
     # Error handling
     'Error', 'Warning',
@@ -180,4 +198,7 @@ __all__ = [
     'DateFromTicks', 'DateFromTicks', 'TimestampFromTicks', 'TimeFromTicks',
     'STRING', 'BINARY', 'NUMBER',
     'DATETIME', 'ROWID',
+
+    # C Extension
+    'CMySQLConnection',
     ]

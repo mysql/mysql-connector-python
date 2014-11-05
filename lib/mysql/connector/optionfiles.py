@@ -30,9 +30,7 @@ import os
 import re
 
 from .catch23 import PY2
-from .connection import DEFAULT_CONFIGURATION
-from .pooling import CNX_POOL_ARGS
-from .fabric import CNX_FABRIC_ARGS
+from .constants import DEFAULT_CONFIGURATION, CNX_POOL_ARGS, CNX_FABRIC_ARGS
 
 # pylint: disable=F0401
 if PY2:

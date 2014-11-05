@@ -64,7 +64,16 @@ if __name__ == '__main__':
     #
     # Configure MySQL login and database to use in config.py
     #
-    import config
-    config = config.Config.dbinfo().copy()
+    config = {
+        'host': 'localhost',
+        'port': 3306,
+        'database': 'test',
+        'user': 'root',
+        'password': '',
+        'charset': 'utf8',
+        'use_unicode': True,
+        'get_warnings': True,
+    }
+
     out = main(config)
     print('\n'.join(out))
