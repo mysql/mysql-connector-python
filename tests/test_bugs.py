@@ -3027,3 +3027,26 @@ class BugOra19549363(tests.MySQLConnectorTests):
             cnx1.close()
         except:
             self.fail("Reset session with compression test failed.")
+
+
+class BugOra19803702(tests.MySQLConnectorTests):
+    """BUG#19803702: CAN'T REPORT ERRORS THAT HAVE NON-ASCII CHARACTERS
+    """
+    def test_errors(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'áááëëëááá'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 VARCHAR(10), col2 INT) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+
+        self.cur.execute(create)
+        self.assertRaises(errors.DatabaseError, self.cur.execute, create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
