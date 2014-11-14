@@ -26,6 +26,7 @@
 
 import datetime
 import sys
+import unittest
 
 import tests
 
@@ -82,6 +83,7 @@ FOREIGN KEY (id_t1) REFERENCES django_t1(id) ON DELETE CASCADE
 import django.db  # pylint: disable=W0611
 if tests.DJANGO_VERSION >= (1, 6):
     from django.db.backends import FieldInfo
+from django.db.backends.signals import connection_created
 
 import mysql.connector
 from mysql.connector.django.base import (DatabaseWrapper, DatabaseOperations,
@@ -207,6 +209,23 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         exp = self.conn.converter._time_to_mysql(value)
         self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
 
+    def test_signal(self):
+        from django.db import connection
+
+        def conn_setup(*args, **kwargs):
+            conn = kwargs['connection']
+            cur = conn.cursor()
+            cur.execute("SET @xyz=10")
+            cur.close()
+
+        connection_created.connect(conn_setup)
+        cursor = connection.cursor()
+        cursor.execute("SELECT @xyz")
+
+        self.assertEqual((10,), cursor.fetchone())
+        cursor.close()
+        self.cnx.close()
+
 
 class DjangoDatabaseOperations(tests.MySQLConnectorTests):
 
@@ -248,3 +267,16 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
         django_converter = DjangoMySQLConverter()
         self.assertEqual(datetime.time(10, 11, 12),
                          django_converter._TIME_to_python(value, dsc=None))
+
+    def test__DATETIME_to_python(self):
+        value = b'1990-11-12 00:00:00'
+        django_converter = DjangoMySQLConverter()
+        self.assertEqual(datetime.datetime(1990, 11, 12, 0, 0, 0),
+                         django_converter._DATETIME_to_python(value, dsc=None))
+
+        settings.USE_TZ = True
+        value = b'0000-00-00 00:00:00'
+        django_converter = DjangoMySQLConverter()
+        self.assertEqual(None,
+                         django_converter._DATETIME_to_python(value, dsc=None))
+        settings.USE_TZ = False

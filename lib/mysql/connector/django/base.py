@@ -92,6 +92,8 @@ class DjangoMySQLConverter(MySQLConverter):
         if not value:
             return None
         dt = MySQLConverter._DATETIME_to_python(self, value)
+        if dt is None:
+            return None
         if settings.USE_TZ and timezone.is_naive(dt):
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
@@ -584,7 +586,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         cnx = mysql.connector.connect(**conn_params)
         self.server_version = cnx.get_server_version()
         cnx.set_converter_class(DjangoMySQLConverter)
-        connection_created.send(sender=self.__class__, connection=self)
 
         return cnx
 
@@ -609,6 +610,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def _connect(self):
         """Setup the connection with MySQL"""
         self.connection = self.get_new_connection(self.get_connection_params())
+        connection_created.send(sender=self.__class__, connection=self)
         self.init_connection_state()
 
     def _cursor(self):

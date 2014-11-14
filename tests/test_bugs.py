@@ -2305,6 +2305,9 @@ class BugOra18389196(tests.MySQLConnectorTests):
                       err)
 
 
+@unittest.skipIf(tests.MYSQL_VERSION >= (5, 7, 5),
+                 "MySQL {0} does not support old password auth".format(
+                     tests.MYSQL_VERSION_TXT))
 class BugOra18415927(tests.MySQLConnectorTests):
     """BUG#18415927: AUTH_RESPONSE VARIABLE INCREMENTED WITHOUT BEING DEFINED
     """
@@ -2867,3 +2870,160 @@ class BugOra19481761(tests.MySQLConnectorTests):
 
         os.remove(temp_cnf_file)
         os.remove(temp_include_file)
+
+
+class BugOra19584051(tests.MySQLConnectorTests):
+    """BUG#19584051: TYPE_CODE DOES NOT COMPARE EQUAL
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        self.tbl = 'Bug19584051'
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = ('CREATE TABLE {0}(col1 INT NOT NULL, col2 BLOB, '
+                  'col3 VARCHAR(10), col4 DECIMAL(4,2), '
+                  'col5 DATETIME , col6 YEAR, '
+                  'PRIMARY KEY(col1))'.format(self.tbl))
+
+        self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+        self.cursor.close()
+        self.cnx.close()
+
+    def test_dbapi(self):
+        cur = self.cnx.cursor()
+        sql = ("INSERT INTO {0}(col1, col2, col3, col4, col5, col6) "
+               "VALUES (%s, %s, %s, %s, %s, %s)".format(self.tbl))
+        params = (100, 'blob-data', 'foo', 1.2, datetime(2014, 8, 4, 9, 11, 14),
+                  2014)
+
+        exp = [
+            mysql.connector.NUMBER,
+            mysql.connector.BINARY,
+            mysql.connector.STRING,
+            mysql.connector.NUMBER,
+            mysql.connector.DATETIME,
+            mysql.connector.NUMBER,
+        ]
+        cur.execute(sql, params)
+
+        sql = "SELECT * FROM {0}".format(self.tbl)
+        cur.execute(sql)
+        temp = cur.fetchone()
+        type_codes = [row[1] for row in cur.description]
+        self.assertEqual(exp, type_codes)
+        cur.close()
+
+
+class BugOra19522948(tests.MySQLConnectorTests):
+    """BUG#19522948: DATA CORRUPTION WITH TEXT FIELDS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug19522948'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = "CREATE TABLE {0} (c1 LONGTEXT NOT NULL)".format(
+            self.tbl
+        )
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_row_to_python(self):
+        cur = self.cnx.cursor(prepared=True)
+
+        data = "test_data"*10
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((data,), self.cur.fetchone())
+        self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+
+        data = "test_data"*1000
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((data,), self.cur.fetchone())
+        self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+
+        data = "test_data"*10000
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual((data,), self.cur.fetchone())
+
+
+class BugOra19500097(tests.MySQLConnectorTests):
+    """BUG#19500097: BETTER SUPPORT FOR RAW/BINARY DATA
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug19500097'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 VARCHAR(10), col2 INT) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_binary_charset(self):
+
+        sql = "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl)
+        self.cur.execute(sql, ('foo', 1))
+        self.cur.execute(sql, ('ëëë', 2))
+        self.cur.execute(sql, (u'ááá', 5))
+
+        self.cnx.set_charset_collation('binary')
+        self.cur.execute(sql, ('bar', 3))
+        self.cur.execute(sql, ('ëëë', 4))
+        self.cur.execute(sql, (u'ááá', 6))
+
+        exp = [
+            (bytearray(b'foo'), 1),
+            (bytearray(b'\xeb\xeb\xeb'), 2),
+            (bytearray(b'\xe1\xe1\xe1'), 5),
+            (bytearray(b'bar'), 3),
+            (bytearray(b'\xc3\xab\xc3\xab\xc3\xab'), 4),
+            (bytearray(b'\xc3\xa1\xc3\xa1\xc3\xa1'), 6)
+        ]
+
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, self.cur.fetchall())
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
+                 "MySQL {0} does not support COM_RESET_CONNECTION".format(
+                 tests.MYSQL_VERSION_TXT))
+class BugOra19549363(tests.MySQLConnectorTests):
+    """BUG#19549363: Compression does not work with Change User
+    """
+    def test_compress(self):
+        config = tests.get_mysql_config()
+        config['compress'] = True
+
+        mysql.connector._CONNECTION_POOLS = {}
+        config['pool_name'] = 'mypool'
+        config['pool_size'] = 3
+        config['pool_reset_session'] = True
+        cnx1 = mysql.connector.connect(**config)
+
+        try:
+            cnx1.close()
+        except:
+            self.fail("Reset session with compression test failed.")
