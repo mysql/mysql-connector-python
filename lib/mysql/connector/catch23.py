@@ -36,13 +36,13 @@ PY2 = sys.version_info[0] == 2
 if PY2:
     NUMERIC_TYPES = (int, float, Decimal, HexLiteral, long)
     INT_TYPES = (int, long)
-    UNICODE_TYPE = (unicode,)
+    UNICODE_TYPES = (unicode,)
     STRING_TYPES = (str, unicode)
     BYTE_TYPES = (bytearray,)
 else:
     NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
     INT_TYPES = (int,)
-    UNICODE_TYPE = (str,)
+    UNICODE_TYPES = (str,)
     STRING_TYPES = (str,)
     BYTE_TYPES = (bytearray, bytes)
 
