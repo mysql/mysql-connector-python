@@ -613,7 +613,7 @@ class MySQLConnectionAbstract(object):
         Returns a string.
         """
         encoding = CharacterSet.get_info(self._charset_id)[0]
-        if encoding == 'utf8mb4':
+        if encoding in ('utf8mb4', 'binary'):
             return 'utf8'
         else:
             return encoding
@@ -652,6 +652,14 @@ class MySQLConnectionAbstract(object):
 
         self._execute_query("SET NAMES '{0}' COLLATE '{1}'".format(
             charset_name, collation_name))
+
+        try:
+            # Required for C Extension
+            self.set_character_set_name(charset_name)
+        except AttributeError:
+            # Not required for pure Python connection
+            pass
+
         if self.converter:
             self.converter.set_charset(charset_name)
 
