@@ -215,6 +215,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
             else:
                 raise errors.InterfaceError(errmsg)
 
+    def set_character_set_name(self, charset):
+        """Sets the default character set name for current connection.
+        """
+        self._cmysql.set_character_set(charset)
+
     def info_query(self, query):
         """Send a query which only returns 1 row"""
         self._cmysql.query(query)

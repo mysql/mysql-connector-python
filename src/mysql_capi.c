@@ -1178,6 +1178,10 @@ MySQL_escape_string(MySQL *self, PyObject *value)
 
     if (PyUnicode_Check(value))
     {
+        if (strcmp(charset, "binary") == 0)
+        {
+            charset = "utf8";
+        }
         from= PyUnicode_AsEncodedString(value, charset, NULL);
         if (!from)
         {
