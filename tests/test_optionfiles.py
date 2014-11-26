@@ -99,6 +99,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
 
     def test_get_groups(self):
         exp = {
+            'password': '12345',
             'port': '1001',
             'socket': '/var/run/mysqld/mysqld2.sock',
             'ssl-ca': 'dummyCA',
@@ -122,6 +123,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
     def test_get_groups_as_dict(self):
         exp = dict([
             ('client', {'port': '1000',
+                        'password': '12345',
                         'socket': '/var/run/mysqld/mysqld.sock',
                         'ssl-ca': 'dummyCA',
                         'ssl-cert': 'dummyCert',
@@ -167,6 +169,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
 
         option_file_dir = os.path.join('tests', 'data', 'option_files')
         exp = {
+            'password': '12345',
             'port': 1000,
             'unix_socket': '/var/run/mysqld/mysqld.sock',
             'ssl_ca': 'dummyCA',
@@ -177,6 +180,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
             option_file_dir, 'my.cnf'))
         self.assertEqual(exp, result)
         exp = {
+            'password': '12345',
             'port': 1001,
             'unix_socket': '/var/run/mysqld/mysqld2.sock',
             'ssl_ca': 'dummyCA',
