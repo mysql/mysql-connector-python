@@ -25,7 +25,6 @@
 """
 
 from distutils.command.build_ext import build_ext
-from distutils.command.build import build
 from distutils.command.install import install
 from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
@@ -223,16 +222,25 @@ class BuildMySQLExt(build_ext):
         self._mysql_config_info = None
         min_version = BuildMySQLExt.min_connector_c_version
 
+        err_invalid_loc = "MySQL C API location is invalid; was %s"
+
         mysql_config = None
         err_version = "MySQL C API {0}.{1}.{2} or later required".format(
             *BuildMySQLExt.min_connector_c_version)
 
+        if not os.path.exists(connc_loc):
+            log.error(err_invalid_loc, connc_loc)
+            sys.exit(1)
+
         if os.path.isdir(connc_loc):
-            # if directory, and no mysql_config is availble, figure out the
+            # if directory, and no mysql_config is available, figure out the
             # lib/ and include/ folders from the the filesystem
             mysql_config = os.path.join(connc_loc, 'bin', 'mysql_config')
-            if not (os.path.isfile(mysql_config) and
-                        os.access(mysql_config, os.X_OK)):
+            if os.path.isfile(mysql_config) and \
+                    os.access(mysql_config, os.X_OK):
+                connc_loc = mysql_config
+            else:
+                # Probably using MS Windows
                 myconfigh = os.path.join(connc_loc, 'include', 'my_config.h')
 
                 if not os.path.exists(myconfigh):
@@ -280,11 +288,10 @@ class BuildMySQLExt(build_ext):
                 else:
                     self.arch = 'i386'
 
-        # We were given the mysql_config, or we discovered it
-        if not mysql_config:
+        # We were given the location of the mysql_config tool (not on Windows)
+        if not os.name == 'nt' and os.path.isfile(connc_loc) \
+                and os.access(connc_loc, os.X_OK):
             mysql_config = connc_loc
-
-        if os.path.isfile(mysql_config) and os.access(mysql_config, os.X_OK):
             # Check mysql_config
             myc_info = get_mysql_config_info(mysql_config)
 
@@ -299,8 +306,8 @@ class BuildMySQLExt(build_ext):
             self.arch = self._mysql_config_info['arch']
             connc_64bit = self.arch == 'x86_64'
 
-        else:
-            log.error("MySQL tool mysql_config not available")
+        if not os.path.exists(include_dir):
+            log.error(err_invalid_loc, connc_loc)
             sys.exit(1)
 
         # Set up the build_ext class
@@ -404,6 +411,7 @@ class InstallLib(install_lib):
         install_lib.finalize_options(self)
         self.set_undefined_options('install',
                                    ('byte_code_only', 'byte_code_only'))
+        self.set_undefined_options('build', ('build_base', 'build_dir'))
 
     def run(self):
         self.build()
@@ -456,4 +464,6 @@ class Install(install):
             # We install pure Python code in purelib location when no
             # extension is build
             self.install_lib = self.install_purelib
+        else:
+            log.info("installing C Extension")
         install.run(self)
