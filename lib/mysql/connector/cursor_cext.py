@@ -159,16 +159,6 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._affected_rows = result['affected_rows']
             self._rowcount = -1
 
-    def _handle_unread_result(self):
-        """Check whether there is an unread result"""
-        if not self._cnx:
-            return
-
-        if self._cnx.can_consume_results:
-            self._cnx.consume_results()
-        elif self._cnx.unread_result:
-            raise errors.InternalError("Unread result found")
-
     def _handle_resultset(self):
         """Handle a result set"""
         pass
@@ -225,7 +215,7 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         if not self._cnx:
             raise errors.ProgrammingError("Cursor is not connected")
-        self._handle_unread_result()
+        self._cnx.handle_unread_result()
 
         stmt = ''
         self.reset()
@@ -332,7 +322,7 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         if not self._cnx:
             raise errors.ProgrammingError("Cursor is not connected")
-        self._handle_unread_result()
+        self._cnx.handle_unread_result()
 
         if not isinstance(seq_params, (list, tuple)):
             raise errors.ProgrammingError(
@@ -395,7 +385,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not self._cnx:
             return False
 
-        self._handle_unread_result()
+        self._cnx.handle_unread_result()
         self._warnings = None
         self._cnx = None
         return True

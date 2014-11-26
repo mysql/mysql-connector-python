@@ -1623,6 +1623,25 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur.close()
         cnx.close()
 
+    def test_handle_unread_result(self):
+        config = tests.get_mysql_config()
+        config['consume_results'] = True
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("SELECT 1,2,3")
+        cur.execute("SELECT 1,2,3")
+        self.assertEqual(False, cnx.handle_unread_result())
+        cur.close()
+
+        config['consume_results'] = False
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("SELECT 1,2,3")
+        self.assertRaises(errors.InterfaceError, cur.execute, "SELECT 1,2,3")
+        cnx.consume_results()
+        cur.close()
+        cnx.close()
+
 
 class WL7937(tests.MySQLConnectorTests):
     """Allow 'LOAD DATA LOCAL INFILE' by default

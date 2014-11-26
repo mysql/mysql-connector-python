@@ -338,11 +338,8 @@ class MySQLCursor(CursorBase):
         """
         if self._connection is None:
             return False
-        if self._connection.can_consume_results:
-            self._connection.consume_results()
-        elif self._have_unread_result():
-            raise errors.InternalError("Unread result found.")
 
+        self._connection.handle_unread_result()
         self._reset_result()
         self._connection = None
 
@@ -480,8 +477,8 @@ class MySQLCursor(CursorBase):
 
         if not self._connection:
             raise errors.ProgrammingError("Cursor is not connected")
-        if self._connection.unread_result is True:
-            raise errors.InternalError("Unread result found")
+
+        self._connection.handle_unread_result()
 
         self._reset_result()
         stmt = ''
@@ -599,8 +596,8 @@ class MySQLCursor(CursorBase):
         """
         if not operation or not seq_params:
             return None
-        if self._connection.unread_result is True:
-            raise errors.InternalError("Unread result found.")
+        self._connection.handle_unread_result()
+
         if not isinstance(seq_params, (list, tuple)):
             raise errors.ProgrammingError(
                 "Parameters for query must be list or tuple.")
