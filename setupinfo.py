@@ -25,7 +25,9 @@ from distutils.core import Extension
 import os
 import sys
 
-from lib.cpy_distutils import Install, InstallLib, BuildMySQLExt
+from lib.cpy_distutils import (
+    Install, InstallLib, BuildExtDynamic, BuildExtStatic
+)
 
 # Development Status Trove Classifiers significant for Connector/Python
 DEVELOPMENT_STATUSES = {
@@ -46,9 +48,10 @@ version_py = os.path.join('lib', 'mysql', 'connector', 'version.py')
 with open(version_py, 'rb') as fp:
     exec(compile(fp.read(), version_py, 'exec'))
 
-BuildMySQLExt.min_connector_c_version = (5, 5, 8)
+BuildExtDynamic.min_connector_c_version = (5, 5, 8)
 command_classes = {
-    'build_ext': BuildMySQLExt,
+    'build_ext': BuildExtDynamic,
+    'build_ext_static': BuildExtStatic,
     'install_lib': InstallLib,
     'install': Install,
 }

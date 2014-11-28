@@ -29,6 +29,7 @@ from distutils.command.install import install
 from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
+from distutils.dir_util import copy_tree
 from distutils import log
 from glob import glob
 import os
@@ -41,12 +42,17 @@ ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
 
 CEXT_OPTIONS = [
     ('with-mysql-capi=', None,
-     "Location of MySQL C API installation or path to mysql_config")
+     "Location of MySQL C API installation or path to mysql_config"),
+]
+
+CEXT_STATIC_OPTIONS = [
+    ('static', None,
+     "Link C libraries statically with the C Extension"),
 ]
 
 INSTALL_OPTIONS = [
     ('byte-code-only=', None,
-     "Remove Python .py files; leave byte code .pyc only")
+     "Remove Python .py files; leave byte code .pyc only"),
 ]
 
 
@@ -199,7 +205,7 @@ def remove_cext(distribution):
         distribution.ext_modules.remove(ext_mod)
 
 
-class BuildMySQLExt(build_ext):
+class BuildExtDynamic(build_ext):
 
     """Build Connector/Python C Extension"""
 
@@ -220,13 +226,13 @@ class BuildMySQLExt(build_ext):
         """
         platform = get_platform()
         self._mysql_config_info = None
-        min_version = BuildMySQLExt.min_connector_c_version
+        min_version = BuildExtDynamic.min_connector_c_version
 
         err_invalid_loc = "MySQL C API location is invalid; was %s"
 
         mysql_config = None
         err_version = "MySQL C API {0}.{1}.{2} or later required".format(
-            *BuildMySQLExt.min_connector_c_version)
+            *BuildExtDynamic.min_connector_c_version)
 
         if not os.path.exists(connc_loc):
             log.error(err_invalid_loc, connc_loc)
@@ -397,6 +403,62 @@ class BuildMySQLExt(build_ext):
             self.real_build_extensions()
 
 
+class BuildExtStatic(BuildExtDynamic):
+
+    """Build and Link libraries statically with the C Extensions"""
+
+    user_options = build_ext.user_options + CEXT_OPTIONS
+
+    def finalize_options(self):
+        self.set_undefined_options('install',
+                                   ('with_mysql_capi', 'with_mysql_capi'))
+
+        build_ext.finalize_options(self)
+        self.connc_lib = os.path.join(self.build_temp, 'connc', 'lib')
+        self.connc_include = os.path.join(self.build_temp, 'connc', 'include')
+
+        if self.with_mysql_capi:
+            self._finalize_connector_c(self.with_mysql_capi)
+
+    def _finalize_connector_c(self, connc_loc):
+        if not os.path.isdir(connc_loc):
+            log.error("MySQL C API should be a directory")
+            sys.exit(1)
+
+        copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
+        copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
+
+        for lib_file in os.listdir(self.connc_lib):
+            if os.name == 'posix' and not lib_file.endswith('.a'):
+                os.unlink(os.path.join(self.connc_lib, lib_file))
+
+    def fix_compiler(self):
+        BuildExtDynamic.fix_compiler(self)
+
+        extra_compile_args = []
+        extra_link_args = []
+
+        if os.name == 'posix':
+            extra_compile_args = [
+                '-I%s' % self.connc_include
+            ]
+            extra_link_args = [
+                #'-lstdc++',
+                '-L%s' % self.connc_lib,
+                '-lmysqlclient',
+            ]
+
+        if not extra_compile_args and not extra_link_args:
+            return
+
+        for ext in self.extensions:
+            if extra_compile_args:
+                ext.extra_compile_args.extend(extra_compile_args)
+            if extra_link_args:
+                ext.extra_link_args.extend(extra_link_args)
+
+
+
 class InstallLib(install_lib):
 
     user_options = install_lib.user_options + CEXT_OPTIONS + INSTALL_OPTIONS
@@ -435,18 +497,23 @@ class Install(install):
 
     description = "install MySQL Connector/Python"
 
-    user_options = install.user_options + CEXT_OPTIONS + INSTALL_OPTIONS
+    user_options = install.user_options + CEXT_OPTIONS + INSTALL_OPTIONS + \
+                   CEXT_STATIC_OPTIONS
 
-    boolean_options = ['byte-code-only']
+    boolean_options = ['byte-code-only', 'static']
     need_ext = False
 
     def initialize_options(self):
         install.initialize_options(self)
         self.with_mysql_capi = None
         self.byte_code_only = None
+        self.static = None
 
     def finalize_options(self):
         install.finalize_options(self)
+
+        if self.static:
+            self.distribution.cmdclass['build_ext'] = BuildExtStatic
 
         if self.byte_code_only is None:
             self.byte_code_only = False
