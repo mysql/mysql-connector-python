@@ -256,10 +256,11 @@ class BuildExtDynamic(build_ext):
                 else:
                     with open(myconfigh, 'rb') as fp:
                         for line in fp.readlines():
-                            if '#define VERSION' in line:
+                            if b'#define VERSION' in line:
                                 version = tuple([
                                     int(v) for v in
-                                    line.split()[2].replace('"', '').split('.')
+                                    line.split()[2].replace(
+                                        b'"', b'').split(b'.')
                                 ])
                                 if version < min_version:
                                     log.error(err_version);
