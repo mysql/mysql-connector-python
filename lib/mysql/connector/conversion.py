@@ -66,7 +66,11 @@ class MySQLConverterBase(object):
 
     def to_mysql(self, value):
         """Convert Python data type to MySQL"""
-        return value
+        type_name = value.__class__.__name__.lower()
+        try:
+            return getattr(self, "_{0}_to_mysql".format(type_name))(value)
+        except AttributeError:
+            return value
 
     def to_python(self, vtype, value):
         """Convert MySQL data type to Python"""

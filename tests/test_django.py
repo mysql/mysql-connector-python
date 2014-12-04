@@ -198,7 +198,7 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
 
     def test__init__(self):
         exp = self.conn.get_server_version()
-        self.assertEqual(exp, self.cnx.server_version)
+        self.assertEqual(exp, self.cnx.mysql_version)
 
         value = datetime.time(2, 5, 7)
         exp = self.conn.converter._time_to_mysql(value)
@@ -214,7 +214,9 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
 
         def conn_setup(*args, **kwargs):
             conn = kwargs['connection']
+            settings.DEBUG = True
             cur = conn.cursor()
+            settings.DEBUG = False
             cur.execute("SET @xyz=10")
             cur.close()
 
@@ -225,6 +227,22 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         self.assertEqual((10,), cursor.fetchone())
         cursor.close()
         self.cnx.close()
+
+    def count_conn(self, *args, **kwargs):
+        try:
+            self.connections += 1
+        except AttributeError:
+            self.connection = 1
+
+    def test_connections(self):
+        connection_created.connect(self.count_conn)
+        self.connections = 0
+
+        # Checking if DatabaseWrapper object creates a connection by default
+        conn = DatabaseWrapper(settings.DATABASES['default'])
+        dbo = DatabaseOperations(conn)
+        dbo.value_to_db_time(datetime.time(3, 3, 3))
+        self.assertEqual(self.connections, 0)
 
 
 class DjangoDatabaseOperations(tests.MySQLConnectorTests):
