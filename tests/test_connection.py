@@ -1630,14 +1630,15 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur = cnx.cursor()
         cur.execute("SELECT 1,2,3")
         cur.execute("SELECT 1,2,3")
-        self.assertEqual(False, cnx.handle_unread_result())
+        cnx.handle_unread_result()
+        self.assertEqual(False, cnx.unread_result)
         cur.close()
 
         config['consume_results'] = False
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
         cur.execute("SELECT 1,2,3")
-        self.assertRaises(errors.InterfaceError, cur.execute, "SELECT 1,2,3")
+        self.assertRaises(errors.InternalError, cur.execute, "SELECT 1,2,3")
         cnx.consume_results()
         cur.close()
         cnx.close()
