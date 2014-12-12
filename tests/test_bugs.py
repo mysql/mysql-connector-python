@@ -3050,3 +3050,54 @@ class BugOra19803702(tests.MySQLConnectorTests):
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
         self.cur.close()
         self.cnx.close()
+
+
+
+class BugOra19777815(tests.MySQLConnectorTests):
+    """BUG#19777815:  CALLPROC() DOES NOT SUPPORT WARNINGS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config['get_warnings'] = True
+        self.cnx = connection.MySQLConnection(**config)
+        cur = self.cnx.cursor()
+        self.sp1 = 'BUG19777815'
+        self.sp2 = 'BUG19777815_with_result'
+        create1 = (
+            "CREATE PROCEDURE {0}() BEGIN SIGNAL SQLSTATE '01000' "
+            "SET MESSAGE_TEXT = 'TEST WARNING'; END;".format(self.sp1)
+        )
+        create2 = (
+            "CREATE PROCEDURE {0}() BEGIN SELECT 1; SIGNAL SQLSTATE '01000' "
+            "SET MESSAGE_TEXT = 'TEST WARNING'; END;".format(self.sp2)
+        )
+
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp1))
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp2))
+        cur.execute(create1)
+        cur.execute(create2)
+        cur.close()
+
+    def tearDown(self):
+        cur = self.cnx.cursor()
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp1))
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp2))
+        cur.close()
+        self.cnx.close()
+
+    def test_warning(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.sp1)
+        exp = [(u'Warning', 1642, u'TEST WARNING')]
+        self.assertEqual(exp, cur.fetchwarnings())
+        cur.close()
+
+    def test_warning_with_rows(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.sp2)
+
+        exp = [(1,)]
+        self.assertEqual(exp, cur.stored_results().next().fetchall())
+        exp = [(u'Warning', 1642, u'TEST WARNING')]
+        self.assertEqual(exp, cur.fetchwarnings())
+        cur.close()
