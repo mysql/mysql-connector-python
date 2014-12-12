@@ -435,6 +435,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                 results.append(cur)
                 self._cnx.next_result()
             self._stored_results = results
+            self._handle_eof()
 
             if argnames:
                 self.reset()
