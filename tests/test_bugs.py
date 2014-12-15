@@ -3013,6 +3013,10 @@ class BugOra19500097(tests.MySQLConnectorTests):
 class BugOra19549363(tests.MySQLConnectorTests):
     """BUG#19549363: Compression does not work with Change User
     """
+
+    def tearDown(self):
+        mysql.connector._CONNECTION_POOLS = {}
+
     def test_compress(self):
         config = tests.get_mysql_config()
         config['compress'] = True
@@ -3097,7 +3101,12 @@ class BugOra19777815(tests.MySQLConnectorTests):
         cur.callproc(self.sp2)
 
         exp = [(1,)]
-        self.assertEqual(exp, cur.stored_results().next().fetchall())
+        try:
+            select_result = cur.stored_results().next()
+        except AttributeError:
+            # Python 3
+            select_result = next(cur.stored_results())
+        self.assertEqual(exp, select_result.fetchall())
         exp = [(u'Warning', 1642, u'TEST WARNING')]
         self.assertEqual(exp, cur.fetchwarnings())
         cur.close()

@@ -535,9 +535,15 @@ class FabricShardingTests(tests.MySQLConnectorTests):
             rows = cur.fetchall()
             self.assertEqual(rows, emp_exp_range_string[str_key])
 
-        self.cnx.set_property(tables=tables,
-                              key=b'not unicode str', mode=fabric.MODE_READONLY)
-        self.assertRaises(ValueError, self.cnx.cursor)
+        if not PY2:
+            self.assertRaises(TypeError, self.cnx.set_property,
+                              tables=tables, key=b'not unicode str',
+                              mode=fabric.MODE_READONLY)
+        else:
+            self.cnx.set_property(tables=tables,
+                                  key=b'not unicode str',
+                                  mode=fabric.MODE_READONLY)
+            self.assertRaises(ValueError, self.cnx.cursor)
 
         self.cnx.set_property(tables=tables,
                               key=12345, mode=fabric.MODE_READONLY)
@@ -618,3 +624,5 @@ class FabricShardingTests(tests.MySQLConnectorTests):
                     mysqlserver.host, mysqlserver.port, config['user'],
                     config['database'])
             )
+
+        mysql.connector._CONNECTION_POOLS = {}

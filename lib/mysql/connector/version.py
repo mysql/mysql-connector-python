@@ -26,7 +26,7 @@ The file version.py gets installed and is available after installation
 as mysql.connector.version.
 """
 
-VERSION = (2, 0, 2, '', 0)
+VERSION = (2, 0, 3, '', 0)
 
 if VERSION[3] and VERSION[4]:
     VERSION_TEXT = '{0}.{1}.{2}{3}{4}'.format(*VERSION)
