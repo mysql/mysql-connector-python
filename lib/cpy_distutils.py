@@ -455,5 +455,6 @@ class Install(install):
             remove_cext(self.distribution)
             # We install pure Python code in purelib location when no
             # extension is build
-            self.install_lib = self.install_purelib
+            if not self.install_lib:
+                self.install_lib = self.install_purelib
         install.run(self)
