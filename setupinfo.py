@@ -24,6 +24,7 @@
 from distutils.core import Extension
 import os
 import sys
+import platform
 
 from lib.cpy_distutils import (
     Install, InstallLib, BuildExtDynamic, BuildExtStatic
@@ -60,6 +61,10 @@ package_dir = {'': 'lib'}
 name = 'mysql-connector-python'
 version = '{0}.{1}.{2}'.format(*VERSION[0:3])
 
+extra_libraries = ['rt']
+if platform.system() in ["Darwin", "Windows"]:
+    extra_libraries = []
+
 extensions = [
     Extension("_mysql_connector",
               sources=[
@@ -67,8 +72,10 @@ extensions = [
                   "src/mysql_capi.c",
                   "src/mysql_capi_conversion.c",
                   "src/mysql_connector.c",
+                  "src/force_cpp_linkage.cc",
               ],
-              include_dirs=['src/include']
+              include_dirs=['src/include'],
+              libraries=extra_libraries,
     )
 ]
 
