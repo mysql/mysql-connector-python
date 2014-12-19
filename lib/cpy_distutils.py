@@ -37,6 +37,7 @@ import shlex
 import struct
 from subprocess import Popen, PIPE, STDOUT
 import sys
+import platform
 
 ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
 
@@ -429,6 +430,7 @@ class BuildExtStatic(BuildExtDynamic):
         copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
         copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
 
+        # Remove all but static libraries to force static linking
         for lib_file in os.listdir(self.connc_lib):
             if os.name == 'posix' and not lib_file.endswith('.a'):
                 os.unlink(os.path.join(self.connc_lib, lib_file))
@@ -436,28 +438,25 @@ class BuildExtStatic(BuildExtDynamic):
     def fix_compiler(self):
         BuildExtDynamic.fix_compiler(self)
 
-        extra_compile_args = []
-        extra_link_args = []
+        include_dirs = []
+        library_dirs = []
+        libraries = []
 
         if os.name == 'posix':
-            extra_compile_args = [
-                '-I%s' % self.connc_include
-            ]
-            extra_link_args = [
-                #'-lstdc++',
-                '-L%s' % self.connc_lib,
-                '-lmysqlclient',
-            ]
+            include_dirs.append(self.connc_include)
+            library_dirs.append(self.connc_lib)
+            libraries.append("mysqlclient")
 
-        if not extra_compile_args and not extra_link_args:
-            return
+            # As we statically link and the "libmysqlclient.a" library
+            # carry no information what it depends on, we need to
+            # manually add library dependencies here.
+            if platform.system() not in ["Darwin", "Windows"]:
+                libraries.append("rt")
 
         for ext in self.extensions:
-            if extra_compile_args:
-                ext.extra_compile_args.extend(extra_compile_args)
-            if extra_link_args:
-                ext.extra_link_args.extend(extra_link_args)
-
+            ext.include_dirs.extend(include_dirs)
+            ext.library_dirs.extend(library_dirs)
+            ext.libraries.extend(libraries)
 
 
 class InstallLib(install_lib):
