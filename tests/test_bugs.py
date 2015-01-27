@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -3110,3 +3110,47 @@ class BugOra19777815(tests.MySQLConnectorTests):
         exp = [(u'Warning', 1642, u'TEST WARNING')]
         self.assertEqual(exp, cur.fetchwarnings())
         cur.close()
+
+
+class BugOra20407036(tests.MySQLConnectorTests):
+    """BUG#20407036:  INCORRECT ARGUMENTS TO MYSQLD_STMT_EXECUTE ERROR
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug20407036'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} ( id int(10) unsigned NOT NULL, "
+                  "text VARCHAR(70000) CHARACTER SET utf8 NOT NULL, "
+                  "rooms tinyint(3) unsigned NOT NULL) "
+                  "ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 "
+                  "COLLATE=utf8_unicode_ci".format(self.tbl))
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_binary_charset(self):
+        cur = self.cnx.cursor(prepared=True)
+        sql = "INSERT INTO {0}(text, rooms) VALUES(%s, %s)".format(self.tbl)
+        cur.execute(sql, ('a'*252, 1))
+        cur.execute(sql, ('a'*253, 2))
+        cur.execute(sql, ('a'*255, 3))
+        cur.execute(sql, ('a'*251, 4))
+        cur.execute(sql, ('a'*65535, 5))
+
+        exp = [
+            (0, 'a'*252, 1),
+            (0, 'a'*253, 2),
+            (0, 'a'*255, 3),
+            (0, 'a'*251, 4),
+            (0, 'a'*65535, 5),
+        ]
+
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, self.cur.fetchall())

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -125,12 +125,12 @@ class UtilsTests(tests.MySQLConnectorTests):
 
     def test_lc_int(self):
         prefix = (b'', b'\xfc', b'\xfd', b'\xfe')
+        intstore = (1, 2, 3, 8)
         try:
-            for i, j in enumerate((8, 16, 24, 64)):
-                val = 2 ** (j - 1)
-                lenenc = utils.lc_int(val)
+            for i, j in enumerate((128, 251, 2**24-1, 2**64-1)):
+                lenenc = utils.lc_int(j)
                 exp = prefix[i] + \
-                    getattr(utils, 'int{0}store'.format(int(j/8)))(val)
+                    getattr(utils, 'int{0}store'.format(intstore[i]))(j)
                 self.assertEqual(exp, lenenc)
         except ValueError as err:
             self.fail("length_encoded_int failed for size {0}".format(j, err))
