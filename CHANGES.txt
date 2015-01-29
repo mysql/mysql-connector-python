@@ -3,10 +3,20 @@ MySQL Connector/Python 2.0 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
+
+v2.0.3
+======
+
+- BUG19703022: Fix using passwords with integers only in option files
+- BUG19777815: Add support for warnings with MySQLCursor.callproc()
+- BUG19972427: Fix creating of redundant connections in Django
+- BUG19331658: Fix connection pooling with MySQL Fabric
+- BUG19930054: Lost connection to server error during query
+- BUG19803702: Fix reporting errors with non-ascii characters
 
 v2.0.2
 ======

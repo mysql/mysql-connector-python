@@ -30,6 +30,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             'IntegerField': 'integer',
             'BigIntegerField': 'bigint',
             'IPAddressField': 'char(15)',
+
             'GenericIPAddressField': 'char(39)',
             'NullBooleanField': 'bool',
             'OneToOneField': 'integer',
@@ -42,7 +43,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         }
 
         # Support for microseconds
-        if self.connection.get_server_version() >= (5, 6, 4):
+        if self.connection.mysql_version >= (5, 6, 4):
             self.data_types.update({
                 'DateTimeField': 'datetime(6)',
                 'TimeField': 'time(6)',

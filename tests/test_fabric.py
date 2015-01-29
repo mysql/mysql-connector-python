@@ -41,6 +41,7 @@ import mysql.connector
 from mysql.connector import fabric, errorcode
 from mysql.connector.fabric import connection, balancing
 from mysql.connector.catch23 import UNICODE_TYPES, PY2
+from mysql.connector.pooling import PooledMySQLConnection
 
 ERR_NO_FABRIC_CONFIG = "Fabric configuration not available"
 
@@ -534,9 +535,15 @@ class FabricShardingTests(tests.MySQLConnectorTests):
             rows = cur.fetchall()
             self.assertEqual(rows, emp_exp_range_string[str_key])
 
-        self.cnx.set_property(tables=tables,
-                              key=b'not unicode str', mode=fabric.MODE_READONLY)
-        self.assertRaises(ValueError, self.cnx.cursor)
+        if not PY2:
+            self.assertRaises(TypeError, self.cnx.set_property,
+                              tables=tables, key=b'not unicode str',
+                              mode=fabric.MODE_READONLY)
+        else:
+            self.cnx.set_property(tables=tables,
+                                  key=b'not unicode str',
+                                  mode=fabric.MODE_READONLY)
+            self.assertRaises(ValueError, self.cnx.cursor)
 
         self.cnx.set_property(tables=tables,
                               key=12345, mode=fabric.MODE_READONLY)
@@ -578,3 +585,44 @@ class FabricShardingTests(tests.MySQLConnectorTests):
             self.assertEqual("Key invalid; was '1977-01-01'", str(exc))
         else:
             self.fail("ValueError not raised")
+
+    def test_bug19331658(self):
+        """Pooling not working with fabric
+        """
+        self.assertRaises(
+            AttributeError, mysql.connector.connect,
+            fabric=tests.FABRIC_CONFIG, user='root', database='employees',
+            pool_name='mypool')
+
+        pool_size = 2
+        cnx = mysql.connector.connect(
+            fabric=tests.FABRIC_CONFIG, user='root', database='employees',
+            pool_size=pool_size, pool_reset_session=False
+        )
+        tbl_name = "employees_range"
+
+        tables = ["employees.{0}".format(tbl_name)]
+
+        cnx.set_property(tables=tables,
+                         scope=fabric.SCOPE_GLOBAL,
+                         mode=fabric.MODE_READWRITE)
+        cnx.cursor()
+        self.assertTrue(isinstance(cnx._mysql_cnx, PooledMySQLConnection))
+
+        data = self.emp_data[1985]
+
+        for emp in data:
+            cnx.set_property(tables=tables,
+                             key=emp[0],
+                             scope=fabric.SCOPE_LOCAL,
+                             mode=fabric.MODE_READWRITE)
+            cnx.cursor()
+            mysqlserver = cnx._fabric_mysql_server
+            config = cnx._mysql_config
+            self.assertEqual(
+                cnx._mysql_cnx.pool_name, "{0}_{1}_{2}_{3}".format(
+                    mysqlserver.host, mysqlserver.port, config['user'],
+                    config['database'])
+            )
+
+        mysql.connector._CONNECTION_POOLS = {}

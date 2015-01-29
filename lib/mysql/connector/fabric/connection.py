@@ -61,7 +61,7 @@ else:
         HAVE_SSL = True
 # pylint: enable=F0401,E0611
 
-from ..connection import MySQLConnection
+import mysql.connector
 from ..pooling import MySQLConnectionPool
 from ..errors import (
     Error, InterfaceError, NotSupportedError, MySQLFabricError, InternalError,
@@ -1123,6 +1123,8 @@ class MySQLFabricConnection(object):
             del test_config['pool_name']
         if 'pool_size' in test_config:
             del test_config['pool_size']
+        if 'pool_reset_session' in test_config:
+            del test_config['pool_reset_session']
         try:
             pool = MySQLConnectionPool(pool_name=str(uuid.uuid4()))
             pool.set_config(**test_config)
@@ -1186,7 +1188,7 @@ class MySQLFabricConnection(object):
             dbconfig['host'] = mysqlserver.host
             dbconfig['port'] = mysqlserver.port
             try:
-                self._mysql_cnx = MySQLConnection(**dbconfig)
+                self._mysql_cnx = mysql.connector.connect(**dbconfig)
             except Error as exc:
                 if counter == attempts:
                     self.reset_cache(mysqlserver.group)

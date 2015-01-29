@@ -192,7 +192,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         self.supports_microsecond_precision = self._microseconds_precision()
 
     def _microseconds_precision(self):
-        if self.connection.server_version >= (5, 6, 3):
+        if self.connection.mysql_version >= (5, 6, 3):
             return True
         return False
 
@@ -212,7 +212,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             cursor.execute(droptable)
             cursor.execute('CREATE TABLE {table} (X INT)'.format(table=tblname))
 
-            if self.connection.server_version >= (5, 0, 0):
+            if self.connection.mysql_version >= (5, 0, 0):
                 cursor.execute(
                     "SELECT ENGINE FROM INFORMATION_SCHEMA.TABLES "
                     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
@@ -399,7 +399,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Truncate already resets the AUTO_INCREMENT field from
         # MySQL version 5.0.13 onwards. Refs #16961.
         res = []
-        if self.connection.server_version < (5, 0, 13):
+        if self.connection.mysql_version < (5, 0, 13):
             fmt = "{alter} {table} {{tablename}} {auto_inc} {field};".format(
                 alter=style.SQL_KEYWORD('ALTER'),
                 table=style.SQL_KEYWORD('TABLE'),
@@ -431,13 +431,7 @@ class DatabaseOperations(BaseDatabaseOperations):
                     "MySQL backend does not support timezone-aware times."
                 )
 
-        try:
-            # Django 1.6
-            self.connection.ensure_connection()
-        except AttributeError:
-            if not self.connection.connection:
-                self.connection._connect()
-        return self.connection.connection.converter._datetime_to_mysql(value)
+        return self.connection.converter.to_mysql(value)
 
     def value_to_db_time(self, value):
         if value is None:
@@ -448,13 +442,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             raise ValueError("MySQL backend does not support timezone-aware "
                              "times.")
 
-        try:
-            # Django 1.6
-            self.connection.ensure_connection()
-        except AttributeError:
-            if not self.connection.connection:
-                self.connection._connect()
-        return self.connection.connection.converter._time_to_mysql(value)
+        return self.connection.converter.to_mysql(value)
 
     def year_lookup_bounds(self, value):
         # Again, no microseconds
@@ -467,7 +455,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Again, no microseconds
         first, second = super(DatabaseOperations,
             self).year_lookup_bounds_for_datetime_field(value)
-        if self.connection.server_version >= (5, 6, 4):
+        if self.connection.mysql_version >= (5, 6, 4):
             return [first.replace(microsecond=0), second]
         else:
             return [first.replace(microsecond=0),
@@ -522,15 +510,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def __init__(self, *args, **kwargs):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
-        self.server_version = None
 
-        # Since some features depend on the MySQL version, we need to connect
-        try:
-            # Django 1.6
-            self.ensure_connection()
-        except AttributeError:
-            self._connect()
-
+        self.converter = DjangoMySQLConverter()
         self.ops = DatabaseOperations(self)
         self.features = DatabaseFeatures(self)
         self.client = DatabaseClient(self)
@@ -584,14 +565,13 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def get_new_connection(self, conn_params):
         # Django 1.6
         cnx = mysql.connector.connect(**conn_params)
-        self.server_version = cnx.get_server_version()
         cnx.set_converter_class(DjangoMySQLConverter)
 
         return cnx
 
     def init_connection_state(self):
         # Django 1.6
-        if self.server_version < (5, 5, 3):
+        if self.mysql_version < (5, 5, 3):
             # See sysvar_sql_auto_is_null in MySQL Reference manual
             self.connection.cmd_query("SET SQL_AUTO_IS_NULL = 0")
 
@@ -737,6 +717,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         # Django 1.6
         return self.connection.is_connected()
 
-    @property
+    @cached_property
     def mysql_version(self):
-        return self.server_version
+        config = self.get_connection_params()
+        temp_conn = mysql.connector.connect(**config)
+        server_version = temp_conn.get_server_version()
+        temp_conn.close()
+
+        return server_version

@@ -697,12 +697,14 @@ class MySQLCursor(CursorBase):
             call = "CALL {0}({1})".format(procname, ','.join(argnames))
 
             for result in self._connection.cmd_query_iter(call):
+                # pylint: disable=W0212
+                tmp = MySQLCursorBuffered(self._connection._get_self())
+                tmp._handle_result(result)
+                if tmp._warnings is not None:
+                    self._warnings = tmp._warnings
+                # pylint: enable=W0212
                 if 'columns' in result:
-                    # pylint: disable=W0212
-                    tmp = MySQLCursorBuffered(self._connection._get_self())
-                    tmp._handle_result(result)
                     results.append(tmp)
-                    # pylint: enable=W0212
 
             if argnames:
                 select = "SELECT {0}".format(','.join(argtypes))
