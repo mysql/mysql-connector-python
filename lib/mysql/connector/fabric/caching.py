@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -129,6 +129,8 @@ class CacheShardTable(CacheEntry):
                         key
                     ))
         elif self.shard_type == 'RANGE_STRING':
+            pass
+        elif self.shard_type == "HASH":
             pass
         else:
             raise ValueError("Unsupported sharding type {0}".format(
