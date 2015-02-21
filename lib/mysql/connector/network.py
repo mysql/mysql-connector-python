@@ -220,7 +220,7 @@ class BaseMySQLSocket(object):
         """Receive packets from the MySQL server"""
         try:
             # Read the header of the MySQL packet, 4 bytes
-            packet = self.sock.recv(1)
+            packet = bytearray()
             while len(packet) < 4:
                 chunk = self.sock.recv(1)
                 if not chunk:
