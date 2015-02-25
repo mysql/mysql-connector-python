@@ -24,7 +24,6 @@
 """Unittests for mysql.connector.connection
 """
 
-import sys
 import os
 import logging
 import timeit
@@ -37,7 +36,8 @@ import tests
 from . import PY2
 
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
-from mysql.connector import (connection, network, errors, constants, cursor)
+from mysql.connector import (connection, network, errors,
+                             constants, cursor, abstracts, catch23)
 from mysql.connector.optionfiles import read_option_files
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
@@ -79,7 +79,7 @@ class _DummyMySQLConnection(connection.MySQLConnection):
         pass
 
 
-class ConnectionTests(tests.MySQLConnectorTests):
+class ConnectionTests(object):
     def test_DEFAULT_CONFIGURATION(self):
         exp = {
             'database': None,
@@ -113,6 +113,7 @@ class ConnectionTests(tests.MySQLConnectorTests):
             'force_ipv6': False,
             'auth_plugin': None,
             'allow_local_infile': True,
+            'consume_results': False,
         }
         self.assertEqual(exp, connection.DEFAULT_CONFIGURATION)
 
@@ -157,6 +158,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             '_force_ipv6': False,
             '_auth_plugin': None,
             '_pool_config_version': None,
+            '_consume_results': False,
         }
         for key, value in exp.items():
             self.assertEqual(
@@ -282,6 +284,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'insert_id': 0, 'field_count': 0, 'warning_count': 0,
             'server_status': 1, 'affected_rows': 6}
         self.assertEqual(exp, self.cnx._handle_result(packet))
+
         exp = [
             bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
                       b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
@@ -293,9 +296,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         ]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
-        # Column count is invalid (is None)
+        # Column count is invalid ( more than 4096)
         self.cnx._socket.sock.reset()
-        packet = bytearray(b'\x01\x00\x00\x01\xfa\xa3\x00\xa3')
+        packet = bytearray(b'\x01\x00\x00\x01\xfc\xff\xff\xff')
         self.assertRaises(errors.InterfaceError,
                           self.cnx._handle_result, packet)
 
@@ -493,37 +496,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock = tests.DummySocket()
         self.assertEqual(b'\x01', self.cnx.cmd_quit())
 
-    def test_cmd_shutdown(self):
-        """Send the Shutdown-command to MySQL"""
-        self.cnx._socket.sock = tests.DummySocket()
-        self.cnx._socket.sock.add_packet(EOF_PACKET)
-        self.assertEqual(EOF_PACKET_RESULT, self.cnx.cmd_shutdown())
-        exp = [bytearray(b'\x02\x00\x00\x00\x08\x00')]
-        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
-
-        self.cnx._socket.sock.reset()
-        self.assertRaises(errors.InterfaceError,
-                          self.cnx.cmd_shutdown, 99)
-
-        self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(EOF_PACKET)
-        self.cnx.cmd_shutdown(
-            constants.ShutdownType.SHUTDOWN_WAIT_CONNECTIONS)
-        exp = [bytearray(b'\x02\x00\x00\x00\x08\x01')]
-        self.assertEqual(exp, self.cnx._socket.sock._client_sends)
-
-        self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(bytearray(
-            b'\x4a\x00\x00\x01\xff\xcb\x04\x23\x34\x32\x30\x30'
-            b'\x30\x41\x63\x63\x65\x73\x73\x20\x64\x65\x6e\x69'
-            b'\x65\x64\x3b\x20\x79\x6f\x75\x20\x6e\x65\x65\x64'
-            b'\x20\x74\x68\x65\x20\x53\x48\x55\x54\x44\x4f\x57'
-            b'\x4e\x20\x70\x72\x69\x76\x69\x6c\x65\x67\x65\x20'
-            b'\x66\x6f\x72\x20\x74\x68\x69\x73\x20\x6f\x70\x65'
-            b'\x72\x61\x74\x69\x6f\x6e')
-        )
-        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_shutdown)
-
     def test_cmd_statistics(self):
         """Send the Statistics-command to MySQL"""
         self.cnx._socket.sock = tests.DummySocket()
@@ -682,8 +654,40 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test__do_handshake(self):
         """Handle the handshake-packet sent by MySQL"""
-        self.cnx._socket.sock = tests.DummySocket()
-        handshake = bytearray(
+        config = tests.get_mysql_config()
+        config['connection_timeout'] = 1
+        cnx = connection.MySQLConnection()
+        self.assertEqual(None, cnx._handshake)
+
+        cnx.connect(**config)
+
+        exp = {
+            'protocol': int,
+            'server_version_original': catch23.STRING_TYPES,
+            'charset': int,
+            'server_threadid': int,
+            'capabilities': catch23.INT_TYPES,
+            'server_status': int,
+            'auth_data': catch23.BYTE_TYPES,
+            'auth_plugin': catch23.STRING_TYPES,
+        }
+
+        self.assertEqual(len(exp), len(cnx._handshake))
+        for key, type_ in exp.items():
+            self.assertTrue(key in cnx._handshake)
+            self.assertTrue(
+                isinstance(cnx._handshake[key], type_),
+                "type check failed for '{0}', expected {1}, we got {2}".format(
+                    key, type_, type(cnx._handshake[key])))
+        self.assertRaises(errors.OperationalError, cnx._do_handshake)
+
+        class FakeSocket(object):
+            def __init__(self, packet):
+                self.packet = packet
+            def recv(self):
+                return self.packet
+
+        correct_handshake =  bytearray(
             b'\x47\x00\x00\x00\x0a\x35\x2e\x30\x2e\x33\x30\x2d'
             b'\x65\x6e\x74\x65\x72\x70\x72\x69\x73\x65\x2d\x67'
             b'\x70\x6c\x2d\x6c\x6f\x67\x00\x09\x01\x00\x00\x68'
@@ -692,22 +696,22 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'
             b'\x59\x48\x00'
         )
+
+        cnx = connection.MySQLConnection(**config)
+        cnx._socket = FakeSocket(correct_handshake)
         exp = {
             'protocol': 10,
-            'server_version_original': b'5.0.30-enterprise-gpl-log',
+            'server_version_original': '5.0.30-enterprise-gpl-log',
             'charset': 8,
             'server_threadid': 265,
             'capabilities': 41516,
             'server_status': 2,
-            'auth_data': b'h4i6oP!OLng9&PD@WrYH',
-            'auth_plugin': 'mysql_native_password',
+            'auth_data': bytearray(b'h4i6oP!OLng9&PD@WrYH'),
+            'auth_plugin': u'mysql_native_password',
         }
 
-        self.cnx._socket.sock.add_packet(handshake)
-        self.cnx._do_handshake()
-        self.assertEqual(exp, self.cnx._handshake)
-
-        self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
+        cnx._do_handshake()
+        self.assertEqual(exp, cnx._handshake)
 
         # Handshake with version set to Z.Z.ZZ to simulate bad version
         false_handshake = bytearray(
@@ -719,9 +723,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'
             b'\x59\x48\x00'
         )
-        self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(false_handshake)
-        self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
+        cnx._socket = FakeSocket(false_handshake)
+        self.assertRaises(errors.InterfaceError, cnx._do_handshake)
 
         # Handshake with version set to 4.0.23
         unsupported_handshake = bytearray(
@@ -733,9 +736,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             b'\x00\x00\x4c\x6e\x67\x39\x26\x50\x44\x40\x57\x72'
             b'\x59\x48\x00'
         )
-        self.cnx._socket.sock.reset()
-        self.cnx._socket.sock.add_packet(unsupported_handshake)
-        self.assertRaises(errors.InterfaceError, self.cnx._do_handshake)
+        cnx._socket = FakeSocket(unsupported_handshake)
+        self.assertRaises(errors.InterfaceError, cnx._do_handshake)
 
     def test__do_auth(self):
         """Authenticate with the MySQL server"""
@@ -830,7 +832,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         _post_connection().
         """
         cnx = _DummyMySQLConnection()
-        default_config = connection.DEFAULT_CONFIGURATION.copy()
+        default_config = abstracts.DEFAULT_CONFIGURATION.copy()
 
         # Should fail because 'dsn' is given
         self.assertRaises(errors.NotSupportedError, cnx.config,
@@ -844,6 +846,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'ssl_key': 'ServerKey',
             'ssl_verify_cert': False
         })
+        default_config['converter_class'] = MySQLConverter
         try:
             cnx.config(**default_config)
         except AttributeError as err:
@@ -1072,43 +1075,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         config['host'] = tests.fake_hostname()
         self.assertRaises(errors.InterfaceError, cnx.connect, **config)
 
-    def test_is_connected(self):
-        """Check connection to MySQL Server"""
-        self.assertEqual(True, self.cnx.is_connected())
-        self.cnx.disconnect()
-        self.assertEqual(False, self.cnx.is_connected())
-
-    def test_reset_session(self):
-        "Resets the active session"
-        config = tests.get_mysql_config()
-        exp = [True, 'STRICT_ALL_TABLES', '-09:00', 33]
-        config['autocommit'] = exp[0]
-        config['sql_mode'] = exp[1]
-        config['time_zone'] = exp[2]
-        config['charset'] = exp[3]
-        self.cnx = connection.MySQLConnection(**config)
-
-        user_variables = {'ham': '1', 'spam': '2'}
-        session_variables = {'wait_timeout': 100000}
-        self.cnx.reset_session(user_variables, session_variables)
-
-        self.assertEqual(exp, [self.cnx.autocommit, self.cnx.sql_mode,
-                               self.cnx.time_zone, self.cnx._charset_id])
-
-        if PY2:
-            exp_user_variables = {'ham': '1', 'spam': '2'}
-            exp_session_variables = {'wait_timeout': '100000'}
-        else:
-            exp_user_variables = {'ham': b'1', 'spam': b'2'}
-            exp_session_variables = {'wait_timeout': b'100000'}
-
-        for key, value in exp_user_variables.items():
-            self.cnx.cmd_query("SELECT @{0}".format(key))
-            self.assertEqual((value,), self.cnx.get_rows()[0][0])
-        for key, value in exp_session_variables.items():
-            self.cnx.cmd_query("SELECT @@session.{0}".format(key))
-            self.assertEqual((value,), self.cnx.get_rows()[0][0])
-
     def test_reconnect(self):
         """Reconnecting to the MySQL Server"""
         supported_arguments = {
@@ -1212,27 +1178,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual('', self.cnx._user)
         self.assertEqual('', self.cnx._password)
 
-    def test__set_unread_result(self):
-        """Toggle unread result set"""
-        self.cnx._set_unread_result(True)
-        self.assertEqual(True, self.cnx._unread_result)
-        self.cnx._set_unread_result(False)
-        self.assertEqual(False, self.cnx._unread_result)
-        self.assertRaises(ValueError, self.cnx._set_unread_result, 1)
-
-    def test__get_unread_result(self):
-        """Check for unread result set"""
-        self.cnx._unread_result = True
-        self.assertEqual(True, self.cnx._get_unread_result())
-        self.cnx._unread_result = False
-        self.assertEqual(False, self.cnx._get_unread_result())
-
     def test_unread_results(self):
         """Check and toggle unread result using property"""
         self.cnx.unread_result = True
         self.assertEqual(True, self.cnx._unread_result)
+        self.assertEqual(True, self.cnx.unread_result)
         self.cnx.unread_result = False
         self.assertEqual(False, self.cnx._unread_result)
+        self.assertEqual(False, self.cnx.unread_result)
 
         try:
             self.cnx.unread_result = 1
@@ -1241,27 +1194,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         except:
             self.fail("Expected ValueError to be raised")
 
-    def test__set_getwarnings(self):
-        """Toggle whether to get warnings"""
-        self.cnx._set_getwarnings(True)
-        self.assertEqual(True, self.cnx._get_warnings)
-        self.cnx._set_getwarnings(False)
-        self.assertEqual(False, self.cnx._get_warnings)
-        self.assertRaises(ValueError, self.cnx._set_getwarnings, 1)
-
-    def test__get_getwarnings(self):
-        """Check whether we need to get warnings"""
-        self.cnx._get_warnings = True
-        self.assertEqual(True, self.cnx._get_getwarnings())
-        self.cnx._get_warnings = False
-        self.assertEqual(False, self.cnx._get_getwarnings())
-
     def test_get_warnings(self):
         """Check and toggle the get_warnings property"""
         self.cnx.get_warnings = True
         self.assertEqual(True, self.cnx._get_warnings)
+        self.assertEqual(True, self.cnx.get_warnings)
         self.cnx.get_warnings = False
         self.assertEqual(False, self.cnx._get_warnings)
+        self.assertEqual(False, self.cnx.get_warnings)
 
         try:
             self.cnx.get_warnings = 1
@@ -1373,153 +1313,26 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._unix_socket = exp
         self.assertEqual(exp, self.cnx.unix_socket)
 
-    def test_set_database(self):
-        exp = 'mysql'
-        self.cnx.set_database(exp)
-        self.assertEqual(exp, self.cnx._info_query("SELECT DATABASE()")[0])
-
-    def test_get_database(self):
-        exp = self.cnx._info_query("SELECT DATABASE()")[0]
-        self.assertEqual(exp, self.cnx.get_database())
-
     def test_database(self):
+        exp = self.cnx.info_query("SELECT DATABASE()")[0]
+        self.assertEqual(exp, self.cnx.database)
         exp = 'mysql'
         self.cnx.database = exp
         self.assertEqual(exp, self.cnx.database)
-
-    def test_set_time_zone(self):
-        """Set the time zone for current MySQL session"""
-        cnx = _DummyMySQLConnection()
-        exp = "-09:00"
-        cnx.connect(time_zone=exp)
-        self.assertEqual(exp, cnx._time_zone)
-        exp = "+03:00"
-        self.cnx.set_time_zone(exp)
-        self.assertEqual(exp, self.cnx._time_zone)
-        res = self.cnx._info_query("SELECT @@session.time_zone")[0]
-        self.assertEqual(exp, res)
-
-    def test_get_time_zone(self):
-        """Get the time zone from current MySQL Session"""
-        exp = "-08:00"
-        self.cnx._info_query("SET @@session.time_zone = '{0}'".format(exp))
-        self.assertEqual(exp, self.cnx.get_time_zone())
-
-    def test_time_zone(self):
-        """Set and get the time zone through property"""
-        exp = "+05:00"
-        self.cnx.time_zone = exp
-        self.assertEqual(exp, self.cnx._time_zone)
-        self.assertEqual(exp, self.cnx.time_zone)
-        self.assertEqual(self.cnx.get_time_zone(), self.cnx.time_zone)
-
-    def test_set_sql_mode(self):
-        """Set SQL Mode"""
-        # Use an unknown SQL Mode
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx.set_sql_mode, 'HAM')
-
-        # Set an SQL Mode
-        try:
-            self.cnx.set_sql_mode('TRADITIONAL')
-        except errors.Error:
-            self.fail("Failed setting SQL Mode")
-
-        # Set SQL Mode to a list of modes
-        if tests.MYSQL_VERSION[0:3] < (5, 7, 4):
-            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,'
-                   'NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,'
-                   'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
-        else:
-            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,'
-                   'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
-
-        try:
-            self.cnx.set_sql_mode(exp)
-            result = self.cnx.get_sql_mode()
-        except errors.Error as err:
-            self.fail(
-                "Failed setting SQL Mode with multiple modes: {0}".format(
-                    str(err)))
-        self.assertEqual(exp, result)
-
-        exp = sorted([
-            constants.SQLMode.STRICT_ALL_TABLES,
-            constants.SQLMode.REAL_AS_FLOAT
-        ])
-        self.cnx.sql_mode = exp
-        self.assertEqual(exp, sorted(self.cnx.sql_mode.split(',')))
-
-    def test_get_sql_mode(self):
-        """Get SQL Mode"""
-        config = tests.get_mysql_config()
-        config['sql_mode'] = ''
-        self.cnx = connection.MySQLConnection(**config)
-
-        # SQL Modes must be empty
-        self.assertEqual('', self.cnx.get_sql_mode())
-
-        # Set SQL Mode and check
-        sql_mode = exp = 'STRICT_ALL_TABLES'
-        self.cnx.set_sql_mode(sql_mode)
-        self.assertEqual(exp, self.cnx.get_sql_mode())
-
-        # Unset the SQL Mode again
-        self.cnx.set_sql_mode('')
-        self.assertEqual('', self.cnx.get_sql_mode())
-
-    def test_sql_mode(self):
-        """Set and get SQL Mode through property"""
-        config = tests.get_mysql_config()
-        config['sql_mode'] = ''
-        self.cnx = connection.MySQLConnection(**config)
-
-        sql_mode = exp = 'STRICT_ALL_TABLES'
-        self.cnx.sql_mode = sql_mode
-        self.assertEqual(exp, self.cnx.sql_mode)
-
-    def test_set_autocommit(self):
-        self.cnx.set_autocommit(True)
-        self.assertEqual(self.cnx._autocommit, True)
-        res = self.cnx._info_query("SELECT @@session.autocommit")[0]
-        self.assertEqual(1, res)
-        self.cnx.set_autocommit(0)
-        res = self.cnx._info_query("SELECT @@session.autocommit")[0]
-        self.assertEqual(0, res)
-
-    def test_get_autocommit(self):
-        cases = [False, True]
-        for exp in cases:
-            self.cnx.set_autocommit(exp)
-            res = self.cnx._info_query("SELECT @@session.autocommit")[0]
-            self.assertEqual(exp, cases[res])
 
     def test_autocommit(self):
         for exp in [False, True]:
             self.cnx.autocommit = exp
             self.assertEqual(exp, self.cnx.autocommit)
 
-    def test__set_raise_on_warnings(self):
-        """Toggle whether to get warnings"""
-        self.cnx._set_raise_on_warnings(True)
-        self.assertEqual(True, self.cnx._raise_on_warnings)
-        self.cnx._set_raise_on_warnings(False)
-        self.assertEqual(False, self.cnx._raise_on_warnings)
-        self.assertRaises(ValueError, self.cnx._set_raise_on_warnings, 1)
-
-    def test__get_raise_on_warnings(self):
-        """Check whether we need to get warnings"""
-        self.cnx._raise_on_warnings = True
-        self.assertEqual(True, self.cnx._get_raise_on_warnings())
-        self.cnx._raise_on_warnings = False
-        self.assertEqual(False, self.cnx._get_raise_on_warnings())
-
     def test_raise_on_warnings(self):
         """Check and toggle the get_warnings property"""
         self.cnx.raise_on_warnings = True
-        self.assertEqual(True, self.cnx._get_raise_on_warnings())
+        self.assertEqual(True, self.cnx._raise_on_warnings)
+        self.assertEqual(True, self.cnx.raise_on_warnings)
         self.cnx.raise_on_warnings = False
-        self.assertEqual(False, self.cnx._get_raise_on_warnings())
+        self.assertEqual(False, self.cnx._raise_on_warnings)
+        self.assertEqual(False, self.cnx.raise_on_warnings)
 
         try:
             self.cnx.raise_on_warnings = 1
@@ -1605,42 +1418,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # Nothing to read, but try to send empty packet
         self.assertRaises(errors.OperationalError,
                           self.cnx._send_data, fp, True)
-
-    def test_in_transaction(self):
-        self.cnx.cmd_query('START TRANSACTION')
-        self.assertTrue(self.cnx.in_transaction)
-        self.cnx.cmd_query('ROLLBACK')
-        self.assertFalse(self.cnx.in_transaction)
-
-        # AUTO_COMMIT turned ON
-        self.cnx.autocommit = True
-        self.assertFalse(self.cnx.in_transaction)
-
-        self.cnx.cmd_query('START TRANSACTION')
-        self.assertTrue(self.cnx.in_transaction)
-
-    def test_start_transaction(self):
-        self.cnx.start_transaction()
-        self.assertTrue(self.cnx.in_transaction)
-        self.cnx.rollback()
-
-        self.cnx.start_transaction(consistent_snapshot=True)
-        self.assertTrue(self.cnx.in_transaction)
-        self.assertRaises(errors.ProgrammingError, self.cnx.start_transaction)
-        self.cnx.rollback()
-
-        levels = ['READ UNCOMMITTED', 'READ COMMITTED', 'REPEATABLE READ',
-                  'SERIALIZABLE',
-                  'READ-UNCOMMITTED', 'READ-COMMITTED', 'REPEATABLE-READ',
-                  'SERIALIZABLE']
-        for level in levels:
-            level = level.replace(' ', '-')
-            self.cnx.start_transaction(isolation_level=level)
-            self.assertTrue(self.cnx.in_transaction)
-            self.cnx.rollback()
-
-        self.assertRaises(ValueError,
-                          self.cnx.start_transaction, isolation_level='spam')
 
     def test__handle_binary_ok(self):
         """Handle a Binary OK packet"""

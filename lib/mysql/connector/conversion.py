@@ -48,6 +48,7 @@ class MySQLConverterBase(object):
         self.use_unicode = None
         self.set_charset(charset)
         self.set_unicode(use_unicode)
+        self._cache_field_types = {}
 
     def set_charset(self, charset):
         """Set character set"""
@@ -70,7 +71,25 @@ class MySQLConverterBase(object):
 
     def to_python(self, vtype, value):
         """Convert MySQL data type to Python"""
-        return value
+
+        if (value == b'\x00' or value is None) and vtype[1] != FieldType.BIT:
+            # Don't go further when we hit a NULL value
+            return None
+
+        if not self._cache_field_types:
+            self._cache_field_types = {}
+            for name, info in FieldType.desc.items():
+                try:
+                    self._cache_field_types[info[0]] = getattr(
+                        self, '_{0}_to_python'.format(name))
+                except AttributeError:
+                    # We ignore field types which has no method
+                    pass
+
+        try:
+            return self._cache_field_types[vtype[1]](value, vtype)
+        except KeyError:
+            return value
 
     def escape(self, buf):
         """Escape buffer for sending to MySQL"""
@@ -158,6 +177,39 @@ class MySQLConverter(MySQLConverterBase):
             raise TypeError("Python '{0}' cannot be converted to a "
                             "MySQL type".format(type_name))
 
+    def to_python(self, vtype, value):
+        """Convert MySQL data type to Python"""
+        if value == 0 and vtype[1] != FieldType.BIT:  # \x00
+            # Don't go further when we hit a NULL value
+            return None
+        if value is None:
+            return None
+
+        if not self._cache_field_types:
+            self._cache_field_types = {}
+            for name, info in FieldType.desc.items():
+                try:
+                    self._cache_field_types[info[0]] = getattr(
+                        self, '_{0}_to_python'.format(name))
+                except AttributeError:
+                    # We ignore field types which has no method
+                    pass
+
+        try:
+            return self._cache_field_types[vtype[1]](value, vtype)
+        except KeyError:
+            # If one type is not defined, we just return the value as str
+            try:
+                return value.decode('utf-8')
+            except UnicodeDecodeError:
+                return value
+        except ValueError as err:
+            raise ValueError("%s (field %s)" % (err, vtype[0]))
+        except TypeError as err:
+            raise TypeError("%s (field %s)" % (err, vtype[0]))
+        except:
+            raise
+
     def _int_to_mysql(self, value):
         """Convert value to int"""
         return int(value)
@@ -178,10 +230,15 @@ class MySQLConverter(MySQLConverterBase):
 
     def _unicode_to_mysql(self, value):
         """Convert unicode"""
-        encoded = value.encode(self.charset)
-        if self.charset_id in CharacterSet.slash_charsets:
+        charset = self.charset
+        charset_id = self.charset_id
+        if charset == 'binary':
+            charset = 'utf8'
+            charset_id = CharacterSet.get_charset_info(charset)[0]
+        encoded = value.encode(charset)
+        if charset_id in CharacterSet.slash_charsets:
             if b'\x5c' in encoded:
-                return HexLiteral(value, self.charset)
+                return HexLiteral(value, charset)
         return encoded
 
     def _bytes_to_mysql(self, value):
@@ -311,45 +368,6 @@ class MySQLConverter(MySQLConverterBase):
             return str(value).encode('ascii')
 
         return None
-
-    def to_python(self, flddsc, value):
-        """
-        Converts a given value coming from MySQL to a certain type in Python.
-        The flddsc contains additional information for the field in the
-        table. It's an element from MySQLCursor.description.
-
-        Returns a mixed value.
-        """
-        if value == 0 and flddsc[1] != FieldType.BIT:  # \x00
-            # Don't go further when we hit a NULL value
-            return None
-        if value is None:
-            return None
-
-        if not self._cache_field_types:
-            self._cache_field_types = {}
-            for name, info in FieldType.desc.items():
-                try:
-                    self._cache_field_types[info[0]] = getattr(
-                        self, '_{0}_to_python'.format(name))
-                except AttributeError:
-                    # We ignore field types which has no method
-                    pass
-
-        try:
-            return self._cache_field_types[flddsc[1]](value, flddsc)
-        except KeyError:
-            # If one type is not defined, we just return the value as str
-            try:
-                return value.decode('utf-8')
-            except UnicodeDecodeError:
-                return value
-        except ValueError as err:
-            raise ValueError("%s (field %s)" % (err, flddsc[0]))
-        except TypeError as err:
-            raise TypeError("%s (field %s)" % (err, flddsc[0]))
-        except:
-            raise
 
     def row_to_python(self, row, fields):
         """Convert a MySQL text result row to Python types
@@ -508,7 +526,7 @@ class MySQLConverter(MySQLConverterBase):
         return year
 
     def _SET_to_python(self, value, dsc=None):  # pylint: disable=C0103
-        """Returns SET column typs as set
+        """Returns SET column type as set
 
         Actually, MySQL protocol sees a SET as a string type field. So this
         code isn't called directly, but used by STRING_to_python() method.
@@ -537,6 +555,8 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.BINARY:
                 return value
 
+        if self.charset == 'binary':
+            return value
         if isinstance(value, (bytes, bytearray)) and self.use_unicode:
             return value.decode(self.charset)
 

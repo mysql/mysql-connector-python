@@ -35,10 +35,17 @@ PY2 = sys.version_info[0] == 2
 
 if PY2:
     NUMERIC_TYPES = (int, float, Decimal, HexLiteral, long)
-    UNICODE_TYPES = (unicode,)  # This should not contain str
+    INT_TYPES = (int, long)
+    UNICODE_TYPES = (unicode,)
+    STRING_TYPES = (str, unicode)
+    BYTE_TYPES = (bytearray,)
 else:
     NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
+    INT_TYPES = (int,)
     UNICODE_TYPES = (str,)
+    STRING_TYPES = (str,)
+    BYTE_TYPES = (bytearray, bytes)
+
 
 def init_bytearray(payload=b'', encoding='utf-8'):
     """Initializes a bytearray from the payload"""
@@ -83,3 +90,25 @@ if PY2:
         return struct.unpack_from(fmt, buf)
 else:
     struct_unpack = struct.unpack  # pylint: disable=C0103
+
+
+def make_abc(base_class):
+    """Decorator used to create a abstract base class
+
+    We use this decorator to create abstract base classes instead of
+    using the abc-module. The decorator makes it possible to do the
+    same in both Python v2 and v3 code.
+    """
+    def wrapper(class_):
+        """Wrapper"""
+        attrs = class_.__dict__.copy()
+        for attr in '__dict__', '__weakref__':
+            attrs.pop(attr, None)  # ignore missing attributes
+
+        bases = class_.__bases__
+        if PY2:
+            attrs['__metaclass__'] = class_
+        else:
+            bases = (class_,) + bases
+        return base_class(class_.__name__, bases, attrs)
+    return wrapper

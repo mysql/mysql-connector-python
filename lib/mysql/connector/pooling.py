@@ -39,7 +39,6 @@ from . import errors
 from .connection import MySQLConnection
 
 CONNECTION_POOL_LOCK = threading.RLock()
-CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
 CNX_POOL_MAXSIZE = 32
 CNX_POOL_MAXNAMESIZE = 64
 CNX_POOL_NAMEREGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')
@@ -269,6 +268,17 @@ class MySQLConnectionPool(object):
 
             if not cnx:
                 cnx = MySQLConnection(**self._cnx_config)
+                try:
+                    if (self._reset_session and self._cnx_config['compress']
+                            and cnx.get_server_version() < (5, 7, 3)):
+                        raise errors.NotSupportedError("Pool reset session is "
+                                                       "not supported with "
+                                                       "compression for MySQL "
+                                                       "server version 5.7.2 "
+                                                       "or earlier.")
+                except KeyError:
+                    pass
+
                 # pylint: disable=W0201,W0212
                 cnx._pool_config_version = self._config_version
                 # pylint: enable=W0201,W0212

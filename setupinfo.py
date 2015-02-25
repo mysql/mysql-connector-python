@@ -21,8 +21,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-import sys
+from distutils.core import Extension
 import os
+import sys
+
+from lib.cpy_distutils import (
+    Install, InstallLib, BuildExtDynamic, BuildExtStatic
+)
 
 # Development Status Trove Classifiers significant for Connector/Python
 DEVELOPMENT_STATUSES = {
@@ -43,11 +48,30 @@ version_py = os.path.join('lib', 'mysql', 'connector', 'version.py')
 with open(version_py, 'rb') as fp:
     exec(compile(fp.read(), version_py, 'exec'))
 
-command_classes = {}
+BuildExtDynamic.min_connector_c_version = (5, 5, 8)
+command_classes = {
+    'build_ext': BuildExtDynamic,
+    'build_ext_static': BuildExtStatic,
+    'install_lib': InstallLib,
+    'install': Install,
+}
 
 package_dir = {'': 'lib'}
 name = 'mysql-connector-python'
 version = '{0}.{1}.{2}'.format(*VERSION[0:3])
+
+extensions = [
+    Extension("_mysql_connector",
+              sources=[
+                  "src/exceptions.c",
+                  "src/mysql_capi.c",
+                  "src/mysql_capi_conversion.c",
+                  "src/mysql_connector.c",
+                  "src/force_cpp_linkage.cc",
+              ],
+              include_dirs=['src/include'],
+    )
+]
 
 packages = [
     'mysql',

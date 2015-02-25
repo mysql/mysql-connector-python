@@ -36,18 +36,22 @@ import datetime
 
 from . import constants
 
-class _DBAPITypeObject:
+class _DBAPITypeObject(object):
 
     def __init__(self, *values):
         self.values = values
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         if other in self.values:
-            return 0
-        if other < self.values:
-            return 1
+            return True
         else:
-            return -1
+            return False
+
+    def __ne__(self, other):
+        if other in self.values:
+            return False
+        else:
+            return True
 
 Date = datetime.date
 Time = datetime.time
@@ -64,8 +68,8 @@ def TimestampFromTicks(ticks):
 
 Binary = bytes
 
-STRING = _DBAPITypeObject(constants.FieldType.get_string_types())
-BINARY = _DBAPITypeObject(constants.FieldType.get_binary_types())
-NUMBER = _DBAPITypeObject(constants.FieldType.get_number_types())
-DATETIME = _DBAPITypeObject(constants.FieldType.get_timestamp_types())
+STRING = _DBAPITypeObject(*constants.FieldType.get_string_types())
+BINARY = _DBAPITypeObject(*constants.FieldType.get_binary_types())
+NUMBER = _DBAPITypeObject(*constants.FieldType.get_number_types())
+DATETIME = _DBAPITypeObject(*constants.FieldType.get_timestamp_types())
 ROWID = _DBAPITypeObject()

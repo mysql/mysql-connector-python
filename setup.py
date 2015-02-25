@@ -41,7 +41,7 @@ for install_scheme in INSTALL_SCHEMES.values():
 import setupinfo
 try:
     from cpyint import metasetupinfo
-    setupinfo.command_classes = metasetupinfo.command_classes
+    setupinfo.command_classes.update(metasetupinfo.command_classes)
 except (ImportError, AttributeError):
     # python-internal not available
     pass
@@ -60,6 +60,7 @@ setup(
     package_dir=setupinfo.package_dir,
     packages=setupinfo.packages,
     classifiers=setupinfo.classifiers,
-    cmdclass=setupinfo.command_classes
+    cmdclass=setupinfo.command_classes,
+    ext_modules=setupinfo.extensions,
 )
 

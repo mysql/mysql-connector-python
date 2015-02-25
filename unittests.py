@@ -55,8 +55,8 @@ Examples:
 unittests.py has exit status 0 when tests were ran successfully, 1 otherwise.
 
 """
-import sys
 import os
+import sys
 import time
 import unittest
 try:
@@ -93,8 +93,8 @@ if not (((2, 6) <= sys.version_info < (3, 0)) or sys.version_info >= (3, 3)):
 else:
     sys.path.insert(0, os.path.join(_TOPDIR, 'lib'))
     sys.path.insert(0, os.path.join(_TOPDIR))
-
-import mysql.connector
+    tests.TEST_BUILD_DIR = os.path.join(_TOPDIR, 'build', 'testing')
+    sys.path.insert(0, tests.TEST_BUILD_DIR)
 
 
 # MySQL option file template. Platform specifics dynamically added later.
@@ -135,6 +135,7 @@ log-error = mysqld_{name}.err
 log-bin = mysqld_{name}_bin
 local_infile = 1
 innodb_flush_log_at_trx_commit = 2
+general_log_file = general_{name}.log
 ssl
 """
 
@@ -171,8 +172,7 @@ _UNITTESTS_CMD_ARGS = {
 
     ('-t', '--test'): {
         'dest': 'testcase', 'metavar': 'NAME',
-        'help': 'Tests to execute, one of {names}'.format(
-            names=tests.get_test_names())
+        'help': 'Tests to execute, see --help-tests for more information'
     },
 
     ('-l', '--log'): {
@@ -296,6 +296,25 @@ _UNITTESTS_CMD_ARGS = {
         'dest': 'django_path', 'metavar': 'NAME',
         'default': None,
         'help': ("Location of Django (none installed source)")
+    },
+
+    ('', '--help-tests'): {
+        'dest': 'show_tests', 'action': 'store_true',
+        'help': ("Show extra information about test groups")
+    },
+
+    ('', '--skip-install'): {
+        'dest': 'skip_install', 'action': 'store_true', 'default': False,
+        'help': (
+            'Skip installation of Connector/Python, reuse previous.'
+        ),
+    },
+
+    ('', '--with-mysql-capi'): {
+        'dest': 'mysql_capi', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Location of MySQL C API installation "
+                 "or full path to mysql_config")
     },
 
     ('', '--with-fabric'): {
@@ -644,7 +663,6 @@ def init_mysql_server(port, options):
                          "Check error log.".format(name=name))
             sys.exit(1)
 
-
 def main():
     parser = _get_arg_parser()
     options = parser.parse_args()
@@ -653,6 +671,12 @@ def main():
     if isinstance(options, tuple):
         # Fallback to old optparse
         options = options[0]
+
+    if options.show_tests:
+        sys.path.insert(0, os.path.join(os.getcwd(), 'lib'))
+        for name, _, description in tests.get_test_modules():
+            print("{0:22s} {1}".format(name, description))
+        sys.exit()
 
     tests.setup_logger(LOGGER, debug=options.debug, logfile=options.logfile)
     LOGGER.info(
@@ -686,7 +710,6 @@ def main():
         sys.path.insert(0, options.django_path)
         try:
             import django
-
             tests.DJANGO_VERSION = django.VERSION[0:3]
         except ImportError:
             msg = "Could not find django package at {0}".format(
@@ -708,36 +731,45 @@ def main():
             'password': fab.password,
         }
 
-    # Start Dummy MySQL Server
-    #tests.MYSQL_DUMMY = mysqld.DummyMySQLServer(('127.0.0.1', options.port - 1),
-    #                                            mysqld.DummyMySQLRequestHandler)
-    #tests.MYSQL_DUMMY_THREAD = threading.Thread(
-    #    target=tests.MYSQL_DUMMY.serve_forever)
-    #tests.MYSQL_DUMMY_THREAD.setDaemon(True)
-
     # We have to at least run 1 MySQL server
     init_mysql_server(port=(options.port), options=options)
 
+    tests.MYSQL_CAPI = options.mysql_capi
+    if not options.skip_install:
+        tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
+                                options.mysql_capi)
+
     # Which tests cases to run
     testcases = []
-    testsuite = None
 
     if options.testcase:
-        if options.testcase in tests.get_test_names():
-            for module in tests.get_test_modules():
-                if module.endswith('test_' + options.testcase):
-                    testcases = [module]
-                    break
-            testsuite = unittest.TestLoader().loadTestsFromNames(testcases)
-        else:
-            msg = "Test case is not one of {0}".format(
-                ', '.join(tests.get_test_names()))
-            _show_help(msg=msg, parser=parser, exit_code=1)
+        for name, module, _ in tests.get_test_modules():
+            if name == options.testcase or module == options.testcase:
+                LOGGER.info("Executing tests in module %s", module)
+                testcases = [module]
+                break
+        if not testcases:
+            LOGGER.error("Test case not valid; see --help-tests")
+            sys.exit(1)
     elif options.onetest:
-        testsuite = unittest.TestLoader().loadTestsFromName(options.onetest)
+        LOGGER.info("Executing test: %s", options.onetest)
+        testcases = [options.onetest]
     else:
-        testcases = tests.get_test_modules()
-        testsuite = unittest.TestLoader().loadTestsFromNames(testcases)
+        testcases = [mod[1] for mod in tests.get_test_modules()]
+
+
+    # Load tests
+    test_loader = unittest.TestLoader()
+    testsuite = None
+    if testcases:
+        # Check if we nee to test anything with the C Extension
+        if any(['cext' in case for case in testcases]):
+            # Try to load the C Extension, and try to load the MySQL library
+            tests.check_c_extension()
+        testsuite = test_loader.loadTestsFromNames(testcases)
+    else:
+        LOGGER.error("No test cases loaded.")
+        sys.exit(1)
 
     # Initialize the other MySQL Servers
     for i in range(1, tests.MYSQL_SERVERS_NEEDED):

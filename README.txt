@@ -1,9 +1,9 @@
 ==========================
-MySQL Connector/Python 2.0
+MySQL Connector/Python 2.1
 ==========================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 License information can be found in the LICENSE.txt file.
 

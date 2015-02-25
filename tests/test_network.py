@@ -199,10 +199,6 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
         self.cnx.sock.add_packet(b'\01\01\01')
         self.assertRaises(errors.InterfaceError, self.cnx.recv_plain)
 
-        # Receive the header of a packet, but nothing more
-        self.cnx.sock.add_packet(b'\01\00\00\00')
-        self.assertRaises(errors.InterfaceError, self.cnx.recv_plain)
-
         # Socket fails to receive and produces an error
         self.cnx.sock.raise_socket_error()
         self.assertRaises(errors.OperationalError, self.cnx.recv_plain)

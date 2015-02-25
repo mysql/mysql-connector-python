@@ -32,16 +32,19 @@ import datetime
 import inspect
 import platform
 import unittest
-import glob
 import logging
 import shutil
 import subprocess
 import errno
+from imp import load_source
+from functools import wraps
+from pkgutil import walk_packages
 
 
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
 PY2 = sys.version_info[0] == 2
+_CACHED_TESTCASES = []
 
 try:
     from unittest.util import strclass
@@ -62,6 +65,8 @@ except ImportError:
     else:
         LOGGER.error("Could not initialize Python's unittest module")
         sys.exit(1)
+
+from lib.cpy_distutils import get_mysql_config_info
 
 SSL_AVAILABLE = True
 try:
@@ -97,7 +102,7 @@ OPTIONS_INIT = False
 
 MYSQL_SERVERS_NEEDED = 1
 MYSQL_SERVERS = []
-MYSQL_VERSION = None
+MYSQL_VERSION = ()
 MYSQL_VERSION_TXT = ''
 MYSQL_DUMMY = None
 MYSQL_DUMMY_THREAD = None
@@ -106,6 +111,7 @@ SSL_CA = os.path.abspath(os.path.join(SSL_DIR, 'tests_CA_cert.pem'))
 SSL_CERT = os.path.abspath(os.path.join(SSL_DIR, 'tests_client_cert.pem'))
 SSL_KEY = os.path.abspath(os.path.join(SSL_DIR, 'tests_client_key.pem'))
 TEST_BUILD_DIR = None
+MYSQL_CAPI = None
 
 DJANGO_VERSION = None
 FABRIC_CONFIG = None
@@ -151,17 +157,19 @@ class DummySocket(object):
         self._server_replies = self._server_replies[bufsize:]
         return res
 
-    def recv_into(self, buffer, nbytes=0, flags=0):
+    def recv_into(self, buffer_, nbytes=0, flags=0):
         if self._raise_socket_error:
             raise socket.error(self._raise_socket_error)
         if nbytes == 0:
-            nbytes = len(buffer)
+            nbytes = len(buffer_)
         try:
-            buffer[0:nbytes] = self._server_replies[0:nbytes]
-        except (IndexError, TypeError, ValueError) as err:
+            buffer_[0:nbytes] = self._server_replies[0:nbytes]
+        except (IndexError, TypeError) as err:
             return 0
+        except ValueError:
+            pass
         self._server_replies = self._server_replies[nbytes:]
-        return len(buffer)
+        return len(buffer_)
 
     def send(self, string, flags=0):
         if self._raise_socket_error:
@@ -193,22 +201,55 @@ def get_test_modules():
     """Get list of Python modules containing tests
 
     This function scans the tests/ folder for Python modules which name
-    start with 'test_'.
+    start with 'test_'. It will return the dotted name of the module with
+    submodules together with the first line of the doc string found in
+    the module.
 
-    Returns a list of strings.
+    The result is a sorted list of tuples and each tuple is
+        (name, module_dotted_path, description)
+
+    For example:
+        ('cext_connection', 'tests.cext.cext_connection', 'This module..')
+
+    Returns a list of tuples.
     """
+    global _CACHED_TESTCASES
+
+    if _CACHED_TESTCASES:
+        return _CACHED_TESTCASES
     testcases = []
 
-    # For all python version
-    for file_ in glob.glob(os.path.join('tests', 'test_*.py')):
-        module = os.path.splitext(os.path.basename(file_))[0]
-        if OPTIONS_INIT and not DJANGO_VERSION and 'django' in module:
-            # Skip django testing completely when Django is not available.
-            LOGGER.warning("Django tests will not run: Django not available")
+    pattern = re.compile('.*test_(.*)')
+    for finder, name, is_pkg in walk_packages(__path__, prefix=__name__+'.'):
+        if ('.test_' not in name or
+                ('django' in name and not DJANGO_VERSION) or
+                ('fabric' in name and not FABRIC_CONFIG) or
+                ('cext' in name and not MYSQL_CAPI)):
             continue
-        testcases.append(
-            'tests.{module}'.format(module=module))
-        LOGGER.debug('Added tests.{module}'.format(module=module))
+
+        module_path = os.path.join(finder.path, name.split('.')[-1] + '.py')
+        dsc = '(description not available)'
+        try:
+            mod = load_source(name, module_path)
+        except IOError as exc:
+            # Not Python source files
+            continue
+        except ImportError as exc:
+            check_c_extension(exc)
+        else:
+            try:
+                dsc = mod.__doc__.splitlines()[0]
+            except AttributeError:
+                # No description available
+                pass
+
+        testcases.append((pattern.match(name).group(1), name, dsc))
+
+    testcases.sort(key=lambda x: x[0], reverse=False)
+
+    # 'Unimport' modules so they can be correctly imported when tests run
+    for _, module, _ in testcases:
+        sys.modules.pop(module, None)
 
     _CACHED_TESTCASES = testcases
     return testcases
@@ -223,8 +264,8 @@ def get_test_names():
 
     Returns a list of strings.
     """
-    pattern = re.compile('.*test_')
-    return [pattern.sub('', s) for s in get_test_modules()]
+    pattern = re.compile('.*test_(.*)')
+    return [mod[0] for mod in get_test_modules()]
 
 
 def set_nr_mysql_servers(number):
@@ -361,7 +402,67 @@ class TestTimeZone(datetime.tzinfo):
         return 'TestZone'
 
 
+def cnx_config(**extra_config):
+    def _cnx_config(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            if not hasattr(self, 'config'):
+                self.config = get_mysql_config()
+            if extra_config:
+                for key, value in extra_config.items():
+                    self.config[key] = value
+            func(self, *args, **kwargs)
+        return wrapper
+    return _cnx_config
+
+
+def foreach_cnx(*cnx_classes, **extra_config):
+    def _use_cnx(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            if not hasattr(self, 'config'):
+                self.config = get_mysql_config()
+            if extra_config:
+                for key, value in extra_config.items():
+                    self.config[key] = value
+            for cnx_class in cnx_classes or self.all_cnx_classes:
+                try:
+                    self.cnx = cnx_class(**self.config)
+                    self._testMethodName = "{0} (using {1})".format(
+                        func.__name__, cnx_class.__name__)
+                except:
+                    if hasattr(self, 'cnx'):
+                        # We will rollback/close later
+                        pass
+                try:
+                    func(self, *args, **kwargs)
+                except Exception as exc:
+                    raise exc
+                finally:
+                    try:
+                        self.cnx.rollback()
+                        self.cnx.close()
+                    except:
+                        # Might already be closed.
+                        pass
+        return wrapper
+    return _use_cnx
+
+
 class MySQLConnectorTests(unittest.TestCase):
+
+    def __init__(self, methodName='runTest'):
+        from mysql.connector import connection
+        self.all_cnx_classes = [connection.MySQLConnection]
+        try:
+            import _mysql_connector
+            from mysql.connector import connection_cext
+        except ImportError:
+            self.have_cext = False
+        else:
+            self.have_cext = True
+            self.all_cnx_classes.append(connection_cext.CMySQLConnection)
+        super(MySQLConnectorTests, self).__init__(methodName=methodName)
 
     def __str__(self):
         classname = strclass(self.__class__)
@@ -422,6 +523,20 @@ class MySQLConnectorTests(unittest.TestCase):
             if add_skip:
                 add_skip(self, self._testMethodName + ': ' + reason)
 
+    if sys.version_info[0:2] == (2, 6):
+        # Backport handy asserts from 2.7
+        def assertIsInstance(self, obj, cls, msg=None):
+            if not isinstance(obj, cls):
+                msg = "{0} is not an instance of {1}".format(
+                    unittest.util.safe_repr(obj), unittest.util.repr(cls))
+                self.fail(self._formatMessage(msg, msg))
+
+        def assertGreater(self, a, b, msg=None):
+            if not a > b:
+                msg = "{0} not greater than {1}".format(
+                    unittest.util.safe_repr(a), unittest.util.safe_repr(b))
+                self.fail(self._formatMessage(msg, msg))
+
     def run(self, result=None):
         if sys.version_info[0:2] == (2, 6):
             test_method = getattr(self, self._testMethodName)
@@ -452,6 +567,7 @@ class MySQLConnectorTests(unittest.TestCase):
                 self.fail("Attribute '{0}' not part of namedtuple {1}".format(
                     attr, tocheck))
 
+
 class TestsCursor(MySQLConnectorTests):
 
     def _test_execute_setup(self, cnx, tbl="myconnpy_cursor", engine="MyISAM"):
@@ -480,6 +596,91 @@ class TestsCursor(MySQLConnectorTests):
         except Exception as err:  # pylint: disable=W0703
             self.fail("Failed cleaning up test table; {0}".format(err))
         cur.close()
+
+
+class CMySQLConnectorTests(MySQLConnectorTests):
+
+    def connc_connect_args(self, recache=False):
+        """Get connection arguments for the MySQL C API
+
+        Get the connection arguments suitable for the MySQL C API
+        from the Connector/Python arguments. This method sets the member
+        variable connc_kwargs as well as returning a copy of connc_kwargs.
+
+        If recache is True, the information stored in connc_kwargs will
+        be refreshed.
+
+        :return: Dictionary containing connection arguments.
+        :rtype: dict
+        """
+        self.config = get_mysql_config()
+
+        if not self.hasattr('connc_kwargs') or recache is True:
+            connect_args = [
+                "host", "user", "password", "database",
+                "port", "unix_socket", "client_flags"
+            ]
+            self.connc_kwargs = {}
+            for key, value in self.config.items():
+                if key in connect_args:
+                    self.connect_kwargs[key] = value
+        return self.connc_kwargs.copy()
+
+
+class CMySQLCursorTests(CMySQLConnectorTests):
+
+    _cleanup_tables = []
+
+    def setUp(self):
+        self.config = get_mysql_config()
+        # Import here allowed
+        from mysql.connector.connection_cext import CMySQLConnection
+        self.cnx = CMySQLConnection(**self.config)
+
+    def tearDown(self):
+        self.cleanup_tables(self.cnx)
+        self.cnx.close()
+
+    def setup_table(self, cnx, tbl="myconnpy_cursor", engine="InnoDB"):
+
+        self.cleanup_table(cnx, tbl)
+        stmt_create = (
+            "CREATE TABLE {table} "
+            "(col1 INT AUTO_INCREMENT, "
+            "col2 VARCHAR(30), "
+            "col3 INT NOT NULL DEFAULT 0, "
+            "PRIMARY KEY (col1))"
+            "ENGINE={engine}").format(
+            table=tbl, engine=engine)
+
+        try:
+            cnx.cmd_query(stmt_create)
+        except Exception as err:  # pylint: disable=W0703
+            cnx.rollback()
+            self.fail("Failed setting up test table; {0}".format(err))
+        else:
+            cnx.commit()
+
+        self._cleanup_tables.append(tbl)
+
+    def cleanup_table(self, cnx, tbl="myconnpy_cursor"):
+
+        stmt_drop = "DROP TABLE IF EXISTS {table}".format(table=tbl)
+
+        # Explicit rollback: uncommited changes could otherwise block
+        cnx.rollback()
+
+        try:
+            cnx.cmd_query(stmt_drop)
+        except Exception as err:  # pylint: disable=W0703
+            self.fail("Failed cleaning up test table; {0}".format(err))
+
+        if tbl in self._cleanup_tables:
+            self._cleanup_tables.remove(tbl)
+
+    def cleanup_tables(self, cnx):
+        for tbl in self._cleanup_tables:
+            self.cleanup_table(cnx, tbl)
 
 
 def printmsg(msg=None):
@@ -545,7 +746,7 @@ def setup_logger(logger, debug=False, logfile=None):
     LOGGER.addHandler(handler)
 
 
-def install_connector(root_dir, install_dir):
+def install_connector(root_dir, install_dir, connc_location=None):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -563,18 +764,87 @@ def install_connector(root_dir, install_dir):
         sys.executable,
         'setup.py',
         'clean', '--all',  # necessary for removing the build/
+    ]
+
+    cmd.extend([
         'install',
         '--root', install_dir,
         '--install-lib', '.'
-    ]
+    ])
+
+    if connc_location:
+        cmd.extend(['--with-mysql-capi', connc_location])
 
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                            cwd=root_dir)
     stdout = prc.communicate()[0]
     if prc.returncode is not 0:
-        with open(logfile, 'w') as logfp:
-            logfp.write(stdout.decode('utf8'))
+        with open(logfile, 'wb') as logfp:
+            logfp.write(stdout)
         LOGGER.error("Failed installing Connector/Python, see {log}".format(
             log=logfile))
+        sys.exit(1)
+
+
+def check_c_extension(exc=None):
+    """Check whether we can load the C Extension
+
+    This function needs the location of the mysql_config tool to
+    figure out the location of the MySQL Connector/C libraries. On
+    Windows it would be the installation location of Connector/C.
+
+    :param mysql_config: Location of the mysql_config tool
+    :param exc: An ImportError exception
+    """
+    if not MYSQL_CAPI:
+        return
+
+    if platform.system() == "Darwin":
+        libpath_var = 'DYLD_LIBRARY_PATH'
+    elif platform.system() == "Windows":
+        libpath_var = 'PATH'
+    else:
+        libpath_var = 'LD_LIBRARY_PATH'
+
+    if not os.path.exists(MYSQL_CAPI):
+        LOGGER.error("MySQL Connector/C not available using '%s'", MYSQL_CAPI)
+
+    if os.name == 'posix':
+        if os.path.isdir(MYSQL_CAPI):
+            mysql_config = os.path.join(MYSQL_CAPI, 'bin', 'mysql_config')
+        else:
+            mysql_config = MYSQL_CAPI
+        lib_dir = get_mysql_config_info(mysql_config)['lib_dir']
+    elif os.path.isdir(MYSQL_CAPI):
+        lib_dir = os.path.join(MYSQL_CAPI, 'lib')
+    else:
+        LOGGER.error("C Extension not supported on %s", os.name)
+        sys.exit(1)
+
+    error_msg = ''
+    if not exc:
+        try:
+            import _mysql_connector
+        except ImportError as exc:
+            error_msg = str(exc).strip()
+    else:
+        assert(isinstance(exc, ImportError))
+        error_msg = str(exc).strip()
+
+    if not error_msg:
+        # Nothing to do
+        return
+
+    match = re.match('.*Library not loaded:\s(.+)\n.*', error_msg)
+    if match:
+        lib_name = match.group(1)
+        LOGGER.error(
+            "MySQL Client library not loaded. Make sure the shared library "
+            "'%s' can be loaded by Python. Tip: Add folder '%s' to "
+            "environment variable '%s'.",
+            lib_name, lib_dir, libpath_var)
+        sys.exit(1)
+    else:
+        LOGGER.error("C Extension not available: %s", error_msg)
         sys.exit(1)

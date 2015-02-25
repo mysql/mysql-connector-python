@@ -29,7 +29,7 @@ import datetime
 from decimal import Decimal
 
 from .constants import (
-    FieldFlag, ServerCmd, FieldType, ClientFlag)
+    FieldFlag, ServerCmd, FieldType, ClientFlag, MAX_MYSQL_TABLE_COLUMNS)
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
@@ -194,6 +194,7 @@ class MySQLProtocol(object):
 
         res['auth_data'] = auth_data1 + auth_data2
         res['capabilities'] = capabilities
+        res['server_version_original'] = res['server_version_original'].decode()
         return res
 
     def parse_ok(self, packet):
@@ -219,7 +220,10 @@ class MySQLProtocol(object):
     def parse_column_count(self, packet):
         """Parse a MySQL packet with the number of columns in result set"""
         try:
-            return utils.read_lc_int(packet[4:])[1]
+            count = utils.read_lc_int(packet[4:])[1]
+            if count > MAX_MYSQL_TABLE_COLUMNS:
+                return None
+            return count
         except (struct.error, ValueError):
             raise errors.InterfaceError("Failed parsing column count")
 
@@ -265,12 +269,15 @@ class MySQLProtocol(object):
         res['status_flag'] = unpacked[3]
         return res
 
-    def parse_statistics(self, packet):
+    def parse_statistics(self, packet, with_header=True):
         """Parse the statistics packet"""
         errmsg = "Failed getting COM_STATISTICS information"
         res = {}
         # Information is separated by 2 spaces
-        pairs = packet[4:].split(b'\x20\x20')
+        if with_header:
+            pairs = packet[4:].split(b'\x20\x20')
+        else:
+            pairs = packet.split(b'\x20\x20')
         for pair in pairs:
             try:
                 (lbl, val) = [v.strip() for v in pair.split(b':', 2)]
@@ -636,24 +643,25 @@ class MySQLProtocol(object):
                     values.append(packed)
                 elif isinstance(value, str):
                     if PY2:
-                        values.append(utils.intstore(len(value)) + value)
+                        values.append(utils.lc_int(len(value)) +
+                                      value)
                     else:
                         value = value.encode(charset)
                         values.append(
-                            utils.intstore(len(value)) + value)
+                            utils.lc_int(len(value)) + value)
                     field_type = FieldType.VARCHAR
                 elif isinstance(value, bytes):
-                    values.append(utils.intstore(len(value)) + value)
+                    values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.BLOB
                 elif PY2 and \
                         isinstance(value, unicode):  # pylint: disable=E0602
                     value = value.encode(charset)
-                    values.append(utils.intstore(len(value)) + value)
+                    values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.VARCHAR
                 elif isinstance(value, Decimal):
                     values.append(
-                        utils.intstore(len(str(value).encode(charset))) +
-                        str(value).encode(charset))
+                        utils.lc_int(len(str(value).encode(
+                            charset))) + str(value).encode(charset))
                     field_type = FieldType.DECIMAL
                 elif isinstance(value, float):
                     values.append(struct.pack('d', value))

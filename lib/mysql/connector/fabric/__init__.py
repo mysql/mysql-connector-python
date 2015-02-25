@@ -39,12 +39,6 @@ FabricShard = namedtuple(
      'shard', 'shard_type', 'group', 'global_group']
     )
 
-CNX_FABRIC_ARGS = ['fabric_host', 'fabric_username', 'fabric_password',
-                   'fabric_port', 'fabric_connect_attempts',
-                   'fabric_connect_delay', 'fabric_report_errors',
-                   'fabric_ssl_ca', 'fabric_ssl_key', 'fabric_ssl_cert',
-                   'fabric_user']
-
 from .connection import (
     MODE_READONLY, MODE_READWRITE,
     STATUS_PRIMARY, STATUS_SECONDARY,
