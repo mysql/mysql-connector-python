@@ -3149,32 +3149,39 @@ class BugOra19500097(tests.MySQLConnectorTests):
     """
     def setUp(self):
         config = tests.get_mysql_config()
-        self.cnx = connection.MySQLConnection(**config)
-        self.cur = self.cnx.cursor()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
 
         self.tbl = 'Bug19500097'
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = ("CREATE TABLE {0} (col1 VARCHAR(10), col2 INT) "
                   "DEFAULT CHARSET latin1".format(self.tbl))
-        self.cur.execute(create)
+        cur.execute(create)
+        cur.close()
+        cnx.close()
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
-        self.cur.close()
-        self.cnx.close()
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
 
+    @foreach_cnx()
     def test_binary_charset(self):
 
         sql = "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl)
-        self.cur.execute(sql, ('foo', 1))
-        self.cur.execute(sql, ('ëëë', 2))
-        self.cur.execute(sql, (u'ááá', 5))
+        cur = self.cnx.cursor()
+        cur.execute(sql, ('foo', 1))
+        cur.execute(sql, ('ëëë', 2))
+        cur.execute(sql, (u'ááá', 5))
 
         self.cnx.set_charset_collation('binary')
-        self.cur.execute(sql, ('bar', 3))
-        self.cur.execute(sql, ('ëëë', 4))
-        self.cur.execute(sql, (u'ááá', 6))
+        cur.execute(sql, ('bar', 3))
+        cur.execute(sql, ('ëëë', 4))
+        cur.execute(sql, (u'ááá', 6))
 
         exp = [
             (bytearray(b'foo'), 1),
@@ -3184,9 +3191,8 @@ class BugOra19500097(tests.MySQLConnectorTests):
             (bytearray(b'\xc3\xab\xc3\xab\xc3\xab'), 4),
             (bytearray(b'\xc3\xa1\xc3\xa1\xc3\xa1'), 6)
         ]
-
-        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
-        self.assertEqual(exp, self.cur.fetchall())
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, cur.fetchall())
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),

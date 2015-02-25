@@ -430,18 +430,21 @@ def foreach_cnx(*cnx_classes, **extra_config):
                     self.cnx = cnx_class(**self.config)
                     self._testMethodName = "{0} (using {1})".format(
                         func.__name__, cnx_class.__name__)
-                    func(self, *args, **kwargs)
                 except:
                     if hasattr(self, 'cnx'):
                         # We will rollback/close later
                         pass
-
                 try:
-                    self.cnx.rollback()
-                    self.cnx.close()
-                except:
-                    # Might already be closed.
-                    pass
+                    func(self, *args, **kwargs)
+                except Exception as exc:
+                    raise exc
+                finally:
+                    try:
+                        self.cnx.rollback()
+                        self.cnx.close()
+                    except:
+                        # Might already be closed.
+                        pass
         return wrapper
     return _use_cnx
 

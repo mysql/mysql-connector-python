@@ -25,11 +25,11 @@
 """
 
 from distutils.command.build_ext import build_ext
-from distutils.command.build import build
 from distutils.command.install import install
 from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
+from distutils.dir_util import copy_tree
 from distutils import log
 from glob import glob
 import os
@@ -37,17 +37,23 @@ import shlex
 import struct
 from subprocess import Popen, PIPE, STDOUT
 import sys
+import platform
 
 ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
 
 CEXT_OPTIONS = [
     ('with-mysql-capi=', None,
-     "Location of MySQL C API installation or path to mysql_config")
+     "Location of MySQL C API installation or path to mysql_config"),
+]
+
+CEXT_STATIC_OPTIONS = [
+    ('static', None,
+     "Link C libraries statically with the C Extension"),
 ]
 
 INSTALL_OPTIONS = [
     ('byte-code-only=', None,
-     "Remove Python .py files; leave byte code .pyc only")
+     "Remove Python .py files; leave byte code .pyc only"),
 ]
 
 
@@ -200,7 +206,7 @@ def remove_cext(distribution):
         distribution.ext_modules.remove(ext_mod)
 
 
-class BuildMySQLExt(build_ext):
+class BuildExtDynamic(build_ext):
 
     """Build Connector/Python C Extension"""
 
@@ -221,18 +227,27 @@ class BuildMySQLExt(build_ext):
         """
         platform = get_platform()
         self._mysql_config_info = None
-        min_version = BuildMySQLExt.min_connector_c_version
+        min_version = BuildExtDynamic.min_connector_c_version
+
+        err_invalid_loc = "MySQL C API location is invalid; was %s"
 
         mysql_config = None
         err_version = "MySQL C API {0}.{1}.{2} or later required".format(
-            *BuildMySQLExt.min_connector_c_version)
+            *BuildExtDynamic.min_connector_c_version)
+
+        if not os.path.exists(connc_loc):
+            log.error(err_invalid_loc, connc_loc)
+            sys.exit(1)
 
         if os.path.isdir(connc_loc):
-            # if directory, and no mysql_config is availble, figure out the
+            # if directory, and no mysql_config is available, figure out the
             # lib/ and include/ folders from the the filesystem
             mysql_config = os.path.join(connc_loc, 'bin', 'mysql_config')
-            if not (os.path.isfile(mysql_config) and
-                        os.access(mysql_config, os.X_OK)):
+            if os.path.isfile(mysql_config) and \
+                    os.access(mysql_config, os.X_OK):
+                connc_loc = mysql_config
+            else:
+                # Probably using MS Windows
                 myconfigh = os.path.join(connc_loc, 'include', 'my_config.h')
 
                 if not os.path.exists(myconfigh):
@@ -242,10 +257,11 @@ class BuildMySQLExt(build_ext):
                 else:
                     with open(myconfigh, 'rb') as fp:
                         for line in fp.readlines():
-                            if '#define VERSION' in line:
+                            if b'#define VERSION' in line:
                                 version = tuple([
                                     int(v) for v in
-                                    line.split()[2].replace('"', '').split('.')
+                                    line.split()[2].replace(
+                                        b'"', b'').split(b'.')
                                 ])
                                 if version < min_version:
                                     log.error(err_version);
@@ -280,11 +296,10 @@ class BuildMySQLExt(build_ext):
                 else:
                     self.arch = 'i386'
 
-        # We were given the mysql_config, or we discovered it
-        if not mysql_config:
+        # We were given the location of the mysql_config tool (not on Windows)
+        if not os.name == 'nt' and os.path.isfile(connc_loc) \
+                and os.access(connc_loc, os.X_OK):
             mysql_config = connc_loc
-
-        if os.path.isfile(mysql_config) and os.access(mysql_config, os.X_OK):
             # Check mysql_config
             myc_info = get_mysql_config_info(mysql_config)
 
@@ -299,8 +314,8 @@ class BuildMySQLExt(build_ext):
             self.arch = self._mysql_config_info['arch']
             connc_64bit = self.arch == 'x86_64'
 
-        else:
-            log.error("MySQL tool mysql_config not available")
+        if not os.path.exists(include_dir):
+            log.error(err_invalid_loc, connc_loc)
             sys.exit(1)
 
         # Set up the build_ext class
@@ -390,6 +405,60 @@ class BuildMySQLExt(build_ext):
             self.real_build_extensions()
 
 
+class BuildExtStatic(BuildExtDynamic):
+
+    """Build and Link libraries statically with the C Extensions"""
+
+    user_options = build_ext.user_options + CEXT_OPTIONS
+
+    def finalize_options(self):
+        self.set_undefined_options('install',
+                                   ('with_mysql_capi', 'with_mysql_capi'))
+
+        build_ext.finalize_options(self)
+        self.connc_lib = os.path.join(self.build_temp, 'connc', 'lib')
+        self.connc_include = os.path.join(self.build_temp, 'connc', 'include')
+
+        if self.with_mysql_capi:
+            self._finalize_connector_c(self.with_mysql_capi)
+
+    def _finalize_connector_c(self, connc_loc):
+        if not os.path.isdir(connc_loc):
+            log.error("MySQL C API should be a directory")
+            sys.exit(1)
+
+        copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
+        copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
+
+        # Remove all but static libraries to force static linking
+        for lib_file in os.listdir(self.connc_lib):
+            if os.name == 'posix' and not lib_file.endswith('.a'):
+                os.unlink(os.path.join(self.connc_lib, lib_file))
+
+    def fix_compiler(self):
+        BuildExtDynamic.fix_compiler(self)
+
+        include_dirs = []
+        library_dirs = []
+        libraries = []
+
+        if os.name == 'posix':
+            include_dirs.append(self.connc_include)
+            library_dirs.append(self.connc_lib)
+            libraries.append("mysqlclient")
+
+            # As we statically link and the "libmysqlclient.a" library
+            # carry no information what it depends on, we need to
+            # manually add library dependencies here.
+            if platform.system() not in ["Darwin", "Windows"]:
+                libraries.append("rt")
+
+        for ext in self.extensions:
+            ext.include_dirs.extend(include_dirs)
+            ext.library_dirs.extend(library_dirs)
+            ext.libraries.extend(libraries)
+
+
 class InstallLib(install_lib):
 
     user_options = install_lib.user_options + CEXT_OPTIONS + INSTALL_OPTIONS
@@ -404,6 +473,7 @@ class InstallLib(install_lib):
         install_lib.finalize_options(self)
         self.set_undefined_options('install',
                                    ('byte_code_only', 'byte_code_only'))
+        self.set_undefined_options('build', ('build_base', 'build_dir'))
 
     def run(self):
         self.build()
@@ -427,18 +497,23 @@ class Install(install):
 
     description = "install MySQL Connector/Python"
 
-    user_options = install.user_options + CEXT_OPTIONS + INSTALL_OPTIONS
+    user_options = install.user_options + CEXT_OPTIONS + INSTALL_OPTIONS + \
+                   CEXT_STATIC_OPTIONS
 
-    boolean_options = ['byte-code-only']
+    boolean_options = ['byte-code-only', 'static']
     need_ext = False
 
     def initialize_options(self):
         install.initialize_options(self)
         self.with_mysql_capi = None
         self.byte_code_only = None
+        self.static = None
 
     def finalize_options(self):
         install.finalize_options(self)
+
+        if self.static:
+            self.distribution.cmdclass['build_ext'] = BuildExtStatic
 
         if self.byte_code_only is None:
             self.byte_code_only = False
@@ -455,6 +530,7 @@ class Install(install):
             remove_cext(self.distribution)
             # We install pure Python code in purelib location when no
             # extension is build
-            if not self.install_lib:
-                self.install_lib = self.install_purelib
+            self.install_lib = self.install_purelib
+        else:
+            log.info("installing C Extension")
         install.run(self)
