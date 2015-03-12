@@ -3154,3 +3154,49 @@ class BugOra20407036(tests.MySQLConnectorTests):
 
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual(exp, self.cur.fetchall())
+
+
+class BugOra20301989(tests.MySQLConnectorTests):
+    """BUG#20301989: SET DATA TYPE NOT TRANSLATED CORRECTLY WHEN EMPTY
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug20301989'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 SET('val1', 'val2')) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    def test_set(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        cur.execute(sql, ('val1,val2',))
+        cur.execute(sql, ('val1',))
+        cur.execute(sql, ('',))
+        cur.execute(sql, (None,))
+
+        exp = [
+            (set([u'val1', u'val2']),),
+            (set([u'val1']),),
+            (set([]),),
+            (None,)
+        ]
+
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, cur.fetchall())
