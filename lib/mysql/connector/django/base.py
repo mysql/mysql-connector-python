@@ -121,6 +121,12 @@ class DjangoMySQLConverter(MySQLConverter):
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
 
+    def _safetext_to_mysql(self, value):
+        return self._str_to_mysql(value)
+
+    def _safebytes_to_mysql(self, value):
+        return self._bytes_to_mysql(value)
+
 
 class DjangoCMySQLConverter(MySQLConverterBase):
     """Custom converter for Django for CMySQLConnection"""
