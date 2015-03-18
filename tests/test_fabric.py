@@ -121,7 +121,10 @@ class ConnectionModuleTests(tests.MySQLConnectorTests):
         self.assertEqual(error_codes, connection.RESET_CACHE_ON_ERROR)
 
         modvars = {
-            'MYSQL_FABRIC_PORT': 32274,
+            'MYSQL_FABRIC_PORT': {
+                'xmlrpc': 32274, 'mysql': 32275
+            },
+            'DEFAULT_FABRIC_PROTOCOL': 'xmlrpc',
             'FABRICS': {},
             '_CNX_ATTEMPT_DELAY': 1,
             '_CNX_ATTEMPT_MAX': 3,
@@ -604,7 +607,6 @@ class FabricShardingTests(tests.MySQLConnectorTests):
         self.assertTrue(isinstance(cnx._mysql_cnx, PooledMySQLConnection))
 
         data = self.emp_data[1985]
-
         for emp in data:
             cnx.set_property(tables=tables,
                              key=emp[0],
