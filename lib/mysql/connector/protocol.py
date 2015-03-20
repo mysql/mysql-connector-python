@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -313,11 +313,8 @@ class MySQLProtocol(object):
                 while packet.startswith(b'\xff\xff\xff'):
                     datas.append(packet[4:])
                     packet = sock.recv()
-                if packet[4] == 254:
-                    eof = self.parse_eof(packet)
-                else:
-                    datas.append(packet[4:])
-                rowdata = utils.read_lc_string_list(b''.join(datas))
+                datas.append(packet[4:])
+                rowdata = utils.read_lc_string_list(bytearray(b'').join(datas))
             elif packet[4] == 254:
                 eof = self.parse_eof(packet)
                 rowdata = None

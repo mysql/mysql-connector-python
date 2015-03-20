@@ -3056,7 +3056,6 @@ class BugOra19803702(tests.MySQLConnectorTests):
         self.cnx.close()
 
 
-
 class BugOra19777815(tests.MySQLConnectorTests):
     """BUG#19777815:  CALLPROC() DOES NOT SUPPORT WARNINGS
     """
@@ -3200,3 +3199,53 @@ class BugOra20301989(tests.MySQLConnectorTests):
 
         cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual(exp, cur.fetchall())
+
+
+class BugOra20462427(tests.MySQLConnectorTests):
+    """BUG#20462427: BYTEARRAY INDEX OUT OF RANGE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config['autocommit'] = True
+        config['connection_timeout'] = 100
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'BugOra20462427'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} ("
+                  "id INT PRIMARY KEY, "
+                  "a LONGTEXT "
+                  ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
+
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_bigdata(self):
+        temp = 'a'*16777210
+        insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, temp)
+
+        self.cur.execute(insert)
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777210, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777211, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777212, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777213, len(res[0][0]))
