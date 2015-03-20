@@ -150,7 +150,11 @@ def get_mysql_config_info(mysql_config):
     for option, line in zip(options, stdout.split('\n')):
         info[option] = line.strip()
 
-    info['version'] = tuple([int(v) for v in info['version'].split('.')[0:3]])
+    ver = info['version']
+    if '-' in ver:
+        ver, _ = ver.split('-', 2)
+
+    info['version'] = tuple([int(v) for v in ver.split('.')[0:3]])
     libs = shlex.split(info['libs'])
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
