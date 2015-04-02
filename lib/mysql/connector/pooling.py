@@ -40,7 +40,6 @@ from .connection import MySQLConnection
 
 CONNECTION_POOL_LOCK = threading.RLock()
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
-CNX_POOL_MAXSIZE = 32
 CNX_POOL_MAXNAMESIZE = 64
 CNX_POOL_NAMEREGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')
 
@@ -202,13 +201,7 @@ class MySQLConnectionPool(object):
 
         This method sets the size of the pool but it will not resize the pool.
 
-        Raises an AttributeError when the pool_size is not valid. Invalid size
-        is 0, negative or higher than pooling.CNX_POOL_MAXSIZE.
         """
-        if pool_size <= 0 or pool_size > CNX_POOL_MAXSIZE:
-            raise AttributeError(
-                "Pool size should be higher than 0 and "
-                "lower or equal to {0}".format(CNX_POOL_MAXSIZE))
         self._pool_size = pool_size
 
     def _set_pool_name(self, pool_name):
