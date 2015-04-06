@@ -3434,3 +3434,73 @@ class BugOra20462427(tests.MySQLConnectorTests):
         self.cur.execute("SELECT a FROM {0}".format(self.tbl))
         res = self.cur.fetchall()
         self.assertEqual(16777213, len(res[0][0]))
+
+
+class BugOra20811802(tests.MySQLConnectorTests):
+    """BUG#20811802:  ISSUES WHILE USING BUFFERED=TRUE OPTION WITH CPY CEXT
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug20811802'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (id INT, name VARCHAR(5), dept VARCHAR(5)) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s, %s, %s)".format(self.tbl)
+
+        data = [
+            (1, 'abc', 'cs'),
+            (2, 'def', 'is'),
+            (3, 'ghi', 'cs'),
+            (4, 'jkl', 'it'),
+        ]
+        cur.executemany(sql, data)
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True, buffered=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual((row.id, row.name, row.dept), data[i])
+            i += 1
+        cur.close()
+
+        cur = self.cnx.cursor(dictionary=True, buffered=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual(row, dict(zip(('id', 'name', 'dept'), data[i])))
+            i += 1
+
+        cur = self.cnx.cursor(named_tuple=True, buffered=False)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual((row.id, row.name, row.dept), data[i])
+            i += 1
+        cur.close()
+
+        cur = self.cnx.cursor(dictionary=True, buffered=False)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual(row, dict(zip(('id', 'name', 'dept'), data[i])))
+            i += 1

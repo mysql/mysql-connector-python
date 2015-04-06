@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -727,7 +727,10 @@ class CMySQLCursorBufferedDict(CMySQLCursorBuffered):
 
     def _fetch_row(self):
         row = super(CMySQLCursorBufferedDict, self)._fetch_row()
-        return dict(zip(self.column_names, row))
+        if row:
+            return dict(zip(self.column_names, row))
+        else:
+            return None
 
     def fetchall(self):
         res = super(CMySQLCursorBufferedDict, self).fetchall()
@@ -777,7 +780,10 @@ class CMySQLCursorBufferedNamedTuple(CMySQLCursorBuffered):
 
     def _fetch_row(self):
         row = super(CMySQLCursorBufferedNamedTuple, self)._fetch_row()
-        return self.named_tuple(*row)
+        if row:
+            return self.named_tuple(*row)
+        else:
+            return None
 
     def fetchall(self):
         res = super(CMySQLCursorBufferedNamedTuple, self).fetchall()
