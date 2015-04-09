@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -514,8 +514,6 @@ class Install(install):
         self.static = None
 
     def finalize_options(self):
-        install.finalize_options(self)
-
         if self.static:
             self.distribution.cmdclass['build_ext'] = BuildExtStatic
 
@@ -529,13 +527,14 @@ class Install(install):
             build.with_mysql_capi = self.with_mysql_capi
             self.need_ext = True
 
-    def run(self):
         if not self.need_ext:
             remove_cext(self.distribution)
-            # We install pure Python code in purelib location when no
-            # extension is build
-            if not self.install_lib or self.install_purelib:
-                self.install_lib = self.install_purelib
+
+        install.finalize_options(self)
+
+    def run(self):
+        if not self.need_ext:
+            log.info("Not Installing C Extension")
         else:
-            log.info("installing C Extension")
+            log.info("Installing C Extension")
         install.run(self)
