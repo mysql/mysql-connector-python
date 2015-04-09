@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -1215,7 +1215,7 @@ class MySQLCursorNamedTuple(MySQLCursor):
         if hasattr(self._connection, 'converter'):
             row = self._connection.converter.row_to_python(rowdata, desc)
         else:
-            rowdata = row
+            row = rowdata
 
         if row:
             # pylint: disable=W0201
@@ -1243,16 +1243,15 @@ class MySQLCursorNamedTuple(MySQLCursor):
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
 
-        if hasattr(self._connection, 'converter'):
-            row_to_python = self._connection.converter.row_to_python
-            rows = [row_to_python(row, self.description) for row in rows]
+        res = [self._row_to_python(row, self.description)
+               for row in rows]
 
         self._handle_eof(eof)
         rowcount = len(rows)
         if rowcount >= 0 and self._rowcount == -1:
             self._rowcount = 0
         self._rowcount += rowcount
-        return rows
+        return res
 
 
 class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
