@@ -25,6 +25,8 @@ v2.1.2b1
 - BUG20022533: Fix failing Django inspectdb command with C/Python
 - BUG19703022: Fix using passwords with integers only in option files
 - BUG19803702: Fix reporting errors with non-ascii characters
+- BUG20834643: Attribute Error while promoting servers using MySQL Fabric
+- BUG20811802: Fix buffered named tuple cursor with CExtension
 
 v2.1.1a1
 ========
