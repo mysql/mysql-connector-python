@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -558,7 +558,10 @@ class MySQLServer(MySQLServerBase):
             fp.write(self._cnf.format(**options))
             fp.close()
             self._start_server()
-            time.sleep(5)
+            for i in range(10):
+                if self.check_running():
+                    break
+                time.sleep(5)
         except MySQLServerError as err:
             if self._debug is True:
                 raise
