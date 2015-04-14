@@ -416,8 +416,9 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
-        self.set_undefined_options('install',
-                                   ('with_mysql_capi', 'with_mysql_capi'))
+        if not self.with_mysql_capi:
+            self.set_undefined_options('install',
+                                       ('with_mysql_capi', 'with_mysql_capi'))
 
         build_ext.finalize_options(self)
         self.connc_lib = os.path.join(self.build_temp, 'connc', 'lib')
