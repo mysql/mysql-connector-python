@@ -8,6 +8,15 @@ Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v2.0.4
+======
+
+- BUG20324089: Fix HASH based sharding with MySQL Fabric
+- BUG20462427: Fix receiving large field data from server
+- BUG20301989: Fix conversion of empty set
+- BUG20407036: Fix incorrect arguments to mysld_stmt_execute error
+- BUG20106629: Support Django Safetext and SafeBytes type
+
 v2.0.3
 ======
 

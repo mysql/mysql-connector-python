@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -3056,7 +3056,6 @@ class BugOra19803702(tests.MySQLConnectorTests):
         self.cnx.close()
 
 
-
 class BugOra19777815(tests.MySQLConnectorTests):
     """BUG#19777815:  CALLPROC() DOES NOT SUPPORT WARNINGS
     """
@@ -3110,3 +3109,143 @@ class BugOra19777815(tests.MySQLConnectorTests):
         exp = [(u'Warning', 1642, u'TEST WARNING')]
         self.assertEqual(exp, cur.fetchwarnings())
         cur.close()
+
+
+class BugOra20407036(tests.MySQLConnectorTests):
+    """BUG#20407036:  INCORRECT ARGUMENTS TO MYSQLD_STMT_EXECUTE ERROR
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug20407036'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} ( id int(10) unsigned NOT NULL, "
+                  "text VARCHAR(70000) CHARACTER SET utf8 NOT NULL, "
+                  "rooms tinyint(3) unsigned NOT NULL) "
+                  "ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 "
+                  "COLLATE=utf8_unicode_ci".format(self.tbl))
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_binary_charset(self):
+        cur = self.cnx.cursor(prepared=True)
+        sql = "INSERT INTO {0}(text, rooms) VALUES(%s, %s)".format(self.tbl)
+        cur.execute(sql, ('a'*252, 1))
+        cur.execute(sql, ('a'*253, 2))
+        cur.execute(sql, ('a'*255, 3))
+        cur.execute(sql, ('a'*251, 4))
+        cur.execute(sql, ('a'*65535, 5))
+
+        exp = [
+            (0, 'a'*252, 1),
+            (0, 'a'*253, 2),
+            (0, 'a'*255, 3),
+            (0, 'a'*251, 4),
+            (0, 'a'*65535, 5),
+        ]
+
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, self.cur.fetchall())
+
+
+class BugOra20301989(tests.MySQLConnectorTests):
+    """BUG#20301989: SET DATA TYPE NOT TRANSLATED CORRECTLY WHEN EMPTY
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug20301989'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 SET('val1', 'val2')) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    def test_set(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        cur.execute(sql, ('val1,val2',))
+        cur.execute(sql, ('val1',))
+        cur.execute(sql, ('',))
+        cur.execute(sql, (None,))
+
+        exp = [
+            (set([u'val1', u'val2']),),
+            (set([u'val1']),),
+            (set([]),),
+            (None,)
+        ]
+
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, cur.fetchall())
+
+
+class BugOra20462427(tests.MySQLConnectorTests):
+    """BUG#20462427: BYTEARRAY INDEX OUT OF RANGE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config['autocommit'] = True
+        config['connection_timeout'] = 100
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'BugOra20462427'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} ("
+                  "id INT PRIMARY KEY, "
+                  "a LONGTEXT "
+                  ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
+
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_bigdata(self):
+        temp = 'a'*16777210
+        insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, temp)
+
+        self.cur.execute(insert)
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777210, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777211, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777212, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777213, len(res[0][0]))

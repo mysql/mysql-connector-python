@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -626,3 +626,39 @@ class FabricShardingTests(tests.MySQLConnectorTests):
             )
 
         mysql.connector._CONNECTION_POOLS = {}
+
+    def test_range_hash(self):
+        self.assertTrue(self._check_table(
+            "employees.employees_hash", 'HASH'))
+        tbl_name = "employees_hash"
+
+        tables = ["employees.{0}".format(tbl_name)]
+
+        self.cnx.set_property(tables=tables,
+                              scope=fabric.SCOPE_GLOBAL,
+                              mode=fabric.MODE_READWRITE)
+
+        cur = self.cnx.cursor()
+        gtid_executed = self._truncate(cur, tbl_name)
+        self.cnx.commit()
+
+        insert = ("INSERT INTO {0} "
+                  "VALUES (%s, %s, %s, %s, %s, %s)").format(tbl_name)
+
+        self._populate(self.cnx, gtid_executed, tbl_name, insert,
+                       self.emp_data[1985] + self.emp_data[2000], 3)
+
+        time.sleep(2)
+
+        emp_exp_hash = self.emp_data[1985] + self.emp_data[2000]
+
+        rows = []
+        self.cnx.reset_properties()
+        str_keys = ['group1', 'group2']
+        for str_key in str_keys:
+            self.cnx.set_property(group=str_key, mode=fabric.MODE_READONLY)
+            cur = self.cnx.cursor()
+            cur.execute("SELECT * FROM {0}".format(tbl_name))
+            rows += cur.fetchall()
+
+        self.assertEqual(rows, emp_exp_hash)

@@ -120,6 +120,7 @@ general_log = ON
 language = {lc_messages_dir}/english
 
 [mysqld]
+max_allowed_packet=26777216
 basedir = {basedir}
 datadir = {datadir}
 tmpdir = {tmpdir}
@@ -135,6 +136,8 @@ log-error = mysqld_{name}.err
 log-bin = mysqld_{name}_bin
 local_infile = 1
 innodb_flush_log_at_trx_commit = 2
+innodb_log_file_size = 1Gb
+general_log_file = general_{name}.log
 ssl
 """
 
