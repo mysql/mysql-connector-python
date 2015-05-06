@@ -447,37 +447,44 @@ class MySQLServer(MySQLServerBase):
         extra_sql = [
             "CREATE DATABASE myconnpy;"
         ]
+        insert = (
+            "INSERT INTO mysql.user VALUES ('localhost','root'{0},"
+            "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+            "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+            "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
+            "@@default_authentication_plugin,'','N',"
+            "CURRENT_TIMESTAMP,NULL{1});"
+        )
+        # MySQL 5.7.5+ creates no user while bootstrapping
+        if self._version[0:3] >= (5, 7, 6):
+            # MySQL 5.7.6+ have extra account_locked col and no password col
+            extra_sql.append(insert.format("", ",'N'"))
+        elif self._version[0:3] >= (5, 7, 5):
+            extra_sql.append(insert.format(",''", ""))
 
-        if self._version[0:3] >= (5, 7, 5):
-            # MySQL 5.7.5 creates no user while bootstrapping
-            extra_sql.append(
-                "INSERT INTO mysql.user VALUES ('localhost','root','',"
-                "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-                "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-                "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
-                "@@default_authentication_plugin,'','N',"
-                "CURRENT_TIMESTAMP,NULL);"
-            )
-        if self._version[0:3] >= (5, 7, 4):
-            # MySQL 5.7.4 only creates root@localhost
-            extra_sql.append(
-                "INSERT INTO mysql.user SELECT '127.0.0.1', `User`, `Password`,"
-                " `Select_priv`, `Insert_priv`, `Update_priv`, `Delete_priv`,"
-                " `Create_priv`, `Drop_priv`, `Reload_priv`, `Shutdown_priv`,"
-                " `Process_priv`, `File_priv`, `Grant_priv`, `References_priv`,"
-                " `Index_priv`, `Alter_priv`, `Show_db_priv`, `Super_priv`,"
-                " `Create_tmp_table_priv`, `Lock_tables_priv`, `Execute_priv`,"
-                " `Repl_slave_priv`, `Repl_client_priv`, `Create_view_priv`,"
-                " `Show_view_priv`, `Create_routine_priv`, "
-                "`Alter_routine_priv`,"
-                " `Create_user_priv`, `Event_priv`, `Trigger_priv`, "
-                "`Create_tablespace_priv`, `ssl_type`, `ssl_cipher`,"
-                "`x509_issuer`, `x509_subject`, `max_questions`, `max_updates`,"
-                "`max_connections`, `max_user_connections`, `plugin`,"
-                "`authentication_string`, `password_expired`,"
-                "`password_last_changed`, `password_lifetime` FROM mysql.user "
-                "WHERE `user` = 'root' and `host` = 'localhost';"
-            )
+        insert_localhost = (
+            "INSERT INTO mysql.user SELECT '127.0.0.1', `User`{0},"
+            " `Select_priv`, `Insert_priv`, `Update_priv`, `Delete_priv`,"
+            " `Create_priv`, `Drop_priv`, `Reload_priv`, `Shutdown_priv`,"
+            " `Process_priv`, `File_priv`, `Grant_priv`, `References_priv`,"
+            " `Index_priv`, `Alter_priv`, `Show_db_priv`, `Super_priv`,"
+            " `Create_tmp_table_priv`, `Lock_tables_priv`, `Execute_priv`,"
+            " `Repl_slave_priv`, `Repl_client_priv`, `Create_view_priv`,"
+            " `Show_view_priv`, `Create_routine_priv`, "
+            "`Alter_routine_priv`,"
+            " `Create_user_priv`, `Event_priv`, `Trigger_priv`, "
+            "`Create_tablespace_priv`, `ssl_type`, `ssl_cipher`,"
+            "`x509_issuer`, `x509_subject`, `max_questions`, `max_updates`,"
+            "`max_connections`, `max_user_connections`, `plugin`,"
+            "`authentication_string`, `password_expired`,"
+            "`password_last_changed`, `password_lifetime`{1} FROM mysql.user "
+            "WHERE `user` = 'root' and `host` = 'localhost';"
+        )
+        # MySQL 5.7.4+ only creates root@localhost
+        if self._version[0:3] >= (5, 7, 6):
+            extra_sql.append(insert_localhost.format("", ",`account_locked`"))
+        elif self._version[0:3] >= (5, 7, 4):
+            extra_sql.append(insert_localhost.format(",`Password`", ""))
 
         bootstrap_log = os.path.join(self._topdir, 'bootstrap.log')
         try:
