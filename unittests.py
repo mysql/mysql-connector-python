@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -120,6 +120,7 @@ general_log = ON
 language = {lc_messages_dir}/english
 
 [mysqld]
+max_allowed_packet=26777216
 basedir = {basedir}
 datadir = {datadir}
 tmpdir = {tmpdir}
@@ -135,6 +136,7 @@ log-error = mysqld_{name}.err
 log-bin = mysqld_{name}_bin
 local_infile = 1
 innodb_flush_log_at_trx_commit = 2
+innodb_log_file_size = 1Gb
 general_log_file = general_{name}.log
 ssl
 """
@@ -321,6 +323,12 @@ _UNITTESTS_CMD_ARGS = {
         'dest': 'fabric_config', 'metavar': 'NAME',
         'default': None,
         'help': ("Fabric configuration as URI fabric://user:pass@server:port")
+    },
+
+    ('', '--with-fabric-protocol'): {
+        'dest': 'fabric_protocol', 'metavar': 'NAME',
+        'default': 'xmlrpc',
+        'help': ("Protocol to talk to MySQL Fabric")
     },
 }
 
@@ -724,13 +732,23 @@ def main():
     if options.fabric_config:
         # URL example: fabric://user:pass@mysqlfabric.example.com:32274
         fab = urlsplit(options.fabric_config)
+        tests.FABRIC_CONFIG = {}
+        default_ports = {
+            'xmlrpc': 32274,
+            'mysql': 32275
+        }
+        if options.fabric_protocol:
+            tests.FABRIC_CONFIG['protocol'] = options.fabric_protocol
+        else:
+            tests.FABRIC_CONFIG['protocol'] = 'xmlrpc'
+        LOGGER.info("Fabric will be tested using the '{}' protocol".format(
+            tests.FABRIC_CONFIG['protocol'].upper()))
         tests.FABRIC_CONFIG = {
             'host': fab.hostname,
-            'port': fab.port or 32274,
+            'port': fab.port or default_ports[tests.FABRIC_CONFIG['protocol']],
             'user': fab.username,
             'password': fab.password,
         }
-
     # We have to at least run 1 MySQL server
     init_mysql_server(port=(options.port), options=options)
 

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -221,11 +221,13 @@ class BaseMySQLSocket(object):
         try:
             # Read the header of the MySQL packet, 4 bytes
             packet = bytearray(b'')
-            while len(packet) < 4:
-                chunk = self.sock.recv(4)
+            packet_len = 0
+            while packet_len < 4:
+                chunk = self.sock.recv(4 - packet_len)
                 if not chunk:
                     raise errors.InterfaceError(errno=2013)
                 packet += chunk
+                packet_len = len(packet)
 
             # Save the packet number and payload length
             self._packet_number = packet[3]
@@ -257,12 +259,13 @@ class BaseMySQLSocket(object):
         try:
             # Read the header of the MySQL packet, 4 bytes
             header = bytearray(b'')
-
-            while len(header) < 4:
-                chunk = self.sock.recv(4)
+            header_len = 0
+            while header_len < 4:
+                chunk = self.sock.recv(4 - header_len)
                 if not chunk:
                     raise errors.InterfaceError(errno=2013)
                 header += chunk
+                header_len = len(header)
 
             # Save the packet number and payload length
             self._packet_number = header[3]

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -67,7 +67,11 @@ class MySQLConverterBase(object):
 
     def to_mysql(self, value):
         """Convert Python data type to MySQL"""
-        return value
+        type_name = value.__class__.__name__.lower()
+        try:
+            return getattr(self, "_{0}_to_mysql".format(type_name))(value)
+        except AttributeError:
+            return value
 
     def to_python(self, vtype, value):
         """Convert MySQL data type to Python"""
@@ -535,6 +539,8 @@ class MySQLConverter(MySQLConverterBase):
         """
         set_type = None
         val = value.decode(self.charset)
+        if not val:
+            return set()
         try:
             set_type = set(val.split(','))
         except ValueError:

@@ -95,6 +95,7 @@ import django.db  # pylint: disable=W0611
 if tests.DJANGO_VERSION >= (1, 6):
     from django.db.backends import FieldInfo
 from django.db.backends.signals import connection_created
+from django.utils.safestring import SafeBytes, SafeText
 
 import mysql.connector
 
@@ -213,7 +214,7 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
 
     def test__init__(self):
         exp = self.conn.get_server_version()
-        self.assertEqual(exp, self.cnx.server_version)
+        self.assertEqual(exp, self.cnx.mysql_version)
 
         value = datetime.time(2, 5, 7)
         exp = self.conn.converter._time_to_mysql(value)
@@ -224,12 +225,16 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         exp = self.conn.converter._time_to_mysql(value)
         self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
 
+
+
     def test_signal(self):
         from django.db import connection
 
         def conn_setup(*args, **kwargs):
             conn = kwargs['connection']
+            settings.DEBUG = True
             cur = conn.cursor()
+            settings.DEBUG = False
             cur.execute("SET @xyz=10")
             cur.close()
 
@@ -240,6 +245,22 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         self.assertEqual((10,), cursor.fetchone())
         cursor.close()
         self.cnx.close()
+
+    def count_conn(self, *args, **kwargs):
+        try:
+            self.connections += 1
+        except AttributeError:
+            self.connection = 1
+
+    def test_connections(self):
+        connection_created.connect(self.count_conn)
+        self.connections = 0
+
+        # Checking if DatabaseWrapper object creates a connection by default
+        conn = DatabaseWrapper(settings.DATABASES['default'])
+        dbo = DatabaseOperations(conn)
+        dbo.value_to_db_time(datetime.time(3, 3, 3))
+        self.assertEqual(self.connections, 0)
 
 
 class DjangoDatabaseOperations(tests.MySQLConnectorTests):
@@ -295,3 +316,25 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
         self.assertEqual(None,
                          django_converter._DATETIME_to_python(value, dsc=None))
         settings.USE_TZ = False
+
+
+class BugOra20106629(tests.MySQLConnectorTests):
+    """CONNECTOR/PYTHON DJANGO BACKEND DOESN'T SUPPORT SAFETEXT"""
+    def setUp(self):
+        dbconfig = tests.get_mysql_config()
+        self.conn = mysql.connector.connect(**dbconfig)
+        self.cnx = DatabaseWrapper(settings.DATABASES['default'])
+        self.cur = self.cnx.cursor()
+        self.tbl = "BugOra20106629"
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
+        self.cur.execute("CREATE TABLE {0}(col1 TEXT, col2 BLOB)".format(self.tbl), ())
+
+    def teardown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
+
+    def test_safe_string(self):
+        safe_text = SafeText("dummy & safe data <html> ")
+        safe_bytes = SafeBytes(b"\x00\x00\x4c\x6e\x67\x39")
+        self.cur.execute("INSERT INTO {0} VALUES(%s, %s)".format(self.tbl), (safe_text, safe_bytes))
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl), ())
+        self.assertEqual(self.cur.fetchall(), [(safe_text, safe_bytes)])

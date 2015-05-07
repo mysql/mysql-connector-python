@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -338,11 +338,8 @@ class MySQLCursor(CursorBase):
         """
         if self._connection is None:
             return False
-        if self._connection.can_consume_results:
-            self._connection.consume_results()
-        elif self._have_unread_result():
-            raise errors.InternalError("Unread result found.")
 
+        self._connection.handle_unread_result()
         self._reset_result()
         self._connection = None
 
@@ -480,8 +477,8 @@ class MySQLCursor(CursorBase):
 
         if not self._connection:
             raise errors.ProgrammingError("Cursor is not connected")
-        if self._connection.unread_result is True:
-            raise errors.InternalError("Unread result found")
+
+        self._connection.handle_unread_result()
 
         self._reset_result()
         stmt = ''
@@ -599,8 +596,8 @@ class MySQLCursor(CursorBase):
         """
         if not operation or not seq_params:
             return None
-        if self._connection.unread_result is True:
-            raise errors.InternalError("Unread result found.")
+        self._connection.handle_unread_result()
+
         if not isinstance(seq_params, (list, tuple)):
             raise errors.ProgrammingError(
                 "Parameters for query must be list or tuple.")
@@ -704,12 +701,14 @@ class MySQLCursor(CursorBase):
             call = "CALL {0}({1})".format(procname, ','.join(argnames))
 
             for result in self._connection.cmd_query_iter(call):
+                # pylint: disable=W0212
+                tmp = MySQLCursorBuffered(self._connection._get_self())
+                tmp._handle_result(result)
+                if tmp._warnings is not None:
+                    self._warnings = tmp._warnings
+                # pylint: enable=W0212
                 if 'columns' in result:
-                    # pylint: disable=W0212
-                    tmp = MySQLCursorBuffered(self._connection._get_self())
-                    tmp._handle_result(result)
                     results.append(tmp)
-                    # pylint: enable=W0212
 
             if argnames:
                 select = "SELECT {0}".format(','.join(argtypes))
@@ -1216,7 +1215,7 @@ class MySQLCursorNamedTuple(MySQLCursor):
         if hasattr(self._connection, 'converter'):
             row = self._connection.converter.row_to_python(rowdata, desc)
         else:
-            rowdata = row
+            row = rowdata
 
         if row:
             # pylint: disable=W0201
@@ -1244,16 +1243,15 @@ class MySQLCursorNamedTuple(MySQLCursor):
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
 
-        if hasattr(self._connection, 'converter'):
-            row_to_python = self._connection.converter.row_to_python
-            rows = [row_to_python(row, self.description) for row in rows]
+        res = [self._row_to_python(row, self.description)
+               for row in rows]
 
         self._handle_eof(eof)
         rowcount = len(rows)
         if rowcount >= 0 and self._rowcount == -1:
             self._rowcount = 0
         self._rowcount += rowcount
-        return rows
+        return res
 
 
 class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):

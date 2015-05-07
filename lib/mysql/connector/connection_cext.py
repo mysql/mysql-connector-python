@@ -355,8 +355,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def cmd_query(self, query, raw=False, buffered=False, raw_as_string=False):
         """Send a query to the MySQL server"""
-        if self.unread_result:
-            raise errors.InternalError("Unread result found")
+        self.handle_unread_result()
 
         try:
             if not isinstance(query, bytes):
@@ -413,8 +412,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         :return: Subclass of CMySQLCursor
         :rtype: CMySQLCursor or subclass
         """
-        if self.unread_result is True:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
         if not self.is_connected():
             raise errors.OperationalError("MySQL Connection not available.")
         if cursor_class is not None:
@@ -566,8 +564,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def cmd_statistics(self):
         """Return statistics from the MySQL server"""
-        if self.unread_result:
-            raise errors.InternalError("Unread result found")
+        self.handle_unread_result()
 
         try:
             stat = self._cmysql.stat()
@@ -582,3 +579,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise ValueError("MySQL PID must be int")
         self.info_query("KILL {0}".format(mysql_pid))
 
+    def handle_unread_result(self):
+        """Check whether there is an unread result"""
+        if self.can_consume_results:
+            self.consume_results()
+        elif self.unread_result:
+            raise errors.InternalError("Unread result found")

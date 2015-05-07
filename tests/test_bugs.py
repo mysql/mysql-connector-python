@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -3215,3 +3215,366 @@ class BugOra19549363(tests.MySQLConnectorTests):
             cnx1.close()
         except:
             self.fail("Reset session with compression test failed.")
+
+
+class BugOra19803702(tests.MySQLConnectorTests):
+    """BUG#19803702: CAN'T REPORT ERRORS THAT HAVE NON-ASCII CHARACTERS
+    """
+    def test_errors(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'áááëëëááá'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 VARCHAR(10), col2 INT) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+
+        self.cur.execute(create)
+        self.assertRaises(errors.DatabaseError, self.cur.execute, create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+
+class BugOra19777815(tests.MySQLConnectorTests):
+    """BUG#19777815:  CALLPROC() DOES NOT SUPPORT WARNINGS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config['get_warnings'] = True
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        self.sp1 = 'BUG19777815'
+        self.sp2 = 'BUG19777815_with_result'
+        create1 = (
+            "CREATE PROCEDURE {0}() BEGIN SIGNAL SQLSTATE '01000' "
+            "SET MESSAGE_TEXT = 'TEST WARNING'; END;".format(self.sp1)
+        )
+        create2 = (
+            "CREATE PROCEDURE {0}() BEGIN SELECT 1; SIGNAL SQLSTATE '01000' "
+            "SET MESSAGE_TEXT = 'TEST WARNING'; END;".format(self.sp2)
+        )
+
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp1))
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp2))
+        cur.execute(create1)
+        cur.execute(create2)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp1))
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.sp2))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx(get_warnings=True)
+    def test_warning(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.sp1)
+        exp = [(u'Warning', 1642, u'TEST WARNING')]
+        self.assertEqual(exp, cur.fetchwarnings())
+
+    @foreach_cnx(get_warnings=True)
+    def test_warning_with_rows(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.sp2)
+
+        exp = [(1,)]
+        if PY2:
+            self.assertEqual(exp, cur.stored_results().next().fetchall())
+        else:
+            self.assertEqual(exp, next(cur.stored_results()).fetchall())
+
+        exp = [(u'Warning', 1642, u'TEST WARNING')]
+        self.assertEqual(exp, cur.fetchwarnings())
+
+
+class BugOra20407036(tests.MySQLConnectorTests):
+    """BUG#20407036:  INCORRECT ARGUMENTS TO MYSQLD_STMT_EXECUTE ERROR
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'Bug20407036'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} ( id int(10) unsigned NOT NULL, "
+                  "text VARCHAR(70000) CHARACTER SET utf8 NOT NULL, "
+                  "rooms tinyint(3) unsigned NOT NULL) "
+                  "ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 "
+                  "COLLATE=utf8_unicode_ci".format(self.tbl))
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_binary_charset(self):
+        cur = self.cnx.cursor(prepared=True)
+        sql = "INSERT INTO {0}(text, rooms) VALUES(%s, %s)".format(self.tbl)
+        cur.execute(sql, ('a'*252, 1))
+        cur.execute(sql, ('a'*253, 2))
+        cur.execute(sql, ('a'*255, 3))
+        cur.execute(sql, ('a'*251, 4))
+        cur.execute(sql, ('a'*65535, 5))
+
+        exp = [
+            (0, 'a'*252, 1),
+            (0, 'a'*253, 2),
+            (0, 'a'*255, 3),
+            (0, 'a'*251, 4),
+            (0, 'a'*65535, 5),
+        ]
+
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, self.cur.fetchall())
+
+
+class BugOra20301989(tests.MySQLConnectorTests):
+    """BUG#20301989: SET DATA TYPE NOT TRANSLATED CORRECTLY WHEN EMPTY
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug20301989'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (col1 SET('val1', 'val2')) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        cur.execute(sql, ('val1,val2',))
+        cur.execute(sql, ('val1',))
+        cur.execute(sql, ('',))
+        cur.execute(sql, (None,))
+
+        exp = [
+            (set([u'val1', u'val2']),),
+            (set([u'val1']),),
+            (set([]),),
+            (None,)
+        ]
+
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.assertEqual(exp, cur.fetchall())
+
+
+class BugOra20462427(tests.MySQLConnectorTests):
+    """BUG#20462427: BYTEARRAY INDEX OUT OF RANGE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config['autocommit'] = True
+        config['connection_timeout'] = 100
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+        self.tbl = 'BugOra20462427'
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} ("
+                  "id INT PRIMARY KEY, "
+                  "a LONGTEXT "
+                  ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
+
+        self.cur.execute(create)
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test_bigdata(self):
+        temp = 'a'*16777210
+        insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, temp)
+
+        self.cur.execute(insert)
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777210, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777211, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777212, len(res[0][0]))
+
+        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = self.cur.fetchall()
+        self.assertEqual(16777213, len(res[0][0]))
+
+
+class BugOra20811802(tests.MySQLConnectorTests):
+    """BUG#20811802:  ISSUES WHILE USING BUFFERED=TRUE OPTION WITH CPY CEXT
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug20811802'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (id INT, name VARCHAR(5), dept VARCHAR(5)) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s, %s, %s)".format(self.tbl)
+
+        data = [
+            (1, 'abc', 'cs'),
+            (2, 'def', 'is'),
+            (3, 'ghi', 'cs'),
+            (4, 'jkl', 'it'),
+        ]
+        cur.executemany(sql, data)
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True, buffered=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual((row.id, row.name, row.dept), data[i])
+            i += 1
+        cur.close()
+
+        cur = self.cnx.cursor(dictionary=True, buffered=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual(row, dict(zip(('id', 'name', 'dept'), data[i])))
+            i += 1
+
+        cur = self.cnx.cursor(named_tuple=True, buffered=False)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual((row.id, row.name, row.dept), data[i])
+            i += 1
+        cur.close()
+
+        cur = self.cnx.cursor(dictionary=True, buffered=False)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        i = 0
+        for row in cur:
+            self.assertEqual(row, dict(zip(('id', 'name', 'dept'), data[i])))
+            i += 1
+
+
+class BugOra20834643(tests.MySQLConnectorTests):
+    """BUG#20834643: ATTRIBUTE ERROR NOTICED WHILE TRYING TO PROMOTE SERVERS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug20834643'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (id INT, name VARCHAR(5), dept VARCHAR(5)) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s, %s, %s)".format(self.tbl)
+
+        data = [
+            (1, 'abc', 'cs'),
+            (2, 'def', 'is'),
+            (3, 'ghi', 'cs'),
+            (4, 'jkl', 'it'),
+        ]
+        cur.executemany(sql, data)
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+
+        res = cur.fetchone()
+        self.assertEqual(data[0], (res.id, res.name, res.dept))
+        res = cur.fetchall()
+        exp = []
+        for row in res:
+            exp.append((row.id, row.name, row.dept))
+        self.assertEqual(exp, data[1:])
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True, buffered=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        res = cur.fetchone()
+        self.assertEqual(data[0], (res.id, res.name, res.dept))
+        res = cur.fetchall()
+        exp = []
+        for row in res:
+            exp.append((row.id, row.name, row.dept))
+        self.assertEqual(exp, data[1:])
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True, buffered=False)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        res = cur.fetchone()
+        self.assertEqual(data[0], (res.id, res.name, res.dept))
+        res = cur.fetchall()
+        exp = []
+        for row in res:
+            exp.append((row.id, row.name, row.dept))
+        self.assertEqual(exp, data[1:])
+        cur.close()

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -159,16 +159,6 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._affected_rows = result['affected_rows']
             self._rowcount = -1
 
-    def _handle_unread_result(self):
-        """Check whether there is an unread result"""
-        if not self._cnx:
-            return
-
-        if self._cnx.can_consume_results:
-            self._cnx.consume_results()
-        elif self._cnx.unread_result:
-            raise errors.InternalError("Unread result found")
-
     def _handle_resultset(self):
         """Handle a result set"""
         pass
@@ -225,7 +215,7 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         if not self._cnx:
             raise errors.ProgrammingError("Cursor is not connected")
-        self._handle_unread_result()
+        self._cnx.handle_unread_result()
 
         stmt = ''
         self.reset()
@@ -332,7 +322,7 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         if not self._cnx:
             raise errors.ProgrammingError("Cursor is not connected")
-        self._handle_unread_result()
+        self._cnx.handle_unread_result()
 
         if not isinstance(seq_params, (list, tuple)):
             raise errors.ProgrammingError(
@@ -395,7 +385,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not self._cnx:
             return False
 
-        self._handle_unread_result()
+        self._cnx.handle_unread_result()
         self._warnings = None
         self._cnx = None
         return True
@@ -445,6 +435,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                 results.append(cur)
                 self._cnx.next_result()
             self._stored_results = results
+            self._handle_eof()
 
             if argnames:
                 self.reset()
@@ -736,7 +727,10 @@ class CMySQLCursorBufferedDict(CMySQLCursorBuffered):
 
     def _fetch_row(self):
         row = super(CMySQLCursorBufferedDict, self)._fetch_row()
-        return dict(zip(self.column_names, row))
+        if row:
+            return dict(zip(self.column_names, row))
+        else:
+            return None
 
     def fetchall(self):
         res = super(CMySQLCursorBufferedDict, self).fetchall()
@@ -786,7 +780,10 @@ class CMySQLCursorBufferedNamedTuple(CMySQLCursorBuffered):
 
     def _fetch_row(self):
         row = super(CMySQLCursorBufferedNamedTuple, self)._fetch_row()
-        return self.named_tuple(*row)
+        if row:
+            return self.named_tuple(*row)
+        else:
+            return None
 
     def fetchall(self):
         res = super(CMySQLCursorBufferedNamedTuple, self).fetchall()

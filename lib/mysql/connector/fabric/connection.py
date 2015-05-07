@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -61,7 +61,9 @@ else:
         HAVE_SSL = True
 # pylint: enable=F0401,E0611
 
+import mysql.connector
 from ..connection import MySQLConnection
+from ..conversion import MySQLConverter
 from ..pooling import MySQLConnectionPool
 from ..errors import (
     Error, InterfaceError, NotSupportedError, MySQLFabricError, InternalError,
@@ -94,7 +96,12 @@ REPORT_ERRORS = (
 )
 REPORT_ERRORS_EXTRA = []
 
-MYSQL_FABRIC_PORT = 32274
+DEFAULT_FABRIC_PROTOCOL = 'xmlrpc'
+
+MYSQL_FABRIC_PORT = {
+    'xmlrpc': 32274,
+    'mysql': 32275
+}
 
 FABRICS = {}
 
@@ -139,6 +146,153 @@ _CNX_PROPERTIES = {
 
 _LOGGER = logging.getLogger('myconnpy-fabric')
 
+
+class MySQLRPCProtocol(object):
+    def __init__(self, fabric, host, port, connect_attempts, connect_delay):
+        self.converter = MySQLConverter()
+        self.handler = FabricMySQLConnection(fabric, host, port,
+                                             connect_attempts,
+                                             connect_delay)
+        self.handler.connect()
+
+    def _process_params_dict(self, params):
+        """Process query parameters given as dictionary"""
+        try:
+            res = []
+            for key, value in list(params.items()):
+                conv = value
+                conv = self.converter.to_mysql(conv)
+                conv = self.converter.escape(conv)
+                conv = self.converter.quote(conv)
+                res.append("{0}={1}".format(key, str(conv)))
+        except Exception as err:
+            raise mysql.connector.errors.ProgrammingError(
+                "Failed processing pyformat-parameters; %s" % err)
+        else:
+            return res
+
+    def _process_params(self, params):
+        """Process query parameters."""
+        try:
+            res = params
+            res = [self.converter.to_mysql(i) for i in res]
+            res = [self.converter.escape(i) for i in res]
+            res = [self.converter.quote(i) for i in res]
+            res = [str(i) for i in res]
+        except Exception as err:
+            raise mysql.connector.errors.ProgrammingError(
+                "Failed processing format-parameters; %s" % err)
+        else:
+            return tuple(res)
+
+    def _execute_cmd(self, stmt, params=None):
+        if not params:
+            params = ()
+        cur = self.handler.connection.cursor(dictionary=True)
+        results = []
+
+        for res in cur.execute(stmt, params, multi=True):
+            results.append(res.fetchall())
+
+        return results
+
+    def create_params(self, *args, **kwargs):
+        params = []
+        if args:
+            args = self._process_params(args)
+            params.extend(args)
+        if kwargs:
+            kwargs = self._process_params_dict(kwargs)
+            params.extend(kwargs)
+
+        params = ', '.join(params)
+        return params
+
+    def execute(self, group, command, *args, **kwargs):
+        params = self.create_params(*args, **kwargs)
+        cmd = "CALL {0}.{1}({2})".format(group, command, params)
+
+        fab_set = None
+        try:
+            data = self._execute_cmd(cmd)
+            fab_set = FabricMySQLSet(data)
+        except (Fault, socket.error, InterfaceError) as exc:
+            msg = "Executing {group}.{command} failed: {error}".format(
+                group=group, command=command, error=str(exc))
+            raise InterfaceError(msg)
+
+        return fab_set
+
+
+class XMLRPCProtocol(object):
+    def __init__(self, fabric, host, port, connect_attempts, connect_delay):
+        self.handler = FabricXMLRPCConnection(fabric, host, port,
+                                              connect_attempts, connect_delay)
+        self.handler.connect()
+
+    def execute(self, group, command, *args, **kwargs):
+        try:
+            grp = getattr(self.handler.proxy, group)
+            cmd = getattr(grp, command)
+        except AttributeError as exc:
+            raise ValueError("{group}.{command} not available ({err})".format(
+                group=group, command=command, err=str(exc)))
+
+        fab_set = None
+        try:
+            data = cmd(*args, **kwargs)
+            fab_set = FabricSet(data)
+        except (Fault, socket.error, InterfaceError) as exc:
+            msg = "Executing {group}.{command} failed: {error}".format(
+                group=group, command=command, error=str(exc))
+            raise InterfaceError(msg)
+
+        return fab_set
+
+
+class FabricMySQLResponse(object):
+    def __init__(self, data):
+        info = data[0][0]
+        (fabric_uuid_str, ttl, error) = (info['fabric_uuid'], info['ttl'],
+                                         info['message'])
+        if error:
+            raise InterfaceError(error)
+
+        self.fabric_uuid_str = fabric_uuid_str
+        self.ttl = ttl
+        self.coded_rows = data[1]
+
+
+class FabricMySQLSet(FabricMySQLResponse):
+    def __init__(self, data):
+        """Initialize the FabricSet object.
+        """
+        super(FabricMySQLSet, self).__init__(data)
+        self.__names = self.coded_rows[0].keys()
+        self.__rows = self.coded_rows
+        self.__result = collections.namedtuple('ResultSet', self.__names)
+
+    def rowcount(self):
+        """The number of rows in the result set.
+        """
+        return len(self.__rows)
+
+    def rows(self):
+        """Iterate over the rows of the result set.
+
+        Each row is a named tuple.
+        """
+        for row in self.__rows:
+            yield self.__result(**row)
+
+    def row(self, index):
+        """Indexing method for a row.
+
+        Each row is a named tuple.
+        """
+        return self.__result(**self.__rows[index])
+
+
 class FabricResponse(object):
     """Class used to parse a response got from Fabric.
     """
@@ -162,6 +316,7 @@ class FabricResponse(object):
         self.fabric_uuid_str = fabric_uuid_str
         self.ttl = ttl
         self.coded_rows = rows
+
 
 class FabricSet(FabricResponse):
     """Iterator to navigate through the result set returned from Fabric
@@ -375,12 +530,25 @@ class Fabric(object):
     """Class managing MySQL Fabric instances"""
 
     def __init__(self, host, username=None, password=None,
-                 port=MYSQL_FABRIC_PORT,
+                 port=None,
                  connect_attempts=_CNX_ATTEMPT_MAX,
                  connect_delay=_CNX_ATTEMPT_DELAY,
                  report_errors=False,
-                 ssl_ca=None, ssl_key=None, ssl_cert=None, user=None):
+                 ssl_ca=None, ssl_key=None, ssl_cert=None, user=None,
+                 protocol=DEFAULT_FABRIC_PROTOCOL):
         """Initialize"""
+        if protocol == 'xmlrpc':
+            self._protocol_class = XMLRPCProtocol
+        elif protocol == 'mysql':
+            self._protocol_class = MySQLRPCProtocol
+        else:
+            raise InterfaceError(
+                "Protocol not supported by MySQL Fabric,"
+                " was '{}'".format(protocol))
+
+        if not port:
+            port = MYSQL_FABRIC_PORT[protocol]
+
         self._fabric_instances = {}
         self._fabric_uuid = None
         self._ttl = 1 * 60  # one minute by default
@@ -393,7 +561,7 @@ class Fabric(object):
         self._init_port = port
         self._ssl = _validate_ssl_args(ssl_ca, ssl_key, ssl_cert)
         self._report_errors = report_errors
-
+        self._protocol = protocol
         if user and username:
             raise ValueError("can not specify both user and username")
         self._username = user or username
@@ -425,10 +593,10 @@ class Fabric(object):
         host = host or self._init_host
         port = port or self._init_port
 
-        fabinst = FabricConnection(self, host, port,
-                                   connect_attempts=self._connect_attempts,
-                                   connect_delay=self._connect_delay)
-        fabinst.connect()
+        fabinst = self._protocol_class(self, host, port,
+                                       connect_attempts=self._connect_attempts,
+                                       connect_delay=self._connect_delay)
+
         fabric_uuid, fabric_version, ttl, fabrics = self.get_fabric_servers(
             fabinst)
 
@@ -449,16 +617,15 @@ class Fabric(object):
 
         # Update the Fabric servers
         for fabric in fabrics:
-            inst = FabricConnection(self, fabric['host'], fabric['port'],
-                                    connect_attempts=self._connect_attempts,
-                                    connect_delay=self._connect_delay)
-            inst_uuid = inst.uuid
+            inst = self._protocol_class(self, fabric['host'], fabric['port'],
+                                        connect_attempts=self._connect_attempts,
+                                        connect_delay=self._connect_delay)
+            inst_uuid = inst.handler.uuid
             if inst_uuid not in self._fabric_instances:
-                inst.connect()
                 self._fabric_instances[inst_uuid] = inst
                 _LOGGER.debug(
                     "Added new Fabric server {host}:{port}".format(
-                        host=inst.host, port=inst.port))
+                        host=inst.handler.host, port=inst.handler.port))
 
     def reset_cache(self, group=None):
         """Reset cached information
@@ -489,8 +656,8 @@ class Fabric(object):
             inst = self._fabric_instances[instance_list[nxt]]
         else:
             inst = self._fabric_instances[list(self._fabric_instances)[nxt]]
-        if not inst.is_connected:
-            inst.connect()
+        if not inst.handler.is_connected:
+            inst.handler.connect()
         return inst
 
     def report_failure(self, server_uuid, errno):
@@ -510,7 +677,7 @@ class Fabric(object):
                           server_uuid)
             inst = self.get_instance()
             try:
-                data = inst.proxy.threat.report_failure(
+                data = inst.execute('threat', 'report_failure',
                     server_uuid, current_host, errno
                 )
                 FabricResponse(data)
@@ -537,17 +704,19 @@ class Fabric(object):
         result = []
         err_msg = "Looking up Fabric servers failed using {host}:{port}: {err}"
         try:
-            data = inst.proxy.dump.fabric_nodes('protocol.xmlrpc')
-            fset = FabricSet(data)
+            fset = inst.execute('dump', 'fabric_nodes',
+                                "protocol." + self._protocol)
+
             for row in fset.rows():
                 result.append({'host': row.host, 'port': row.port})
         except (Fault, socket.error) as exc:
-            msg = err_msg.format(err=str(exc), host=inst.host, port=inst.port)
+            msg = err_msg.format(err=str(exc), host=inst.handler.host,
+                                 port=inst.handler.port)
             raise InterfaceError(msg)
         except (TypeError, AttributeError) as exc:
             msg = err_msg.format(
                 err="No Fabric server available ({0})".format(exc),
-                host=inst.host, port=inst.port)
+                host=inst.handler.host, port=inst.handler.port)
             raise InterfaceError(msg)
 
         try:
@@ -580,8 +749,7 @@ class Fabric(object):
         inst = self.get_instance()
         result = []
         try:
-            data = inst.proxy.dump.servers(self._version_token, group)
-            fset = FabricSet(data)
+            fset = inst.execute('dump', 'servers', self._version_token, group)
         except (Fault, socket.error) as exc:
             msg = ("Looking up MySQL servers failed for group "
                    "{group}: {error}").format(error=str(exc), group=group)
@@ -703,10 +871,11 @@ class Fabric(object):
 
         inst = self.get_instance()
         try:
-            data = inst.proxy.dump.sharding_information(
-                self._version_token, ','.join(patterns)
+
+            fset = inst.execute(
+                'dump', 'sharding_information', self._version_token,
+                ','.join(patterns)
             )
-            fset = FabricSet(data)
         except (Fault, socket.error) as exc:
             msg = "Looking up sharding information failed : {error}".format(
                 error=str(exc))
@@ -817,30 +986,14 @@ class Fabric(object):
         Returns FabricSet.
         """
         inst = self.get_instance()
-        try:
-            grp = getattr(inst.proxy, group)
-            cmd = getattr(grp, command)
-        except AttributeError as exc:
-            raise ValueError("{group}.{command} not available ({err})".format(
-                group=group, command=command, err=str(exc)))
-
-        fab_set = None
-        try:
-            data = cmd(*args, **kwargs)
-            fab_set = FabricSet(data)
-        except (Fault, socket.error, InterfaceError) as exc:
-            msg = "Executing {group}.{command} failed: {error}".format(
-                group=group, command=command, error=str(exc))
-            raise InterfaceError(msg)
-
-        return fab_set
+        return inst.execute(group, command, *args, **kwargs)
 
 
 class FabricConnection(object):
-
-    """Class holding a connection to a MySQL Fabric server"""
-
-    def __init__(self, fabric, host, port=MYSQL_FABRIC_PORT,
+    """Class holding a connection to a MySQL Fabric server through MySQL protocol
+    """
+    def __init__(self, fabric, host,
+                 port=MYSQL_FABRIC_PORT[DEFAULT_FABRIC_PROTOCOL],
                  connect_attempts=_CNX_ATTEMPT_MAX,
                  connect_delay=_CNX_ATTEMPT_DELAY):
         """Initialize"""
@@ -849,7 +1002,6 @@ class FabricConnection(object):
         self._fabric = fabric
         self._host = host
         self._port = port
-        self._proxy = None
         self._connect_attempts = connect_attempts
         self._connect_delay = connect_delay
 
@@ -864,19 +1016,55 @@ class FabricConnection(object):
         return self._port
 
     @property
-    def uri(self):
-        """Returns the XMLRPC URI for current Fabric connection"""
-        return _fabric_xmlrpc_uri(self._host, self._port)
-
-    @property
     def uuid(self):
         """Returns UUID of the Fabric server we are connected with"""
         return _fabric_server_uuid(self._host, self._port)
+
+    def connect(self):
+        """Connect with MySQL Fabric"""
+        pass
+
+    @property
+    def is_connected(self):
+        """Check whether connection with Fabric is valid
+
+        Return True if we can still interact with the Fabric server; False
+        if Not.
+
+        Returns True or False.
+        """
+        pass
+
+    def __repr__(self):
+        return "{class_}(host={host}, port={port})".format(
+            class_=self.__class__,
+            host=self._host,
+            port=self._port,
+        )
+
+
+class FabricXMLRPCConnection(FabricConnection):
+
+    """Class holding a connection to a MySQL Fabric server through XML-RPC"""
+
+    def __init__(self, fabric, host, port=MYSQL_FABRIC_PORT['xmlrpc'],
+                 connect_attempts=_CNX_ATTEMPT_MAX,
+                 connect_delay=_CNX_ATTEMPT_DELAY):
+        """Initialize"""
+        super(FabricXMLRPCConnection, self).__init__(
+            fabric, host, port, connect_attempts, connect_delay
+        )
+        self._proxy = None
 
     @property
     def proxy(self):
         """Returns the XMLRPC Proxy of current Fabric connection"""
         return self._proxy
+
+    @property
+    def uri(self):
+        """Returns the XMLRPC URI for current Fabric connection"""
+        return _fabric_xmlrpc_uri(self._host, self._port)
 
     def _xmlrpc_get_proxy(self):
         """Return the XMLRPC server proxy instance to MySQL Fabric
@@ -945,12 +1133,86 @@ class FabricConnection(object):
         else:
             return False
 
-    def __repr__(self):
-        return "{class_}(host={host}, port={port})".format(
-            class_=self.__class__,
-            host=self._host,
-            port=self._port,
+
+class FabricMySQLConnection(FabricConnection):
+    """Class holding a connection to a MySQL Fabric server through MySQL protocol
+    """
+    def __init__(self, fabric, host, port=MYSQL_FABRIC_PORT['mysql'],
+                 connect_attempts=_CNX_ATTEMPT_MAX,
+                 connect_delay=_CNX_ATTEMPT_DELAY):
+        """Initialize"""
+        super(FabricMySQLConnection, self).__init__(
+            fabric, host, port=port,
+            connect_attempts=connect_attempts, connect_delay=connect_delay
         )
+        self._connection = None
+
+    @property
+    def connection(self):
+        """Returns the MySQL RPC Connection to Fabric"""
+        return self._connection
+
+    def _get_connection(self):
+        """Return the connection instance to MySQL Fabric through MySQL RPC
+
+        This method tries to get a valid connection to a MySQL Fabric
+        server.
+
+        Returns a MySQLConnection instance.
+        """
+        if self.is_connected:
+            return self._connection
+
+        attempts = self._connect_attempts
+        delay = self._connect_delay
+
+        connection = None
+        counter = 0
+
+        while counter != attempts:
+            counter += 1
+            try:
+                dbconfig = {
+                    'host': self._host,
+                    'port': self._port,
+                    'user': self._fabric.username,
+                    'password': self._fabric.password
+                }
+                if self._fabric.ssl_config:
+                    if not HAVE_SSL:
+                        raise InterfaceError("Python does not support SSL")
+                    dbconfig['ssl_key'] = self._fabric.ssl_config['key']
+                    dbconfig['ssl_cert'] = self._fabric.ssl_config['cert']
+
+                return MySQLConnection(**dbconfig)
+
+            except AttributeError as exc:
+                if counter == attempts:
+                    raise InterfaceError(
+                        "Connection to MySQL Fabric failed ({0})".format(exc))
+                _LOGGER.debug(
+                    "Retrying {host}:{port}, attempts {counter}".format(
+                        host=self.host, port=self.port, counter=counter))
+            if delay > 0:
+                time.sleep(delay)
+
+    def connect(self):
+        """Connect with MySQL Fabric"""
+        self._connection = self._get_connection()
+
+    @property
+    def is_connected(self):
+        """Check whether connection with Fabric is valid
+
+        Return True if we can still interact with the Fabric server; False
+        if Not.
+
+        Returns True or False.
+        """
+        try:
+            return self._connection.is_connected()
+        except AttributeError:
+            return False
 
 
 class MySQLFabricConnection(object):
@@ -1084,7 +1346,12 @@ class MySQLFabricConnection(object):
                         "Missing configuration parameter '{parameter}' "
                         "for fabric".format(parameter=required_key))
             host = config['host']
-            port = config.get('port', MYSQL_FABRIC_PORT)
+            protocol = config.get('protocol', DEFAULT_FABRIC_PROTOCOL)
+            try:
+                port = config.get('port', MYSQL_FABRIC_PORT[protocol])
+            except KeyError:
+                raise InterfaceError(
+                    "{0} protocol is not available".format(protocol))
             server_uuid = _fabric_server_uuid(host, port)
             try:
                 self._fabric = FABRICS[server_uuid]
@@ -1123,6 +1390,8 @@ class MySQLFabricConnection(object):
             del test_config['pool_name']
         if 'pool_size' in test_config:
             del test_config['pool_size']
+        if 'pool_reset_session' in test_config:
+            del test_config['pool_reset_session']
         try:
             pool = MySQLConnectionPool(pool_name=str(uuid.uuid4()))
             pool.set_config(**test_config)
@@ -1186,7 +1455,7 @@ class MySQLFabricConnection(object):
             dbconfig['host'] = mysqlserver.host
             dbconfig['port'] = mysqlserver.port
             try:
-                self._mysql_cnx = MySQLConnection(**dbconfig)
+                self._mysql_cnx = mysql.connector.connect(**dbconfig)
             except Error as exc:
                 if counter == attempts:
                     self.reset_cache(mysqlserver.group)

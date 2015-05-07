@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -150,7 +150,11 @@ def get_mysql_config_info(mysql_config):
     for option, line in zip(options, stdout.split('\n')):
         info[option] = line.strip()
 
-    info['version'] = tuple([int(v) for v in info['version'].split('.')[0:3]])
+    ver = info['version']
+    if '-' in ver:
+        ver, _ = ver.split('-', 2)
+
+    info['version'] = tuple([int(v) for v in ver.split('.')[0:3]])
     libs = shlex.split(info['libs'])
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
@@ -412,8 +416,9 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
-        self.set_undefined_options('install',
-                                   ('with_mysql_capi', 'with_mysql_capi'))
+        if not self.with_mysql_capi:
+            self.set_undefined_options('install',
+                                       ('with_mysql_capi', 'with_mysql_capi'))
 
         build_ext.finalize_options(self)
         self.connc_lib = os.path.join(self.build_temp, 'connc', 'lib')
@@ -510,8 +515,6 @@ class Install(install):
         self.static = None
 
     def finalize_options(self):
-        install.finalize_options(self)
-
         if self.static:
             self.distribution.cmdclass['build_ext'] = BuildExtStatic
 
@@ -525,12 +528,14 @@ class Install(install):
             build.with_mysql_capi = self.with_mysql_capi
             self.need_ext = True
 
-    def run(self):
         if not self.need_ext:
             remove_cext(self.distribution)
-            # We install pure Python code in purelib location when no
-            # extension is build
-            self.install_lib = self.install_purelib
+
+        install.finalize_options(self)
+
+    def run(self):
+        if not self.need_ext:
+            log.info("Not Installing C Extension")
         else:
-            log.info("installing C Extension")
+            log.info("Installing C Extension")
         install.run(self)

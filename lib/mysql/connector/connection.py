@@ -256,8 +256,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a MySQL packet or None.
         """
-        if self.unread_result:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
 
         try:
             self._socket.send(
@@ -280,8 +279,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a MySQL packet.
         """
-        if self.unread_result:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
 
         if not hasattr(data_file, 'read'):
             raise ValueError("expecting a file-like object")
@@ -453,7 +451,7 @@ class MySQLConnection(MySQLConnectionAbstract):
     def consume_results(self):
         """Consume results
         """
-        if self._unread_result:
+        if self.unread_result:
             self.get_rows()
 
     def cmd_init_db(self, database):
@@ -521,8 +519,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         # Handle next results, if any
         while self._have_next_result:
-            if self.unread_result:
-                raise errors.InternalError("Unread result found.")
+            self.handle_unread_result()
             yield self._handle_result(self._socket.recv())
 
     def cmd_refresh(self, options):
@@ -551,8 +548,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a str()
         """
-        if self.unread_result:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
 
         packet = self._protocol.make_command(ServerCmd.QUIT)
         self._socket.send(packet, 0)
@@ -586,8 +582,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a dict()
         """
-        if self.unread_result:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
 
         packet = self._protocol.make_command(ServerCmd.STATISTICS)
         self._socket.send(packet, 0)
@@ -637,8 +632,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a dict()
         """
-        if self.unread_result:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
 
         if self._compress:
             raise errors.NotSupportedError("Change user is not supported with "
@@ -805,8 +799,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a cursor-object
         """
-        if self._unread_result is True:
-            raise errors.InternalError("Unread result found.")
+        self.handle_unread_result()
+
         if not self.is_connected():
             raise errors.OperationalError("MySQL Connection not available.")
         if cursor_class is not None:
@@ -855,7 +849,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
     def rollback(self):
         """Rollback current transaction"""
-        if self._unread_result:
+        if self.unread_result:
             self.get_rows()
 
         self._execute_query("ROLLBACK")
@@ -869,9 +863,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a dict()
         """
-        if self._unread_result is True:
-            raise errors.InternalError("Unread result found.")
-
+        self.handle_unread_result()
         self.cmd_query(query)
 
     def info_query(self, query):
@@ -1051,3 +1043,10 @@ class MySQLConnection(MySQLConnectionAbstract):
                                            "COM_RESET_CONNECTION.")
         self._handle_ok(self._send_cmd(ServerCmd.RESET_CONNECTION))
         self._post_connection()
+
+    def handle_unread_result(self):
+        """Check whether there is an unread result"""
+        if self.can_consume_results:
+            self.consume_results()
+        elif self.unread_result:
+            raise errors.InternalError("Unread result found")

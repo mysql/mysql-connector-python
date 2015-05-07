@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -41,6 +41,7 @@ import mysql.connector
 from mysql.connector import fabric, errorcode
 from mysql.connector.fabric import connection, balancing
 from mysql.connector.catch23 import UNICODE_TYPES, PY2
+from mysql.connector.pooling import PooledMySQLConnection
 
 ERR_NO_FABRIC_CONFIG = "Fabric configuration not available"
 
@@ -120,7 +121,10 @@ class ConnectionModuleTests(tests.MySQLConnectorTests):
         self.assertEqual(error_codes, connection.RESET_CACHE_ON_ERROR)
 
         modvars = {
-            'MYSQL_FABRIC_PORT': 32274,
+            'MYSQL_FABRIC_PORT': {
+                'xmlrpc': 32274, 'mysql': 32275
+            },
+            'DEFAULT_FABRIC_PROTOCOL': 'xmlrpc',
             'FABRICS': {},
             '_CNX_ATTEMPT_DELAY': 1,
             '_CNX_ATTEMPT_MAX': 3,
@@ -578,3 +582,77 @@ class FabricShardingTests(tests.MySQLConnectorTests):
             self.assertEqual("Key invalid; was '1977-01-01'", str(exc))
         else:
             self.fail("ValueError not raised")
+
+    def test_bug19331658(self):
+        """Pooling not working with fabric
+        """
+        self.assertRaises(
+            AttributeError, mysql.connector.connect,
+            fabric=tests.FABRIC_CONFIG, user='root', database='employees',
+            pool_name='mypool')
+
+        pool_size = 2
+        cnx = mysql.connector.connect(
+            fabric=tests.FABRIC_CONFIG, user='root', database='employees',
+            pool_size=pool_size, pool_reset_session=False
+        )
+        tbl_name = "employees_range"
+
+        tables = ["employees.{0}".format(tbl_name)]
+
+        cnx.set_property(tables=tables,
+                         scope=fabric.SCOPE_GLOBAL,
+                         mode=fabric.MODE_READWRITE)
+        cnx.cursor()
+        self.assertTrue(isinstance(cnx._mysql_cnx, PooledMySQLConnection))
+
+        data = self.emp_data[1985]
+        for emp in data:
+            cnx.set_property(tables=tables,
+                             key=emp[0],
+                             scope=fabric.SCOPE_LOCAL,
+                             mode=fabric.MODE_READWRITE)
+            cnx.cursor()
+            mysqlserver = cnx._fabric_mysql_server
+            config = cnx._mysql_config
+            self.assertEqual(
+                cnx._mysql_cnx.pool_name, "{0}_{1}_{2}_{3}".format(
+                    mysqlserver.host, mysqlserver.port, config['user'],
+                    config['database'])
+            )
+
+    def test_range_hash(self):
+        self.assertTrue(self._check_table(
+            "employees.employees_hash", 'HASH'))
+        tbl_name = "employees_hash"
+
+        tables = ["employees.{0}".format(tbl_name)]
+
+        self.cnx.set_property(tables=tables,
+                              scope=fabric.SCOPE_GLOBAL,
+                              mode=fabric.MODE_READWRITE)
+
+        cur = self.cnx.cursor()
+        gtid_executed = self._truncate(cur, tbl_name)
+        self.cnx.commit()
+
+        insert = ("INSERT INTO {0} "
+                  "VALUES (%s, %s, %s, %s, %s, %s)").format(tbl_name)
+
+        self._populate(self.cnx, gtid_executed, tbl_name, insert,
+                       self.emp_data[1985] + self.emp_data[2000], 3)
+
+        time.sleep(2)
+
+        emp_exp_hash = self.emp_data[1985] + self.emp_data[2000]
+
+        rows = []
+        self.cnx.reset_properties()
+        str_keys = ['group1', 'group2']
+        for str_key in str_keys:
+            self.cnx.set_property(group=str_key, mode=fabric.MODE_READONLY)
+            cur = self.cnx.cursor()
+            cur.execute("SELECT * FROM {0}".format(tbl_name))
+            rows += cur.fetchall()
+
+        self.assertEqual(rows, emp_exp_hash)
