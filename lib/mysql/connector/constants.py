@@ -64,6 +64,7 @@ DEFAULT_CONFIGURATION = {
     'auth_plugin': None,
     'allow_local_infile': True,
     'consume_results': False,
+    'connattrs': None,
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')

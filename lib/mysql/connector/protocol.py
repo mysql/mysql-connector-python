@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from .constants import (
     FieldFlag, ServerCmd, FieldType, ClientFlag, MAX_MYSQL_TABLE_COLUMNS)
-from . import errors, utils
+from . import errors, utils, version
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
 
@@ -105,8 +105,6 @@ class MySQLProtocol(object):
         if client_flags & ClientFlag.PLUGIN_AUTH:
             packet += auth_plugin.encode('utf8') + b'\x00'
 
-        if connattrs is None:
-            connattrs = {'_client_name': 'MySQL Connector/Python'}
         if client_flags & ClientFlag.CONNECT_ARGS:
             packet += self.make_connattrs(connattrs)
 
@@ -114,8 +112,17 @@ class MySQLProtocol(object):
 
     def make_connattrs(self, connattrs):
         """Encode the connection attributes"""
-        if not isinstance(connattrs, dict):
-            raise ValueError('connattrs must be of type dict')
+
+        default_connattrs = {'_client_name': 'MySQL Connector/Python',
+                             '_client_version': version.VERSION_TEXT}
+
+        if isinstance(connattrs, dict):
+            default_connattrs.update(connattrs)
+            connattrs = default_connattrs
+        elif connattrs is None:
+            connattrs = default_connattrs
+        else:
+            raise ValueError('connattrs must be of type dict or None')
 
 	connattrs_len = sum([len(x) + len(connattrs[x]) for x in connattrs]) + len(connattrs.keys()) + len(connattrs.values())
         connattrs_packet = struct.pack('<B', connattrs_len)
