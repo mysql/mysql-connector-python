@@ -73,7 +73,7 @@ class MySQLProtocol(object):
     def make_auth(self, handshake, username=None, password=None, database=None,
                   charset=33, client_flags=0,
                   max_allowed_packet=1073741824, ssl_enabled=False,
-                  auth_plugin=None):
+                  auth_plugin=None, connattrs=None):
         """Make a MySQL Authentication packet"""
 
         try:
@@ -105,7 +105,25 @@ class MySQLProtocol(object):
         if client_flags & ClientFlag.PLUGIN_AUTH:
             packet += auth_plugin.encode('utf8') + b'\x00'
 
+        if connattrs is None:
+            connattrs = {'_client_name': 'MySQL Connector/Python'}
+        if client_flags & ClientFlag.CONNECT_ARGS:
+            packet += self.make_connattrs(connattrs)
+
         return packet
+
+    def make_connattrs(self, connattrs):
+        """Encode the connection attributes"""
+        if not isinstance(connattrs, dict):
+            raise ValueError('connattrs must be of type dict')
+
+	connattrs_len = sum([len(x) + len(connattrs[x]) for x in connattrs]) + len(connattrs.keys()) + len(connattrs.values())
+        connattrs_packet = struct.pack('<B', connattrs_len)
+        for item in connattrs:
+            connattrs_packet += struct.pack('<B', len(item)) + item
+            connattrs_packet += struct.pack('<B', len(connattrs[item])) + connattrs[item]
+
+        return connattrs_packet
 
     def make_auth_ssl(self, charset=33, client_flags=0,
                       max_allowed_packet=1073741824):

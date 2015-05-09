@@ -113,6 +113,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         if handshake['capabilities'] & ClientFlag.PLUGIN_AUTH:
             self.set_client_flags([ClientFlag.PLUGIN_AUTH])
 
+        self.set_client_flags([ClientFlag.CONNECT_ARGS])
         self._handshake = handshake
 
     def _do_auth(self, username=None, password=None, database=None,
