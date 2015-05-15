@@ -598,9 +598,11 @@ class MySQLCursor(CursorBase):
             return None
         self._connection.handle_unread_result()
 
-        if not isinstance(seq_params, (list, tuple)):
+        try:
+            _ = iter(seq_params)
+        except TypeError:
             raise errors.ProgrammingError(
-                "Parameters for query must be list or tuple.")
+                "Parameters for query must be an Iterable.")
 
         # Optimize INSERTs by batching them
         if re.match(RE_SQL_INSERT_STMT, operation):
@@ -859,9 +861,11 @@ class MySQLCursor(CursorBase):
         statements were executed, the current statement in the iterator
         will be returned.
         """
+        if self._executed is None:
+            return None
         try:
-            return self._executed.strip().decode('utf8')
-        except AttributeError:
+            return self._executed.strip().decode('utf-8')
+        except (AttributeError, UnicodeDecodeError) as err:
             return self._executed.strip()
 
     @property
