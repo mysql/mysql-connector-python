@@ -231,6 +231,11 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         res = self._protocol.parse_handshake(handshake)
         self.assertEqual(exp, res)
 
+        # Test when end byte \x00 is not present for server 5.5.8
+        handshake = handshake[:-1]
+        res = self._protocol.parse_handshake(handshake)
+        self.assertEqual(exp, res)
+
     def test_parse_ok(self):
         """Parse OK-packet sent by MySQL"""
         res = self._protocol.parse_ok(OK_PACKET)

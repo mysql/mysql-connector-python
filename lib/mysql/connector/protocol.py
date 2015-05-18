@@ -173,6 +173,7 @@ class MySQLProtocol(object):
          capabilities2,
          auth_data_length
         ) = struct_unpack('<I8sx2sBH2sBxxxxxxxxxx', packet[0:31])
+        res['server_version_original'] = res['server_version_original'].decode()
 
         packet = packet[31:]
 
@@ -186,15 +187,19 @@ class MySQLProtocol(object):
                 auth_data2 = auth_data2[:-1]
 
         if capabilities & ClientFlag.PLUGIN_AUTH:
-            (packet, res['auth_plugin']) = utils.read_string(
-                packet, end=b'\x00')
+            if (b'\x00' not in packet
+                    and res['server_version_original'].startswith("5.5.8")):
+                # MySQL server 5.5.8 has a bug where end byte is not send
+                (packet, res['auth_plugin']) = (b'', packet)
+            else:
+                (packet, res['auth_plugin']) = utils.read_string(
+                    packet, end=b'\x00')
             res['auth_plugin'] = res['auth_plugin'].decode('utf-8')
         else:
             res['auth_plugin'] = 'mysql_native_password'
 
         res['auth_data'] = auth_data1 + auth_data2
         res['capabilities'] = capabilities
-        res['server_version_original'] = res['server_version_original'].decode()
         return res
 
     def parse_ok(self, packet):
