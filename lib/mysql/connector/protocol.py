@@ -33,6 +33,7 @@ from .constants import (
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
+from .errors import get_exception
 
 
 class MySQLProtocol(object):
@@ -335,8 +336,10 @@ class MySQLProtocol(object):
                 rowdata = utils.read_lc_string_list(packet[4:])
             if eof is None and rowdata is not None:
                 rows.append(rowdata)
+            elif eof is None and rowdata is None:
+                raise get_exception(packet)
             i += 1
-        return (rows, eof)
+        return rows, eof
 
     def _parse_binary_integer(self, packet, field):
         """Parse an integer from a binary packet"""
@@ -466,6 +469,8 @@ class MySQLProtocol(object):
                 values = self._parse_binary_values(columns, packet[5:])
             if eof is None and values is not None:
                 rows.append(values)
+            elif eof is None and values is None:
+                raise get_exception(packet)
             i += 1
         return (rows, eof)
 

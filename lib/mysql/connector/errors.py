@@ -143,8 +143,11 @@ def get_exception(packet):
     """
     errno = errmsg = None
 
-    if packet[4] != 255:
-        raise ValueError("Packet is not an error packet")
+    try:
+        if packet[4] != 255:
+            raise ValueError("Packet is not an error packet")
+    except IndexError as err:
+        return InterfaceError("Failed getting Error information (%r)" % err)
 
     sqlstate = None
     try:
