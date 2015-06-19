@@ -1,18 +1,20 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
+import django
+import subprocess
 
-import os
-import sys
-
-from django.db.backends import BaseDatabaseClient
+if django.VERSION >= (1, 8):
+    from django.db.backends.base.client import BaseDatabaseClient
+else:
+    from django.db.backends import BaseDatabaseClient
 
 
 class DatabaseClient(BaseDatabaseClient):
     executable_name = 'mysql'
 
-    def runshell(self):
-        settings_dict = self.connection.settings_dict
-        args = [self.executable_name]
+    @classmethod
+    def settings_to_cmd_args(cls, settings_dict):
+        args = [cls.executable_name]
 
         db = settings_dict['OPTIONS'].get('database', settings_dict['NAME'])
         user = settings_dict['OPTIONS'].get('user',
@@ -47,7 +49,9 @@ class DatabaseClient(BaseDatabaseClient):
         if db:
             args.append("--database={0}".format(db))
 
-        if os.name == 'nt':
-            sys.exit(os.system(' '.join(args)))
-        else:
-            os.execvp(self.executable_name, args)
+        return args
+
+    def runshell(self):
+        args = DatabaseClient.settings_to_cmd_args(
+            self.connection.settings_dict)
+        subprocess.call(args)

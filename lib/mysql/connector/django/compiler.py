@@ -18,13 +18,20 @@ class SQLCompiler(compiler.SQLCompiler):
             values.append(value)
         return row[:index_extra_select] + tuple(values)
 
-    def as_subquery_condition(self, alias, columns, qn):
-        # Django 1.6
-        qn2 = self.connection.ops.quote_name
-        sql, params = self.as_sql()
-        column_list = ', '.join(
-            ['%s.%s' % (qn(alias), qn2(column)) for column in columns])
-        return '({0}) IN ({1})'.format(column_list, sql), params
+    if django.VERSION >= (1, 8):
+        def as_subquery_condition(self, alias, columns, compiler):
+            qn = compiler.quote_name_unless_alias
+            qn2 = self.connection.ops.quote_name
+            sql, params = self.as_sql()
+            return '(%s) IN (%s)' % (', '.join('%s.%s' % (qn(alias), qn2(column)) for column in columns), sql), params
+    else:
+        def as_subquery_condition(self, alias, columns, qn):
+            # Django 1.6
+            qn2 = self.connection.ops.quote_name
+            sql, params = self.as_sql()
+            column_list = ', '.join(
+                ['%s.%s' % (qn(alias), qn2(column)) for column in columns])
+            return '({0}) IN ({1})'.format(column_list, sql), params
 
 
 class SQLInsertCompiler(compiler.SQLInsertCompiler, SQLCompiler):
@@ -42,11 +49,11 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, SQLCompiler):
 class SQLAggregateCompiler(compiler.SQLAggregateCompiler, SQLCompiler):
     pass
 
-
-class SQLDateCompiler(compiler.SQLDateCompiler, SQLCompiler):
-    pass
-
-if django.VERSION >= (1, 6):
-    class SQLDateTimeCompiler(compiler.SQLDateTimeCompiler, SQLCompiler):
-        # Django 1.6
+if django.VERSION < (1, 8):
+    class SQLDateCompiler(compiler.SQLDateCompiler, SQLCompiler):
         pass
+
+    if django.VERSION >= (1, 6):
+        class SQLDateTimeCompiler(compiler.SQLDateTimeCompiler, SQLCompiler):
+            # Django 1.6
+            pass

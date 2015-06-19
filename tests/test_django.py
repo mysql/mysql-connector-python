@@ -93,7 +93,10 @@ FOREIGN KEY (id_t1) REFERENCES django_t1(id) ON DELETE CASCADE
 # Have to load django.db to make importing db backend work for Django < 1.6
 import django.db  # pylint: disable=W0611
 if tests.DJANGO_VERSION >= (1, 6):
-    from django.db.backends import FieldInfo
+    if tests.DJANGO_VERSION >= (1, 8):
+        from django.db.backends.base.introspection import FieldInfo
+    else:
+        from django.db.backends import FieldInfo
 from django.db.backends.signals import connection_created
 from django.utils.safestring import SafeBytes, SafeText
 
