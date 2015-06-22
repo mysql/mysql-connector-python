@@ -3578,3 +3578,75 @@ class BugOra20834643(tests.MySQLConnectorTests):
             exp.append((row.id, row.name, row.dept))
         self.assertEqual(exp, data[1:])
         cur.close()
+
+
+class BugOra20653441(tests.MySQLConnectorTests):
+
+    """BUG#20653441: PYTHON CONNECTOR HANGS IF A QUERY IS KILLED (ERROR 1317)"""
+
+    def setUp(self):
+        self.table_name = 'Bug20653441'
+
+    def _setup(self):
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table_name))
+        table = (
+            "CREATE TABLE {table} ("
+            " id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
+            " c1 VARCHAR(255) DEFAULT '{default}',"
+            " PRIMARY KEY (id)"
+            ")"
+        ).format(table=self.table_name, default='a' * 255)
+        self.cnx.cmd_query(table)
+
+        stmt = "INSERT INTO {table} (id) VALUES {values}".format(
+            table=self.table_name,
+            values=','.join(['(NULL)'] * 1024)
+        )
+        self.cnx.cmd_query(stmt)
+
+    def tearDown(self):
+        try:
+            cnx = connection.MySQLConnection(**tests.get_mysql_config())
+            cnx.cmd_query(
+                "DROP TABLE IF EXISTS {0}".format(self.table_name))
+            cnx.close()
+        except:
+            pass
+
+    @foreach_cnx()
+    def test_kill_query(self):
+        self._setup()
+
+        def kill(connection_id):
+            """Kill query using separate connection"""
+            killer = connection.MySQLConnection(**tests.get_mysql_config())
+            time.sleep(1)
+            killer.cmd_query("KILL QUERY {0}".format(connection_id))
+            killer.close()
+
+        def sleepy_select(cnx):
+            """Execute a SELECT statement which takes a while to complete"""
+            cur = cnx.cursor()
+            # Ugly query ahead!
+            stmt = "SELECT x1.*, x2.* from {table} as x1, {table} as x2".format(
+                table=self.table_name)
+            cur.execute(stmt)
+            # Save the error so we can check in the calling thread
+            cnx.test_error = None
+
+            try:
+                cur.fetchall()
+            except errors.Error as err:
+                cnx.test_error = err
+
+        worker = Thread(target=sleepy_select, args=[self.cnx])
+        killer = Thread(target=kill, args=[self.cnx.connection_id])
+        worker.start()
+        killer.start()
+        worker.join()
+        killer.join()
+
+        self.assertTrue(isinstance(self.cnx.test_error, errors.DatabaseError))
+        self.assertEqual(str(self.cnx.test_error),
+                         "1317 (70100): Query execution was interrupted")
+        self.cnx.close()
