@@ -324,7 +324,15 @@ class MySQLProtocol(object):
                     eof = self.parse_eof(packet)
                 else:
                     datas.append(packet[4:])
-                rowdata = utils.read_lc_string_list(b''.join(datas))
+
+                if type(datas[0]).__name__  == "bytearray":
+                    bdata = b''
+                    for val in datas:
+                        bdata += val
+                else:
+                    bdata = b''.join(datas)
+
+                rowdata = utils.read_lc_string_list(bdata)
             elif packet[4] == 254:
                 eof = self.parse_eof(packet)
                 rowdata = None
