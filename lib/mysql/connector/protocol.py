@@ -332,7 +332,7 @@ class MySQLProtocol(object):
                 else:
                     bdata = b''.join(datas)
 
-                rowdata = utils.read_lc_string_list(b''.join(datas))
+                rowdata = utils.read_lc_string_list(bdata)
             elif packet[4] == 254:
                 eof = self.parse_eof(packet)
                 rowdata = None
