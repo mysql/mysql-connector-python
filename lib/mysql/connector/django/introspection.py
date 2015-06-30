@@ -94,9 +94,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 FROM information_schema.columns
                 WHERE table_name = %s AND table_schema = DATABASE()""",
                            [table_name])
-            field_info = {
-                line[0]: InfoLine(*line) for line in cursor.fetchall()
-            }
+            field_info = dict(
+                (line[0], InfoLine(*line)) for line in cursor.fetchall()
+            )
 
             cursor.execute("SELECT * FROM %s LIMIT 1"
                            % self.connection.ops.quote_name(table_name))
