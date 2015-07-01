@@ -2234,9 +2234,14 @@ class BugOra16217765(tests.MySQLConnectorTests):
         else:
             cnx.cmd_query("SET old_passwords = 0")
 
-        passwd = ("SET PASSWORD FOR '{user}'@'{host}' = "
-                  "PASSWORD('{password}')").format(user=user, host=host,
-                                                   password=password)
+        if tests.MYSQL_VERSION < (5, 7, 5):
+            passwd = ("SET PASSWORD FOR '{user}'@'{host}' = "
+                      "PASSWORD('{password}')").format(user=user, host=host,
+                                                       password=password)
+        else:
+            passwd = ("ALTER USER '{user}'@'{host}' IDENTIFIED BY "
+                      "'{password}'").format(user=user, host=host,
+                                             password=password)
         cnx.cmd_query(passwd)
 
         grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
@@ -3215,6 +3220,8 @@ class BugOra19549363(tests.MySQLConnectorTests):
             cnx1.close()
         except:
             self.fail("Reset session with compression test failed.")
+        finally:
+            mysql.connector._CONNECTION_POOLS = {}
 
 
 class BugOra19803702(tests.MySQLConnectorTests):
