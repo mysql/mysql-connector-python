@@ -2237,6 +2237,7 @@ MySQL_fetch_row(MySQL *self)
     for (i= 0; i < num_fields; i++) {
     	if (row[i] == NULL)
     	{
+                Py_INCREF(Py_None);
     		PyTuple_SET_ITEM(result_row, i, Py_None);
     		continue;
         }

@@ -3657,3 +3657,44 @@ class BugOra20653441(tests.MySQLConnectorTests):
         self.assertEqual(str(self.cnx.test_error),
                          "1317 (70100): Query execution was interrupted")
         self.cnx.close()
+
+class BugOra21420633(tests.MySQLConnectorTests):
+    """BUG#21420633: CEXTENSION CRASHES WHILE FETCHING LOTS OF NULL VALUES
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug21420633'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (id INT, dept VARCHAR(5)) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_null(self):
+        cur = self.cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl)
+
+        data = [(i, None) for i in range(10000)]
+
+        cur.executemany(sql, data)
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+
+        res = cur.fetchall()
+        cur.close()
