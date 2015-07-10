@@ -437,11 +437,15 @@ class MySQLConnection(MySQLConnectionAbstract):
         if not self.unread_result:
             raise errors.InternalError("No result set available.")
 
-        if binary:
-            rows = self._protocol.read_binary_result(
-                self._socket, columns, count)
-        else:
-            rows = self._protocol.read_text_result(self._socket, count)
+        try:
+            if binary:
+                rows = self._protocol.read_binary_result(
+                    self._socket, columns, count)
+            else:
+                rows = self._protocol.read_text_result(self._socket, count)
+        except errors.Error as err:
+            self.unread_result = False
+            raise err
         if rows[-1] is not None:
             self._handle_server_status(rows[-1]['status_flag'])
             self.unread_result = False

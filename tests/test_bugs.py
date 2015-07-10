@@ -3645,6 +3645,7 @@ class BugOra20653441(tests.MySQLConnectorTests):
                 cur.fetchall()
             except errors.Error as err:
                 cnx.test_error = err
+                cur.close()
 
         worker = Thread(target=sleepy_select, args=[self.cnx])
         killer = Thread(target=kill, args=[self.cnx.connection_id])

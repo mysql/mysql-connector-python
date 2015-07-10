@@ -269,6 +269,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     break
                 row = self._cmysql.fetch_row()
         except MySQLInterfaceError as exc:
+            self.free_result()
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
 
