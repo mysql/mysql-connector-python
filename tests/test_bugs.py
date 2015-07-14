@@ -2220,6 +2220,16 @@ class BugOra16217765(tests.MySQLConnectorTests):
             'password': 'nativeP@ss',
         },
     }
+    users_nopass = {
+        'sha256_password': {
+            'username': 'sha256user_np',
+            'password': '',
+        },
+        'mysql_native_password': {
+            'username': 'nativeuser_np',
+            'password': '',
+        },
+    }
 
     def _create_user(self, cnx, user, password, host, database,
                      plugin):
@@ -2281,28 +2291,28 @@ class BugOra16217765(tests.MySQLConnectorTests):
         })
 
         auth_plugin = 'sha256_password'
-        user = self.users[auth_plugin]
-        self._create_user(self.admin_cnx, user['username'],
-                          user['password'],
-                          self.host,
-                          config['database'],
-                          plugin=auth_plugin)
+        for user in (self.users[auth_plugin], self.users_nopass[auth_plugin]):
+            self._create_user(self.admin_cnx, user['username'],
+                              user['password'],
+                              self.host,
+                              config['database'],
+                              plugin=auth_plugin)
 
-        config['user'] = user['username']
-        config['password'] = user['password']
-        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+            config['user'] = user['username']
+            config['password'] = user['password']
+            config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
 
-        try:
-            cnx = connection.MySQLConnection(**config)
-        except:
-            import traceback
-            traceback.print_exc()
-            self.fail("Connecting using sha256_password auth failed")
+            try:
+                cnx = connection.MySQLConnection(**config)
+            except:
+                import traceback
+                traceback.print_exc()
+                self.fail("Connecting using sha256_password auth failed")
 
-        try:
-            cnx.cmd_change_user(config['user'], config['password'])
-        except:
-            self.fail("Changing user using sha256_password auth failed")
+            try:
+                cnx.cmd_change_user(config['user'], config['password'])
+            except:
+                self.fail("Changing user using sha256_password auth failed")
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 6),
                      "MySQL {0} does not support sha256_password auth".format(
@@ -2312,18 +2322,18 @@ class BugOra16217765(tests.MySQLConnectorTests):
         config['unix_socket'] = None
 
         auth_plugin = 'sha256_password'
-        user = self.users[auth_plugin]
-        self._create_user(self.admin_cnx, user['username'],
-                          user['password'],
-                          self.host,
-                          config['database'],
-                          plugin=auth_plugin)
+        for user in (self.users[auth_plugin], self.users_nopass[auth_plugin]):
+            self._create_user(self.admin_cnx, user['username'],
+                              user['password'],
+                              self.host,
+                              config['database'],
+                              plugin=auth_plugin)
 
-        config['user'] = user['username']
-        config['password'] = user['password']
-        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
-        self.assertRaises(errors.InterfaceError, connection.MySQLConnection,
-                          **config)
+            config['user'] = user['username']
+            config['password'] = user['password']
+            config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+            self.assertRaises(errors.InterfaceError, connection.MySQLConnection,
+                              **config)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 5, 7),
                      "MySQL {0} does not support authentication plugins".format(
@@ -2333,21 +2343,21 @@ class BugOra16217765(tests.MySQLConnectorTests):
         config['unix_socket'] = None
 
         auth_plugin = 'mysql_native_password'
-        user = self.users[auth_plugin]
-        self._create_user(self.admin_cnx, user['username'],
-                          user['password'],
-                          self.host,
-                          config['database'],
-                          plugin=auth_plugin)
+        for user in (self.users[auth_plugin], self.users_nopass[auth_plugin]):
+            self._create_user(self.admin_cnx, user['username'],
+                              user['password'],
+                              self.host,
+                              config['database'],
+                              plugin=auth_plugin)
 
-        config['user'] = user['username']
-        config['password'] = user['password']
-        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
-        try:
-            cnx = connection.MySQLConnection(**config)
-        except Exception as exc:
-            self.fail("Connecting using {0} auth failed: {1}".format(
-                auth_plugin, exc))
+            config['user'] = user['username']
+            config['password'] = user['password']
+            config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+            try:
+                cnx = connection.MySQLConnection(**config)
+            except Exception as exc:
+                self.fail("Connecting using {0} auth failed: {1}".format(
+                    auth_plugin, exc))
 
 
 class BugOra18144971(tests.MySQLConnectorTests):

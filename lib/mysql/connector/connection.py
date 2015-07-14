@@ -167,10 +167,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             auth = get_auth_plugin(new_auth_plugin)(
                 auth_data, password=password, ssl_enabled=self._ssl_active)
             response = auth.auth_response()
-            if response == b'\x00':
-                self._socket.send(b'')
-            else:
-                self._socket.send(response)
+            self._socket.send(response)
             packet = self._socket.recv()
             if packet[4] != 1:
                 return self._handle_ok(packet)

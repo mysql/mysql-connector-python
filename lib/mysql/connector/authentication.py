@@ -92,7 +92,7 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             raise errors.InterfaceError("Missing authentication data (seed)")
 
         if not self._password:
-            return b'\x00'
+            return b''
         password = self._password
 
         if isstr(self._password):
