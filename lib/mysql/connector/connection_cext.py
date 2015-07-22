@@ -187,7 +187,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def is_connected(self):
         """Reports whether the connection to MySQL Server is available"""
         if self._cmysql:
-            return self._cmysql.connected()
+            return self._cmysql.ping()
 
         return False
 
@@ -208,12 +208,17 @@ class CMySQLConnection(MySQLConnectionAbstract):
         errmsg = "Connection to MySQL is not available"
 
         try:
-            self._cmysql.ping()
+            connected = self._cmysql.ping()
         except AttributeError:
-            if reconnect:
-                self.reconnect(attempts=attempts, delay=delay)
-            else:
-                raise errors.InterfaceError(errmsg)
+          pass  # Raise or reconnect later
+        else:
+            if connected:
+                return
+
+        if reconnect:
+            self.reconnect(attempts=attempts, delay=delay)
+        else:
+            raise errors.InterfaceError(errmsg)
 
     def set_character_set_name(self, charset):
         """Sets the default character set name for current connection.
