@@ -11,6 +11,7 @@ Full release notes:
 v2.1.3
 ======
 
+- BUG#21499127: Fix copyright year in README.txt
 - BUG#21420633: Fix CExtension crashing while fetching large number of NULL value
 - BUG#21420906: Fix connect using SHA256 user with blank password
 - BUG#21414628: Fix failing C extension unittests
