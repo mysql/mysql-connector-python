@@ -121,8 +121,10 @@ def unix_lib_is64bit(lib_file):
                 break
         lib_file = mysqlclient_lib
 
-    prc = Popen(['file', lib_file], stdin=PIPE, stderr=STDOUT, stdout=PIPE)
+    prc = Popen(['file', '-L', lib_file], stdin=PIPE, stderr=STDOUT,
+                stdout=PIPE)
     stdout = prc.communicate()[0]
+    stdout = stdout.split(':')[1]
 
     if 'x86_64' in stdout or 'x86-64' in stdout:
         return True
@@ -173,8 +175,10 @@ def get_mysql_config_info(mysql_config):
 
         stdout = None
         try:
-            proc = Popen(['file', lib], stdout=PIPE, universal_newlines=True)
+            proc = Popen(['file', '-L', lib], stdout=PIPE,
+                         universal_newlines=True)
             stdout, _ = proc.communicate()
+            stdout = stdout.split(':')[1]
         except OSError as exc:
             raise DistutilsExecError(
                 "Although the system seems POSIX, the file-command could not "
