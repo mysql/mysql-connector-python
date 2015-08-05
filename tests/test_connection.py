@@ -1172,7 +1172,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp = ('Ham ', ' Spam ')
         self.cnx.set_login(*exp)
         self.assertEqual(exp[0].strip(), self.cnx._user)
-        self.assertEqual(exp[1].strip(), self.cnx._password)
+        self.assertEqual(exp[1], self.cnx._password)
 
         self.cnx.set_login()
         self.assertEqual('', self.cnx._user)

@@ -164,7 +164,7 @@ class Bug480360(tests.MySQLConnectorTests):
         self.cnx.close()
 
 @unittest.skipIf(tests.MYSQL_VERSION >= (5, 6, 6),
-                 "Bug380528 not tested with MSQL version >= 5.6.6")
+                 "Bug380528 not tested with MySQL version >= 5.6.6")
 class Bug380528(tests.MySQLConnectorTests):
 
     """lp:380528: we do not support old passwords"""
@@ -3669,6 +3669,7 @@ class BugOra20653441(tests.MySQLConnectorTests):
                          "1317 (70100): Query execution was interrupted")
         self.cnx.close()
 
+
 class BugOra21420633(tests.MySQLConnectorTests):
     """BUG#21420633: CEXTENSION CRASHES WHILE FETCHING LOTS OF NULL VALUES
     """
@@ -3709,3 +3710,48 @@ class BugOra21420633(tests.MySQLConnectorTests):
 
         res = cur.fetchall()
         cur.close()
+
+
+class BugOra21492428(tests.MySQLConnectorTests):
+    """BUG#21492428: CONNECT FAILS WHEN PASSWORD STARTS OR ENDS WITH SPACES
+    """
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        if config['unix_socket'] and os.name != 'nt':
+            self.host = 'localhost'
+        else:
+            self.host = config['host']
+
+        grant = u"CREATE USER '{user}'@'{host}' IDENTIFIED BY '{password}'"
+
+        self._credentials = [
+            ('ABCD', ' XYZ'),
+            (' PQRS', ' 1 2 3 '),
+            ('XYZ1 ', 'XYZ123    '),
+            (' A B C D ', '    ppppp    '),
+        ]
+        for user, password in self._credentials:
+            self.cursor.execute(grant.format(
+                user=user, host=self.host, password=password))
+
+    def tearDown(self):
+        for user, password in self._credentials:
+            self.cursor.execute(u"DROP USER '{user}'@'{host}'".format(
+                user=user, host=self.host))
+
+    def test_password_with_spaces(self):
+        config = tests.get_mysql_config()
+        for user, password in self._credentials:
+            config['user'] = user
+            config['password'] = password
+            config['database'] = None
+            try:
+                cnx = connection.MySQLConnection(**config)
+            except errors.ProgrammingError:
+                self.fail('Failed using password with spaces')
+            else:
+                cnx.close()

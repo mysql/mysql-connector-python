@@ -484,7 +484,7 @@ class MySQLConnectionAbstract(object):
         else:
             self._user = ''
         if password is not None:
-            self._password = password.strip()
+            self._password = password
         else:
             self._password = ''
 
