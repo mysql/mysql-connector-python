@@ -410,6 +410,7 @@ class MySQLServer(MySQLServerBase):
             '--default-storage-engine=myisam',
             '--net_buffer_length=16K',
             '--tmpdir=%s' % self._tmpdir,
+            '--innodb_log_file_size=1Gb',
         ]
         if self._version[0:2] < (5, 5):
             cmd.append('--language={0}/english'.format(self._lc_messages_dir))
