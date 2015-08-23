@@ -46,6 +46,7 @@ typedef struct {
     PyObject *have_result_set;
     PyObject *fields;
     PyObject *auth_plugin;
+    MY_CHARSET_INFO cs;
     unsigned int connection_timeout;
     // class members
 

@@ -233,7 +233,7 @@ class MySQLProtocol(object):
         except (struct.error, ValueError):
             raise errors.InterfaceError("Failed parsing column count")
 
-    def parse_column(self, packet):
+    def parse_column(self, packet, charset='utf-8'):
         """Parse a MySQL column-packet"""
         (packet, _) = utils.read_lc_string(packet[4:])  # catalog
         (packet, _) = utils.read_lc_string(packet)  # db
@@ -249,7 +249,7 @@ class MySQLProtocol(object):
             raise errors.InterfaceError("Failed parsing column information")
 
         return (
-            name.decode('utf-8'),
+            name.decode(charset),
             field_type,
             None,  # display_size
             None,  # internal_size

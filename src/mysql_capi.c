@@ -129,6 +129,23 @@ str_to_bytes(const char* charset, PyObject *value)
 }
 
 /**
+  Get Python character name based on MySQL character name
+ */
+static char*
+python_characterset_name(const char* mysql_name)
+{
+    if (!mysql_name) {
+        return "latin1"; // MySQL default
+    }
+
+    if (strcmp(mysql_name, "utf8mb4") == 0) {
+        return "utf8";
+    }
+
+    return (char*)mysql_name;
+}
+
+/**
   Get the character set name from the current MySQL session.
 
   Get the character set name from the current MySQL session.
@@ -148,17 +165,14 @@ static const char*
 my2py_charset_name(MYSQL *session)
 {
     const char *name;
+
     if (!session)
     {
         return NULL;
     }
 
-    name = mysql_character_set_name(session);
-    if (strcmp(name, "utf8mb4") == 0) {
-        return "utf8";
-    }
-
-    return name;
+    name= mysql_character_set_name(session);
+    return python_characterset_name(name);
 }
 
 /**
@@ -177,12 +191,15 @@ my2py_charset_name(MYSQL *session)
     @retval NULL    Exception
 */
 static PyObject*
-fetch_fields(MYSQL_RES *result, unsigned int num_fields)
+fetch_fields(MYSQL_RES *result, unsigned int num_fields, MY_CHARSET_INFO *cs,
+             unsigned int use_unicode)
 {
-    PyObject *fields = NULL;
-    PyObject *field = NULL;
-    MYSQL_FIELD *my_fields;
+    PyObject *fields= NULL;
+    PyObject *field= NULL;
+    PyObject *decoded= NULL;
+    MYSQL_FIELD *myfs;
     unsigned int i;
+    char *charset= python_characterset_name(cs->csname);
 
     fields = PyList_New(0);
 
@@ -192,35 +209,48 @@ fetch_fields(MYSQL_RES *result, unsigned int num_fields)
     }
 
     Py_BEGIN_ALLOW_THREADS
-    my_fields = mysql_fetch_fields(result);
+    myfs = mysql_fetch_fields(result);
     Py_END_ALLOW_THREADS
 
     for (i = 0; i < num_fields; i++)
     {
         field = PyTuple_New(11);
-        PyTuple_SET_ITEM(field, 0,
-    	                 UnicodeFromStringAndSize(my_fields[i].catalog,
-    	                                          my_fields[i].catalog_length));
-        PyTuple_SET_ITEM(field, 1,
-    	                 UnicodeFromStringAndSize(my_fields[i].db,
-    	                                          my_fields[i].db_length));
-        PyTuple_SET_ITEM(field, 2,
-    	                 UnicodeFromStringAndSize(my_fields[i].table,
-    	                                          my_fields[i].table_length));
-        PyTuple_SET_ITEM(field, 3,
-    	                 UnicodeFromStringAndSize(my_fields[i].org_table,
-    	                                          my_fields[i].org_table_length));
-        PyTuple_SET_ITEM(field, 4,
-    	                 UnicodeFromStringAndSize(my_fields[i].name,
-    	                                          my_fields[i].name_length));
-        PyTuple_SET_ITEM(field, 5,
-    	                 UnicodeFromStringAndSize(my_fields[i].org_name,
-    	                                          my_fields[i].org_name_length));
-    	PyTuple_SET_ITEM(field, 6, PyInt_FromLong(my_fields[i].charsetnr));
-    	PyTuple_SET_ITEM(field, 7, PyInt_FromLong(my_fields[i].max_length));
-    	PyTuple_SET_ITEM(field, 8, PyInt_FromLong(my_fields[i].type));
-    	PyTuple_SET_ITEM(field, 9, PyInt_FromLong(my_fields[i].flags));
-    	PyTuple_SET_ITEM(field, 10, PyInt_FromLong(my_fields[i].decimals));
+
+        decoded= mytopy_string(myfs[i].catalog, myfs[i].catalog_length,
+                               myfs[i].flags, charset, use_unicode);
+        if (NULL == decoded) return NULL; // decode error
+        PyTuple_SET_ITEM(field, 0, decoded);
+
+        decoded= mytopy_string(myfs[i].db, myfs[i].db_length,
+                               myfs[i].flags, charset, use_unicode);
+        if (NULL == decoded) return NULL; // decode error
+        PyTuple_SET_ITEM(field, 1, decoded);
+
+        decoded= mytopy_string(myfs[i].table, myfs[i].table_length,
+                               myfs[i].flags, charset, use_unicode);
+        if (NULL == decoded) return NULL; // decode error
+        PyTuple_SET_ITEM(field, 2, decoded);
+
+        decoded= mytopy_string(myfs[i].org_table, myfs[i].org_table_length,
+                               myfs[i].flags, charset, use_unicode);
+        if (NULL == decoded) return NULL; // decode error
+        PyTuple_SET_ITEM(field, 3, decoded);
+
+        decoded= mytopy_string(myfs[i].name, myfs[i].name_length,
+                               myfs[i].flags, charset, use_unicode);
+        if (NULL == decoded) return NULL; // decode error
+        PyTuple_SET_ITEM(field, 4, decoded);
+
+        decoded= mytopy_string(myfs[i].org_name, myfs[i].org_name_length,
+                               myfs[i].flags, charset, use_unicode);
+        if (NULL == decoded) return NULL; // decode error
+        PyTuple_SET_ITEM(field, 5, decoded);
+
+    	PyTuple_SET_ITEM(field, 6, PyInt_FromLong(myfs[i].charsetnr));
+    	PyTuple_SET_ITEM(field, 7, PyInt_FromLong(myfs[i].max_length));
+    	PyTuple_SET_ITEM(field, 8, PyInt_FromLong(myfs[i].type));
+    	PyTuple_SET_ITEM(field, 9, PyInt_FromLong(myfs[i].flags));
+    	PyTuple_SET_ITEM(field, 10, PyInt_FromLong(myfs[i].decimals));
         PyList_Append(fields, field);
 		Py_DECREF(field);
     }
@@ -1823,6 +1853,7 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
 		self->raw= self->raw_at_connect;
 	}
 
+    mysql_get_character_set_info(&self->session, &self->cs);
     return MySQL_handle_result(self);
 }
 
@@ -2157,7 +2188,7 @@ MySQL_fetch_fields(MySQL *self)
     count= mysql_num_fields(self->result);
     Py_END_ALLOW_THREADS
 
-    return fetch_fields(self->result, count);
+    return fetch_fields(self->result, count, &self->cs, self->use_unicode);
 }
 
 /**
@@ -2230,7 +2261,8 @@ MySQL_fetch_row(MySQL *self)
     }
 
     if (self->fields == NULL) {
-        self->fields= fetch_fields(self->result, num_fields);
+        self->fields= fetch_fields(self->result, num_fields, &self->cs,
+                                   self->use_unicode);
     }
 
     result_row = PyTuple_New(num_fields);

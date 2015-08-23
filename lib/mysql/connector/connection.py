@@ -401,7 +401,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         columns = [None,] * column_count
         for i in range(0, column_count):
-            columns[i] = self._protocol.parse_column(self._socket.recv())
+            columns[i] = self._protocol.parse_column(
+                self._socket.recv(), self.python_charset)
 
         eof = self._handle_eof(self._socket.recv())
         self.unread_result = True
@@ -920,7 +921,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         columns = [None] * column_count
         for i in range(0, column_count):
-            columns[i] = self._protocol.parse_column(self._socket.recv())
+            columns[i] = self._protocol.parse_column(
+                self._socket.recv(), self.python_charset)
 
         eof = self._handle_eof(self._socket.recv())
         return (column_count, columns, eof)
@@ -941,12 +943,14 @@ class MySQLConnection(MySQLConnectionAbstract):
         if result['num_params'] > 0:
             for _ in range(0, result['num_params']):
                 result['parameters'].append(
-                    self._protocol.parse_column(self._socket.recv()))
+                    self._protocol.parse_column(self._socket.recv(),
+                                                self.python_charset))
             self._handle_eof(self._socket.recv())
         if result['num_columns'] > 0:
             for _ in range(0, result['num_columns']):
                 result['columns'].append(
-                    self._protocol.parse_column(self._socket.recv()))
+                    self._protocol.parse_column(self._socket.recv(),
+                                                self.python_charset))
             self._handle_eof(self._socket.recv())
 
         return result

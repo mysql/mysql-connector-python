@@ -438,7 +438,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
     def test_column_names(self):
         cur = self._get_cursor(self.cnx)
         stmt = "SELECT NOW() as now, 'The time' as label, 123 FROM dual"
-        exp = ('now', 'label', '123')
+        exp = (b'now', 'label', b'123')
         cur.execute(stmt)
         cur.fetchone()
         self.assertEqual(exp, cur.column_names)

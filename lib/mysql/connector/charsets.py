@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -24,8 +24,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA 
 
 # This file was auto-generated.
-_GENERATED_ON = '2014-05-23'
-_MYSQL_VERSION = (5, 7, 4)
+_GENERATED_ON = '2015-08-24'
+_MYSQL_VERSION = (5, 7, 8)
 
 """This module contains the MySQL Server Character Sets"""
 

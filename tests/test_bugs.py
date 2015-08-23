@@ -3675,6 +3675,65 @@ class BugOra20653441(tests.MySQLConnectorTests):
                          "1317 (70100): Query execution was interrupted")
 
 
+class BugOra21535573(tests.MySQLConnectorTests):
+    """BUG#21535573:  SEGFAULT WHEN TRY TO SELECT GBK DATA WITH C-EXTENSION
+    """
+    def tearDown(self):
+        cnx = connection.MySQLConnection(**tests.get_mysql_config())
+        for charset in ('gbk', 'sjis', 'big5'):
+            tablename = charset + 'test'
+            cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tablename))
+        cnx.close()
+
+    def _test_charset(self, charset, data):
+        config = tests.get_mysql_config()
+        config['charset'] = charset
+        config['use_unicode'] = True
+        self.cnx = self.cnx.__class__(**config)
+        tablename = charset + 'test'
+        cur = self.cnx.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tablename))
+        if PY2:
+            column = data.encode(charset)
+        else:
+            column = data
+        table = (
+            "CREATE TABLE {table} ("
+            " {col} INT AUTO_INCREMENT KEY, "
+            "c1 VARCHAR(40)"
+            ") CHARACTER SET '{charset}'"
+        ).format(table=tablename, charset=charset, col=column)
+        cur.execute(table)
+        self.cnx.commit()
+
+        cur.execute("TRUNCATE {0}".format(tablename))
+        self.cnx.commit()
+
+        insert = "INSERT INTO {0} (c1) VALUES (%s)".format(tablename)
+        cur.execute(insert, (data,))
+        self.cnx.commit()
+
+        cur.execute("SELECT * FROM {0}".format(tablename))
+        for row in cur:
+            self.assertEqual(data, row[1])
+
+        cur.close()
+        self.cnx.close()
+
+    @foreach_cnx()
+    def test_gbk(self):
+        self._test_charset('gbk', u'海豚')
+
+    @foreach_cnx()
+    def test_sjis(self):
+        self._test_charset('sjis', u'シイラ')
+
+    @foreach_cnx()
+    def test_big5(self):
+        self._test_charset('big5', u'皿')
+
+
 class BugOra21536507(tests.MySQLConnectorTests):
     """BUG#21536507:C/PYTHON BEHAVIOR NOT PROPER WHEN RAISE_ON_WARNINGS=TRUE
     """

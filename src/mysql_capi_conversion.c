@@ -736,6 +736,18 @@ mytopy_string(const char *data, const unsigned long length,
               const unsigned long flags, const char *charset,
               unsigned int use_unicode)
 {
+    if (!charset || !data) {
+        printf("\n==> here ");
+        if (charset) {
+            printf(" charset:%s", charset);
+        }
+        if (data) {
+            printf(" data:'%s'", data);
+        }
+        printf("\n");
+        return NULL;
+    }
+
     if (!(flags & BINARY_FLAG) && use_unicode && strcmp(charset, "binary") != 0)
     {
         return PyUnicode_Decode(data, length, charset, NULL);
