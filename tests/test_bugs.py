@@ -1889,7 +1889,7 @@ class Bug17578937(tests.MySQLConnectorTests):
         config = tests.get_mysql_config().copy()
         config['connection_timeout'] = 2
         cnxpool = pooling.MySQLConnectionPool(
-            pool_name='test', pool_size=1, **tests.get_mysql_config())
+            pool_name='test', pool_size=1, **config)
 
         pcnx = cnxpool.get_connection()
         self.assertTrue(isinstance(pcnx, pooling.PooledMySQLConnection))
@@ -3603,9 +3603,12 @@ class BugOra20653441(tests.MySQLConnectorTests):
 
     def setUp(self):
         self.table_name = 'Bug20653441'
+        self._setup()
 
     def _setup(self):
-        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table_name))
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table_name))
         table = (
             "CREATE TABLE {table} ("
             " id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
@@ -3613,13 +3616,15 @@ class BugOra20653441(tests.MySQLConnectorTests):
             " PRIMARY KEY (id)"
             ")"
         ).format(table=self.table_name, default='a' * 255)
-        self.cnx.cmd_query(table)
+        cnx.cmd_query(table)
 
         stmt = "INSERT INTO {table} (id) VALUES {values}".format(
             table=self.table_name,
             values=','.join(['(NULL)'] * 1024)
         )
-        self.cnx.cmd_query(stmt)
+        cnx.cmd_query(stmt)
+        cnx.commit()
+        cnx.close()
 
     def tearDown(self):
         try:
@@ -3632,14 +3637,13 @@ class BugOra20653441(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_kill_query(self):
-        self._setup()
 
         def kill(connection_id):
             """Kill query using separate connection"""
-            killer = connection.MySQLConnection(**tests.get_mysql_config())
+            killer_cnx = connection.MySQLConnection(**tests.get_mysql_config())
             time.sleep(1)
-            killer.cmd_query("KILL QUERY {0}".format(connection_id))
-            killer.close()
+            killer_cnx.cmd_query("KILL QUERY {0}".format(connection_id))
+            killer_cnx.close()
 
         def sleepy_select(cnx):
             """Execute a SELECT statement which takes a while to complete"""
@@ -3664,10 +3668,37 @@ class BugOra20653441(tests.MySQLConnectorTests):
         worker.join()
         killer.join()
 
+        self.cnx.close()
+
         self.assertTrue(isinstance(self.cnx.test_error, errors.DatabaseError))
         self.assertEqual(str(self.cnx.test_error),
                          "1317 (70100): Query execution was interrupted")
-        self.cnx.close()
+
+
+class BugOra21536507(tests.MySQLConnectorTests):
+    """BUG#21536507:C/PYTHON BEHAVIOR NOT PROPER WHEN RAISE_ON_WARNINGS=TRUE
+    """
+    @cnx_config(raw=True, get_warnings=True, raise_on_warnings=True)
+    @foreach_cnx()
+    def test_with_raw(self):
+        cur = self.cnx.cursor()
+        drop_stmt = "DROP TABLE IF EXISTS unknown"
+        self.assertRaises(errors.DatabaseError, cur.execute, drop_stmt)
+        exp = [('Note', 1051, "Unknown table 'myconnpy.unknown'")]
+        self.assertEqual(exp, cur.fetchwarnings())
+
+        select_stmt = "SELECT 'a'+'b'"
+        cur.execute(select_stmt)
+        self.assertRaises(errors.DatabaseError, cur.fetchall)
+        exp = [
+            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
+            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
+        ]
+        self.assertEqual(exp, cur.fetchwarnings())
+        try:
+            cur.close()
+        except errors.InternalError as exc:
+            self.fail("Closing cursor failed with: %s" % str(exc))
 
 
 class BugOra21420633(tests.MySQLConnectorTests):

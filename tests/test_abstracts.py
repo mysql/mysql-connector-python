@@ -162,7 +162,6 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_reset_session(self):
-        config = tests.get_mysql_config()
         exp = [True, u'STRICT_ALL_TABLES', u'-09:00', 33]
         self.cnx.autocommit = exp[0]
         self.cnx.sql_mode = exp[1]
@@ -252,7 +251,6 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         pid = other_cnx.connection_id
 
         self.cnx.cmd_process_kill(pid)
-
         self.assertFalse(other_cnx.is_connected())
 
     @foreach_cnx()

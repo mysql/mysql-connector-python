@@ -810,8 +810,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                     "Cursor class needs be to subclass of cursor.CursorBase")
             return (cursor_class)(self)
 
-        buffered = buffered or self._buffered
-        raw = raw or self._raw
+        buffered = buffered if buffered is not None else self._buffered
+        raw = raw if raw is not None else self._raw
 
         cursor_type = 0
         if buffered is True:

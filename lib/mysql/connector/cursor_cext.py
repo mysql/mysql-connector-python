@@ -130,6 +130,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._cnx.consume_results()
             _ = self._cnx.cmd_query("SHOW WARNINGS")
             warnings = self._cnx.get_rows()
+            self._cnx.consume_results()
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
@@ -158,6 +159,9 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._warning_count = result['warning_count']
             self._affected_rows = result['affected_rows']
             self._rowcount = -1
+            self._handle_warnings()
+            if self._cnx.raise_on_warnings is True and self._warnings:
+                raise errors.get_mysql_exception(*self._warnings[0][1:3])
 
     def _handle_resultset(self):
         """Handle a result set"""

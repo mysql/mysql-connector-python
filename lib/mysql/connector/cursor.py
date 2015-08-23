@@ -396,8 +396,10 @@ class MySQLCursor(CursorBase):
             raise errors.ProgrammingError(
                 "Failed handling non-resultset; {0}".format(err))
 
-        if self._connection.get_warnings is True and self._warning_count:
-            self._warnings = self._fetch_warnings()
+        self._handle_warnings()
+        if self._connection.raise_on_warnings is True and self._warnings:
+            raise errors.get_mysql_exception(
+                self._warnings[0][1], self._warnings[0][2])
 
     def _handle_resultset(self):
         """Handles result set
@@ -746,7 +748,7 @@ class MySQLCursor(CursorBase):
         """
         res = []
         try:
-            cur = self._connection.cursor()
+            cur = self._connection.cursor(raw=False)
             cur.execute("SHOW WARNINGS")
             res = cur.fetchall()
             cur.close()
@@ -754,21 +756,25 @@ class MySQLCursor(CursorBase):
             raise errors.InterfaceError(
                 "Failed getting warnings; %s" % err)
 
-        if self._connection.raise_on_warnings is True:
-            raise errors.get_mysql_exception(res[0][1], res[0][2])
-        else:
-            if len(res):
-                return res
+        if len(res):
+            return res
 
         return None
+
+    def _handle_warnings(self):
+        """Handle possible warnings after all results are consumed"""
+        if self._connection.get_warnings is True and self._warning_count:
+            self._warnings = self._fetch_warnings()
 
     def _handle_eof(self, eof):
         """Handle EOF packet"""
         self._connection.unread_result = False
         self._nextrow = (None, None)
         self._warning_count = eof['warning_count']
-        if self._connection.get_warnings is True and eof['warning_count']:
-            self._warnings = self._fetch_warnings()
+        self._handle_warnings()
+        if self._connection.raise_on_warnings is True and self._warnings:
+            raise errors.get_mysql_exception(
+                self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self):
         """Returns the next row in the result set
