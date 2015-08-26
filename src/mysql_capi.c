@@ -315,7 +315,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self->result=               NULL;
 	self->fields=               NULL;
 	self->use_unicode=          1;
-	self->auth_plugin=          NULL;
+	self->auth_plugin=          PyStringFromString("mysql_native_password");
 
 	return (PyObject *)self;
 }
@@ -367,7 +367,7 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
                                      &PyStringType, &self->charset_name,
                                      &PyIntType, &con_timeout,
                                      &PyBool_Type, &use_unicode,
-                                     &auth_plugin))
+                                     &PyStringType, &auth_plugin))
         return -1;
 
     if (self->buffered_at_connect)
@@ -1113,8 +1113,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
     }
 
-    if (self->auth_plugin) {
-        auth_plugin= PyBytesAsString(self->auth_plugin);
+    if (PyString_Check(self->auth_plugin)) {
+        auth_plugin= PyStringAsString(self->auth_plugin);
         mysql_options(&self->session, MYSQL_DEFAULT_AUTH, auth_plugin);
         if (strcmp(auth_plugin, "mysql_clear_password") == 0)
         {
@@ -2269,7 +2269,7 @@ MySQL_fetch_row(MySQL *self)
     for (i= 0; i < num_fields; i++) {
     	if (row[i] == NULL)
     	{
-                Py_INCREF(Py_None);
+            Py_INCREF(Py_None);
     		PyTuple_SET_ITEM(result_row, i, Py_None);
     		continue;
         }

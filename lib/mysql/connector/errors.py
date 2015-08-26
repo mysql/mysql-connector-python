@@ -300,4 +300,5 @@ _ERROR_EXCEPTIONS = {
     2013: OperationalError,
     2049: NotSupportedError,
     2055: OperationalError,
+    2061: InterfaceError,
 }
