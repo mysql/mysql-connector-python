@@ -434,6 +434,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                     cur = CMySQLCursorBufferedRaw(self._cnx._get_self())
                 else:
                     cur = CMySQLCursorBuffered(self._cnx._get_self())
+                cur._executed = "(a result of {0})".format(call)
                 cur._handle_result(result)
                 # pylint: enable=W0212
                 results.append(cur)
@@ -610,15 +611,18 @@ class CMySQLCursor(MySQLCursorAbstract):
         return False
 
     def __str__(self):
-        fmt = "CMySQLCursor: {0}"
+        fmt = "{class_name}: {stmt}"
         if self._executed:
-            executed = self._executed.decode('utf-8')
-            if len(executed) > 30:
-                executed = executed[:30] + '..'
+            try:
+                executed = self._executed.decode('utf-8')
+            except AttributeError:
+                executed = self._executed
+            if len(executed) > 40:
+                executed = executed[:40] + '..'
         else:
             executed = '(Nothing executed yet)'
 
-        return fmt.format(executed)
+        return fmt.format(class_name=self.__class__.__name__, stmt=executed)
 
 
 class CMySQLCursorBuffered(CMySQLCursor):

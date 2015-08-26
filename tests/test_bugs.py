@@ -3856,3 +3856,68 @@ class BugOra21492428(tests.MySQLConnectorTests):
                 self.fail('Failed using password with spaces')
             else:
                 cnx.close()
+
+
+class BugOra21492815(tests.MySQLConnectorTests):
+    """BUG#21492815: CALLPROC() HANGS WHEN CONSUME_RESULTS=TRUE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.proc1 = 'Bug20834643'
+        self.proc2 = 'Bug20834643_1'
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc1))
+
+        create = ("CREATE PROCEDURE {0}() BEGIN SELECT 1234; "
+                  "END".format(self.proc1))
+        cur.execute(create)
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc2))
+
+        create = ("CREATE PROCEDURE {0}() BEGIN SELECT 9876; "
+                  "SELECT CONCAT('','abcd'); END".format(self.proc2))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc1))
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc2))
+        cur.close()
+        cnx.close()
+
+    @cnx_config(consume_results=True, raw=True)
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.proc1)
+        self.assertEqual((bytearray(b'1234'),),
+                          next(cur.stored_results()).fetchone())
+
+        cur.callproc(self.proc2)
+        exp = [[(bytearray(b'9876'),)], [(bytearray(b'abcd'),)]]
+        results = []
+        for result in cur.stored_results():
+            results.append(result.fetchall())
+        self.assertEqual(exp, results)
+        cur.close()
+
+    @cnx_config(consume_results=True, raw=False)
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.proc1)
+        self.assertEqual((1234,),
+                          next(cur.stored_results()).fetchone())
+
+        cur.callproc(self.proc2)
+        exp = [[(9876,)], [('abcd',)]]
+        results = []
+        for result in cur.stored_results():
+            results.append(result.fetchall())
+        self.assertEqual(exp, results)
+        cur.close()

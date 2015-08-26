@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -916,7 +916,7 @@ class MySQLCursorTests(tests.TestsCursor):
         stmt = "SELECT VERSION(),USER(),CURRENT_TIME(),NOW(),SHA1('myconnpy')"
         self.cur.execute(stmt)
         self.cur.fetchone()
-        self.assertEqual("MySQLCursor: {0}..".format(stmt[:30]),
+        self.assertEqual("MySQLCursor: {0}..".format(stmt[:40]),
                          self.cur.__str__())
         self.cur.close()
 

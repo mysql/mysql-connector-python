@@ -84,6 +84,8 @@ class CursorBase(MySQLCursorAbstract):
     It's better to inherite from MySQLCursor.
     """
 
+    _raw = False
+
     def __init__(self):
         self._description = None
         self._rowcount = -1
@@ -704,15 +706,24 @@ class MySQLCursor(CursorBase):
 
             call = "CALL {0}({1})".format(procname, ','.join(argnames))
 
+            # pylint: disable=W0212
+            # We disable consuming results temporary to make sure we
+            # getting all results
+            can_consume_results = self._connection._consume_results
             for result in self._connection.cmd_query_iter(call):
-                # pylint: disable=W0212
-                tmp = MySQLCursorBuffered(self._connection._get_self())
+                self._connection._consume_results = False
+                if self._raw:
+                    tmp = MySQLCursorBufferedRaw(self._connection._get_self())
+                else:
+                    tmp = MySQLCursorBuffered(self._connection._get_self())
+                tmp._executed = "(a result of {0})".format(call)
                 tmp._handle_result(result)
                 if tmp._warnings is not None:
                     self._warnings = tmp._warnings
-                # pylint: enable=W0212
                 if 'columns' in result:
                     results.append(tmp)
+            self._connection._consume_results = can_consume_results
+            #pylint: enable=W0212
 
             if argnames:
                 select = "SELECT {0}".format(','.join(argtypes))
@@ -888,16 +899,17 @@ class MySQLCursor(CursorBase):
         return True
 
     def __str__(self):
-        fmt = "MySQLCursor: %s"
+        fmt = "{class_name}: {stmt}"
         if self._executed:
-            executed = bytearray(self._executed).decode('utf-8')
-            if len(executed) > 30:
-                res = fmt % (executed[:30] + '..')
-            else:
-                res = fmt % (executed)
+            try:
+                executed = self._executed.decode('utf-8')
+            except AttributeError:
+                executed = self._executed
+            if len(executed) > 40:
+                executed = executed[:40] + '..'
         else:
-            res = fmt % '(Nothing executed yet)'
-        return res
+            executed = '(Nothing executed yet)'
+        return fmt.format(class_name=self.__class__.__name__, stmt=executed)
 
 
 class MySQLCursorBuffered(MySQLCursor):
@@ -965,6 +977,9 @@ class MySQLCursorRaw(MySQLCursor):
     """
     Skips conversion from MySQL datatypes to Python types when fetching rows.
     """
+
+    _raw = True
+
     def fetchone(self):
         row = self._fetch_row()
         if row:
@@ -990,6 +1005,9 @@ class MySQLCursorBufferedRaw(MySQLCursorBuffered):
     Cursor which skips conversion from MySQL datatypes to Python types when
     fetching rows and fetches rows within execute().
     """
+
+    _raw = True
+
     def fetchone(self):
         row = self._fetch_row()
         if row:
