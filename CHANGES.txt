@@ -11,6 +11,7 @@ Full release notes:
 v2.1.3
 ======
 
+- BUG#21782246: Fix Install check of bitness of libmysql c client fails
 - BUG#21505096: MySQL Connector python 2.1.2 does not ship with required __init.py__ files
 - BUG#21499127: Fix copyright year in README.txt
 - BUG#21420633: Fix CExtension crashing while fetching large number of NULL value
