@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -125,7 +125,7 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
                           auth_plugin.prepare_password)
 
         if PY2:
-            empty = '\x00'
+            empty = ''
             auth_data = (
                 '\x3b\x55\x78\x7d\x2c\x5f\x7c\x72\x49\x52'
                 '\x3f\x28\x47\x6f\x77\x28\x5f\x28\x46\x69'
@@ -135,7 +135,7 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
                 '\x29\x88\xaa\xae\xdb\x00\xb3\x4d\x91\x5b'
             )
         else:
-            empty = b'\x00'
+            empty = b''
             auth_data = (
                 b'\x3b\x55\x78\x7d\x2c\x5f\x7c\x72\x49\x52'
                 b'\x3f\x28\x47\x6f\x77\x28\x5f\x28\x46\x69'

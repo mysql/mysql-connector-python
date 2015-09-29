@@ -164,7 +164,7 @@ class Bug480360(tests.MySQLConnectorTests):
         self.cnx.close()
 
 @unittest.skipIf(tests.MYSQL_VERSION >= (5, 6, 6),
-                 "Bug380528 not tested with MSQL version >= 5.6.6")
+                 "Bug380528 not tested with MySQL version >= 5.6.6")
 class Bug380528(tests.MySQLConnectorTests):
 
     """lp:380528: we do not support old passwords"""
@@ -1889,7 +1889,7 @@ class Bug17578937(tests.MySQLConnectorTests):
         config = tests.get_mysql_config().copy()
         config['connection_timeout'] = 2
         cnxpool = pooling.MySQLConnectionPool(
-            pool_name='test', pool_size=1, **tests.get_mysql_config())
+            pool_name='test', pool_size=1, **config)
 
         pcnx = cnxpool.get_connection()
         self.assertTrue(isinstance(pcnx, pooling.PooledMySQLConnection))
@@ -2211,13 +2211,25 @@ class BugOra16217765(tests.MySQLConnectorTests):
     """
 
     users = {
-        'sha256_password': {
+        'sha256user': {
             'username': 'sha256user',
             'password': 'sha256P@ss',
+            'auth_plugin': 'sha256_password',
         },
-        'mysql_native_password': {
+        'nativeuser': {
             'username': 'nativeuser',
             'password': 'nativeP@ss',
+            'auth_plugin': 'mysql_native_password',
+        },
+        'sha256user_np': {
+            'username': 'sha256user_np',
+            'password': '',
+            'auth_plugin': 'sha256_password',
+        },
+        'nativeuser_np': {
+            'username': 'nativeuser_np',
+            'password': '',
+            'auth_plugin': 'mysql_native_password',
         },
     }
 
@@ -2234,9 +2246,14 @@ class BugOra16217765(tests.MySQLConnectorTests):
         else:
             cnx.cmd_query("SET old_passwords = 0")
 
-        passwd = ("SET PASSWORD FOR '{user}'@'{host}' = "
-                  "PASSWORD('{password}')").format(user=user, host=host,
-                                                   password=password)
+        if tests.MYSQL_VERSION < (5, 7, 5):
+            passwd = ("SET PASSWORD FOR '{user}'@'{host}' = "
+                      "PASSWORD('{password}')").format(user=user, host=host,
+                                                       password=password)
+        else:
+            passwd = ("ALTER USER '{user}'@'{host}' IDENTIFIED BY "
+                      "'{password}'").format(user=user, host=host,
+                                             password=password)
         cnx.cmd_query(passwd)
 
         grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
@@ -2256,9 +2273,16 @@ class BugOra16217765(tests.MySQLConnectorTests):
         self.host = config['host']
         self.admin_cnx = connection.MySQLConnection(**config)
 
+        for key, user in self.users.items():
+            self._create_user(self.admin_cnx, user['username'],
+                              user['password'],
+                              self.host,
+                              config['database'],
+                              plugin=user['auth_plugin'])
+
     def tearDown(self):
-        for plugin_name, info in self.users.items():
-            self._drop_user(self.admin_cnx, info['username'], self.host)
+        for key, user in self.users.items():
+            self._drop_user(self.admin_cnx, user['username'], self.host)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 6),
                      "MySQL {0} does not support sha256_password auth".format(
@@ -2275,29 +2299,37 @@ class BugOra16217765(tests.MySQLConnectorTests):
             'ssl_key': tests.SSL_KEY,
         })
 
-        auth_plugin = 'sha256_password'
-        user = self.users[auth_plugin]
-        self._create_user(self.admin_cnx, user['username'],
-                          user['password'],
-                          self.host,
-                          config['database'],
-                          plugin=auth_plugin)
-
+        user = self.users['sha256user']
         config['user'] = user['username']
         config['password'] = user['password']
         config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+        config['auth_plugin'] = user['auth_plugin']
 
         try:
             cnx = connection.MySQLConnection(**config)
-        except:
+        except Exception as exc:
             import traceback
             traceback.print_exc()
-            self.fail("Connecting using sha256_password auth failed")
+            self.fail(self.errmsg.format(config['auth_plugin'], exc))
 
         try:
             cnx.cmd_change_user(config['user'], config['password'])
         except:
-            self.fail("Changing user using sha256_password auth failed")
+            self.fail("Changing user using sha256_password auth failed "
+                      "with pure Python connector")
+
+        if CMySQLConnection:
+            try:
+                cnx = CMySQLConnection(**config)
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                self.fail(self.errmsg.format(config['auth_plugin'], exc))
+            try:
+                cnx.cmd_change_user(config['user'], config['password'])
+            except:
+                self.fail("Changing user using sha256_password auth failed "
+                          "with CExtension")
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 6),
                      "MySQL {0} does not support sha256_password auth".format(
@@ -2305,20 +2337,15 @@ class BugOra16217765(tests.MySQLConnectorTests):
     def test_sha256_nonssl(self):
         config = tests.get_mysql_config()
         config['unix_socket'] = None
+        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
 
-        auth_plugin = 'sha256_password'
-        user = self.users[auth_plugin]
-        self._create_user(self.admin_cnx, user['username'],
-                          user['password'],
-                          self.host,
-                          config['database'],
-                          plugin=auth_plugin)
-
+        user = self.users['sha256user']
         config['user'] = user['username']
         config['password'] = user['password']
-        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
         self.assertRaises(errors.InterfaceError, connection.MySQLConnection,
                           **config)
+        if CMySQLConnection:
+            self.assertRaises(errors.InterfaceError, CMySQLConnection, **config)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 5, 7),
                      "MySQL {0} does not support authentication plugins".format(
@@ -2327,22 +2354,21 @@ class BugOra16217765(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         config['unix_socket'] = None
 
-        auth_plugin = 'mysql_native_password'
-        user = self.users[auth_plugin]
-        self._create_user(self.admin_cnx, user['username'],
-                          user['password'],
-                          self.host,
-                          config['database'],
-                          plugin=auth_plugin)
-
+        user = self.users['nativeuser']
         config['user'] = user['username']
         config['password'] = user['password']
         config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+        config['auth_plugin'] = user['auth_plugin']
         try:
             cnx = connection.MySQLConnection(**config)
         except Exception as exc:
-            self.fail("Connecting using {0} auth failed: {1}".format(
-                auth_plugin, exc))
+                self.fail(self.errmsg.format(config['auth_plugin'], exc))
+
+        if CMySQLConnection:
+            try:
+                cnx = CMySQLConnection(**config)
+            except Exception as exc:
+                self.fail(self.errmsg.format(config['auth_plugin'], exc))
 
 
 class BugOra18144971(tests.MySQLConnectorTests):
@@ -3215,6 +3241,8 @@ class BugOra19549363(tests.MySQLConnectorTests):
             cnx1.close()
         except:
             self.fail("Reset session with compression test failed.")
+        finally:
+            mysql.connector._CONNECTION_POOLS = {}
 
 
 class BugOra19803702(tests.MySQLConnectorTests):
@@ -3577,4 +3605,319 @@ class BugOra20834643(tests.MySQLConnectorTests):
         for row in res:
             exp.append((row.id, row.name, row.dept))
         self.assertEqual(exp, data[1:])
+        cur.close()
+
+
+class BugOra20653441(tests.MySQLConnectorTests):
+
+    """BUG#20653441: PYTHON CONNECTOR HANGS IF A QUERY IS KILLED (ERROR 1317)"""
+
+    def setUp(self):
+        self.table_name = 'Bug20653441'
+        self._setup()
+
+    def _setup(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table_name))
+        table = (
+            "CREATE TABLE {table} ("
+            " id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
+            " c1 VARCHAR(255) DEFAULT '{default}',"
+            " PRIMARY KEY (id)"
+            ")"
+        ).format(table=self.table_name, default='a' * 255)
+        cnx.cmd_query(table)
+
+        stmt = "INSERT INTO {table} (id) VALUES {values}".format(
+            table=self.table_name,
+            values=','.join(['(NULL)'] * 1024)
+        )
+        cnx.cmd_query(stmt)
+        cnx.commit()
+        cnx.close()
+
+    def tearDown(self):
+        try:
+            cnx = connection.MySQLConnection(**tests.get_mysql_config())
+            cnx.cmd_query(
+                "DROP TABLE IF EXISTS {0}".format(self.table_name))
+            cnx.close()
+        except:
+            pass
+
+    @foreach_cnx()
+    def test_kill_query(self):
+
+        def kill(connection_id):
+            """Kill query using separate connection"""
+            killer_cnx = connection.MySQLConnection(**tests.get_mysql_config())
+            time.sleep(1)
+            killer_cnx.cmd_query("KILL QUERY {0}".format(connection_id))
+            killer_cnx.close()
+
+        def sleepy_select(cnx):
+            """Execute a SELECT statement which takes a while to complete"""
+            cur = cnx.cursor()
+            # Ugly query ahead!
+            stmt = "SELECT x1.*, x2.* from {table} as x1, {table} as x2".format(
+                table=self.table_name)
+            cur.execute(stmt)
+            # Save the error so we can check in the calling thread
+            cnx.test_error = None
+
+            try:
+                cur.fetchall()
+            except errors.Error as err:
+                cnx.test_error = err
+                cur.close()
+
+        worker = Thread(target=sleepy_select, args=[self.cnx])
+        killer = Thread(target=kill, args=[self.cnx.connection_id])
+        worker.start()
+        killer.start()
+        worker.join()
+        killer.join()
+
+        self.cnx.close()
+
+        self.assertTrue(isinstance(self.cnx.test_error, errors.DatabaseError))
+        self.assertEqual(str(self.cnx.test_error),
+                         "1317 (70100): Query execution was interrupted")
+
+
+class BugOra21535573(tests.MySQLConnectorTests):
+    """BUG#21535573:  SEGFAULT WHEN TRY TO SELECT GBK DATA WITH C-EXTENSION
+    """
+    def tearDown(self):
+        cnx = connection.MySQLConnection(**tests.get_mysql_config())
+        for charset in ('gbk', 'sjis', 'big5'):
+            tablename = charset + 'test'
+            cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tablename))
+        cnx.close()
+
+    def _test_charset(self, charset, data):
+        config = tests.get_mysql_config()
+        config['charset'] = charset
+        config['use_unicode'] = True
+        self.cnx = self.cnx.__class__(**config)
+        tablename = charset + 'test'
+        cur = self.cnx.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tablename))
+        if PY2:
+            column = data.encode(charset)
+        else:
+            column = data
+        table = (
+            "CREATE TABLE {table} ("
+            " {col} INT AUTO_INCREMENT KEY, "
+            "c1 VARCHAR(40)"
+            ") CHARACTER SET '{charset}'"
+        ).format(table=tablename, charset=charset, col=column)
+        cur.execute(table)
+        self.cnx.commit()
+
+        cur.execute("TRUNCATE {0}".format(tablename))
+        self.cnx.commit()
+
+        insert = "INSERT INTO {0} (c1) VALUES (%s)".format(tablename)
+        cur.execute(insert, (data,))
+        self.cnx.commit()
+
+        cur.execute("SELECT * FROM {0}".format(tablename))
+        for row in cur:
+            self.assertEqual(data, row[1])
+
+        cur.close()
+        self.cnx.close()
+
+    @foreach_cnx()
+    def test_gbk(self):
+        self._test_charset('gbk', u'海豚')
+
+    @foreach_cnx()
+    def test_sjis(self):
+        self._test_charset('sjis', u'シイラ')
+
+    @foreach_cnx()
+    def test_big5(self):
+        self._test_charset('big5', u'皿')
+
+
+class BugOra21536507(tests.MySQLConnectorTests):
+    """BUG#21536507:C/PYTHON BEHAVIOR NOT PROPER WHEN RAISE_ON_WARNINGS=TRUE
+    """
+    @cnx_config(raw=True, get_warnings=True, raise_on_warnings=True)
+    @foreach_cnx()
+    def test_with_raw(self):
+        cur = self.cnx.cursor()
+        drop_stmt = "DROP TABLE IF EXISTS unknown"
+        self.assertRaises(errors.DatabaseError, cur.execute, drop_stmt)
+        exp = [('Note', 1051, "Unknown table 'myconnpy.unknown'")]
+        self.assertEqual(exp, cur.fetchwarnings())
+
+        select_stmt = "SELECT 'a'+'b'"
+        cur.execute(select_stmt)
+        self.assertRaises(errors.DatabaseError, cur.fetchall)
+        exp = [
+            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
+            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
+        ]
+        self.assertEqual(exp, cur.fetchwarnings())
+        try:
+            cur.close()
+        except errors.InternalError as exc:
+            self.fail("Closing cursor failed with: %s" % str(exc))
+
+
+class BugOra21420633(tests.MySQLConnectorTests):
+    """BUG#21420633: CEXTENSION CRASHES WHILE FETCHING LOTS OF NULL VALUES
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.tbl = 'Bug21420633'
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+        create = ("CREATE TABLE {0} (id INT, dept VARCHAR(5)) "
+                  "DEFAULT CHARSET latin1".format(self.tbl))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_null(self):
+        cur = self.cnx.cursor()
+        sql = "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl)
+
+        data = [(i, None) for i in range(10000)]
+
+        cur.executemany(sql, data)
+        cur.close()
+
+        cur = self.cnx.cursor(named_tuple=True)
+        cur.execute("SELECT * FROM {0}".format(self.tbl))
+
+        res = cur.fetchall()
+        cur.close()
+
+
+class BugOra21492428(tests.MySQLConnectorTests):
+    """BUG#21492428: CONNECT FAILS WHEN PASSWORD STARTS OR ENDS WITH SPACES
+    """
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cursor = self.cnx.cursor()
+
+        if config['unix_socket'] and os.name != 'nt':
+            self.host = 'localhost'
+        else:
+            self.host = config['host']
+
+        grant = u"CREATE USER '{user}'@'{host}' IDENTIFIED BY '{password}'"
+
+        self._credentials = [
+            ('ABCD', ' XYZ'),
+            (' PQRS', ' 1 2 3 '),
+            ('XYZ1 ', 'XYZ123    '),
+            (' A B C D ', '    ppppp    '),
+        ]
+        for user, password in self._credentials:
+            self.cursor.execute(grant.format(
+                user=user, host=self.host, password=password))
+
+    def tearDown(self):
+        for user, password in self._credentials:
+            self.cursor.execute(u"DROP USER '{user}'@'{host}'".format(
+                user=user, host=self.host))
+
+    def test_password_with_spaces(self):
+        config = tests.get_mysql_config()
+        for user, password in self._credentials:
+            config['user'] = user
+            config['password'] = password
+            config['database'] = None
+            try:
+                cnx = connection.MySQLConnection(**config)
+            except errors.ProgrammingError:
+                self.fail('Failed using password with spaces')
+            else:
+                cnx.close()
+
+
+class BugOra21492815(tests.MySQLConnectorTests):
+    """BUG#21492815: CALLPROC() HANGS WHEN CONSUME_RESULTS=TRUE
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        self.proc1 = 'Bug20834643'
+        self.proc2 = 'Bug20834643_1'
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc1))
+
+        create = ("CREATE PROCEDURE {0}() BEGIN SELECT 1234; "
+                  "END".format(self.proc1))
+        cur.execute(create)
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc2))
+
+        create = ("CREATE PROCEDURE {0}() BEGIN SELECT 9876; "
+                  "SELECT CONCAT('','abcd'); END".format(self.proc2))
+        cur.execute(create)
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc1))
+        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc2))
+        cur.close()
+        cnx.close()
+
+    @cnx_config(consume_results=True, raw=True)
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.proc1)
+        self.assertEqual((bytearray(b'1234'),),
+                          next(cur.stored_results()).fetchone())
+
+        cur.callproc(self.proc2)
+        exp = [[(bytearray(b'9876'),)], [(bytearray(b'abcd'),)]]
+        results = []
+        for result in cur.stored_results():
+            results.append(result.fetchall())
+        self.assertEqual(exp, results)
+        cur.close()
+
+    @cnx_config(consume_results=True, raw=False)
+    @foreach_cnx()
+    def test_set(self):
+        cur = self.cnx.cursor()
+        cur.callproc(self.proc1)
+        self.assertEqual((1234,),
+                          next(cur.stored_results()).fetchone())
+
+        cur.callproc(self.proc2)
+        exp = [[(9876,)], [('abcd',)]]
+        results = []
+        for result in cur.stored_results():
+            results.append(result.fetchall())
+        self.assertEqual(exp, results)
         cur.close()

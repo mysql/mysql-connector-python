@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -24,7 +24,7 @@
 """Module gathering all abstract base classes"""
 
 # Issue with pylint and NotImplementedError
-#pylint: disable=R0921
+# pylint: disable=R0921
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 import re
@@ -484,7 +484,7 @@ class MySQLConnectionAbstract(object):
         else:
             self._user = ''
         if password is not None:
-            self._password = password.strip()
+            self._password = password
         else:
             self._password = ''
 
@@ -655,7 +655,7 @@ class MySQLConnectionAbstract(object):
 
         try:
             # Required for C Extension
-            self.set_character_set_name(charset_name)
+            self.set_character_set_name(charset_name)  # pylint: disable=E1101
         except AttributeError:
             # Not required for pure Python connection
             pass

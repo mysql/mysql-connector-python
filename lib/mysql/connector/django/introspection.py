@@ -2,11 +2,19 @@
 
 
 import re
+from collections import namedtuple
+
 import django
-from django.db.backends import BaseDatabaseIntrospection
+if django.VERSION >= (1, 8):
+    from django.db.backends.base.introspection import (
+        BaseDatabaseIntrospection, FieldInfo, TableInfo
+    )
+else:
+    from django.db.backends import BaseDatabaseIntrospection
 
 if django.VERSION >= (1, 6):
-    from django.db.backends import FieldInfo
+    if django.VERSION < (1, 8):
+        from django.db.backends import FieldInfo
     from django.utils.encoding import force_text
     if django.VERSION >= (1, 7):
         from django.utils.datastructures import OrderedSet
@@ -15,6 +23,9 @@ from mysql.connector.constants import FieldType
 
 foreign_key_re = re.compile(r"\sCONSTRAINT `[^`]*` FOREIGN KEY \(`([^`]*)`\) "
                             r"REFERENCES `([^`]*)` \(`([^`]*)`\)")
+
+if django.VERSION >= (1, 8):
+    FieldInfo = namedtuple('FieldInfo', FieldInfo._fields + ('extra',))
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):
@@ -29,7 +40,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         FieldType.INT24: 'IntegerField',
         FieldType.LONG: 'IntegerField',
         FieldType.LONGLONG: 'BigIntegerField',
-        FieldType.SHORT: 'IntegerField',
+        FieldType.SHORT: (
+            'IntegerField' if django.VERSION < (1, 8) else 'SmallIntegerField'
+        ),
         FieldType.STRING: 'CharField',
         FieldType.TIME: 'TimeField',
         FieldType.TIMESTAMP: 'DateTimeField',
@@ -40,46 +53,111 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         FieldType.VAR_STRING: 'CharField',
     }
 
+    def get_field_type(self, data_type, description):
+        field_type = super(DatabaseIntrospection, self).get_field_type(
+            data_type, description)
+        if (field_type == 'IntegerField'
+                and 'auto_increment' in description.extra):
+            return 'AutoField'
+        return field_type
+
     def get_table_list(self, cursor):
-        "Returns a list of table names in the current database."
-        cursor.execute("SHOW TABLES")
-        return [row[0] for row in cursor.fetchall()]
-
-    def get_table_description(self, cursor, table_name):
-        """
-        Returns a description of the table, with the DB-API cursor.description
-        interface."
-        """
-        # varchar length returned by cursor.description is an internal length,
-        # not visible length (#5725), use information_schema database to fix
-        # this
-        cursor.execute(
-            "SELECT column_name, character_maximum_length "
-            "FROM INFORMATION_SCHEMA.COLUMNS "
-            "WHERE table_name = %s AND table_schema = DATABASE() "
-            "AND character_maximum_length IS NOT NULL", [table_name])
-        length_map = dict(cursor.fetchall())
-
-        # Also getting precision and scale from information_schema (see #5014)
-        cursor.execute(
-            "SELECT column_name, numeric_precision, numeric_scale FROM "
-            "INFORMATION_SCHEMA.COLUMNS WHERE table_name = %s AND "
-            "table_schema = DATABASE() AND data_type='decimal'", [table_name])
-        numeric_map = dict((line[0], tuple([int(n) for n in line[1:]]))
-                           for line in cursor.fetchall())
-
-        cursor.execute("SELECT * FROM {0} LIMIT 1".format(
-            self.connection.ops.quote_name(table_name)))
-        if django.VERSION >= (1, 6):
-            return [FieldInfo(*((force_text(line[0]),)
-                                + line[1:3]
-                                + (length_map.get(line[0], line[3]),)
-                                + numeric_map.get(line[0], line[4:6])
-                                + (line[6],)))
-                    for line in cursor.description]
+        """Returns a list of table names in the current database."""
+        cursor.execute("SHOW FULL TABLES")
+        if django.VERSION >= (1, 8):
+            return [
+                TableInfo(row[0], {'BASE TABLE': 't', 'VIEW': 'v'}.get(row[1]))
+                for row in cursor.fetchall()
+            ]
         else:
-            return [line[:3] + (length_map.get(line[0], line[3]),) + line[4:]
-                    for line in cursor.description]
+            return [row[0] for row in cursor.fetchall()]
+
+    if django.VERSION >= (1, 8):
+        def get_table_description(self, cursor, table_name):
+            """
+            Returns a description of the table, with the DB-API
+            cursor.description interface."
+            """
+            # - information_schema database gives more accurate results for
+            #   some figures:
+            # - varchar length returned by cursor.description is an internal
+            #   length, not visible length (#5725)
+            # - precision and scale (for decimal fields) (#5014)
+            # - auto_increment is not available in cursor.description
+            InfoLine = namedtuple(
+                'InfoLine',
+                'col_name data_type max_len num_prec num_scale extra'
+            )
+            cursor.execute("""
+                SELECT column_name, data_type, character_maximum_length,
+                numeric_precision, numeric_scale, extra
+                FROM information_schema.columns
+                WHERE table_name = %s AND table_schema = DATABASE()""",
+                           [table_name])
+            field_info = dict(
+                (line[0], InfoLine(*line)) for line in cursor.fetchall()
+            )
+
+            cursor.execute("SELECT * FROM %s LIMIT 1"
+                           % self.connection.ops.quote_name(table_name))
+            to_int = lambda i: int(i) if i is not None else i
+            fields = []
+            for line in cursor.description:
+                col_name = force_text(line[0])
+                fields.append(
+                    FieldInfo(*((col_name,)
+                                + line[1:3]
+                                + (to_int(field_info[col_name].max_len)
+                                   or line[3],
+                                   to_int(field_info[col_name].num_prec)
+                                   or line[4],
+                                   to_int(field_info[col_name].num_scale)
+                                   or line[5])
+                                + (line[6],)
+                                + (field_info[col_name].extra,)))
+                )
+            return fields
+    else:
+        def get_table_description(self, cursor, table_name):
+            """
+            Returns a description of the table, with the DB-API
+            cursor.description interface.
+            """
+            # varchar length returned by cursor.description is an internal
+            # length not visible length (#5725), use information_schema database
+            #  to fix this
+            cursor.execute(
+                "SELECT column_name, character_maximum_length "
+                "FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE table_name = %s AND table_schema = DATABASE() "
+                "AND character_maximum_length IS NOT NULL", [table_name])
+            length_map = dict(cursor.fetchall())
+
+            # Also getting precision and scale from
+            # information_schema (see #5014)
+            cursor.execute(
+                "SELECT column_name, numeric_precision, numeric_scale FROM "
+                "INFORMATION_SCHEMA.COLUMNS WHERE table_name = %s AND "
+                "table_schema = DATABASE() AND data_type='decimal'",
+                [table_name])
+            numeric_map = dict((line[0], tuple([int(n) for n in line[1:]]))
+                               for line in cursor.fetchall())
+
+            cursor.execute("SELECT * FROM {0} LIMIT 1".format(
+                self.connection.ops.quote_name(table_name)))
+
+            if django.VERSION >= (1, 6):
+                return [FieldInfo(*((force_text(line[0]),)
+                                    + line[1:3]
+                                    + (length_map.get(line[0], line[3]),)
+                                    + numeric_map.get(line[0], line[4:6])
+                                    + (line[6],)))
+                        for line in cursor.description]
+            else:
+                return [
+                    line[:3] + (length_map.get(line[0], line[3]),) + line[4:]
+                    for line in cursor.description
+                ]
 
     def _name_to_index(self, cursor, table_name):
         """
@@ -95,15 +173,20 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         other_table)}
         representing all relationships to the given table. Indexes are 0-based.
         """
-        my_field_dict = self._name_to_index(cursor, table_name)
         constraints = self.get_key_columns(cursor, table_name)
         relations = {}
-        for my_fieldname, other_table, other_field in constraints:
-            other_field_index = self._name_to_index(cursor,
-                                                    other_table)[other_field]
-            my_field_index = my_field_dict[my_fieldname]
-            relations[my_field_index] = (other_field_index, other_table)
-        return relations
+        if django.VERSION >= (1, 8):
+            for my_fieldname, other_table, other_field in constraints:
+                relations[my_fieldname] = (other_field, other_table)
+            return relations
+        else:
+            my_field_dict = self._name_to_index(cursor, table_name)
+            for my_fieldname, other_table, other_field in constraints:
+                other_field_index = self._name_to_index(
+                    cursor, other_table)[other_field]
+                my_field_index = my_field_dict[my_fieldname]
+                relations[my_field_index] = (other_field_index, other_table)
+            return relations
 
     def get_key_columns(self, cursor, table_name):
         """
@@ -156,6 +239,20 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 return column[0]
         return None
 
+    def get_storage_engine(self, cursor, table_name):
+        """
+        Retrieves the storage engine for a given table. Returns the default
+        storage engine if the table doesn't exist.
+        """
+        cursor.execute(
+            "SELECT engine "
+            "FROM information_schema.tables "
+            "WHERE table_name = %s", [table_name])
+        result = cursor.fetchone()
+        if not result:
+            return self.connection.features.mysql_storage_engine
+        return result[0]
+
     def get_constraints(self, cursor, table_name):
         """
         Retrieves any constraints or keys (unique, pk, fk, check, index) across
@@ -182,7 +279,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     'unique': False,
                     'index': False,
                     'check': False,
-                    'foreign_key': (ref_table, ref_column) if ref_column else None,
+                    'foreign_key': (
+                        (ref_table, ref_column) if ref_column else None,
+                    )
                 }
             constraints[constraint]['columns'].add(column)
         # Now get the constraint types

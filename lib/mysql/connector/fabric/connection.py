@@ -148,6 +148,8 @@ _LOGGER = logging.getLogger('myconnpy-fabric')
 
 
 class MySQLRPCProtocol(object):
+    """Class using MySQL protocol to query Fabric.
+    """
     def __init__(self, fabric, host, port, connect_attempts, connect_delay):
         self.converter = MySQLConverter()
         self.handler = FabricMySQLConnection(fabric, host, port,
@@ -186,6 +188,10 @@ class MySQLRPCProtocol(object):
             return tuple(res)
 
     def _execute_cmd(self, stmt, params=None):
+        """Executes the given query
+
+        Returns a list containing response from Fabric
+        """
         if not params:
             params = ()
         cur = self.handler.connection.cursor(dictionary=True)
@@ -197,6 +203,8 @@ class MySQLRPCProtocol(object):
         return results
 
     def create_params(self, *args, **kwargs):
+        """Process arguments to create query parameters.
+        """
         params = []
         if args:
             args = self._process_params(args)
@@ -209,6 +217,13 @@ class MySQLRPCProtocol(object):
         return params
 
     def execute(self, group, command, *args, **kwargs):
+        """Executes the given command with MySQL protocol
+
+        Executes the given command with the given parameters.
+
+        Returns an iterator to navigate to navigate through the result set
+        returned by Fabric
+        """
         params = self.create_params(*args, **kwargs)
         cmd = "CALL {0}.{1}({2})".format(group, command, params)
 
@@ -225,12 +240,21 @@ class MySQLRPCProtocol(object):
 
 
 class XMLRPCProtocol(object):
+    """Class using XML-RPC protocol to query Fabric.
+    """
     def __init__(self, fabric, host, port, connect_attempts, connect_delay):
         self.handler = FabricXMLRPCConnection(fabric, host, port,
                                               connect_attempts, connect_delay)
         self.handler.connect()
 
     def execute(self, group, command, *args, **kwargs):
+        """Executes the given command with XML-RPC protocol
+
+        Executes the given command with the given parameters
+
+        Returns an iterator to navigate to navigate through the result set
+        returned by Fabric
+        """
         try:
             grp = getattr(self.handler.proxy, group)
             cmd = getattr(grp, command)
@@ -251,6 +275,8 @@ class XMLRPCProtocol(object):
 
 
 class FabricMySQLResponse(object):
+    """Class used to parse a response got from Fabric with MySQL protocol.
+    """
     def __init__(self, data):
         info = data[0][0]
         (fabric_uuid_str, ttl, error) = (info['fabric_uuid'], info['ttl'],
@@ -264,6 +290,9 @@ class FabricMySQLResponse(object):
 
 
 class FabricMySQLSet(FabricMySQLResponse):
+    """Iterator to navigate through the result set returned from Fabric
+    with MySQL Protocol.
+    """
     def __init__(self, data):
         """Initialize the FabricSet object.
         """
@@ -678,8 +707,7 @@ class Fabric(object):
             inst = self.get_instance()
             try:
                 data = inst.execute('threat', 'report_failure',
-                    server_uuid, current_host, errno
-                )
+                                    server_uuid, current_host, errno)
                 FabricResponse(data)
             except (Fault, socket.error) as exc:
                 _LOGGER.debug("Failed reporting server to Fabric (%s)",
@@ -990,7 +1018,7 @@ class Fabric(object):
 
 
 class FabricConnection(object):
-    """Class holding a connection to a MySQL Fabric server through MySQL protocol
+    """Base Class for a class holding a connection to a MySQL Fabric server
     """
     def __init__(self, fabric, host,
                  port=MYSQL_FABRIC_PORT[DEFAULT_FABRIC_PROTOCOL],
@@ -1135,7 +1163,8 @@ class FabricXMLRPCConnection(FabricConnection):
 
 
 class FabricMySQLConnection(FabricConnection):
-    """Class holding a connection to a MySQL Fabric server through MySQL protocol
+    """
+    Class holding a connection to a MySQL Fabric server through MySQL protocol
     """
     def __init__(self, fabric, host, port=MYSQL_FABRIC_PORT['mysql'],
                  connect_attempts=_CNX_ATTEMPT_MAX,
@@ -1166,7 +1195,6 @@ class FabricMySQLConnection(FabricConnection):
         attempts = self._connect_attempts
         delay = self._connect_delay
 
-        connection = None
         counter = 0
 
         while counter != attempts:

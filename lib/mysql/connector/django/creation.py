@@ -2,8 +2,11 @@
 
 import django
 from django.db import models
-from django.db.backends.creation import BaseDatabaseCreation
 
+if django.VERSION >= (1, 8):
+    from django.db.backends.base.creation import BaseDatabaseCreation
+else:
+    from django.db.backends.creation import BaseDatabaseCreation
 if django.VERSION < (1, 7):
     from django.db.backends.util import truncate_name
 else:
@@ -15,39 +18,40 @@ class DatabaseCreation(BaseDatabaseCreation):
     def __init__(self, connection):
         super(DatabaseCreation, self).__init__(connection)
 
-        self.data_types = {
-            'AutoField': 'integer AUTO_INCREMENT',
-            'BinaryField': 'longblob',
-            'BooleanField': 'bool',
-            'CharField': 'varchar(%(max_length)s)',
-            'CommaSeparatedIntegerField': 'varchar(%(max_length)s)',
-            'DateField': 'date',
-            'DateTimeField': 'datetime',  # ms support set later
-            'DecimalField': 'numeric(%(max_digits)s, %(decimal_places)s)',
-            'FileField': 'varchar(%(max_length)s)',
-            'FilePathField': 'varchar(%(max_length)s)',
-            'FloatField': 'double precision',
-            'IntegerField': 'integer',
-            'BigIntegerField': 'bigint',
-            'IPAddressField': 'char(15)',
+        if django.VERSION < (1, 8):
+            self.data_types = {
+                'AutoField': 'integer AUTO_INCREMENT',
+                'BinaryField': 'longblob',
+                'BooleanField': 'bool',
+                'CharField': 'varchar(%(max_length)s)',
+                'CommaSeparatedIntegerField': 'varchar(%(max_length)s)',
+                'DateField': 'date',
+                'DateTimeField': 'datetime',  # ms support set later
+                'DecimalField': 'numeric(%(max_digits)s, %(decimal_places)s)',
+                'FileField': 'varchar(%(max_length)s)',
+                'FilePathField': 'varchar(%(max_length)s)',
+                'FloatField': 'double precision',
+                'IntegerField': 'integer',
+                'BigIntegerField': 'bigint',
+                'IPAddressField': 'char(15)',
 
-            'GenericIPAddressField': 'char(39)',
-            'NullBooleanField': 'bool',
-            'OneToOneField': 'integer',
-            'PositiveIntegerField': 'integer UNSIGNED',
-            'PositiveSmallIntegerField': 'smallint UNSIGNED',
-            'SlugField': 'varchar(%(max_length)s)',
-            'SmallIntegerField': 'smallint',
-            'TextField': 'longtext',
-            'TimeField': 'time',  # ms support set later
-        }
+                'GenericIPAddressField': 'char(39)',
+                'NullBooleanField': 'bool',
+                'OneToOneField': 'integer',
+                'PositiveIntegerField': 'integer UNSIGNED',
+                'PositiveSmallIntegerField': 'smallint UNSIGNED',
+                'SlugField': 'varchar(%(max_length)s)',
+                'SmallIntegerField': 'smallint',
+                'TextField': 'longtext',
+                'TimeField': 'time',  # ms support set later
+            }
 
-        # Support for microseconds
-        if self.connection.mysql_version >= (5, 6, 4):
-            self.data_types.update({
-                'DateTimeField': 'datetime(6)',
-                'TimeField': 'time(6)',
-            })
+            # Support for microseconds
+            if self.connection.mysql_version >= (5, 6, 4):
+                self.data_types.update({
+                    'DateTimeField': 'datetime(6)',
+                    'TimeField': 'time(6)',
+                })
 
     def sql_table_creation_suffix(self):
         suffix = []

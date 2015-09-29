@@ -247,7 +247,7 @@ class FabricCache(object):
         try:
             entry = self._sharding[entry_hash]
             if entry.invalid:
-                _LOGGER.debug("{entry} invalidated".format(entry))
+                _LOGGER.debug("{0} invalidated".format(entry))
                 self.remove_shardtable(entry_hash)
                 return None
         except KeyError:
@@ -264,7 +264,7 @@ class FabricCache(object):
         try:
             entry = self._groups[entry_hash]
             if entry.invalid:
-                _LOGGER.debug("{entry} invalidated".format(entry))
+                _LOGGER.debug("{0} invalidated".format(entry))
                 self.remove_group(entry_hash)
                 return None
         except KeyError:

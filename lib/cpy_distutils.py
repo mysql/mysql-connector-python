@@ -40,6 +40,7 @@ import sys
 import platform
 
 ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
+py_arch = '64-bit' if ARCH_64BIT else '32-bit'
 
 CEXT_OPTIONS = [
     ('with-mysql-capi=', None,
@@ -108,23 +109,28 @@ def unix_lib_is64bit(lib_file):
         raise OSError("unix_lib_is64bit only useful on UNIX-like systems")
 
     if os.isdir(lib_file):
-        mysqlclient_lib = None
-        for root, dirs, files in os.walk(lib_file):
+        mysqlclient_libs = []
+        for root, _, files in os.walk(lib_file):
             for filename in files:
                 filepath = os.path.join(root, filename)
                 if filename.startswith('libmysqlclient') and \
-                    not os.path.islink(filepath) and \
-                    '_r' not in filename:
-                    mysqlclient_lib = filepath
-                    break
-            if mysqlclient_lib:
+                   not os.path.islink(filepath) and \
+                   '_r' not in filename and \
+                   '.a' not in filename:
+                    mysqlclient_libs.append(filepath)
+            if mysqlclient_libs:
                 break
-        lib_file = mysqlclient_lib
+        # give priority to .so files instead of .a
+        mysqlclient_libs.sort()
+        lib_file = mysqlclient_libs[-1]
 
-    prc = Popen(['file', lib_file], stdin=PIPE, stderr=STDOUT, stdout=PIPE)
+    log.debug("# Using file command to test lib_file {0}".format(lib_file))
+    prc = Popen(['file', '-L', lib_file], stdin=PIPE, stderr=STDOUT,
+                stdout=PIPE)
     stdout = prc.communicate()[0]
-
-    if 'x86_64' in stdout or 'x86-64' in stdout:
+    stdout = stdout.split(':')[1]
+    log.debug("# lib_file {0} stdout: {1}".format(lib_file, stdout))
+    if 'x86_64' in stdout or 'x86-64' in stdout or '32-bit' not in stdout:
         return True
 
     return False
@@ -145,9 +151,11 @@ def get_mysql_config_info(mysql_config):
     except OSError as exc:
         raise DistutilsExecError("Failed executing mysql_config: {0}".format(
             str(exc)))
-
+    log.debug("# stdout: {0}".format(stdout))
     info = {}
     for option, line in zip(options, stdout.split('\n')):
+        log.debug("# option: {0}".format(option))
+        log.debug("# line: {0}".format(line))
         info[option] = line.strip()
 
     ver = info['version']
@@ -158,7 +166,10 @@ def get_mysql_config_info(mysql_config):
     libs = shlex.split(info['libs'])
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
-
+    log.debug("# info['libs']: ")
+    for lib in info['libs']:
+        log.debug("#   {0}".format(lib))
+    log.error("# info['libs']: {0}".format(info['libs']))
     libs = shlex.split(info['libs_r'])
     info['lib_r_dir'] = libs[0].replace('-L', '')
     info['libs_r'] = [ lib.replace('-l', '') for lib in libs[1:] ]
@@ -169,12 +180,32 @@ def get_mysql_config_info(mysql_config):
     info['arch'] = None
     if os.name == 'posix':
         pathname = os.path.join(info['lib_dir'], 'lib' + info['libs'][0]) + '*'
-        lib = glob(pathname)[0]
+        libs = glob(pathname)
+        log.debug("# libs: {0}".format(libs))
+        for lib in libs:
+            log.debug("#-   {0}".format(lib))
+        mysqlclient_libs = []
+        for filepath in libs:
+            _, filename = os.path.split(filepath)
+            log.debug("#  filename {0}".format(filename))
+            if filename.startswith('libmysqlclient') and \
+               not os.path.islink(filepath) and \
+               '_r' not in filename and \
+               '.a' not in filename:
+                mysqlclient_libs.append(filepath)
+        mysqlclient_libs.sort()
 
         stdout = None
         try:
-            proc = Popen(['file', lib], stdout=PIPE, universal_newlines=True)
+            log.debug("# mysqlclient_lib: {0}".format(mysqlclient_libs[-1]))
+            for mysqlclient_lib in mysqlclient_libs:
+                log.debug("#+   {0}".format(mysqlclient_lib))
+            log.debug("# tested mysqlclient_lib[-1]: "
+                      "{0}".format(mysqlclient_libs[-1]))
+            proc = Popen(['file', '-L', mysqlclient_libs[-1]], stdout=PIPE,
+                         universal_newlines=True)
             stdout, _ = proc.communicate()
+            stdout = stdout.split(':')[1]
         except OSError as exc:
             raise DistutilsExecError(
                 "Although the system seems POSIX, the file-command could not "
@@ -250,6 +281,7 @@ class BuildExtDynamic(build_ext):
             if os.path.isfile(mysql_config) and \
                     os.access(mysql_config, os.X_OK):
                 connc_loc = mysql_config
+                log.debug("# connc_loc: {0}".format(connc_loc))
             else:
                 # Probably using MS Windows
                 myconfigh = os.path.join(connc_loc, 'include', 'my_config.h')
@@ -295,6 +327,7 @@ class BuildExtDynamic(build_ext):
                     libraries = ['-lmysqlclient']
                 library_dirs = os.path.join(connc_loc, 'lib')
 
+                log.debug("# connc_64bit: {0}".format(connc_64bit))
                 if connc_64bit:
                     self.arch = 'x86_64'
                 else:
@@ -306,6 +339,7 @@ class BuildExtDynamic(build_ext):
             mysql_config = connc_loc
             # Check mysql_config
             myc_info = get_mysql_config_info(mysql_config)
+            log.debug("# myc_info: {0}".format(myc_info))
 
             if myc_info['version'] < min_version:
                 log.error(err_version)
@@ -330,10 +364,16 @@ class BuildExtDynamic(build_ext):
         # We try to offer a nice message when the architecture of Python
         # is not the same as MySQL Connector/C binaries.
         py_arch = '64-bit' if ARCH_64BIT else '32-bit'
+        log.debug("# Python architecture: {0}".format(py_arch))
+        log.debug("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
+        log.debug("# self.arch: {0}".format(self.arch))
         if ARCH_64BIT != connc_64bit:
             log.error("Python is {0}, but does not "
-                      "match MySQL C API {1} architecture".format(
-                py_arch, '64-bit' if connc_64bit else '32-bit'))
+                      "match MySQL C API {1} architecture, "
+                      "type: {2}"
+                      "".format(py_arch,
+                                '64-bit' if connc_64bit else '32-bit',
+                                self.arch))
             sys.exit(1)
 
     def finalize_options(self):

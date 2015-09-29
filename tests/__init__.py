@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -36,6 +36,7 @@ import logging
 import shutil
 import subprocess
 import errno
+import traceback
 from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
@@ -437,6 +438,7 @@ def foreach_cnx(*cnx_classes, **extra_config):
                 try:
                     func(self, *args, **kwargs)
                 except Exception as exc:
+                    traceback.print_exc(file=sys.stdout)
                     raise exc
                 finally:
                     try:
@@ -613,7 +615,7 @@ class CMySQLConnectorTests(MySQLConnectorTests):
         :return: Dictionary containing connection arguments.
         :rtype: dict
         """
-        self.config = get_mysql_config()
+        self.config = get_mysql_config().copy()
 
         if not self.hasattr('connc_kwargs') or recache is True:
             connect_args = [

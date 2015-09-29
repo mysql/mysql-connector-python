@@ -33,6 +33,7 @@ from .constants import (
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
+from .errors import get_exception
 
 
 class MySQLProtocol(object):
@@ -173,6 +174,7 @@ class MySQLProtocol(object):
          capabilities2,
          auth_data_length
         ) = struct_unpack('<I8sx2sBH2sBxxxxxxxxxx', packet[0:31])
+        res['server_version_original'] = res['server_version_original'].decode()
 
         packet = packet[31:]
 
@@ -186,15 +188,19 @@ class MySQLProtocol(object):
                 auth_data2 = auth_data2[:-1]
 
         if capabilities & ClientFlag.PLUGIN_AUTH:
-            (packet, res['auth_plugin']) = utils.read_string(
-                packet, end=b'\x00')
+            if (b'\x00' not in packet
+                    and res['server_version_original'].startswith("5.5.8")):
+                # MySQL server 5.5.8 has a bug where end byte is not send
+                (packet, res['auth_plugin']) = (b'', packet)
+            else:
+                (packet, res['auth_plugin']) = utils.read_string(
+                    packet, end=b'\x00')
             res['auth_plugin'] = res['auth_plugin'].decode('utf-8')
         else:
             res['auth_plugin'] = 'mysql_native_password'
 
         res['auth_data'] = auth_data1 + auth_data2
         res['capabilities'] = capabilities
-        res['server_version_original'] = res['server_version_original'].decode()
         return res
 
     def parse_ok(self, packet):
@@ -227,7 +233,7 @@ class MySQLProtocol(object):
         except (struct.error, ValueError):
             raise errors.InterfaceError("Failed parsing column count")
 
-    def parse_column(self, packet):
+    def parse_column(self, packet, charset='utf-8'):
         """Parse a MySQL column-packet"""
         (packet, _) = utils.read_lc_string(packet[4:])  # catalog
         (packet, _) = utils.read_lc_string(packet)  # db
@@ -243,7 +249,7 @@ class MySQLProtocol(object):
             raise errors.InterfaceError("Failed parsing column information")
 
         return (
-            name.decode('utf-8'),
+            name.decode(charset),
             field_type,
             None,  # display_size
             None,  # internal_size
@@ -330,8 +336,10 @@ class MySQLProtocol(object):
                 rowdata = utils.read_lc_string_list(packet[4:])
             if eof is None and rowdata is not None:
                 rows.append(rowdata)
+            elif eof is None and rowdata is None:
+                raise get_exception(packet)
             i += 1
-        return (rows, eof)
+        return rows, eof
 
     def _parse_binary_integer(self, packet, field):
         """Parse an integer from a binary packet"""
@@ -461,6 +469,8 @@ class MySQLProtocol(object):
                 values = self._parse_binary_values(columns, packet[5:])
             if eof is None and values is not None:
                 rows.append(values)
+            elif eof is None and values is None:
+                raise get_exception(packet)
             i += 1
         return (rows, eof)
 

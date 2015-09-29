@@ -130,6 +130,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._cnx.consume_results()
             _ = self._cnx.cmd_query("SHOW WARNINGS")
             warnings = self._cnx.get_rows()
+            self._cnx.consume_results()
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
@@ -158,6 +159,9 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._warning_count = result['warning_count']
             self._affected_rows = result['affected_rows']
             self._rowcount = -1
+            self._handle_warnings()
+            if self._cnx.raise_on_warnings is True and self._warnings:
+                raise errors.get_mysql_exception(*self._warnings[0][1:3])
 
     def _handle_resultset(self):
         """Handle a result set"""
@@ -430,6 +434,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                     cur = CMySQLCursorBufferedRaw(self._cnx._get_self())
                 else:
                     cur = CMySQLCursorBuffered(self._cnx._get_self())
+                cur._executed = "(a result of {0})".format(call)
                 cur._handle_result(result)
                 # pylint: enable=W0212
                 results.append(cur)
@@ -606,15 +611,18 @@ class CMySQLCursor(MySQLCursorAbstract):
         return False
 
     def __str__(self):
-        fmt = "CMySQLCursor: {0}"
+        fmt = "{class_name}: {stmt}"
         if self._executed:
-            executed = self._executed.decode('utf-8')
-            if len(executed) > 30:
-                executed = executed[:30] + '..'
+            try:
+                executed = self._executed.decode('utf-8')
+            except AttributeError:
+                executed = self._executed
+            if len(executed) > 40:
+                executed = executed[:40] + '..'
         else:
             executed = '(Nothing executed yet)'
 
-        return fmt.format(executed)
+        return fmt.format(class_name=self.__class__.__name__, stmt=executed)
 
 
 class CMySQLCursorBuffered(CMySQLCursor):

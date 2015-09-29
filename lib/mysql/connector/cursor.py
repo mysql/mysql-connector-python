@@ -84,6 +84,8 @@ class CursorBase(MySQLCursorAbstract):
     It's better to inherite from MySQLCursor.
     """
 
+    _raw = False
+
     def __init__(self):
         self._description = None
         self._rowcount = -1
@@ -396,8 +398,10 @@ class MySQLCursor(CursorBase):
             raise errors.ProgrammingError(
                 "Failed handling non-resultset; {0}".format(err))
 
-        if self._connection.get_warnings is True and self._warning_count:
-            self._warnings = self._fetch_warnings()
+        self._handle_warnings()
+        if self._connection.raise_on_warnings is True and self._warnings:
+            raise errors.get_mysql_exception(
+                self._warnings[0][1], self._warnings[0][2])
 
     def _handle_resultset(self):
         """Handles result set
@@ -598,9 +602,11 @@ class MySQLCursor(CursorBase):
             return None
         self._connection.handle_unread_result()
 
-        if not isinstance(seq_params, (list, tuple)):
+        try:
+            _ = iter(seq_params)
+        except TypeError:
             raise errors.ProgrammingError(
-                "Parameters for query must be list or tuple.")
+                "Parameters for query must be an Iterable.")
 
         # Optimize INSERTs by batching them
         if re.match(RE_SQL_INSERT_STMT, operation):
@@ -700,15 +706,24 @@ class MySQLCursor(CursorBase):
 
             call = "CALL {0}({1})".format(procname, ','.join(argnames))
 
+            # pylint: disable=W0212
+            # We disable consuming results temporary to make sure we
+            # getting all results
+            can_consume_results = self._connection._consume_results
             for result in self._connection.cmd_query_iter(call):
-                # pylint: disable=W0212
-                tmp = MySQLCursorBuffered(self._connection._get_self())
+                self._connection._consume_results = False
+                if self._raw:
+                    tmp = MySQLCursorBufferedRaw(self._connection._get_self())
+                else:
+                    tmp = MySQLCursorBuffered(self._connection._get_self())
+                tmp._executed = "(a result of {0})".format(call)
                 tmp._handle_result(result)
                 if tmp._warnings is not None:
                     self._warnings = tmp._warnings
-                # pylint: enable=W0212
                 if 'columns' in result:
                     results.append(tmp)
+            self._connection._consume_results = can_consume_results
+            #pylint: enable=W0212
 
             if argnames:
                 select = "SELECT {0}".format(','.join(argtypes))
@@ -744,7 +759,7 @@ class MySQLCursor(CursorBase):
         """
         res = []
         try:
-            cur = self._connection.cursor()
+            cur = self._connection.cursor(raw=False)
             cur.execute("SHOW WARNINGS")
             res = cur.fetchall()
             cur.close()
@@ -752,21 +767,25 @@ class MySQLCursor(CursorBase):
             raise errors.InterfaceError(
                 "Failed getting warnings; %s" % err)
 
-        if self._connection.raise_on_warnings is True:
-            raise errors.get_mysql_exception(res[0][1], res[0][2])
-        else:
-            if len(res):
-                return res
+        if len(res):
+            return res
 
         return None
+
+    def _handle_warnings(self):
+        """Handle possible warnings after all results are consumed"""
+        if self._connection.get_warnings is True and self._warning_count:
+            self._warnings = self._fetch_warnings()
 
     def _handle_eof(self, eof):
         """Handle EOF packet"""
         self._connection.unread_result = False
         self._nextrow = (None, None)
         self._warning_count = eof['warning_count']
-        if self._connection.get_warnings is True and eof['warning_count']:
-            self._warnings = self._fetch_warnings()
+        self._handle_warnings()
+        if self._connection.raise_on_warnings is True and self._warnings:
+            raise errors.get_mysql_exception(
+                self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self):
         """Returns the next row in the result set
@@ -859,9 +878,11 @@ class MySQLCursor(CursorBase):
         statements were executed, the current statement in the iterator
         will be returned.
         """
+        if self._executed is None:
+            return None
         try:
-            return self._executed.strip().decode('utf8')
-        except AttributeError:
+            return self._executed.strip().decode('utf-8')
+        except (AttributeError, UnicodeDecodeError):
             return self._executed.strip()
 
     @property
@@ -878,16 +899,17 @@ class MySQLCursor(CursorBase):
         return True
 
     def __str__(self):
-        fmt = "MySQLCursor: %s"
+        fmt = "{class_name}: {stmt}"
         if self._executed:
-            executed = bytearray(self._executed).decode('utf-8')
-            if len(executed) > 30:
-                res = fmt % (executed[:30] + '..')
-            else:
-                res = fmt % (executed)
+            try:
+                executed = self._executed.decode('utf-8')
+            except AttributeError:
+                executed = self._executed
+            if len(executed) > 40:
+                executed = executed[:40] + '..'
         else:
-            res = fmt % '(Nothing executed yet)'
-        return res
+            executed = '(Nothing executed yet)'
+        return fmt.format(class_name=self.__class__.__name__, stmt=executed)
 
 
 class MySQLCursorBuffered(MySQLCursor):
@@ -955,6 +977,9 @@ class MySQLCursorRaw(MySQLCursor):
     """
     Skips conversion from MySQL datatypes to Python types when fetching rows.
     """
+
+    _raw = True
+
     def fetchone(self):
         row = self._fetch_row()
         if row:
@@ -980,6 +1005,9 @@ class MySQLCursorBufferedRaw(MySQLCursorBuffered):
     Cursor which skips conversion from MySQL datatypes to Python types when
     fetching rows and fetches rows within execute().
     """
+
+    _raw = True
+
     def fetchone(self):
         row = self._fetch_row()
         if row:

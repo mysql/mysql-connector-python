@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -24,8 +24,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA 
 
 # This file was auto-generated.
-_GENERATED_ON = '2014-11-05'
-_MYSQL_VERSION = (5, 7, 5)
+_GENERATED_ON = '2015-07-02'
+_MYSQL_VERSION = (5, 7, 7)
 
 # Start MySQL Error messages
 CR_UNKNOWN_ERROR = u"Unknown MySQL error"
@@ -84,11 +84,12 @@ CR_NO_STMT_METADATA = u"Prepared statement contains no metadata"
 CR_NO_RESULT_SET = u"Attempt to read a row while there is no result set associated with the statement"
 CR_NOT_IMPLEMENTED = u"This feature is not implemented yet"
 CR_SERVER_LOST_EXTENDED = u"Lost connection to MySQL server at '%s', system error: %s"
-CR_STMT_CLOSED = u"Statement closed indirectly because of a preceeding %s() call"
+CR_STMT_CLOSED = u"Statement closed indirectly because of a preceding %s() call"
 CR_NEW_STMT_METADATA = u"The number of columns in the result set differs from the number of bound buffers. You must reset the statement, rebind the result set columns, and execute the statement again"
 CR_ALREADY_CONNECTED = u"This handle is already connected. Use a separate handle for each connection."
 CR_AUTH_PLUGIN_CANNOT_LOAD = u"Authentication plugin '%s' cannot be loaded: %s"
 CR_DUPLICATE_CONNECTION_ATTR = u"There is an attribute with the same name already"
 CR_AUTH_PLUGIN_ERR = u"Authentication plugin '%s' reported error: %s"
+CR_INSECURE_API_ERR = u"Insecure API function call: '%s' Use instead: '%s'"
 # End MySQL Error messages
 

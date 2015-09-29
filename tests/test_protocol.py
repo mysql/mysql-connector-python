@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -228,6 +228,11 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             'auth_plugin': 'mysql_native_password',
         }
 
+        res = self._protocol.parse_handshake(handshake)
+        self.assertEqual(exp, res)
+
+        # Test when end byte \x00 is not present for server 5.5.8
+        handshake = handshake[:-1]
         res = self._protocol.parse_handshake(handshake)
         self.assertEqual(exp, res)
 

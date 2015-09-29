@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -167,10 +167,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             auth = get_auth_plugin(new_auth_plugin)(
                 auth_data, password=password, ssl_enabled=self._ssl_active)
             response = auth.auth_response()
-            if response == b'\x00':
-                self._socket.send(b'')
-            else:
-                self._socket.send(response)
+            self._socket.send(response)
             packet = self._socket.recv()
             if packet[4] != 1:
                 return self._handle_ok(packet)
@@ -404,7 +401,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         columns = [None,] * column_count
         for i in range(0, column_count):
-            columns[i] = self._protocol.parse_column(self._socket.recv())
+            columns[i] = self._protocol.parse_column(
+                self._socket.recv(), self.python_charset)
 
         eof = self._handle_eof(self._socket.recv())
         self.unread_result = True
@@ -437,11 +435,15 @@ class MySQLConnection(MySQLConnectionAbstract):
         if not self.unread_result:
             raise errors.InternalError("No result set available.")
 
-        if binary:
-            rows = self._protocol.read_binary_result(
-                self._socket, columns, count)
-        else:
-            rows = self._protocol.read_text_result(self._socket, count)
+        try:
+            if binary:
+                rows = self._protocol.read_binary_result(
+                    self._socket, columns, count)
+            else:
+                rows = self._protocol.read_text_result(self._socket, count)
+        except errors.Error as err:
+            self.unread_result = False
+            raise err
         if rows[-1] is not None:
             self._handle_server_status(rows[-1]['status_flag'])
             self.unread_result = False
@@ -809,8 +811,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                     "Cursor class needs be to subclass of cursor.CursorBase")
             return (cursor_class)(self)
 
-        buffered = buffered or self._buffered
-        raw = raw or self._raw
+        buffered = buffered if buffered is not None else self._buffered
+        raw = raw if raw is not None else self._raw
 
         cursor_type = 0
         if buffered is True:
@@ -919,7 +921,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         columns = [None] * column_count
         for i in range(0, column_count):
-            columns[i] = self._protocol.parse_column(self._socket.recv())
+            columns[i] = self._protocol.parse_column(
+                self._socket.recv(), self.python_charset)
 
         eof = self._handle_eof(self._socket.recv())
         return (column_count, columns, eof)
@@ -940,12 +943,14 @@ class MySQLConnection(MySQLConnectionAbstract):
         if result['num_params'] > 0:
             for _ in range(0, result['num_params']):
                 result['parameters'].append(
-                    self._protocol.parse_column(self._socket.recv()))
+                    self._protocol.parse_column(self._socket.recv(),
+                                                self.python_charset))
             self._handle_eof(self._socket.recv())
         if result['num_columns'] > 0:
             for _ in range(0, result['num_columns']):
                 result['columns'].append(
-                    self._protocol.parse_column(self._socket.recv()))
+                    self._protocol.parse_column(self._socket.recv(),
+                                                self.python_charset))
             self._handle_eof(self._socket.recv())
 
         return result

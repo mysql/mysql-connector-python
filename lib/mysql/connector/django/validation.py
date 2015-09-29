@@ -1,7 +1,11 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
 import django
-from django.db.backends import BaseDatabaseValidation
+
+if django.VERSION >= (1, 8):
+    from django.db.backends.base.validation import BaseDatabaseValidation
+else:
+    from django.db.backends import BaseDatabaseValidation
 
 if django.VERSION < (1, 7):
     from django.db import models
@@ -41,6 +45,9 @@ class DatabaseValidation(BaseDatabaseValidation):
             # Ignore any related fields.
             if getattr(field, 'rel', None) is None:
                 field_type = field.db_type(connection)
+
+                if field_type is None:
+                    return errors
 
                 if (field_type.startswith('varchar')  # Look for CharFields...
                         and field.unique  # ... that are unique
