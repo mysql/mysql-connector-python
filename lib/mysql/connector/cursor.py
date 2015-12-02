@@ -1153,7 +1153,13 @@ class MySQLCursorPrepared(MySQLCursor):
 
         Returns a tuple or None.
         """
-        return self._fetch_row() or None
+        row = self._fetch_row()
+        if row:
+            if hasattr(self._connection, 'converter'):
+                return self._connection.converter.row_to_python(
+                    row, self.description)
+            return row
+        return None
 
     def fetchmany(self, size=None):
         res = []
@@ -1170,6 +1176,11 @@ class MySQLCursorPrepared(MySQLCursor):
             raise errors.InterfaceError("No result set to fetch from.")
         (rows, eof) = self._connection.get_rows(
             binary=self._binary, columns=self.description)
+
+        if hasattr(self._connection, 'converter'):
+            row_to_python = self._connection.converter.row_to_python
+            rows = [row_to_python(row, self.description) for row in rows]
+
         self._rowcount = len(rows)
         self._handle_eof(eof)
         return rows
