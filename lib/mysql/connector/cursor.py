@@ -1174,8 +1174,10 @@ class MySQLCursorPrepared(MySQLCursor):
     def fetchall(self):
         if not self._have_unread_result():
             raise errors.InterfaceError("No result set to fetch from.")
-        (rows, eof) = self._connection.get_rows(
-            binary=self._binary, columns=self.description)
+        (rows, eof) = self._connection.get_rows()
+
+        if self._nextrow[0]:
+            rows.insert(0, self._nextrow[0])
 
         if hasattr(self._connection, 'converter'):
             row_to_python = self._connection.converter.row_to_python
