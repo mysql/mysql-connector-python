@@ -237,7 +237,7 @@ class MySQLConnection(MySQLConnectionAbstract):
     disconnect = close
 
     def _send_cmd(self, command, argument=None, packet_number=0, packet=None,
-                  expect_response=True):
+                  expect_response=True, compressed_packet_number=0):
         """Send a command to the MySQL server
 
         This method sends a command with an optional argument.
@@ -258,7 +258,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         try:
             self._socket.send(
                 self._protocol.make_command(command, packet or argument),
-                packet_number)
+                packet_number, compressed_packet_number)
         except AttributeError:
             raise errors.OperationalError("MySQL Connection not available.")
 
@@ -553,7 +553,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self.handle_unread_result()
 
         packet = self._protocol.make_command(ServerCmd.QUIT)
-        self._socket.send(packet, 0)
+        self._socket.send(packet, 0, 0)
         return packet
 
     def cmd_shutdown(self, shutdown_type=None):
@@ -587,7 +587,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self.handle_unread_result()
 
         packet = self._protocol.make_command(ServerCmd.STATISTICS)
-        self._socket.send(packet, 0)
+        self._socket.send(packet, 0, 0)
         return self._protocol.parse_statistics(self._socket.recv())
 
     def cmd_process_kill(self, mysql_pid):
@@ -646,7 +646,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             charset=charset, client_flags=self._client_flags,
             ssl_enabled=self._ssl_active,
             auth_plugin=self._auth_plugin)
-        self._socket.send(packet, 0)
+        self._socket.send(packet, 0, 0)
 
         ok_packet = self._auth_switch_request(username, password)
 

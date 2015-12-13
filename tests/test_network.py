@@ -151,7 +151,7 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
 
         # Small packet
         data = (b'\x03\x53\x45\x4c\x45\x43\x54\x20\x22\x61\x62\x63\x22', 1)
-        exp = [b'\x11\x00\x00\x00\x00\x00\x00\r\x00\x00\x01\x03SELECT "abc"']
+        exp = [b'\x11\x00\x00\x02\x00\x00\x00\r\x00\x00\x01\x03SELECT "abc"']
         try:
             self.cnx.send_compressed(*data)
         except errors.Error as err:
@@ -161,7 +161,7 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
 
         # Slightly bigger packet (not getting compressed)
         data = (b'\x03\x53\x45\x4c\x45\x43\x54\x20\x22\x61\x62\x63\x22', 1)
-        exp = (24, b'\x11\x00\x00\x00\x00\x00\x00\x0d\x00\x00\x01\x03'
+        exp = (24, b'\x11\x00\x00\x03\x00\x00\x00\x0d\x00\x00\x01\x03'
                b'\x53\x45\x4c\x45\x43\x54\x20\x22')
         try:
             self.cnx.send_compressed(*data)
@@ -175,9 +175,9 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
         data = (b'\x03\x53\x45\x4c\x45\x43\x54\x20\x22'
                 + b'\x61' * (constants.MAX_PACKET_LENGTH + 1000) + b'\x22', 2)
         exp = [
-            (63, b'\x38\x00\x00\x00\x00\x40\x00\x78\x9c\xed\xc1\x31'
+            (63, b'\x38\x00\x00\x04\x00\x40\x00\x78\x9c\xed\xc1\x31'
                 b'\x0d\x00\x20\x0c\x00\xb0\x04\x8c'),
-            (16322, b'\xbb\x3f\x00\x01\xf9\xc3\xff\x78\x9c\xec\xc1\x81'
+            (16322, b'\xbb\x3f\x00\x05\xf9\xc3\xff\x78\x9c\xec\xc1\x81'
                 b'\x00\x00\x00\x00\x80\x20\xd6\xfd')]
         try:
             self.cnx.send_compressed(*data)

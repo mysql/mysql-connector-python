@@ -1706,8 +1706,8 @@ class BugOra16369511(tests.MySQLConnectorTests):
 
     def _setup(self):
         cnx = connection.MySQLConnection(**tests.get_mysql_config())
-        self.cnx.cmd_query("DROP TABLE IF EXISTS local_data")
-        self.cnx.cmd_query(
+        cnx.cmd_query("DROP TABLE IF EXISTS local_data")
+        cnx.cmd_query(
             "CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
         cnx.close()
 
@@ -1718,6 +1718,21 @@ class BugOra16369511(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_load_csv(self):
+        self._setup()
+        cur = self.cnx.cursor()
+        sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
+        cur.execute(sql, (self.data_file,))
+        cur.execute("SELECT * FROM local_data")
+
+        exp = [
+            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        self.assertEqual(exp, cur.fetchall())
+
+    @cnx_config(compress=True)
+    @foreach_cnx()
+    def test_load_csv_with_compress(self):
         self._setup()
         cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
