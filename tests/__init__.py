@@ -775,7 +775,7 @@ def install_connector(root_dir, install_dir, connc_location=None):
     ])
 
     if connc_location:
-        cmd.extend(['--with-mysql-capi', connc_location])
+        cmd.extend(['--static', '--with-mysql-capi', connc_location])
 
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,

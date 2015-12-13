@@ -2269,6 +2269,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
             pass
 
     def setUp(self):
+        self.errmsg = "AuthPlugin {0} failed: {1}"
         config = tests.get_mysql_config()
         self.host = config['host']
         self.admin_cnx = connection.MySQLConnection(**config)
