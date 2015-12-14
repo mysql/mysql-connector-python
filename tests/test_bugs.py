@@ -215,6 +215,10 @@ class Bug499362(tests.MySQLConnectorTests):
         cur = self.cnx.cursor()
 
         ver = self.cnx.get_server_version()
+
+        varlst = ['character_set_client', 'character_set_connection',
+          'character_set_results']
+
         if ver < (5, 1, 12):
             exp1 = [('character_set_client', 'latin1'),
                     ('character_set_connection', 'latin1'),
@@ -232,6 +236,25 @@ class Bug499362(tests.MySQLConnectorTests):
                     ('character_set_system', 'utf8')]
             varlst = []
             stmt = r"SHOW SESSION VARIABLES LIKE 'character\_set\_%%'"
+
+            exp1 = [('CHARACTER_SET_CONNECTION', 'latin1'),
+                    ('CHARACTER_SET_CLIENT', 'latin1'),
+                    ('CHARACTER_SET_RESULTS', 'latin1')]
+            exp2 = [('CHARACTER_SET_CONNECTION', 'latin2'),
+                    ('CHARACTER_SET_CLIENT', 'latin2'),
+                    ('CHARACTER_SET_RESULTS', 'latin2')]
+
+        elif ver >= (5, 7, 6):
+            # INFORMATION_SCHEMA is deprecated
+            exp1 = [('character_set_client', 'latin1'),
+                    ('character_set_connection', 'latin1'),
+                    ('character_set_results', 'latin1')]
+            exp2 = [('character_set_client', 'latin2'),
+                    ('character_set_connection', 'latin2'),
+                    ('character_set_results', 'latin2')]
+            stmt = ("SELECT * FROM performance_schema.session_variables "
+                    "WHERE VARIABLE_NAME IN (%s,%s,%s)")
+
         else:
             exp1 = [('CHARACTER_SET_CONNECTION', 'latin1'),
                     ('CHARACTER_SET_CLIENT', 'latin1'),
@@ -240,10 +263,8 @@ class Bug499362(tests.MySQLConnectorTests):
                     ('CHARACTER_SET_CLIENT', 'latin2'),
                     ('CHARACTER_SET_RESULTS', 'latin2')]
 
-            varlst = ['character_set_client', 'character_set_connection',
-                      'character_set_results']
-            stmt = """SELECT * FROM INFORMATION_SCHEMA.SESSION_VARIABLES
-                WHERE VARIABLE_NAME IN (%s,%s,%s)"""
+            stmt = ("SELECT * FROM INFORMATION_SCHEMA.SESSION_VARIABLES "
+                    "WHERE VARIABLE_NAME IN (%s,%s,%s)")
 
         cur.execute(stmt, varlst)
         res1 = cur.fetchall()
@@ -2346,6 +2367,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
         self.assertRaises(errors.InterfaceError, connection.MySQLConnection,
                           **config)
         if CMySQLConnection:
+            CMySQLConnection(**config)
             self.assertRaises(errors.InterfaceError, CMySQLConnection, **config)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 5, 7),
