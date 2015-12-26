@@ -29,6 +29,7 @@ import logging
 import unittest
 
 from mysql.connector import errors, errorcode
+from .. import PY2
 
 import tests
 
@@ -139,6 +140,28 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         stmt = "SELECT col1,col2 FROM {0} WHERE col1 <= %(id)s".format(tbl)
         cur.execute(stmt, data)
         self.assertEqual([(1, '100')], cur.fetchall())
+
+        cur.close()
+
+        cur = self._get_cursor(self.cnx)
+        cur.execute("DROP PROCEDURE IF EXISTS multi_results")
+        procedure = (
+            "CREATE PROCEDURE multi_results () "
+            "BEGIN SELECT 1; SELECT 'ham'; END"
+        )
+        cur.execute(procedure)
+        exp_stmt = "CALL multi_results()"
+        if not PY2:
+            exp_stmt = b"CALL multi_results()"
+        exp_result = [[(1,)], [(u'ham',)]]
+        results = []
+        for result in cur.execute(exp_stmt, multi=True):
+            if result.with_rows:
+                self.assertEqual(exp_stmt, result._executed)
+                results.append(result.fetchall())
+
+        self.assertEqual(exp_result, results)
+        cur.execute("DROP PROCEDURE multi_results")
 
         cur.close()
 

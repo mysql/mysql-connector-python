@@ -204,7 +204,10 @@ class CMySQLCursor(MySQLCursorAbstract):
                 if exc.errno != CR_NO_RESULT_SET:
                     raise
             i += 1
-            self._executed = executed_list[i].strip()
+            try:
+                self._executed = executed_list[i].strip()
+            except IndexError:
+                self._executed = executed_list[0]
             yield self
         return
 
