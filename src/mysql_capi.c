@@ -1043,7 +1043,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 		NULL
     };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzksssO!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!", kwlist,
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
