@@ -1,7 +1,6 @@
 [MASTER]
 #rcfile=
 #init-hook=
-profile=no
 ignore=.bzr, .bzr-mysql, __pycache__, data
 persistent=no
 load-plugins=
@@ -51,7 +50,7 @@ no-docstring-rgx=__.*__
 docstring-min-length=-1
 
 [FORMAT]
-max-line-length=80
+max-line-length=120
 ignore-long-lines=^\s*(# )?<?https?://\S+>?$
 max-module-lines=2500
 indent-string='    '
@@ -59,7 +58,6 @@ indent-string='    '
 [TYPECHECK]
 ignore-mixin-members=yes
 ignored-classes=
-zope=no
 generated-members=REQUEST,acl_users,aq_parent
 
 [DESIGN]
@@ -81,7 +79,6 @@ ext-import-graph=
 int-import-graph=
 
 [CLASSES]
-ignore-iface-methods=
 defining-attr-methods=__init__,__new__,setUp
 valid-classmethod-first-arg=cls
 valid-metaclass-classmethod-first-arg=mcs

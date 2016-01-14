@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -392,7 +392,7 @@ class BaseMySQLSocket(object):
         self._connection_timeout = timeout
 
     # pylint: disable=C0103
-    def switch_to_ssl(self, ca, cert, key, verify_cert=False):
+    def switch_to_ssl(self, ca, cert, key, verify_cert=False, cipher=None):
         """Switch the socket to use SSL"""
         if not self.sock:
             raise errors.InterfaceError(errno=2048)
@@ -406,7 +406,7 @@ class BaseMySQLSocket(object):
             self.sock = ssl.wrap_socket(
                 self.sock, keyfile=key, certfile=cert, ca_certs=ca,
                 cert_reqs=cert_reqs, do_handshake_on_connect=False,
-                ssl_version=ssl.PROTOCOL_TLSv1)
+                ssl_version=ssl.PROTOCOL_TLSv1, ciphers=cipher)
             self.sock.do_handshake()
         except NameError:
             raise errors.NotSupportedError(

@@ -2,7 +2,6 @@
 
 #rcfile=
 #init-hook=
-profile=no
 ignore=.bzr, .bzr-mysql, __pycache__, data
 persistent=no
 load-plugins=
@@ -18,7 +17,6 @@ output-format=text
 files-output=no
 reports=no
 evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
-comment=no
 msg-template={msg_id}:{line:3d},{column:2d}: {msg} ({symbol})
 
 [VARIABLES]
@@ -40,7 +38,6 @@ ignore-imports=no
 
 [BASIC]
 
-required-attributes=
 bad-functions=map,filter,apply,input
 module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
 const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$
@@ -60,7 +57,7 @@ docstring-min-length=-1
 
 [FORMAT]
 
-max-line-length=80
+max-line-length=120
 ignore-long-lines=^\s*(# )?<?https?://\S+>?$
 max-module-lines=2500
 indent-string='    '
@@ -70,7 +67,6 @@ indent-string='    '
 ignore-mixin-members=yes
 ignored-classes=SQLObject
 
-zope=no
 generated-members=REQUEST,acl_users,aq_parent
 
 [DESIGN]
@@ -95,7 +91,6 @@ int-import-graph=
 
 [CLASSES]
 
-ignore-iface-methods=
 defining-attr-methods=__init__,__new__,setUp
 valid-classmethod-first-arg=cls
 valid-metaclass-classmethod-first-arg=mcs

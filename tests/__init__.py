@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -431,10 +431,13 @@ def foreach_cnx(*cnx_classes, **extra_config):
                     self.cnx = cnx_class(**self.config)
                     self._testMethodName = "{0} (using {1})".format(
                         func.__name__, cnx_class.__name__)
-                except:
+                except Exception as exc:
                     if hasattr(self, 'cnx'):
                         # We will rollback/close later
                         pass
+                    else:
+                        traceback.print_exc(file=sys.stdout)
+                        raise exc
                 try:
                     func(self, *args, **kwargs)
                 except Exception as exc:

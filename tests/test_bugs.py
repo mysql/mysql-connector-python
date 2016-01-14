@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -2228,6 +2228,7 @@ class BugOra17054848(tests.MySQLConnectorTests):
         config['ssl_verify_cert'] = False
         config.update({
             'ssl_ca': ssl_ca,
+            'ssl_cipher': 'AES256-SHA',
         })
 
         try:
@@ -2334,6 +2335,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
             'ssl_ca': tests.SSL_CA,
             'ssl_cert': tests.SSL_CERT,
             'ssl_key': tests.SSL_KEY,
+            'ssl_cipher': 'AES256-SHA',
         })
 
         user = self.users['sha256user']
@@ -2382,7 +2384,6 @@ class BugOra16217765(tests.MySQLConnectorTests):
         self.assertRaises(errors.InterfaceError, connection.MySQLConnection,
                           **config)
         if CMySQLConnection:
-            CMySQLConnection(**config)
             self.assertRaises(errors.InterfaceError, CMySQLConnection, **config)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 5, 7),

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -105,6 +105,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
             'ssl-ca': 'dummyCA',
             'ssl-cert': 'dummyCert',
             'ssl-key': 'dummyKey',
+            'ssl-cipher': 'AES256-SHA:CAMELLIA256-SHA',
             'nice': '0',
             'user': 'mysql',
             'pid-file': '/var/run/mysqld/mysqld.pid',
@@ -127,7 +128,8 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
                         'socket': '/var/run/mysqld/mysqld.sock',
                         'ssl-ca': 'dummyCA',
                         'ssl-cert': 'dummyCert',
-                        'ssl-key': 'dummyKey'}),
+                        'ssl-key': 'dummyKey',
+                        'ssl-cipher': 'AES256-SHA:CAMELLIA256-SHA'}),
             ('mysqld_safe', {'socket': '/var/run/mysqld/mysqld1.sock',
                             'nice': '0'}),
             ('mysqld', {'user': 'mysql',
@@ -175,6 +177,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
             'ssl_ca': 'dummyCA',
             'ssl_cert': 'dummyCert',
             'ssl_key': 'dummyKey',
+            'ssl_cipher': 'AES256-SHA:CAMELLIA256-SHA',
         }
         result = read_option_files(option_files=os.path.join(
             option_file_dir, 'my.cnf'))
@@ -186,6 +189,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
             'ssl_ca': 'dummyCA',
             'ssl_cert': 'dummyCert',
             'ssl_key': 'dummyKey',
+            'ssl_cipher': 'AES256-SHA:CAMELLIA256-SHA',
             'user': 'mysql',
         }
         result = read_option_files(option_files=os.path.join(
