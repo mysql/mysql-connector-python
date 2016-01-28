@@ -1,6 +1,6 @@
 /*
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -269,12 +269,14 @@ fetch_fields(MYSQL_RES *result, unsigned int num_fields, MY_CHARSET_INFO *cs,
 void
 MySQL_dealloc(MySQL *self)
 {
-    MySQL_free_result(self);
-    if (&self->session)
-    {
-        mysql_close(&self->session);
-    }
-	Py_TYPE(self)->tp_free((PyObject*)self);
+    if (self) {
+        MySQL_free_result(self);
+        if (&self->session)
+        {
+            mysql_close(&self->session);
+        }
+        Py_TYPE(self)->tp_free((PyObject*)self);
+	}
 }
 
 /**
@@ -1028,6 +1030,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
 	PyObject *charset_name, *compress, *ssl_verify_cert;
 	const char* auth_plugin;
+	unsigned long ver;
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
 	unsigned int protocol= 0;
@@ -1043,7 +1046,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 		NULL
     };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzksssO!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!", kwlist,
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
@@ -1062,6 +1065,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
     mysql_init(&self->session);
+    ver= mysql_get_client_version();
 
 #ifdef MS_WINDOWS
     if (NULL == host)
@@ -1104,13 +1108,41 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, (char*)&tmp_uint);
 
     if (ssl_ca || ssl_cert || ssl_key) {
-        abool= 1;
+
+        if (ver > 50703 && ver < 50711) {
+            abool= 1;
+            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
+        } else if (ver >= 50711) {
+#ifdef SSL_MODE_REQUIRED
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_REQUIRED);
+#endif
+        }
+
         if (ssl_verify_cert && ssl_verify_cert == Py_True)
         {
-            mysql_options(&self->session,
-                          MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
+#ifdef SSL_MODE_VERIFY_IDENTITY
+            if (ver >= 50711) {
+                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_VERIFY_IDENTITY);
+            } else
+#endif
+            {
+                abool= 1;
+                mysql_options(&self->session,
+                              MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
+            }
         }
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
+    } else {
+        // Make sure to not enforce SSL
+        abool= 1;
+        if (ver > 50703 && ver < 50711) {
+            abool= 0;
+            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
+        } else if (ver >= 50711) {
+#ifdef SSL_MODE_DISABLED
+            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, SSL_MODE_DISABLED);
+#endif
+        }
     }
 
     if (PyString_Check(self->auth_plugin)) {

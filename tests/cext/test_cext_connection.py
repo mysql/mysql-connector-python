@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -87,9 +87,17 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         exp = {
             'eof': {'status_flag': 32, 'warning_count': 0},
             'columns': [
-                ('Variable_name', 253, None, None, None, None, 0, 1),
-                ('Value', 253, None, None, None, None, 1, 0)]
+                ['Variable_name', 253, None, None, None, None, 0, 1],
+                ('Value', 253, None, None, None, None, 1, 0)
+            ]
         }
+
+        if tests.MYSQL_VERSION >= (5, 7, 10):
+            exp['columns'][0][7] = 4097
+            exp['eof']['status_flag'] = 16385
+
+        exp['columns'][0] = tuple(exp['columns'][0])
+
         self.assertEqual(exp, info)
 
         rows = self.cnx.get_rows()
