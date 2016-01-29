@@ -2241,8 +2241,8 @@ class BugOra17054848(tests.MySQLConnectorTests):
         self.assertTrue(res != '')
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 5, 7),
-                 "BugOra16217765 not tested with MySQL version < 5.5.7")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 7),
+                 "BugOra16217765 not tested with MySQL version < 5.6.7")
 class BugOra16217765(tests.MySQLConnectorTests):
     """BUG#16217765: Fix authentication plugin support
     """
@@ -3813,7 +3813,10 @@ class BugOra21536507(tests.MySQLConnectorTests):
         drop_stmt = "DROP TABLE IF EXISTS unknown"
         self.assertRaises(errors.DatabaseError, cur.execute, drop_stmt)
         exp = [('Note', 1051, "Unknown table 'myconnpy.unknown'")]
-        self.assertEqual(exp, cur.fetchwarnings())
+        res = cur.fetchwarnings()
+        self.assertEqual('Note', res[0][0])
+        self.assertEqual(1051, res[0][1])
+        self.assertTrue(res[0][2].startswith("Unknown table"))
 
         select_stmt = "SELECT 'a'+'b'"
         cur.execute(select_stmt)
@@ -3889,10 +3892,19 @@ class BugOra21492428(tests.MySQLConnectorTests):
 
         self._credentials = [
             ('ABCD', ' XYZ'),
-            (' PQRS', ' 1 2 3 '),
-            ('XYZ1 ', 'XYZ123    '),
-            (' A B C D ', '    ppppp    '),
+            ('PQRS', ' 1 2 3 '),
+            ('XYZ1', 'XYZ123    '),
+            ('A B C D', '    ppppp    '),
         ]
+
+        if self.cnx.get_server_version() > (5, 6):
+            self._credentials += [
+                (' PQRSWITHSPACE', ' 1 2 3 '),
+                ('XYZ1WITHSPACE ', 'XYZ123    '),
+                (' S P A C E D ', '    ppppp    '),
+            ]
+
+
         for user, password in self._credentials:
             self.cursor.execute(grant.format(
                 user=user, host=self.host, password=password))
@@ -3911,7 +3923,7 @@ class BugOra21492428(tests.MySQLConnectorTests):
             try:
                 cnx = connection.MySQLConnection(**config)
             except errors.ProgrammingError:
-                self.fail('Failed using password with spaces')
+                self.fail('Failed using password with spaces for user %s' % user)
             else:
                 cnx.close()
 

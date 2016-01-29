@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -206,14 +206,14 @@ class MySQLProtocol(object):
     def parse_ok(self, packet):
         """Parse a MySQL OK-packet"""
         if not packet[4] == 0:
-            raise errors.InterfaceError("Failed parsing OK packet.")
+            raise errors.InterfaceError("Failed parsing OK packet (invalid).")
 
         ok_packet = {}
         try:
             ok_packet['field_count'] = struct_unpack('<xxxxB', packet[0:5])[0]
             (packet, ok_packet['affected_rows']) = utils.read_lc_int(packet[5:])
             (packet, ok_packet['insert_id']) = utils.read_lc_int(packet)
-            (ok_packet['server_status'],
+            (ok_packet['status_flag'],
              ok_packet['warning_count']) = struct_unpack('<HH', packet[0:4])
             packet = packet[4:]
             if packet:
@@ -261,6 +261,10 @@ class MySQLProtocol(object):
 
     def parse_eof(self, packet):
         """Parse a MySQL EOF-packet"""
+        if packet[4] == 0:
+            # EOF packet deprecation
+            return self.parse_ok(packet)
+
         err_msg = "Failed parsing EOF packet."
         res = {}
         try:
@@ -302,7 +306,7 @@ class MySQLProtocol(object):
                         "{0} ({1}:{2}).".format(errmsg, lbl, val))
         return res
 
-    def read_text_result(self, sock, count=1):
+    def read_text_result(self, sock, version, count=1):
         """Read MySQL text result
 
         Reads all or given number of rows from the socket.
@@ -314,10 +318,9 @@ class MySQLProtocol(object):
         eof = None
         rowdata = None
         i = 0
+        eof57 = version >= (5, 7, 5)
         while True:
-            if eof is not None:
-                break
-            if i == count:
+            if eof or i == count:
                 break
             packet = sock.recv()
             if packet.startswith(b'\xff\xff\xff'):
@@ -328,8 +331,12 @@ class MySQLProtocol(object):
                     packet = sock.recv()
                 datas.append(packet[4:])
                 rowdata = utils.read_lc_string_list(bytearray(b'').join(datas))
-            elif packet[4] == 254:
+            elif (packet[4] == 254 and packet[0] < 7):
                 eof = self.parse_eof(packet)
+                rowdata = None
+            elif eof57 and (packet[4] == 0 and packet[0] > 9):
+                # EOF deprecation: make sure we catch it whether flag is set or not
+                eof = self.parse_ok(packet)
                 rowdata = None
             else:
                 eof = None

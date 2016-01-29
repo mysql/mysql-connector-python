@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -38,7 +38,7 @@ OK_PACKET_RESULT = {
     'affected_rows': 1,
     'field_count': 0,
     'warning_count': 1,
-    'server_status': 0
+    'status_flag': 0
 }
 
 ERR_PACKET = bytearray(

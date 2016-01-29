@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -36,8 +36,9 @@ from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
 from .protocol import MySQLProtocol
 
 HAVE_CMYSQL = False
+# pylint: disable=F0401,C0413
 try:
-    import _mysql_connector  # pylint: disable=F0401
+    import _mysql_connector
     from .cursor_cext import (
         CMySQLCursor, CMySQLCursorRaw,
         CMySQLCursorBuffered, CMySQLCursorBufferedRaw, CMySQLCursorPrepared,
@@ -51,7 +52,7 @@ except ImportError as exc:
         ))
 else:
     HAVE_CMYSQL = True
-
+# pylint: enable=F0401,C0413
 
 class CMySQLConnection(MySQLConnectionAbstract):
 
@@ -210,7 +211,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         try:
             connected = self._cmysql.ping()
         except AttributeError:
-          pass  # Raise or reconnect later
+            pass  # Raise or reconnect later
         else:
             if connected:
                 return
