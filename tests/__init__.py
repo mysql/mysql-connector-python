@@ -459,6 +459,7 @@ class MySQLConnectorTests(unittest.TestCase):
     def __init__(self, methodName='runTest'):
         from mysql.connector import connection
         self.all_cnx_classes = [connection.MySQLConnection]
+        self.maxDiff = 64
         try:
             import _mysql_connector
             from mysql.connector import connection_cext

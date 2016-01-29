@@ -3266,7 +3266,7 @@ class BugOra19500097(tests.MySQLConnectorTests):
 class BugOra19549363(tests.MySQLConnectorTests):
     """BUG#19549363: Compression does not work with Change User
     """
-    def test_compress(self):
+    def test_compress_reset_connection(self):
         config = tests.get_mysql_config()
         config['compress'] = True
 
@@ -3458,49 +3458,68 @@ class BugOra20462427(tests.MySQLConnectorTests):
     """
     def setUp(self):
         config = tests.get_mysql_config()
-        config['autocommit'] = True
-        config['connection_timeout'] = 100
-        self.cnx = connection.MySQLConnection(**config)
-        self.cur = self.cnx.cursor()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
 
         self.tbl = 'BugOra20462427'
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = ("CREATE TABLE {0} ("
                   "id INT PRIMARY KEY, "
                   "a LONGTEXT "
                   ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
 
-        self.cur.execute(create)
+        cur.execute(create)
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
-        self.cur.close()
-        self.cnx.close()
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
 
-    def test_bigdata(self):
+    def _test_bigdata(self):
         temp = 'a'*16777210
         insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, temp)
 
-        self.cur.execute(insert)
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur = self.cnx.cursor()
+        cur.execute(insert)
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777210, len(res[0][0]))
 
-        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777211, len(res[0][0]))
 
-        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777212, len(res[0][0]))
 
-        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777213, len(res[0][0]))
+
+        cur.execute("UPDATE {0} SET a = concat(a, 'aaa')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
+        self.assertEqual(16777216, len(res[0][0]))
+
+        cur.close()
+
+    @cnx_config(compress=False, connection_timeout=100)
+    @foreach_cnx()
+    def test_bigdata_compress(self):
+        self._test_bigdata()
+
+    @cnx_config(connection_timeout=100)
+    @foreach_cnx()
+    def test_bigdata_nocompress(self):
+        self._test_bigdata()
 
 
 class BugOra20811802(tests.MySQLConnectorTests):

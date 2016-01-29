@@ -338,10 +338,15 @@ class BaseMySQLSocket(object):
             while header:
                 if len(header) < 7:
                     raise errors.InterfaceError(errno=2013)
+
+                # Get length of compressed packet
                 zip_payload_length = struct_unpack("<I",
                                                    header[0:3] + b'\x00')[0]
                 self._compressed_packet_number = header[3]
+
+                # Get payload length before compression
                 payload_length = struct_unpack("<I", header[4:7] + b'\x00')[0]
+
                 zip_payload = init_bytearray(abyte)
                 while len(zip_payload) < zip_payload_length:
                     chunk = self.sock.recv(zip_payload_length
@@ -349,34 +354,40 @@ class BaseMySQLSocket(object):
                     if len(chunk) == 0:
                         raise errors.InterfaceError(errno=2013)
                     zip_payload = zip_payload + chunk
+
+                # Payload was not compressed
                 if payload_length == 0:
                     self._split_zipped_payload(zip_payload)
                     pkt = self._packet_queue.popleft()
                     self._packet_number = pkt[3]
                     return pkt
-                packets.append(header + zip_payload)
-                if payload_length != 16384:
+
+                packets.append((payload_length, zip_payload))
+
+                if zip_payload_length <= 16384:
+                    # We received the full compressed packet
                     break
+
+                # Get next compressed packet
                 header = init_bytearray(b'')
                 abyte = self.sock.recv(1)
                 while abyte and len(header) < 7:
                     header += abyte
                     abyte = self.sock.recv(1)
+
         except IOError as err:
             raise errors.OperationalError(
                 errno=2055, values=(self.get_address(), _strioerror(err)))
 
+        # Compressed packet can contain more than 1 MySQL packets
+        # We decompress and make one so we can split it up
         tmp = init_bytearray(b'')
-        for packet in packets:
-            payload_length = struct_unpack("<I", header[4:7] + b'\x00')[0]
-            if payload_length == 0:
-                tmp.append(packet[7:])
+        for payload_length, payload in packets:
+            # payload_length can not be 0; this was previously handled
+            if PY2:
+                tmp += zlib.decompress(buffer(payload))  # pylint: disable=E0602
             else:
-                if PY2:
-                    tmp += zlib.decompress(
-                        buffer(packet[7:]))  # pylint: disable=E0602
-                else:
-                    tmp += zlib.decompress(packet[7:])
+                tmp += zlib.decompress(payload)
         self._split_zipped_payload(tmp)
         del tmp
 
