@@ -1109,14 +1109,17 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 
     if (ssl_ca || ssl_cert || ssl_key) {
 
+#ifdef MYSQL_OPT_SSL_ENFORCE
         if (ver > 50703 && ver < 50711) {
             abool= 1;
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
-        } else if (ver >= 50711) {
-#ifdef SSL_MODE_REQUIRED
-            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_REQUIRED);
-#endif
         }
+#ifdef SSL_MODE_REQUIRED
+        else if (ver >= 50711) {
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_REQUIRED);
+        }
+#endif
+#endif
 
         if (ssl_verify_cert && ssl_verify_cert == Py_True)
         {
@@ -1135,14 +1138,17 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     } else {
         // Make sure to not enforce SSL
         abool= 1;
+#ifdef MYSQL_OPT_SSL_ENFORCE
         if (ver > 50703 && ver < 50711) {
             abool= 0;
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
-        } else if (ver >= 50711) {
-#ifdef SSL_MODE_DISABLED
-            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, SSL_MODE_DISABLED);
-#endif
         }
+#ifdef SSL_MODE_DISABLED
+        else if (ver >= 50711) {
+            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, SSL_MODE_DISABLED);
+        }
+#endif
+#endif
     }
 
     if (PyString_Check(self->auth_plugin)) {
