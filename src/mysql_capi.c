@@ -1108,46 +1108,46 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, (char*)&tmp_uint);
 
     if (ssl_ca || ssl_cert || ssl_key) {
-
-#ifdef MYSQL_OPT_SSL_ENFORCE
-        if (ver > 50703 && ver < 50711) {
+#if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
+        printf(">>>> %d\n", MYSQL_VERSION_ID);
+        {
             abool= 1;
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
         }
-#ifdef SSL_MODE_REQUIRED
-        else if (ver >= 50711) {
+#endif
+#if MYSQL_VERSION_ID >= 50711
+        {
             mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_REQUIRED);
         }
-#endif
 #endif
 
         if (ssl_verify_cert && ssl_verify_cert == Py_True)
         {
-#ifdef SSL_MODE_VERIFY_IDENTITY
-            if (ver >= 50711) {
+#if MYSQL_VERSION_ID >= 50711
+            {
                 mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_VERIFY_IDENTITY);
-            } else
-#endif
+            }
+#else
             {
                 abool= 1;
                 mysql_options(&self->session,
                               MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
             }
+#endif
         }
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
     } else {
         // Make sure to not enforce SSL
-        abool= 1;
-#ifdef MYSQL_OPT_SSL_ENFORCE
-        if (ver > 50703 && ver < 50711) {
+#if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
+        {
             abool= 0;
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
         }
-#ifdef SSL_MODE_DISABLED
-        else if (ver >= 50711) {
+#endif
+#if MYSQL_VERSION_ID >= 50711
+        {
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, SSL_MODE_DISABLED);
         }
-#endif
 #endif
     }
 
