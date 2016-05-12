@@ -239,19 +239,20 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         for priority, filename in enumerate(filenames):
             try:
                 out_file = io.StringIO()
-                for line in codecs.open(filename, encoding='utf-8'):
-                    line = line.strip()
-                    match_obj = self.OPTCRE.match(line)
-                    if not self.SECTCRE.match(line) and match_obj:
-                        optname, delimiter, optval = match_obj.group('option',
-                                                                     'vi',
-                                                                     'value')
-                        if optname and not optval and not delimiter:
-                            out_file.write(line + "=\n")
+                with codecs.open(filename, encoding='utf-8') as in_file:
+                    for line in in_file(filename, encoding='utf-8'):
+                        line = line.strip()
+                        match_obj = self.OPTCRE.match(line)
+                        if not self.SECTCRE.match(line) and match_obj:
+                            optname, delimiter, optval = match_obj.group('option',
+                                                                         'vi',
+                                                                         'value')
+                            if optname and not optval and not delimiter:
+                                out_file.write(line + "=\n")
+                            else:
+                                out_file.write(line + '\n')
                         else:
                             out_file.write(line + '\n')
-                    else:
-                        out_file.write(line + '\n')
                 out_file.seek(0)
             except IOError:
                 continue
