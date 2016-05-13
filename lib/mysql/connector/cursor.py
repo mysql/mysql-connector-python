@@ -1175,6 +1175,20 @@ class MySQLCursorPrepared(MySQLCursor):
         return rows
 
 
+class MySQLCursorPreparedDict(MySQLCursorPrepared):
+    def fetchone(self):
+        row = super().fetchone()
+        return dict(zip(self.column_names, row)) if row else None
+
+    def fetchmany(self, size=None):
+        rows = super().fetchmany(size=size)
+        return [dict(zip(self.column_names, row)) for row in rows]
+
+    def fetchall(self):
+        rows = super().fetchall()
+        return [dict(zip(self.column_names, row)) for row in rows]
+
+
 class MySQLCursorDict(MySQLCursor):
     """
     Cursor fetching rows as dictionaries.

@@ -41,7 +41,7 @@ from .cursor import (
     CursorBase, MySQLCursor, MySQLCursorRaw,
     MySQLCursorBuffered, MySQLCursorBufferedRaw, MySQLCursorPrepared,
     MySQLCursorDict, MySQLCursorBufferedDict, MySQLCursorNamedTuple,
-    MySQLCursorBufferedNamedTuple)
+    MySQLCursorBufferedNamedTuple, MySQLCursorPreparedDict)
 from .network import MySQLUnixSocket, MySQLTCPSocket
 from .protocol import MySQLProtocol
 from .utils import int4store
@@ -835,7 +835,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             5: MySQLCursorBufferedDict,
             8: MySQLCursorNamedTuple,
             9: MySQLCursorBufferedNamedTuple,
-            16: MySQLCursorPrepared
+            16: MySQLCursorPrepared,
+            20: MySQLCursorPreparedDict
         }
         try:
             return (types[cursor_type])(self)
