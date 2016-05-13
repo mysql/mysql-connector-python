@@ -48,6 +48,7 @@ RE_SQL_SPLIT_STMTS = re.compile(
     b''';(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)''')
 RE_SQL_FIND_PARAM = re.compile(
     b'''%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)''')
+RE_SQL_FIND_PYTHON_STRING_PARAM = re.compile('%\([\w_]+\)s')
 
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
@@ -1076,7 +1077,7 @@ class MySQLCursorPrepared(MySQLCursor):
             self._connection.unread_result = True
             self._have_result = True
 
-    def execute(self, operation, params=(), multi=False):  # multi is unused
+    def execute(self, operation, params=None, multi=False):  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
 
         This method will preare the given operation and execute it using
@@ -1085,6 +1086,16 @@ class MySQLCursorPrepared(MySQLCursor):
         If the cursor instance already had a prepared statement, it is
         first closed.
         """
+        if type(params) == dict:
+            replaced_fields = re.findall(RE_SQL_FIND_PYTHON_STRING_PARAM, operation)
+            operation = re.sub(RE_SQL_FIND_PYTHON_STRING_PARAM, '?', operation)
+            if len(params) != len(replaced_fields):
+                raise errors.ProgrammingError(
+                        "Not all parameters were used in the SQL statement")
+
+            #Replace params dict with params tuple in correct order.
+            params = tuple([ params[field[2:-2]] for field in replaced_fields])
+
         if operation is not self._executed:
             if self._prepared:
                 self._connection.cmd_stmt_close(self._prepared['statement_id'])
