@@ -48,7 +48,8 @@ RE_SQL_SPLIT_STMTS = re.compile(
     b''';(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)''')
 RE_SQL_FIND_PARAM = re.compile(
     b'''%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)''')
-RE_SQL_FIND_PYTHON_STRING_PARAM = re.compile('%\([\w_]+\)s')
+RE_SQL_PYTHON_REPLACE_PARAM = re.compile('%\(.*?\)s')
+RE_SQL_PYTHON_CAPTURE_PARAM_NAME = re.compile('%\((.*?)\)s')
 
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
@@ -1087,14 +1088,14 @@ class MySQLCursorPrepared(MySQLCursor):
         first closed.
         """
         if type(params) == dict:
-            replaced_fields = re.findall(RE_SQL_FIND_PYTHON_STRING_PARAM, operation)
-            operation = re.sub(RE_SQL_FIND_PYTHON_STRING_PARAM, '?', operation)
-            if len(params) != len(replaced_fields):
+            query_replacement_keys = re.findall(RE_SQL_PYTHON_CAPTURE_PARAM_NAME, operation)
+            operation = re.sub(RE_SQL_PYTHON_REPLACE_PARAM, '?', operation)
+            if len(params) != len(query_replacements_keys):
                 raise errors.ProgrammingError(
                         "Not all parameters were used in the SQL statement")
 
             #Replace params dict with params tuple in correct order.
-            params = tuple([ params[field[2:-2]] for field in replaced_fields])
+            params = tuple([ params[key] for key in query_replacement_keys])
 
         if operation is not self._executed:
             if self._prepared:
