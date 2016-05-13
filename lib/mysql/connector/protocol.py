@@ -442,7 +442,7 @@ class MySQLProtocol(object):
                 values.append(value)
             elif field[1] in (FieldType.DECIMAL, FieldType.NEWDECIMAL):
                 (packet, value) = utils.read_lc_string(packet)
-                values.append(Decimal(str(val, encoding="utf-8")))
+                values.append(Decimal(str(value, encoding="utf-8")))
             else:
                 (packet, value) = utils.read_lc_string(packet)
                 values.append(value)
