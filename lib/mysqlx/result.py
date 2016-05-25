@@ -399,9 +399,22 @@ class Column(object):
 
 
 class Row(object):
-    def __init__(self, col_count):
-        self.fields = [None] * col_count
+    def __init__(self, rs, fields):
+        self._fields = fields
+        self._resultset = rs
 
+    def __getitem__(self, index):
+        if index >= len(self._fields):
+            raise Exception("Index out of range")
+        return self._fields[index]
+
+    def get_string(self, str_index):
+        int_index = self._resultset.index_of(str_index)
+        if int_index >= len(self._fields):
+            raise Exception("Argument out of range")
+        if int_index == -1:
+            raise Exception("Column name '" + str_index + "' not found")
+        return str(self._fields[int_index])
 
 class BaseResult(object):
     def __init__(self, connection):
@@ -431,6 +444,14 @@ class BufferingResult(BaseResult):
     def __getitem__(self, index):
         return self._items[index]
 
+    def index_of(self, col_name):
+        index = 0
+        for col in self._columns:
+            if col.get_column_name() == col_name:
+                return index
+            index = index + 1
+        return -1
+
     def _read_item(self, dumping):
         row = self._protocol.read_row(self)
         if row is None:
@@ -440,7 +461,7 @@ class BufferingResult(BaseResult):
             for x in range(len(row.field)):
                 col = self._columns[x]
                 item[x] = from_protobuf(col.get_type(), row.field[x])
-        return item
+        return Row(self, item)
 
     def _page_in_items(self):
         if self._is_complete:

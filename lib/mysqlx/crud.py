@@ -71,6 +71,7 @@ class Schema(DatabaseObject):
 
     def get_collections(self):
         rows = self._connection.get_row_result("list_objects", self._name)
+        rows.fetch_all()
         collections = []
         for row in rows:
             if row.get_string("type") != "COLLECTION":
@@ -78,6 +79,17 @@ class Schema(DatabaseObject):
             collection = Collection(self, row.get_string("name"))
             collections.append(collection)
         return collections
+
+    def get_tables(self):
+        rows = self._connection.get_row_result("list_objects", self._name)
+        rows.fetch_all()
+        tables = []
+        for row in rows:
+            if row.get_string("type") != "TABLE":
+                continue
+            table = Table(self, row.get_string("name"))
+            tables.append(table)
+        return tables
 
     def get_table(self, name, check_existence=False):
         table = Table(self, name)

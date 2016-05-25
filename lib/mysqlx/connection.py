@@ -110,7 +110,7 @@ class Connection(object):
             raise Exception("No data found")
         return result[0][0]
 
-    def get_row_result(self, cmd, args=None):
+    def get_row_result(self, cmd, *args):
         self.protocol.send_execute_statement("xplugin", cmd, args)
         return RowResult(self)
 

@@ -55,9 +55,10 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             self.session = mysqlx.get_session(self.connect_kwargs)
         except Exception as err:  # TODO: Replace by a custom error
             self.fail("{0}".format(err))
-        self.schema = self.session.get_schema(self.schema_name)
-        if not self.schema.exists_in_database():
-            self.schema = self.session.create_schema(self.schema_name)
+        self.schema = self.session.create_schema(self.schema_name)
+
+    def tearDown(self):
+        self.session.drop_schema(self.schema_name)
 
     def test_get_session(self):
         session = self.schema.get_session()
@@ -79,13 +80,58 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         collection = self.schema.create_collection(collection_name, True)
         self.assertEqual(collection.get_name(), collection_name)
         self.assertTrue(collection.exists_in_database())
+
+        # reusing the existing collection should work
+        collection = self.schema.create_collection(collection_name, True)
+        self.assertEqual(collection.get_name(), collection_name)
+        self.assertTrue(collection.exists_in_database())
+
+        # should get exception if reuse is false and it already exists
+        self.assertRaises(Exception, self.schema.create_collection, collection_name, False)
+
         self.schema.drop_collection(collection_name)
+
+    def test_get_collection(self):
+        collection_name = "collection_test"
+        coll =  self.schema.get_collection(collection_name)
+        self.assertFalse(coll.exists_in_database())
+        coll = self.schema.create_collection(collection_name)
+        self.assertTrue(coll.exists_in_database())
+
+    def test_get_collections(self):
+        coll = self.schema.get_collections()
+        self.assertEqual(0, len(coll), "Should have returned 0 objects")
+        self.schema.create_collection("coll1")
+        self.schema.create_collection("coll2")
+        self.schema.create_collection("coll3")
+        coll = self.schema.get_collections()
+        self.assertEqual(3, len(coll), "Should have returned 3 objects")
+        self.assertEqual("coll1", coll[0].get_name())
+        self.assertEqual("coll2", coll[1].get_name())
+        self.assertEqual("coll3", coll[2].get_name())
+
+    def test_get_tables(self):
+        tables = self.schema.get_tables()
+        self.assertEqual(0, len(tables), "Should have returned 0 objects")
+
+        self.session.connection.execute_nonquery("sql", "CREATE TABLE {0}.table1(id INT)".format(self.schema_name), True)
+        self.session.connection.execute_nonquery("sql", "CREATE TABLE {0}.table2(id INT)".format(self.schema_name), True)
+        self.session.connection.execute_nonquery("sql", "CREATE TABLE {0}.table3(id INT)".format(self.schema_name), True)
+
+        tables = self.schema.get_tables()
+        self.assertEqual(3, len(tables), "Should have returned 3 objects")
+        self.assertEqual("table1", tables[0].get_name())
+        self.assertEqual("table2", tables[1].get_name())
+        self.assertEqual("table3", tables[2].get_name())
 
     def test_drop_collection(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         self.schema.drop_collection(collection_name)
         self.assertFalse(collection.exists_in_database())
+
+        # dropping an non-existing collection should succeed silently
+        self.schema.drop_collection(collection_name)
 
     def test_drop_table(self):
         table_name = "table_test"
@@ -96,12 +142,12 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             self.session.connection.execute_nonquery("sql", sql, True)
         except Exception as err:
             LOGGER.info("{0}".format(err))
+        table = self.schema.get_table(table_name)
         self.schema.drop_table(table_name)
+        self.assertFalse(table.exists_in_database())
 
-        # TODO: Replace execute_sql_scalar by:
-        #       self.assertFalse(table.exists_in_database(sql_count))
-        self.assertEqual(
-            self.schema.connection.execute_sql_scalar(_COUNT_TABLES_QUERY), 0)
+        # dropping an non-existing table should succeed silently
+        self.schema.drop_table(table_name)
 
 
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
