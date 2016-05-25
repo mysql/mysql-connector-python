@@ -119,6 +119,7 @@ FABRIC_CONFIG = None
 
 __all__ = [
     'MySQLConnectorTests',
+    'MySQLxTests',
     'get_test_names', 'printmsg',
     'LOGGER_NAME',
     'DummySocket',
@@ -303,6 +304,25 @@ def fake_hostname():
         return ''.join(["%02x" % c for c in os.urandom(4)])
 
 
+def get_mysqlx_config(name=None, index=None):
+    """Get MySQLx enabled server configuration for running MySQL server
+
+    If no name is given, then we will return the configuration of the
+    first added.
+    """
+    if not name and not index:
+        return MYSQL_SERVERS[0].xplugin_config.copy()
+
+    if name:
+        for server in MYSQL_SERVERS:
+            if server.name == name:
+                return server.xplugin_config.copy()
+    elif index:
+        return MYSQL_SERVERS[index].xplugin_config.copy()
+
+    return None
+
+
 def get_mysql_config(name=None, index=None):
     """Get MySQL server configuration for running MySQL server
 
@@ -452,6 +472,31 @@ def foreach_cnx(*cnx_classes, **extra_config):
                         pass
         return wrapper
     return _use_cnx
+
+
+class MySQLxTests(unittest.TestCase):
+
+    def run(self, result=None):
+        if sys.version_info[0:2] == (2, 6):
+            test_method = getattr(self, self._testMethodName)
+            if (getattr(self.__class__, "__unittest_skip__", False) or
+                    getattr(test_method, "__unittest_skip__", False)):
+                # We skipped a class
+                try:
+                    why = (
+                        getattr(self.__class__, '__unittest_skip_why__', '')
+                        or
+                        getattr(test_method, '__unittest_skip_why__', '')
+                    )
+                    self._addSkip(result, why)
+                finally:
+                    result.stopTest(self)
+                return
+
+        if PY2:
+            return super(MySQLxTests, self).run(result)
+        else:
+            return super().run(result)
 
 
 class MySQLConnectorTests(unittest.TestCase):

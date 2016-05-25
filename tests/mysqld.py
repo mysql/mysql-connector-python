@@ -343,13 +343,14 @@ class MySQLServerBase(object):
 class MySQLServer(MySQLServerBase):
     """Class for managing a MySQL server"""
 
-    def __init__(self, basedir, topdir, cnf, bind_address, port,
+    def __init__(self, basedir, topdir, cnf, bind_address, port, mysqlx_port,
                  name, datadir=None, tmpdir=None,
                  unix_socket_folder=None, ssl_folder=None, sharedir=None):
         self._cnf = cnf
         self._option_file = os.path.join(topdir, 'my.cnf')
         self._bind_address = bind_address
         self._port = port
+        self._mysqlx_port = mysqlx_port
         self._topdir = topdir
         self._basedir = basedir
         self._ssldir = ssl_folder or topdir
@@ -554,6 +555,7 @@ class MySQLServer(MySQLServerBase):
             'tmpdir': _convert_forward_slash(self._tmpdir),
             'bind_address': self._bind_address,
             'port': self._port,
+            'mysqlx_port': self._mysqlx_port,
             'unix_socket': _convert_forward_slash(self._unix_socket),
             'ssl_dir': _convert_forward_slash(self._ssldir),
             'pid_file': _convert_forward_slash(self._pid_file),

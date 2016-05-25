@@ -100,6 +100,10 @@ else:
 # MySQL option file template. Platform specifics dynamically added later.
 MY_CNF = """
 # MySQL option file for MySQL Connector/Python tests
+[mysqld-5.7]
+plugin-load=mysqlx.so
+mysqlx_port={mysqlx_port}
+
 [mysqld-5.6]
 innodb_compression_level = 0
 innodb_compression_failure_threshold_pct = 0
@@ -279,6 +283,12 @@ _UNITTESTS_CMD_ARGS = {
     ('-P', '--port'): {
         'dest': 'port', 'metavar': 'NUMBER', 'default': 33770, 'type': int,
         'help': 'First TCP/IP port to use.',
+        'type_optparse': int,
+    },
+
+    ('', '--mysqlx-port'): {
+        'dest': 'mysqlx_port', 'metavar': 'NUMBER', 'default': 33060,
+        'type': int, 'help': 'First TCP/IP port to use for mysqlx protocol.',
         'type_optparse': int,
     },
 
@@ -601,6 +611,7 @@ def init_mysql_server(port, options):
             cnf=MY_CNF,
             bind_address=options.bind_address,
             port=port,
+            mysqlx_port=options.mysqlx_port,
             unix_socket_folder=options.unix_socket_folder,
             ssl_folder=os.path.abspath(tests.SSL_DIR),
             name=name,
@@ -654,6 +665,14 @@ def init_mysql_server(port, options):
         'password': '',
         'database': 'myconnpy',
         'connection_timeout': 10,
+    }
+
+    mysql_server.xplugin_config = {
+        'host': options.host,
+        'port': options.mysqlx_port,
+        'user': 'root',
+        'password': '',
+        'database': 'myconnpy'
     }
 
     # Bootstrap and start a MySQL server

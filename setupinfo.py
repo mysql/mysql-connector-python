@@ -80,6 +80,8 @@ packages = [
     'mysql.connector.locales.eng',
     'mysql.connector.django',
     'mysql.connector.fabric',
+    'mysqlx',
+    'mysqlx.protobuf',
 ]
 description = "MySQL driver written in Python"
 long_description = """
