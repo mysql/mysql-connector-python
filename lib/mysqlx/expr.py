@@ -578,7 +578,7 @@ def parseAndPrintExpr(expr_string, allowRelational=True):
     p = ExprParser(expr_string, allowRelational)
     print(p.tokens)
     e = p.expr()
-    print e
+    print(e)
     #print(expr_unparser.expr_to_string(e))
 
 def x_test():
