@@ -41,7 +41,6 @@ from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
 
-
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
 PY2 = sys.version_info[0] == 2
@@ -475,7 +474,6 @@ def foreach_cnx(*cnx_classes, **extra_config):
 
 
 class MySQLxTests(unittest.TestCase):
-
     def run(self, result=None):
         if sys.version_info[0:2] == (2, 6):
             test_method = getattr(self, self._testMethodName)

@@ -53,6 +53,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["database"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
+            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except Exception as err:  # TODO: Replace by a custom error
             self.fail("{0}".format(err))
         self.schema = self.session.create_schema(self.schema_name)
@@ -63,6 +64,9 @@ class MySQLxSchemaTests(tests.MySQLxTests):
     def test_get_session(self):
         session = self.schema.get_session()
         self.assertEqual(session, self.session)
+        self.assertTrue(self.schema.exists_in_database())
+        bad_schema = self.session.get_schema("boo")
+        self.assertFalse(bad_schema.exists_in_database())
 
     # TODO: Fix this test
     # def test_get_collections(self):
@@ -114,9 +118,9 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         tables = self.schema.get_tables()
         self.assertEqual(0, len(tables), "Should have returned 0 objects")
 
-        self.session.connection.execute_nonquery("sql", "CREATE TABLE {0}.table1(id INT)".format(self.schema_name), True)
-        self.session.connection.execute_nonquery("sql", "CREATE TABLE {0}.table2(id INT)".format(self.schema_name), True)
-        self.session.connection.execute_nonquery("sql", "CREATE TABLE {0}.table3(id INT)".format(self.schema_name), True)
+        self.node_session.sql("CREATE TABLE {0}.table1(id INT)".format(self.schema_name)).execute()
+        self.node_session.sql("CREATE TABLE {0}.table2(id INT)".format(self.schema_name)).execute()
+        self.node_session.sql("CREATE TABLE {0}.table3(id INT)".format(self.schema_name)).execute()
 
         tables = self.schema.get_tables()
         self.assertEqual(3, len(tables), "Should have returned 3 objects")
@@ -138,8 +142,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         # TODO: Replace the table creation by:
         #       schema.create_table(table_name)
         try:
-            sql = _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
-            self.session.connection.execute_nonquery("sql", sql, True)
+            self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)).execute()
         except Exception as err:
             LOGGER.info("{0}".format(err))
         table = self.schema.get_table(table_name)
@@ -148,6 +151,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         # dropping an non-existing table should succeed silently
         self.schema.drop_table(table_name)
+
 
 
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
@@ -159,11 +163,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["database"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
+            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except Exception as err:  # TODO: Replace by a custom error
             self.fail("{0}".format(err))
-        self.schema = self.session.get_schema(self.schema_name)
-        if not self.schema.exists_in_database():
-            self.schema = self.session.create_schema(self.schema_name)
+        self.schema = self.session.create_schema(self.schema_name)
+
+    def tearDown(self):
+        self.session.drop_schema(self.schema_name)
 
     def test_exists_in_database(self):
         collection_name = "collection_test"
@@ -193,17 +199,19 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["database"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
+            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except Exception as err:  # TODO: Replace by a custom error
             self.fail("{0}".format(err))
-        self.schema = self.session.get_schema(self.schema_name)
-        if not self.schema.exists_in_database():
-            self.schema = self.session.create_schema(self.schema_name)
+        self.schema = self.session.create_schema(self.schema_name)
+
+    def tearDown(self):
+        self.session.drop_schema(self.schema_name)
 
     def test_exists_in_database(self):
         table_name = "table_test"
         try:
             sql = _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
-            self.session.connection.execute_nonquery("sql", sql, True)
+            self.node_session.sql(sql).execute()
         except Exception as err:
             LOGGER.info("{0}".format(err))
         table = self.schema.get_table(table_name)
@@ -224,13 +232,10 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_delete(self):
         table_name = "table_test"
-        self.session.connection.execute_nonquery(
-            "sql", _CREATE_TEST_TABLE_QUERY.format(self.schema_name,
-                                                   table_name), True)
-        self.session.connection.execute_nonquery(
-            "sql", _INSERT_TEST_TABLE_QUERY.format(self.schema_name,
-                                                   table_name, "1"), True)
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)).execute()
+        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(self.schema_name, table_name, "1")).execute()
         table = self.schema.get_table(table_name)
+        self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
         table.delete("id = 1").execute()
         self.assertEqual(table.count(), 0)
@@ -238,12 +243,9 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_count(self):
         table_name = "table_test"
-        self.session.connection.execute_nonquery(
-            "sql", _CREATE_TEST_TABLE_QUERY.format(self.schema_name,
-                                                   table_name), True)
-        self.session.connection.execute_nonquery(
-            "sql", _INSERT_TEST_TABLE_QUERY.format(self.schema_name,
-                                                   table_name, "1"), True)
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)).execute()
+        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(self.schema_name, table_name, "1")).execute()
         table = self.schema.get_table(table_name)
+        self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
         self.schema.drop_table(table_name)

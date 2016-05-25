@@ -121,10 +121,6 @@ class BaseSession(object):
         self._connection = Connection(self._settings)
         self._connection.connect()
 
-    @property
-    def connection(self):
-        return self._connection
-
     def get_schema(self, name):
         return Schema(self, name)
 

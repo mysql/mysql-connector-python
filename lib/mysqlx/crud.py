@@ -36,7 +36,7 @@ class DatabaseObject(object):
     def __init__(self, schema, name):
         self._schema = schema
         self._name = name
-        self._connection = self._schema.get_session().connection
+        self._connection = self._schema.get_session()._connection
 
     @property
     def schema(self):
@@ -45,10 +45,6 @@ class DatabaseObject(object):
     @property
     def name(self):
         return self._name
-
-    @property
-    def connection(self):
-        return self._connection
 
     def get_schema(self):
         return self._schema

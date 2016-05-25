@@ -30,7 +30,7 @@ from .protobuf import mysqlx_notice_pb2 as MySQLxNotice
 from .protobuf import mysqlx_datatypes_pb2 as MySQLxDatatypes
 from .protobuf import mysqlx_resultset_pb2 as MySQLxResultset
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
-from .result import Column
+from .result import Column, Warning
 
 _SERVER_MESSAGES = [
     (MySQLx.ServerMessages.SESS_AUTHENTICATE_CONTINUE,
@@ -50,8 +50,26 @@ _SERVER_MESSAGES = [
 class MessageReaderWriter(object):
     def __init__(self, socket_stream):
         self._stream = socket_stream
+        self._msg = None
+
+#    def peek_message(self):
+ #       if self._msg == None:
+  #          self._msg = self._read_message()
+   #     return self._msg
+
+    def push_message(self, msg):
+        if not self._msg == None:
+            raise Exception("message push slot is full")
+        self._msg = msg
 
     def read_message(self):
+        if not self._msg == None:
+            m = self._msg
+            self._msg = None
+            return m
+        return self._read_message()
+
+    def _read_message(self):
         hdr = self._stream.read(5)
         msg_len, msg_type = struct.unpack("<LB", hdr)
         payload = self._stream.read(msg_len - 1)
@@ -133,44 +151,61 @@ class Protocol(object):
         return None
 
     def close_result(self, rs):
-        while (True):
-            msg = self._read_message(rs)
-            if isinstance(msg, MySQLx.Error):
-                raise Exception(msg.msg)
-
-            # TODO need to handle notices and warnings here
-            if isinstance(msg, MySQLxSQL.StmtExecuteOk):
-                return
-            elif isinstance(msg, MySQLxResultset.FetchDoneMoreResultsets):
-                rs._has_more_results = True
-                return
+        msg = self._read_message(rs)
+        if not msg == None:
+            raise Exception("Expected to close the result")
 
     def read_row(self, rs):
-        msg = self._peek_message(None)
-        if not isinstance(msg, MySQLxResultset.Row):
-            self.close_result(rs)
+        msg = self._read_message(rs)
+        if msg == None:
             return None
-        return self._read_message(None)
+        if isinstance(msg, MySQLxResultset.Row):
+            return msg
+        self._reader.push_message(msg)
+        return None
 
-    def _peek_message(self, rs):
-        if self._message is None:
-            self._message = self._reader.read_message()
-        return self._message
+    def _process_frame(self, msg, rs):
+        if msg.type == 1:
+            warningMsg = MySQLxNotice.Warning()
+            warningMsg.ParseFromString(msg.payload)
+            rs._warnings.append(Warning(warningMsg.level, warningMsg.code, warningMsg.msg))
+        elif msg.type == 2:
+            sessVarMsg = MySQLxNotice.SessionVariableChanged()
+            sessVarMsg.ParseFromString(msg.payload)
+        elif msg.type == 3:
+            sessStateMsg = MySQLxNotice.SessionStateChanged()
+            sessStateMsg.ParseFromString(msg.payload)
+            if sessStateMsg.param == MySQLxNotice.SessionStateChanged.ROWS_AFFECTED:
+                rs._rows_affected = sessStateMsg.value.v_unsigned_int
 
     def _read_message(self, rs):
-        if self._message is not None:
-            msg = self._message
-            self._message = None
-            return msg
-        return self._reader.read_message()
+        while True:
+            msg = self._reader.read_message()
+            if isinstance(msg, MySQLx.Error):
+                raise Exception(msg.msg)
+            elif isinstance(msg, MySQLxNotice.Frame):
+                self._process_frame(msg, rs)
+            elif isinstance(msg, MySQLxSQL.StmtExecuteOk):
+                return None
+            elif isinstance(msg, MySQLxResultset.FetchDone):
+                rs._closed = True
+            elif isinstance(msg, MySQLxResultset.FetchDoneMoreResultsets):
+                rs._has_more_results = True
+            else:
+                break
+        return msg
 
     def get_column_metadata(self, rs):
         columns = []
         while (True):
-            msg = self._peek_message(rs)
-            if not isinstance(msg, MySQLxResultset.ColumnMetaData):
-                break
             msg = self._read_message(rs)
+            if msg == None:
+                break
+            if isinstance(msg, MySQLxResultset.Row):
+                self._reader.push_message(msg)
+                break;
+            if not isinstance(msg, MySQLxResultset.ColumnMetaData):
+                raise Exception("Unexpected msg type")
             col = Column(msg.type, msg.catalog, msg.schema, msg.table,
                          msg.original_table, msg.name, msg.original_name,
                          msg.length, msg.collation, msg.fractional_digits,

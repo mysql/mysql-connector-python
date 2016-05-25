@@ -43,7 +43,7 @@ class Statement(object):
     def __init__(self, target, doc_based=True):
         self._target = target
         self._doc_based = doc_based
-        self._connection = target.connection if target else None
+        self._connection = target._connection if target else None
 
     @property
     def target(self):

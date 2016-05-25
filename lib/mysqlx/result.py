@@ -397,6 +397,24 @@ class Column(object):
         # TODO: To implement
         raise NotImplementedError
 
+class Warning(object):
+    def __init__(self, level, code, msg):
+        self._level = level
+        self._code = code
+        self._message = msg
+
+    @property
+    def Level(self):
+        return self._level
+
+    @property
+    def Code(self):
+        return self._code
+
+    @property
+    def Message(self):
+        return self._message
+
 
 class Row(object):
     def __init__(self, rs, fields):
@@ -420,20 +438,29 @@ class BaseResult(object):
     def __init__(self, connection):
         self._connection = connection
         self._protocol = self._connection.protocol
+        self._closed = False
+        self._rows_affected = 0
+        self._warnings = []
 
+    @property
+    def Warnings(self):
+        return self._warnings
 
 class Result(BaseResult):
     def __init__(self, connection):
         super(Result, self).__init__(connection)
         self._protocol.close_result(self)
 
+    @property
+    def rows_affected(self):
+        return self._rows_affected
 
 class BufferingResult(BaseResult):
     def __init__(self, connection):
         super(BufferingResult, self).__init__(connection)
+        self._has_more_data = True
         self._columns = self._protocol.get_column_metadata(self)
         self._items = []
-        self._is_complete = False
         self._page_size = 20
         self._position = -1
 
@@ -464,14 +491,13 @@ class BufferingResult(BaseResult):
         return Row(self, item)
 
     def _page_in_items(self):
-        if self._is_complete:
+        if self._closed:
             return False
 
         count = 0
         for i in range(self._page_size):
             item = self._read_item(False)
             if item is None:
-                self._is_complete = True
                 break
             self._items.append(item)
             count += 1
@@ -491,3 +517,5 @@ class RowResult(BufferingResult):
 class SqlResult(RowResult):
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
+        self._has_more_results = False
+
