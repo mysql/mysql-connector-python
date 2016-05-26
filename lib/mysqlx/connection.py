@@ -91,6 +91,12 @@ class Connection(object):
     def send_sql(self, sql, *args):
         self.protocol.send_execute_statement("sql", sql, args)
 
+    def send_doc_insert(self, statement):
+        self.protocol.send_doc_insert(statement.schema.name,
+                                  statement.target.name,
+                                  statement._docs)
+        return Result(self)
+
     def send_delete(self, statement, is_docs):
         # TODO: make sure statement is a FilterableStatement
         self.protocol.send_delete(statement.schema.name,

@@ -30,7 +30,10 @@ from .protobuf import mysqlx_notice_pb2 as MySQLxNotice
 from .protobuf import mysqlx_datatypes_pb2 as MySQLxDatatypes
 from .protobuf import mysqlx_resultset_pb2 as MySQLxResultset
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
-from .result import Column, Warning
+from .protobuf import mysqlx_expr_pb2 as MySQLxExpr
+from .result import *
+from .statement import *
+from .expr import *
 
 _SERVER_MESSAGES = [
     (MySQLx.ServerMessages.SESS_AUTHENTICATE_CONTINUE,
@@ -143,6 +146,18 @@ class Protocol(object):
         self._writer.write_message(MySQLx.ClientMessages.SQL_STMT_EXECUTE,
                                    stmt)
 
+    def send_doc_insert(self, schema, target, docs):
+        insert = MySQLxCrud.Insert(
+            collection=MySQLxCrud.Collection(schema=schema, name=target),
+            data_model=MySQLxCrud.DOCUMENT)
+        for doc in docs:
+            row = MySQLxCrud.Insert.TypedRow()
+            o = self.arg_object_to_expr(doc, False)
+            row.field.extend([o])
+            insert.row.extend([row])
+
+        self._writer.write_message(MySQLx.ClientMessages.CRUD_INSERT, insert)
+
     def _create_any(self, arg):
         if isinstance(arg, (str, unicode,)):
             val = MySQLxDatatypes.Scalar.String(value=arg)
@@ -206,9 +221,31 @@ class Protocol(object):
                 break;
             if not isinstance(msg, MySQLxResultset.ColumnMetaData):
                 raise Exception("Unexpected msg type")
-            col = Column(msg.type, msg.catalog, msg.schema, msg.table,
+            col = ColumnMetaData(msg.type, msg.catalog, msg.schema, msg.table,
                          msg.original_table, msg.name, msg.original_name,
                          msg.length, msg.collation, msg.fractional_digits,
                          msg.flags)
             columns.append(col)
         return columns
+
+    def arg_object_to_expr(self, value, allow_relational):
+        if value == None:
+            return Expr.build_null_scalar()
+        value_type = type(value)
+        if value_type == type(True):
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_bool_scalar(value))
+        elif isinstance(value, (int, long)):
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_int_scalar(value))
+        elif isinstance(value, (float)):
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_double_scalar(value))
+        elif value_type == type(str):
+            try:
+                expression = ExprParser(value, allow_relational).expr()
+                if expression.has_identifier():
+                    return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_string_scalar(value))
+                return expression
+            except Exception as e:
+                return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_string_scalar(value))
+        elif isinstance(value, DbDoc):
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(str(value)))
+        raise Exception("Unsupported type")

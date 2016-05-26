@@ -32,11 +32,19 @@ class DbDoc(object):
     def __init__(self, value):
         # TODO: handle exceptions.  What happens if it doesn't load properly
         if isinstance(value, dict):
-            self._json = value
+            self.__dict__ = value
         elif isinstance(value, basestring):
-            self._json = json.loads(value)
+            self.__dict__ = json.loads(value)
         else:
             raise Exception("Unable to handle type: ".format(type(value)))
+
+    def ensure_id(self):
+        if "_id" not in self.__dict__:
+            self.__dict__["_id"] = str(uuid.uuid4())
+
+    def __str__(self):
+        return json.dumps(self.__dict__)
+        #return str(self.__dict__)
 
 
 class Statement(object):
@@ -105,14 +113,12 @@ class AddStatement(Statement):
                 self._docs.append(val)
             else:
                 self._docs.append(DbDoc(val))
+        return self
 
     def execute(self):
-        self._assign_ids()
-
-    def _assign_ids(self):
         for doc in self._docs:
-            if "_id" not in doc:
-                doc["_id"] = uuid.uuid4()
+            doc.ensure_id()
+        return self._connection.send_doc_insert(self)
 
 
 class RemoveStatement(FilterableStatement):

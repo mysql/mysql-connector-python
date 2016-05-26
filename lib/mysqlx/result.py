@@ -308,7 +308,7 @@ class BytesColumnFlags(ColumnFlags):
     UNSIGNED = 0x0001
 
 
-class Column(object):
+class ColumnMetaData(object):
     def __init__(self, col_type, catalog=None, schema=None, table=None,
                  original_table=None, name=None, original_name=None,
                  length=None, collation=None, fractional_digits=None,

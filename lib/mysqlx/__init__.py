@@ -25,7 +25,7 @@
 
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table
-from .result import Column, Row, Result, BufferingResult, RowResult, SqlResult
+from .result import ColumnMetaData, Row, Result, BufferingResult, RowResult, SqlResult
 from .statement import (DbDoc, Statement, FilterableStatement, SqlStatement,
                         AddStatement, RemoveStatement, TableDeleteStatement)
 
@@ -45,7 +45,7 @@ __all__ = [
     Schema, Collection, Table,
 
     # mysqlx.result
-    Column, Row, Result, BufferingResult, RowResult, SqlResult,
+    ColumnMetaData, Row, Result, BufferingResult, RowResult, SqlResult,
 
     # mysqlx.statement
     DbDoc, Statement, FilterableStatement, SqlStatement, AddStatement,

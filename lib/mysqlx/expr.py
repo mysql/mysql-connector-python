@@ -23,6 +23,7 @@
 
 from protobuf.mysqlx_datatypes_pb2 import *
 from protobuf.mysqlx_expr_pb2 import *
+from protobuf.mysqlx_crud_pb2 import *
 
 import expr_unparser
 
@@ -572,6 +573,9 @@ class ExprParser:
 
     def expr(self):
         return self.or_expr()
+
+    def parse_table_insert_field(self):
+        return Column(name=self.consume_token(TokenType.IDENT))
 
 def parseAndPrintExpr(expr_string, allowRelational=True):
     print(">>>>>>> parsing:  " + expr_string)

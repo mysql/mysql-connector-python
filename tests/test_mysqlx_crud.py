@@ -178,8 +178,23 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.schema.drop_collection(collection_name)
 
     def test_add(self):
-        # TODO: To implement
-        pass
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add({"name":"Fred", "age":21}).execute()
+        self.assertEqual(result.rows_affected, 1)
+        self.assertEqual(1, collection.count())
+
+        # now add multiple dictionaries at once
+        result = collection.add({"name": "Wilma", "age": 33}, {"name": "Barney", "age": 42}).execute()
+        self.assertEqual(result.rows_affected, 2)
+        self.assertEqual(3, collection.count())
+
+        # now let's try adding strings
+        result = collection.add('{"name": "Bambam", "age": 8}', '{"name": "Pebbles", "age": 8}').execute()
+        self.assertEqual(result.rows_affected, 2)
+        self.assertEqual(5, collection.count())
+
+        #TODO: do we want to support public DbDocs
 
     def test_remove(self):
         # TODO: To implement

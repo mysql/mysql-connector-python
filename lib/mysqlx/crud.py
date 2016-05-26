@@ -128,11 +128,17 @@ class Collection(DatabaseObject):
         return self._connection.execute_sql_scalar(sql) == 1
 
     def add(self, *values):
-        return AddStatement(self).add(values)
+        return AddStatement(self).add(*values)
 
-    def remove(self, id_):
-        condition = "_id = '{0}'".format(id_)
-        return RemoveStatement(self).where(condition)
+    def remove(self, id):
+        return self.remove("_id = '{0}'".format(id))
+
+    def remove(self, condition=None):
+        rs = RemoveStatement()
+        if not condition == None:
+            condition = "_id = '{0}'".format(id)
+            rs.where(condition)
+        return rs
 
     def count(self):
         sql = _COUNT_QUERY.format(self._schema.name, self._name)
