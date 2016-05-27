@@ -80,16 +80,10 @@ class TokenType:
     MONTH = 50
     QUARTER = 51
     YEAR = 52
-    EROTEME = 53
+    PLACEHOLDER = 53
     DOUBLESTAR = 54
     MOD = 55
     COLON = 56
-    OROR = 57
-    ANDAND = 58
-    LCURLY = 59
-    RCURLY = 60
-    CAST = 61
-    DOTSTAR = 62
 
 interval_units = set([
     TokenType.MICROSECOND,
@@ -115,7 +109,6 @@ reservedWords = {
         "between":  TokenType.BETWEEN,
         "interval": TokenType.INTERVAL,
         "escape":   TokenType.ESCAPE,
-        "cast":     TokenType.CAST,
         "div":      TokenType.DIV,
         "hex":      TokenType.HEX,
         "bin":      TokenType.BIN,
@@ -193,151 +186,142 @@ class ExprParser:
     def next_char_is(self, i, c):
         return i + 1 < len(self.string) and self.string[i + 1] == c
 
-    def lex_number(self, pos):
-        # numeric literal
-        start = pos
-        found_dot = False
-        while pos < len(self.string) and (self.string[pos].isdigit() or self.string[pos] == "."):
-            if self.string[pos] == ".":
-                if found_dot == True:
-                    raise Exception("Invalid number. Found multiple '.'")
-                found_dot = True
-            # technically we allow more than one "." and let float()'s parsing complain later
-            pos = pos + 1
-        t = Token(TokenType.LNUM, self.string[start:pos])
-        return t
-
-    def lex_alpha(self, i):
-        start = i
-        while i < len(self.string) and (self.string[i].isalnum() or self.string[i] == "_"):
-            i = i + 1
-        val = self.string[start:i]
-        try:
-            token = Token(reservedWords[val.lower()], val.upper())
-        except KeyError:
-            token = Token(TokenType.IDENT, val)
-        return token
-
-
-    def lex_quoted_token(self, i):
-        quote_char = self.string[i]
-        val = ""
-        i += 1
-        start = i
-        while i < len(self.string):
-            c = self.string[i]
-            if c == quote_char and i + 1 < len(self.string) and self.string[i + 1] != quote_char:
-                # break if we have a quote char that's not double
-                break
-            elif c == quote_char or c == "\\":
-                # this quote char has to be doubled
-                if i + 1 >= len(self.string):
-                    break
-                i = i + 1
-                val = val + self.string[i]
-            else:
-                val = val + c
-            i = i + 1
-        if i >= len(self.string) or self.string[i] != quote_char:
-            raise StandardError("Unterminated quoted string starting at " + str(start))
-        if quote_char == "`":
-            return Token(TokenType.IDENT, val)
-        else:
-            return Token(TokenType.LSTRING, val)
-
     def lex(self):
         i = 0
         while i < len(self.string):
             c = self.string[i]
             if c.isspace():
-                i += 1
-                continue
+                # do nothing
+                pass
             elif c.isdigit():
-                token = self.lex_number(i)
-            elif c.isalpha() or c == "_":
-                token = self.lex_alpha(i)
-            elif c == "?":
-                token = Token(TokenType.EROTEME, c)
-            elif c == ":":
-                token = Token(TokenType.COLON, c)
-            elif c == "{":
-                token = Token(TokenType.LCURLY, c)
-            elif c == "}":
-                token = Token(TokenType.RCURLY, c)
-            elif c == "+":
-                token = Token(TokenType.PLUS, c)
-            elif c == "-":
-                Token(TokenType.MINUS, c)
-            elif c == "*":
-                if self.next_char_is(i, "*"):
-                    token = Token(TokenType.DOUBLESTAR, "**")
+                # numeric literal
+                start = i
+                while i < len(self.string) and (self.string[i].isdigit() or self.string[i] == "."):
+                    # technically we allow more than one "." and let float()'s parsing complain later
+                    i = i + 1
+                self.tokens.append(Token(TokenType.LNUM, self.string[start:i]))
+                if i < len(self.string):
+                    # back up if we're not at the end of the string
+                    i = i - 1
+            elif not (c.isalpha() or c == "_"):
+                # non-identifier, e.g. operator or quoted literal
+                if c == "?":
+                    self.tokens.append(Token(TokenType.PLACEHOLDER, c))
+                elif c == ":":
+                    self.tokens.append(Token(TokenType.COLON, c))
+                elif c == "+":
+                    self.tokens.append(Token(TokenType.PLUS, c))
+                elif c == "-":
+                    self.tokens.append(Token(TokenType.MINUS, c))
+                elif c == "*":
+                    if self.next_char_is(i, "*"):
+                        i = i + 1
+                        self.tokens.append(Token(TokenType.DOUBLESTAR, "**"))
+                    else:
+                        self.tokens.append(Token(TokenType.MUL, c))
+                elif c == "/":
+                    self.tokens.append(Token(TokenType.DIV, c))
+                elif c == "$":
+                    self.tokens.append(Token(TokenType.DOLLAR, c))
+                elif c == "%":
+                    self.tokens.append(Token(TokenType.MOD, c))
+                elif c == "=":
+                    if self.next_char_is(i, "="):
+                        i = i + 1
+                    self.tokens.append(Token(TokenType.EQ, "=="))
+                elif c == "&":
+                    self.tokens.append(Token(TokenType.BITAND, c))
+                elif c == "|":
+                    self.tokens.append(Token(TokenType.BITOR, c))
+                elif c == "(":
+                    self.tokens.append(Token(TokenType.LPAREN, c))
+                elif c == ")":
+                    self.tokens.append(Token(TokenType.RPAREN, c))
+                elif c == "[":
+                    self.tokens.append(Token(TokenType.LSQBRACKET, c))
+                elif c == "]":
+                    self.tokens.append(Token(TokenType.RSQBRACKET, c))
+                elif c == "~":
+                    self.tokens.append(Token(TokenType.NEG, c))
+                elif c == ",":
+                    self.tokens.append(Token(TokenType.COMMA, c))
+                elif c == "!":
+                    if self.next_char_is(i, "="):
+                        i = i + 1
+                        self.tokens.append(Token(TokenType.NE, "!="))
+                    else:
+                        self.tokens.append(Token(TokenType.BANG, c))
+                elif c == "<":
+                    if self.next_char_is(i, "<"):
+                        i = i + 1
+                        self.tokens.append(Token(TokenType.LSHIFT, "<<"))
+                    elif self.next_char_is(i, "="):
+                        i = i + 1
+                        self.tokens.append(Token(TokenType.LE, "<="))
+                    else:
+                        self.tokens.append(Token(TokenType.LT, c))
+                elif c == ">":
+                    if self.next_char_is(i, ">"):
+                        i = i + 1
+                        self.tokens.append(Token(TokenType.RSHIFT, ">>"))
+                    elif self.next_char_is(i, "="):
+                        i = i + 1
+                        self.tokens.append(Token(TokenType.GE, ">="))
+                    else:
+                        self.tokens.append(Token(TokenType.GT, c))
+                elif c == ".":
+                    if i + 1 < len(self.string) and self.string[i + 1].isdigit():
+                        # could be a floating point, like .1
+                        start = i
+                        i = i + 1
+                        while i < len(self.string) and self.string[i].isdigit():
+                            i = i + 1
+                        self.tokens.append(Token(TokenType.LNUM, self.string[start:i]))
+                        if i < len(self.string):
+                            # back up if we're not at the end of the string
+                            i = i - 1
+                    else:
+                        self.tokens.append(Token(TokenType.DOT, c))
+                elif c == '"' or c == "'" or c == "`":
+                    quote_char = c
+                    val = ""
+                    i = i + 1
+                    start = i
+                    while i < len(self.string):
+                        c = self.string[i]
+                        if c == quote_char and i + 1 < len(self.string) and self.string[i + 1] != quote_char:
+                            # break if we have a quote char that's not double
+                            break
+                        elif c == quote_char or c == "\\":
+                            # this quote char has to be doubled
+                            if i + 1 >= len(self.string):
+                                break
+                            i = i + 1
+                            val = val + self.string[i]
+                        else:
+                            val = val + c
+                        i = i + 1
+                    if i >= len(self.string) or self.string[i] != quote_char:
+                        raise StandardError("Unterminated quoted string starting at " + str(start))
+                    if quote_char == "`":
+                        self.tokens.append(Token(TokenType.IDENT, val))
+                    else:
+                        self.tokens.append(Token(TokenType.LSTRING, val))
                 else:
-                    token = Token(TokenType.MUL, c)
-            elif c == "/":
-                token = Token(TokenType.DIV, c)
-            elif c == "$":
-                token = Token(TokenType.DOLLAR, c)
-            elif c == "%":
-                token = Token(TokenType.MOD, c)
-            elif c == "=":
-                if self.next_char_is(i, "="):
-                    token = Token(TokenType.EQ, "==")
-                else:
-                    token = Token(TokenType.EQ, "=")
-            elif c == "&":
-                if self.next_char_is(i, "&"):
-                    token = Token(TokenType.ANDAND, c)
-                else:
-                    token = Token(TokenType.BITAND, c)
-            elif c == "|":
-                if self.next_char_is(i, "|"):
-                    token = Token(TokenType.OROR, "||")
-                else:
-                    token = Token(TokenType.BITOR, c)
-            elif c == "(":
-                token = Token(TokenType.LPAREN, c)
-            elif c == ")":
-                token = Token(TokenType.RPAREN, c)
-            elif c == "[":
-                token = Token(TokenType.LSQBRACKET, c)
-            elif c == "]":
-                token = Token(TokenType.RSQBRACKET, c)
-            elif c == "~":
-                token = Token(TokenType.NEG, c)
-            elif c == ",":
-                token = Token(TokenType.COMMA, c)
-            elif c == "!":
-                if self.next_char_is(i, "="):
-                    token = Token(TokenType.NE, "!=")
-                else:
-                    token = Token(TokenType.BANG, c)
-            elif c == "<":
-                if self.next_char_is(i, "<"):
-                    token = Token(TokenType.LSHIFT, "<<")
-                elif self.next_char_is(i, "="):
-                    token = Token(TokenType.LE, "<=")
-                else:
-                    token = Token(TokenType.LT, c)
-            elif c == ">":
-                if self.next_char_is(i, ">"):
-                    token = Token(TokenType.RSHIFT, ">>")
-                elif self.next_char_is(i, "="):
-                    token = Token(TokenType.GE, ">=")
-                else:
-                    token = Token(TokenType.GT, c)
-            elif c == ".":
-                if self.next_char_is(i, "*"):
-                    token = Token(TokenType.DOTSTAR, ".*")
-                elif i + 1 < len(self.string) and self.string[i + 1].isdigit():
-                    token = self.lex_number(i)
-                else:
-                    token = Token(TokenType.DOT, c)
-            elif c == '"' or c == "'" or c == "`":
-                token = self.lex_qouted_token(i)
+                    raise StandardError("Unknown character at " + str(i))
             else:
-                raise StandardError("Unknown character at " + str(i))
-            self.tokens.append(token)
-            i += len(token.val)
+                start = i
+                while i < len(self.string) and (self.string[i].isalnum() or self.string[i] == "_"):
+                    i = i + 1
+                val = self.string[start:i]
+                try:
+                    self.tokens.append(Token(reservedWords[val.lower()], val.upper()))
+                except KeyError:
+                    self.tokens.append(Token(TokenType.IDENT, val))
+                if i < len(self.string):
+                    # we went one past the last ident char (unless it's end of string)
+                    i = i - 1
+            i = i + 1
 
     def assert_cur_token(self, type):
         if self.pos >= len(self.tokens):
@@ -392,20 +376,15 @@ class ExprParser:
 
     def docpath_member(self):
         self.consume_token(TokenType.DOT)
-        token = self.tokens[self.pos]
-
-        if token.type == TokenType.IDENT:
-            if token.val.startswith('`') and token.val.endswith('`'):
-                raise Exception(token.value + " is not a valid JSON/ECMAScript identifier")
-            self.consume_token(TokenType.IDENT)
-            memberName = token.val
-        elif self.token.type == TokenType.LSTRING:
-            self.consume_token(TokenType.LSTRING)
-            memberName = token.val
+        if self.cur_token_type_is(TokenType.IDENT):
+            # TODO: what are the rules for JSON identifiers?
+            return "." + self.consume_token(TokenType.IDENT)
+        elif self.cur_token_type_is(TokenType.LSTRING):
+            return ".\"" + escape_literal(self.consume_token(TokenType.LSTRING)) + "\""
+        elif self.cur_token_type_is(TokenType.MUL):
+            return "." + self.consume_token(TokenType.MUL)
         else:
             raise StandardError("Expected token type IDENT or LSTRING in JSON path at token pos " + str(self.pos))
-        item = DocumentPathItem(type=DocumentPathItem.MEMBER, value=memberName)
-        return item
 
     def docpath_array_loc(self):
         self.consume_token(TokenType.LSQBRACKET)
@@ -430,22 +409,18 @@ class ExprParser:
 
     def document_path(self):
         """Parse a JSON-style document path, like WL#7909, but prefix by @. instead of $. We parse this as a string because the protocol doesn't support it. (yet)"""
-        docpath = []
+        docpath = ""
         while True:
             if self.cur_token_type_is(TokenType.DOT):
-                docpath.append(self.docpath_member())
-            elif self.cur_token_type_is(TokenType.DOTSTAR):
-                self.consume_token(TokenType.DOTSTAR)
-                docpath.append(DocumentPathItem(type=DocumentPathItem.MEMBER_ASTERISK))
+                docpath = docpath + self.docpath_member()
             elif self.cur_token_type_is(TokenType.LSQBRACKET):
-                docpath.append(self.docpath_array_loc())
+                docpath = docpath + self.docpath_array_loc()
             elif self.cur_token_type_is(TokenType.DOUBLESTAR):
                 self.consume_token(TokenType.DOUBLESTAR)
-                docpath.append(DocumentPathItem(type=DocumentPathItem.DOUBLE_ASTERISK))
+                docpath = docpath + "**"
             else:
                 break
-        items = len(docpath)
-        if items > 0 and docpath[items-1].type == DocumentPathItem.DOUBLE_ASTERISK:
+        if docpath.endswith("**"):
             raise StandardError("JSON path may not end in '**' at " + str(self.pos))
         return docpath
 
@@ -475,85 +450,59 @@ class ExprParser:
         e.identifier.CopyFrom(colid)
         return e
 
-    def next_token(self):
-        if (self.pos >= len(self.tokens)):
-            raise Exception("Unexpected end of token stream")
-        t = self.tokens[self.pos]
-        self.pos += 1
-        return t
-
-    def expect_token(self, token_type):
-        t = self.next_token()
-        if t.type != token_type:
-            raise Exception("Expected token type " + str(token_type))
-
-    def parse_json_doc(self):
-        o = Object()
-
     def atomic_expr(self):
         """Parse an atomic expression and return a protobuf Expr object"""
-        token = self.next_token()
-
-        if token.type in [TokenType.EROTEME, TokenType.COLON]:
-            #TODO do this
-            pass
-        elif token.type == TokenType.LCURLY:
-            return self.parse_json_doc()
-        elif token.type == TokenType.CAST:
-            #TODO implement pass
-            pass
-        elif token.type == TokenType.LPAREN:
-            e  = self.expr()
-            self.expect_token(TokenType.RPAREN)
+        t = self.tokens[self.pos]
+        self.pos = self.pos + 1
+        if t.type == TokenType.PLACEHOLDER:
+            return build_literal_expr(build_string_scalar("?"))
+        elif t.type == TokenType.DOLLAR:
+            # TODO: make sure this doesn't interfere with un-prefixed JSON paths
+            e = Expr()
+            e.type = Expr.VARIABLE
+            e.variable = self.consume_token(TokenType.IDENT)
             return e
-        elif token.type in [TokenType.PLUS, TokenType.MINUS]:
-            pass
-        elif token.type in [TokenType.PLUS, TokenType.MINUS]:
-            peek = self.peek_token()
-            if peek.type == TokenType.LNUM:
-                self.tokens[self.pos].val = token.val + peek.val
-                return self.atomic_expr()
-            return build_unary_op(token.val, self.atomic_expr())
-        elif token.type in [TokenType.NOT, TokenType.NEG, TokenType.BANG]:
-            return build_unary_op(token.val, self.atomic_expr())
-        elif token.type == TokenType.LSTRING:
-            return build_literal_expr(build_string_scalar(token.val))
-        elif token.type == TokenType.NULL:
+        elif t.type == TokenType.LPAREN:
+            e = self.expr()
+            self.consume_token(TokenType.RPAREN)
+            return e
+        elif self.cur_token_type_is(TokenType.LNUM) and (t.type == TokenType.PLUS or t.type == TokenType.MINUS):
+            # add the +/- to the numeric string and loop back through
+            self.tokens[self.pos].val = t.val + self.tokens[self.pos].val
+            return self.atomic_expr()
+        elif t.type == TokenType.PLUS or t.type == TokenType.MINUS or t.type == TokenType.NOT or t.type == TokenType.NEG:
+            return build_unary_op(t.val, self.atomic_expr())
+        elif t.type == TokenType.LSTRING:
+            return build_literal_expr(build_string_scalar(t.val))
+        elif t.type == TokenType.NULL:
             return build_literal_expr(build_null_scalar())
-        elif token.type == TokenType.LNUM:
-            if "." in token.val:
-                return build_literal_expr(build_double_scalar(float(token.val)))
+        elif t.type == TokenType.LNUM:
+            if "." in t.val:
+                return build_literal_expr(build_double_scalar(float(t.val)))
             else:
-                return build_literal_expr(build_int_scalar(int(token.val)))
-        elif token.type in [TokenType.TRUE, TokenType.FALSE]:
-            return build_literal_expr(build_bool_scalar(token.type == TokenType.TRUE))
-        elif token.type == TokenType.DOLLAR:
-            return self.document_field()
-        elif token.type == TokenType.MUL:
-            return self.starOperator()
-        elif token.type == TokenType.IDENT:
+                return build_literal_expr(build_int_scalar(int(t.val)))
+        elif t.type == TokenType.TRUE or t.type == TokenType.FALSE:
+            return build_literal_expr(build_bool_scalar(t.type == TokenType.TRUE))
+        elif t.type == TokenType.INTERVAL:
+            e = Expr()
+            e.type = Expr.OPERATOR
+            e.operator.name = "INTERVAL"
+            e.operator.param.add().CopyFrom(self.expr())
+            # validate the interval units
+            if self.pos < len(self.tokens) and self.tokens[self.pos].type in interval_units:
+                pass
+            else:
+                raise StandardError("Expected interval units at " + str(self.pos))
+            e.operator.param.add().CopyFrom(build_literal_expr(build_string_scalar(self.tokens[self.pos].val)))
+            self.pos = self.pos + 1
+            return e
+        elif t.type == TokenType.IDENT:
             self.pos = self.pos - 1 # stay on the identifier
             if self.next_token_type_is(TokenType.LPAREN) or (self.next_token_type_is(TokenType.DOT) and self.pos_token_type_is(self.pos + 2, TokenType.IDENT) and self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)):
                 # Function call
                 return self.function_call()
             else:
                 return self.document_field() if not self._allowRelationalColumns else self.column_identifier()
-
-#        if t.type == TokenType.EROTEME:
-#            return build_literal_expr(build_string_scalar("?"))
-#        elif t.type == TokenType.INTERVAL:
-#            e = Expr()
-#            e.type = Expr.OPERATOR
-#            e.operator.name = "INTERVAL"
-#            e.operator.param.add().CopyFrom(self.expr())
-#            # validate the interval units
-#            if self.pos < len(self.tokens) and self.tokens[self.pos].type in interval_units:
-#                pass
-#            else:
-#                raise StandardError("Expected interval units at " + str(self.pos))
-#            e.operator.param.add().CopyFrom(build_literal_expr(build_string_scalar(self.tokens[self.pos].val)))
-#            self.pos = self.pos + 1
-#            return e
         raise StandardError("Unknown token type = " + str(t.type) + " when expecting atomic expression at " + str(self.pos))
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
@@ -570,21 +519,11 @@ class ExprParser:
         return lhs
 
     # operator precedence is implemented here
-    def mul_div_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.MUL, TokenType.DIV, TokenType.MOD]), self.atomic_expr)
-
-    def add_sub_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.PLUS, TokenType.MINUS]), self.mul_div_expr)
-
-    def shift_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.LSHIFT, TokenType.RSHIFT]), self.add_sub_expr)
-
-    def bit_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.BITAND, TokenType.BITOR, TokenType.BITXOR]), self.shift_expr)
-
-    def comp_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.GE, TokenType.GT, TokenType.LE, TokenType.LT, TokenType.EQ, TokenType.NE]), self.bit_expr)
-
+    def mul_div_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.MUL, TokenType.DIV, TokenType.MOD]), self.atomic_expr)
+    def add_sub_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.PLUS, TokenType.MINUS]), self.mul_div_expr)
+    def shift_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.LSHIFT, TokenType.RSHIFT]), self.add_sub_expr)
+    def bit_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.BITAND, TokenType.BITOR, TokenType.BITXOR]), self.shift_expr)
+    def comp_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.GE, TokenType.GT, TokenType.LE, TokenType.LT, TokenType.EQ, TokenType.NE]), self.bit_expr)
     def ilri_expr(self):
         lhs = self.comp_expr()
         is_not = False
@@ -632,12 +571,8 @@ class ExprParser:
                     e = build_unary_op("NOT", e)
                 lhs = e
         return lhs
-
-    def and_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.AND, TokenType.ANDAND]), self.ilri_expr)
-
-    def or_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.OR, TokenType.OROR]), self.and_expr)
+    def and_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.AND]), self.ilri_expr)
+    def or_expr(self): return self.parse_left_assoc_binary_op_expr(set([TokenType.OR]), self.and_expr)
 
     def expr(self):
         return self.or_expr()
@@ -654,8 +589,8 @@ def parseAndPrintExpr(expr_string, allowRelational=True):
     #print(expr_unparser.expr_to_string(e))
 
 def x_test():
-    parseAndPrintExpr("$.age == 21");
-    return
+    parseAndPrintExpr("now () - interval -2 day");
+    parseAndPrintExpr("1");
     parseAndPrintExpr("10+1");
     parseAndPrintExpr("(abc == 1)");
     parseAndPrintExpr("(func(abc)=1)");
@@ -681,7 +616,6 @@ def x_test():
     parseAndPrintExpr("`ident`");
     parseAndPrintExpr("`ident```");
     parseAndPrintExpr("`ident\"'`");
-    parseAndPrintExpr("now () - interval -2 day");
     parseAndPrintExpr("? > x and func(?, ?, ?)");
     parseAndPrintExpr("a > now() + interval (2 + x) MiNuTe");
     parseAndPrintExpr("a between 1 and 2");
@@ -699,4 +633,4 @@ def x_test():
     parseAndPrintExpr("a@[0].*", False);
     parseAndPrintExpr("a@**[0].*", False);
 
-x_test()
+#x_test()

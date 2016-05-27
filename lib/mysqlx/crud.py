@@ -130,13 +130,12 @@ class Collection(DatabaseObject):
     def add(self, *values):
         return AddStatement(self).add(*values)
 
-    def remove(self, id):
+    def remove_one(self, id):
         return self.remove("_id = '{0}'".format(id))
 
     def remove(self, condition=None):
-        rs = RemoveStatement()
+        rs = RemoveStatement(self)
         if not condition == None:
-            condition = "_id = '{0}'".format(id)
             rs.where(condition)
         return rs
 

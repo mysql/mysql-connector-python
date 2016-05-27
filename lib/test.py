@@ -6,9 +6,11 @@ node = mysqlx.get_node_session({"host":"localhost", "port":33060, "user":"root",
 session = mysqlx.get_session({"host":"localhost", "port":33060, "user":"root", "password":""})
 schema = session.get_schema("test")
 
-o = json.loads('{"name": "reggie", "age":46}')
-x = str(o)
-schema.drop_collection("boo")
-boo = schema.create_collection("boo")
-stmt = boo.add('{"name": "reggie", "age":46}', {"name":"Fred", "age":21})
-result = stmt.execute()
+collection_name = "collection_test"
+schema.drop_collection(collection_name)
+collection = schema.create_collection(collection_name)
+collection.add({"name": "Fred", "age": 21}).execute()
+
+result = collection.remove("$.age == 21").execute()
+print "rows affected = " + str(result.rows_affected)
+print "count = " + str(collection.count())

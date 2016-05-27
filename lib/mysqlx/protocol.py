@@ -55,11 +55,6 @@ class MessageReaderWriter(object):
         self._stream = socket_stream
         self._msg = None
 
-#    def peek_message(self):
- #       if self._msg == None:
-  #          self._msg = self._read_message()
-   #     return self._msg
-
     def push_message(self, msg):
         if not self._msg == None:
             raise Exception("message push slot is full")

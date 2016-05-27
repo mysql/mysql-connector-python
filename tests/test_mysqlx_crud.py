@@ -197,8 +197,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         #TODO: do we want to support public DbDocs
 
     def test_remove(self):
-        # TODO: To implement
-        pass
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add({"name":"Fred", "age":21}).execute()
+        self.assertEqual(1, collection.count())
+        result = collection.remove("age == 21").execute()
+        self.assertEqual(1, result.rows_affected)
+        self.assertEqual(0, collection.count())
 
     def test_count(self):
         # TODO: To implement
