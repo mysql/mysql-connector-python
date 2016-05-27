@@ -194,8 +194,6 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.rows_affected, 2)
         self.assertEqual(5, collection.count())
 
-        #TODO: do we want to support public DbDocs
-
     def test_remove(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -204,10 +202,6 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.remove("age == 21").execute()
         self.assertEqual(1, result.rows_affected)
         self.assertEqual(0, collection.count())
-
-    def test_count(self):
-        # TODO: To implement
-        pass
 
 
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")

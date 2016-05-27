@@ -11,6 +11,6 @@ schema.drop_collection(collection_name)
 collection = schema.create_collection(collection_name)
 collection.add({"name": "Fred", "age": 21}).execute()
 
-result = collection.remove("$.age == 21").execute()
+result = collection.remove("$.age = 21").execute()
 print "rows affected = " + str(result.rows_affected)
 print "count = " + str(collection.count())

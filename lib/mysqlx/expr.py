@@ -338,6 +338,7 @@ class ExprParser:
                 raise StandardError("Unknown character at " + str(i))
             self.tokens.append(token)
             i += len(token.val)
+            if token.val == "=": token.val = "=="
 
     def assert_cur_token(self, type):
         if self.pos >= len(self.tokens):
@@ -654,7 +655,7 @@ def parseAndPrintExpr(expr_string, allowRelational=True):
     #print(expr_unparser.expr_to_string(e))
 
 def x_test():
-    parseAndPrintExpr("$.age == 21");
+    parseAndPrintExpr("age = 21");
     return
     parseAndPrintExpr("10+1");
     parseAndPrintExpr("(abc == 1)");
@@ -699,4 +700,4 @@ def x_test():
     parseAndPrintExpr("a@[0].*", False);
     parseAndPrintExpr("a@**[0].*", False);
 
-x_test()
+#x_test()
