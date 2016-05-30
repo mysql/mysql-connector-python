@@ -64,6 +64,7 @@ def function_call_to_string(fc):
             s = s + ", "
     return s + ")"
 
+
 def operator_to_string(op):
     ps = op.param
     if op.name == "IN":

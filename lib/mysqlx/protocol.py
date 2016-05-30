@@ -123,6 +123,8 @@ class Protocol(object):
         if statement._has_limit:
             message.limit.row_count = statement._limit_row_count
             message.limit.offset = statement._limit_offset
+        if statement._has_sort:
+            message.order.extend(statement._sort_expr)
 
     def send_find(self, stmt):
         find = Find(

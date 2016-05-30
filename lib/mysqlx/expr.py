@@ -90,6 +90,8 @@ class TokenType:
     RCURLY = 60
     CAST = 61
     DOTSTAR = 62
+    ORDERBY_ASC = 63
+    ORDERBY_DESC = 64
 
 interval_units = set([
     TokenType.MICROSECOND,
@@ -130,7 +132,9 @@ reservedWords = {
         "month":    TokenType.MONTH,
         "quarter":  TokenType.QUARTER,
         "year":     TokenType.YEAR,
-        "microsecond": TokenType.MICROSECOND}
+        "microsecond": TokenType.MICROSECOND,
+        "asc":      TokenType.ORDERBY_ASC,
+        "desc":     TokenType.ORDERBY_DESC}
 
 class Token:
     def __init__(self, type, val, len=1):
@@ -646,6 +650,23 @@ class ExprParser:
 
     def parse_table_insert_field(self):
         return Column(name=self.consume_token(TokenType.IDENT))
+
+    def parse_order_spec(self):
+        order_specs = []
+        first = True
+        while self.pos < len(self.tokens):
+            if not first:
+                self.consume_token(TokenType.COMMA)
+            first = False
+            order = Order(expr = self.expr())
+            if self.cur_token_type_is(TokenType.ORDERBY_ASC):
+                order.direction = Order.ASC
+                self.consume_token(TokenType.ORDERBY_ASC)
+            elif self.cur_token_type_is(TokenType.ORDERBY_DESC):
+                order.direction = Order.DESC
+                self.consume_token(TokenType.ORDERBY_DESC)
+            order_specs.append(order)
+        return order_specs
 
 def parseAndPrintExpr(expr_string, allowRelational=True):
     print(">>>>>>> parsing:  " + expr_string)

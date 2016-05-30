@@ -422,7 +422,9 @@ class Row(object):
         self._resultset = rs
 
     def __getitem__(self, index):
-        if index >= len(self._fields):
+        if isinstance(index, basestring):
+            index = self._resultset.index_of(index)
+        elif index >= len(self._fields):
             raise Exception("Index out of range")
         return self._fields[index]
 

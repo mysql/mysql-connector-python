@@ -51,7 +51,7 @@ class FilterableStatement(Statement):
                                                   doc_based=doc_based)
         self._has_where = False
         self._has_limit = False
-        self._has_order = False
+        self._has_sort = False
         self._has_grouping = False
         if condition is not None:
             self.where(condition)
@@ -68,10 +68,13 @@ class FilterableStatement(Statement):
         self._limit_row_count = row_count
         return self
 
-    def sort(self, ):
-        pass
+    def sort(self, *sort_clauses):
+        self._has_sort = True
+        self._sort_expr = ExprParser(",".join(sort_clauses), not self._doc_based).parse_order_spec()
+        return self
+
     def execute(self):
-        pass
+        raise Exception("This should never be called")
 
 
 class SqlStatement(Statement):

@@ -218,9 +218,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Betty", docs[0]["name"])
 
-        result = collection.find("$.age > 28").execute()
+        result = collection.find("$.age > 28").sort("age DESC, name ASC").execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
+        self.assertEqual(67, docs[0]["age"])
 
         result = collection.find().limit(2).execute()
         docs = result.fetch_all()
@@ -264,9 +265,10 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)).execute()
 
         table = self.schema.get_table("test")
-        result = table.select().execute()
+        result = table.select().sort("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
+        self.assertEqual(67, rows[0]["age"])
 
         result = table.select("age = 42").execute()
         rows = result.fetch_all()
