@@ -26,7 +26,7 @@ import struct
 import sys
 
 from datetime import datetime, timedelta
-
+from .dbdoc import DbDoc
 
 def from_protobuf(col_type, payload):
     if len(payload) == 0:
@@ -507,15 +507,24 @@ class BufferingResult(BaseResult):
         while (True):
             if not self._page_in_items():
                 break
-
+        return self._items
 
 class RowResult(BufferingResult):
     def __init__(self, connection):
         super(RowResult, self).__init__(connection)
 
-
 class SqlResult(RowResult):
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
         self._has_more_results = False
+
+class DocResult(BufferingResult):
+    def __init__(self, connection):
+        super(DocResult, self).__init__(connection)
+
+    def _read_item(self, dumping):
+        row = super(DocResult, self)._read_item(dumping)
+        if row is None:
+            return None
+        return DbDoc(row[0])
 

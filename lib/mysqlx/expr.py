@@ -133,9 +133,10 @@ reservedWords = {
         "microsecond": TokenType.MICROSECOND}
 
 class Token:
-    def __init__(self, type, val):
+    def __init__(self, type, val, len=1):
         self.type = type
         self.val = val
+        self.len = len
 
     def __repr__(self):
         return self.__str__()
@@ -204,7 +205,8 @@ class ExprParser:
                 found_dot = True
             # technically we allow more than one "." and let float()'s parsing complain later
             pos = pos + 1
-        t = Token(TokenType.LNUM, self.string[start:pos])
+        val = self.string[start:pos]
+        t = Token(TokenType.LNUM, val, len(val))
         return t
 
     def lex_alpha(self, i):
@@ -213,9 +215,9 @@ class ExprParser:
             i = i + 1
         val = self.string[start:i]
         try:
-            token = Token(reservedWords[val.lower()], val.upper())
+            token = Token(reservedWords[val.lower()], val.upper(), len(val))
         except KeyError:
-            token = Token(TokenType.IDENT, val)
+            token = Token(TokenType.IDENT, val, len(val))
         return token
 
 
@@ -241,9 +243,9 @@ class ExprParser:
         if i >= len(self.string) or self.string[i] != quote_char:
             raise StandardError("Unterminated quoted string starting at " + str(start))
         if quote_char == "`":
-            return Token(TokenType.IDENT, val)
+            return Token(TokenType.IDENT, val, len(val)+2)
         else:
-            return Token(TokenType.LSTRING, val)
+            return Token(TokenType.LSTRING, val, len(val)+2)
 
     def lex(self):
         i = 0
@@ -281,9 +283,9 @@ class ExprParser:
                 token = Token(TokenType.MOD, c)
             elif c == "=":
                 if self.next_char_is(i, "="):
-                    token = Token(TokenType.EQ, "==")
+                    token = Token(TokenType.EQ, "==", 2)
                 else:
-                    token = Token(TokenType.EQ, "=")
+                    token = Token(TokenType.EQ, "==", 1)
             elif c == "&":
                 if self.next_char_is(i, "&"):
                     token = Token(TokenType.ANDAND, c)
@@ -333,12 +335,11 @@ class ExprParser:
                 else:
                     token = Token(TokenType.DOT, c)
             elif c == '"' or c == "'" or c == "`":
-                token = self.lex_qouted_token(i)
+                token = self.lex_quoted_token(i)
             else:
                 raise StandardError("Unknown character at " + str(i))
             self.tokens.append(token)
-            i += len(token.val)
-            if token.val == "=": token.val = "=="
+            i += token.len
 
     def assert_cur_token(self, type):
         if self.pos >= len(self.tokens):
@@ -555,7 +556,7 @@ class ExprParser:
 #            e.operator.param.add().CopyFrom(build_literal_expr(build_string_scalar(self.tokens[self.pos].val)))
 #            self.pos = self.pos + 1
 #            return e
-        raise StandardError("Unknown token type = " + str(t.type) + " when expecting atomic expression at " + str(self.pos))
+        raise StandardError("Unknown token type = " + str(token.type) + " when expecting atomic expression at " + str(self.pos))
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
         """Given a `set' of types and an Expr-returning inner parser function, parse a left associate binary operator expression"""
@@ -655,7 +656,7 @@ def parseAndPrintExpr(expr_string, allowRelational=True):
     #print(expr_unparser.expr_to_string(e))
 
 def x_test():
-    parseAndPrintExpr("age = 21");
+    parseAndPrintExpr("$.age > 28 or $.name = 'Fred'");
     return
     parseAndPrintExpr("10+1");
     parseAndPrintExpr("(abc == 1)");

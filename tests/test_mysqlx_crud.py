@@ -203,6 +203,28 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, result.rows_affected)
         self.assertEqual(0, collection.count())
 
+    def test_find(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add(
+            {"name":"Fred", "age":21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+
+        ).execute()
+        result = collection.find("$.age == 67").execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual("Betty", docs[0]["name"])
+
+        result = collection.find("$.age > 28").execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+
+        result = collection.find().limit(2).execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
 
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -233,8 +255,22 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.schema.drop_table(table_name)
 
     def test_select(self):
-        # TODO: To implement
-        pass
+        table_name = "{0}.test".format(self.schema_name)
+
+        self.node_session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma')".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)).execute()
+
+        table = self.schema.get_table("test")
+        result = table.select().execute()
+        rows = result.fetch_all()
+        self.assertEqual(4, len(rows))
+
+        result = table.select("age = 42").execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
 
     def test_insert(self):
         # TODO: To implement

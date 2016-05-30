@@ -21,7 +21,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .statement import AddStatement, RemoveStatement, TableDeleteStatement
+from .statement import AddStatement, RemoveStatement, TableDeleteStatement, FindStatement, SelectStatement
 
 
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
@@ -127,6 +127,9 @@ class Collection(DatabaseObject):
         sql = _COUNT_TABLES_QUERY.format(self._schema.get_name(), self._name)
         return self._connection.execute_sql_scalar(sql) == 1
 
+    def find(self, condition=None):
+        return FindStatement(self, condition)
+
     def add(self, *values):
         return AddStatement(self).add(*values)
 
@@ -152,8 +155,8 @@ class Table(DatabaseObject):
         sql = _COUNT_TABLES_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql) == 1
 
-    def select(self, *columns):
-        pass
+    def select(self, condition=None):
+        return SelectStatement(self, condition)
 
     def insert(self, *fields):
         pass

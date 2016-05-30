@@ -117,6 +117,20 @@ class Protocol(object):
             if msg.__class__ is MySQLx.Error:
                 raise Exception(msg.msg)
 
+    def _apply_filter(self, message, statement):
+        if statement._has_where:
+            message.criteria.CopyFrom(statement._where_expr)
+        if statement._has_limit:
+            message.limit.row_count = statement._limit_row_count
+            message.limit.offset = statement._limit_offset
+
+    def send_find(self, stmt):
+        find = Find(
+            data_model=MySQLxCrud.DOCUMENT if stmt._doc_based else MySQLxCrud.TABLE,
+            collection=MySQLxCrud.Collection(name=stmt.target.name, schema=stmt.schema.name))
+        self._apply_filter(find, stmt)
+        self._writer.write_message(MySQLx.ClientMessages.CRUD_FIND, find)
+
     def send_insert(self, schema, target, is_docs, rows, cols):
         stmt = MySQLxCrud.Insert(
             datamodel=MySQLxCrud.DOCUMENT if is_docs else MySQLxCrud.TABLE,
@@ -125,12 +139,12 @@ class Protocol(object):
             typed_row = MySQLxCrud.Insert.TypedRow()
             stmt.rows.extend(row)
 
-    def send_delete(self, schema, target, is_docs, filter):
-        stmt = MySQLxCrud.Delete(
-            data_model=MySQLxCrud.DOCUMENT if is_docs else MySQLxCrud.TABLE,
-            collection=MySQLxCrud.Collection(name=target, schema=schema),
-            criteria=filter["expr"] or None)
-        self._writer.write_message(MySQLx.ClientMessages.CRUD_DELETE, stmt)
+    def send_delete(self, stmt):
+        delete = MySQLxCrud.Delete(
+            data_model=MySQLxCrud.DOCUMENT if stmt._doc_based else MySQLxCrud.TABLE,
+            collection=MySQLxCrud.Collection(name=stmt.target.name, schema=stmt.schema.name))
+        self._apply_filter(delete, stmt)
+        self._writer.write_message(MySQLx.ClientMessages.CRUD_DELETE, delete)
 
     def send_execute_statement(self, namespace, stmt, args):
         stmt = MySQLxSQL.StmtExecute(namespace=namespace, stmt=stmt,

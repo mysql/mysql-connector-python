@@ -21,31 +21,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-import json
-import uuid
+
 
 from .result import SqlResult
 from .expr import ExprParser
-
-
-class DbDoc(object):
-    def __init__(self, value):
-        # TODO: handle exceptions.  What happens if it doesn't load properly
-        if isinstance(value, dict):
-            self.__dict__ = value
-        elif isinstance(value, basestring):
-            self.__dict__ = json.loads(value)
-        else:
-            raise Exception("Unable to handle type: ".format(type(value)))
-
-    def ensure_id(self):
-        if "_id" not in self.__dict__:
-            self.__dict__["_id"] = str(uuid.uuid4())
-
-    def __str__(self):
-        return json.dumps(self.__dict__)
-        #return str(self.__dict__)
-
+from .dbdoc import DbDoc
 
 class Statement(object):
     def __init__(self, target, doc_based=True):
@@ -69,24 +49,27 @@ class FilterableStatement(Statement):
     def __init__(self, target, doc_based=True, condition=None):
         super(FilterableStatement, self).__init__(target=target,
                                                   doc_based=doc_based)
-        self._filter = {}
+        self._has_where = False
+        self._has_limit = False
+        self._has_order = False
+        self._has_grouping = False
         if condition is not None:
             self.where(condition)
 
-    @property
-    def filter(self):
-        return self._filter
-
     def where(self, condition):
-        self._filter["where"] = condition
-        self._filter["expr"] = ExprParser(condition,
-                                          not self._doc_based).expr()
+        self._has_where = True
+        self._where = condition
+        self._where_expr = ExprParser(condition, not self._doc_based).expr()
+        return self
 
-    def limit(self, offset, limit):
-        self._filter["has_limit"] = True
-        self._filter["offset"] = offset
-        self._filter["limit"] = limit
+    def limit(self, row_count, offset=0):
+        self._has_limit = True
+        self._limit_offset = offset
+        self._limit_row_count = row_count
+        return self
 
+    def sort(self, ):
+        pass
     def execute(self):
         pass
 
@@ -120,13 +103,28 @@ class AddStatement(Statement):
             doc.ensure_id()
         return self._connection.send_doc_insert(self)
 
+class FindStatement(FilterableStatement):
+    def __init__(self, collection, condition=None):
+        super(FindStatement, self).__init__(collection, True, condition)
+
+    def execute(self):
+        return self._connection.find(self)
+
+
+class SelectStatement(FilterableStatement):
+    def __init__(self, table, condition=None):
+        super(SelectStatement, self).__init__(table, False, condition)
+
+    def execute(self):
+        return self._connection.find(self)
+
 
 class RemoveStatement(FilterableStatement):
     def __init__(self, collection):
         super(RemoveStatement, self).__init__(target=collection)
 
     def execute(self):
-        return self._connection.send_delete(self, True)
+        return self._connection.delete(self)
 
 
 class TableDeleteStatement(FilterableStatement):
@@ -136,4 +134,4 @@ class TableDeleteStatement(FilterableStatement):
                                                    doc_based=False)
 
     def execute(self):
-        return self._connection.send_delete(self, False)
+        return self._connection.delete(self)

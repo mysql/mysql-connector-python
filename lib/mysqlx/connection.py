@@ -27,7 +27,7 @@ import socket
 
 from .protocol import Protocol, MessageReaderWriter
 from .authentication import MySQL41AuthPlugin
-from .result import Result, RowResult
+from .result import Result, RowResult, DocResult
 from .crud import Schema
 from .statement import SqlStatement
 
@@ -97,11 +97,12 @@ class Connection(object):
                                   statement._docs)
         return Result(self)
 
-    def send_delete(self, statement, is_docs):
-        # TODO: make sure statement is a FilterableStatement
-        self.protocol.send_delete(statement.schema.name,
-                                  statement.target.name, is_docs,
-                                  statement.filter)
+    def find(self, statement):
+        self.protocol.send_find(statement)
+        return DocResult(self) if statement._doc_based else RowResult(self)
+
+    def delete(self, statement):
+        self.protocol.send_delete(statement)
         return Result(self)
 
     def execute_nonquery(self, namespace, cmd, raise_on_fail=True, *args):

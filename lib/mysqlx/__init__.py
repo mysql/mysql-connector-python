@@ -26,9 +26,9 @@
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table
 from .result import ColumnMetaData, Row, Result, BufferingResult, RowResult, SqlResult
-from .statement import (DbDoc, Statement, FilterableStatement, SqlStatement,
+from .statement import (Statement, FilterableStatement, SqlStatement,
                         AddStatement, RemoveStatement, TableDeleteStatement)
-
+from .dbdoc import DbDoc
 
 def get_session(settings):
     return XSession(settings)
