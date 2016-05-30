@@ -49,6 +49,7 @@ class FilterableStatement(Statement):
     def __init__(self, target, doc_based=True, condition=None):
         super(FilterableStatement, self).__init__(target=target,
                                                   doc_based=doc_based)
+        self._has_projection = False
         self._has_where = False
         self._has_limit = False
         self._has_sort = False
@@ -61,6 +62,10 @@ class FilterableStatement(Statement):
         self._where = condition
         self._where_expr = ExprParser(condition, not self._doc_based).expr()
         return self
+
+    def projection(self, *fields):
+        self._has_projection = True
+        self._projection_expr = ExprParser(",".join(fields), not self._doc_based).parse_table_select_projection()
 
     def limit(self, row_count, offset=0):
         self._has_limit = True
@@ -110,13 +115,17 @@ class FindStatement(FilterableStatement):
     def __init__(self, collection, condition=None):
         super(FindStatement, self).__init__(collection, True, condition)
 
+    def fields(self, *fields):
+        return self.projection(*fields)
+
     def execute(self):
         return self._connection.find(self)
 
 
 class SelectStatement(FilterableStatement):
-    def __init__(self, table, condition=None):
-        super(SelectStatement, self).__init__(table, False, condition)
+    def __init__(self, table, *fields):
+        super(SelectStatement, self).__init__(table, False)
+        self.projection(*fields)
 
     def execute(self):
         return self._connection.find(self)

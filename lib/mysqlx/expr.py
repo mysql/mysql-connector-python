@@ -92,6 +92,7 @@ class TokenType:
     DOTSTAR = 62
     ORDERBY_ASC = 63
     ORDERBY_DESC = 64
+    AS = 65
 
 interval_units = set([
     TokenType.MICROSECOND,
@@ -134,7 +135,8 @@ reservedWords = {
         "year":     TokenType.YEAR,
         "microsecond": TokenType.MICROSECOND,
         "asc":      TokenType.ORDERBY_ASC,
-        "desc":     TokenType.ORDERBY_DESC}
+        "desc":     TokenType.ORDERBY_DESC,
+        "as":       TokenType.AS}
 
 class Token:
     def __init__(self, type, val, len=1):
@@ -650,6 +652,21 @@ class ExprParser:
 
     def parse_table_insert_field(self):
         return Column(name=self.consume_token(TokenType.IDENT))
+
+    def parse_table_select_projection(self):
+        project_expr = []
+        first = True
+        while self.pos < len(self.tokens):
+            if not first:
+                self.consume_token(TokenType.COMMA)
+            first = False
+            projection = Projection(source = self.expr())
+            if self.cur_token_type_is(TokenType.AS):
+                self.consume_token(TokenType.AS)
+                projection.alias = self.consume_token(TokenType.IDENT)
+            project_expr.append(projection)
+        return project_expr
+
 
     def parse_order_spec(self):
         order_specs = []

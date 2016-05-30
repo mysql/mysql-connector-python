@@ -37,6 +37,9 @@ class DbDoc(object):
     def __getitem__(self, index):
         return self.__dict__[index]
 
+    def keys(self):
+        return self.__dict__.keys()
+
     def ensure_id(self):
         if "_id" not in self.__dict__:
             self.__dict__["_id"] = str(uuid.uuid4())

@@ -223,9 +223,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(2, len(docs))
         self.assertEqual(67, docs[0]["age"])
 
-        result = collection.find().limit(2).execute()
+        result = collection.find("age").sort("age DESC").limit(2).execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
+        self.assertEqual(42, docs[1]["age"])
+        self.assertEqual(1, len(docs[1].keys()))
 
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -270,7 +272,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(4, len(rows))
         self.assertEqual(67, rows[0]["age"])
 
-        result = table.select("age = 42").execute()
+        result = table.select("age").where("age = 42").execute()
+        self.assertEqual(1, len(result.columns))
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 

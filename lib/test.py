@@ -19,9 +19,10 @@ node.sql("INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)).execute()
 
 table = schema.get_table("test")
 try:
-    result = table.select().sort("age DESC").execute()
+    result = table.select("age").sort("age DESC").execute()
+    print "col count = " + str(len(result.columns))
+    rows = result.fetch_all()
+    print "count = " + str(len(rows))
+    print "age = " + str(rows[0]["age"])
 except Exception as e:
     print "boo"
-rows = result.fetch_all()
-print "count = " + str(len(rows))
-print "age = " + str(rows[0]["age"])

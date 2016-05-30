@@ -155,8 +155,8 @@ class Table(DatabaseObject):
         sql = _COUNT_TABLES_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql) == 1
 
-    def select(self, condition=None):
-        return SelectStatement(self, condition)
+    def select(self, *fields):
+        return SelectStatement(self, *fields)
 
     def insert(self, *fields):
         pass

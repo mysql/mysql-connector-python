@@ -130,6 +130,8 @@ class Protocol(object):
         find = Find(
             data_model=MySQLxCrud.DOCUMENT if stmt._doc_based else MySQLxCrud.TABLE,
             collection=MySQLxCrud.Collection(name=stmt.target.name, schema=stmt.schema.name))
+        if stmt._has_projection:
+            find.projection.extend(stmt._projection_expr)
         self._apply_filter(find, stmt)
         self._writer.write_message(MySQLx.ClientMessages.CRUD_FIND, find)
 

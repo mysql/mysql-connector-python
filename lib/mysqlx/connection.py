@@ -140,6 +140,15 @@ class BaseSession(object):
             "sql", _CREATE_DATABASE_QUERY.format(name), True)
         return Schema(self, name)
 
+    def start_transaction(self):
+        self._connection.execute_nonquery("START TRANSACTION")
+
+    def commit(self):
+        self._connection.execute_nonquery("COMMIT")
+
+    def roillback(self):
+        self._connection.execute_nonquery("ROLLBACK")
+
 
 class XSession(BaseSession):
     def __init__(self, settings):

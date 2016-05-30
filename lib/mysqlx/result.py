@@ -515,6 +515,10 @@ class RowResult(BufferingResult):
     def __init__(self, connection):
         super(RowResult, self).__init__(connection)
 
+    @property
+    def columns(self):
+        return self._columns
+
 class SqlResult(RowResult):
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
