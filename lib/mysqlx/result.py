@@ -443,6 +443,9 @@ class BaseResult(object):
         self._closed = False
         self._rows_affected = 0
         self._warnings = []
+        if connection._active_result != None:
+            connection._active_result.fetch_all()
+            connection._active_result = None
 
     @property
     def Warnings(self):
@@ -465,6 +468,7 @@ class BufferingResult(BaseResult):
         self._items = []
         self._page_size = 20
         self._position = -1
+        self._connection._active_result = self
 
     @property
     def count(self):

@@ -229,6 +229,29 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
 
+
+    def test_results(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+
+        ).execute()
+        result1 = collection.find().execute()
+        # now do another collection find.
+        # the first one will have to be transparently buffered
+        result2 = collection.find("age > 28").sort("age DESC").execute()
+        docs2 = result2.fetch_all()
+        self.assertEqual(2, len(docs2))
+        self.assertEqual("Betty", docs2[0]["name"])
+
+        docs1 = result1.fetch_all();
+        self.assertEqual(4, len(docs1))
+
+
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):

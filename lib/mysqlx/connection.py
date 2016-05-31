@@ -63,6 +63,7 @@ class Connection(object):
         self._port = settings.get("port", 33060)
         self._user = settings.get("user")
         self._password = settings.get("password")
+        self._active_result = None
         self.stream = SocketStream()
         self.reader_writer = None
         self.protocol = None
