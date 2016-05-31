@@ -21,14 +21,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-"""MySQLx DevAPI Python implementation"""
+"""MySQL X DevAPI Python implementation"""
 
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table
-from .result import ColumnMetaData, Row, Result, BufferingResult, RowResult, SqlResult
+from .errors import (Error, Warning, InterfaceError, DatabaseError,
+                     NotSupportedError, DataError, IntegrityError,
+                     ProgrammingError, OperationalError, InternalError)
+from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
+                     SqlResult)
 from .statement import (Statement, FilterableStatement, SqlStatement,
                         AddStatement, RemoveStatement, TableDeleteStatement)
 from .dbdoc import DbDoc
+
 
 def get_session(settings):
     return XSession(settings)
@@ -37,17 +42,24 @@ def get_session(settings):
 def get_node_session(settings):
     return NodeSession(settings)
 
+
 __all__ = [
     # mysqlx.connection
-    XSession, NodeSession, get_session, get_node_session,
+    "XSession", "NodeSession", "get_session", "get_node_session",
 
     # mysqlx.crud
-    Schema, Collection, Table,
+    "Schema", "Collection", "Table",
+
+    # mysqlx.errors
+    "Error", "Warning", "InterfaceError", "DatabaseError", "NotSupportedError",
+    "DataError", "IntegrityError", "ProgrammingError", "OperationalError",
+    "InternalError",
 
     # mysqlx.result
-    ColumnMetaData, Row, Result, BufferingResult, RowResult, SqlResult,
+    "ColumnMetaData", "Row", "Result", "BufferingResult", "RowResult",
+    "SqlResult",
 
     # mysqlx.statement
-    DbDoc, Statement, FilterableStatement, SqlStatement, AddStatement,
-    RemoveStatement, TableDeleteStatement,
+    "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
+    "AddStatement", "RemoveStatement", "TableDeleteStatement",
 ]

@@ -473,30 +473,6 @@ def foreach_cnx(*cnx_classes, **extra_config):
     return _use_cnx
 
 
-class MySQLxTests(unittest.TestCase):
-    def run(self, result=None):
-        if sys.version_info[0:2] == (2, 6):
-            test_method = getattr(self, self._testMethodName)
-            if (getattr(self.__class__, "__unittest_skip__", False) or
-                    getattr(test_method, "__unittest_skip__", False)):
-                # We skipped a class
-                try:
-                    why = (
-                        getattr(self.__class__, '__unittest_skip_why__', '')
-                        or
-                        getattr(test_method, '__unittest_skip_why__', '')
-                    )
-                    self._addSkip(result, why)
-                finally:
-                    result.stopTest(self)
-                return
-
-        if PY2:
-            return super(MySQLxTests, self).run(result)
-        else:
-            return super().run(result)
-
-
 class MySQLConnectorTests(unittest.TestCase):
 
     def __init__(self, methodName='runTest'):
@@ -730,6 +706,34 @@ class CMySQLCursorTests(CMySQLConnectorTests):
     def cleanup_tables(self, cnx):
         for tbl in self._cleanup_tables:
             self.cleanup_table(cnx, tbl)
+
+
+class MySQLxTests(MySQLConnectorTests):
+
+    def __init__(self, methodName="runTest"):
+        super(MySQLxTests, self).__init__(methodName=methodName)
+
+    def run(self, result=None):
+        if sys.version_info[0:2] == (2, 6):
+            test_method = getattr(self, self._testMethodName)
+            if (getattr(self.__class__, "__unittest_skip__", False) or
+                    getattr(test_method, "__unittest_skip__", False)):
+                # We skipped a class
+                try:
+                    why = (
+                        getattr(self.__class__, '__unittest_skip_why__', '')
+                        or
+                        getattr(test_method, '__unittest_skip_why__', '')
+                    )
+                    self._addSkip(result, why)
+                finally:
+                    result.stopTest(self)
+                return
+
+        if PY2:
+            return super(MySQLxTests, self).run(result)
+        else:
+            return super().run(result)
 
 
 def printmsg(msg=None):
