@@ -47,6 +47,7 @@ _SERVER_MESSAGES = [
      MySQLxResultset.ColumnMetaData),
     (MySQLx.ServerMessages.RESULTSET_ROW, MySQLxResultset.Row),
     (MySQLx.ServerMessages.RESULTSET_FETCH_DONE, MySQLxResultset.FetchDone),
+    (MySQLx.ServerMessages.RESULTSET_FETCH_DONE_MORE_RESULTSETS, MySQLxResultset.FetchDoneMoreResultsets),
 ]
 
 

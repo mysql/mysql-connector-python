@@ -463,12 +463,15 @@ class Result(BaseResult):
 class BufferingResult(BaseResult):
     def __init__(self, connection):
         super(BufferingResult, self).__init__(connection)
-        self._has_more_data = True
+        self._init_result()
+
+    def _init_result(self):
         self._columns = self._protocol.get_column_metadata(self)
+        self._has_more_data = True if len(self._columns) > 0 else False
         self._items = []
         self._page_size = 20
         self._position = -1
-        self._connection._active_result = self
+        self._connection._active_result = self if self._has_more_data == True else None
 
     @property
     def count(self):
@@ -527,6 +530,13 @@ class SqlResult(RowResult):
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
         self._has_more_results = False
+
+    def next_result(self):
+        if self._closed == True:
+            return False
+        self._has_more_results = False
+        self._init_result()
+        return True
 
 class DocResult(BufferingResult):
     def __init__(self, connection):

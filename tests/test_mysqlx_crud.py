@@ -327,3 +327,21 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
         self.schema.drop_table(table_name)
+
+    def test_multiple_resultsets(self):
+        table_name = "{0}.test".format(self.schema_name)
+
+        self.node_session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; SELECT 2; SELECT 'a' END".format(self.schema_name)).execute()
+
+        result = self.node_session.sql(" CALL {0}.spProc".format(self.schema_name)).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+        self.assertEqual(1, rows[0][0])
+        self.assertEqual(True, result.next_result())
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+        self.assertEqual(2, rows[0][0])
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+        self.assertEqual("a", rows[0][0])
+        self.assertEqual(False, result.next_result())
