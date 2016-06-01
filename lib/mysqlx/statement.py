@@ -66,6 +66,7 @@ class FilterableStatement(Statement):
     def projection(self, *fields):
         self._has_projection = True
         self._projection_expr = ExprParser(",".join(fields), not self._doc_based).parse_table_select_projection()
+        return self
 
     def limit(self, row_count, offset=0):
         self._has_limit = True

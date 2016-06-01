@@ -664,6 +664,9 @@ class ExprParser:
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection.alias = self.consume_token(TokenType.IDENT)
+            else:
+                self.pos -= 1
+                projection.alias = self.consume_token(TokenType.IDENT)
             project_expr.append(projection)
         return project_expr
 
