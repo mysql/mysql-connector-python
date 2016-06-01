@@ -688,6 +688,16 @@ class ExprParser:
             order_specs.append(order)
         return order_specs
 
+    def parse_expr_list(self):
+        expr_list = []
+        first = True
+        while self.pos < len(self.tokens):
+            if not first:
+                self.consume_token(TokenType.COMMA)
+            first = False
+            expr_list.append(self.expr())
+        return expr_list
+
 def parseAndPrintExpr(expr_string, allowRelational=True):
     print(">>>>>>> parsing:  " + expr_string)
     p = ExprParser(expr_string, allowRelational)

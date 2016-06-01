@@ -300,6 +300,27 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 
+    def test_having(self):
+        table_name = "{0}.test".format(self.schema_name)
+
+        self.node_session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50), gender CHAR(1))".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred', 'M')".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney', 'M')".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma', 'F')".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty', 'F')".format(table_name)).execute()
+
+        table = self.schema.get_table("test")
+        result = table.select().group_by("gender").sort("age ASC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
+        self.assertEqual(21, rows[0]["age"])
+        self.assertEqual(42, rows[1]["age"])
+
+        result = table.select().group_by("gender").having("gender = 'F'").sort("age ASC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+        self.assertEqual(42, rows[0]["age"])
+
     def test_insert(self):
         # TODO: To implement
         pass

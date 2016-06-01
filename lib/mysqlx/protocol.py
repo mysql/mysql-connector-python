@@ -126,6 +126,10 @@ class Protocol(object):
             message.limit.offset = statement._limit_offset
         if statement._has_sort:
             message.order.extend(statement._sort_expr)
+        if statement._has_group_by:
+            message.grouping.extend(statement._grouping)
+        if statement._has_having:
+            message.grouping_criteria.CopyFrom(statement._having)
 
     def send_find(self, stmt):
         find = Find(

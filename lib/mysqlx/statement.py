@@ -53,7 +53,8 @@ class FilterableStatement(Statement):
         self._has_where = False
         self._has_limit = False
         self._has_sort = False
-        self._has_grouping = False
+        self._has_group_by = False
+        self._has_having = False
         if condition is not None:
             self.where(condition)
 
@@ -63,7 +64,7 @@ class FilterableStatement(Statement):
         self._where_expr = ExprParser(condition, not self._doc_based).expr()
         return self
 
-    def projection(self, *fields):
+    def _projection(self, *fields):
         self._has_projection = True
         self._projection_expr = ExprParser(",".join(fields), not self._doc_based).parse_table_select_projection()
         return self
@@ -78,6 +79,14 @@ class FilterableStatement(Statement):
         self._has_sort = True
         self._sort_expr = ExprParser(",".join(sort_clauses), not self._doc_based).parse_order_spec()
         return self
+
+    def _group_by(self, *fields):
+        self._has_group_by = True
+        self._grouping = ExprParser(",".join(fields), not self._doc_based).parse_expr_list()
+
+    def _having(self, condition):
+        self._has_having = True
+        self._having = ExprParser(condition, not self._doc_based).expr()
 
     def execute(self):
         raise Exception("This should never be called")
@@ -117,7 +126,15 @@ class FindStatement(FilterableStatement):
         super(FindStatement, self).__init__(collection, True, condition)
 
     def fields(self, *fields):
-        return self.projection(*fields)
+        return self._projection(*fields)
+
+    def group_by(self, *fields):
+        self._group_by(*fields)
+        return self
+
+    def having(self, condition):
+        self._having(condition)
+        return self
 
     def execute(self):
         return self._connection.find(self)
@@ -126,7 +143,15 @@ class FindStatement(FilterableStatement):
 class SelectStatement(FilterableStatement):
     def __init__(self, table, *fields):
         super(SelectStatement, self).__init__(table, False)
-        self.projection(*fields)
+        self._projection(*fields)
+
+    def group_by(self, *fields):
+        self._group_by(*fields)
+        return self
+
+    def having(self, condition):
+        self._having(condition)
+        return self
 
     def execute(self):
         return self._connection.find(self)
