@@ -21,7 +21,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .statement import AddStatement, RemoveStatement, TableDeleteStatement, FindStatement, SelectStatement
+from .statement import (AddStatement, RemoveStatement, TableDeleteStatement,
+                        FindStatement, SelectStatement,
+                        CreateCollectionIndexStatement,
+                        DropCollectionIndexStatement)
 
 
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
@@ -145,6 +148,23 @@ class Collection(DatabaseObject):
     def count(self):
         sql = _COUNT_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql)
+
+    def create_index(self, index_name, is_unique):
+        """Creates a collection index.
+
+        Args:
+            index_name (string): Index name.
+            is_unique (bool): True if the index is unique.
+        """
+        return CreateCollectionIndexStatement(self, index_name, is_unique)
+
+    def drop_index(self, index_name):
+        """Drops a collection index.
+
+        Args:
+            index_name (string): Index name.
+        """
+        return DropCollectionIndexStatement(self, index_name)
 
 
 class Table(DatabaseObject):
