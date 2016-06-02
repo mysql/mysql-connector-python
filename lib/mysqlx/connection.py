@@ -104,6 +104,10 @@ class Connection(object):
         self.protocol.send_delete(statement)
         return Result(self)
 
+    def update(self, statement):
+        self.protocol.send_update(statement)
+        return Result(self)
+
     def execute_nonquery(self, namespace, cmd, raise_on_fail=True, *args):
         self.protocol.send_execute_statement(namespace, cmd, args)
         return Result(self)

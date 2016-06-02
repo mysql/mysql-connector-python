@@ -448,8 +448,11 @@ class BaseResult(object):
             connection._active_result = None
 
     @property
-    def Warnings(self):
+    def get_warnings(self):
         return self._warnings
+
+    def get_warnings_count(self):
+        return len(self._warnings)
 
 class Result(BaseResult):
     def __init__(self, connection):
@@ -457,8 +460,12 @@ class Result(BaseResult):
         self._protocol.close_result(self)
 
     @property
-    def rows_affected(self):
+    def get_affected_items_count(self):
         return self._rows_affected
+
+    @property
+    def get_autoincrement_value(self):
+        pass
 
 class BufferingResult(BaseResult):
     def __init__(self, connection):

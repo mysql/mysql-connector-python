@@ -22,7 +22,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 
-
+from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult
 from .expr import ExprParser
 from .dbdoc import DbDoc
@@ -121,6 +121,52 @@ class AddStatement(Statement):
             doc.ensure_id()
         return self._connection.send_insert(self)
 
+class UpdateSpec(object):
+    def __init__(self, type, source, value=None):
+        if type == MySQLxCrud.UpdateOperation.SET:
+            self._table_set(source, value)
+        else:
+            self.update_type = type
+            self.source = source
+            if len(source) > 0 and source[0] == '$':
+                self.source = source[1:]
+            self.source = ExprParser(self.source, False).document_field().identifier
+            self.value = value
+
+    def _table_set(self, source, value):
+        self.update_type = MySQLxCrud.UpdateOperation.SET
+        self.source = ExprParser(source, True).parse_table_update_field()
+        self.value = value
+
+class ModifyStatement(FilterableStatement):
+    def __init__(self, collection, condition=None):
+        super(ModifyStatement, self).__init__(target=collection, condition=condition)
+        self._update_ops = []
+
+    def set(self, doc_path, value):
+        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_SET, doc_path, value))
+        return self
+
+    def change(self, doc_path, value):
+        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REPLACE, doc_path, value))
+        return self
+
+    def unset(self, doc_path):
+        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, doc_path))
+        return self
+
+    def array_insert(self, field, value):
+        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ARRAY_INSERT, field, value))
+        return self
+
+    def array_append(self, doc_path, value):
+        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.UpdateType.ARRAY_APPEND, doc_path, value))
+        return self
+
+    def execute(self):
+        return self._connection.update(self)
+
+
 class FindStatement(FilterableStatement):
     def __init__(self, collection, condition=None):
         super(FindStatement, self).__init__(collection, True, condition)
@@ -170,6 +216,19 @@ class InsertStatement(Statement):
     def execute(self):
         return self._connection.send_insert(self)
 
+class UpdateStatement(FilterableStatement):
+    def __init__(self, table, *fields):
+        super(UpdateStatement, self).__init__(target=table, doc_based=False)
+        self._update_ops = []
+
+    def set(self, field, value):
+        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.SET, field, value))
+        return self
+
+    def execute(self):
+        return self._connection.update(self)
+
+
 class RemoveStatement(FilterableStatement):
     def __init__(self, collection):
         super(RemoveStatement, self).__init__(target=collection)
@@ -178,9 +237,9 @@ class RemoveStatement(FilterableStatement):
         return self._connection.delete(self)
 
 
-class TableDeleteStatement(FilterableStatement):
+class DeleteStatement(FilterableStatement):
     def __init__(self, table, condition=None):
-        super(TableDeleteStatement, self).__init__(target=table,
+        super(DeleteStatement, self).__init__(target=table,
                                                    condition=condition,
                                                    doc_based=False)
 

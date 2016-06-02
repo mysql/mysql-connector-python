@@ -21,10 +21,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .statement import (AddStatement, RemoveStatement, TableDeleteStatement,
-                        FindStatement, SelectStatement,
-                        CreateCollectionIndexStatement, InsertStatement,
-                        DropCollectionIndexStatement)
+from .statement import (FindStatement, AddStatement, RemoveStatement, ModifyStatement,
+                        SelectStatement, InsertStatement, DeleteStatement, UpdateStatement,
+                        CreateCollectionIndexStatement, DropCollectionIndexStatement)
 
 
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
@@ -145,6 +144,9 @@ class Collection(DatabaseObject):
             rs.where(condition)
         return rs
 
+    def modify(self, condition=None):
+        return ModifyStatement(self, condition)
+
     def count(self):
         sql = _COUNT_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql)
@@ -182,10 +184,10 @@ class Table(DatabaseObject):
         return InsertStatement(self, *fields)
 
     def update(self):
-        pass
+        return UpdateStatement(self)
 
     def delete(self, condition=None):
-        return TableDeleteStatement(self, condition)
+        return DeleteStatement(self, condition)
 
     def count(self):
         sql = _COUNT_QUERY.format(self._schema.name, self._name)

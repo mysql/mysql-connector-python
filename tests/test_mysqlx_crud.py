@@ -181,17 +181,17 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         result = collection.add({"name":"Fred", "age":21}).execute()
-        self.assertEqual(result.rows_affected, 1)
+        self.assertEqual(result.get_affected_items_count, 1)
         self.assertEqual(1, collection.count())
 
         # now add multiple dictionaries at once
         result = collection.add({"name": "Wilma", "age": 33}, {"name": "Barney", "age": 42}).execute()
-        self.assertEqual(result.rows_affected, 2)
+        self.assertEqual(result.get_affected_items_count, 2)
         self.assertEqual(3, collection.count())
 
         # now let's try adding strings
         result = collection.add('{"name": "Bambam", "age": 8}', '{"name": "Pebbles", "age": 8}').execute()
-        self.assertEqual(result.rows_affected, 2)
+        self.assertEqual(result.get_affected_items_count, 2)
         self.assertEqual(5, collection.count())
 
     def test_remove(self):
@@ -200,7 +200,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection.add({"name":"Fred", "age":21}).execute()
         self.assertEqual(1, collection.count())
         result = collection.remove("age == 21").execute()
-        self.assertEqual(1, result.rows_affected)
+        self.assertEqual(1, result.get_affected_items_count)
         self.assertEqual(0, collection.count())
 
     def test_find(self):
@@ -229,6 +229,31 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
 
+    def test_modify(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add(
+            {"name":"Fred", "age":21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+
+        ).execute()
+
+        result = collection.modify("age < 67").set("young", True).execute()
+        self.assertEqual(3, result.get_affected_items_count)
+        doc = collection.find("name = 'Fred'").execute().fetch_all()[0]
+        self.assertEqual(True, doc.young)
+
+        result = collection.modify("age == 28").change("young", False).execute()
+        self.assertEqual(1, result.get_affected_items_count)
+        docs = collection.find("young = True").execute().fetch_all()
+        self.assertEqual(2, len(docs))
+
+        result = collection.modify("young == True").unset("young").execute()
+        self.assertEqual(2, result.get_affected_items_count)
+        docs = collection.find("young = True").execute().fetch_all()
+        self.assertEqual(0, len(docs))
 
     def test_results(self):
         collection_name = "collection_test"
@@ -376,8 +401,18 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(4, len(rows))
 
     def test_update(self):
-        # TODO: To implement
-        pass
+        table = self.schema.get_table("test")
+
+        self.node_session.sql("CREATE TABLE {0}.test(age INT, name VARCHAR(50), gender CHAR(1))".format(self.schema_name)).execute()
+
+        result = table.insert("age", "name") \
+            .values(21, 'Fred') \
+            .values(28, 'Barney') \
+            .values(42, 'Wilma') \
+            .values(67, 'Betty').execute()
+
+        result = table.update().set("age", 25).where("age == 21").execute()
+        self.assertEqual(1, result.get_affected_items_count)
 
     def test_delete(self):
         table_name = "table_test"

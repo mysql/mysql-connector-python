@@ -140,13 +140,18 @@ class Protocol(object):
         self._apply_filter(find, stmt)
         self._writer.write_message(MySQLx.ClientMessages.CRUD_FIND, find)
 
-    def send_insert(self, schema, target, is_docs, rows, cols):
-        stmt = MySQLxCrud.Insert(
-            datamodel=MySQLxCrud.DOCUMENT if is_docs else MySQLxCrud.TABLE,
-            collection=MySQLxCrud.Collection(name=target, schema=schema))
-        for row in rows:
-            typed_row = MySQLxCrud.Insert.TypedRow()
-            stmt.rows.extend(row)
+    def send_update(self, statement):
+        update = MySQLxCrud.Update(
+            data_model=MySQLxCrud.DOCUMENT if statement._doc_based else MySQLxCrud.TABLE,
+            collection=MySQLxCrud.Collection(name=statement.target.name, schema=statement.schema.name))
+        self._apply_filter(update, statement)
+        for update_op in statement._update_ops:
+            opexpr = UpdateOperation(operation=update_op.update_type, source=update_op.source)
+            if update_op.value != None:
+                opexpr.value.CopyFrom(self.arg_object_to_expr(update_op.value, not statement._doc_based))
+            update.operation.extend([opexpr])
+        self._writer.write_message(MySQLx.ClientMessages.CRUD_UPDATE, update)
+
 
     def send_delete(self, stmt):
         delete = MySQLxCrud.Delete(

@@ -653,6 +653,9 @@ class ExprParser:
     def parse_table_insert_field(self):
         return Column(name=self.consume_token(TokenType.IDENT))
 
+    def parse_table_update_field(self):
+        return self.column_identifier().identifier
+
     def parse_table_select_projection(self):
         project_expr = []
         first = True
