@@ -251,6 +251,45 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs1 = result1.fetch_all();
         self.assertEqual(4, len(docs1))
 
+    def test_create_index(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+
+        index_name = "age_idx"
+        collection.create_index(index_name, True) \
+            .field("$.age", "INT", False).execute()
+
+        show_indexes_sql = (
+            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+            "".format(self.schema_name, collection_name, index_name)
+        )
+
+        result = self.node_session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+
+    def test_drop_index(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+
+        index_name = "age_idx"
+        collection.create_index(index_name, True) \
+            .field("$.age", "INT", False).execute()
+
+        show_indexes_sql = (
+            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+            "".format(self.schema_name, collection_name, index_name)
+        )
+
+        result = self.node_session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+
+        collection.drop_index(index_name).execute()
+        result = self.node_session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(0, len(rows))
+
 
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")

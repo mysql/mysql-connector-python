@@ -181,6 +181,10 @@ class Protocol(object):
             val = MySQLxDatatypes.Scalar.String(value=arg)
             scalar = MySQLxDatatypes.Scalar(type=8, v_string=val)
             return MySQLxDatatypes.Any(type=1, scalar=scalar)
+        elif isinstance(arg, bool):
+            return MySQLxDatatypes.Any(type=1, scalar=build_bool_scalar(arg))
+        elif isinstance(arg, int):
+            return MySQLxDatatypes.Any(type=1, scalar=build_int_scalar(arg))
         return None
 
     def close_result(self, rs):

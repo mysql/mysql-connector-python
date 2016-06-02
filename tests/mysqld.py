@@ -556,6 +556,7 @@ class MySQLServer(MySQLServerBase):
             'bind_address': self._bind_address,
             'port': self._port,
             'mysqlx_port': self._mysqlx_port,
+            'mysqlx_plugin': 'mysqlx.so' if os.name == 'posix' else 'mysqlx',
             'unix_socket': _convert_forward_slash(self._unix_socket),
             'ssl_dir': _convert_forward_slash(self._ssldir),
             'pid_file': _convert_forward_slash(self._pid_file),

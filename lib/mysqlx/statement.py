@@ -173,3 +173,63 @@ class TableDeleteStatement(FilterableStatement):
 
     def execute(self):
         return self._connection.delete(self)
+
+
+class CreateCollectionIndexStatement(Statement):
+    """A statement that creates an index on a collection.
+
+    Args:
+        collection (mysqlx.Collection): Collection.
+        index_name (string): Index name.
+        is_unique (bool): True if the index is unique.
+    """
+    def __init__(self, collection, index_name, is_unique):
+        super(CreateCollectionIndexStatement, self).__init__(target=collection)
+        self._index_name = index_name
+        self._is_unique = is_unique
+        self._fields = []
+
+    def field(self, document_path, column_type, is_required):
+        """Add the field specification to this index creation statement.
+
+        Args:
+            document_path (string): Document path.
+            column_type (string): Column type.
+            is_required (bool): True if the field is required.
+        """
+        self._fields.append((document_path, column_type, is_required,))
+        return self
+
+    def execute(self):
+        """Execute the Statement.
+
+        Returns:
+            mysqlx.Result
+        """
+        fields = [item for sublist in self._fields for item in sublist]
+        return self._connection.execute_nonquery(
+            "xplugin", "create_collection_index", True,
+            self._target.schema.name, self._target.name, self._index_name,
+            self._is_unique, *fields)
+
+
+class DropCollectionIndexStatement(Statement):
+    """A statement that drops an index on a collection.
+
+    Args:
+        collection (mysqlx.Collection): Collection.
+        index_name (string): Index name.
+    """
+    def __init__(self, collection, index_name):
+        super(DropCollectionIndexStatement, self).__init__(target=collection)
+        self._index_name = index_name
+
+    def execute(self):
+        """Execute the Statement.
+
+        Returns:
+            mysqlx.Result
+        """
+        return self._connection.execute_nonquery(
+            "xplugin", "drop_collection_index", True,
+            self._target.schema.name, self._target.name, self._index_name)
