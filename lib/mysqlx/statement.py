@@ -204,7 +204,7 @@ class CreateCollectionIndexStatement(Statement):
         """Execute the Statement.
 
         Returns:
-            mysqlx.Result
+            mysqlx.Result: Result object
         """
         fields = [item for sublist in self._fields for item in sublist]
         return self._connection.execute_nonquery(
