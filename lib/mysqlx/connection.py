@@ -92,10 +92,8 @@ class Connection(object):
     def send_sql(self, sql, *args):
         self.protocol.send_execute_statement("sql", sql, args)
 
-    def send_doc_insert(self, statement):
-        self.protocol.send_doc_insert(statement.schema.name,
-                                  statement.target.name,
-                                  statement._docs)
+    def send_insert(self, statement):
+        self.protocol.send_insert(statement)
         return Result(self)
 
     def find(self, statement):

@@ -23,7 +23,7 @@
 
 from .statement import (AddStatement, RemoveStatement, TableDeleteStatement,
                         FindStatement, SelectStatement,
-                        CreateCollectionIndexStatement,
+                        CreateCollectionIndexStatement, InsertStatement,
                         DropCollectionIndexStatement)
 
 
@@ -179,7 +179,7 @@ class Table(DatabaseObject):
         return SelectStatement(self, *fields)
 
     def insert(self, *fields):
-        pass
+        return InsertStatement(self, *fields)
 
     def update(self):
         pass

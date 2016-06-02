@@ -164,17 +164,25 @@ class Protocol(object):
         self._writer.write_message(MySQLx.ClientMessages.SQL_STMT_EXECUTE,
                                    stmt)
 
-    def send_doc_insert(self, schema, target, docs):
+    def send_insert(self, statement):
         insert = MySQLxCrud.Insert(
-            collection=MySQLxCrud.Collection(schema=schema, name=target),
-            data_model=MySQLxCrud.DOCUMENT)
-        for doc in docs:
+            data_model=MySQLxCrud.DOCUMENT if statement._doc_based else MySQLxCrud.TABLE,
+            collection=MySQLxCrud.Collection(name=statement.target.name, schema=statement.schema.name))
+        if hasattr(statement, '_fields'):
+            for field in statement._fields:
+                insert.projection.extend([ExprParser(field, not statement._doc_based).parse_table_insert_field()])
+        for value in statement._values:
             row = MySQLxCrud.Insert.TypedRow()
-            o = self.arg_object_to_expr(doc, False)
-            row.field.extend([o])
+            if isinstance(value, list):
+                for v in value:
+                    o = self.arg_object_to_expr(v, not statement._doc_based)
+                    row.field.extend([o])
+            else:
+                o = self.arg_object_to_expr(value, not statement._doc_based)
+                row.field.extend([o])
             insert.row.extend([row])
-
         self._writer.write_message(MySQLx.ClientMessages.CRUD_INSERT, insert)
+
 
     def _create_any(self, arg):
         if isinstance(arg, (str, unicode,)):
@@ -253,21 +261,21 @@ class Protocol(object):
     def arg_object_to_expr(self, value, allow_relational):
         if value == None:
             return Expr.build_null_scalar()
-        value_type = type(value)
-        if value_type == type(True):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_bool_scalar(value))
+        #value_type = type(value)
+        if isinstance(value, bool):
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_bool_scalar(value))
         elif isinstance(value, (int, long)):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_int_scalar(value))
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_int_scalar(value))
         elif isinstance(value, (float)):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_double_scalar(value))
-        elif value_type == type(str):
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_double_scalar(value))
+        elif isinstance(value, basestring):
             try:
                 expression = ExprParser(value, allow_relational).expr()
                 if expression.has_identifier():
-                    return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_string_scalar(value))
+                    return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(value))
                 return expression
             except Exception as e:
-                return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=ExprParser().build_string_scalar(value))
+                return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(value))
         elif isinstance(value, DbDoc):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(str(value)))
-        raise Exception("Unsupported type")
+        raise Exception("Unsupported type: " + str(type(value)))

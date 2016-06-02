@@ -361,8 +361,19 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(42, rows[0]["age"])
 
     def test_insert(self):
-        # TODO: To implement
-        pass
+        table = self.schema.get_table("test")
+
+        self.node_session.sql("CREATE TABLE {0}.test(age INT, name VARCHAR(50), gender CHAR(1))".format(self.schema_name)).execute()
+
+        result = table.insert("age", "name") \
+            .values(21, 'Fred') \
+            .values(28, 'Barney') \
+            .values(42, 'Wilma') \
+            .values(67, 'Betty').execute()
+
+        result = table.select().execute()
+        rows = result.fetch_all()
+        self.assertEqual(4, len(rows))
 
     def test_update(self):
         # TODO: To implement

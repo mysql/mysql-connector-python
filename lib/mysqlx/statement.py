@@ -106,20 +106,20 @@ class SqlStatement(Statement):
 class AddStatement(Statement):
     def __init__(self, collection):
         super(AddStatement, self).__init__(target=collection)
-        self._docs = []
+        self._values = []
 
     def add(self, *values):
         for val in values:
             if isinstance(val, DbDoc):
-                self._docs.append(val)
+                self._values.append(val)
             else:
-                self._docs.append(DbDoc(val))
+                self._values.append(DbDoc(val))
         return self
 
     def execute(self):
-        for doc in self._docs:
+        for doc in self._values:
             doc.ensure_id()
-        return self._connection.send_doc_insert(self)
+        return self._connection.send_insert(self)
 
 class FindStatement(FilterableStatement):
     def __init__(self, collection, condition=None):
@@ -156,6 +156,19 @@ class SelectStatement(FilterableStatement):
     def execute(self):
         return self._connection.find(self)
 
+
+class InsertStatement(Statement):
+    def __init__(self, table, *fields):
+        super(InsertStatement, self).__init__(target=table, doc_based=False)
+        self._fields = fields
+        self._values = []
+
+    def values(self, *values):
+        self._values.append(list(values))
+        return self
+
+    def execute(self):
+        return self._connection.send_insert(self)
 
 class RemoveStatement(FilterableStatement):
     def __init__(self, collection):
