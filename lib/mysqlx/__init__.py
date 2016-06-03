@@ -63,6 +63,6 @@ __all__ = [
 
     # mysqlx.statement
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
-    "AddStatement", "RemoveStatement", "TableDeleteStatement",
+    "AddStatement", "RemoveStatement", "DeleteStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
 ]
