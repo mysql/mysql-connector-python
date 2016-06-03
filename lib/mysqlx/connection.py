@@ -126,41 +126,109 @@ class Connection(object):
 
 
 class BaseSession(object):
+    """Base functionality for Session classes through the X Protocol.
+
+    This class encloses the core functionality to be made available on both
+    the XSession and NodeSession classes, such functionality includes:
+
+        - Accessing available schemas.
+        - Schema management operations.
+        - Enabling/disabling warning generation.
+        - Retrieval of connection information.
+
+    Args:
+        settings (dict): Connection data used to connect to the database.
+    """
     def __init__(self, settings):
         self._settings = settings
         self._connection = Connection(self._settings)
         self._connection.connect()
 
     def get_schema(self, name):
+        """Retrieves a Schema object from the current session by it's name.
+
+        Args:
+            name (string): The name of the Schema object to be retrieved.
+
+        Returns:
+            mysqlx.Schema: The Schema object with the given name.
+        """
         return Schema(self, name)
 
     def drop_schema(self, name):
+        """Drops the schema with the specified name.
+
+        Args:
+            name (string): The name of the Schema object to be retrieved.
+        """
         self._connection.execute_nonquery(
             "sql", _DROP_DATABASE_QUERY.format(name), True)
 
     def create_schema(self, name):
+        """Creates a schema on the database and returns the corresponding
+        object.
+
+        Args:
+            name (string): A string value indicating the schema name.
+        """
         self._connection.execute_nonquery(
             "sql", _CREATE_DATABASE_QUERY.format(name), True)
         return Schema(self, name)
 
     def start_transaction(self):
+        """Starts a transaction context on the server.
+        """
         self._connection.execute_nonquery("START TRANSACTION")
 
     def commit(self):
+        """Commits all the operations executed after a call to
+        startTransaction().
+        """
         self._connection.execute_nonquery("COMMIT")
 
-    def roillback(self):
+    def rollback(self):
+        """Discards all the operations executed after a call to
+        startTransaction().
+        """
         self._connection.execute_nonquery("ROLLBACK")
 
 
 class XSession(BaseSession):
+    """Enables interaction with an X Protocol enabled MySQL Product.
+
+    The functionality includes:
+
+    - Accessing available schemas.
+    - Schema management operations.
+    - Enabling/disabling warning generation.
+    - Retrieval of connection information.
+
+    Args:
+        settings (dict): Connection data used to connect to the database.
+    """
     def __init__(self, settings):
         super(XSession, self).__init__(settings)
 
 
 class NodeSession(BaseSession):
+    """Enables interaction with an X Protocol enabled MySQL Server.
+
+    The functionality includes:
+
+    - Accessing available schemas.
+    - Schema management operations.
+    - Enabling/disabling warning generation.
+    - Retrieval of connection information.
+    - Includes SQL Execution.
+
+    Args:
+        settings (dict): Connection data used to connect to the database.
+    """
     def __init__(self, settings):
         super(NodeSession, self).__init__(settings)
 
     def sql(self, sql):
+        """Creates a :class:`mysqlx.SqlStatement` object to allow running the
+        SQL statement on the target MySQL Server.
+        """
         return SqlStatement(self._connection, sql)

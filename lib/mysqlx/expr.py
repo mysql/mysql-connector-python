@@ -25,7 +25,6 @@ from protobuf.mysqlx_datatypes_pb2 import *
 from protobuf.mysqlx_expr_pb2 import *
 from protobuf.mysqlx_crud_pb2 import *
 
-import expr_unparser
 
 class TokenType:
     NOT = 1
@@ -107,36 +106,38 @@ interval_units = set([
 
 # map of reserved word to token type
 reservedWords = {
-        "and":      TokenType.AND,
-        "or":       TokenType.OR,
-        "xor":      TokenType.XOR,
-        "is":       TokenType.IS,
-        "not":      TokenType.NOT,
-        "like":     TokenType.LIKE,
-        "in":       TokenType.IN,
-        "regexp":   TokenType.REGEXP,
-        "between":  TokenType.BETWEEN,
-        "interval": TokenType.INTERVAL,
-        "escape":   TokenType.ESCAPE,
-        "cast":     TokenType.CAST,
-        "div":      TokenType.DIV,
-        "hex":      TokenType.HEX,
-        "bin":      TokenType.BIN,
-        "true":     TokenType.TRUE,
-        "false":    TokenType.FALSE,
-        "null":     TokenType.NULL,
-        "second":   TokenType.SECOND,
-        "minute":   TokenType.MINUTE,
-        "hour":     TokenType.HOUR,
-        "day":      TokenType.DAY,
-        "week":     TokenType.WEEK,
-        "month":    TokenType.MONTH,
-        "quarter":  TokenType.QUARTER,
-        "year":     TokenType.YEAR,
-        "microsecond": TokenType.MICROSECOND,
-        "asc":      TokenType.ORDERBY_ASC,
-        "desc":     TokenType.ORDERBY_DESC,
-        "as":       TokenType.AS}
+    "and":      TokenType.AND,
+    "or":       TokenType.OR,
+    "xor":      TokenType.XOR,
+    "is":       TokenType.IS,
+    "not":      TokenType.NOT,
+    "like":     TokenType.LIKE,
+    "in":       TokenType.IN,
+    "regexp":   TokenType.REGEXP,
+    "between":  TokenType.BETWEEN,
+    "interval": TokenType.INTERVAL,
+    "escape":   TokenType.ESCAPE,
+    "cast":     TokenType.CAST,
+    "div":      TokenType.DIV,
+    "hex":      TokenType.HEX,
+    "bin":      TokenType.BIN,
+    "true":     TokenType.TRUE,
+    "false":    TokenType.FALSE,
+    "null":     TokenType.NULL,
+    "second":   TokenType.SECOND,
+    "minute":   TokenType.MINUTE,
+    "hour":     TokenType.HOUR,
+    "day":      TokenType.DAY,
+    "week":     TokenType.WEEK,
+    "month":    TokenType.MONTH,
+    "quarter":  TokenType.QUARTER,
+    "year":     TokenType.YEAR,
+    "microsecond": TokenType.MICROSECOND,
+    "asc":      TokenType.ORDERBY_ASC,
+    "desc":     TokenType.ORDERBY_DESC,
+    "as":       TokenType.AS
+}
+
 
 class Token:
     def __init__(self, type, val, len=1):
@@ -148,23 +149,30 @@ class Token:
         return self.__str__()
 
     def __str__(self):
-        if self.type == TokenType.IDENT or self.type == TokenType.LNUM or self.type == TokenType.LSTRING:
+        if self.type == TokenType.IDENT or self.type == TokenType.LNUM or \
+           self.type == TokenType.LSTRING:
             return str(self.type) + "(" + self.val + ")"
         else:
             return str(self.type)
 
+
 # static protobuf helper functions
+
 def build_null_scalar():
     return Scalar(type=Scalar.V_NULL)
+
 
 def build_double_scalar(d):
     return Scalar(type=Scalar.V_DOUBLE, v_double=d)
 
+
 def build_int_scalar(i):
     return Scalar(type=Scalar.V_SINT, v_signed_int=i)
 
+
 def build_string_scalar(s):
     return Scalar(type=Scalar.V_STRING, v_string=Scalar.String(value=s))
+
 
 def build_bool_scalar(b):
     s = Scalar()
@@ -172,11 +180,13 @@ def build_bool_scalar(b):
     s.v_bool = b
     return s
 
+
 def build_literal_expr(anyval):
     e = Expr()
     e.type = Expr.LITERAL
     e.literal.CopyFrom(anyval)
     return e
+
 
 def build_unary_op(name, param):
     e = Expr()
@@ -185,8 +195,10 @@ def build_unary_op(name, param):
     e.operator.param.add().CopyFrom(param)
     return e
 
+
 def escape_literal(string):
     return string.replace('"', '""')
+
 
 class ExprParser:
     def __init__(self, string, allowRelational):
@@ -206,12 +218,14 @@ class ExprParser:
         # numeric literal
         start = pos
         found_dot = False
-        while pos < len(self.string) and (self.string[pos].isdigit() or self.string[pos] == "."):
+        while pos < len(self.string) and (self.string[pos].isdigit() or
+                                          self.string[pos] == "."):
             if self.string[pos] == ".":
-                if found_dot == True:
+                if found_dot is True:
                     raise Exception("Invalid number. Found multiple '.'")
                 found_dot = True
-            # technically we allow more than one "." and let float()'s parsing complain later
+            # technically we allow more than one "." and let float()'s parsing
+            # complain later
             pos = pos + 1
         val = self.string[start:pos]
         t = Token(TokenType.LNUM, val, len(val))
@@ -219,7 +233,8 @@ class ExprParser:
 
     def lex_alpha(self, i):
         start = i
-        while i < len(self.string) and (self.string[i].isalnum() or self.string[i] == "_"):
+        while i < len(self.string) and (self.string[i].isalnum() or
+                                        self.string[i] == "_"):
             i = i + 1
         val = self.string[start:i]
         try:
@@ -228,7 +243,6 @@ class ExprParser:
             token = Token(TokenType.IDENT, val, len(val))
         return token
 
-
     def lex_quoted_token(self, i):
         quote_char = self.string[i]
         val = ""
@@ -236,7 +250,8 @@ class ExprParser:
         start = i
         while i < len(self.string):
             c = self.string[i]
-            if c == quote_char and i + 1 < len(self.string) and self.string[i + 1] != quote_char:
+            if c == quote_char and i + 1 < len(self.string) and \
+               self.string[i + 1] != quote_char:
                 # break if we have a quote char that's not double
                 break
             elif c == quote_char or c == "\\":
@@ -249,7 +264,8 @@ class ExprParser:
                 val = val + c
             i = i + 1
         if i >= len(self.string) or self.string[i] != quote_char:
-            raise StandardError("Unterminated quoted string starting at " + str(start))
+            raise StandardError("Unterminated quoted string starting at {0}"
+                                "".format(start))
         if quote_char == "`":
             return Token(TokenType.IDENT, val, len(val)+2)
         else:
@@ -345,16 +361,18 @@ class ExprParser:
             elif c == '"' or c == "'" or c == "`":
                 token = self.lex_quoted_token(i)
             else:
-                raise StandardError("Unknown character at " + str(i))
+                raise StandardError("Unknown character at {0}".format(i))
             self.tokens.append(token)
             i += token.len
 
     def assert_cur_token(self, type):
         if self.pos >= len(self.tokens):
-            raise StandardError("Expected token type " + str(type) + " at pos " + str(self.pos) + " but no tokens left")
+            raise StandardError("Expected token type {0} at pos {1} but no "
+                                "tokens left".format(type, self.pos))
         if self.tokens[self.pos].type != type:
-            raise StandardError("Expected token type " + str(type) + " at pos " + str(self.pos) + " but found type " + str(self.tokens[self.pos]))
-        pass
+            raise StandardError("Expected token type {0} at pos {1} but found "
+                                "type {2}".format(type, self.pos,
+                                                  self.tokens[self.pos]))
 
     def cur_token_type_is(self, type):
         return self.pos_token_type_is(self.pos, type)
@@ -372,7 +390,9 @@ class ExprParser:
         return v
 
     def paren_expr_list(self):
-        """Parse a paren-bounded expression list for function arguments or IN list and return a list of Expr objects"""
+        """Parse a paren-bounded expression list for function arguments or IN
+        list and return a list of Expr objects.
+        """
         exprs = []
         self.consume_token(TokenType.LPAREN)
         if not self.cur_token_type_is(TokenType.RPAREN):
@@ -406,14 +426,16 @@ class ExprParser:
 
         if token.type == TokenType.IDENT:
             if token.val.startswith('`') and token.val.endswith('`'):
-                raise Exception(token.value + " is not a valid JSON/ECMAScript identifier")
+                raise Exception("{0} is not a valid JSON/ECMAScript identifier"
+                                "".format(token.value))
             self.consume_token(TokenType.IDENT)
             memberName = token.val
         elif self.token.type == TokenType.LSTRING:
             self.consume_token(TokenType.LSTRING)
             memberName = token.val
         else:
-            raise StandardError("Expected token type IDENT or LSTRING in JSON path at token pos " + str(self.pos))
+            raise StandardError("Expected token type IDENT or LSTRING in JSON "
+                                "path at token pos {0}".format(self.pos))
         item = DocumentPathItem(type=DocumentPathItem.MEMBER, value=memberName)
         return item
 
@@ -425,38 +447,50 @@ class ExprParser:
         elif self.cur_token_type_is(TokenType.LNUM):
             v = int(self.consume_token(TokenType.LNUM))
             if v < 0:
-                raise StandardError("Array index cannot be negative at " + str(self.pos))
+                raise StandardError("Array index cannot be negative at {0}"
+                                    "".format(self.pos))
             self.consume_token(TokenType.RSQBRACKET)
             return "[" + str(v) + "]"
         else:
-            raise StandardError("Exception token type MUL or LNUM in JSON path array index at token pos " + str(self.pos))
+            raise StandardError("Exception token type MUL or LNUM in JSON "
+                                "path array index at token pos "
+                                "".format(self.pos))
 
     def document_field(self):
         col = ColumnIdentifier()
         if self.cur_token_type_is(TokenType.IDENT):
-            col.document_path.extend([DocumentPathItem(type=DocumentPathItem.MEMBER, value=self.consume_token(TokenType.IDENT))])
+            col.document_path.extend([
+                DocumentPathItem(type=DocumentPathItem.MEMBER,
+                                 value=self.consume_token(TokenType.IDENT))])
         col.document_path.extend(self.document_path())
-        return Expr( type=Expr.IDENT, identifier=col )
+        return Expr(type=Expr.IDENT, identifier=col)
 
     def document_path(self):
-        """Parse a JSON-style document path, like WL#7909, but prefix by @. instead of $. We parse this as a string because the protocol doesn't support it. (yet)"""
+        """Parse a JSON-style document path, like WL#7909, but prefix by @.
+        instead of $. We parse this as a string because the protocol doesn't
+        support it. (yet)
+        """
         docpath = []
         while True:
             if self.cur_token_type_is(TokenType.DOT):
                 docpath.append(self.docpath_member())
             elif self.cur_token_type_is(TokenType.DOTSTAR):
                 self.consume_token(TokenType.DOTSTAR)
-                docpath.append(DocumentPathItem(type=DocumentPathItem.MEMBER_ASTERISK))
+                docpath.append(DocumentPathItem(
+                    type=DocumentPathItem.MEMBER_ASTERISK))
             elif self.cur_token_type_is(TokenType.LSQBRACKET):
                 docpath.append(self.docpath_array_loc())
             elif self.cur_token_type_is(TokenType.DOUBLESTAR):
                 self.consume_token(TokenType.DOUBLESTAR)
-                docpath.append(DocumentPathItem(type=DocumentPathItem.DOUBLE_ASTERISK))
+                docpath.append(DocumentPathItem(
+                    type=DocumentPathItem.DOUBLE_ASTERISK))
             else:
                 break
         items = len(docpath)
-        if items > 0 and docpath[items-1].type == DocumentPathItem.DOUBLE_ASTERISK:
-            raise StandardError("JSON path may not end in '**' at " + str(self.pos))
+        if items > 0 and docpath[items-1].type == \
+           DocumentPathItem.DOUBLE_ASTERISK:
+            raise StandardError("JSON path may not end in '**' at {0}"
+                                "".format(self.pos))
         return docpath
 
     def column_identifier(self):
@@ -466,7 +500,8 @@ class ExprParser:
             self.consume_token(TokenType.DOT)
             parts.append(self.consume_token(TokenType.IDENT))
         if len(parts) > 3:
-            raise StandardError("Too many parts to identifier at " + str(self.pos))
+            raise StandardError("Too many parts to identifier at {0}"
+                                "".format(self.pos))
         parts.reverse()
         colid = ColumnIdentifier()
         # clever way to apply them to the struct
@@ -530,10 +565,10 @@ class ExprParser:
         elif token.type == TokenType.LCURLY:
             return self.parse_json_doc()
         elif token.type == TokenType.CAST:
-            #TODO implement pass
+            # TODO implement pass
             pass
         elif token.type == TokenType.LPAREN:
-            e  = self.expr()
+            e = self.expr()
             self.expect_token(TokenType.RPAREN)
             return e
         elif token.type in [TokenType.PLUS, TokenType.MINUS]:
@@ -552,22 +587,29 @@ class ExprParser:
             return build_literal_expr(build_null_scalar())
         elif token.type == TokenType.LNUM:
             if "." in token.val:
-                return build_literal_expr(build_double_scalar(float(token.val)))
+                return build_literal_expr(
+                    build_double_scalar(float(token.val)))
             else:
                 return build_literal_expr(build_int_scalar(int(token.val)))
         elif token.type in [TokenType.TRUE, TokenType.FALSE]:
-            return build_literal_expr(build_bool_scalar(token.type == TokenType.TRUE))
+            return build_literal_expr(
+                build_bool_scalar(token.type == TokenType.TRUE))
         elif token.type == TokenType.DOLLAR:
             return self.document_field()
         elif token.type == TokenType.MUL:
             return self.starOperator()
         elif token.type == TokenType.IDENT:
-            self.pos = self.pos - 1 # stay on the identifier
-            if self.next_token_type_is(TokenType.LPAREN) or (self.next_token_type_is(TokenType.DOT) and self.pos_token_type_is(self.pos + 2, TokenType.IDENT) and self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)):
+            self.pos = self.pos - 1  # stay on the identifier
+            if self.next_token_type_is(TokenType.LPAREN) or \
+               (self.next_token_type_is(TokenType.DOT) and
+               self.pos_token_type_is(self.pos + 2, TokenType.IDENT) and
+               self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)):
                 # Function call
                 return self.function_call()
             else:
-                return self.document_field() if not self._allowRelationalColumns else self.column_identifier()
+                return (self.document_field()
+                        if not self._allowRelationalColumns
+                        else self.column_identifier())
 
 #        if t.type == TokenType.EROTEME:
 #            return build_literal_expr(build_string_scalar("?"))
@@ -584,12 +626,15 @@ class ExprParser:
 #            e.operator.param.add().CopyFrom(build_literal_expr(build_string_scalar(self.tokens[self.pos].val)))
 #            self.pos = self.pos + 1
 #            return e
-        raise StandardError("Unknown token type = " + str(token.type) + " when expecting atomic expression at " + str(self.pos))
+        raise StandardError("Unknown token type = {0}  when expecting atomic "
+                            "expression at {1}".format(token.type, self.pos))
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
-        """Given a `set' of types and an Expr-returning inner parser function, parse a left associate binary operator expression"""
+        """Given a `set' of types and an Expr-returning inner parser function,
+        parse a left associate binary operator expression"""
         lhs = inner_parser()
-        while self.pos < len(self.tokens) and self.tokens[self.pos].type in types:
+        while (self.pos < len(self.tokens) and
+               self.tokens[self.pos].type in types):
             e = Expr()
             e.type = Expr.OPERATOR
             e.operator.name = self.tokens[self.pos].val
@@ -601,19 +646,27 @@ class ExprParser:
 
     # operator precedence is implemented here
     def mul_div_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.MUL, TokenType.DIV, TokenType.MOD]), self.atomic_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.MUL, TokenType.DIV, TokenType.MOD]),
+            self.atomic_expr)
 
     def add_sub_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.PLUS, TokenType.MINUS]), self.mul_div_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.PLUS, TokenType.MINUS]), self.mul_div_expr)
 
     def shift_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.LSHIFT, TokenType.RSHIFT]), self.add_sub_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.LSHIFT, TokenType.RSHIFT]), self.add_sub_expr)
 
     def bit_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.BITAND, TokenType.BITOR, TokenType.BITXOR]), self.shift_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.BITAND, TokenType.BITOR, TokenType.BITXOR]),
+            self.shift_expr)
 
     def comp_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.GE, TokenType.GT, TokenType.LE, TokenType.LT, TokenType.EQ, TokenType.NE]), self.bit_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.GE, TokenType.GT, TokenType.LE, TokenType.LT,
+                 TokenType.EQ, TokenType.NE]), self.bit_expr)
 
     def ilri_expr(self):
         lhs = self.comp_expr()
@@ -650,8 +703,9 @@ class ExprParser:
                 params.append(self.comp_expr())
             else:
                 if is_not:
-                    raise StandardError("Unknown token after NOT as pos " + str(self.pos))
-                op_name = None # not an operator we're interested in
+                    raise StandardError("Unknown token after NOT as pos {0}"
+                                        "".format(self.pos))
+                op_name = None  # not an operator we're interested in
             if op_name:
                 e = Expr()
                 e.type = Expr.OPERATOR
@@ -664,10 +718,12 @@ class ExprParser:
         return lhs
 
     def and_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.AND, TokenType.ANDAND]), self.ilri_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.AND, TokenType.ANDAND]), self.ilri_expr)
 
     def or_expr(self):
-        return self.parse_left_assoc_binary_op_expr(set([TokenType.OR, TokenType.OROR]), self.and_expr)
+        return self.parse_left_assoc_binary_op_expr(
+            set([TokenType.OR, TokenType.OROR]), self.and_expr)
 
     def expr(self):
         return self.or_expr()
@@ -685,7 +741,7 @@ class ExprParser:
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            projection = Projection(source = self.expr())
+            projection = Projection(source=self.expr())
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection.alias = self.consume_token(TokenType.IDENT)
@@ -695,7 +751,6 @@ class ExprParser:
             project_expr.append(projection)
         return project_expr
 
-
     def parse_order_spec(self):
         order_specs = []
         first = True
@@ -703,7 +758,7 @@ class ExprParser:
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            order = Order(expr = self.expr())
+            order = Order(expr=self.expr())
             if self.cur_token_type_is(TokenType.ORDERBY_ASC):
                 order.direction = Order.ASC
                 self.consume_token(TokenType.ORDERBY_ASC)
@@ -723,58 +778,61 @@ class ExprParser:
             expr_list.append(self.expr())
         return expr_list
 
+
 def parseAndPrintExpr(expr_string, allowRelational=True):
-    print(">>>>>>> parsing:  " + expr_string)
+    print(">>>>>>> parsing:  {0}".format(expr_string))
     p = ExprParser(expr_string, allowRelational)
     print(p.tokens)
     e = p.expr()
     print(e)
-    #print(expr_unparser.expr_to_string(e))
+
 
 def x_test():
     parseAndPrintExpr("name like :name")
     return
-    parseAndPrintExpr("10+1");
-    parseAndPrintExpr("(abc == 1)");
-    parseAndPrintExpr("(func(abc)=1)");
-    parseAndPrintExpr("(abc = \"jess\")");
-    parseAndPrintExpr("(abc = \"with \\\"\")");
-    parseAndPrintExpr("(abc != .10)");
-    parseAndPrintExpr("(abc != \"xyz\")");
-    parseAndPrintExpr("a + b * c + d");
-    parseAndPrintExpr("(a + b) * c + d");
-    parseAndPrintExpr("(field not in ('a',func('b', 2.0),'c'))");
-    parseAndPrintExpr("jess.age between 30 and death");
-    parseAndPrintExpr("a + b * c + d");
-    parseAndPrintExpr("x > 10 and Y >= -20");
-    parseAndPrintExpr("a is true and b is null and C + 1 > 40 and (time = now() or hungry())");
-    parseAndPrintExpr("a + b + -c > 2");
-    parseAndPrintExpr("now () + b + c > 2");
-    parseAndPrintExpr("now () + @b + c > 2");
-    parseAndPrintExpr("now () - interval +2 day > some_other_time() or something_else IS NOT NULL");
-    parseAndPrintExpr("\"two quotes to one\"\"\"");
-    parseAndPrintExpr("'two quotes to one'''");
-    parseAndPrintExpr("'different quote \"'");
-    parseAndPrintExpr("\"different quote '\"");
-    parseAndPrintExpr("`ident`");
-    parseAndPrintExpr("`ident```");
-    parseAndPrintExpr("`ident\"'`");
-    parseAndPrintExpr("now () - interval -2 day");
-    parseAndPrintExpr("? > x and func(?, ?, ?)");
-    parseAndPrintExpr("a > now() + interval (2 + x) MiNuTe");
-    parseAndPrintExpr("a between 1 and 2");
-    parseAndPrintExpr("a not between 1 and 2");
-    parseAndPrintExpr("a in (1,2,a.b(3),4,5,x)");
-    parseAndPrintExpr("a not in (1,2,3,4,5,@x)");
-    parseAndPrintExpr("a like b escape c");
-    parseAndPrintExpr("a not like b escape c");
-    parseAndPrintExpr("(1 + 3) in (3, 4, 5)");
-    parseAndPrintExpr("`a crazy \"function\"``'name'`(1 + 3) in (3, 4, 5)");
-    parseAndPrintExpr("`a crazy \"function\"``'name'`(1 + 3) in (3, 4, 5)");
-    parseAndPrintExpr("a@.b", False);
-    parseAndPrintExpr("a@.b[0][0].c**.d.\"a weird\\\"key name\"", False);
-    parseAndPrintExpr("a@.*", False);
-    parseAndPrintExpr("a@[0].*", False);
-    parseAndPrintExpr("a@**[0].*", False);
+    parseAndPrintExpr("10+1")
+    parseAndPrintExpr("(abc == 1)")
+    parseAndPrintExpr("(func(abc)=1)")
+    parseAndPrintExpr("(abc = \"jess\")")
+    parseAndPrintExpr("(abc = \"with \\\"\")")
+    parseAndPrintExpr("(abc != .10)")
+    parseAndPrintExpr("(abc != \"xyz\")")
+    parseAndPrintExpr("a + b * c + d")
+    parseAndPrintExpr("(a + b) * c + d")
+    parseAndPrintExpr("(field not in ('a',func('b', 2.0),'c'))")
+    parseAndPrintExpr("jess.age between 30 and death")
+    parseAndPrintExpr("a + b * c + d")
+    parseAndPrintExpr("x > 10 and Y >= -20")
+    parseAndPrintExpr("a is true and b is null and C + 1 > 40 and "
+                      "(time = now() or hungry())")
+    parseAndPrintExpr("a + b + -c > 2")
+    parseAndPrintExpr("now () + b + c > 2")
+    parseAndPrintExpr("now () + @b + c > 2")
+    parseAndPrintExpr("now () - interval +2 day > some_other_time() or "
+                      "something_else IS NOT NULL")
+    parseAndPrintExpr("\"two quotes to one\"\"\"")
+    parseAndPrintExpr("'two quotes to one'''")
+    parseAndPrintExpr("'different quote \"'")
+    parseAndPrintExpr("\"different quote '\"")
+    parseAndPrintExpr("`ident`")
+    parseAndPrintExpr("`ident```")
+    parseAndPrintExpr("`ident\"'`")
+    parseAndPrintExpr("now () - interval -2 day")
+    parseAndPrintExpr("? > x and func(?, ?, ?)")
+    parseAndPrintExpr("a > now() + interval (2 + x) MiNuTe")
+    parseAndPrintExpr("a between 1 and 2")
+    parseAndPrintExpr("a not between 1 and 2")
+    parseAndPrintExpr("a in (1,2,a.b(3),4,5,x)")
+    parseAndPrintExpr("a not in (1,2,3,4,5,@x)")
+    parseAndPrintExpr("a like b escape c")
+    parseAndPrintExpr("a not like b escape c")
+    parseAndPrintExpr("(1 + 3) in (3, 4, 5)")
+    parseAndPrintExpr("`a crazy \"function\"``'name'`(1 + 3) in (3, 4, 5)")
+    parseAndPrintExpr("`a crazy \"function\"``'name'`(1 + 3) in (3, 4, 5)")
+    parseAndPrintExpr("a@.b", False)
+    parseAndPrintExpr("a@.b[0][0].c**.d.\"a weird\\\"key name\"", False)
+    parseAndPrintExpr("a@.*", False)
+    parseAndPrintExpr("a@[0].*", False)
+    parseAndPrintExpr("a@**[0].*", False)
 
-#x_test()
+# x_test()
