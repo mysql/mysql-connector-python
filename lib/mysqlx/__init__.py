@@ -31,17 +31,34 @@ from .errors import (Error, Warning, InterfaceError, DatabaseError,
 from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
                      SqlResult)
 from .statement import (Statement, FilterableStatement, SqlStatement,
-                        AddStatement, RemoveStatement, DeleteStatement,
-                        CreateCollectionIndexStatement,
+                        AddStatement, RemoveStatement, ModifyStatement,
+                        SelectStatement, InsertStatement, DeleteStatement,
+                        UpdateStatement, CreateCollectionIndexStatement,
                         DropCollectionIndexStatement)
 from .dbdoc import DbDoc
 
 
 def get_session(settings):
+    """Creates a XSession instance using the provided connection data.
+
+    Args:
+        settings (dict): Connection data used to connect to the database.
+
+    Returns:
+        mysqlx.XSession: XSession object.
+    """
     return XSession(settings)
 
 
 def get_node_session(settings):
+    """Creates a NodeSession instance using the provided connection data.
+
+    Args:
+        settings (dict): Connection data used to connect to the database.
+
+    Returns:
+        mysqlx.XSession: XSession object.
+    """
     return NodeSession(settings)
 
 
@@ -63,6 +80,7 @@ __all__ = [
 
     # mysqlx.statement
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
-    "AddStatement", "RemoveStatement", "DeleteStatement",
+    "AddStatement", "RemoveStatement", "ModifyStatement", "SelectStatement",
+    "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
 ]

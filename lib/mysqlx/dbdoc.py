@@ -25,6 +25,14 @@ import json
 import uuid
 
 class DbDoc(object):
+    """Represents a generic document in JSON format.
+
+    Args:
+        value (object): The value can be a JSON string or a dict.
+
+    Raises:
+        Exception: If ``value`` type is not a basestring or dict.
+    """
     def __init__(self, value):
         # TODO: handle exceptions.  What happens if it doesn't load properly
         if isinstance(value, dict):
