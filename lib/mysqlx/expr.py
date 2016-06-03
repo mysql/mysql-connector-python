@@ -194,6 +194,8 @@ class ExprParser:
         self.tokens = []
         self.pos = 0
         self._allowRelationalColumns = allowRelational
+        self.placeholder_name_to_position = {}
+        self.positional_placeholder_count = 0
         self.lex()
 
     # convencience checker for lexer
@@ -498,13 +500,33 @@ class ExprParser:
     def parse_json_doc(self):
         o = Object()
 
+    def parse_place_holder(self, token):
+        place_holder_name = ""
+        if self.cur_token_type_is(TokenType.LNUM):
+            place_holder_name = self.consume_token(TokenType.LNUM_INT)
+        elif self.cur_token_type_is(TokenType.IDENT):
+            place_holder_name = self.consume_token(TokenType.IDENT)
+        elif token.type == TokenType.EROTEME:
+            place_holder_name = str(self.positional_placeholder_count)
+        else:
+            raise Exception("Invalid placeholder name at token pos " + str(self.pos))
+
+        place_holder_name = place_holder_name.lower()
+        expr = Expr(type=Expr.PLACEHOLDER)
+        if place_holder_name in self.placeholder_name_to_position:
+            expr.position = self.placeholder_name_to_position[place_holder_name]
+        else:
+            expr.position = self.positional_placeholder_count
+            self.placeholder_name_to_position[place_holder_name] = self.positional_placeholder_count
+            self.positional_placeholder_count += 1
+        return expr
+
     def atomic_expr(self):
         """Parse an atomic expression and return a protobuf Expr object"""
         token = self.next_token()
 
         if token.type in [TokenType.EROTEME, TokenType.COLON]:
-            #TODO do this
-            pass
+            return self.parse_place_holder(token)
         elif token.type == TokenType.LCURLY:
             return self.parse_json_doc()
         elif token.type == TokenType.CAST:
@@ -710,7 +732,7 @@ def parseAndPrintExpr(expr_string, allowRelational=True):
     #print(expr_unparser.expr_to_string(e))
 
 def x_test():
-    parseAndPrintExpr("$.age > 28 or $.name = 'Fred'");
+    parseAndPrintExpr("name like :name")
     return
     parseAndPrintExpr("10+1");
     parseAndPrintExpr("(abc == 1)");

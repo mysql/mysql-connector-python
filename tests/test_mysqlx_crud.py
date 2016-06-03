@@ -316,6 +316,27 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(0, len(rows))
 
 
+    def test_parameter_binding(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+
+        ).execute()
+        result = collection.find("age == :age").bind("age", 67).execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual("Betty", docs[0]["name"])
+
+        result = collection.find("$.age = :age").bind('{"age":42}').sort("age DESC, name ASC").execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual("Wilma", docs[0]["name"])
+
+
 @unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):

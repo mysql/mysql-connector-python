@@ -21,7 +21,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-
+import json
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult
 from .expr import ExprParser
@@ -55,13 +55,18 @@ class FilterableStatement(Statement):
         self._has_sort = False
         self._has_group_by = False
         self._has_having = False
+        self._has_bindings = False
+        self._binding_map = {}
+        self._bindings = []
         if condition is not None:
             self.where(condition)
 
     def where(self, condition):
         self._has_where = True
         self._where = condition
-        self._where_expr = ExprParser(condition, not self._doc_based).expr()
+        expr = ExprParser(condition, not self._doc_based)
+        self._where_expr = expr.expr()
+        self._binding_map = expr.placeholder_name_to_position
         return self
 
     def _projection(self, *fields):
@@ -87,6 +92,25 @@ class FilterableStatement(Statement):
     def _having(self, condition):
         self._has_having = True
         self._having = ExprParser(condition, not self._doc_based).expr()
+
+    def bind(self, *args):
+        self._has_bindings = True
+        count = len(args)
+        if count == 1:
+            self._bind_single(args[0])
+        elif count > 2:
+            raise Exception("Invalid number of arguments to bind")
+        else:
+            self._bindings.append( { "name":args[0], "value":args[1] })
+        return self
+
+    def _bind_single(self, object):
+        if isinstance(object, DbDoc):
+            self.bind(str(object))
+        elif isinstance(object, basestring):
+            dict = json.loads(object)
+            for key in dict.keys():
+                self.bind(key,dict[key])
 
     def execute(self):
         raise Exception("This should never be called")

@@ -118,9 +118,23 @@ class Protocol(object):
             if msg.__class__ is MySQLx.Error:
                 raise Exception(msg.msg)
 
+    def get_binding_scalars(self, statement):
+        count = len(statement._binding_map)
+        scalars = count * [None]
+
+        for binding in statement._bindings:
+            name = binding["name"]
+            if not name in statement._binding_map:
+                raise Exception("Unable to find placeholder for parameter " + name)
+            pos = statement._binding_map[name]
+            scalars[pos] = self.arg_object_to_scalar(binding["value"], not statement._doc_based)
+        return scalars
+
     def _apply_filter(self, message, statement):
         if statement._has_where:
             message.criteria.CopyFrom(statement._where_expr)
+        if statement._has_bindings:
+            message.args.extend(self.get_binding_scalars(statement))
         if statement._has_limit:
             message.limit.row_count = statement._limit_row_count
             message.limit.offset = statement._limit_offset
@@ -284,3 +298,6 @@ class Protocol(object):
         elif isinstance(value, DbDoc):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(str(value)))
         raise Exception("Unsupported type: " + str(type(value)))
+
+    def arg_object_to_scalar(self, value, allow_relational):
+        return self.arg_object_to_expr(value, allow_relational).literal
