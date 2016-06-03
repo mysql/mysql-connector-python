@@ -24,6 +24,7 @@
 import json
 import uuid
 
+
 class DbDoc(object):
     """Represents a generic document in JSON format.
 
@@ -34,7 +35,7 @@ class DbDoc(object):
         Exception: If ``value`` type is not a basestring or dict.
     """
     def __init__(self, value):
-        # TODO: handle exceptions.  What happens if it doesn't load properly
+        # TODO: Handle exceptions. What happens if it doesn't load properly?
         if isinstance(value, dict):
             self.__dict__ = value
         elif isinstance(value, basestring):
@@ -54,4 +55,3 @@ class DbDoc(object):
 
     def __str__(self):
         return json.dumps(self.__dict__)
-        #return str(self.__dict__)

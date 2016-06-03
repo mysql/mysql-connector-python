@@ -21,9 +21,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .statement import (FindStatement, AddStatement, RemoveStatement, ModifyStatement,
-                        SelectStatement, InsertStatement, DeleteStatement, UpdateStatement,
-                        CreateCollectionIndexStatement, DropCollectionIndexStatement)
+from .statement import (FindStatement, AddStatement, RemoveStatement,
+                        ModifyStatement, SelectStatement, InsertStatement,
+                        DeleteStatement, UpdateStatement,
+                        CreateCollectionIndexStatement,
+                        DropCollectionIndexStatement)
 
 
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
@@ -259,7 +261,7 @@ class Collection(DatabaseObject):
             mysqlx.RemoveStatement: RemoveStatement object.
         """
         rs = RemoveStatement(self)
-        if not condition == None:
+        if condition:
             rs.where(condition)
         return rs
 

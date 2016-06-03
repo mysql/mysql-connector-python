@@ -24,8 +24,10 @@
 from .protobuf.mysqlx_datatypes_pb2 import *
 from .protobuf.mysqlx_expr_pb2 import *
 
+
 def escape_literal(string):
     return string.replace('"', '""')
+
 
 def scalar_to_string(s):
     if s.type == Scalar.V_SINT:
@@ -38,21 +40,23 @@ def scalar_to_string(s):
         else:
             return "FALSE"
     elif s.type == Scalar.V_STRING:
-        return "\"" +  escape_literal(s.v_string.value) + "\""
+        return '"{0}"'.format(escape_literal(s.v_string.value))
     elif s.type == Scalar.V_NULL:
         return "NULL"
     else:
-        raise StandardError("Unknown type tag: " + str(s.type))
+        raise StandardError("Unknown type tag: {0}".format(s.type))
+
 
 def column_identifier_to_string(id):
     s = quote_identifier(id.name)
     if id.HasField("table_name"):
-        s = quote_identifier(id.table_name) + "." + s
+        s = "{0}.{1}".format(quote_identifier(id.table_name), s)
     if id.HasField("schema_name"):
-        s = quote_identifier(id.schema_name) + "." + s
-#    if id.HasField("document_path"):
- #       s = s + "@" + id.document_path
+        s = "{0}.{1}".format(quote_identifier(id.schema_name), s)
+    # if id.HasField("document_path"):
+    #     s = "{0}@{1}".format(s, id.document_path)
     return s
+
 
 def function_call_to_string(fc):
     s = quote_identifier(fc.name.name) + "("
@@ -75,27 +79,36 @@ def operator_to_string(op):
                 s = s + ", "
         return s + ")"
     elif op.name == "INTERVAL":
-        return "INTERVAL " + expr_to_string(ps[0]) + " " + expr_to_string(ps[1]).replace('"', '')
+        return ("INTERVAL {0} {1}"
+                "".format(expr_to_string(ps[0]),
+                          expr_to_string(ps[1]).replace('"', '')))
     elif op.name == "BETWEEN":
-        return expr_to_string(ps[0]) + " BETWEEN " + expr_to_string(ps[1]) + " AND " + expr_to_string(ps[2])
+        return "{0} BETWEEN {1} AND {2}".format(expr_to_string(ps[0]),
+                                                expr_to_string(ps[1]),
+                                                expr_to_string(ps[2]))
     elif op.name == "LIKE" and len(ps) == 3:
-        return expr_to_string(ps[0]) + " LIKE " + expr_to_string(ps[1]) + " ESCAPE " + expr_to_string(ps[2])
+        return "{0} LIKE {1} ESCAPE {2}".format(expr_to_string(ps[0]),
+                                                expr_to_string(ps[1]),
+                                                expr_to_string(ps[2]))
     elif len(ps) == 2:
-        return "(" + expr_to_string(ps[0]) + " " + op.name + " " + expr_to_string(ps[1]) + ")"
+        return "{0} {1} {2}".format(expr_to_string(ps[0]), op.name,
+                                    expr_to_string(ps[1]))
     elif len(ps) == 1:
         if len(op.name) == 1:
-            return op.name + expr_to_string(ps[0])
+            return "{0}{1}".format(op.name, expr_to_string(ps[0]))
         else:
             # something like NOT
-            return op.name + " (" + expr_to_string(ps[0]) + ")"
+            return "{0} ({1})".format(op.name, expr_to_string(ps[0]))
     else:
-        raise StandardError("Unknown operator structure: " + str(op))
+        raise StandardError("Unknown operator structure: {0}".format(op))
+
 
 def quote_identifier(id):
     if "`" in id or '"' in id or "'" in id or "@" in id or "." in id:
-        return "`" + id.replace("`", "``") + "`"
+        return "`{0}`".format(id.replace("`", "``"))
     else:
         return id
+
 
 def expr_to_string(e):
     if e.type == Expr.LITERAL:
@@ -107,6 +120,6 @@ def expr_to_string(e):
     elif e.type == Expr.OPERATOR:
         return operator_to_string(e.operator)
     elif e.type == Expr.VARIABLE:
-        return "@" + quote_identifier(e.variable)
+        return "@{0}".format(quote_identifier(e.variable))
     else:
-        raise StandardError("Unknown expression type: " + str(e.type))
+        raise StandardError("Unknown expression type: {0}".format(e.type))

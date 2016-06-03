@@ -31,9 +31,11 @@ from .protobuf import mysqlx_datatypes_pb2 as MySQLxDatatypes
 from .protobuf import mysqlx_resultset_pb2 as MySQLxResultset
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .protobuf import mysqlx_expr_pb2 as MySQLxExpr
-from .result import *
-from .statement import *
-from .expr import *
+from .result import ColumnMetaData
+from .dbdoc import DbDoc
+from .expr import (Expr, ExprParser, Find, UpdateOperation, build_int_scalar,
+                   build_string_scalar, build_bool_scalar, build_double_scalar)
+
 
 _SERVER_MESSAGES = [
     (MySQLx.ServerMessages.SESS_AUTHENTICATE_CONTINUE,
@@ -47,7 +49,8 @@ _SERVER_MESSAGES = [
      MySQLxResultset.ColumnMetaData),
     (MySQLx.ServerMessages.RESULTSET_ROW, MySQLxResultset.Row),
     (MySQLx.ServerMessages.RESULTSET_FETCH_DONE, MySQLxResultset.FetchDone),
-    (MySQLx.ServerMessages.RESULTSET_FETCH_DONE_MORE_RESULTSETS, MySQLxResultset.FetchDoneMoreResultsets),
+    (MySQLx.ServerMessages.RESULTSET_FETCH_DONE_MORE_RESULTSETS,
+     MySQLxResultset.FetchDoneMoreResultsets),
 ]
 
 
@@ -57,12 +60,12 @@ class MessageReaderWriter(object):
         self._msg = None
 
     def push_message(self, msg):
-        if not self._msg == None:
+        if self._msg is not None:
             raise Exception("message push slot is full")
         self._msg = msg
 
     def read_message(self):
-        if not self._msg == None:
+        if self._msg is not None:
             m = self._msg
             self._msg = None
             return m
@@ -113,9 +116,9 @@ class Protocol(object):
     def read_auth_ok(self):
         while True:
             msg = self._reader.read_message()
-            if msg.__class__ is MySQLxSession.AuthenticateOk:
+            if isinstance(msg, MySQLxSession.AuthenticateOk):
                 break
-            if msg.__class__ is MySQLx.Error:
+            if isinstance(msg, MySQLx.Error):
                 raise Exception(msg.msg)
 
     def _apply_filter(self, message, statement):
@@ -132,9 +135,10 @@ class Protocol(object):
             message.grouping_criteria.CopyFrom(statement._having)
 
     def send_find(self, stmt):
-        find = Find(
-            data_model=MySQLxCrud.DOCUMENT if stmt._doc_based else MySQLxCrud.TABLE,
-            collection=MySQLxCrud.Collection(name=stmt.target.name, schema=stmt.schema.name))
+        find = Find(data_model=(MySQLxCrud.DOCUMENT
+                                if stmt._doc_based else MySQLxCrud.TABLE),
+                    collection=MySQLxCrud.Collection(name=stmt.target.name,
+                                                     schema=stmt.schema.name))
         if stmt._has_projection:
             find.projection.extend(stmt._projection_expr)
         self._apply_filter(find, stmt)
@@ -142,21 +146,27 @@ class Protocol(object):
 
     def send_update(self, statement):
         update = MySQLxCrud.Update(
-            data_model=MySQLxCrud.DOCUMENT if statement._doc_based else MySQLxCrud.TABLE,
-            collection=MySQLxCrud.Collection(name=statement.target.name, schema=statement.schema.name))
+            data_model=(MySQLxCrud.DOCUMENT
+                        if statement._doc_based else MySQLxCrud.TABLE),
+            collection=MySQLxCrud.Collection(name=statement.target.name,
+                                             schema=statement.schema.name))
         self._apply_filter(update, statement)
         for update_op in statement._update_ops:
-            opexpr = UpdateOperation(operation=update_op.update_type, source=update_op.source)
-            if update_op.value != None:
-                opexpr.value.CopyFrom(self.arg_object_to_expr(update_op.value, not statement._doc_based))
+            opexpr = UpdateOperation(operation=update_op.update_type,
+                                     source=update_op.source)
+            if update_op.value is not None:
+                opexpr.value.CopyFrom(
+                    self.arg_object_to_expr(
+                        update_op.value, not statement._doc_based))
             update.operation.extend([opexpr])
         self._writer.write_message(MySQLx.ClientMessages.CRUD_UPDATE, update)
 
-
     def send_delete(self, stmt):
         delete = MySQLxCrud.Delete(
-            data_model=MySQLxCrud.DOCUMENT if stmt._doc_based else MySQLxCrud.TABLE,
-            collection=MySQLxCrud.Collection(name=stmt.target.name, schema=stmt.schema.name))
+            data_model=(MySQLxCrud.DOCUMENT
+                        if stmt._doc_based else MySQLxCrud.TABLE),
+            collection=MySQLxCrud.Collection(name=stmt.target.name,
+                                             schema=stmt.schema.name))
         self._apply_filter(delete, stmt)
         self._writer.write_message(MySQLx.ClientMessages.CRUD_DELETE, delete)
 
@@ -164,30 +174,34 @@ class Protocol(object):
         stmt = MySQLxSQL.StmtExecute(namespace=namespace, stmt=stmt,
                                      compact_metadata=False)
         for arg in args:
-            v = self._create_any(arg)
-            stmt.args.extend([v])
+            value = self._create_any(arg)
+            stmt.args.extend([value])
         self._writer.write_message(MySQLx.ClientMessages.SQL_STMT_EXECUTE,
                                    stmt)
 
     def send_insert(self, statement):
         insert = MySQLxCrud.Insert(
-            data_model=MySQLxCrud.DOCUMENT if statement._doc_based else MySQLxCrud.TABLE,
-            collection=MySQLxCrud.Collection(name=statement.target.name, schema=statement.schema.name))
-        if hasattr(statement, '_fields'):
+            data_model=(MySQLxCrud.DOCUMENT
+                        if statement._doc_based else MySQLxCrud.TABLE),
+            collection=MySQLxCrud.Collection(name=statement.target.name,
+                                             schema=statement.schema.name))
+        if hasattr(statement, "_fields"):
             for field in statement._fields:
-                insert.projection.extend([ExprParser(field, not statement._doc_based).parse_table_insert_field()])
+                insert.projection.extend([
+                    ExprParser(field, not statement._doc_based)
+                    .parse_table_insert_field()])
         for value in statement._values:
             row = MySQLxCrud.Insert.TypedRow()
             if isinstance(value, list):
-                for v in value:
-                    o = self.arg_object_to_expr(v, not statement._doc_based)
-                    row.field.extend([o])
+                for val in value:
+                    obj = self.arg_object_to_expr(
+                        val, not statement._doc_based)
+                    row.field.extend([obj])
             else:
-                o = self.arg_object_to_expr(value, not statement._doc_based)
-                row.field.extend([o])
+                obj = self.arg_object_to_expr(value, not statement._doc_based)
+                row.field.extend([obj])
             insert.row.extend([row])
         self._writer.write_message(MySQLx.ClientMessages.CRUD_INSERT, insert)
-
 
     def _create_any(self, arg):
         if isinstance(arg, (str, unicode,)):
@@ -202,12 +216,12 @@ class Protocol(object):
 
     def close_result(self, rs):
         msg = self._read_message(rs)
-        if not msg == None:
+        if msg is not None:
             raise Exception("Expected to close the result")
 
     def read_row(self, rs):
         msg = self._read_message(rs)
-        if msg == None:
+        if msg is None:
             return None
         if isinstance(msg, MySQLxResultset.Row):
             return msg
@@ -218,14 +232,16 @@ class Protocol(object):
         if msg.type == 1:
             warningMsg = MySQLxNotice.Warning()
             warningMsg.ParseFromString(msg.payload)
-            rs._warnings.append(Warning(warningMsg.level, warningMsg.code, warningMsg.msg))
+            rs._warnings.append(Warning(warningMsg.level, warningMsg.code,
+                                        warningMsg.msg))
         elif msg.type == 2:
             sessVarMsg = MySQLxNotice.SessionVariableChanged()
             sessVarMsg.ParseFromString(msg.payload)
         elif msg.type == 3:
             sessStateMsg = MySQLxNotice.SessionStateChanged()
             sessStateMsg.ParseFromString(msg.payload)
-            if sessStateMsg.param == MySQLxNotice.SessionStateChanged.ROWS_AFFECTED:
+            if sessStateMsg.param == \
+               MySQLxNotice.SessionStateChanged.ROWS_AFFECTED:
                 rs._rows_affected = sessStateMsg.value.v_unsigned_int
 
     def _read_message(self, rs):
@@ -247,40 +263,45 @@ class Protocol(object):
 
     def get_column_metadata(self, rs):
         columns = []
-        while (True):
+        while True:
             msg = self._read_message(rs)
-            if msg == None:
+            if msg is None:
                 break
             if isinstance(msg, MySQLxResultset.Row):
                 self._reader.push_message(msg)
-                break;
+                break
             if not isinstance(msg, MySQLxResultset.ColumnMetaData):
                 raise Exception("Unexpected msg type")
             col = ColumnMetaData(msg.type, msg.catalog, msg.schema, msg.table,
-                         msg.original_table, msg.name, msg.original_name,
-                         msg.length, msg.collation, msg.fractional_digits,
-                         msg.flags)
+                                 msg.original_table, msg.name,
+                                 msg.original_name, msg.length, msg.collation,
+                                 msg.fractional_digits, msg.flags)
             columns.append(col)
         return columns
 
     def arg_object_to_expr(self, value, allow_relational):
-        if value == None:
+        if value is None:
             return Expr.build_null_scalar()
-        #value_type = type(value)
         if isinstance(value, bool):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_bool_scalar(value))
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                   literal=build_bool_scalar(value))
         elif isinstance(value, (int, long)):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_int_scalar(value))
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                   literal=build_int_scalar(value))
         elif isinstance(value, (float)):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_double_scalar(value))
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                   literal=build_double_scalar(value))
         elif isinstance(value, basestring):
             try:
                 expression = ExprParser(value, allow_relational).expr()
                 if expression.has_identifier():
-                    return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(value))
+                    return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                           literal=build_string_scalar(value))
                 return expression
-            except Exception as e:
-                return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(value))
+            except:
+                return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                       literal=build_string_scalar(value))
         elif isinstance(value, DbDoc):
-            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL, literal=build_string_scalar(str(value)))
-        raise Exception("Unsupported type: " + str(type(value)))
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                   literal=build_string_scalar(str(value)))
+        raise Exception("Unsupported type: {0}".format(type(value)))
