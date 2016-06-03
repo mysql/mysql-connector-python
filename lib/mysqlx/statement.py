@@ -21,11 +21,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+"""Implementation of Statements."""
+
 import json
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult
 from .expr import ExprParser
 from .dbdoc import DbDoc
+
 
 class Statement(object):
     """Provides base functionality for statement objects.
@@ -103,7 +106,9 @@ class FilterableStatement(Statement):
 
     def _projection(self, *fields):
         self._has_projection = True
-        self._projection_expr = ExprParser(",".join(fields), not self._doc_based).parse_table_select_projection()
+        self._projection_expr = ExprParser(
+            ",".join(fields),
+            not self._doc_based).parse_table_select_projection()
         return self
 
     def limit(self, row_count, offset=0):
@@ -125,12 +130,14 @@ class FilterableStatement(Statement):
             *sort_clauses: The expression strings defining the sort criteria.
         """
         self._has_sort = True
-        self._sort_expr = ExprParser(",".join(sort_clauses), not self._doc_based).parse_order_spec()
+        self._sort_expr = ExprParser(",".join(sort_clauses),
+                                     not self._doc_based).parse_order_spec()
         return self
 
     def _group_by(self, *fields):
         self._has_group_by = True
-        self._grouping = ExprParser(",".join(fields), not self._doc_based).parse_expr_list()
+        self._grouping = ExprParser(",".join(fields),
+                                    not self._doc_based).parse_expr_list()
 
     def _having(self, condition):
         self._has_having = True
@@ -161,7 +168,7 @@ class FilterableStatement(Statement):
         Raises:
            NotImplementedError: This method must be implemented.
         """
-        raise Exception("This should never be called")
+        raise NotImplementedError
 
 
 class SqlStatement(Statement):
@@ -222,22 +229,25 @@ class AddStatement(Statement):
             doc.ensure_id()
         return self._connection.send_insert(self)
 
+
 class UpdateSpec(object):
-    def __init__(self, type, source, value=None):
-        if type == MySQLxCrud.UpdateOperation.SET:
+    def __init__(self, update_type, source, value=None):
+        if update_type == MySQLxCrud.UpdateOperation.SET:
             self._table_set(source, value)
         else:
-            self.update_type = type
+            self.update_type = update_type
             self.source = source
             if len(source) > 0 and source[0] == '$':
                 self.source = source[1:]
-            self.source = ExprParser(self.source, False).document_field().identifier
+            self.source = ExprParser(self.source,
+                                     False).document_field().identifier
             self.value = value
 
     def _table_set(self, source, value):
         self.update_type = MySQLxCrud.UpdateOperation.SET
         self.source = ExprParser(source, True).parse_table_update_field()
         self.value = value
+
 
 class ModifyStatement(FilterableStatement):
     """A statement for document update operations on a Collection.
@@ -248,7 +258,8 @@ class ModifyStatement(FilterableStatement):
                                    documents to be updated.
     """
     def __init__(self, collection, condition=None):
-        super(ModifyStatement, self).__init__(target=collection, condition=condition)
+        super(ModifyStatement, self).__init__(target=collection,
+                                              condition=condition)
         self._update_ops = []
 
     def set(self, doc_path, value):
@@ -261,7 +272,8 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_SET, doc_path, value))
+        self._update_ops.append(
+            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_SET, doc_path, value))
         return self
 
     def change(self, doc_path, value):
@@ -275,7 +287,9 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REPLACE, doc_path, value))
+        self._update_ops.append(
+            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REPLACE, doc_path,
+                       value))
         return self
 
     def unset(self, doc_path):
@@ -288,7 +302,8 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, doc_path))
+        self._update_ops.append(
+            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, doc_path))
         return self
 
     def array_insert(self, field, value):
@@ -303,7 +318,8 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.ARRAY_INSERT, field, value))
+        self._update_ops.append(
+            UpdateSpec(MySQLxCrud.UpdateOperation.ARRAY_INSERT, field, value))
         return self
 
     def array_append(self, doc_path, value):
@@ -319,7 +335,9 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.UpdateType.ARRAY_APPEND, doc_path, value))
+        self._update_ops.append(
+            UpdateSpec(MySQLxCrud.UpdateOperation.UpdateType.ARRAY_APPEND,
+                       doc_path, value))
         return self
 
     def execute(self):
@@ -466,6 +484,7 @@ class InsertStatement(Statement):
         """
         return self._connection.send_insert(self)
 
+
 class UpdateStatement(FilterableStatement):
     """A statement for record update operations on a Table.
 
@@ -484,7 +503,8 @@ class UpdateStatement(FilterableStatement):
             field (string): The column name to be updated.
             value (object): The value to be set on the specified column.
         """
-        self._update_ops.append(UpdateSpec(MySQLxCrud.UpdateOperation.SET, field, value))
+        self._update_ops.append(
+            UpdateSpec(MySQLxCrud.UpdateOperation.SET, field, value))
         return self
 
     def execute(self):
@@ -524,8 +544,8 @@ class DeleteStatement(FilterableStatement):
     """
     def __init__(self, table, condition=None):
         super(DeleteStatement, self).__init__(target=table,
-                                                   condition=condition,
-                                                   doc_based=False)
+                                              condition=condition,
+                                              doc_based=False)
 
     def execute(self):
         """Execute the statement.

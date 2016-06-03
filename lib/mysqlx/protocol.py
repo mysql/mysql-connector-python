@@ -21,6 +21,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+"""Implementation of the X protocol for MySQL servers."""
+
 import struct
 
 from .protobuf import mysqlx_pb2 as MySQLx

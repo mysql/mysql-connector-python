@@ -21,12 +21,16 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+"""Implementation of the Result Set classes."""
+
 import decimal
 import struct
 import sys
 
 from datetime import datetime, timedelta
+
 from .dbdoc import DbDoc
+
 
 def from_protobuf(col_type, payload):
     if len(payload) == 0:
@@ -69,7 +73,7 @@ def double_from_protobuf(payload):
 
 def varint_from_protobuf_stream(payload):
     if len(payload) == 0:
-        raise ValueError("payload is empty")
+        raise ValueError("Payload is empty")
 
     cur = 0
     i = 0
@@ -86,13 +90,13 @@ def varint_from_protobuf_stream(payload):
         cur += 1
         shift += 7
 
-    raise EOFError("payload too short")
+    raise EOFError("Payload too short")
 
 
 def varint_from_protobuf(payload):
     i, payload = varint_from_protobuf_stream(payload)
     if len(payload) != 0:
-        raise ValueError("payload too long")
+        raise ValueError("Payload too long")
 
     return i
 
@@ -100,7 +104,7 @@ def varint_from_protobuf(payload):
 def varsint_from_protobuf(payload):
     i, payload = varint_from_protobuf_stream(payload)
     if len(payload) != 0:
-        raise ValueError("payload too long")
+        raise ValueError("Payload too long")
 
     # Zigzag encoded, revert it
     if i & 0x1:
@@ -122,7 +126,7 @@ def set_from_protobuf(payload):
                 if len(payload) == 0 and field_len == 1 and len(s) == 0:
                     # Special case for empty set
                     return []
-                raise ValueError("invalid Set encoding")
+                raise ValueError("Invalid Set encoding")
 
             s.append(payload[:field_len])
             payload = payload[field_len:]
@@ -397,6 +401,7 @@ class ColumnMetaData(object):
         # TODO: To implement
         raise NotImplementedError
 
+
 class Warning(object):
     def __init__(self, level, code, msg):
         self._level = level
@@ -433,8 +438,9 @@ class Row(object):
         if int_index >= len(self._fields):
             raise Exception("Argument out of range")
         if int_index == -1:
-            raise Exception("Column name '" + str_index + "' not found")
+            raise Exception("Column name '{0}' not found".format(str_index))
         return str(self._fields[int_index])
+
 
 class BaseResult(object):
     def __init__(self, connection):
@@ -443,7 +449,7 @@ class BaseResult(object):
         self._closed = False
         self._rows_affected = 0
         self._warnings = []
-        if connection._active_result != None:
+        if connection._active_result is not None:
             connection._active_result.fetch_all()
             connection._active_result = None
 
@@ -453,6 +459,7 @@ class BaseResult(object):
 
     def get_warnings_count(self):
         return len(self._warnings)
+
 
 class Result(BaseResult):
     def __init__(self, connection):
@@ -467,6 +474,7 @@ class Result(BaseResult):
     def get_autoincrement_value(self):
         pass
 
+
 class BufferingResult(BaseResult):
     def __init__(self, connection):
         super(BufferingResult, self).__init__(connection)
@@ -478,7 +486,7 @@ class BufferingResult(BaseResult):
         self._items = []
         self._page_size = 20
         self._position = -1
-        self._connection._active_result = self if self._has_more_data == True else None
+        self._connection._active_result = self if self._has_more_data else None
 
     @property
     def count(self):
@@ -520,10 +528,11 @@ class BufferingResult(BaseResult):
         return count
 
     def fetch_all(self):
-        while (True):
+        while True:
             if not self._page_in_items():
                 break
         return self._items
+
 
 class RowResult(BufferingResult):
     def __init__(self, connection):
@@ -533,17 +542,19 @@ class RowResult(BufferingResult):
     def columns(self):
         return self._columns
 
+
 class SqlResult(RowResult):
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
         self._has_more_results = False
 
     def next_result(self):
-        if self._closed == True:
+        if self._closed:
             return False
         self._has_more_results = False
         self._init_result()
         return True
+
 
 class DocResult(BufferingResult):
     def __init__(self, connection):
@@ -554,4 +565,3 @@ class DocResult(BufferingResult):
         if row is None:
             return None
         return DbDoc(row[0])
-
