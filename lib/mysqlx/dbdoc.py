@@ -43,7 +43,7 @@ class DbDoc(object):
         elif isinstance(value, basestring):
             self.__dict__ = json.loads(value)
         else:
-            raise Exception("Unable to handle type: ".format(type(value)))
+            raise ValueError("Unable to handle type: ".format(type(value)))
 
     def __getitem__(self, index):
         return self.__dict__[index]

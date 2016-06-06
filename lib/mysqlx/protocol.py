@@ -37,6 +37,7 @@ from .result import ColumnMetaData
 from .dbdoc import DbDoc
 from .expr import (Expr, ExprParser, Find, UpdateOperation, build_int_scalar,
                    build_string_scalar, build_bool_scalar, build_double_scalar)
+from .errors import InterfaceError, OperationalError, ProgrammingError
 
 
 _SERVER_MESSAGES = [
@@ -63,7 +64,7 @@ class MessageReaderWriter(object):
 
     def push_message(self, msg):
         if self._msg is not None:
-            raise Exception("message push slot is full")
+            raise OperationalError("Message push slot is full")
         self._msg = msg
 
     def read_message(self):
@@ -84,7 +85,7 @@ class MessageReaderWriter(object):
                 msg.ParseFromString(payload)
                 return msg
 
-        raise Exception("Unknown msg_type: {0}".format(msg_type))
+        raise ValueError("Unknown msg_type: {0}".format(msg_type))
 
     def write_message(self, msg_id, msg):
         msg_str = msg.SerializeToString()
@@ -106,8 +107,8 @@ class Protocol(object):
     def read_auth_continue(self):
         msg = self._reader.read_message()
         if not isinstance(msg, MySQLxSession.AuthenticateContinue):
-            raise Exception("Unexpected message encountered during "
-                            "authentication handshake")
+            raise InterfaceError("Unexpected message encountered during "
+                                 "authentication handshake")
         return msg.auth_data
 
     def send_auth_continue(self, data):
@@ -121,7 +122,7 @@ class Protocol(object):
             if isinstance(msg, MySQLxSession.AuthenticateOk):
                 break
             if isinstance(msg, MySQLx.Error):
-                raise Exception(msg.msg)
+                raise InterfaceError(msg.msg)
 
     def get_binding_scalars(self, statement):
         count = len(statement._binding_map)
@@ -129,10 +130,12 @@ class Protocol(object):
 
         for binding in statement._bindings:
             name = binding["name"]
-            if not name in statement._binding_map:
-                raise Exception("Unable to find placeholder for parameter " + name)
+            if name not in statement._binding_map:
+                raise ProgrammingError("Unable to find placeholder for "
+                                       "parameter: {0}".format(name))
             pos = statement._binding_map[name]
-            scalars[pos] = self.arg_object_to_scalar(binding["value"], not statement._doc_based)
+            scalars[pos] = self.arg_object_to_scalar(binding["value"],
+                                                     not statement._doc_based)
         return scalars
 
     def _apply_filter(self, message, statement):
@@ -233,7 +236,7 @@ class Protocol(object):
     def close_result(self, rs):
         msg = self._read_message(rs)
         if msg is not None:
-            raise Exception("Expected to close the result")
+            raise OperationalError("Expected to close the result")
 
     def read_row(self, rs):
         msg = self._read_message(rs)
@@ -264,7 +267,7 @@ class Protocol(object):
         while True:
             msg = self._reader.read_message()
             if isinstance(msg, MySQLx.Error):
-                raise Exception(msg.msg)
+                raise OperationalError(msg.msg)
             elif isinstance(msg, MySQLxNotice.Frame):
                 self._process_frame(msg, rs)
             elif isinstance(msg, MySQLxSQL.StmtExecuteOk):
@@ -287,7 +290,7 @@ class Protocol(object):
                 self._reader.push_message(msg)
                 break
             if not isinstance(msg, MySQLxResultset.ColumnMetaData):
-                raise Exception("Unexpected msg type")
+                raise InterfaceError("Unexpected msg type")
             col = ColumnMetaData(msg.type, msg.catalog, msg.schema, msg.table,
                                  msg.original_table, msg.name,
                                  msg.original_name, msg.length, msg.collation,
@@ -320,7 +323,7 @@ class Protocol(object):
         elif isinstance(value, DbDoc):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
                                    literal=build_string_scalar(str(value)))
-        raise Exception("Unsupported type: {0}".format(type(value)))
+        raise InterfaceError("Unsupported type: {0}".format(type(value)))
 
     def arg_object_to_scalar(self, value, allow_relational):
         return self.arg_object_to_expr(value, allow_relational).literal

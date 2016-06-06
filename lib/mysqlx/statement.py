@@ -24,10 +24,12 @@
 """Implementation of Statements."""
 
 import json
-from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
-from .result import SqlResult
+
+from .errors import ProgrammingError
 from .expr import ExprParser
 from .dbdoc import DbDoc
+from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
+from .result import SqlResult
 
 
 class Statement(object):
@@ -149,9 +151,9 @@ class FilterableStatement(Statement):
         if count == 1:
             self._bind_single(args[0])
         elif count > 2:
-            raise Exception("Invalid number of arguments to bind")
+            raise ProgrammingError("Invalid number of arguments to bind")
         else:
-            self._bindings.append( { "name":args[0], "value":args[1] })
+            self._bindings.append({"name": args[0], "value": args[1]})
         return self
 
     def _bind_single(self, object):
@@ -160,7 +162,7 @@ class FilterableStatement(Statement):
         elif isinstance(object, basestring):
             dict = json.loads(object)
             for key in dict.keys():
-                self.bind(key,dict[key])
+                self.bind(key, dict[key])
 
     def execute(self):
         """Execute the statement.

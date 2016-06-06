@@ -222,7 +222,7 @@ class ExprParser:
                                           self.string[pos] == "."):
             if self.string[pos] == ".":
                 if found_dot is True:
-                    raise Exception("Invalid number. Found multiple '.'")
+                    raise ValueError("Invalid number. Found multiple '.'")
                 found_dot = True
             # technically we allow more than one "." and let float()'s parsing
             # complain later
@@ -264,8 +264,8 @@ class ExprParser:
                 val = val + c
             i = i + 1
         if i >= len(self.string) or self.string[i] != quote_char:
-            raise StandardError("Unterminated quoted string starting at {0}"
-                                "".format(start))
+            raise ValueError("Unterminated quoted string starting at {0}"
+                             "".format(start))
         if quote_char == "`":
             return Token(TokenType.IDENT, val, len(val)+2)
         else:
@@ -361,18 +361,18 @@ class ExprParser:
             elif c == '"' or c == "'" or c == "`":
                 token = self.lex_quoted_token(i)
             else:
-                raise StandardError("Unknown character at {0}".format(i))
+                raise ValueError("Unknown character at {0}".format(i))
             self.tokens.append(token)
             i += token.len
 
     def assert_cur_token(self, type):
         if self.pos >= len(self.tokens):
-            raise StandardError("Expected token type {0} at pos {1} but no "
-                                "tokens left".format(type, self.pos))
+            raise ValueError("Expected token type {0} at pos {1} but no "
+                             "tokens left".format(type, self.pos))
         if self.tokens[self.pos].type != type:
-            raise StandardError("Expected token type {0} at pos {1} but found "
-                                "type {2}".format(type, self.pos,
-                                                  self.tokens[self.pos]))
+            raise ValueError("Expected token type {0} at pos {1} but found "
+                             "type {2}".format(type, self.pos,
+                                               self.tokens[self.pos]))
 
     def cur_token_type_is(self, type):
         return self.pos_token_type_is(self.pos, type)
@@ -426,16 +426,16 @@ class ExprParser:
 
         if token.type == TokenType.IDENT:
             if token.val.startswith('`') and token.val.endswith('`'):
-                raise Exception("{0} is not a valid JSON/ECMAScript identifier"
-                                "".format(token.value))
+                raise ValueError("{0} is not a valid JSON/ECMAScript "
+                                 "identifier".format(token.value))
             self.consume_token(TokenType.IDENT)
             memberName = token.val
         elif self.token.type == TokenType.LSTRING:
             self.consume_token(TokenType.LSTRING)
             memberName = token.val
         else:
-            raise StandardError("Expected token type IDENT or LSTRING in JSON "
-                                "path at token pos {0}".format(self.pos))
+            raise ValueError("Expected token type IDENT or LSTRING in JSON "
+                             "path at token pos {0}".format(self.pos))
         item = DocumentPathItem(type=DocumentPathItem.MEMBER, value=memberName)
         return item
 
@@ -447,14 +447,14 @@ class ExprParser:
         elif self.cur_token_type_is(TokenType.LNUM):
             v = int(self.consume_token(TokenType.LNUM))
             if v < 0:
-                raise StandardError("Array index cannot be negative at {0}"
-                                    "".format(self.pos))
+                raise IndexError("Array index cannot be negative at {0}"
+                                 "".format(self.pos))
             self.consume_token(TokenType.RSQBRACKET)
             return "[" + str(v) + "]"
         else:
-            raise StandardError("Exception token type MUL or LNUM in JSON "
-                                "path array index at token pos "
-                                "".format(self.pos))
+            raise ValueError("Exception token type MUL or LNUM in JSON "
+                             "path array index at token pos {0}"
+                             "".format(self.pos))
 
     def document_field(self):
         col = ColumnIdentifier()
@@ -489,8 +489,8 @@ class ExprParser:
         items = len(docpath)
         if items > 0 and docpath[items-1].type == \
            DocumentPathItem.DOUBLE_ASTERISK:
-            raise StandardError("JSON path may not end in '**' at {0}"
-                                "".format(self.pos))
+            raise ValueError("JSON path may not end in '**' at {0}"
+                             "".format(self.pos))
         return docpath
 
     def column_identifier(self):
@@ -500,8 +500,8 @@ class ExprParser:
             self.consume_token(TokenType.DOT)
             parts.append(self.consume_token(TokenType.IDENT))
         if len(parts) > 3:
-            raise StandardError("Too many parts to identifier at {0}"
-                                "".format(self.pos))
+            raise ValueError("Too many parts to identifier at {0}"
+                             "".format(self.pos))
         parts.reverse()
         colid = ColumnIdentifier()
         # clever way to apply them to the struct
@@ -522,7 +522,7 @@ class ExprParser:
 
     def next_token(self):
         if (self.pos >= len(self.tokens)):
-            raise Exception("Unexpected end of token stream")
+            raise ValueError("Unexpected end of token stream")
         t = self.tokens[self.pos]
         self.pos += 1
         return t
@@ -530,7 +530,7 @@ class ExprParser:
     def expect_token(self, token_type):
         t = self.next_token()
         if t.type != token_type:
-            raise Exception("Expected token type " + str(token_type))
+            raise ValueError("Expected token type {0}".format(token_type))
 
     def parse_json_doc(self):
         o = Object()
@@ -544,15 +544,18 @@ class ExprParser:
         elif token.type == TokenType.EROTEME:
             place_holder_name = str(self.positional_placeholder_count)
         else:
-            raise Exception("Invalid placeholder name at token pos " + str(self.pos))
+            raise ValueError("Invalid placeholder name at token pos {0}"
+                             "".format(self.pos))
 
         place_holder_name = place_holder_name.lower()
         expr = Expr(type=Expr.PLACEHOLDER)
         if place_holder_name in self.placeholder_name_to_position:
-            expr.position = self.placeholder_name_to_position[place_holder_name]
+            expr.position = \
+                self.placeholder_name_to_position[place_holder_name]
         else:
             expr.position = self.positional_placeholder_count
-            self.placeholder_name_to_position[place_holder_name] = self.positional_placeholder_count
+            self.placeholder_name_to_position[place_holder_name] = \
+                self.positional_placeholder_count
             self.positional_placeholder_count += 1
         return expr
 
@@ -626,8 +629,8 @@ class ExprParser:
 #            e.operator.param.add().CopyFrom(build_literal_expr(build_string_scalar(self.tokens[self.pos].val)))
 #            self.pos = self.pos + 1
 #            return e
-        raise StandardError("Unknown token type = {0}  when expecting atomic "
-                            "expression at {1}".format(token.type, self.pos))
+        raise ValueError("Unknown token type = {0}  when expecting atomic "
+                         "expression at {1}".format(token.type, self.pos))
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
         """Given a `set' of types and an Expr-returning inner parser function,
@@ -703,8 +706,8 @@ class ExprParser:
                 params.append(self.comp_expr())
             else:
                 if is_not:
-                    raise StandardError("Unknown token after NOT as pos {0}"
-                                        "".format(self.pos))
+                    raise ValueError("Unknown token after NOT as pos {0}"
+                                     "".format(self.pos))
                 op_name = None  # not an operator we're interested in
             if op_name:
                 e = Expr()

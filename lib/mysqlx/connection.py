@@ -25,10 +25,11 @@
 
 import socket
 
-from .protocol import Protocol, MessageReaderWriter
 from .authentication import MySQL41AuthPlugin
-from .result import Result, RowResult, DocResult
+from .errors import InterfaceError
 from .crud import Schema
+from .protocol import Protocol, MessageReaderWriter
+from .result import Result, RowResult, DocResult
 from .statement import SqlStatement
 
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
@@ -117,7 +118,7 @@ class Connection(object):
         result = RowResult(self)
         result.fetch_all()
         if result.count == 0:
-            raise Exception("No data found")
+            raise InterfaceError("No data found")
         return result[0][0]
 
     def get_row_result(self, cmd, *args):

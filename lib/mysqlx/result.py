@@ -430,15 +430,15 @@ class Row(object):
         if isinstance(index, basestring):
             index = self._resultset.index_of(index)
         elif index >= len(self._fields):
-            raise Exception("Index out of range")
+            raise IndexError("Index out of range")
         return self._fields[index]
 
     def get_string(self, str_index):
         int_index = self._resultset.index_of(str_index)
         if int_index >= len(self._fields):
-            raise Exception("Argument out of range")
+            raise IndexError("Argument out of range")
         if int_index == -1:
-            raise Exception("Column name '{0}' not found".format(str_index))
+            raise ValueError("Column name '{0}' not found".format(str_index))
         return str(self._fields[int_index])
 
 
