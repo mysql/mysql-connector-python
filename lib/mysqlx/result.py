@@ -518,6 +518,7 @@ class BaseResult(object):
         self._protocol = self._connection.protocol
         self._closed = False
         self._rows_affected = 0
+        self._generated_id = -1
         self._warnings = []
         if connection._active_result is not None:
             connection._active_result.fetch_all()
@@ -540,9 +541,8 @@ class Result(BaseResult):
     def get_affected_items_count(self):
         return self._rows_affected
 
-    @property
     def get_autoincrement_value(self):
-        pass
+        return self._generated_id
 
 
 class BufferingResult(BaseResult):
@@ -617,6 +617,9 @@ class SqlResult(RowResult):
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
         self._has_more_results = False
+
+    def get_autoincrement_value(self):
+        return self._generated_id
 
     def next_result(self):
         if self._closed:

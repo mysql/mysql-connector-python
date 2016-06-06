@@ -35,7 +35,7 @@ from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .protobuf import mysqlx_expr_pb2 as MySQLxExpr
 from .result import ColumnMetaData
 from .dbdoc import DbDoc
-from .expr import (Expr, ExprParser, Find, UpdateOperation, build_int_scalar,
+from .expr import (Expr, ExprParser, Find, UpdateOperation, build_null_scalar, build_int_scalar,
                    build_string_scalar, build_bool_scalar, build_double_scalar)
 from .errors import InterfaceError, OperationalError, ProgrammingError
 
@@ -260,8 +260,11 @@ class Protocol(object):
             sessStateMsg = MySQLxNotice.SessionStateChanged()
             sessStateMsg.ParseFromString(msg.payload)
             if sessStateMsg.param == \
-               MySQLxNotice.SessionStateChanged.ROWS_AFFECTED:
+                    MySQLxNotice.SessionStateChanged.ROWS_AFFECTED:
                 rs._rows_affected = sessStateMsg.value.v_unsigned_int
+            elif sessStateMsg.param == \
+                    MySQLxNotice.SessionStateChanged.GENERATED_INSERT_ID:
+                rs._generated_id = sessStateMsg.value.v_unsigned_int
 
     def _read_message(self, rs):
         while True:
@@ -302,7 +305,8 @@ class Protocol(object):
 
     def arg_object_to_expr(self, value, allow_relational):
         if value is None:
-            return Expr.build_null_scalar()
+            return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
+                                   literal=build_null_scalar())
         if isinstance(value, bool):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
                                    literal=build_bool_scalar(value))

@@ -479,6 +479,17 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(False, result.next_result())
 
 
+    def test_auto_inc_value(self):
+        table_name = "{0}.test".format(self.schema_name)
+
+        self.node_session.sql(
+            "CREATE TABLE {0}(id INT KEY AUTO_INCREMENT, name VARCHAR(50))".format(table_name)).execute()
+        result = self.node_session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')".format(table_name)).execute()
+        self.assertEqual(1, result.get_autoincrement_value())
+        table = self.schema.get_table("test")
+        result2 = table.insert("id", "name").values(None, "Boo").execute()
+        self.assertEqual(2, result2.get_autoincrement_value())
+
     def test_column_metadata(self):
         table_name = "{0}.test".format(self.schema_name)
 
