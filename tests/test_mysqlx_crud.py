@@ -276,44 +276,44 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs1 = result1.fetch_all();
         self.assertEqual(4, len(docs1))
 
-    def test_create_index(self):
-        collection_name = "collection_test"
-        collection = self.schema.create_collection(collection_name)
+    # def test_create_index(self):
+    #     collection_name = "collection_test"
+    #     collection = self.schema.create_collection(collection_name)
+    #
+    #     index_name = "age_idx"
+    #     collection.create_index(index_name, True) \
+    #         .field("$.age", "INT", False).execute()
+    #
+    #     show_indexes_sql = (
+    #         "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+    #         "".format(self.schema_name, collection_name, index_name)
+    #     )
+    #
+    #     result = self.node_session.sql(show_indexes_sql).execute()
+    #     rows = result.fetch_all()
+    #     self.assertEqual(1, len(rows))
 
-        index_name = "age_idx"
-        collection.create_index(index_name, True) \
-            .field("$.age", "INT", False).execute()
-
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-            "".format(self.schema_name, collection_name, index_name)
-        )
-
-        result = self.node_session.sql(show_indexes_sql).execute()
-        rows = result.fetch_all()
-        self.assertEqual(1, len(rows))
-
-    def test_drop_index(self):
-        collection_name = "collection_test"
-        collection = self.schema.create_collection(collection_name)
-
-        index_name = "age_idx"
-        collection.create_index(index_name, True) \
-            .field("$.age", "INT", False).execute()
-
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-            "".format(self.schema_name, collection_name, index_name)
-        )
-
-        result = self.node_session.sql(show_indexes_sql).execute()
-        rows = result.fetch_all()
-        self.assertEqual(1, len(rows))
-
-        collection.drop_index(index_name).execute()
-        result = self.node_session.sql(show_indexes_sql).execute()
-        rows = result.fetch_all()
-        self.assertEqual(0, len(rows))
+    # def test_drop_index(self):
+    #     collection_name = "collection_test"
+    #     collection = self.schema.create_collection(collection_name)
+    #
+    #     index_name = "age_idx"
+    #     collection.create_index(index_name, True) \
+    #         .field("$.age", "INT", False).execute()
+    #
+    #     show_indexes_sql = (
+    #         "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+    #         "".format(self.schema_name, collection_name, index_name)
+    #     )
+    #
+    #     result = self.node_session.sql(show_indexes_sql).execute()
+    #     rows = result.fetch_all()
+    #     self.assertEqual(1, len(rows))
+    #
+    #     collection.drop_index(index_name).execute()
+    #     result = self.node_session.sql(show_indexes_sql).execute()
+    #     rows = result.fetch_all()
+    #     self.assertEqual(0, len(rows))
 
 
     def test_parameter_binding(self):
@@ -473,3 +473,40 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
         self.assertEqual("a", rows[0][0])
         self.assertEqual(False, result.next_result())
+
+
+    def test_column_metadata(self):
+        table_name = "{0}.test".format(self.schema_name)
+
+        self.node_session.sql(
+            "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), config JSON)".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL)".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL)".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL)".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL)".format(table_name)).execute()
+
+        table = self.schema.get_table("test")
+        result = table.select().execute()
+        rows = result.fetch_all()
+        col = result.columns[0]
+        self.assertEqual("age", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.INT, col.get_type())
+
+        col = result.columns[1]
+        self.assertEqual("name", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.STRING, col.get_type())
+
+        col = result.columns[2]
+        self.assertEqual("pic", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual("binary", col.get_collation_name())
+        self.assertEqual("binary", col.get_character_set_name())
+        self.assertEqual(mysqlx.ColumnType.BYTES, col.get_type())
+
+        col = result.columns[3]
+        self.assertEqual("config", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.JSON, col.get_type())
+

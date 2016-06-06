@@ -291,9 +291,11 @@ class Protocol(object):
             col = ColumnMetaData(msg.type, msg.catalog, msg.schema, msg.table,
                                  msg.original_table, msg.name,
                                  msg.original_name, msg.length, msg.collation,
-                                 msg.fractional_digits, msg.flags)
+                                 msg.fractional_digits, msg.flags, msg.content_type)
             columns.append(col)
         return columns
+
+
 
     def arg_object_to_expr(self, value, allow_relational):
         if value is None:

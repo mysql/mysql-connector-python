@@ -29,7 +29,7 @@ from .errors import (Error, Warning, InterfaceError, DatabaseError,
                      NotSupportedError, DataError, IntegrityError,
                      ProgrammingError, OperationalError, InternalError)
 from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
-                     SqlResult)
+                     SqlResult, ColumnType)
 from .statement import (Statement, FilterableStatement, SqlStatement,
                         AddStatement, RemoveStatement, ModifyStatement,
                         SelectStatement, InsertStatement, DeleteStatement,

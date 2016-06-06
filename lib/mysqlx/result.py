@@ -28,9 +28,8 @@ import struct
 import sys
 
 from datetime import datetime, timedelta
-
 from .dbdoc import DbDoc
-
+from .charsets import MYSQL_CHARACTER_SETS
 
 def from_protobuf(col_type, payload):
     if len(payload) == 0:
@@ -38,17 +37,17 @@ def from_protobuf(col_type, payload):
 
     try:
         return {
-            ColumnType.SINT: varsint_from_protobuf,
-            ColumnType.UINT: varint_from_protobuf,
-            ColumnType.BYTES: bytes_from_protobuf,
-            ColumnType.DATETIME: datetime_from_protobuf,
-            ColumnType.TIME: time_from_protobuf,
-            ColumnType.FLOAT: float_from_protobuf,
-            ColumnType.DOUBLE: double_from_protobuf,
-            ColumnType.BIT: varint_from_protobuf,
-            ColumnType.SET: set_from_protobuf,
-            ColumnType.ENUM: bytes_from_protobuf,
-            ColumnType.DECIMAL: decimal_from_protobuf,
+            ColumnProtoType.SINT: varsint_from_protobuf,
+            ColumnProtoType.UINT: varint_from_protobuf,
+            ColumnProtoType.BYTES: bytes_from_protobuf,
+            ColumnProtoType.DATETIME: datetime_from_protobuf,
+            ColumnProtoType.TIME: time_from_protobuf,
+            ColumnProtoType.FLOAT: float_from_protobuf,
+            ColumnProtoType.DOUBLE: double_from_protobuf,
+            ColumnProtoType.BIT: varint_from_protobuf,
+            ColumnProtoType.SET: set_from_protobuf,
+            ColumnProtoType.ENUM: bytes_from_protobuf,
+            ColumnProtoType.DECIMAL: decimal_from_protobuf,
         }[col_type](payload)
     except KeyError as e:
         sys.stderr.write("{0}".format(e))
@@ -230,8 +229,29 @@ def time_from_protobuf(payload):
 class Collations(object):
     UTF8_GENERAL_CI = 33
 
-
 class ColumnType(object):
+    BIT = 1
+    TINYINT = 2
+    SMALLINT = 3
+    MEDIUMINT = 4
+    INT = 5
+    BIGINT = 6
+    FLOAT = 7
+    DECIMAL = 8
+    DOUBLE = 9
+    JSON = 10
+    STRING = 11
+    BYTES = 12
+    TIME = 13
+    DATE = 14
+    DATETIME = 15
+    TIMESTAMP = 16
+    SET = 17
+    ENUM = 18
+    GEOMETRY = 19
+    XML = 20
+
+class ColumnProtoType(object):
     SINT = 1
     UINT = 2
     DOUBLE = 5
@@ -309,25 +329,46 @@ class FloatColumnFlags(ColumnFlags):
 
 
 class BytesColumnFlags(ColumnFlags):
-    UNSIGNED = 0x0001
+    RIGHT_PAD = 0x0001
+
+class BytesContentType(ColumnFlags):
+    GEOMETRY = 0x0001
+    JSON = 0x0002
+    XML = 0x0003
 
 
 class ColumnMetaData(object):
     def __init__(self, col_type, catalog=None, schema=None, table=None,
                  original_table=None, name=None, original_name=None,
                  length=None, collation=None, fractional_digits=None,
-                 flags=None):
+                 flags=None, content_type=None):
         self._schema = schema
         self._name = name
         self._original_name = original_name
         self._table = table
         self._original_table = original_table
-        self._col_type = col_type
+        self._proto_type = col_type
+        self._col_type = None
         self._catalog = catalog
         self._length = length
         self._collation = collation
         self._fractional_digits = fractional_digits
         self._flags = flags
+        self._content_type = content_type
+        self._number_signed = False
+        self._is_padded = False
+        self._is_binary = False
+        self._collation_name = None
+        self._character_set_name = None
+
+        if self._collation > 0:
+            if self._collation >= len(MYSQL_CHARACTER_SETS):
+                raise Exception("No mapping found for collation " + str(self._collation))
+            info = MYSQL_CHARACTER_SETS[self._collation]
+            self._character_set_name = info[0]
+            self._collation_name = info[1]
+            self._is_binary = "binary" in self._collation_name or "_bin" in self._collation_name
+        self._map_type()
 
     def __str__(self):
         return str({
@@ -337,44 +378,20 @@ class ColumnMetaData(object):
             "flags": str(self._flags),
         })
 
-    @property
-    def original_name(self):
-        return self._original_name or self._name
-
-    @property
-    def original_table(self):
-        return self._original_table or self._table
-
-    @property
-    def flags(self):
-        return self._flags
-
-    @flags.setter
-    def flags(self, value):
-        # Flags are type specific
-        try:
-            self._flags = {
-                ColumnType.DATETIME: DatetimeColumnFlags,
-            }[self._col_type](value)
-        except KeyError:
-            self._flags = ColumnFlags(value)
-
     def get_schema_name(self):
-        return self._schema.name
+        return self._schema
 
     def get_table_name(self):
-        return self._table.name
+        return self._original_table or self._table
 
     def get_table_label(self):
-        # TODO: To implement
-        raise NotImplementedError
+        return self._table or self._original_table
 
     def get_column_name(self):
-        return self._name
+        return self._original_name or self._name
 
     def get_column_label(self):
-        # TODO: To implement
-        raise NotImplementedError
+        return self._name or self._original_name
 
     def get_type(self):
         return self._col_type
@@ -386,20 +403,73 @@ class ColumnMetaData(object):
         return self._fractional_digits
 
     def get_collation_name(self):
-        # TODO: To implement
-        raise NotImplementedError
+        return self._collation_name
 
-    def get_character_setname(self):
-        # TODO: To implement
-        raise NotImplementedError
+    def get_character_set_name(self):
+        return self._character_set_name
 
     def is_number_signed(self):
-        # TODO: To implement
-        raise NotImplementedError
+        return self._number_signed
 
     def is_padded(self):
-        # TODO: To implement
-        raise NotImplementedError
+        return self._is_padded
+
+    def _map_int_type(self):
+        if self._length <= 4: self._col_type = ColumnType.TINYINT
+        elif self._length <= 6: self._col_type = ColumnType.SMALLINT
+        elif self._length <= 9: self._col_type = ColumnType.MEDIUMINT
+        elif self._length <= 11: self._col_type = ColumnType.INT
+        else:
+            self._col_type = ColumnType.BIGINT
+        self._number_signed = True
+
+    def _map_uint_type(self):
+        if self._length <= 3: self._col_type = ColumnType.TINYINT
+        elif self._length <= 5: self._col_type = ColumnType.SMALLINT
+        elif self._length <= 8: self._col_type = ColumnType.MEDIUMINT
+        elif self._length <= 10: self._col_type = ColumnType.INT
+        else:
+            self._col_type = ColumnType.BIGINT
+        self._zero_fill = self._flags & 1
+
+    def _map_bytes(self):
+        if self._content_type == BytesContentType.GEOMETRY:
+            self._col_type = ColumnType.GEOMETRY
+        elif self._content_type == BytesContentType.JSON:
+            self._col_type = ColumnType.JSON
+        elif self._content_type == BytesContentType.XML:
+            self._col_type = ColumnType.XML
+        elif self._is_binary:
+            self._col_type = ColumnType.BYTES
+        else:
+            self._col_type = ColumnType.STRING
+        self._is_padded = self._flags & 1
+
+    def _map_datetime(self):
+        if self._length == 10: self._col_type = ColumnType.DATE
+        elif self._length == 19: self._col_type = ColumnType.DATETIME
+        elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0: self._col_type = ColumnType.TIMESTAMP
+        raise Exception("Datetime mapping scenario unhandled")
+
+    def _map_type(self):
+        if self._proto_type == ColumnProtoType.SINT: self._map_int_type()
+        elif self._proto_type == ColumnProtoType.UINT: self._map_uint_type()
+        elif self._proto_type == ColumnProtoType.FLOAT:
+            self._col_type = ColumnType.FLOAT
+            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
+        elif self._proto_type == ColumnProtoType.DECIMAL:
+            self._col_type = ColumnType.DECIMAL
+            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
+        elif self._proto_type == ColumnProtoType.DOUBLE:
+            self._col_type = ColumnType.DOUBLE
+            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
+        elif self._proto_type == ColumnProtoType.BYTES: self._map_bytes()
+        elif self._proto_type == ColumnProtoType.TIME: self._col_type = ColumnType.TIME
+        elif self._proto_type == ColumnProtoType.DATETIME: self._map_datetime()
+        elif self._proto_type == ColumnProtoType.SET: self._col_type = ColumnType.SET
+        elif self._proto_type == ColumnProtoType.ENUM: self._col_type = ColumnType.ENUM
+        else:
+            raise Exception("Unknown column type {0}".format(self._col_type))
 
 
 class Warning(object):
@@ -511,7 +581,7 @@ class BufferingResult(BaseResult):
         if not dumping:
             for x in range(len(row.field)):
                 col = self._columns[x]
-                item[x] = from_protobuf(col.get_type(), row.field[x])
+                item[x] = from_protobuf(col._proto_type, row.field[x])
         return Row(self, item)
 
     def _page_in_items(self):

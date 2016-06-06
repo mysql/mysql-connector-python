@@ -124,6 +124,15 @@ class Schema(DatabaseObject):
             collections.append(collection)
         return collections
 
+    def get_collection_as_table(self, name, check_existence=False):
+        """Returns a a table object for the given collection
+
+        Returns:
+            mysqlx.Table: Table object.
+
+        """
+        return self.get_table(name, check_existence)
+
     def get_tables(self):
         """Returns a list of tables for this schema.
 
