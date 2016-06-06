@@ -23,6 +23,7 @@
 
 """Implementation of the CRUD database objects."""
 
+from .errors import ProgrammingError
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
@@ -158,7 +159,7 @@ class Schema(DatabaseObject):
         table = Table(self, name)
         if check_existence:
             if not table.exists_in_database():
-                raise Exception("table does not exist")
+                raise ProgrammingError("Table does not exist")
         return table
 
     def get_collection(self, name, check_existence=False):
@@ -170,7 +171,7 @@ class Schema(DatabaseObject):
         collection = Collection(self, name)
         if check_existence:
             if not collection.exists_in_database():
-                raise Exception("collection does not exist")
+                raise ProgrammingError("Collection does not exist")
         return collection
 
     def drop_collection(self, name):
@@ -207,7 +208,7 @@ class Schema(DatabaseObject):
             self._connection.execute_nonquery("xplugin", "create_collection",
                                               True, self._name, name)
         elif not reuse:
-            raise Exception("Collection already exists")
+            raise ProgrammingError("Collection already exists")
         return collection
 
 

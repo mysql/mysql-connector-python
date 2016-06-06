@@ -28,18 +28,12 @@ import logging
 import unittest
 
 import tests
+import mysqlx
 
-try:
-    import mysqlx
-except ImportError:
-    MYSQLX_AVAILABLE = False
-else:
-    MYSQLX_AVAILABLE = True
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
 
-@unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxXSessionTests(tests.MySQLxTests):
 
@@ -48,7 +42,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["database"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
-        except Exception as err:  # TODO: Replace by a custom error
+        except mysqlx.Error as err:
             self.fail("{0}".format(err))
 
     def test___init__(self):
@@ -75,7 +69,6 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         self.assertTrue(schema.exists_in_database())
 
 
-@unittest.skipIf(MYSQLX_AVAILABLE is False, "MySQLX not available")
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxNodeSessionTests(tests.MySQLxTests):
 
@@ -84,7 +77,7 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["database"]
         try:
             self.session = mysqlx.get_node_session(self.connect_kwargs)
-        except Exception as err:  # TODO: Replace by a custom error
+        except mysqlx.Error as err:
             self.fail("{0}".format(err))
 
     def test___init__(self):

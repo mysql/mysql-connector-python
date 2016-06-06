@@ -44,7 +44,7 @@ def scalar_to_string(s):
     elif s.type == Scalar.V_NULL:
         return "NULL"
     else:
-        raise StandardError("Unknown type tag: {0}".format(s.type))
+        raise ValueError("Unknown type tag: {0}".format(s.type))
 
 
 def column_identifier_to_string(id):
@@ -100,7 +100,7 @@ def operator_to_string(op):
             # something like NOT
             return "{0} ({1})".format(op.name, expr_to_string(ps[0]))
     else:
-        raise StandardError("Unknown operator structure: {0}".format(op))
+        raise ValueError("Unknown operator structure: {0}".format(op))
 
 
 def quote_identifier(id):
@@ -122,4 +122,4 @@ def expr_to_string(e):
     elif e.type == Expr.VARIABLE:
         return "@{0}".format(quote_identifier(e.variable))
     else:
-        raise StandardError("Unknown expression type: {0}".format(e.type))
+        raise ValueError("Unknown expression type: {0}".format(e.type))
