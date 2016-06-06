@@ -181,6 +181,17 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count, 2)
         self.assertEqual(5, collection.count())
 
+    def test_get_document_ids(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add({"name": "Fred", "age": 21}).execute()
+        self.assertTrue(result.get_document_id() != None)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age":45}).execute()
+        self.assertEqual(2, len(result.get_document_ids()))
+
     def test_remove(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)

@@ -30,7 +30,7 @@ from .errors import InterfaceError
 from .crud import Schema
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
-from .statement import SqlStatement
+from .statement import SqlStatement, AddStatement
 
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
@@ -95,7 +95,10 @@ class Connection(object):
 
     def send_insert(self, statement):
         self.protocol.send_insert(statement)
-        return Result(self)
+        ids = None
+        if isinstance(statement, AddStatement):
+            ids = statement._ids
+        return Result(self, ids)
 
     def find(self, statement):
         self.protocol.send_find(statement)

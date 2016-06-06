@@ -204,6 +204,7 @@ class AddStatement(Statement):
     def __init__(self, collection):
         super(AddStatement, self).__init__(target=collection)
         self._values = []
+        self._ids = []
 
     """Adds a list of documents into a collection.
 
@@ -228,7 +229,8 @@ class AddStatement(Statement):
             mysqlx.Result: Result object.
         """
         for doc in self._values:
-            doc.ensure_id()
+            self._ids.append(doc.ensure_id())
+
         return self._connection.send_insert(self)
 
 

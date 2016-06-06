@@ -533,8 +533,9 @@ class BaseResult(object):
 
 
 class Result(BaseResult):
-    def __init__(self, connection):
+    def __init__(self, connection, ids=None):
         super(Result, self).__init__(connection)
+        self._ids = ids
         self._protocol.close_result(self)
 
     @property
@@ -543,6 +544,14 @@ class Result(BaseResult):
 
     def get_autoincrement_value(self):
         return self._generated_id
+
+    def get_document_id(self):
+        if self._ids == None: return None
+        if len(self._ids) == 0: return None
+        return self._ids[0]
+
+    def get_document_ids(self):
+        return self._ids
 
 
 class BufferingResult(BaseResult):
