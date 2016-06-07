@@ -166,30 +166,30 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         result = collection.add({"name": "Fred", "age": 21}).execute()
-        self.assertEqual(result.get_affected_items_count, 1)
+        self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(1, collection.count())
 
         # now add multiple dictionaries at once
         result = collection.add({"name": "Wilma", "age": 33},
                                 {"name": "Barney", "age": 42}).execute()
-        self.assertEqual(result.get_affected_items_count, 2)
+        self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(3, collection.count())
 
         # now let's try adding strings
         result = collection.add('{"name": "Bambam", "age": 8}',
                                 '{"name": "Pebbles", "age": 8}').execute()
-        self.assertEqual(result.get_affected_items_count, 2)
+        self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
 
     def test_get_document_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         result = collection.add({"name": "Fred", "age": 21}).execute()
-        self.assertTrue(result.get_document_id() != None)
+        self.assertTrue(result.get_document_id() is not None)
 
         result = collection.add(
             {"name": "Fred", "age": 21},
-            {"name": "Barney", "age":45}).execute()
+            {"name": "Barney", "age": 45}).execute()
         self.assertEqual(2, len(result.get_document_ids()))
 
     def test_remove(self):
@@ -198,7 +198,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection.add({"name": "Fred", "age": 21}).execute()
         self.assertEqual(1, collection.count())
         result = collection.remove("age == 21").execute()
-        self.assertEqual(1, result.get_affected_items_count)
+        self.assertEqual(1, result.get_affected_items_count())
         self.assertEqual(0, collection.count())
 
     def test_find(self):
@@ -239,18 +239,18 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         ).execute()
 
         result = collection.modify("age < 67").set("young", True).execute()
-        self.assertEqual(3, result.get_affected_items_count)
+        self.assertEqual(3, result.get_affected_items_count())
         doc = collection.find("name = 'Fred'").execute().fetch_all()[0]
         self.assertEqual(True, doc.young)
 
         result = \
             collection.modify("age == 28").change("young", False).execute()
-        self.assertEqual(1, result.get_affected_items_count)
+        self.assertEqual(1, result.get_affected_items_count())
         docs = collection.find("young = True").execute().fetch_all()
         self.assertEqual(2, len(docs))
 
         result = collection.modify("young == True").unset("young").execute()
-        self.assertEqual(2, result.get_affected_items_count)
+        self.assertEqual(2, result.get_affected_items_count())
         docs = collection.find("young = True").execute().fetch_all()
         self.assertEqual(0, len(docs))
 
@@ -327,7 +327,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Betty", docs[0]["name"])
 
-        result = collection.find("$.age = :age").bind('{"age":42}').sort("age DESC, name ASC").execute()
+        result = collection.find("$.age = :age").bind('{"age": 42}') \
+            .sort("age DESC, name ASC").execute()
         docs = result.fetch_all()
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
@@ -443,7 +444,7 @@ class MySQLxTableTests(tests.MySQLxTests):
             .values(67, 'Betty').execute()
 
         result = table.update().set("age", 25).where("age == 21").execute()
-        self.assertEqual(1, result.get_affected_items_count)
+        self.assertEqual(1, result.get_affected_items_count())
 
     def test_delete(self):
         table_name = "table_test"
@@ -489,13 +490,14 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("a", rows[0][0])
         self.assertEqual(False, result.next_result())
 
-
     def test_auto_inc_value(self):
         table_name = "{0}.test".format(self.schema_name)
 
         self.node_session.sql(
-            "CREATE TABLE {0}(id INT KEY AUTO_INCREMENT, name VARCHAR(50))".format(table_name)).execute()
-        result = self.node_session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')".format(table_name)).execute()
+            "CREATE TABLE {0}(id INT KEY AUTO_INCREMENT, name VARCHAR(50))"
+            "".format(table_name)).execute()
+        result = self.node_session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')"
+                                       "".format(table_name)).execute()
         self.assertEqual(1, result.get_autoincrement_value())
         table = self.schema.get_table("test")
         result2 = table.insert("id", "name").values(None, "Boo").execute()
@@ -505,15 +507,24 @@ class MySQLxTableTests(tests.MySQLxTests):
         table_name = "{0}.test".format(self.schema_name)
 
         self.node_session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), config JSON)".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL)".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL)".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL)".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL)".format(table_name)).execute()
+            "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
+            "config JSON)".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL)"
+            "".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL)"
+            "".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL)"
+            "".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL)"
+            "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
         result = table.select().execute()
-        rows = result.fetch_all()
+        result.fetch_all()
         col = result.columns[0]
         self.assertEqual("age", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
@@ -535,4 +546,3 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("config", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.JSON, col.get_type())
-

@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 from .dbdoc import DbDoc
 from .charsets import MYSQL_CHARACTER_SETS
 
+
 def from_protobuf(col_type, payload):
     if len(payload) == 0:
         return None
@@ -229,6 +230,7 @@ def time_from_protobuf(payload):
 class Collations(object):
     UTF8_GENERAL_CI = 33
 
+
 class ColumnType(object):
     BIT = 1
     TINYINT = 2
@@ -250,6 +252,7 @@ class ColumnType(object):
     ENUM = 18
     GEOMETRY = 19
     XML = 20
+
 
 class ColumnProtoType(object):
     SINT = 1
@@ -331,6 +334,7 @@ class FloatColumnFlags(ColumnFlags):
 class BytesColumnFlags(ColumnFlags):
     RIGHT_PAD = 0x0001
 
+
 class BytesContentType(ColumnFlags):
     GEOMETRY = 0x0001
     JSON = 0x0002
@@ -363,11 +367,13 @@ class ColumnMetaData(object):
 
         if self._collation > 0:
             if self._collation >= len(MYSQL_CHARACTER_SETS):
-                raise Exception("No mapping found for collation " + str(self._collation))
+                raise ValueError("No mapping found for collation {0}"
+                                 "".format(self._collation))
             info = MYSQL_CHARACTER_SETS[self._collation]
             self._character_set_name = info[0]
             self._collation_name = info[1]
-            self._is_binary = "binary" in self._collation_name or "_bin" in self._collation_name
+            self._is_binary = ("binary" in self._collation_name or
+                               "_bin" in self._collation_name)
         self._map_type()
 
     def __str__(self):
@@ -415,19 +421,27 @@ class ColumnMetaData(object):
         return self._is_padded
 
     def _map_int_type(self):
-        if self._length <= 4: self._col_type = ColumnType.TINYINT
-        elif self._length <= 6: self._col_type = ColumnType.SMALLINT
-        elif self._length <= 9: self._col_type = ColumnType.MEDIUMINT
-        elif self._length <= 11: self._col_type = ColumnType.INT
+        if self._length <= 4:
+            self._col_type = ColumnType.TINYINT
+        elif self._length <= 6:
+            self._col_type = ColumnType.SMALLINT
+        elif self._length <= 9:
+            self._col_type = ColumnType.MEDIUMINT
+        elif self._length <= 11:
+            self._col_type = ColumnType.INT
         else:
             self._col_type = ColumnType.BIGINT
         self._number_signed = True
 
     def _map_uint_type(self):
-        if self._length <= 3: self._col_type = ColumnType.TINYINT
-        elif self._length <= 5: self._col_type = ColumnType.SMALLINT
-        elif self._length <= 8: self._col_type = ColumnType.MEDIUMINT
-        elif self._length <= 10: self._col_type = ColumnType.INT
+        if self._length <= 3:
+            self._col_type = ColumnType.TINYINT
+        elif self._length <= 5:
+            self._col_type = ColumnType.SMALLINT
+        elif self._length <= 8:
+            self._col_type = ColumnType.MEDIUMINT
+        elif self._length <= 10:
+            self._col_type = ColumnType.INT
         else:
             self._col_type = ColumnType.BIGINT
         self._zero_fill = self._flags & 1
@@ -446,30 +460,43 @@ class ColumnMetaData(object):
         self._is_padded = self._flags & 1
 
     def _map_datetime(self):
-        if self._length == 10: self._col_type = ColumnType.DATE
-        elif self._length == 19: self._col_type = ColumnType.DATETIME
-        elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0: self._col_type = ColumnType.TIMESTAMP
-        raise Exception("Datetime mapping scenario unhandled")
+        if self._length == 10:
+            self._col_type = ColumnType.DATE
+        elif self._length == 19:
+            self._col_type = ColumnType.DATETIME
+        elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0:
+            self._col_type = ColumnType.TIMESTAMP
+        raise ValueError("Datetime mapping scenario unhandled")
 
     def _map_type(self):
-        if self._proto_type == ColumnProtoType.SINT: self._map_int_type()
-        elif self._proto_type == ColumnProtoType.UINT: self._map_uint_type()
+        if self._proto_type == ColumnProtoType.SINT:
+            self._map_int_type()
+        elif self._proto_type == ColumnProtoType.UINT:
+            self._map_uint_type()
         elif self._proto_type == ColumnProtoType.FLOAT:
             self._col_type = ColumnType.FLOAT
-            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
+            self._is_number_signed = \
+                (self._flags & FloatColumnFlags.UNSIGNED) == 0
         elif self._proto_type == ColumnProtoType.DECIMAL:
             self._col_type = ColumnType.DECIMAL
-            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
+            self._is_number_signed = \
+                (self._flags & FloatColumnFlags.UNSIGNED) == 0
         elif self._proto_type == ColumnProtoType.DOUBLE:
             self._col_type = ColumnType.DOUBLE
-            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
-        elif self._proto_type == ColumnProtoType.BYTES: self._map_bytes()
-        elif self._proto_type == ColumnProtoType.TIME: self._col_type = ColumnType.TIME
-        elif self._proto_type == ColumnProtoType.DATETIME: self._map_datetime()
-        elif self._proto_type == ColumnProtoType.SET: self._col_type = ColumnType.SET
-        elif self._proto_type == ColumnProtoType.ENUM: self._col_type = ColumnType.ENUM
+            self._is_number_signed = \
+                (self._flags & FloatColumnFlags.UNSIGNED) == 0
+        elif self._proto_type == ColumnProtoType.BYTES:
+            self._map_bytes()
+        elif self._proto_type == ColumnProtoType.TIME:
+            self._col_type = ColumnType.TIME
+        elif self._proto_type == ColumnProtoType.DATETIME:
+            self._map_datetime()
+        elif self._proto_type == ColumnProtoType.SET:
+            self._col_type = ColumnType.SET
+        elif self._proto_type == ColumnProtoType.ENUM:
+            self._col_type = ColumnType.ENUM
         else:
-            raise Exception("Unknown column type {0}".format(self._col_type))
+            raise ValueError("Unknown column type {0}".format(self._col_type))
 
 
 class Warning(object):
@@ -524,7 +551,6 @@ class BaseResult(object):
             connection._active_result.fetch_all()
             connection._active_result = None
 
-    @property
     def get_warnings(self):
         return self._warnings
 
@@ -538,7 +564,6 @@ class Result(BaseResult):
         self._ids = ids
         self._protocol.close_result(self)
 
-    @property
     def get_affected_items_count(self):
         return self._rows_affected
 
@@ -546,8 +571,10 @@ class Result(BaseResult):
         return self._generated_id
 
     def get_document_id(self):
-        if self._ids == None: return None
-        if len(self._ids) == 0: return None
+        if self._ids is None:
+            return None
+        if len(self._ids) == 0:
+            return None
         return self._ids[0]
 
     def get_document_ids(self):

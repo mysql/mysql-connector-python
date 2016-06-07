@@ -35,8 +35,9 @@ from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .protobuf import mysqlx_expr_pb2 as MySQLxExpr
 from .result import ColumnMetaData
 from .dbdoc import DbDoc
-from .expr import (Expr, ExprParser, Find, UpdateOperation, build_null_scalar, build_int_scalar,
-                   build_string_scalar, build_bool_scalar, build_double_scalar)
+from .expr import (ExprParser, Find, UpdateOperation, build_null_scalar,
+                   build_string_scalar, build_bool_scalar, build_double_scalar,
+                   build_int_scalar)
 from .errors import InterfaceError, OperationalError, ProgrammingError
 
 
@@ -297,11 +298,10 @@ class Protocol(object):
             col = ColumnMetaData(msg.type, msg.catalog, msg.schema, msg.table,
                                  msg.original_table, msg.name,
                                  msg.original_name, msg.length, msg.collation,
-                                 msg.fractional_digits, msg.flags, msg.content_type)
+                                 msg.fractional_digits, msg.flags,
+                                 msg.content_type)
             columns.append(col)
         return columns
-
-
 
     def arg_object_to_expr(self, value, allow_relational):
         if value is None:

@@ -201,7 +201,7 @@ class Schema(DatabaseObject):
             reuse (bool): `True` to reuse an existing collection.
 
         Raises:
-            Exception: If ``reuse`` is False and collection exists.
+            ProgrammingError: If ``reuse`` is False and collection exists.
         """
         collection = Collection(self, name)
         if not collection.exists_in_database():
