@@ -146,6 +146,15 @@ class FilterableStatement(Statement):
         self._having = ExprParser(condition, not self._doc_based).expr()
 
     def bind(self, *args):
+        """Binds a value to a specific placeholder.
+
+        Args:
+            *args: The name of the placeholder and the value to bind.
+                   A :class:`mysqlx.DbDoc` object or a JSON string
+                   representation can be used.
+        Raises:
+            ProgrammingError: If the number of arguments is invalid.
+        """
         self._has_bindings = True
         count = len(args)
         if count == 1:

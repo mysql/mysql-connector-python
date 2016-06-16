@@ -519,6 +519,12 @@ class Warning(object):
 
 
 class Row(object):
+    """Represents a row element returned from a SELECT query.
+
+    Args:
+        rs (mysqlx.Result): The Result set.
+        fields (list): The list of fields.
+    """
     def __init__(self, rs, fields):
         self._fields = fields
         self._resultset = rs
@@ -531,6 +537,11 @@ class Row(object):
         return self._fields[index]
 
     def get_string(self, str_index):
+        """Returns the value if the index by string.
+
+        Args:
+            str_index (str): The string index.
+        """
         int_index = self._resultset.index_of(str_index)
         if int_index >= len(self._fields):
             raise IndexError("Argument out of range")
@@ -540,6 +551,11 @@ class Row(object):
 
 
 class BaseResult(object):
+    """Provides base functionality for result objects.
+
+    Args:
+        connection (mysqlx.connection.Connection): The Connection object.
+    """
     def __init__(self, connection):
         self._connection = connection
         self._protocol = self._connection.protocol
@@ -552,25 +568,54 @@ class BaseResult(object):
             connection._active_result = None
 
     def get_warnings(self):
+        """Returns the warnings.
+
+        Returns:
+            list: The list of warnings.
+        """
         return self._warnings
 
     def get_warnings_count(self):
+        """Returns the number of warnings.
+
+        Returns:
+            int: The number of warnings.
+        """
         return len(self._warnings)
 
 
 class Result(BaseResult):
+    """Allows retrieving information about non query operations performed on
+    the database.
+
+    Args:
+        connection (mysqlx.connection.Connection): The Connection object.
+        ids (list): A list of IDs.
+    """
     def __init__(self, connection, ids=None):
         super(Result, self).__init__(connection)
         self._ids = ids
         self._protocol.close_result(self)
 
     def get_affected_items_count(self):
+        """Returns the number of affected items for the last operation.
+
+        Returns:
+            int: The number of affected items.
+        """
         return self._rows_affected
 
     def get_autoincrement_value(self):
+        """Returns the last insert id auto generated.
+
+        Returns:
+            int: The last insert id.
+        """
         return self._generated_id
 
     def get_document_id(self):
+        """Returns ID of the last document inserted into a collection.
+        """
         if self._ids is None:
             return None
         if len(self._ids) == 0:
@@ -578,6 +623,8 @@ class Result(BaseResult):
         return self._ids[0]
 
     def get_document_ids(self):
+        """Returns the list of generated documents IDs.
+        """
         return self._ids
 
 
@@ -596,12 +643,19 @@ class BufferingResult(BaseResult):
 
     @property
     def count(self):
+        """int: The total of items.
+        """
         return len(self._items)
 
     def __getitem__(self, index):
         return self._items[index]
 
     def index_of(self, col_name):
+        """Returns the index of the column.
+
+        Returns:
+            int: The index of the column.
+        """
         index = 0
         for col in self._columns:
             if col.get_column_name() == col_name:
@@ -634,6 +688,11 @@ class BufferingResult(BaseResult):
         return count
 
     def fetch_all(self):
+        """Fetch all items.
+
+        Returns:
+            list: The list of items.
+        """
         while True:
             if not self._page_in_items():
                 break
@@ -641,20 +700,34 @@ class BufferingResult(BaseResult):
 
 
 class RowResult(BufferingResult):
+    """Allows traversing the Row objects returned by a Table.select operation.
+
+    Args:
+        connection (mysqlx.connection.Connection): The Connection object.
+    """
     def __init__(self, connection):
         super(RowResult, self).__init__(connection)
 
     @property
     def columns(self):
+        """list: The list of columns.
+        """
         return self._columns
 
 
 class SqlResult(RowResult):
+    """Represents a result from a SQL statement.
+
+    Args:
+        connection (mysqlx.connection.Connection): The Connection object.
+    """
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
         self._has_more_results = False
 
     def get_autoincrement_value(self):
+        """Returns the identifier for the last record inserted.
+        """
         return self._generated_id
 
     def next_result(self):
@@ -666,6 +739,12 @@ class SqlResult(RowResult):
 
 
 class DocResult(BufferingResult):
+    """Allows traversing the DbDoc objects returned by a Collection.find
+    operation.
+
+    Args:
+        connection (mysqlx.connection.Connection): The Connection object.
+    """
     def __init__(self, connection):
         super(DocResult, self).__init__(connection)
 

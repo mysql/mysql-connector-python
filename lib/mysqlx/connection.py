@@ -198,7 +198,7 @@ class BaseSession(object):
 
 
 class XSession(BaseSession):
-    """Enables interaction with an X Protocol enabled MySQL Product.
+    """Enables interaction with a X Protocol enabled MySQL Product.
 
     The functionality includes:
 
@@ -215,7 +215,7 @@ class XSession(BaseSession):
 
 
 class NodeSession(BaseSession):
-    """Enables interaction with an X Protocol enabled MySQL Server.
+    """Enables interaction with a X Protocol enabled MySQL Server.
 
     The functionality includes:
 

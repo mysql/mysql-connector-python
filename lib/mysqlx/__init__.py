@@ -31,9 +31,10 @@ from .errors import (Error, Warning, InterfaceError, DatabaseError,
 from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
                      SqlResult, ColumnType)
 from .statement import (Statement, FilterableStatement, SqlStatement,
-                        AddStatement, RemoveStatement, ModifyStatement,
-                        SelectStatement, InsertStatement, DeleteStatement,
-                        UpdateStatement, CreateCollectionIndexStatement,
+                        FindStatement, AddStatement, RemoveStatement,
+                        ModifyStatement, SelectStatement, InsertStatement,
+                        DeleteStatement, UpdateStatement,
+                        CreateCollectionIndexStatement,
                         DropCollectionIndexStatement)
 from .dbdoc import DbDoc
 
@@ -76,11 +77,11 @@ __all__ = [
 
     # mysqlx.result
     "ColumnMetaData", "Row", "Result", "BufferingResult", "RowResult",
-    "SqlResult",
+    "SqlResult", "ColumnType",
 
     # mysqlx.statement
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
-    "AddStatement", "RemoveStatement", "ModifyStatement", "SelectStatement",
-    "InsertStatement", "DeleteStatement", "UpdateStatement",
+    "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
+    "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
 ]
