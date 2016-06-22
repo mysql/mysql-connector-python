@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
 # Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
 
@@ -332,6 +333,26 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs = result.fetch_all()
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
+
+    def test_unicode_parameter_binding(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add(
+            {"name": u"José", "age": 21},
+            {"name": u"João", "age": 28},
+            {"name": u"Célia", "age": 42},
+        ).execute()
+        result = collection.find("name == :name").bind("name", u"José") \
+                                                 .execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual(u"José", docs[0]["name"])
+
+        result = collection.find("$.name = :name").bind(u'{"name": "João"}') \
+                                                  .execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual(u"João", docs[0]["name"])
 
     def test_array_insert(self):
         collection_name = "collection_test"

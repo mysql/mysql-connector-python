@@ -171,6 +171,8 @@ def build_int_scalar(i):
 
 
 def build_string_scalar(s):
+    if isinstance(s, unicode):
+        s = bytes(bytearray(s, "utf-8"))
     return Scalar(type=Scalar.V_STRING, v_string=Scalar.String(value=s))
 
 
