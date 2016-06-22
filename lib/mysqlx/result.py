@@ -466,7 +466,8 @@ class ColumnMetaData(object):
             self._col_type = ColumnType.DATETIME
         elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0:
             self._col_type = ColumnType.TIMESTAMP
-        raise ValueError("Datetime mapping scenario unhandled")
+        else:
+            raise ValueError("Datetime mapping scenario unhandled")
 
     def _map_type(self):
         if self._proto_type == ColumnProtoType.SINT:

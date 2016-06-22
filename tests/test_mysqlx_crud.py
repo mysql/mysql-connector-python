@@ -520,18 +520,18 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         self.node_session.sql(
             "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
-            "config JSON)".format(table_name)).execute()
+            "config JSON, created DATE)".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL)"
+            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26')"
             "".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL)"
+            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12')"
             "".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL)"
+            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11')"
             "".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL)"
+            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21')"
             "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
