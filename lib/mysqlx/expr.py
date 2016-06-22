@@ -443,14 +443,14 @@ class ExprParser:
         self.consume_token(TokenType.LSQBRACKET)
         if self.cur_token_type_is(TokenType.MUL):
             self.consume_token(TokenType.RSQBRACKET)
-            return "[*]"
+            return DocumentPathItem(type=DocumentPathItem.ARRAY_INDEX_ASTERISK)
         elif self.cur_token_type_is(TokenType.LNUM):
             v = int(self.consume_token(TokenType.LNUM))
             if v < 0:
                 raise IndexError("Array index cannot be negative at {0}"
                                  "".format(self.pos))
             self.consume_token(TokenType.RSQBRACKET)
-            return "[" + str(v) + "]"
+            return DocumentPathItem(type=DocumentPathItem.ARRAY_INDEX, index=v)
         else:
             raise ValueError("Exception token type MUL or LNUM in JSON "
                              "path array index at token pos {0}"
