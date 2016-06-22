@@ -106,3 +106,45 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
     def test_sql(self):
         statement = self.session.sql("SELECT VERSION()")
         self.assertTrue(isinstance(statement, mysqlx.statement.Statement))
+
+    def test_rollback(self):
+        table_name = "t2"
+        schema = self.session.get_schema(self.schema_name)
+
+        if not schema.exists_in_database():
+            self.session.create_schema(self.schema_name)
+
+        stmt = "CREATE TABLE {0}.{1}(_id INT)"
+        self.session.sql(stmt.format(self.schema_name, table_name)).execute()
+        table = schema.get_table(table_name)
+
+        self.session.start_transaction()
+
+        table.insert("_id").values(1).execute()
+        self.assertEqual(table.count(), 1)
+
+        self.session.rollback()
+        self.assertEqual(table.count(), 0)
+
+        schema.drop_table(table_name)
+
+    def test_commit(self):
+        table_name = "t2"
+        schema = self.session.get_schema(self.schema_name)
+
+        if not schema.exists_in_database():
+            self.session.create_schema(self.schema_name)
+
+        stmt = "CREATE TABLE {0}.{1}(_id INT)"
+        self.session.sql(stmt.format(self.schema_name, table_name)).execute()
+        table = schema.get_table(table_name)
+
+        self.session.start_transaction()
+
+        table.insert("_id").values(1).execute()
+        self.assertEqual(table.count(), 1)
+
+        self.session.commit()
+        self.assertEqual(table.count(), 1)
+
+        schema.drop_table(table_name)

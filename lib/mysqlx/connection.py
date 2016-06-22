@@ -182,19 +182,19 @@ class BaseSession(object):
     def start_transaction(self):
         """Starts a transaction context on the server.
         """
-        self._connection.execute_nonquery("START TRANSACTION")
+        self._connection.execute_nonquery("sql", "START TRANSACTION", True)
 
     def commit(self):
         """Commits all the operations executed after a call to
         startTransaction().
         """
-        self._connection.execute_nonquery("COMMIT")
+        self._connection.execute_nonquery("sql", "COMMIT", True)
 
     def rollback(self):
         """Discards all the operations executed after a call to
         startTransaction().
         """
-        self._connection.execute_nonquery("ROLLBACK")
+        self._connection.execute_nonquery("sql", "ROLLBACK", True)
 
 
 class XSession(BaseSession):
