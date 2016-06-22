@@ -349,8 +349,8 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.UpdateType.ARRAY_APPEND,
-                       doc_path, value))
+            UpdateSpec(MySQLxCrud.UpdateOperation.ARRAY_APPEND, doc_path,
+                       value))
         return self
 
     def execute(self):

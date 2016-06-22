@@ -333,6 +333,18 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
 
+    def test_array_append(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"_id": 1, "name": "Fred", "cards": []},
+            {"_id": 2, "name": "Barney", "cards": [1, 2, 4]},
+            {"_id": 3, "name": "Wilma", "cards": []},
+            {"_id": 4, "name": "Betty", "cards": []},
+        ).execute()
+        collection.modify("$._id == 2").array_append("$.cards[1]", 3).execute()
+        docs = collection.find("$._id == 2").execute().fetch_all()
+        self.assertEqual([1, [2, 3], 4], docs[0]["cards"])
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):
