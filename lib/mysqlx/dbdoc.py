@@ -53,7 +53,7 @@ class DbDoc(object):
 
     def ensure_id(self):
         if "_id" not in self.__dict__:
-            self.__dict__["_id"] = str(uuid.uuid4())
+            self.__dict__["_id"] = uuid.uuid4().hex
         return self.__dict__["_id"]
 
     def __str__(self):
