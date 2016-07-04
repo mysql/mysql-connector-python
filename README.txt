@@ -8,6 +8,13 @@ Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 License information can be found in the LICENSE.txt file.
 
 
+Requirements
+============
+
+Python Protobuf (version >= 2.6.1)
+https://developers.google.com/protocol-buffers/docs/downloads
+
+
 Documentation & Examples
 ========================
 
