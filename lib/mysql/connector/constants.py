@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -56,6 +56,7 @@ DEFAULT_CONFIGURATION = {
     'ssl_cert': None,
     'ssl_key': None,
     'ssl_verify_cert': False,
+    'ssl_cipher': None,
     'passwd': None,
     'db': None,
     'connect_timeout': None,
@@ -397,6 +398,8 @@ class ClientFlag(_Flags):
     CONNECT_ARGS = 1 << 20
     PLUGIN_AUTH_LENENC_CLIENT_DATA = 1 << 21
     CAN_HANDLE_EXPIRED_PASSWORDS = 1 << 22
+    SESION_TRACK = 1 << 23
+    DEPRECATE_EOF = 1 << 24
     SSL_VERIFY_SERVER_CERT = 1 << 30
     REMEMBER_OPTIONS = 1 << 31
 
@@ -419,6 +422,14 @@ class ClientFlag(_Flags):
         'SECURE_CONNECTION': (1 << 15, 'New 4.1 authentication'),
         'MULTI_STATEMENTS': (1 << 16, 'Enable/disable multi-stmt support'),
         'MULTI_RESULTS': (1 << 17, 'Enable/disable multi-results'),
+        'PS_MULTI_RESULTS': (1 << 18, 'Multi-results in PS-protocol'),
+        'PLUGIN_AUTH': (1 << 19, 'Client supports plugin authentication'),
+        'CONNECT_ARGS': (1 << 20, 'Client supports connection attributes'),
+        'PLUGIN_AUTH_LENENC_CLIENT_DATA': (1 << 21,
+                                           'Enable authentication response packet to be larger than 255 bytes'),
+        'CAN_HANDLE_EXPIRED_PASSWORDS': (1 << 22, "Don't close the connection for a connection with expired password"),
+        'SESION_TRACK': (1 << 23, 'Capable of handling server state change information'),
+        'DEPRECATE_EOF': (1 << 24, 'Client no longer needs EOF packet'),
         'SSL_VERIFY_SERVER_CERT': (1 << 30, ''),
         'REMEMBER_OPTIONS': (1 << 31, ''),
     }

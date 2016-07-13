@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -61,12 +61,22 @@ def get_variables(cnx, pattern=None, variables=None, global_vars=False):
         'where_clause': '',
         'where': '',
     }
-    if global_vars is True:
-        format_vars['table'] = 'GLOBAL_VARIABLES'
+    ver = cnx.get_server_version()
+    if ver >= (5, 7, 6):
+        table_global_vars = 'global_variables'
+        table_session_vars = 'session_variables'
+        format_vars['schema'] = 'performance_schema'
     else:
-        format_vars['table'] = 'SESSION_VARIABLES'
+        table_global_vars = 'GLOBAL_VARIABLES'
+        table_session_vars = 'SESSION_VARIABLES'
+        format_vars['schema'] = 'INFORMATION_SCHEMA'
 
-    query = "SELECT * FROM INFORMATION_SCHEMA.{table} {where} {where_clause}"
+    if global_vars is True:
+        format_vars['table'] = table_global_vars
+    else:
+        format_vars['table'] = table_session_vars
+
+    query = "SELECT * FROM {schema}.{table} {where} {where_clause}"
 
     where = []
     if pattern:
@@ -85,7 +95,7 @@ def get_variables(cnx, pattern=None, variables=None, global_vars=False):
 
     row = cnx.fetch_row()
     while row:
-        result[row[0]] = row[1]
+        result[row[0].lower()] = row[1]
         row = cnx.fetch_row()
 
     cnx.free_result()
@@ -512,10 +522,10 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                           cmy1.set_character_set, 'ham_spam')
 
         variables = ('character_set_connection',)
-        exp = {b'CHARACTER_SET_CONNECTION': b'utf8',}
+        exp = {b'character_set_connection': b'utf8',}
         self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
-        exp = {b'CHARACTER_SET_CONNECTION': b'big5',}
+        exp = {b'character_set_connection': b'big5',}
         cmy1.set_character_set('big5')
         self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
@@ -729,14 +739,11 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         var_names = ('"HAVE_CRYPT"', '"CHARACTER_SET_CONNECTION"')
         queries = (
-            "SELECT VARIABLE_NAME FROM INFORMATION_SCHEMA.SESSION_VARIABLES "
-            "WHERE VARIABLE_NAME IN ({0})".format(','.join(var_names)),
             "SELECT 'HAM'",
             "INSERT INTO {0} () VALUES ()".format(table),
             "SELECT 'SPAM'",
         )
         exp = [
-            [(b'HAVE_CRYPT',), (b'CHARACTER_SET_CONNECTION',)],
             [(b'HAM',)],
             {'insert_id': 1, 'affected': 1},
             [(b'SPAM',)]

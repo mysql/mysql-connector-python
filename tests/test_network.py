@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -151,7 +151,7 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
 
         # Small packet
         data = (b'\x03\x53\x45\x4c\x45\x43\x54\x20\x22\x61\x62\x63\x22', 1)
-        exp = [b'\x11\x00\x00\x00\x00\x00\x00\r\x00\x00\x01\x03SELECT "abc"']
+        exp = [b'\x11\x00\x00\x02\x00\x00\x00\r\x00\x00\x01\x03SELECT "abc"']
         try:
             self.cnx.send_compressed(*data)
         except errors.Error as err:
@@ -161,7 +161,7 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
 
         # Slightly bigger packet (not getting compressed)
         data = (b'\x03\x53\x45\x4c\x45\x43\x54\x20\x22\x61\x62\x63\x22', 1)
-        exp = (24, b'\x11\x00\x00\x00\x00\x00\x00\x0d\x00\x00\x01\x03'
+        exp = (24, b'\x11\x00\x00\x03\x00\x00\x00\x0d\x00\x00\x01\x03'
                b'\x53\x45\x4c\x45\x43\x54\x20\x22')
         try:
             self.cnx.send_compressed(*data)
@@ -175,9 +175,9 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
         data = (b'\x03\x53\x45\x4c\x45\x43\x54\x20\x22'
                 + b'\x61' * (constants.MAX_PACKET_LENGTH + 1000) + b'\x22', 2)
         exp = [
-            (63, b'\x38\x00\x00\x00\x00\x40\x00\x78\x9c\xed\xc1\x31'
+            (63, b'\x38\x00\x00\x04\x00\x40\x00\x78\x9c\xed\xc1\x31'
                 b'\x0d\x00\x20\x0c\x00\xb0\x04\x8c'),
-            (16322, b'\xbb\x3f\x00\x01\xf9\xc3\xff\x78\x9c\xec\xc1\x81'
+            (16322, b'\xbb\x3f\x00\x05\xf9\xc3\xff\x78\x9c\xec\xc1\x81'
                 b'\x00\x00\x00\x00\x80\x20\xd6\xfd')]
         try:
             self.cnx.send_compressed(*data)
@@ -244,44 +244,6 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
         self.cnx.sock.raise_socket_error()
         self.assertRaises(errors.OperationalError, self.cnx.recv_compressed)
 
-        # Receive result of query SELECT REPEAT('a',1*1024*1024), 'XYZ'
-        packets = (
-            b'\x80\x00\x00\x01\x00\x40\x00\x78\x9c\xed\xcb\xbd\x0a\x81\x01'
-            b'\x14\xc7\xe1\xff\xeb\xa5\x28\x83\x4d\x26\x99\x7c\x44\x21\x37'
-            b'\x60\xb0\x4b\x06\x6c\x0a\xd7\xe3\x7a\x15\x79\xc9\xec\x0a\x9e'
-            b'\x67\x38\x9d\xd3\xaf\x53\x24\x45\x6d\x96\xd4\xca\xcb\xf5\x96'
-            b'\xa4\xbb\xdb\x6c\x37\xeb\xfd\x68\x78\x1e\x4e\x17\x93\xc5\x7c'
-            b'\xb9\xfa\x8e\x71\xda\x83\xaa\xde\xf3\x28\xd2\x4f\x7a\x49\xf9'
-            b'\x7b\x28\x0f\xc7\xd3\x27\xb6\xaa\xfd\xf9\x8d\x8d\xa4\xfe\xaa'
-            b'\xae\x34\xd3\x69\x3c\x93\xce\x19\x00\x00\x00\x00\x00\x00\x00'
-            b'\x00\x00\x00\x00\x00\x00\x00\x00\xf8\xeb\x0d\xe7\xa5\x29\xb8',
-
-            b'\x05\x04\x00\x02\x68\xc0\x0f\x78\x9c\xed\xc1\x31\x01\x00\x00'
-            b'\x08\x03\xa0\xc3\x92\xea\xb7\xfe\x25\x8c\x60\x01\x20\x01' +
-            b'\x00' * 999 + b'\xe0\x53\x3d\x7b\x0a\x29\x40\x7b'
-        )
-        exp = [
-            b'\x01\x00\x00\x01\x02',
-            b'\x2d\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x17\x52\x45\x50'
-            b'\x45\x41\x54\x28\x27\x61\x27\x2c\x31\x2a\x31\x30\x32\x34\x2a'
-            b'\x31\x30\x32\x34\x29\x00\x0c\x21\x00\x00\x00\x90\x00\xfa\x01'
-            b'\x00\x1f\x00\x00',
-            b'\x19\x00\x00\x03\x03\x64\x65\x66\x00\x00\x00\x03\x58\x59\x5a'
-            b'\x00\x0c\x21\x00\x09\x00\x00\x00\xfd\x01\x00\x1f\x00\x00',
-            b'\x05\x00\x00\x04\xfe\x00\x00\x00\x00',
-            b'\x08\x00\x10\x05\xfd\x00\x00\x10' +
-            b'\x61' * 1 * 1024 * 1024 + b'\x03\x58\x59\x5a'
-        ]
-        self.cnx.sock.reset()
-        self.cnx.sock.add_packets(packets)
-        length_exp = len(exp)
-        packet = self.cnx.recv_compressed()
-        counter = 0
-        while packet and counter < length_exp:
-            self.assertEqual(exp[counter], packet)
-            packet = self.cnx.recv_compressed()
-            counter += 1
-
     def test_set_connection_timeout(self):
         """Set the connection timeout"""
         exp = 5
@@ -338,6 +300,7 @@ class MySQLUnixSocketTests(tests.MySQLConnectorTests):
             'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
             'cert': os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'),
             'key': os.path.join(tests.SSL_DIR, 'tests_client_key.pem'),
+            'cipher': 'AES256-SHA'
         }
         self.assertRaises(errors.InterfaceError,
                           self.cnx.switch_to_ssl, **args)

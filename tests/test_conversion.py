@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -229,6 +229,14 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         data = b'This is a bytes'
         exp = data
         res = self.cnv._bytes_to_mysql(data)
+
+        self.assertEqual(exp, res)
+
+    def test__bytearray_to_mysql(self):
+        """A Python bytearray becomes bytes."""
+        data = bytearray(b'This is a bytearray',)
+        exp = bytes(data)
+        res = self.cnv._bytearray_to_mysql(data)
 
         self.assertEqual(exp, res)
 

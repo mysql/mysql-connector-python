@@ -169,7 +169,6 @@ def get_mysql_config_info(mysql_config):
     log.debug("# info['libs']: ")
     for lib in info['libs']:
         log.debug("#   {0}".format(lib))
-    log.error("# info['libs']: {0}".format(info['libs']))
     libs = shlex.split(info['libs_r'])
     info['lib_r_dir'] = libs[0].replace('-L', '')
     info['libs_r'] = [ lib.replace('-l', '') for lib in libs[1:] ]
@@ -181,9 +180,6 @@ def get_mysql_config_info(mysql_config):
     if os.name == 'posix':
         pathname = os.path.join(info['lib_dir'], 'lib' + info['libs'][0]) + '*'
         libs = glob(pathname)
-        log.debug("# libs: {0}".format(libs))
-        for lib in libs:
-            log.debug("#-   {0}".format(lib))
         mysqlclient_libs = []
         for filepath in libs:
             _, filename = os.path.split(filepath)
@@ -472,13 +468,19 @@ class BuildExtStatic(BuildExtDynamic):
             log.error("MySQL C API should be a directory")
             sys.exit(1)
 
+        log.info("Copying MySQL libraries")
         copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
+        log.info("Copying MySQL header files")
         copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
 
         # Remove all but static libraries to force static linking
-        for lib_file in os.listdir(self.connc_lib):
-            if os.name == 'posix' and not lib_file.endswith('.a'):
-                os.unlink(os.path.join(self.connc_lib, lib_file))
+        if os.name == 'posix':
+            log.info("Removing non-static MySQL libraries from %s" % self.connc_lib)
+            for lib_file in os.listdir(self.connc_lib):
+                lib_file_path = os.path.join(self.connc_lib, lib_file)
+                if os.path.isfile(lib_file_path) and not lib_file.endswith('.a'):
+                    os.unlink(os.path.join(self.connc_lib, lib_file))
+
 
     def fix_compiler(self):
         BuildExtDynamic.fix_compiler(self)
@@ -556,6 +558,7 @@ class Install(install):
 
     def finalize_options(self):
         if self.static:
+            log.info("Linking CExtension statically with MySQL libraries")
             self.distribution.cmdclass['build_ext'] = BuildExtStatic
 
         if self.byte_code_only is None:

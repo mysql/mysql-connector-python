@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -79,6 +79,7 @@ class BaseMySQLSocket(object):
         self.sock = None  # holds the socket connection
         self._connection_timeout = None
         self._packet_number = -1
+        self._compressed_packet_number = -1
         self._packet_queue = deque()
         self.recvsize = 8192
 
@@ -89,6 +90,14 @@ class BaseMySQLSocket(object):
         if self._packet_number > 255:
             self._packet_number = 0
         return self._packet_number
+
+    @property
+    def next_compressed_packet_number(self):
+        """Increments the compressed packet number"""
+        self._compressed_packet_number = self._compressed_packet_number + 1
+        if self._compressed_packet_number > 255:
+            self._compressed_packet_number = 0
+        return self._compressed_packet_number
 
     def open_connection(self):
         """Open the socket"""
@@ -115,7 +124,8 @@ class BaseMySQLSocket(object):
         except (socket.error, AttributeError):
             pass
 
-    def send_plain(self, buf, packet_number=None):
+    def send_plain(self, buf, packet_number=None,
+                   compressed_packet_number=None):
         """Send packets to the MySQL server"""
         if packet_number is None:
             self.next_packet_number  # pylint: disable=W0104
@@ -136,12 +146,18 @@ class BaseMySQLSocket(object):
 
     send = send_plain
 
-    def send_compressed(self, buf, packet_number=None):
+    def send_compressed(self, buf, packet_number=None,
+                        compressed_packet_number=None):
         """Send compressed packets to the MySQL server"""
         if packet_number is None:
             self.next_packet_number  # pylint: disable=W0104
         else:
             self._packet_number = packet_number
+        if compressed_packet_number is None:
+            self.next_compressed_packet_number  # pylint: disable=W0104
+        else:
+            self._compressed_packet_number = compressed_packet_number
+
         pktnr = self._packet_number
         pllen = len(buf)
         zpkts = []
@@ -156,32 +172,31 @@ class BaseMySQLSocket(object):
             else:
                 tmpbuf = b''.join(pkts)
             del pkts
-            seqid = 0
             zbuf = zlib.compress(tmpbuf[:16384])
             header = (struct.pack('<I', len(zbuf))[0:3]
-                      + struct.pack('<B', seqid)
+                      + struct.pack('<B', self._compressed_packet_number)
                       + b'\x00\x40\x00')
             if PY2:
                 header = buffer(header)  # pylint: disable=E0602
             zpkts.append(header + zbuf)
             tmpbuf = tmpbuf[16384:]
             pllen = len(tmpbuf)
-            seqid = seqid + 1
+            self.next_compressed_packet_number
             while pllen > maxpktlen:
                 zbuf = zlib.compress(tmpbuf[:maxpktlen])
                 header = (struct.pack('<I', len(zbuf))[0:3]
-                          + struct.pack('<B', seqid)
+                          + struct.pack('<B', self._compressed_packet_number)
                           + b'\xff\xff\xff')
                 if PY2:
                     header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + zbuf)
                 tmpbuf = tmpbuf[maxpktlen:]
                 pllen = len(tmpbuf)
-                seqid = seqid + 1
+                self.next_compressed_packet_number
             if tmpbuf:
                 zbuf = zlib.compress(tmpbuf)
                 header = (struct.pack('<I', len(zbuf))[0:3]
-                          + struct.pack('<B', seqid)
+                          + struct.pack('<B', self._compressed_packet_number)
                           + struct.pack('<I', pllen)[0:3])
                 if PY2:
                     header = buffer(header)  # pylint: disable=E0602
@@ -196,12 +211,12 @@ class BaseMySQLSocket(object):
             if pllen > 50:
                 zbuf = zlib.compress(pkt)
                 zpkts.append(struct.pack('<I', len(zbuf))[0:3]
-                             + struct.pack('<B', 0)
+                             + struct.pack('<B', self._compressed_packet_number)
                              + struct.pack('<I', pllen)[0:3]
                              + zbuf)
             else:
                 header = (struct.pack('<I', pllen)[0:3]
-                          + struct.pack('<B', 0)
+                          + struct.pack('<B', self._compressed_packet_number)
                           + struct.pack('<I', 0)[0:3])
                 if PY2:
                     header = buffer(header)  # pylint: disable=E0602
@@ -294,15 +309,22 @@ class BaseMySQLSocket(object):
     def _split_zipped_payload(self, packet_bunch):
         """Split compressed payload"""
         while packet_bunch:
-            payload_length = struct_unpack("<I",
-                                           packet_bunch[0:3] + b'\x00')[0]
+            if PY2:
+                payload_length = struct.unpack_from(
+                    "<I",
+                    packet_bunch[0:3] + b'\x00')[0]  # pylint: disable=E0602
+            else:
+                payload_length = struct.unpack("<I", packet_bunch[0:3] + b'\x00')[0]
+
             self._packet_queue.append(packet_bunch[0:payload_length + 4])
             packet_bunch = packet_bunch[payload_length + 4:]
 
     def recv_compressed(self):
         """Receive compressed packets from the MySQL server"""
         try:
-            return self._packet_queue.popleft()
+            pkt = self._packet_queue.popleft()
+            self._packet_number = pkt[3]
+            return pkt
         except IndexError:
             pass
 
@@ -316,9 +338,15 @@ class BaseMySQLSocket(object):
             while header:
                 if len(header) < 7:
                     raise errors.InterfaceError(errno=2013)
+
+                # Get length of compressed packet
                 zip_payload_length = struct_unpack("<I",
                                                    header[0:3] + b'\x00')[0]
+                self._compressed_packet_number = header[3]
+
+                # Get payload length before compression
                 payload_length = struct_unpack("<I", header[4:7] + b'\x00')[0]
+
                 zip_payload = init_bytearray(abyte)
                 while len(zip_payload) < zip_payload_length:
                     chunk = self.sock.recv(zip_payload_length
@@ -326,38 +354,47 @@ class BaseMySQLSocket(object):
                     if len(chunk) == 0:
                         raise errors.InterfaceError(errno=2013)
                     zip_payload = zip_payload + chunk
+
+                # Payload was not compressed
                 if payload_length == 0:
                     self._split_zipped_payload(zip_payload)
-                    return self._packet_queue.popleft()
-                packets.append(header + zip_payload)
-                if payload_length != 16384:
+                    pkt = self._packet_queue.popleft()
+                    self._packet_number = pkt[3]
+                    return pkt
+
+                packets.append((payload_length, zip_payload))
+
+                if zip_payload_length <= 16384:
+                    # We received the full compressed packet
                     break
+
+                # Get next compressed packet
                 header = init_bytearray(b'')
                 abyte = self.sock.recv(1)
                 while abyte and len(header) < 7:
                     header += abyte
                     abyte = self.sock.recv(1)
+
         except IOError as err:
             raise errors.OperationalError(
                 errno=2055, values=(self.get_address(), _strioerror(err)))
 
+        # Compressed packet can contain more than 1 MySQL packets
+        # We decompress and make one so we can split it up
         tmp = init_bytearray(b'')
-        for packet in packets:
-            payload_length = struct_unpack("<I", header[4:7] + b'\x00')[0]
-            if payload_length == 0:
-                tmp.append(packet[7:])
+        for payload_length, payload in packets:
+            # payload_length can not be 0; this was previously handled
+            if PY2:
+                tmp += zlib.decompress(buffer(payload))  # pylint: disable=E0602
             else:
-                if PY2:
-                    tmp += zlib.decompress(
-                        buffer(packet[7:]))  # pylint: disable=E0602
-                else:
-                    tmp += zlib.decompress(packet[7:])
-
+                tmp += zlib.decompress(payload)
         self._split_zipped_payload(tmp)
         del tmp
 
         try:
-            return self._packet_queue.popleft()
+            pkt = self._packet_queue.popleft()
+            self._packet_number = pkt[3]
+            return pkt
         except IndexError:
             pass
 
@@ -366,7 +403,7 @@ class BaseMySQLSocket(object):
         self._connection_timeout = timeout
 
     # pylint: disable=C0103
-    def switch_to_ssl(self, ca, cert, key, verify_cert=False):
+    def switch_to_ssl(self, ca, cert, key, verify_cert=False, cipher=None):
         """Switch the socket to use SSL"""
         if not self.sock:
             raise errors.InterfaceError(errno=2048)
@@ -380,7 +417,7 @@ class BaseMySQLSocket(object):
             self.sock = ssl.wrap_socket(
                 self.sock, keyfile=key, certfile=cert, ca_certs=ca,
                 cert_reqs=cert_reqs, do_handshake_on_connect=False,
-                ssl_version=ssl.PROTOCOL_TLSv1)
+                ssl_version=ssl.PROTOCOL_TLSv1, ciphers=cipher)
             self.sock.do_handshake()
         except NameError:
             raise errors.NotSupportedError(

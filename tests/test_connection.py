@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -48,7 +48,7 @@ OK_PACKET_RESULT = {
     'affected_rows': 0,
     'field_count': 0,
     'warning_count': 0,
-    'server_status': 0
+    'status_flag': 0
 }
 
 ERR_PACKET = bytearray(
@@ -282,7 +282,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp = {
             'info_msg': 'Records: 6  Deleted: 0  Skipped: 0  Warnings: 0',
             'insert_id': 0, 'field_count': 0, 'warning_count': 0,
-            'server_status': 1, 'affected_rows': 6}
+            'status_flag': 1, 'affected_rows': 6}
         self.assertEqual(exp, self.cnx._handle_result(packet))
 
         exp = [
@@ -467,7 +467,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             {'affected_rows': 1,
              'field_count': 0,
              'insert_id': 0,
-             'server_status': 8,
+             'status_flag': 8,
              'warning_count': 0},
             {'columns': [('2', 8, None, None, None, None, 0, 129)],
              'eof': {'status_flag': 0, 'warning_count': 0}},

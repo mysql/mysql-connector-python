@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -215,6 +215,10 @@ class Bug499362(tests.MySQLConnectorTests):
         cur = self.cnx.cursor()
 
         ver = self.cnx.get_server_version()
+
+        varlst = ['character_set_client', 'character_set_connection',
+          'character_set_results']
+
         if ver < (5, 1, 12):
             exp1 = [('character_set_client', 'latin1'),
                     ('character_set_connection', 'latin1'),
@@ -232,6 +236,25 @@ class Bug499362(tests.MySQLConnectorTests):
                     ('character_set_system', 'utf8')]
             varlst = []
             stmt = r"SHOW SESSION VARIABLES LIKE 'character\_set\_%%'"
+
+            exp1 = [('CHARACTER_SET_CONNECTION', 'latin1'),
+                    ('CHARACTER_SET_CLIENT', 'latin1'),
+                    ('CHARACTER_SET_RESULTS', 'latin1')]
+            exp2 = [('CHARACTER_SET_CONNECTION', 'latin2'),
+                    ('CHARACTER_SET_CLIENT', 'latin2'),
+                    ('CHARACTER_SET_RESULTS', 'latin2')]
+
+        elif ver >= (5, 7, 6):
+            # INFORMATION_SCHEMA is deprecated
+            exp1 = [('character_set_client', 'latin1'),
+                    ('character_set_connection', 'latin1'),
+                    ('character_set_results', 'latin1')]
+            exp2 = [('character_set_client', 'latin2'),
+                    ('character_set_connection', 'latin2'),
+                    ('character_set_results', 'latin2')]
+            stmt = ("SELECT * FROM performance_schema.session_variables "
+                    "WHERE VARIABLE_NAME IN (%s,%s,%s)")
+
         else:
             exp1 = [('CHARACTER_SET_CONNECTION', 'latin1'),
                     ('CHARACTER_SET_CLIENT', 'latin1'),
@@ -240,10 +263,8 @@ class Bug499362(tests.MySQLConnectorTests):
                     ('CHARACTER_SET_CLIENT', 'latin2'),
                     ('CHARACTER_SET_RESULTS', 'latin2')]
 
-            varlst = ['character_set_client', 'character_set_connection',
-                      'character_set_results']
-            stmt = """SELECT * FROM INFORMATION_SCHEMA.SESSION_VARIABLES
-                WHERE VARIABLE_NAME IN (%s,%s,%s)"""
+            stmt = ("SELECT * FROM INFORMATION_SCHEMA.SESSION_VARIABLES "
+                    "WHERE VARIABLE_NAME IN (%s,%s,%s)")
 
         cur.execute(stmt, varlst)
         res1 = cur.fetchall()
@@ -1685,8 +1706,8 @@ class BugOra16369511(tests.MySQLConnectorTests):
 
     def _setup(self):
         cnx = connection.MySQLConnection(**tests.get_mysql_config())
-        self.cnx.cmd_query("DROP TABLE IF EXISTS local_data")
-        self.cnx.cmd_query(
+        cnx.cmd_query("DROP TABLE IF EXISTS local_data")
+        cnx.cmd_query(
             "CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
         cnx.close()
 
@@ -1697,6 +1718,21 @@ class BugOra16369511(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_load_csv(self):
+        self._setup()
+        cur = self.cnx.cursor()
+        sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
+        cur.execute(sql, (self.data_file,))
+        cur.execute("SELECT * FROM local_data")
+
+        exp = [
+            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        self.assertEqual(exp, cur.fetchall())
+
+    @cnx_config(compress=True)
+    @foreach_cnx()
+    def test_load_csv_with_compress(self):
         self._setup()
         cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
@@ -2192,6 +2228,7 @@ class BugOra17054848(tests.MySQLConnectorTests):
         config['ssl_verify_cert'] = False
         config.update({
             'ssl_ca': ssl_ca,
+            'ssl_cipher': 'AES256-SHA',
         })
 
         try:
@@ -2204,8 +2241,8 @@ class BugOra17054848(tests.MySQLConnectorTests):
         self.assertTrue(res != '')
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 5, 7),
-                 "BugOra16217765 not tested with MySQL version < 5.5.7")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 7),
+                 "BugOra16217765 not tested with MySQL version < 5.6.7")
 class BugOra16217765(tests.MySQLConnectorTests):
     """BUG#16217765: Fix authentication plugin support
     """
@@ -2269,6 +2306,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
             pass
 
     def setUp(self):
+        self.errmsg = "AuthPlugin {0} failed: {1}"
         config = tests.get_mysql_config()
         self.host = config['host']
         self.admin_cnx = connection.MySQLConnection(**config)
@@ -2297,6 +2335,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
             'ssl_ca': tests.SSL_CA,
             'ssl_cert': tests.SSL_CERT,
             'ssl_key': tests.SSL_KEY,
+            'ssl_cipher': 'AES256-SHA',
         })
 
         user = self.users['sha256user']
@@ -3227,7 +3266,7 @@ class BugOra19500097(tests.MySQLConnectorTests):
 class BugOra19549363(tests.MySQLConnectorTests):
     """BUG#19549363: Compression does not work with Change User
     """
-    def test_compress(self):
+    def test_compress_reset_connection(self):
         config = tests.get_mysql_config()
         config['compress'] = True
 
@@ -3419,49 +3458,68 @@ class BugOra20462427(tests.MySQLConnectorTests):
     """
     def setUp(self):
         config = tests.get_mysql_config()
-        config['autocommit'] = True
-        config['connection_timeout'] = 100
-        self.cnx = connection.MySQLConnection(**config)
-        self.cur = self.cnx.cursor()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
 
         self.tbl = 'BugOra20462427'
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = ("CREATE TABLE {0} ("
                   "id INT PRIMARY KEY, "
                   "a LONGTEXT "
                   ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
 
-        self.cur.execute(create)
+        cur.execute(create)
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
-        self.cur.close()
-        self.cnx.close()
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.close()
+        cnx.close()
 
-    def test_bigdata(self):
+    def _test_bigdata(self):
         temp = 'a'*16777210
         insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, temp)
 
-        self.cur.execute(insert)
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur = self.cnx.cursor()
+        cur.execute(insert)
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777210, len(res[0][0]))
 
-        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777211, len(res[0][0]))
 
-        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777212, len(res[0][0]))
 
-        self.cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
-        self.cur.execute("SELECT a FROM {0}".format(self.tbl))
-        res = self.cur.fetchall()
+        cur.execute("UPDATE {0} SET a = concat(a, 'a')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
         self.assertEqual(16777213, len(res[0][0]))
+
+        cur.execute("UPDATE {0} SET a = concat(a, 'aaa')".format(self.tbl))
+        cur.execute("SELECT a FROM {0}".format(self.tbl))
+        res = cur.fetchall()
+        self.assertEqual(16777216, len(res[0][0]))
+
+        cur.close()
+
+    @cnx_config(compress=False, connection_timeout=100)
+    @foreach_cnx()
+    def test_bigdata_compress(self):
+        self._test_bigdata()
+
+    @cnx_config(connection_timeout=100)
+    @foreach_cnx()
+    def test_bigdata_nocompress(self):
+        self._test_bigdata()
 
 
 class BugOra20811802(tests.MySQLConnectorTests):
@@ -3755,7 +3813,10 @@ class BugOra21536507(tests.MySQLConnectorTests):
         drop_stmt = "DROP TABLE IF EXISTS unknown"
         self.assertRaises(errors.DatabaseError, cur.execute, drop_stmt)
         exp = [('Note', 1051, "Unknown table 'myconnpy.unknown'")]
-        self.assertEqual(exp, cur.fetchwarnings())
+        res = cur.fetchwarnings()
+        self.assertEqual('Note', res[0][0])
+        self.assertEqual(1051, res[0][1])
+        self.assertTrue(res[0][2].startswith("Unknown table"))
 
         select_stmt = "SELECT 'a'+'b'"
         cur.execute(select_stmt)
@@ -3831,10 +3892,19 @@ class BugOra21492428(tests.MySQLConnectorTests):
 
         self._credentials = [
             ('ABCD', ' XYZ'),
-            (' PQRS', ' 1 2 3 '),
-            ('XYZ1 ', 'XYZ123    '),
-            (' A B C D ', '    ppppp    '),
+            ('PQRS', ' 1 2 3 '),
+            ('XYZ1', 'XYZ123    '),
+            ('A B C D', '    ppppp    '),
         ]
+
+        if self.cnx.get_server_version() > (5, 6):
+            self._credentials += [
+                (' PQRSWITHSPACE', ' 1 2 3 '),
+                ('XYZ1WITHSPACE ', 'XYZ123    '),
+                (' S P A C E D ', '    ppppp    '),
+            ]
+
+
         for user, password in self._credentials:
             self.cursor.execute(grant.format(
                 user=user, host=self.host, password=password))
@@ -3853,7 +3923,7 @@ class BugOra21492428(tests.MySQLConnectorTests):
             try:
                 cnx = connection.MySQLConnection(**config)
             except errors.ProgrammingError:
-                self.fail('Failed using password with spaces')
+                self.fail('Failed using password with spaces for user %s' % user)
             else:
                 cnx.close()
 
