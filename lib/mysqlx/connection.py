@@ -26,7 +26,7 @@
 import socket
 
 from .authentication import MySQL41AuthPlugin
-from .errors import InterfaceError
+from .errors import InterfaceError, OperationalError
 from .crud import Schema
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
@@ -45,6 +45,9 @@ class SocketStream(object):
         self._socket.connect((host, port,))
 
     def read(self, count):
+        if self._socket == None:
+            raise OperationalError("MySQLx Connection not available")
+
         buf = ""
         while count > 0:
             data = self._socket.recv(count)
@@ -55,7 +58,14 @@ class SocketStream(object):
         return buf
 
     def sendall(self, data):
+        if self._socket == None:
+            raise OperationalError("MySQLx Connection not available")
+
         self._socket.sendall(data)
+
+    def close(self):
+        self._socket.close()
+        self._socket = None
 
 
 class Connection(object):
@@ -128,6 +138,13 @@ class Connection(object):
         self.protocol.send_execute_statement("xplugin", cmd, args)
         return RowResult(self)
 
+    def close(self):
+        if self._active_result is not None:
+            self._active_result.fetch_all()
+        self.protocol.send_close()
+        self.protocol.read_ok()
+        self.stream.close()
+
 
 class BaseSession(object):
     """Base functionality for Session classes through the X Protocol.
@@ -147,6 +164,9 @@ class BaseSession(object):
         self._settings = settings
         self._connection = Connection(self._settings)
         self._connection.connect()
+
+    def is_open(self):
+        return self._connection.stream._socket is not None
 
     def get_schema(self, name):
         """Retrieves a Schema object from the current session by it's name.
@@ -195,6 +215,9 @@ class BaseSession(object):
         startTransaction().
         """
         self._connection.execute_nonquery("sql", "ROLLBACK", True)
+
+    def close(self):
+        self._connection.close()
 
 
 class XSession(BaseSession):

@@ -55,6 +55,7 @@ _SERVER_MESSAGES = [
     (MySQLx.ServerMessages.RESULTSET_FETCH_DONE, MySQLxResultset.FetchDone),
     (MySQLx.ServerMessages.RESULTSET_FETCH_DONE_MORE_RESULTSETS,
      MySQLxResultset.FetchDoneMoreResultsets),
+    (MySQLx.ServerMessages.OK, MySQLx.Ok),
 ]
 
 
@@ -333,3 +334,15 @@ class Protocol(object):
 
     def arg_object_to_scalar(self, value, allow_relational):
         return self.arg_object_to_expr(value, allow_relational).literal
+
+    def read_ok(self):
+        msg = self._reader.read_message()
+        if isinstance(msg, MySQLx.Error):
+            raise InterfaceError(msg.msg)
+
+        if not isinstance(msg, MySQLx.Ok):
+            raise InterfaceError("Unexpected message encountered")
+
+    def send_close(self):
+        msg = MySQLxSession.Close()
+        self._writer.write_message(MySQLx.ClientMessages.SESS_CLOSE, msg)

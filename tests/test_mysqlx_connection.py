@@ -68,6 +68,13 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         schema = self.session.create_schema(self.schema_name)
         self.assertTrue(schema.exists_in_database())
 
+    def test_close(self):
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+
+        session.close()
+        self.assertRaises(mysqlx.OperationalError, schema.exists_in_database)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxNodeSessionTests(tests.MySQLxTests):
