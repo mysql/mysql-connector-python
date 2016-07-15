@@ -79,6 +79,22 @@ class DatabaseObject(object):
         """
         return self._name
 
+    def exists_in_database(self):
+        """Verifies if this object exists in the database.
+
+        Returns:
+            bool: `True` if object exists in database.
+
+        Raises:
+           NotImplementedError: This method must be implemented.
+        """
+        raise NotImplementedError
+
+    def am_i_real(self):
+        return self.exists_in_database()
+
+    def who_am_i(self):
+        return self.get_name()
 
 class Schema(DatabaseObject):
     """A client-side representation of a database schema. Provides access to
