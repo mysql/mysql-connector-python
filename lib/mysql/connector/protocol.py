@@ -718,7 +718,7 @@ class MySQLProtocol(object):
                 "Failed parsing AuthSwitchRequest packet")
 
         (packet, plugin_name) = utils.read_string(packet[5:], end=b'\x00')
-        if packet[-1] == 0:
+        if packet and packet[-1] == 0:
             packet = packet[:-1]
 
         return plugin_name.decode('utf8'), packet
