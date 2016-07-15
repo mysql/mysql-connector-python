@@ -275,6 +275,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs1 = result1.fetch_all()
         self.assertEqual(4, len(docs1))
 
+        result3 = collection.find("age > 28").sort("age DESC").execute()
+        self.assertEqual("Betty", result3.fetch_one()["name"])
+        self.assertEqual("Wilma", result3.fetch_one()["name"])
+        self.assertEqual(None, result3.fetch_one())
+
     # def test_create_index(self):
     #     collection_name = "collection_test"
     #     collection = self.schema.create_collection(collection_name)
@@ -516,6 +521,23 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
         self.schema.drop_table(table_name)
+
+    def test_results(self):
+        table_name = "{0}.test".format(self.schema_name)
+
+        self.node_session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                              "".format(table_name)).execute()
+
+        table = self.schema.get_table("test")
+        result = table.select().execute()
+
+        self.assertEqual("Fred", result.fetch_one()["name"])
+        self.assertEqual("Barney", result.fetch_one()["name"])
+        self.assertEqual(None, result.fetch_one())
 
     def test_multiple_resultsets(self):
         self.node_session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "

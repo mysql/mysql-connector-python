@@ -688,6 +688,17 @@ class BufferingResult(BaseResult):
             count += 1
         return count
 
+    def fetch_one(self):
+        """ Fetch one item.
+
+        Returns:
+            Row/DbDoc: one result item.
+        """
+        if self._closed:
+            return None
+
+        return self._read_item(False)
+
     def fetch_all(self):
         """Fetch all items.
 
