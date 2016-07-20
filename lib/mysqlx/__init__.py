@@ -23,6 +23,8 @@
 
 """MySQL X DevAPI Python implementation"""
 
+from urlparse import urlparse
+
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
@@ -39,27 +41,86 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
 from .dbdoc import DbDoc
 
 
-def get_session(settings):
+def _get_connection_settings(*args, **kwargs):
+    """Parses the connection string and returns a dictionary with the
+    connection settings.
+
+    Args:
+        *args: Variable length argument list with the connection data used
+               to connect to the database. It can be a dictionary or a
+               connection string.
+        **kwargs: Arbitrary keyword arguments with connection data used to
+                  connect to the database.
+
+    Returns:
+        mysqlx.XSession: XSession object.
+    """
+    settings = {}
+    if args:
+        if isinstance(args[0], (str, unicode,)):
+            uri = "{0}{1}".format("" if args[0].startswith("mysqlx://")
+                                  else "mysqlx://", args[0])
+            parsed = urlparse(uri)
+            if parsed.hostname is None or parsed.username is None \
+               or parsed.password is None:
+                raise InterfaceError("Malformed URI '{0}'".format(args[0]))
+            settings = {
+                "host": parsed.hostname,
+                "port": parsed.port,
+                "user": parsed.username,
+                "password": parsed.password,
+                "database": parsed.path.lstrip("/")
+            }
+        elif isinstance(args[0], dict):
+            settings = args[0]
+    elif kwargs:
+        settings = kwargs
+
+    if not settings:
+        raise InterfaceError("Settings not provided")
+
+    if "port" in settings and settings["port"]:
+        try:
+            settings["port"] = int(settings["port"])
+        except NameError:
+            raise InterfaceError("Invalid port")
+    else:
+        settings["port"] = 33060
+
+    return settings
+
+
+def get_session(*args, **kwargs):
     """Creates a XSession instance using the provided connection data.
 
     Args:
-        settings (dict): Connection data used to connect to the database.
+        *args: Variable length argument list with the connection data used
+               to connect to the database. It can be a dictionary or a
+               connection string.
+        **kwargs: Arbitrary keyword arguments with connection data used to
+                  connect to the database.
 
     Returns:
         mysqlx.XSession: XSession object.
     """
+    settings = _get_connection_settings(*args, **kwargs)
     return XSession(settings)
 
 
-def get_node_session(settings):
+def get_node_session(*args, **kwargs):
     """Creates a NodeSession instance using the provided connection data.
 
     Args:
-        settings (dict): Connection data used to connect to the database.
+        *args: Variable length argument list with the connection data used
+               to connect to the database. It can be a dictionary or a
+               connection string.
+        **kwargs: Arbitrary keyword arguments with connection data used to
+                  connect to the database.
 
     Returns:
         mysqlx.XSession: XSession object.
     """
+    settings = _get_connection_settings(*args, **kwargs)
     return NodeSession(settings)
 
 

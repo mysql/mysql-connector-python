@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
 # Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
 
@@ -33,6 +34,27 @@ import mysqlx
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
+_URI_TEST_RESULTS = (  # (uri, result)
+    ("127.0.0.1", None),
+    ("localhost", None),
+    ("domain.com", None),
+    ("user:password@127.0.0.1", {"database": "", "host": "127.0.0.1",
+                                 "password": "password", "port": 33060,
+                                 "user": "user"}),
+    ("user:@127.0.0.1", {"database": "", "host": "127.0.0.1", "password": "",
+                         "port": 33060, "user": "user"}),
+    ("mysqlx://user:@127.0.0.1", {"database": "", "host": "127.0.0.1",
+                                  "password": "", "port": 33060,
+                                  "user": "user"}),
+    ("mysqlx://user@[2001:db8:85a3:8d3:1319:8a2e:370:7348]:1", None),
+    ("mysqlx://user:password@[2001:db8:85a3:8d3:1319:8a2e:370:7348]:1",
+     {"database": "", "host": "2001:db8:85a3:8d3:1319:8a2e:370:7348",
+      "password": "password", "port": 1, "user": "user"}),
+    ("áé'í'óú:unicode@127.0.0.1",
+     {"database": "", "host": "127.0.0.1", "password": "unicode",
+      "port": 33060, "user": "áé'í'óú"}),
+)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxXSessionTests(tests.MySQLxTests):
@@ -53,6 +75,24 @@ class MySQLxXSessionTests(tests.MySQLxTests):
             "password": ""
         }
         self.assertRaises(TypeError, mysqlx.XSession, bad_config)
+
+    def test_connection_uri(self):
+        uri = ("mysqlx://{user}:{password}@{host}:{port}/{schema}"
+               "".format(user=self.connect_kwargs["user"],
+                         password=self.connect_kwargs["password"],
+                         host=self.connect_kwargs["host"],
+                         port=self.connect_kwargs["port"],
+                         schema=self.connect_kwargs["database"]))
+        session = mysqlx.get_session(uri)
+        self.assertIsInstance(session, mysqlx.XSession)
+
+        # Test URI parser function
+        for uri, res in _URI_TEST_RESULTS:
+            try:
+                settings = mysqlx._get_connection_settings(uri)
+                self.assertEqual(res, settings)
+            except mysqlx.Error:
+                self.assertEqual(res, None)
 
     def test_get_schema(self):
         schema = self.session.get_schema(self.schema_name)
@@ -95,6 +135,24 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
             "password": ""
         }
         self.assertRaises(TypeError, mysqlx.NodeSession, bad_config)
+
+    def test_connection_uri(self):
+        uri = ("mysqlx://{user}:{password}@{host}:{port}/{schema}"
+               "".format(user=self.connect_kwargs["user"],
+                         password=self.connect_kwargs["password"],
+                         host=self.connect_kwargs["host"],
+                         port=self.connect_kwargs["port"],
+                         schema=self.connect_kwargs["database"]))
+        session = mysqlx.get_node_session(uri)
+        self.assertIsInstance(session, mysqlx.NodeSession)
+
+        # Test URI parser function
+        for uri, res in _URI_TEST_RESULTS:
+            try:
+                settings = mysqlx._get_connection_settings(uri)
+                self.assertEqual(res, settings)
+            except mysqlx.Error:
+                self.assertEqual(res, None)
 
     def test_get_schema(self):
         schema = self.session.get_schema(self.schema_name)
