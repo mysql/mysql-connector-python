@@ -38,20 +38,32 @@ _URI_TEST_RESULTS = (  # (uri, result)
     ("127.0.0.1", None),
     ("localhost", None),
     ("domain.com", None),
-    ("user:password@127.0.0.1", {"database": "", "host": "127.0.0.1",
+    ("user:password@127.0.0.1", {"schema": "", "host": "127.0.0.1",
                                  "password": "password", "port": 33060,
                                  "user": "user"}),
-    ("user:@127.0.0.1", {"database": "", "host": "127.0.0.1", "password": "",
+    ("user:password@127.0.0.1:33061", {"schema": "", "host": "127.0.0.1",
+                                       "password": "password", "port": 33061,
+                                       "user": "user"}),
+    ("user:@127.0.0.1", {"schema": "", "host": "127.0.0.1", "password": "",
                          "port": 33060, "user": "user"}),
-    ("mysqlx://user:@127.0.0.1", {"database": "", "host": "127.0.0.1",
+    ("user:@127.0.0.1/schema", {"schema": "schema", "host": "127.0.0.1",
+                                "password": "", "port": 33060,
+                                "user": "user"}),
+    ("mysqlx://user:@127.0.0.1", {"schema": "", "host": "127.0.0.1",
                                   "password": "", "port": 33060,
                                   "user": "user"}),
+    ("mysqlx://user:@127.0.0.1:33060/schema",
+     {"schema": "schema", "host": "127.0.0.1", "password": "", "port": 33060,
+      "user": "user"}),
     ("mysqlx://user@[2001:db8:85a3:8d3:1319:8a2e:370:7348]:1", None),
     ("mysqlx://user:password@[2001:db8:85a3:8d3:1319:8a2e:370:7348]:1",
-     {"database": "", "host": "2001:db8:85a3:8d3:1319:8a2e:370:7348",
+     {"schema": "", "host": "2001:db8:85a3:8d3:1319:8a2e:370:7348",
+      "password": "password", "port": 1, "user": "user"}),
+    ("mysqlx://user:password@[2001:db8:85a3:8d3:1319:8a2e:370:7348]:1/schema",
+     {"schema": "schema", "host": "2001:db8:85a3:8d3:1319:8a2e:370:7348",
       "password": "password", "port": 1, "user": "user"}),
     ("áé'í'óú:unicode@127.0.0.1",
-     {"database": "", "host": "127.0.0.1", "password": "unicode",
+     {"schema": "", "host": "127.0.0.1", "password": "unicode",
       "port": 33060, "user": "áé'í'óú"}),
 )
 
@@ -61,7 +73,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
-        self.schema_name = self.connect_kwargs["database"]
+        self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
         except mysqlx.Error as err:
@@ -82,7 +94,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
                          password=self.connect_kwargs["password"],
                          host=self.connect_kwargs["host"],
                          port=self.connect_kwargs["port"],
-                         schema=self.connect_kwargs["database"]))
+                         schema=self.connect_kwargs["schema"]))
         session = mysqlx.get_session(uri)
         self.assertIsInstance(session, mysqlx.XSession)
 
@@ -98,6 +110,18 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         schema = self.session.get_schema(self.schema_name)
         self.assertTrue(schema, mysqlx.Schema)
         self.assertEqual(schema.get_name(), self.schema_name)
+
+    def test_get_default_schema(self):
+        schema = self.session.get_default_schema()
+        self.assertTrue(schema, mysqlx.Schema)
+        self.assertEqual(schema.get_name(), self.connect_kwargs["schema"])
+
+        # Test without default schema configured at connect time
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = None
+        session = mysqlx.get_session(settings)
+        self.assertRaises(mysqlx.ProgrammingError, session.get_default_schema)
+        session.close()
 
     def test_drop_schema(self):
         self.session.drop_schema(self.schema_name)
@@ -121,7 +145,7 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
-        self.schema_name = self.connect_kwargs["database"]
+        self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
@@ -142,7 +166,7 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
                          password=self.connect_kwargs["password"],
                          host=self.connect_kwargs["host"],
                          port=self.connect_kwargs["port"],
-                         schema=self.connect_kwargs["database"]))
+                         schema=self.connect_kwargs["schema"]))
         session = mysqlx.get_node_session(uri)
         self.assertIsInstance(session, mysqlx.NodeSession)
 
@@ -158,6 +182,18 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
         schema = self.session.get_schema(self.schema_name)
         self.assertTrue(schema, mysqlx.Schema)
         self.assertEqual(schema.get_name(), self.schema_name)
+
+    def test_get_default_schema(self):
+        schema = self.session.get_default_schema()
+        self.assertTrue(schema, mysqlx.Schema)
+        self.assertEqual(schema.get_name(), self.connect_kwargs["schema"])
+
+        # Test without default schema configured at connect time
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = None
+        session = mysqlx.get_node_session(settings)
+        self.assertRaises(mysqlx.ProgrammingError, session.get_default_schema)
+        session.close()
 
     def test_drop_schema(self):
         self.session.drop_schema(self.schema_name)

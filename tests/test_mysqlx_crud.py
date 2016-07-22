@@ -46,7 +46,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
-        self.schema_name = self.connect_kwargs["database"]
+        self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
             self.node_session = mysqlx.get_node_session(self.connect_kwargs)
@@ -151,7 +151,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
-        self.schema_name = self.connect_kwargs["database"]
+        self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
             self.node_session = mysqlx.get_node_session(self.connect_kwargs)
@@ -396,7 +396,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
-        self.schema_name = self.connect_kwargs["database"]
+        self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
             self.node_session = mysqlx.get_node_session(self.connect_kwargs)

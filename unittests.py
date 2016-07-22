@@ -672,7 +672,7 @@ def init_mysql_server(port, options):
         'port': options.mysqlx_port,
         'user': 'root',
         'password': '',
-        'database': 'myconnpy'
+        'schema': 'myconnpy'
     }
 
     # Bootstrap and start a MySQL server

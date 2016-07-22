@@ -69,7 +69,7 @@ def _get_connection_settings(*args, **kwargs):
                 "port": parsed.port,
                 "user": parsed.username,
                 "password": parsed.password,
-                "database": parsed.path.lstrip("/")
+                "schema": parsed.path.lstrip("/")
             }
         elif isinstance(args[0], dict):
             settings = args[0]

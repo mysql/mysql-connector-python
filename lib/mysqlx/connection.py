@@ -26,7 +26,7 @@
 import socket
 
 from .authentication import MySQL41AuthPlugin
-from .errors import InterfaceError, OperationalError
+from .errors import InterfaceError, OperationalError, ProgrammingError
 from .crud import Schema
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
@@ -45,7 +45,7 @@ class SocketStream(object):
         self._socket.connect((host, port,))
 
     def read(self, count):
-        if self._socket == None:
+        if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
 
         buf = ""
@@ -58,7 +58,7 @@ class SocketStream(object):
         return buf
 
     def sendall(self, data):
-        if self._socket == None:
+        if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
 
         self._socket.sendall(data)
@@ -74,7 +74,9 @@ class Connection(object):
         self._port = settings.get("port", 33060)
         self._user = settings.get("user")
         self._password = settings.get("password")
+        self._schema = settings.get("schema")
         self._active_result = None
+        self.settings = settings
         self.stream = SocketStream()
         self.reader_writer = None
         self.protocol = None
@@ -178,6 +180,21 @@ class BaseSession(object):
             mysqlx.Schema: The Schema object with the given name.
         """
         return Schema(self, name)
+
+    def get_default_schema(self):
+        """Retrieves a Schema object from the current session by the schema
+        name configured in the connection settings.
+
+        Returns:
+            mysqlx.Schema: The Schema object with the given name at connect
+                           time.
+
+        Raises:
+            ProgrammingError: If default schema not provided.
+        """
+        if self._connection.settings.get("schema"):
+            return Schema(self, self._connection.settings["schema"])
+        raise ProgrammingError("Default schema not provided")
 
     def drop_schema(self, name):
         """Drops the schema with the specified name.
