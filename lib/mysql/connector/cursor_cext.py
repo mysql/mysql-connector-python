@@ -26,6 +26,7 @@
 
 from collections import namedtuple
 import re
+import warnings
 import weakref
 
 from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
@@ -144,9 +145,22 @@ class CMySQLCursor(MySQLCursorAbstract):
         return None
 
     def _handle_warnings(self):
-        """Handle possible warnings after all results are consumed"""
+        """Handle possible warnings after all results are consumed
+
+        Also raises exceptions if raise_on_warnings is set
+        """
         if self._cnx.get_warnings is True and self._warning_count:
             self._warnings = self._fetch_warnings()
+            # should not happen given self._warning_count is set?
+            if not self._warnings:
+                return
+
+            warning = errors.get_mysql_exception(
+                *self._warnings[0][1:3], warning=True)
+            if self._cnx.raise_on_warnings:
+                raise warning
+            else:
+                warnings.warn(warning, stacklevel=4)
 
     def _handle_result(self, result):
         """Handles the result after statement execution"""
@@ -160,8 +174,6 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._affected_rows = result['affected_rows']
             self._rowcount = -1
             self._handle_warnings()
-            if self._cnx.raise_on_warnings is True and self._warnings:
-                raise errors.get_mysql_exception(*self._warnings[0][1:3])
 
     def _handle_resultset(self):
         """Handle a result set"""
@@ -174,8 +186,6 @@ class CMySQLCursor(MySQLCursorAbstract):
         """
         self._warning_count = self._cnx.warning_count
         self._handle_warnings()
-        if self._cnx.raise_on_warnings is True and self._warnings:
-            raise errors.get_mysql_exception(*self._warnings[0][1:3])
 
         if not self._cnx.more_results:
             self._cnx.free_result()
@@ -389,7 +399,12 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not self._cnx:
             return False
 
-        self._cnx.handle_unread_result()
+        try:
+            self._cnx.handle_unread_result()
+        except errors.InternalError as ex:
+            # Don't hide other exceptions which might have occured on closing
+            if ex.msg != "Unread result found":
+                raise
         self._warnings = None
         self._cnx = None
         return True

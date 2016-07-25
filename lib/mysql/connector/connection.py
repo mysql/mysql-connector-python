@@ -229,11 +229,12 @@ class MySQLConnection(MySQLConnectionAbstract):
         if not self._socket:
             return
 
-        try:
-            self.cmd_quit()
-            self._socket.close_connection()
-        except (AttributeError, errors.Error):
-            pass  # Getting an exception would mean we are disconnected.
+        for action in (self.cmd_quit, self._socket.close_connection):
+            try:
+                action()
+            except (AttributeError, errors.Error):
+                pass  # Getting an exception would mean we are disconnected.
+
     disconnect = close
 
     def _send_cmd(self, command, argument=None, packet_number=0, packet=None,
