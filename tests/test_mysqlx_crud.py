@@ -577,18 +577,19 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         self.node_session.sql(
             "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
-            "config JSON, created DATE)".format(table_name)).execute()
-        self.node_session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26')"
+            "config JSON, created DATE, active BIT)"
             "".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12')"
+            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
             "".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11')"
+            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
+            ", 0)".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', 1)"
             "".format(table_name)).execute()
         self.node_session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21')"
+            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', 0)"
             "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
@@ -615,3 +616,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("config", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.JSON, col.get_type())
+
+        col = result.columns[5]
+        self.assertEqual("active", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())

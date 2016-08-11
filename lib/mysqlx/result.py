@@ -496,8 +496,10 @@ class ColumnMetaData(object):
             self._col_type = ColumnType.SET
         elif self._proto_type == ColumnProtoType.ENUM:
             self._col_type = ColumnType.ENUM
+        elif self._proto_type == ColumnProtoType.BIT:
+            self._col_type = ColumnType.BIT
         else:
-            raise ValueError("Unknown column type {0}".format(self._col_type))
+            raise ValueError("Unknown column type {0}".format(self._proto_type))
 
 
 class Warning(object):
