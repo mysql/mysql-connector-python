@@ -35,6 +35,8 @@ LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
 _CREATE_TEST_TABLE_QUERY = "CREATE TABLE `{0}`.`{1}` (id INT)"
 _INSERT_TEST_TABLE_QUERY = "INSERT INTO `{0}`.`{1}` VALUES ({2})"
+_CREATE_TEST_VIEW_QUERY = ("CREATE VIEW `{0}`.`{1}` AS SELECT * "
+                           "FROM `{2}`.`{3}`;")
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
                        "WHERE table_schema = '{0}' AND table_name = '{1}'")
 
@@ -103,18 +105,21 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         tables = self.schema.get_tables()
         self.assertEqual(0, len(tables), "Should have returned 0 objects")
 
-        self.node_session.sql("CREATE TABLE {0}.table1(id INT)"
-                              "".format(self.schema_name)).execute()
-        self.node_session.sql("CREATE TABLE {0}.table2(id INT)"
-                              "".format(self.schema_name)).execute()
-        self.node_session.sql("CREATE TABLE {0}.table3(id INT)"
-                              "".format(self.schema_name)).execute()
-
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, "table1")).execute()
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, "table2")).execute()
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, "table3")).execute()
+        self.node_session.sql(_CREATE_TEST_VIEW_QUERY.format(
+            self.schema_name, "view1",
+            self.schema_name, "table1")).execute()
         tables = self.schema.get_tables()
-        self.assertEqual(3, len(tables), "Should have returned 3 objects")
+        self.assertEqual(4, len(tables), "Should have returned 4 objects")
         self.assertEqual("table1", tables[0].get_name())
         self.assertEqual("table2", tables[1].get_name())
         self.assertEqual("table3", tables[2].get_name())
+        self.assertEqual("view1", tables[3].get_name())
 
     def test_drop_collection(self):
         collection_name = "collection_test"
@@ -621,3 +626,19 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("active", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())
+
+    def test_is_view(self):
+        table_name = "table_test"
+        view_name = "view_test"
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name)).execute()
+        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name, "1")).execute()
+        table = self.schema.get_table(table_name)
+        self.assertFalse(table.is_view())
+
+        self.node_session.sql(_CREATE_TEST_VIEW_QUERY.format(
+            self.schema_name, view_name,
+            self.schema_name, table_name)).execute()
+        view = self.schema.get_table(view_name)
+        self.assertTrue(view.is_view())

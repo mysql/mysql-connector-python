@@ -31,12 +31,15 @@ from .statement import (FindStatement, AddStatement, RemoveStatement,
                         DropCollectionIndexStatement)
 
 
+_COUNT_VIEWS_QUERY = ("SELECT COUNT(*) FROM information_schema.views "
+                      "WHERE table_schema = '{0}' AND table_name = '{1}'")
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
                        "WHERE table_schema = '{0}' AND table_name = '{1}'")
 _COUNT_SCHEMAS_QUERY = ("SELECT COUNT(*) FROM information_schema.schemata "
                         "WHERE schema_name like '{0}'")
 _COUNT_QUERY = "SELECT COUNT(*) FROM `{0}`.`{1}`"
 _DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
+_DROP_VIEW_QUERY = "DROP VIEW IF EXISTS `{0}`.`{1}`"
 
 
 class DatabaseObject(object):
@@ -95,6 +98,7 @@ class DatabaseObject(object):
 
     def who_am_i(self):
         return self.get_name()
+
 
 class Schema(DatabaseObject):
     """A client-side representation of a database schema. Provides access to
@@ -159,11 +163,11 @@ class Schema(DatabaseObject):
         rows = self._connection.get_row_result("list_objects", self._name)
         rows.fetch_all()
         tables = []
+        object_types = ("TABLE", "VIEW",)
         for row in rows:
-            if row.get_string("type") != "TABLE":
-                continue
-            table = Table(self, row.get_string("name"))
-            tables.append(table)
+            if row.get_string("type") in object_types:
+                table = Table(self, row.get_string("name"))
+                tables.append(table)
         return tables
 
     def get_table(self, name, check_existence=False):
@@ -205,8 +209,13 @@ class Schema(DatabaseObject):
         Args:
             name (str): The name of the table to be dropped.
         """
-        self._connection.execute_nonquery(
-            "sql", _DROP_TABLE_QUERY.format(self._name, name), False)
+        table = Table(self, name)
+        if table.is_view():
+            self._connection.execute_nonquery(
+                "sql", _DROP_VIEW_QUERY.format(self._name, name), False)
+        else:
+            self._connection.execute_nonquery(
+                "sql", _DROP_TABLE_QUERY.format(self._name, name), False)
 
     def create_collection(self, name, reuse=False):
         """Creates in the current schema a new collection with the specified
@@ -407,3 +416,12 @@ class Table(DatabaseObject):
         """
         sql = _COUNT_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql)
+
+    def is_view(self):
+        """Determine if the underlying object is a view or not.
+
+        Returns:
+            bool: `True` if the underlying object is a view.
+        """
+        sql = _COUNT_VIEWS_QUERY.format(self._schema.get_name(), self._name)
+        return self._connection.execute_sql_scalar(sql) == 1
