@@ -21,9 +21,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from protobuf.mysqlx_datatypes_pb2 import *
-from protobuf.mysqlx_expr_pb2 import *
-from protobuf.mysqlx_crud_pb2 import *
+from .compat import STRING_TYPES, PY3
+from .protobuf.mysqlx_datatypes_pb2 import Scalar
+from .protobuf.mysqlx_expr_pb2 import ColumnIdentifier, DocumentPathItem, Expr
+from .protobuf.mysqlx_crud_pb2 import Column, Order, Projection
+
+
+if PY3:
+    xrange = range
 
 
 class TokenType:
@@ -171,7 +176,7 @@ def build_int_scalar(i):
 
 
 def build_string_scalar(s):
-    if isinstance(s, unicode):
+    if isinstance(s, STRING_TYPES):
         s = bytes(bytearray(s, "utf-8"))
     return Scalar(type=Scalar.V_STRING, v_string=Scalar.String(value=s))
 

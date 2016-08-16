@@ -28,8 +28,14 @@ import struct
 import sys
 
 from datetime import datetime, timedelta
+
 from .dbdoc import DbDoc
 from .charsets import MYSQL_CHARACTER_SETS
+from .compat import STRING_TYPES
+
+
+def decode_from_bytes(value, encoding="utf-8"):
+    return value.decode(encoding) if isinstance(value, bytes) else value
 
 
 def from_protobuf(col_type, payload):
@@ -80,7 +86,7 @@ def varint_from_protobuf_stream(payload):
     shift = 0
 
     for c in payload:
-        ch = ord(c)
+        ch = c if isinstance(c, int) else ord(c)
         eos = (ch & 0x80) == 0
         cur_bits = (ch & 0x7f)
         cur_bits <<= shift
@@ -346,11 +352,11 @@ class ColumnMetaData(object):
                  original_table=None, name=None, original_name=None,
                  length=None, collation=None, fractional_digits=None,
                  flags=None, content_type=None):
-        self._schema = schema
-        self._name = name
-        self._original_name = original_name
-        self._table = table
-        self._original_table = original_table
+        self._schema = decode_from_bytes(schema)
+        self._name = decode_from_bytes(name)
+        self._original_name = decode_from_bytes(original_name)
+        self._table = decode_from_bytes(table)
+        self._original_table = decode_from_bytes(original_table)
         self._proto_type = col_type
         self._col_type = None
         self._catalog = catalog
@@ -362,6 +368,7 @@ class ColumnMetaData(object):
         self._number_signed = False
         self._is_padded = False
         self._is_binary = False
+        self._is_bytes = False
         self._collation_name = None
         self._character_set_name = None
 
@@ -375,10 +382,13 @@ class ColumnMetaData(object):
             self._is_binary = ("binary" in self._collation_name or
                                "_bin" in self._collation_name)
         self._map_type()
+        self._is_bytes = self._col_type in (
+            ColumnType.GEOMETRY, ColumnType.JSON, ColumnType.XML,
+            ColumnType.BYTES, ColumnType.STRING)
 
     def __str__(self):
         return str({
-            "col_type": self._col_type.name,
+            "col_type": self._col_type,
             "schema": self._schema,
             "table": self._table,
             "flags": str(self._flags),
@@ -419,6 +429,9 @@ class ColumnMetaData(object):
 
     def is_padded(self):
         return self._is_padded
+
+    def is_bytes(self):
+        return self._is_bytes
 
     def _map_int_type(self):
         if self._length <= 4:
@@ -533,7 +546,7 @@ class Row(object):
         self._resultset = rs
 
     def __getitem__(self, index):
-        if isinstance(index, basestring):
+        if isinstance(index, STRING_TYPES):
             index = self._resultset.index_of(index)
         elif index >= len(self._fields):
             raise IndexError("Index out of range")
@@ -674,7 +687,9 @@ class BufferingResult(BaseResult):
         if not dumping:
             for x in range(len(row.field)):
                 col = self._columns[x]
-                item[x] = from_protobuf(col._proto_type, row.field[x])
+                value = (decode_from_bytes(row.field[x])
+                         if col.is_bytes() else row.field[x])
+                item[x] = from_protobuf(col._proto_type, value)
         return Row(self, item)
 
     def _page_in_items(self):
@@ -766,4 +781,4 @@ class DocResult(BufferingResult):
         row = super(DocResult, self)._read_item(dumping)
         if row is None:
             return None
-        return DbDoc(row[0])
+        return DbDoc(decode_from_bytes(row[0]))

@@ -23,10 +23,10 @@
 
 """MySQL X DevAPI Python implementation"""
 
-from urlparse import urlparse
-
+from .compat import STRING_TYPES, urlparse
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table
+from .dbdoc import DbDoc
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
                      NotSupportedError, DataError, IntegrityError,
                      ProgrammingError, OperationalError, InternalError)
@@ -38,7 +38,6 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement,
                         DropCollectionIndexStatement)
-from .dbdoc import DbDoc
 
 
 def _get_connection_settings(*args, **kwargs):
@@ -57,7 +56,7 @@ def _get_connection_settings(*args, **kwargs):
     """
     settings = {}
     if args:
-        if isinstance(args[0], (str, unicode,)):
+        if isinstance(args[0], STRING_TYPES):
             uri = "{0}{1}".format("" if args[0].startswith("mysqlx://")
                                   else "mysqlx://", args[0])
             parsed = urlparse(uri)

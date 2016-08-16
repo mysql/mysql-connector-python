@@ -32,6 +32,7 @@ from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
 from .statement import SqlStatement, AddStatement
 
+
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
 
@@ -47,20 +48,18 @@ class SocketStream(object):
     def read(self, count):
         if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
-
-        buf = ""
+        buf = []
         while count > 0:
             data = self._socket.recv(count)
-            if data == "":
+            if data == b"":
                 raise RuntimeError("Unexpected connection close")
-            buf += data
+            buf.append(data)
             count -= len(data)
-        return buf
+        return b"".join(buf)
 
     def sendall(self, data):
         if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
-
         self._socket.sendall(data)
 
     def close(self):

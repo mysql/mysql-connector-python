@@ -27,6 +27,7 @@ import json
 
 from .errors import ProgrammingError
 from .expr import ExprParser
+from .compat import STRING_TYPES
 from .dbdoc import DbDoc
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult
@@ -168,7 +169,7 @@ class FilterableStatement(Statement):
     def _bind_single(self, object):
         if isinstance(object, DbDoc):
             self.bind(str(object))
-        elif isinstance(object, basestring):
+        elif isinstance(object, STRING_TYPES):
             dict = json.loads(object)
             for key in dict.keys():
                 self.bind(key, dict[key])

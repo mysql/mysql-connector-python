@@ -34,11 +34,11 @@ from .protobuf import mysqlx_resultset_pb2 as MySQLxResultset
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .protobuf import mysqlx_expr_pb2 as MySQLxExpr
 from .result import ColumnMetaData
+from .compat import STRING_TYPES, INT_TYPES
 from .dbdoc import DbDoc
-from .expr import (ExprParser, Find, UpdateOperation, build_null_scalar,
-                   build_string_scalar, build_bool_scalar, build_double_scalar,
-                   build_int_scalar)
 from .errors import InterfaceError, OperationalError, ProgrammingError
+from .expr import (ExprParser, build_null_scalar, build_string_scalar,
+                   build_bool_scalar, build_double_scalar, build_int_scalar)
 
 
 _SERVER_MESSAGES = [
@@ -57,6 +57,10 @@ _SERVER_MESSAGES = [
      MySQLxResultset.FetchDoneMoreResultsets),
     (MySQLx.ServerMessages.OK, MySQLx.Ok),
 ]
+
+
+def encode_to_bytes(value, encoding="utf-8"):
+    return value if isinstance(value, bytes) else value.encode(encoding)
 
 
 class MessageReaderWriter(object):
@@ -92,7 +96,7 @@ class MessageReaderWriter(object):
     def write_message(self, msg_id, msg):
         msg_str = msg.SerializeToString()
         header = struct.pack("<LB", len(msg_str) + 1, msg_id)
-        self._stream.sendall("{0}{1}".format(header, msg_str))
+        self._stream.sendall(b"".join([header, msg_str]))
 
 
 class Protocol(object):
@@ -114,7 +118,8 @@ class Protocol(object):
         return msg.auth_data
 
     def send_auth_continue(self, data):
-        msg = MySQLxSession.AuthenticateContinue(auth_data=data)
+        msg = MySQLxSession.AuthenticateContinue(
+            auth_data=encode_to_bytes(data))
         self._writer.write_message(
             MySQLx.ClientMessages.SESS_AUTHENTICATE_CONTINUE, msg)
 
@@ -156,10 +161,11 @@ class Protocol(object):
             message.grouping_criteria.CopyFrom(statement._having)
 
     def send_find(self, stmt):
-        find = Find(data_model=(MySQLxCrud.DOCUMENT
-                                if stmt._doc_based else MySQLxCrud.TABLE),
-                    collection=MySQLxCrud.Collection(name=stmt.target.name,
-                                                     schema=stmt.schema.name))
+        find = MySQLxCrud.Find(
+            data_model=(MySQLxCrud.DOCUMENT
+                        if stmt._doc_based else MySQLxCrud.TABLE),
+            collection=MySQLxCrud.Collection(name=stmt.target.name,
+                                             schema=stmt.schema.name))
         if stmt._has_projection:
             find.projection.extend(stmt._projection_expr)
         self._apply_filter(find, stmt)
@@ -173,8 +179,8 @@ class Protocol(object):
                                              schema=statement.schema.name))
         self._apply_filter(update, statement)
         for update_op in statement._update_ops:
-            opexpr = UpdateOperation(operation=update_op.update_type,
-                                     source=update_op.source)
+            opexpr = MySQLxCrud.UpdateOperation(
+                operation=update_op.update_type, source=update_op.source)
             if update_op.value is not None:
                 opexpr.value.CopyFrom(
                     self.arg_object_to_expr(
@@ -192,7 +198,8 @@ class Protocol(object):
         self._writer.write_message(MySQLx.ClientMessages.CRUD_DELETE, delete)
 
     def send_execute_statement(self, namespace, stmt, args):
-        stmt = MySQLxSQL.StmtExecute(namespace=namespace, stmt=stmt,
+        stmt = MySQLxSQL.StmtExecute(namespace=namespace,
+                                     stmt=encode_to_bytes(stmt),
                                      compact_metadata=False)
         for arg in args:
             value = self._create_any(arg)
@@ -225,13 +232,13 @@ class Protocol(object):
         self._writer.write_message(MySQLx.ClientMessages.CRUD_INSERT, insert)
 
     def _create_any(self, arg):
-        if isinstance(arg, (str, unicode,)):
-            val = MySQLxDatatypes.Scalar.String(value=arg)
+        if isinstance(arg, STRING_TYPES):
+            val = MySQLxDatatypes.Scalar.String(value=encode_to_bytes(arg))
             scalar = MySQLxDatatypes.Scalar(type=8, v_string=val)
             return MySQLxDatatypes.Any(type=1, scalar=scalar)
         elif isinstance(arg, bool):
             return MySQLxDatatypes.Any(type=1, scalar=build_bool_scalar(arg))
-        elif isinstance(arg, int):
+        elif isinstance(arg, INT_TYPES):
             return MySQLxDatatypes.Any(type=1, scalar=build_int_scalar(arg))
         return None
 
@@ -311,13 +318,13 @@ class Protocol(object):
         if isinstance(value, bool):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
                                    literal=build_bool_scalar(value))
-        elif isinstance(value, (int, long)):
+        elif isinstance(value, INT_TYPES):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
                                    literal=build_int_scalar(value))
         elif isinstance(value, (float)):
             return MySQLxExpr.Expr(type=MySQLxExpr.Expr.LITERAL,
                                    literal=build_double_scalar(value))
-        elif isinstance(value, basestring):
+        elif isinstance(value, STRING_TYPES):
             try:
                 expression = ExprParser(value, allow_relational).expr()
                 if expression.has_identifier():

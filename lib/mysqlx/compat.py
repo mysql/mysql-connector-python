@@ -21,42 +21,25 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-"""Implementation of the DbDoc."""
+"""This module handles compatibility issues between Python 2 and Python 3."""
 
-import json
-import uuid
+import sys
+import decimal
 
-from .compat import STRING_TYPES
+PY3 = sys.version_info.major == 3
 
 
-class DbDoc(object):
-    """Represents a generic document in JSON format.
-
-    Args:
-        value (object): The value can be a JSON string or a dict.
-
-    Raises:
-        ValueError: If ``value`` type is not a basestring or dict.
-    """
-    def __init__(self, value):
-        # TODO: Handle exceptions. What happens if it doesn't load properly?
-        if isinstance(value, dict):
-            self.__dict__ = value
-        elif isinstance(value, STRING_TYPES):
-            self.__dict__ = json.loads(value)
-        else:
-            raise ValueError("Unable to handle type: {0}".format(type(value)))
-
-    def __getitem__(self, index):
-        return self.__dict__[index]
-
-    def keys(self):
-        return self.__dict__.keys()
-
-    def ensure_id(self):
-        if "_id" not in self.__dict__:
-            self.__dict__["_id"] = uuid.uuid4().hex
-        return self.__dict__["_id"]
-
-    def __str__(self):
-        return json.dumps(self.__dict__)
+if PY3:
+    from urllib.parse import urlparse
+    NUMERIC_TYPES = (int, float, decimal.Decimal,)
+    INT_TYPES = (int,)
+    UNICODE_TYPES = (str,)
+    STRING_TYPES = (str,)
+    BYTE_TYPES = (bytearray, bytes,)
+else:
+    from urlparse import urlparse
+    NUMERIC_TYPES = (int, float, decimal.Decimal, long,)
+    INT_TYPES = (int, long,)
+    UNICODE_TYPES = (unicode,)
+    STRING_TYPES = (str, unicode,)
+    BYTE_TYPES = (bytearray,)
