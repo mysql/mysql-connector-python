@@ -574,14 +574,16 @@ class BaseResult(object):
     """
     def __init__(self, connection):
         self._connection = connection
-        self._protocol = self._connection.protocol
         self._closed = False
         self._rows_affected = 0
         self._generated_id = -1
         self._warnings = []
-        if connection._active_result is not None:
-            connection._active_result.fetch_all()
-            connection._active_result = None
+
+        if connection is None:
+            self._protocol = None
+        else:
+            self._protocol = connection.protocol
+            connection.fetch_active_result()
 
     def get_warnings(self):
         """Returns the warnings.
@@ -608,10 +610,12 @@ class Result(BaseResult):
         connection (mysqlx.connection.Connection): The Connection object.
         ids (list): A list of IDs.
     """
-    def __init__(self, connection, ids=None):
+    def __init__(self, connection=None, ids=None):
         super(Result, self).__init__(connection)
         self._ids = ids
-        self._protocol.close_result(self)
+
+        if connection is not None:
+            self._protocol.close_result(self)
 
     def get_affected_items_count(self):
         """Returns the number of affected items for the last operation.

@@ -193,6 +193,26 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(7, collection.count())
 
+        # add empty documents
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+        valid_col = schema.get_collection(collection_name)
+        invalid_col = schema.get_collection('invalid_col')
+
+        result = valid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        result = invalid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        # can add empty documents even with no connection
+        session.close()
+        result = valid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        result = invalid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
     def test_get_document_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
