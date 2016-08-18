@@ -32,6 +32,10 @@ from .dbdoc import DbDoc
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult
 
+def _flexible_params(*values):
+    if len(values) == 1 and isinstance(values[0], (list, tuple,)):
+        return values[0]
+    return values
 
 class Statement(object):
     """Provides base functionality for statement objects.
@@ -110,7 +114,7 @@ class FilterableStatement(Statement):
     def _projection(self, *fields):
         self._has_projection = True
         self._projection_expr = ExprParser(
-            ",".join(fields),
+            ",".join(_flexible_params(*fields)),
             not self._doc_based).parse_table_select_projection()
         return self
 
@@ -133,13 +137,13 @@ class FilterableStatement(Statement):
             *sort_clauses: The expression strings defining the sort criteria.
         """
         self._has_sort = True
-        self._sort_expr = ExprParser(",".join(sort_clauses),
+        self._sort_expr = ExprParser(",".join(_flexible_params(*sort_clauses)),
                                      not self._doc_based).parse_order_spec()
         return self
 
     def _group_by(self, *fields):
         self._has_group_by = True
-        self._grouping = ExprParser(",".join(fields),
+        self._grouping = ExprParser(",".join(_flexible_params(*fields)),
                                     not self._doc_based).parse_expr_list()
 
     def _having(self, condition):
@@ -225,7 +229,7 @@ class AddStatement(Statement):
         mysqlx.AddStatement: AddStatement object.
     """
     def add(self, *values):
-        for val in values:
+        for val in _flexible_params(*values):
             if isinstance(val, DbDoc):
                 self._values.append(val)
             else:
@@ -306,7 +310,7 @@ class ModifyStatement(FilterableStatement):
                        value))
         return self
 
-    def unset(self, doc_path):
+    def unset(self, *doc_paths):
         """Removes attributes from documents in a collection.
 
         Args:
@@ -316,8 +320,9 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, doc_path))
+        self._update_ops.extend([
+            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, x)
+            for x in _flexible_params(*doc_paths)])
         return self
 
     def array_insert(self, field, value):
@@ -475,7 +480,7 @@ class InsertStatement(Statement):
     """
     def __init__(self, table, *fields):
         super(InsertStatement, self).__init__(target=table, doc_based=False)
-        self._fields = fields
+        self._fields = _flexible_params(*fields)
         self._values = []
 
     def values(self, *values):
@@ -487,7 +492,7 @@ class InsertStatement(Statement):
         Returns:
             mysqlx.InsertStatement: InsertStatement object.
         """
-        self._values.append(list(values))
+        self._values.append(list(_flexible_params(*values)))
         return self
 
     def execute(self):

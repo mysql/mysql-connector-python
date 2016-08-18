@@ -187,6 +187,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
 
+        # add an array of dictionaries (flexible params)
+        result = collection.add([{"name": "Wilma", "age": 33},
+                                {"name": "Barney", "age": 42}]).execute()
+        self.assertEqual(result.get_affected_items_count(), 2)
+        self.assertEqual(7, collection.count())
+
     def test_get_document_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -234,6 +240,21 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
 
+        # test flexible params
+        result = collection.find("$.age > 28")\
+                           .sort(["age DESC", "name ASC"]).execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+        self.assertEqual(67, docs[0]["age"])
+
+        # test flexible params
+        result = collection.find().fields(["age"])\
+                           .sort("age DESC").limit(2).execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+        self.assertEqual(42, docs[1]["age"])
+        self.assertEqual(1, len(docs[1].keys()))
+
     def test_modify(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -259,6 +280,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(2, result.get_affected_items_count())
         docs = collection.find("young = True").execute().fetch_all()
         self.assertEqual(0, len(docs))
+
+        # test flexible params
+        result = collection.modify().unset(["young"]).execute()
+        self.assertEqual(1, result.get_affected_items_count())
 
     def test_results(self):
         collection_name = "collection_test"
@@ -443,6 +468,11 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 
+        # test flexible params
+        result = table.select(['age', 'name']).sort("age DESC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(4, len(rows))
+
     def test_having(self):
         table_name = "{0}.test".format(self.schema_name)
 
@@ -470,6 +500,13 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
         self.assertEqual(42, rows[0]["age"])
 
+        # test flexible params
+        result = table.select().group_by(["gender"]).sort(["name DESC", "age ASC"]).execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
+        self.assertEqual(42, rows[0]["age"])
+        self.assertEqual(21, rows[1]["age"])
+
     def test_insert(self):
         table = self.schema.get_table("test")
 
@@ -486,6 +523,15 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.select().execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
+
+        # test flexible params
+        result = table.insert(["age", "name"]) \
+            .values([35, 'Eddard']) \
+            .values(9, 'Arya').execute()
+
+        result = table.select().execute()
+        rows = result.fetch_all()
+        self.assertEqual(6, len(rows))
 
     def test_update(self):
         table = self.schema.get_table("test")
