@@ -30,7 +30,7 @@ from .expr import ExprParser
 from .compat import STRING_TYPES
 from .dbdoc import DbDoc
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
-from .result import SqlResult
+from .result import SqlResult, Result
 
 
 class Statement(object):
@@ -238,6 +238,9 @@ class AddStatement(Statement):
         Returns:
             mysqlx.Result: Result object.
         """
+        if len(self._values) == 0:
+            return Result()
+
         for doc in self._values:
             self._ids.append(doc.ensure_id())
 

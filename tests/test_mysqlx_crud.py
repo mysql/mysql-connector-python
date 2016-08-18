@@ -187,6 +187,33 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
 
+        # add an array of dictionaries (flexible params)
+        result = collection.add([{"name": "Wilma", "age": 33},
+                                {"name": "Barney", "age": 42}]).execute()
+        self.assertEqual(result.get_affected_items_count(), 2)
+        self.assertEqual(7, collection.count())
+
+        # add empty documents
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+        valid_col = schema.get_collection(collection_name)
+        invalid_col = schema.get_collection('invalid_col')
+
+        result = valid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        result = invalid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        # can add empty documents even with no connection
+        session.close()
+        result = valid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        result = invalid_col.add().execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+>>>>>>> 0bc7d3b... DevAPI: Define action on adding empty list of documents
     def test_get_document_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)

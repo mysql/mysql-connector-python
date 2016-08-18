@@ -80,6 +80,11 @@ class Connection(object):
         self.reader_writer = None
         self.protocol = None
 
+    def fetch_active_result(self):
+        if self._active_result is not None:
+            self._active_result.fetch_all()
+            self._active_result = None
+
     def connect(self):
         self.stream.connect(self._host, self._port)
         self.reader_writer = MessageReaderWriter(self.stream)
