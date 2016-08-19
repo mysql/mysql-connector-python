@@ -615,7 +615,7 @@ class Result(BaseResult):
         self._ids = ids
 
         if connection is not None:
-            self._protocol.close_result(self)
+            self._connection.close_result(self)
 
     def get_affected_items_count(self):
         """Returns the number of affected items for the last operation.
@@ -654,7 +654,7 @@ class BufferingResult(BaseResult):
         self._init_result()
 
     def _init_result(self):
-        self._columns = self._protocol.get_column_metadata(self)
+        self._columns = self._connection.get_column_metadata(self)
         self._has_more_data = True if len(self._columns) > 0 else False
         self._items = []
         self._page_size = 20
@@ -684,7 +684,7 @@ class BufferingResult(BaseResult):
         return -1
 
     def _read_item(self, dumping):
-        row = self._protocol.read_row(self)
+        row = self._connection.read_row(self)
         if row is None:
             return None
         item = [None] * len(row.field)

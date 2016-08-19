@@ -209,6 +209,64 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         session.close()
         self.assertRaises(mysqlx.OperationalError, schema.exists_in_database)
 
+    def test_bind_to_default_shard(self):
+        try:
+            # Getting a NodeSession to the default shard
+            sess = mysqlx.get_session(self.connect_kwargs)
+            nsess = sess.bind_to_default_shard()
+            self.assertEqual(sess._settings, nsess._settings)
+
+            # Close XSession and all dependent NodeSessions
+            sess.close()
+            self.assertFalse(nsess.is_open())
+
+            # Connection error on XSession
+            sess = mysqlx.get_session(self.connect_kwargs)
+            nsess_a = sess.bind_to_default_shard()
+            nsess_b = sess.bind_to_default_shard()
+            tests.MYSQL_SERVERS[0].stop()
+            tests.MYSQL_SERVERS[0].wait_down()
+
+            self.assertRaises(mysqlx.errors.InterfaceError,
+                              sess.get_default_schema().exists_in_database)
+            self.assertFalse(sess.is_open())
+            self.assertFalse(nsess_a.is_open())
+            self.assertFalse(nsess_b.is_open())
+
+            tests.MYSQL_SERVERS[0].start()
+            tests.MYSQL_SERVERS[0].wait_up()
+
+            # Connection error on dependent NodeSession
+            sess = mysqlx.get_session(self.connect_kwargs)
+            nsess_a = sess.bind_to_default_shard()
+            nsess_b = sess.bind_to_default_shard()
+            tests.MYSQL_SERVERS[0].stop()
+            tests.MYSQL_SERVERS[0].wait_down()
+
+            self.assertRaises(mysqlx.errors.InterfaceError,
+                              nsess_a.sql("SELECT 1").execute)
+            self.assertFalse(nsess_a.is_open())
+            self.assertTrue(nsess_b.is_open())
+            self.assertTrue(sess.is_open())
+
+            tests.MYSQL_SERVERS[0].start()
+            tests.MYSQL_SERVERS[0].wait_up()
+
+            # Getting a NodeSession a shard (connect error)
+            sess = mysqlx.get_session(self.connect_kwargs)
+            tests.MYSQL_SERVERS[0].stop()
+            tests.MYSQL_SERVERS[0].wait_down()
+
+            self.assertRaises(mysqlx.errors.InterfaceError,
+                              sess.bind_to_default_shard)
+
+            tests.MYSQL_SERVERS[0].start()
+            tests.MYSQL_SERVERS[0].wait_up()
+
+        finally:
+            if not tests.MYSQL_SERVERS[0].check_running():
+                tests.MYSQL_SERVERS[0].start()
+                tests.MYSQL_SERVERS[0].wait_up()
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxNodeSessionTests(tests.MySQLxTests):
