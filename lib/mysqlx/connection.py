@@ -25,6 +25,8 @@
 
 import socket
 
+from functools import wraps
+
 from .authentication import MySQL41AuthPlugin
 from .errors import InterfaceError, OperationalError, ProgrammingError
 from .crud import Schema
@@ -67,6 +69,17 @@ class SocketStream(object):
         self._socket = None
 
 
+def catch_network_exception(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except (socket.error, RuntimeError):
+            self.disconnect()
+            raise InterfaceError("Cannot connect to host.")
+    return wrapper
+
+
 class Connection(object):
     def __init__(self, settings):
         self._user = settings.get("user")
@@ -104,9 +117,11 @@ class Connection(object):
             plugin.build_authentication_response(extra_data))
         self.protocol.read_auth_ok()
 
+    @catch_network_exception
     def send_sql(self, sql, *args):
         self.protocol.send_execute_statement("sql", sql, args)
 
+    @catch_network_exception
     def send_insert(self, statement):
         self.protocol.send_insert(statement)
         ids = None
@@ -114,22 +129,27 @@ class Connection(object):
             ids = statement._ids
         return Result(self, ids)
 
+    @catch_network_exception
     def find(self, statement):
         self.protocol.send_find(statement)
         return DocResult(self) if statement._doc_based else RowResult(self)
 
+    @catch_network_exception
     def delete(self, statement):
         self.protocol.send_delete(statement)
         return Result(self)
 
+    @catch_network_exception
     def update(self, statement):
         self.protocol.send_update(statement)
         return Result(self)
 
+    @catch_network_exception
     def execute_nonquery(self, namespace, cmd, raise_on_fail=True, *args):
         self.protocol.send_execute_statement(namespace, cmd, args)
         return Result(self)
 
+    @catch_network_exception
     def execute_sql_scalar(self, sql, *args):
         self.protocol.send_execute_statement("sql", sql, args)
         result = RowResult(self)
@@ -138,11 +158,34 @@ class Connection(object):
             raise InterfaceError("No data found")
         return result[0][0]
 
+    @catch_network_exception
     def get_row_result(self, cmd, *args):
         self.protocol.send_execute_statement("xplugin", cmd, args)
         return RowResult(self)
 
+    @catch_network_exception
+    def read_row(self, result):
+        return self.protocol.read_row(result)
+
+    @catch_network_exception
+    def close_result(self, result):
+        self.protocol.close_result(result)
+
+    @catch_network_exception
+    def get_column_metadata(self, result):
+        return self.protocol.get_column_metadata(result)
+
+    def is_open(self):
+        return self.stream._socket is not None
+
+    def disconnect(self):
+        if not self.is_open():
+            return
+        self.stream.close()
+
     def close(self):
+        if not self.is_open():
+            return
         if self._active_result is not None:
             self._active_result.fetch_all()
         self.protocol.send_close()
@@ -153,6 +196,7 @@ class Connection(object):
 class XConnection(Connection):
     def __init__(self, settings):
         super(XConnection, self).__init__(settings)
+        self.dependent_connections = []
         self._routers = settings.get("routers", [])
 
         if 'host' in settings and settings['host']:
@@ -204,6 +248,19 @@ class XConnection(Connection):
                 4001)
         else:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
+
+    def bind_connection(self, connection):
+        self.dependent_connections.append(connection)
+
+    def close(self):
+        while self.dependent_connections:
+            self.dependent_connections.pop().close()
+        super(XConnection, self).close()
+
+    def disconnect(self):
+        while self.dependent_connections:
+            self.dependent_connections.pop().disconnect()
+        super(XConnection, self).disconnect()
 
 
 class NodeConnection(Connection):
@@ -323,6 +380,14 @@ class XSession(BaseSession):
         super(XSession, self).__init__(settings)
         self._connection = XConnection(self._settings)
         self._connection.connect()
+
+    def bind_to_default_shard(self):
+        if not self.is_open():
+            raise OperationalError("XSession is not connected to a farm.")
+
+        nsess = NodeSession(self._settings)
+        self._connection.bind_connection(nsess._connection)
+        return nsess
 
 
 class NodeSession(BaseSession):
