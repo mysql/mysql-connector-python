@@ -69,8 +69,6 @@ class SocketStream(object):
 
 class Connection(object):
     def __init__(self, settings):
-        self._host = settings.get("host", "localhost")
-        self._port = settings.get("port", 33060)
         self._user = settings.get("user")
         self._password = settings.get("password")
         self._schema = settings.get("schema")
@@ -85,8 +83,8 @@ class Connection(object):
             self._active_result.fetch_all()
             self._active_result = None
 
-    def connect(self):
-        self.stream.connect(self._host, self._port)
+    def connect(self, host, port):
+        self.stream.connect(host, port)
         self.reader_writer = MessageReaderWriter(self.stream)
         self.protocol = Protocol(self.reader_writer)
         self._handle_capabilities()
@@ -152,6 +150,75 @@ class Connection(object):
         self.stream.close()
 
 
+class XConnection(Connection):
+    def __init__(self, settings):
+        super(XConnection, self).__init__(settings)
+        self._routers = settings.get("routers", [])
+
+        if 'host' in settings and settings['host']:
+            self._routers.append({
+                'host': settings.pop('host'),
+                'port': settings.pop('port', None)
+            })
+
+        self._ensure_priorities()
+        self._routers.sort(key=lambda x: x['priority'], reverse=True)
+
+    def _ensure_priorities(self):
+        priority_count = 0
+        priority = 100
+
+        for router in self._routers:
+            pri = router.get('priority', None)
+            if pri is None:
+                priority_count += 1
+                router["priority"] = priority
+            elif pri > 100:
+                raise ProgrammingError("The priorities must be between 0 and "
+                    "100", 4007)
+            priority -= 1
+
+        if 0 < priority_count < len(self._routers):
+            raise ProgrammingError("You must either assign no priority to any "
+                "of the routers or give a priority for every router", 4000)
+
+    def connect(self):
+        # Reset all router availibilty
+        if not all(x.get('available', None) for x in self._routers):
+            for router in self._routers:
+                router['available'] = True
+
+        # Loop and check
+        error = None
+        for router in self._routers:
+            try:
+                super(XConnection, self).connect(router.get("host"),
+                                                 router.get("port"))
+                return
+            except socket.error as err:
+                router['available'] = False
+                error = err
+
+        if len(self._routers) > 1:
+            raise InterfaceError("Failed to connect to any of the routers.",
+                4001)
+        else:
+            raise InterfaceError("Cannot connect to host: {0}".format(error))
+
+
+class NodeConnection(Connection):
+    def __init__(self, settings):
+        super(NodeConnection, self).__init__(settings)
+        self._host = settings.get("host", "localhost")
+        self._port = settings.get("port", 33060)
+
+    def connect(self):
+        try:
+            super(NodeConnection, self).connect(self._host, self._port)
+        except socket.error as err:
+            raise InterfaceError("Cannot connect to host: {0}".format(err))
+
+
 class BaseSession(object):
     """Base functionality for Session classes through the X Protocol.
 
@@ -168,8 +235,6 @@ class BaseSession(object):
     """
     def __init__(self, settings):
         self._settings = settings
-        self._connection = Connection(self._settings)
-        self._connection.connect()
 
     def is_open(self):
         return self._connection.stream._socket is not None
@@ -256,6 +321,8 @@ class XSession(BaseSession):
     """
     def __init__(self, settings):
         super(XSession, self).__init__(settings)
+        self._connection = XConnection(self._settings)
+        self._connection.connect()
 
 
 class NodeSession(BaseSession):
@@ -274,6 +341,8 @@ class NodeSession(BaseSession):
     """
     def __init__(self, settings):
         super(NodeSession, self).__init__(settings)
+        self._connection = NodeConnection(self._settings)
+        self._connection.connect()
 
     def sql(self, sql):
         """Creates a :class:`mysqlx.SqlStatement` object to allow running the
