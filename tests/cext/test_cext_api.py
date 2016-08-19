@@ -426,6 +426,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy2.query("SELECT * FROM {0} WHERE c1 > 3".format(table))
         self.assertEqual([(4,), (5,), (6,)], fetch_rows(cmy2))
 
+        cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
         cmy1.close()
         cmy2.close()
 
@@ -768,3 +769,4 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             have_more = cmy.next_result()
 
         self.assertEqual(exp, result)
+        cmy.query("DROP TABLE IF EXISTS {0}".format(table))

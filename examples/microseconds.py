@@ -95,7 +95,8 @@ def main(config):
     except:
         # Ignoring the fact that it was not there
         pass
-    
+
+    cursor.execute("DROP TABLE IF EXISTS relay_laps")
     cursor.close()
     cnx.close()
     

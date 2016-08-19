@@ -124,8 +124,10 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         session.close()
 
     def test_drop_schema(self):
-        self.session.drop_schema(self.schema_name)
-        schema = self.session.get_schema(self.schema_name)
+        test_schema = 'mysql_xsession_test_drop_schema'
+        schema = self.session.create_schema(test_schema)
+
+        self.session.drop_schema(test_schema)
         self.assertFalse(schema.exists_in_database())
 
     def test_create_schema(self):
@@ -196,8 +198,10 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
         session.close()
 
     def test_drop_schema(self):
-        self.session.drop_schema(self.schema_name)
-        schema = self.session.get_schema(self.schema_name)
+        test_schema = 'mysql_nodesession_test_drop_schema'
+        schema = self.session.create_schema(test_schema)
+
+        self.session.drop_schema(test_schema)
         self.assertFalse(schema.exists_in_database())
 
     def test_create_schema(self):
