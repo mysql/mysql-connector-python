@@ -82,6 +82,7 @@ def main(config):
         except (mysql.connector.errors.Error, TypeError) as exc:
             output.append("Failed inserting {0}\nError: {1}\n".format(
                 data, exc))
+            cursor.execute(stmt_drop)
             raise
 
     # Read the names again and print them

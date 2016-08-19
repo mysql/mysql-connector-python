@@ -1332,6 +1332,7 @@ class MySQLCursorBufferedDictTests(tests.TestsCursor):
                          'name VARCHAR(20), city VARCHAR(20))')
 
     def tearDown(self):
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorBufferedDictTests')
         self.cur.close()
         self.connection.close()
 
@@ -1406,6 +1407,9 @@ class MySQLCursorBufferedNamedTupleTests(tests.TestsCursor):
                          'id INT(10), name VARCHAR(20), city VARCHAR(20))')
 
     def tearDown(self):
+        self.cur.execute('DROP TABLE IF EXISTS '
+                         'MySQLCursorBufferedNamedTupleTests')
+
         self.cur.close()
         self.connection.close()
 

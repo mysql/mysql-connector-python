@@ -52,10 +52,11 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
-        self.schema = self.session.create_schema(self.schema_name)
+        self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
-        self.session.drop_schema(self.schema_name)
+        self.session.close()
+        self.node_session.close()
 
     def test_get_session(self):
         session = self.schema.get_session()
@@ -89,6 +90,8 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         coll = self.schema.create_collection(collection_name)
         self.assertTrue(coll.exists_in_database())
 
+        self.schema.drop_collection(collection_name)
+
     def test_get_collections(self):
         coll = self.schema.get_collections()
         self.assertEqual(0, len(coll), "Should have returned 0 objects")
@@ -100,6 +103,10 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.assertEqual("coll1", coll[0].get_name())
         self.assertEqual("coll2", coll[1].get_name())
         self.assertEqual("coll3", coll[2].get_name())
+
+        self.schema.drop_collection("coll1")
+        self.schema.drop_collection("coll2")
+        self.schema.drop_collection("coll3")
 
     def test_get_tables(self):
         tables = self.schema.get_tables()
@@ -120,6 +127,11 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.assertEqual("table2", tables[1].get_name())
         self.assertEqual("table3", tables[2].get_name())
         self.assertEqual("view1", tables[3].get_name())
+
+        self.schema.drop_table("table1")
+        self.schema.drop_table("table2")
+        self.schema.drop_table("table3")
+        self.schema.drop_table("view1")
 
     def test_drop_collection(self):
         collection_name = "collection_test"
@@ -157,10 +169,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
-        self.schema = self.session.create_schema(self.schema_name)
+        self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
-        self.session.drop_schema(self.schema_name)
+        self.session.close()
+        self.node_session.close()
 
     def test_exists_in_database(self):
         collection_name = "collection_test"
@@ -187,33 +200,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
 
-        # add an array of dictionaries (flexible params)
-        result = collection.add([{"name": "Wilma", "age": 33},
-                                {"name": "Barney", "age": 42}]).execute()
-        self.assertEqual(result.get_affected_items_count(), 2)
-        self.assertEqual(7, collection.count())
+        self.schema.drop_collection(collection_name)
 
-        # add empty documents
-        session = mysqlx.get_session(self.connect_kwargs)
-        schema = session.get_schema(self.schema_name)
-        valid_col = schema.get_collection(collection_name)
-        invalid_col = schema.get_collection('invalid_col')
-
-        result = valid_col.add().execute()
-        self.assertEqual(0, result.get_affected_items_count())
-
-        result = invalid_col.add().execute()
-        self.assertEqual(0, result.get_affected_items_count())
-
-        # can add empty documents even with no connection
-        session.close()
-        result = valid_col.add().execute()
-        self.assertEqual(0, result.get_affected_items_count())
-
-        result = invalid_col.add().execute()
-        self.assertEqual(0, result.get_affected_items_count())
-
->>>>>>> 0bc7d3b... DevAPI: Define action on adding empty list of documents
     def test_get_document_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -225,6 +213,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             {"name": "Barney", "age": 45}).execute()
         self.assertEqual(2, len(result.get_document_ids()))
 
+        self.schema.drop_collection(collection_name)
+
     def test_remove(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -233,6 +223,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.remove("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
         self.assertEqual(0, collection.count())
+
+        self.schema.drop_collection(collection_name)
 
     def test_find(self):
         collection_name = "collection_test"
@@ -261,6 +253,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
 
+        self.schema.drop_collection(collection_name)
+
     def test_modify(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -287,6 +281,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs = collection.find("young = True").execute().fetch_all()
         self.assertEqual(0, len(docs))
 
+        self.schema.drop_collection(collection_name)
+
     def test_results(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -311,6 +307,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual("Betty", result3.fetch_one()["name"])
         self.assertEqual("Wilma", result3.fetch_one()["name"])
         self.assertEqual(None, result3.fetch_one())
+
+        self.schema.drop_collection(collection_name)
 
     # def test_create_index(self):
     #     collection_name = "collection_test"
@@ -371,6 +369,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
 
+        self.schema.drop_collection(collection_name)
+
     def test_unicode_parameter_binding(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -391,6 +391,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual(u"João", docs[0]["name"])
 
+        self.schema.drop_collection(collection_name)
+
     def test_array_insert(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -403,6 +405,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection.modify("$._id == 2").array_insert("$.cards[2]", 3).execute()
         docs = collection.find("$._id == 2").execute().fetch_all()
         self.assertEqual([1, 2, 3, 4], docs[0]["cards"])
+
+        self.schema.drop_collection(collection_name)
 
     def test_array_append(self):
         collection_name = "collection_test"
@@ -417,6 +421,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs = collection.find("$._id == 2").execute().fetch_all()
         self.assertEqual([1, [2, 3], 4], docs[0]["cards"])
 
+        self.schema.drop_collection(collection_name)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):
@@ -429,10 +435,11 @@ class MySQLxTableTests(tests.MySQLxTests):
             self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
-        self.schema = self.session.create_schema(self.schema_name)
+        self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
-        self.session.drop_schema(self.schema_name)
+        self.session.close()
+        self.node_session.close()
 
     def test_exists_in_database(self):
         table_name = "table_test"
@@ -470,6 +477,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 
+        self.schema.drop_table("test")
+
     def test_having(self):
         table_name = "{0}.test".format(self.schema_name)
 
@@ -497,12 +506,13 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
         self.assertEqual(42, rows[0]["age"])
 
-    def test_insert(self):
-        table = self.schema.get_table("test")
+        self.schema.drop_table("test")
 
+    def test_insert(self):
         self.node_session.sql("CREATE TABLE {0}.test(age INT, name "
                               "VARCHAR(50), gender CHAR(1))"
                               "".format(self.schema_name)).execute()
+        table = self.schema.get_table("test")
 
         result = table.insert("age", "name") \
             .values(21, 'Fred') \
@@ -514,12 +524,13 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
 
-    def test_update(self):
-        table = self.schema.get_table("test")
+        self.schema.drop_table("test")
 
+    def test_update(self):
         self.node_session.sql("CREATE TABLE {0}.test(age INT, name "
                               "VARCHAR(50), gender CHAR(1))"
                               "".format(self.schema_name)).execute()
+        table = self.schema.get_table("test")
 
         result = table.insert("age", "name") \
             .values(21, 'Fred') \
@@ -529,6 +540,8 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         result = table.update().set("age", 25).where("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
+
+        self.schema.drop_table("test")
 
     def test_delete(self):
         table_name = "table_test"
@@ -571,6 +584,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("Barney", result.fetch_one()["name"])
         self.assertEqual(None, result.fetch_one())
 
+        self.schema.drop_table("test")
+
     def test_multiple_resultsets(self):
         self.node_session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "
                               "SELECT 2; SELECT 'a'; END"
@@ -591,6 +606,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("a", rows[0][0])
         self.assertEqual(False, result.next_result())
 
+        self.node_session.sql("DROP PROCEDURE IF EXISTS {0}.spProc".format(self.schema_name)).execute()
+
     def test_auto_inc_value(self):
         table_name = "{0}.test".format(self.schema_name)
 
@@ -603,6 +620,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         table = self.schema.get_table("test")
         result2 = table.insert("id", "name").values(None, "Boo").execute()
         self.assertEqual(2, result2.get_autoincrement_value())
+
+        self.schema.drop_table("test")
 
     def test_column_metadata(self):
         table_name = "{0}.test".format(self.schema_name)
@@ -654,6 +673,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())
 
+        self.schema.drop_table("test")
+
     def test_is_view(self):
         table_name = "table_test"
         view_name = "view_test"
@@ -669,3 +690,6 @@ class MySQLxTableTests(tests.MySQLxTests):
             self.schema_name, table_name)).execute()
         view = self.schema.get_table(view_name)
         self.assertTrue(view.is_view())
+
+        self.schema.drop_table(table_name)
+        self.schema.drop_table(view_name)

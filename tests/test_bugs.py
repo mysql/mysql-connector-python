@@ -109,6 +109,8 @@ class Bug441430Tests(tests.MySQLConnectorTests):
         self.assertEqual(6, cur.rowcount)
         res = cur.execute("UPDATE %s SET id = id + %%s" % tbl, (10,))
         self.assertEqual(8, cur.rowcount)
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
         cur.close()
         self.cnx.close()
 
@@ -657,6 +659,13 @@ class BugOra13395083(tests.MySQLConnectorTests):
     def setUp(self):
         self.table_name = 'BugOra13395083'
 
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_name))
+
     @cnx_config(time_zone="+00:00")
     @foreach_cnx()
     def test_time_zone(self):
@@ -856,6 +865,12 @@ class BugOra14208326(tests.MySQLConnectorTests):
         self.cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.table)
         self.cnx.cmd_query("CREATE TABLE %s (id INT)" % self.table)
 
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table))
+
     @foreach_cnx(connection.MySQLConnection)
     def test_cmd_query(self):
         self._setup()
@@ -942,6 +957,12 @@ class BugOra14259954(tests.MySQLConnectorTests):
                   "`c1` int(11) NOT NULL DEFAULT '0', "
                   "PRIMARY KEY (`id`,`c1`))" % (self.tbl))
         cur.execute(create)
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
     @foreach_cnx()
     def test_executemany(self):
@@ -2110,6 +2131,10 @@ class BugOra17826833(tests.MySQLConnectorTests):
                   "PRIMARY KEY (`id`))" % (self.city_tbl))
         self.cursor.execute(create)
 
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS {0}".format(self.city_tbl))
+        self.cursor.execute("DROP TABLE IF EXISTS {0}".format(self.emp_tbl))
+
     def test_executemany(self):
         stmt = "INSERT INTO {0} (id,name) VALUES (%s,%s)".format(
             self.city_tbl)
@@ -2448,6 +2473,15 @@ class BugOra18144971(tests.MySQLConnectorTests):
         cur.execute(create)
         cnx.close()
 
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        config['use_unicode'] = True
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_cp1251))
+
     @cnx_config(use_unicode=True)
     @foreach_cnx(connection.MySQLConnection)
     def test_prepared_statement(self):
@@ -2653,7 +2687,6 @@ class BugOra18694096(tests.MySQLConnectorTests):
         self.cnx.cmd_query(create)
 
     def tearDown(self):
-        return
         if self.cnx:
             self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
 

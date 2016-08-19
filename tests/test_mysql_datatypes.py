@@ -84,16 +84,14 @@ class TestsDataTypes(tests.MySQLConnectorTests):
 class TestsCursor(TestsDataTypes):
 
     def setUp(self):
-        pass
-        #self.config = tests.get_mysql_config()
-        #cnx = connection.MySQLConnection(**self.config)
-        #self.drop_tables(cnx)
+        self.config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**self.config)
+        self.drop_tables(cnx)
 
     def tearDown(self):
-        pass
-        #cnx = connection.MySQLConnection(**self.config)
-        #self.drop_tables(cnx)
-        #cnx.close()
+        cnx = connection.MySQLConnection(**self.config)
+        self.drop_tables(cnx)
+        cnx.close()
 
     @foreach_cnx()
     def test_numeric_int(self):
