@@ -68,6 +68,19 @@ _URI_TEST_RESULTS = (  # (uri, result)
 )
 
 
+_ROUTER_LIST_RESULTS = (  # (uri, result)
+    ("áé'í'óú:unicode@127.0.0.1", {"schema": "", "host": "127.0.0.1", "port": 33060,
+     "password": "unicode", "user": "áé'í'óú"}),
+    ("user:password@[127.0.0.1, localhost]", {"schema": "", "routers":
+     [{"host": "127.0.0.1", "port": 33060}, {"host": "localhost", "port":
+     33060}], "password": "password", "user": "user"}),
+    ("user:password@[(address=127.0.0.1, priority=99), (address=localhost,"
+     "priority=98)]", {"schema": "", "routers": [{"host": "127.0.0.1",
+     "port": 33060, "priority": 99}, {"host": "localhost", "port": 33060,
+     "priority": 98}], "password": "password", "user": "user"}),
+)
+
+
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxXSessionTests(tests.MySQLxTests):
 
@@ -88,6 +101,61 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         }
         self.assertRaises(TypeError, mysqlx.XSession, bad_config)
 
+        host = self.connect_kwargs["host"]
+        port = self.connect_kwargs["port"]
+        user = self.connect_kwargs["user"]
+        password = self.connect_kwargs["password"]
+
+        # XSession to a farm using one of many routers (prios)
+        # Loop during connect because of network error (succeed)
+        uri = ("mysqlx://{0}:{1}@[(address=bad_host, priority=100),"
+               "(address={2}:{3}, priority=98)]"
+               "".format(user, password, host, port))
+        session = mysqlx.get_session(uri)
+        session.close()
+
+        # XSession to a farm using one of many routers (incomplete prios)
+        uri = ("mysqlx://{0}:{1}@[(address=bad_host, priority=100), {2}:{3}]"
+               "".format(user, password, host, port))
+        self.assertRaises(mysqlx.errors.ProgrammingError,
+                          mysqlx.get_session, uri)
+        try:
+            session = mysqlx.get_session(uri)
+        except mysqlx.errors.ProgrammingError as err:
+            self.assertEqual(4000, err.errno)
+
+        # XSession to a farm using invalid priorities (out of range)
+        uri = ("mysqlx://{0}:{1}@[(address=bad_host, priority=100), "
+               "(address={2}:{3}, priority=101)]"
+               "".format(user, password, host, port))
+        self.assertRaises(mysqlx.errors.ProgrammingError,
+                          mysqlx.get_session, uri)
+        try:
+            session = mysqlx.get_session(uri)
+        except mysqlx.errors.ProgrammingError as err:
+            self.assertEqual(4007, err.errno)
+
+        # Establish an XSession to a farm using one of many routers (no prios)
+        uri = ("mysqlx://{0}:{1}@[bad_host, {2}:{3}]"
+               "".format(user, password, host, port))
+        session = mysqlx.get_session(uri)
+        session.close()
+
+        # Break loop during connect (non-network error)
+        uri = ("mysqlx://{0}:{1}@[bad_host, {2}:{3}]"
+               "".format(user, "bad_pass", host, port))
+        self.assertRaises(mysqlx.errors.InterfaceError,
+                          mysqlx.get_session, uri)
+
+        # Break loop during connect (none left)
+        uri = "mysqlx://{0}:{1}@[bad_host, another_bad_host]"
+        self.assertRaises(mysqlx.errors.InterfaceError,
+                          mysqlx.get_session, uri)
+        try:
+            session = mysqlx.get_session(uri)
+        except mysqlx.errors.InterfaceError as err:
+            self.assertEqual(4001, err.errno)
+
     def test_connection_uri(self):
         uri = ("mysqlx://{user}:{password}@{host}:{port}/{schema}"
                "".format(user=self.connect_kwargs["user"],
@@ -99,7 +167,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         self.assertIsInstance(session, mysqlx.XSession)
 
         # Test URI parser function
-        for uri, res in _URI_TEST_RESULTS:
+        for uri, res in _ROUTER_LIST_RESULTS:
             try:
                 settings = mysqlx._get_connection_settings(uri)
                 self.assertEqual(res, settings)

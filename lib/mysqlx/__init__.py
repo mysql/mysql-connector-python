@@ -23,6 +23,8 @@
 
 """MySQL X DevAPI Python implementation"""
 
+import re
+
 from .compat import STRING_TYPES, urlparse
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table
@@ -39,6 +41,100 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         CreateCollectionIndexStatement,
                         DropCollectionIndexStatement)
 
+
+def _parse_address_list(address_list):
+    """Parses a list of host, port pairs
+
+    Args:
+        address_list: String containing a list of routers or just router
+
+    Returns:
+        Returns a dict with parsed values of host, port and priority if
+        specified.
+    """
+    is_list  = re.compile(r'^\[(?![^,]*\]).*]$')
+    hst_list = re.compile(r',(?![^\(\)]*\))')
+    pri_addr = re.compile(r'^\(address\s*=\s*(?P<address>.+)\s*,\s*priority\s*=\s*(?P<priority>\d+)\)$')
+
+    routers = []
+    if is_list.match(address_list):
+        address_list = address_list.strip("[]")
+        address_list = hst_list.split(address_list)
+    else:
+        match = urlparse("//{0}".format(address_list))
+        return {
+            "host": match.hostname,
+            "port": match.port
+        }
+
+    while address_list:
+        router = {}
+        address = address_list.pop(0).strip()
+        match = pri_addr.match(address)
+        if match:
+            address = match.group("address").strip()
+            router["priority"] = int(match.group("priority"))
+
+        match = urlparse("//{0}".format(address))
+        if not match.hostname:
+            raise InterfaceError("Invalid address: {0}".format(address))
+
+        router["host"] = match.hostname
+        router["port"] = match.port
+        routers.append(router)
+
+    return { "routers": routers }
+
+def _parse_connection_uri(uri):
+    """Parses the connection string and returns a dictionary with the
+    connection settings.
+
+    Args:
+        uri: mysqlx URI scheme to connect to a MySQL server/farm.
+
+    Returns:
+        Returns a dict with parsed values of credentials and address of the
+        MySQL server/farm.
+    """
+    settings = {}
+
+    uri = "{0}{1}".format("" if uri.startswith("mysqlx://")
+                          else "mysqlx://", uri)
+    parsed = urlparse(uri)
+    if parsed.hostname is None or parsed.username is None \
+       or parsed.password is None:
+        raise InterfaceError("Malformed URI '{0}'".format(uri))
+    settings = {
+        "user": parsed.username,
+        "password": parsed.password,
+        "schema": parsed.path.lstrip("/")
+    }
+
+    settings.update(_parse_address_list(parsed.netloc.split("@")[-1]))
+    return settings
+
+def _validate_settings(settings):
+    """Validates the settings to be passed to a Session object
+    the port values are converted to int if specified or set to 33060
+    otherwise. The priority values for each router is converted to int
+    if specified.
+
+    Args:
+        settings: dict containing connection settings.
+    """
+    if "priority" in settings and settings["priority"]:
+        try:
+            settings["priority"] = int(settings["priority"])
+        except NameError:
+            raise InterfaceError("Invalid priority")
+
+    if "port" in settings and settings["port"]:
+        try:
+            settings["port"] = int(settings["port"])
+        except NameError:
+            raise InterfaceError("Invalid port")
+    else:
+        settings["port"] = 33060
 
 def _get_connection_settings(*args, **kwargs):
     """Parses the connection string and returns a dictionary with the
@@ -57,37 +153,22 @@ def _get_connection_settings(*args, **kwargs):
     settings = {}
     if args:
         if isinstance(args[0], STRING_TYPES):
-            uri = "{0}{1}".format("" if args[0].startswith("mysqlx://")
-                                  else "mysqlx://", args[0])
-            parsed = urlparse(uri)
-            if parsed.hostname is None or parsed.username is None \
-               or parsed.password is None:
-                raise InterfaceError("Malformed URI '{0}'".format(args[0]))
-            settings = {
-                "host": parsed.hostname,
-                "port": parsed.port,
-                "user": parsed.username,
-                "password": parsed.password,
-                "schema": parsed.path.lstrip("/")
-            }
+            settings = _parse_connection_uri(args[0])
         elif isinstance(args[0], dict):
-            settings = args[0]
+            settings.update(args[0])
     elif kwargs:
-        settings = kwargs
+        settings.update(kwargs)
 
     if not settings:
         raise InterfaceError("Settings not provided")
 
-    if "port" in settings and settings["port"]:
-        try:
-            settings["port"] = int(settings["port"])
-        except NameError:
-            raise InterfaceError("Invalid port")
+    if "routers" in settings:
+        for router in settings.get("routers"):
+            _validate_settings(router)
     else:
-        settings["port"] = 33060
+        _validate_settings(settings)
 
     return settings
-
 
 def get_session(*args, **kwargs):
     """Creates a XSession instance using the provided connection data.
@@ -120,6 +201,9 @@ def get_node_session(*args, **kwargs):
         mysqlx.XSession: XSession object.
     """
     settings = _get_connection_settings(*args, **kwargs)
+    if "routers" in settings:
+        raise InterfaceError("NodeSession expects only one pair of host and port")
+
     return NodeSession(settings)
 
 
