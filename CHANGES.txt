@@ -8,8 +8,23 @@ Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v2.2.1
+======
+
+- Add support for Protocol Buffers 3
+- Add View support (without DDL)
+- Implement get_default_schema() method in BaseSchema
+- DevAPI: Per ReplicaSet SQL execution
+- DevAPI: XSession accepts a list of routers
+- DevAPI: Define action on adding empty list of documents
+- BUG23729357: Fix fetching BIT datatype
+- BUG23722871: Fix running unittests with mysqlx plugin
+- BUG23583381: Add who_am_i and am_i_real methods to DatabaseObject
+- BUG23568257: Add fetch_one method to mysqlx.result
+- BUG23550743: Add close method to XSession and NodeSession
+- BUG23550057: Add support for URI as connection data
+
 v2.2.0
 ======
 
 - Provide initial implementation of new DevAPI
-
