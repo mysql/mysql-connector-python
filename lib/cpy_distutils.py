@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -125,7 +125,11 @@ def unix_lib_is64bit(lib_file):
         lib_file = mysqlclient_libs[-1]
 
     log.debug("# Using file command to test lib_file {0}".format(lib_file))
-    prc = Popen(['file', '-L', lib_file], stdin=PIPE, stderr=STDOUT,
+    if platform.uname() == 'SunOS':
+        cmd_list = ['file', '-L', lib_file]
+    else:
+        cmd_list = ['file', '-L', lib_file]
+    prc = Popen(cmd_list, stdin=PIPE, stderr=STDOUT,
                 stdout=PIPE)
     stdout = prc.communicate()[0]
     stdout = stdout.split(':')[1]
@@ -166,6 +170,9 @@ def get_mysql_config_info(mysql_config):
     libs = shlex.split(info['libs'])
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
+    if platform.uname()[0] == 'SunOS':
+        info['lib_dir'] = info['lib_dir'].replace('-R', '')
+        info['libs'] = [lib.replace('-R', '') for lib in info['libs']]
     log.debug("# info['libs']: ")
     for lib in info['libs']:
         log.debug("#   {0}".format(lib))
@@ -178,7 +185,17 @@ def get_mysql_config_info(mysql_config):
     # Try to figure out the architecture
     info['arch'] = None
     if os.name == 'posix':
-        pathname = os.path.join(info['lib_dir'], 'lib' + info['libs'][0]) + '*'
+        if platform.uname()[0] == 'SunOS':
+            print("info['lib_dir']: {0}".format(info['lib_dir']))
+            print("info['libs'][0]: {0}".format(info['libs'][0]))
+            pathname = os.path.abspath(os.path.join(info['lib_dir'],
+                                                    'lib',
+                                                    info['libs'][0])) + '/*'
+        else:
+            pathname = os.path.join(info['lib_dir'],
+                                    'lib' + info['libs'][0]) + '*'
+        print("# Looking mysqlclient_lib at path: {0}".format(pathname))
+        log.debug("# searching mysqlclient_lib at: %s", pathname)
         libs = glob(pathname)
         mysqlclient_libs = []
         for filepath in libs:
@@ -198,7 +215,12 @@ def get_mysql_config_info(mysql_config):
                 log.debug("#+   {0}".format(mysqlclient_lib))
             log.debug("# tested mysqlclient_lib[-1]: "
                       "{0}".format(mysqlclient_libs[-1]))
-            proc = Popen(['file', '-L', mysqlclient_libs[-1]], stdout=PIPE,
+            if platform.uname()[0] == 'SunOS':
+                print("mysqlclient_lib: {0}".format(mysqlclient_libs[-1]))
+                cmd_list = ['file', mysqlclient_libs[-1]]
+            else:
+                cmd_list = ['file', '-L', mysqlclient_libs[-1]]
+            proc = Popen(cmd_list, stdout=PIPE,
                          universal_newlines=True)
             stdout, _ = proc.communicate()
             stdout = stdout.split(':')[1]
@@ -360,9 +382,9 @@ class BuildExtDynamic(build_ext):
         # We try to offer a nice message when the architecture of Python
         # is not the same as MySQL Connector/C binaries.
         py_arch = '64-bit' if ARCH_64BIT else '32-bit'
-        log.debug("# Python architecture: {0}".format(py_arch))
-        log.debug("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
-        log.debug("# self.arch: {0}".format(self.arch))
+        print("# Python architecture: {0}".format(py_arch))
+        print("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
+        print("# self.arch: {0}".format(self.arch))
         if ARCH_64BIT != connc_64bit:
             log.error("Python is {0}, but does not "
                       "match MySQL C API {1} architecture, "
