@@ -11,7 +11,7 @@ License information can be found in the LICENSE.txt file.
 Requirements
 ============
 
-Python Protobuf (version >= 2.6.1)
+Python Protobuf (version >= 3.0.0)
 https://developers.google.com/protocol-buffers/docs/downloads
 
 

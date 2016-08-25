@@ -24,12 +24,16 @@
 """Implementation of MySQL Authentication Plugin."""
 
 import hashlib
+import struct
+
+from .compat import PY3, UNICODE_TYPES, hexlify
 
 
 class MySQL41AuthPlugin(object):
     def __init__(self, username, password):
         self._username = username
-        self._password = password
+        self._password = password.encode("utf-8") \
+            if isinstance(password, UNICODE_TYPES) else password
 
     def name(self):
         return "MySQL 4.1 Authentication Plugin"
@@ -37,11 +41,15 @@ class MySQL41AuthPlugin(object):
     def auth_name(self):
         return "MYSQL41"
 
-    def xor_string(self, a, b):
+    def xor_string(self, hash1, hash2):
         """Encrypt/Decrypt function used for password encryption in
         authentication, using a simple XOR.
         """
-        return "".join([chr(ord(x) ^ ord(y)) for x, y in zip(a, b)])
+        if PY3:
+            xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
+        else:
+            xored = [ord(h1) ^ ord(h2) for (h1, h2) in zip(hash1, hash2)]
+        return struct.pack("20B", *xored)
 
     def build_authentication_response(self, data):
         """Hashing for MySQL 4.1 authentication
@@ -50,7 +58,8 @@ class MySQL41AuthPlugin(object):
             h1 = hashlib.sha1(self._password).digest()
             h2 = hashlib.sha1(h1).digest()
             auth_response = self.xor_string(
-                h1, hashlib.sha1(data + h2).digest()).encode("hex")
-            return "{0}\0{1}\0*{2}\0".format("", self._username, auth_response)
+                h1, hashlib.sha1(data + h2).digest())
+            return "{0}\0{1}\0*{2}\0".format("", self._username,
+                                             hexlify(auth_response))
         else:
             return "{0}\0{1}\0".format("", self._username)

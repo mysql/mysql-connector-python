@@ -65,12 +65,17 @@ _URI_TEST_RESULTS = (  # (uri, result)
     ("áé'í'óú:unicode@127.0.0.1",
      {"schema": "", "host": "127.0.0.1", "password": "unicode",
       "port": 33060, "user": "áé'í'óú"}),
+    ("unicode:áé'í'óú@127.0.0.1",
+     {"schema": "", "host": "127.0.0.1", "password": "áé'í'óú",
+      "port": 33060, "user": "unicode"}),
 )
 
 
 _ROUTER_LIST_RESULTS = (  # (uri, result)
-    ("áé'í'óú:unicode@127.0.0.1", {"schema": "", "host": "127.0.0.1", "port": 33060,
-     "password": "unicode", "user": "áé'í'óú"}),
+    ("áé'í'óú:unicode@127.0.0.1", {"schema": "", "host": "127.0.0.1",
+     "port": 33060, "password": "unicode", "user": "áé'í'óú"}),
+    ("unicode:áé'í'óú@127.0.0.1", {"schema": "", "host": "127.0.0.1",
+     "port": 33060, "password": "áé'í'óú", "user": "unicode"}),
     ("user:password@[127.0.0.1, localhost]", {"schema": "", "routers":
      [{"host": "127.0.0.1", "port": 33060}, {"host": "localhost", "port":
      33060}], "password": "password", "user": "user"}),
