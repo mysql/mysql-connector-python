@@ -18,7 +18,6 @@ v2.2.1
 - DevAPI: XSession accepts a list of routers
 - DevAPI: Define action on adding empty list of documents
 - BUG23729357: Fix fetching BIT datatype
-- BUG23722871: Fix running unittests with mysqlx plugin
 - BUG23583381: Add who_am_i and am_i_real methods to DatabaseObject
 - BUG23568257: Add fetch_one method to mysqlx.result
 - BUG23550743: Add close method to XSession and NodeSession
