@@ -25,19 +25,31 @@
 
 import sys
 import decimal
+import binascii
+
 
 PY3 = sys.version_info.major == 3
 
 
 if PY3:
     from urllib.parse import urlparse
+
+    def hexlify(data):
+        return binascii.hexlify(data).decode("utf-8")
+
     NUMERIC_TYPES = (int, float, decimal.Decimal,)
     INT_TYPES = (int,)
     UNICODE_TYPES = (str,)
     STRING_TYPES = (str,)
     BYTE_TYPES = (bytearray, bytes,)
+
+
 else:
     from urlparse import urlparse
+
+    def hexlify(data):
+        return data.encode("hex")
+
     NUMERIC_TYPES = (int, float, decimal.Decimal, long,)
     INT_TYPES = (int, long,)
     UNICODE_TYPES = (unicode,)
