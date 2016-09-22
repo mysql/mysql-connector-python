@@ -13,6 +13,7 @@ v2.1.4
 
 - BUG#22873551: Fix cleartext authentication issue
 - BUG#22545879: Fix usage of --ssl-cipher option
+- BUG#22529828: Fix potencial SQL injection
 - BUG#21881038: Fix duplicate entry in CHANGES.txt
 - BUG#21879914: Fix using SSL without key or certificate using C/Ext
 - BUG#21879859: Fix consuming results after calling procedure
