@@ -83,6 +83,64 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    def test_create_view(self):
+        table_name = "table_test"
+        view_name = "view_test"
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name)).execute()
+        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name, "1")).execute()
+
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
+                                                     table_name)
+        view = self.schema.create_view(view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertEqual(view.get_name(), view_name)
+        self.assertTrue(view.exists_in_database())
+        self.assertTrue(view.is_view())
+
+        # should get exception if reuse is false and it already exists
+        self.assertRaises(mysqlx.ProgrammingError,
+                          self.schema.create_collection, view_name,
+                          False)
+
+        # using replacing the existing view should work
+        view = self.schema.create_view(view_name, True) \
+                          .defined_as(defined_as) \
+                          .execute()
+
+        self.schema.drop_table(table_name)
+        self.schema.drop_table(view_name)
+
+    def test_alter_view(self):
+        table_name = "table_test"
+        view_name = "view_test"
+
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name)).execute()
+        for i in range(10):
+            self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+                self.schema_name, table_name, "{0}".format(i + 1))
+            ).execute()
+
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
+                                                     table_name)
+        view = self.schema.create_view(view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertEqual(10, view.count())
+
+        defined_as = ("SELECT id FROM {0}.{1} WHERE id > 5"
+                      "".format(self.schema_name, table_name))
+        view = self.schema.alter_view(view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertEqual(5, view.count())
+
+        self.schema.drop_table(table_name)
+        self.schema.drop_table(view_name)
+
     def test_get_collection(self):
         collection_name = "collection_test"
         coll = self.schema.get_collection(collection_name)
@@ -91,6 +149,30 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.assertTrue(coll.exists_in_database())
 
         self.schema.drop_collection(collection_name)
+
+    def test_get_view(self):
+        table_name = "table_test"
+        view_name = "view_test"
+        view = self.schema.get_view(view_name)
+        self.assertFalse(view.exists_in_database())
+
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name)).execute()
+
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
+                                                     table_name)
+        view = self.schema.create_view(view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertTrue(view.exists_in_database())
+
+        # raise a ProgrammingError if the view does not exists
+        self.assertRaises(mysqlx.ProgrammingError,
+                          self.schema.get_view, "nonexistent",
+                          check_existence=True)
+
+        self.schema.drop_table(table_name)
+        self.schema.drop_view(view_name)
 
     def test_get_collections(self):
         coll = self.schema.get_collections()
@@ -733,3 +815,270 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         self.schema.drop_table(table_name)
         self.schema.drop_table(view_name)
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+class MySQLxViewTests(tests.MySQLxTests):
+
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.schema_name = self.connect_kwargs["schema"]
+        self.table_name = "table_test"
+        self.view_name = "view_test"
+        try:
+            self.session = mysqlx.get_session(self.connect_kwargs)
+            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
+        except mysqlx.Error as err:
+            self.fail("{0}".format(err))
+        self.schema = self.session.get_schema(self.schema_name)
+
+    def tearDown(self):
+        self.schema.drop_table(self.table_name)
+        self.schema.drop_view(self.view_name)
+        self.session.close()
+        self.node_session.close()
+
+    def test_exists_in_database(self):
+        view = self.schema.get_view(self.view_name)
+        self.assertFalse(view.exists_in_database())
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, self.table_name)).execute()
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
+                                                     self.table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertTrue(view.exists_in_database())
+
+    def test_select(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50))"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty')"
+                              "".format(table_name)).execute()
+
+        defined_as = "SELECT age, name FROM {0}".format(table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        result = view.select().sort("age DESC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(4, len(rows))
+        self.assertEqual(67, rows[0]["age"])
+
+        result = view.select("age").where("age = 42").execute()
+        self.assertEqual(1, len(result.columns))
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+
+        # test flexible params
+        result = view.select(['age', 'name']).sort("age DESC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(4, len(rows))
+
+    def test_having(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
+                              "gender CHAR(1))".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred', 'M')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney', 'M')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma', 'F')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty', 'F')"
+                              "".format(table_name)).execute()
+
+        defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        result = view.select().group_by("gender").sort("age ASC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
+        self.assertEqual(21, rows[0]["age"])
+        self.assertEqual(42, rows[1]["age"])
+
+        result = view.select().group_by("gender").having("gender = 'F'") \
+                                                 .sort("age ASC").execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+        self.assertEqual(42, rows[0]["age"])
+
+        # test flexible params
+        result = view.select().group_by(["gender"]) \
+                              .sort(["name DESC", "age ASC"]).execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
+        self.assertEqual(42, rows[0]["age"])
+        self.assertEqual(21, rows[1]["age"])
+
+    def test_insert(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
+                              "gender CHAR(1))".format(table_name)).execute()
+        defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+
+        result = view.insert("age", "name").values(21, 'Fred') \
+                                           .values(28, 'Barney') \
+                                           .values(42, 'Wilma') \
+                                           .values(67, 'Betty').execute()
+        result = view.select().execute()
+        rows = result.fetch_all()
+        self.assertEqual(4, len(rows))
+
+        # test flexible params
+        result = view.insert(["age", "name"]).values([35, 'Eddard']) \
+                                             .values(9, 'Arya').execute()
+        result = view.select().execute()
+        rows = result.fetch_all()
+        self.assertEqual(6, len(rows))
+
+    def test_update(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
+                              "gender CHAR(1))".format(table_name)).execute()
+        defined_as = ("SELECT age, name, gender FROM {0}".format(table_name))
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+
+        result = view.insert("age", "name").values(21, 'Fred') \
+                                           .values(28, 'Barney') \
+                                           .values(42, 'Wilma') \
+                                           .values(67, 'Betty').execute()
+        result = view.update().set("age", 25).where("age == 21").execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        self.schema.drop_table("test")
+
+    def test_delete(self):
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, self.table_name)).execute()
+        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.schema_name, self.table_name, "1")).execute()
+
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
+                                                     self.table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertEqual(view.count(), 1)
+        view.delete("id = 1").execute()
+        self.assertEqual(view.count(), 0)
+
+    def test_count(self):
+        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+            self.schema_name, self.table_name)).execute()
+        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.schema_name, self.table_name, "1")).execute()
+
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
+                                                     self.table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        self.assertEqual(view.count(), 1)
+
+    def test_results(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50))"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                              "".format(table_name)).execute()
+        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                              "".format(table_name)).execute()
+
+        defined_as = "SELECT age, name FROM {0}".format(table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        result = view.select().execute()
+
+        self.assertEqual("Fred", result.fetch_one()["name"])
+        self.assertEqual("Barney", result.fetch_one()["name"])
+        self.assertEqual(None, result.fetch_one())
+
+    def test_auto_inc_value(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql("CREATE TABLE {0} (id INT KEY AUTO_INCREMENT, "
+                              "name VARCHAR(50))".format(table_name)).execute()
+        result = self.node_session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')"
+                                       "".format(table_name)).execute()
+        self.assertEqual(1, result.get_autoincrement_value())
+
+        defined_as = "SELECT id, name FROM {0}".format(table_name)
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+        result2 = view.insert("id", "name").values(None, "Boo").execute()
+        self.assertEqual(2, result2.get_autoincrement_value())
+
+    def test_column_metadata(self):
+        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+
+        self.node_session.sql(
+            "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
+            "config JSON, created DATE, active BIT)"
+            "".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
+            "".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
+            ", 0)".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', 1)"
+            "".format(table_name)).execute()
+        self.node_session.sql(
+            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', 0)"
+            "".format(table_name)).execute()
+
+        defined_as = ("SELECT age, name, pic, config, created, active FROM {0}"
+                      "".format(table_name))
+        view = self.schema.create_view(self.view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
+
+        result = view.select().execute()
+        result.fetch_all()
+        col = result.columns[0]
+        self.assertEqual("age", col.get_column_name())
+        self.assertEqual(self.view_name, col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.INT, col.get_type())
+
+        col = result.columns[1]
+        self.assertEqual("name", col.get_column_name())
+        self.assertEqual(self.view_name, col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.STRING, col.get_type())
+
+        col = result.columns[2]
+        self.assertEqual("pic", col.get_column_name())
+        self.assertEqual(self.view_name, col.get_table_name())
+        self.assertEqual("binary", col.get_collation_name())
+        self.assertEqual("binary", col.get_character_set_name())
+        self.assertEqual(mysqlx.ColumnType.BYTES, col.get_type())
+
+        col = result.columns[3]
+        self.assertEqual("config", col.get_column_name())
+        self.assertEqual(self.view_name, col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.JSON, col.get_type())
+
+        col = result.columns[5]
+        self.assertEqual("active", col.get_column_name())
+        self.assertEqual(self.view_name, col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())

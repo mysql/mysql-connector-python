@@ -28,14 +28,68 @@ import json
 from .errors import ProgrammingError
 from .expr import ExprParser
 from .compat import STRING_TYPES
+from .constants import Algorithms, Securities, CheckOptions
 from .dbdoc import DbDoc
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult, Result
+
 
 def _flexible_params(*values):
     if len(values) == 1 and isinstance(values[0], (list, tuple,)):
         return values[0]
     return values
+
+
+def is_quoted_identifier(identifier, sql_mode=""):
+    """Check if the given identifier is quoted.
+
+    Args:
+        identifier (string): Identifier to check.
+        sql_mode (Optional[string]): SQL mode.
+
+    Returns:
+        `True` if the identifier has backtick quotes, and False otherwise.
+    """
+    if "ANSI_QUOTES" in sql_mode:
+        return ((identifier[0] == "`" and identifier[-1] == "`") or
+                (identifier[0] == '"' and identifier[-1] == '"'))
+    else:
+        return identifier[0] == "`" and identifier[-1] == "`"
+
+
+def quote_identifier(identifier, sql_mode=""):
+    """Quote the given identifier with backticks, converting backticks (`) in
+    the identifier name with the correct escape sequence (``) unless the
+    identifier is quoted (") as in sql_mode set to ANSI_QUOTES.
+
+    Args:
+        identifier (string): Identifier to quote.
+        sql_mode (Optional[string]): SQL mode.
+
+    Returns:
+        A string with the identifier quoted with backticks.
+    """
+    if is_quoted_identifier(identifier, sql_mode):
+        return identifier
+    if "ANSI_QUOTES" in sql_mode:
+        return '"{0}"'.format(identifier.replace('"', '""'))
+    else:
+        return "`{0}`".format(identifier.replace("`", "``"))
+
+
+def quote_multipart_identifier(identifiers, sql_mode=""):
+    """Quote the given multi-part identifier with backticks.
+
+    Args:
+        identifiers (iterable): List of identifiers to quote.
+        sql_mode (Optional[string]): SQL mode.
+
+    Returns:
+        A string with the multi-part identifier quoted with backticks.
+    """
+    return ".".join([quote_identifier(identifier, sql_mode)
+                     for identifier in identifiers])
+
 
 class Statement(object):
     """Provides base functionality for statement objects.
@@ -103,6 +157,9 @@ class FilterableStatement(Statement):
         Args:
             condition (str): Sets the search condition to filter documents or
                              records.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
         """
         self._has_where = True
         self._where = condition
@@ -124,6 +181,9 @@ class FilterableStatement(Statement):
         Args:
             row_count (int): The maximum number of records or documents.
             offset (Optional[int]) The number of records or documents to skip.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
         """
         self._has_limit = True
         self._limit_offset = offset
@@ -135,6 +195,9 @@ class FilterableStatement(Statement):
 
         Args:
             *sort_clauses: The expression strings defining the sort criteria.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
         """
         self._has_sort = True
         self._sort_expr = ExprParser(",".join(_flexible_params(*sort_clauses)),
@@ -157,6 +220,10 @@ class FilterableStatement(Statement):
             *args: The name of the placeholder and the value to bind.
                    A :class:`mysqlx.DbDoc` object or a JSON string
                    representation can be used.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
+
         Raises:
             ProgrammingError: If the number of arguments is invalid.
         """
@@ -220,15 +287,15 @@ class AddStatement(Statement):
         self._values = []
         self._ids = []
 
-    """Adds a list of documents into a collection.
-
-    Args:
-        *values: The documents to be added into the collection.
-
-    Returns:
-        mysqlx.AddStatement: AddStatement object.
-    """
     def add(self, *values):
+        """Adds a list of documents into a collection.
+
+        Args:
+            *values: The documents to be added into the collection.
+
+        Returns:
+            mysqlx.AddStatement: AddStatement object.
+        """
         for val in _flexible_params(*values):
             if isinstance(val, DbDoc):
                 self._values.append(val)
@@ -390,6 +457,9 @@ class FindStatement(FilterableStatement):
         Args:
             *fields: The string expressions identifying the fields to be
                      extracted.
+
+        Returns:
+            mysqlx.FindStatement: FindStatement object.
         """
         return self._projection(*fields)
 
@@ -524,6 +594,9 @@ class UpdateStatement(FilterableStatement):
         Args:
             field (string): The column name to be updated.
             value (object): The value to be set on the specified column.
+
+        Returns:
+            mysqlx.UpdateStatement: UpdateStatement object.
         """
         self._update_ops.append(
             UpdateSpec(MySQLxCrud.UpdateOperation.SET, field, value))
@@ -599,6 +672,10 @@ class CreateCollectionIndexStatement(Statement):
             document_path (string): The document path.
             column_type (string): The column type.
             is_required (bool): `True` if the field is required.
+
+        Returns:
+            mysqlx.CreateCollectionIndexStatement: \
+                                   CreateCollectionIndexStatement object.
         """
         self._fields.append((document_path, column_type, is_required,))
         return self
@@ -636,3 +713,152 @@ class DropCollectionIndexStatement(Statement):
         return self._connection.execute_nonquery(
             "xplugin", "drop_collection_index", True,
             self._target.schema.name, self._target.name, self._index_name)
+
+
+class CreateViewStatement(Statement):
+    """A statement for creating views.
+
+    Args:
+        view (mysqlx.View): The View object.
+        replace (Optional[bool]): `True` to add replace.
+    """
+    def __init__(self, view, replace=False):
+        super(CreateViewStatement, self).__init__(target=view, doc_based=False)
+        self._view = view
+        self._schema = view.schema
+        self._name = view.name
+        self._replace = replace
+        self._columns = []
+        self._algorithm = Algorithms.UNDEFINED
+        self._security = Securities.DEFINER
+        self._definer = None
+        self._defined_as = None
+        self._check_option = CheckOptions.CASCADED
+
+    def columns(self, columns):
+        """Sets the column names.
+
+        Args:
+            columns (list): The list of column names.
+
+        Returns:
+            mysqlx.CreateViewStatement: CreateViewStatement object.
+        """
+        self._columns = [quote_identifier(col) for col in columns]
+        return self
+
+    def algorithm(self, algorithm):
+        """Sets the algorithm.
+
+        Args:
+            mysqlx.constants.ALGORITHMS: The algorithm.
+
+        Returns:
+            mysqlx.CreateViewStatement: CreateViewStatement object.
+        """
+        self._algorithm = algorithm
+        return self
+
+    def security(self, security):
+        """Sets the SQL security mode.
+
+        Args:
+            mysqlx.constants.SECURITIES: The SQL security mode.
+
+        Returns:
+            mysqlx.CreateViewStatement: CreateViewStatement object.
+        """
+        self._security = security
+        return self
+
+    def definer(self, definer):
+        """Sets the definer.
+
+        Args:
+            definer (string): The definer.
+
+        Returns:
+            mysqlx.CreateViewStatement: CreateViewStatement object.
+        """
+        self._definer = definer
+        return self
+
+    def defined_as(self, statement):
+        """Sets the SelectStatement statement for describing the view.
+
+        Args:
+            mysqlx.SelectStatement: SelectStatement object.
+
+        Returns:
+            mysqlx.CreateViewStatement: CreateViewStatement object.
+        """
+        self._defined_as = statement
+        return self
+
+    def with_check_option(self, check_option):
+        """Sets the check option.
+
+        Args:
+            mysqlx.constants.CHECK_OPTIONS: The check option.
+
+        Returns:
+            mysqlx.CreateViewStatement: CreateViewStatement object.
+        """
+        self._check_option = check_option
+        return self
+
+    def execute(self):
+        """Execute the statement to create a view.
+
+        Returns:
+            mysqlx.View: View object.
+        """
+        replace = " OR REPLACE" if self._replace else ""
+        definer = " DEFINER = {0}".format(self._definer) \
+                  if self._definer else ""
+        columns = " ({0})".format(", ".join(self._columns)) \
+                  if self._columns else ""
+        view_name = quote_multipart_identifier((self._schema.name, self._name))
+        sql = ("CREATE{replace} ALGORITHM = {algorithm}{definer} "
+               "SQL SECURITY {security} VIEW {view_name}{columns} "
+               "AS {defined_as} WITH {check_option} CHECK OPTION"
+               "".format(replace=replace, algorithm=self._algorithm,
+                         definer=definer, security=self._security,
+                         view_name=view_name, columns=columns,
+                         defined_as=self._defined_as,
+                         check_option=self._check_option))
+
+        self._connection.execute_nonquery("sql", sql)
+        return self._view
+
+
+class AlterViewStatement(CreateViewStatement):
+    """A statement for alter views.
+
+    Args:
+        view (mysqlx.View): The View object.
+    """
+    def __init__(self, view):
+        super(AlterViewStatement, self).__init__(view)
+
+    def execute(self):
+        """Execute the statement to alter a view.
+
+        Returns:
+            mysqlx.View: View object.
+        """
+        definer = " DEFINER = {0}".format(self._definer) \
+                  if self._definer else ""
+        columns = " ({0})".format(", ".join(self._columns)) \
+                  if self._columns else ""
+        view_name = quote_multipart_identifier((self._schema.name, self._name))
+        sql = ("ALTER ALGORITHM = {algorithm}{definer} "
+               "SQL SECURITY {security} VIEW {view_name}{columns} "
+               "AS {defined_as} WITH {check_option} CHECK OPTION"
+               "".format(algorithm=self._algorithm, definer=definer,
+                         security=self._security, view_name=view_name,
+                         columns=columns, defined_as=self._defined_as,
+                         check_option=self._check_option))
+
+        self._connection.execute_nonquery("sql", sql)
+        return self._view

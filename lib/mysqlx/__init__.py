@@ -25,9 +25,11 @@
 
 import re
 
+import constants
+
 from .compat import STRING_TYPES, urlparse
 from .connection import XSession, NodeSession
-from .crud import Schema, Collection, Table
+from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
                      NotSupportedError, DataError, IntegrityError,
@@ -39,7 +41,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement,
-                        DropCollectionIndexStatement)
+                        DropCollectionIndexStatement, CreateViewStatement,
+                        AlterViewStatement)
 
 
 def _parse_address_list(address_list):
@@ -211,8 +214,11 @@ __all__ = [
     # mysqlx.connection
     "XSession", "NodeSession", "get_session", "get_node_session",
 
+    # mysqlx.constants
+    "constants",
+
     # mysqlx.crud
-    "Schema", "Collection", "Table",
+    "Schema", "Collection", "Table", "View",
 
     # mysqlx.errors
     "Error", "Warning", "InterfaceError", "DatabaseError", "NotSupportedError",
@@ -228,4 +234,5 @@ __all__ = [
     "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
+    "CreateViewStatement", "AlterViewStatement",
 ]
