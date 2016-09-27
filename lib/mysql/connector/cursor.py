@@ -96,15 +96,20 @@ def _bytestr_format_dict(bytestr, value_dict):
     b'x=%(y)s y=%(x)s'
     """
     def replace(matchobj):
+        value = None
         groups = matchobj.groupdict()
         if groups["conversion_type"] == b"%":
-            return b"%"
+            value = b"%"
         if groups["conversion_type"] == b"s":
-            return value_dict[groups["mapping_key"]]
-        raise ValueError("Unsupported conversion_type: {0}"
-                         "".format(groups["conversion_type"]))
-    return RE_PY_MAPPING_PARAM.sub(replace, bytestr)
-
+            key = groups["mapping_key"].encode("utf-8") \
+                  if PY2 else groups["mapping_key"]
+            value = value_dict[key]
+        if value is None:
+            raise ValueError("Unsupported conversion_type: {0}"
+                             "".format(groups["conversion_type"]))
+        return value.decode("utf-8") if PY2 else value
+    return RE_PY_MAPPING_PARAM.sub(replace, bytestr.decode("utf-8")
+                                   if PY2 else bytestr)
 
 class CursorBase(MySQLCursorAbstract):
     """

@@ -361,6 +361,8 @@ class MySQLCursorTests(tests.TestsCursor):
             datetime.time(20, 3, 23),
             st_now,
             datetime.timedelta(hours=40, minutes=30, seconds=12),
+            'foo %(t)s',
+            'foo %(s)s',
         )
         exp = (
             b'NULL',
@@ -382,6 +384,8 @@ class MySQLCursorTests(tests.TestsCursor):
             b"'" + time.strftime('%Y-%m-%d %H:%M:%S', st_now).encode('ascii')
             + b"'",
             b"'40:30:12'",
+            b"'foo %(t)s'",
+            b"'foo %(s)s'",
         )
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
