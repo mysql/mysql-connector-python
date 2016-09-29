@@ -252,6 +252,8 @@ class Schema(DatabaseObject):
         Raises:
             ProgrammingError: If ``reuse`` is False and collection exists.
         """
+        if not name:
+            raise ProgrammingError("Collection name is invalid")
         collection = Collection(self, name)
         if not collection.exists_in_database():
             self._connection.execute_nonquery("xplugin", "create_collection",

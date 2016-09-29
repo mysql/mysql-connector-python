@@ -81,6 +81,12 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           self.schema.create_collection, collection_name,
                           False)
 
+        # should get exception if using an invalid name
+        self.assertRaises(mysqlx.ProgrammingError,
+                          self.schema.create_collection, "")
+        self.assertRaises(mysqlx.ProgrammingError,
+                          self.schema.create_collection, None)
+
         self.schema.drop_collection(collection_name)
 
     def test_create_view(self):
