@@ -1,0 +1,4 @@
+[submodule "cpyint"]
+	path = cpyint
+	url = ../connector-python-internal
+	branch = master-2.0
