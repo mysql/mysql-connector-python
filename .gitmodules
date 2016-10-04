@@ -1,4 +1,0 @@
-[submodule "cpyint"]
-	path = cpyint
-	url = ../python-internal.git
-	branch = master
