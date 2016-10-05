@@ -96,7 +96,6 @@ else:
     tests.TEST_BUILD_DIR = os.path.join(_TOPDIR, 'build', 'testing')
     sys.path.insert(0, tests.TEST_BUILD_DIR)
 
-
 # MySQL option file template. Platform specifics dynamically added later.
 MY_CNF = """
 # MySQL option file for MySQL Connector/Python tests
@@ -674,6 +673,10 @@ def init_mysql_server(port, options):
         'password': '',
         'schema': 'myconnpy'
     }
+
+    if mysql_server.version >= (5, 7, 15):
+        mysql_server.xplugin_config["socket"] = mysql_server.mysqlx_unix_socket
+        os.environ["MYSQLX_UNIX_PORT"] = mysql_server.mysqlx_unix_socket
 
     # Bootstrap and start a MySQL server
     if have_to_bootstrap:

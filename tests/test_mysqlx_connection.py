@@ -161,6 +161,17 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         except mysqlx.errors.InterfaceError as err:
             self.assertEqual(4001, err.errno)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
+    def test_mysqlx_socket(self):
+        # Connect with unix socket
+        uri = "mysqlx://{user}:{password}@({socket})".format(
+            user=self.connect_kwargs["user"],
+            password=self.connect_kwargs["password"],
+            socket=self.connect_kwargs["socket"])
+
+        session = mysqlx.get_session(uri)
+
+
     def test_connection_uri(self):
         uri = ("mysqlx://{user}:{password}@{host}:{port}/{schema}"
                "".format(user=self.connect_kwargs["user"],
@@ -330,6 +341,16 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
                 self.assertEqual(res, settings)
             except mysqlx.Error:
                 self.assertEqual(res, None)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
+    def test_mysqlx_socket(self):
+        # Connect with unix socket
+        uri = "mysqlx://{user}:{password}@({socket})".format(
+            user=self.connect_kwargs["user"],
+            password=self.connect_kwargs["password"],
+            socket=self.connect_kwargs["socket"])
+
+        session = mysqlx.get_session(uri)
 
     def test_get_schema(self):
         schema = self.session.get_schema(self.schema_name)

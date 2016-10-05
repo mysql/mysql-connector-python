@@ -359,6 +359,9 @@ class MySQLServer(MySQLServerBase):
         self._name = name
         self._unix_socket = os.path.join(unix_socket_folder or self._topdir,
                                          'mysql_cpy_' + name + '.sock')
+        self._mysqlx_unix_socket = os.path.join(unix_socket_folder \
+                or self._topdir, 'mysql_cpy_mysqlx_' + name + '.sock')
+
         self._pid_file = os.path.join(topdir,
                                       'mysql_cpy_' + name + '.pid')
         self._serverid = port + 100000
@@ -541,6 +544,10 @@ class MySQLServer(MySQLServerBase):
         """Return the unix socket of the server"""
         return self._unix_socket
 
+    @property
+    def mysqlx_unix_socket(self):
+        return self._mysqlx_unix_socket
+
     def start(self):
         """Start a MySQL server"""
         if self.check_running():
@@ -558,6 +565,8 @@ class MySQLServer(MySQLServerBase):
             'mysqlx_port': self._mysqlx_port,
             'mysqlx_plugin': 'mysqlx.so' if os.name == 'posix' else 'mysqlx',
             'unix_socket': _convert_forward_slash(self._unix_socket),
+            'mysqlx_unix_socket': _convert_forward_slash(
+                self._mysqlx_unix_socket),
             'ssl_dir': _convert_forward_slash(self._ssldir),
             'pid_file': _convert_forward_slash(self._pid_file),
             'serverid': self._serverid,
