@@ -245,6 +245,84 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         # dropping an non-existing table should succeed silently
         self.schema.drop_table(table_name)
 
+    def test_create_table(self):
+        table_a = 'test_language'
+        table_b = 'test_film'
+        table_c = 'test_lang'
+        table_d = 'test_lang_a'
+        table_e = 'test_lang_b'
+
+        # Simple create table
+        language = self.schema.create_table(table_a) \
+            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
+                .primary().auto_increment().unsigned().not_null()).execute()
+        self.assertTrue(language.exists_in_database())
+
+        # Create table with index and foreign keys
+        film = self.schema.create_table(table_b) \
+            .add_column(mysqlx.ColumnDef('film_id', mysqlx.ColumnType.INT) \
+                .primary().auto_increment().unsigned().not_null()) \
+            .add_column(mysqlx.ColumnDef('title', mysqlx.ColumnType.TEXT, 255) \
+                .not_null()) \
+            .add_column(mysqlx.ColumnDef('description',
+                mysqlx.ColumnType.TEXT)) \
+            .add_column(mysqlx.ColumnDef('release_year',
+                mysqlx.ColumnType.YEAR, 4)) \
+            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
+                .unsigned().not_null()) \
+            .add_column(mysqlx.ColumnDef('original_language_id',
+                mysqlx.ColumnType.INT).unsigned())\
+            .add_column(mysqlx.ColumnDef('rental_duration',
+                mysqlx.ColumnType.INT).unsigned().not_null().set_default(3)) \
+            .add_column(mysqlx.ColumnDef('rental_rate',
+                mysqlx.ColumnType.DECIMAL, 4).decimals(2).not_null() \
+                .set_default(4.99)) \
+            .add_column(mysqlx.ColumnDef('length', mysqlx.ColumnType.INT) \
+                .unsigned()) \
+            .add_column(mysqlx.ColumnDef('replacement_cost',
+                mysqlx.ColumnType.DECIMAL, 5).decimals(2).not_null(). \
+                set_default(19.99)) \
+            .add_column(mysqlx.ColumnDef('rating', mysqlx.ColumnType.ENUM) \
+                .values(['G', 'PG', 'PG-13', 'R', 'NC-17']).set_default('G')) \
+            .add_column(mysqlx.ColumnDef('special_features',
+                mysqlx.ColumnType.SET).values(['Trailers', 'Commentaries',
+                'Deleted Scenes', 'Behind the Scenes'])) \
+            .add_column(mysqlx.ColumnDef('last_update',
+                mysqlx.ColumnType.TIMESTAMP)) \
+            .add_index('idx_title', ['title(255)']) \
+            .add_foreign_key('fk_film_language', mysqlx.ForeignKeyDef() \
+                .fields(['language_id']).refers_to(table_a,
+                ['language_id'])) \
+            .add_foreign_key('fk_film_language_original',
+                mysqlx.ForeignKeyDef().fields(['original_language_id']) \
+                .refers_to(table_a,['language_id']).on_update('Cascade')) \
+            .execute()
+        self.assertTrue(film.exists_in_database())
+
+        # Create table like another table
+        lang = self.schema.create_table(table_c).like(table_a).execute()
+        self.assertTrue(lang.exists_in_database())
+
+        # Create table as Select Statement
+        lang_a = self.schema.create_table(table_d) \
+            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
+                .not_null().primary().auto_increment().unsigned()) \
+            .as_select("SELECT language_id from {0}".format(table_a)).execute()
+        self.assertTrue(lang_a.exists_in_database())
+
+        select = language.select('language_id').where('language_id > 100')
+        lang_b = self.schema.create_table(table_e) \
+            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
+                .not_null().primary().auto_increment().unsigned()) \
+            .as_select(select).execute()
+        self.assertTrue(lang_b.exists_in_database())
+
+        self.schema.drop_table(table_b)
+        self.schema.drop_table(table_a)
+        self.schema.drop_table(table_c)
+        self.schema.drop_table(table_d)
+        self.schema.drop_table(table_e)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxCollectionTests(tests.MySQLxTests):

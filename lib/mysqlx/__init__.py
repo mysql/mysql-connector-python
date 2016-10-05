@@ -42,7 +42,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement,
                         DropCollectionIndexStatement, CreateViewStatement,
-                        AlterViewStatement)
+                        AlterViewStatement, ColumnDef,
+                        GeneratedColumnDef, ForeignKeyDef, Expr)
 
 
 def _parse_address_list(address_list):
@@ -235,4 +236,5 @@ __all__ = [
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
     "CreateViewStatement", "AlterViewStatement",
+    "ColumnDef", "GeneratedColumnDef", "ForeignKeyDef", "Expr",
 ]

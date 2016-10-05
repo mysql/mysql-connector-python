@@ -24,6 +24,7 @@
 """Implementation of Statements."""
 
 import json
+import re
 
 from .errors import ProgrammingError
 from .expr import ExprParser
@@ -31,10 +32,14 @@ from .compat import STRING_TYPES
 from .constants import Algorithms, Securities, CheckOptions
 from .dbdoc import DbDoc
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
-from .result import SqlResult, Result
+from .result import SqlResult, Result, ColumnType
+
+class Expr(object):
+    def __init__(self, expr):
+        self.expr = expr
 
 
-def _flexible_params(*values):
+def flexible_params(*values):
     if len(values) == 1 and isinstance(values[0], (list, tuple,)):
         return values[0]
     return values
@@ -89,6 +94,14 @@ def quote_multipart_identifier(identifiers, sql_mode=""):
     """
     return ".".join([quote_identifier(identifier, sql_mode)
                      for identifier in identifiers])
+
+
+def parse_table_name(default_schema, table_name, sql_mode=""):
+    quote = '"' if "ANSI_QUOTES" in sql_mode else "`"
+    delimiter = ".{0}".format(quote) if quote in table_name else "."
+    temp = table_name.split(delimiter, 1)
+    return (default_schema if len(temp) is 1 else temp[0].strip(quote),
+            temp[-1].strip(quote),)
 
 
 class Statement(object):
@@ -169,9 +182,10 @@ class FilterableStatement(Statement):
         return self
 
     def _projection(self, *fields):
+        fields = flexible_params(*fields)
         self._has_projection = True
-        self._projection_expr = ExprParser(
-            ",".join(_flexible_params(*fields)),
+        self._projection_str = ",".join(fields)
+        self._projection_expr = ExprParser(self._projection_str,
             not self._doc_based).parse_table_select_projection()
         return self
 
@@ -199,14 +213,18 @@ class FilterableStatement(Statement):
         Returns:
             mysqlx.FilterableStatement: FilterableStatement object.
         """
+        sort_clauses = flexible_params(*sort_clauses)
         self._has_sort = True
-        self._sort_expr = ExprParser(",".join(_flexible_params(*sort_clauses)),
+        self._sort_str = ",".join(sort_clauses)
+        self._sort_expr = ExprParser(self._sort_str,
                                      not self._doc_based).parse_order_spec()
         return self
 
     def _group_by(self, *fields):
+        fields = flexible_params(*fields)
         self._has_group_by = True
-        self._grouping = ExprParser(",".join(_flexible_params(*fields)),
+        self._grouping_str = ",".join(fields)
+        self._grouping = ExprParser(self._grouping_str,
                                     not self._doc_based).parse_expr_list()
 
     def _having(self, condition):
@@ -293,10 +311,11 @@ class AddStatement(Statement):
         Args:
             *values: The documents to be added into the collection.
 
-        Returns:
-            mysqlx.AddStatement: AddStatement object.
-        """
-        for val in _flexible_params(*values):
+    Returns:
+        mysqlx.AddStatement: AddStatement object.
+    """
+    def add(self, *values):
+        for val in flexible_params(*values):
             if isinstance(val, DbDoc):
                 self._values.append(val)
             else:
@@ -392,7 +411,7 @@ class ModifyStatement(FilterableStatement):
         """
         self._update_ops.extend([
             UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, x)
-            for x in _flexible_params(*doc_paths)])
+            for x in flexible_params(*doc_paths)])
         return self
 
     def array_insert(self, field, value):
@@ -543,6 +562,23 @@ class SelectStatement(FilterableStatement):
         """
         return self._connection.find(self)
 
+    def get_sql(self):
+        where = " WHERE {0}".format(self._where) if self._has_where else ""
+        group_by = " GROUP BY {0}".format(self._grouping_str) if \
+            self._has_group_by else ""
+        having = " HAVING {0}".format(self._having) if self._has_having else ""
+        order_by = " ORDER BY {0}".format(self._sort_str) if self._has_sort \
+            else ""
+        limit = " LIMIT {0} OFFSET {1}".format(self._limit_row_count,
+            self._limit_offset) if self._has_limit else ""
+
+        stmt = ("SELECT {select} FROM {schema}.{table}{where}{group}{having}"
+                "{order}{limit}".format(
+                select=getattr(self, '_projection_str', "*"),
+                schema=self.schema.name, table=self.target.name, limit=limit,
+                where=where, group=group_by, having=having, order=order_by))
+
+        return stmt
 
 class InsertStatement(Statement):
     """A statement for insert operations on Table.
@@ -553,7 +589,7 @@ class InsertStatement(Statement):
     """
     def __init__(self, table, *fields):
         super(InsertStatement, self).__init__(target=table, doc_based=False)
-        self._fields = _flexible_params(*fields)
+        self._fields = flexible_params(*fields)
         self._values = []
 
     def values(self, *values):
@@ -565,7 +601,7 @@ class InsertStatement(Statement):
         Returns:
             mysqlx.InsertStatement: InsertStatement object.
         """
-        self._values.append(list(_flexible_params(*values)))
+        self._values.append(list(flexible_params(*values)))
         return self
 
     def execute(self):
@@ -715,6 +751,22 @@ class DropCollectionIndexStatement(Statement):
             self._target.schema.name, self._target.name, self._index_name)
 
 
+class TableIndex(object):
+    UNIQUE_INDEX = 1
+    INDEX = 2
+    def __init__(self, name, index_type, columns):
+        self._name = name
+        self._index_type = index_type
+        self._columns = columns
+
+    def get_sql(self):
+        stmt = ""
+        if self._index_type is TableIndex.UNIQUE_INDEX:
+            stmt += "UNIQUE "
+        stmt += "INDEX {0} ({1})"
+        return stmt.format(self._name, ",".join(self._columns))
+
+
 class CreateViewStatement(Statement):
     """A statement for creating views.
 
@@ -862,3 +914,606 @@ class AlterViewStatement(CreateViewStatement):
 
         self._connection.execute_nonquery("sql", sql)
         return self._view
+
+class CreateTableStatement(Statement):
+    """A statement that creates a new table if it doesn't exist already.
+
+    Args:
+        collection (mysqlx.Schema): The Schema object.
+        table_name (string): The name for the new table.
+    """
+    tbl_frmt = re.compile(r"(from\s+)([`\"].+[`\"]|[^\.]+)(\s|$)", re.IGNORECASE)
+    def __init__(self, schema, table_name):
+        super(CreateTableStatement, self).__init__(schema)
+        self._charset = None
+        self._collation = None
+        self._comment = None
+        self._as = None
+        self._like = None
+        self._temp = False
+        self._columns = []
+        self._f_keys = []
+        self._indices = []
+        self._p_keys = []
+        self._u_indices = []
+        self._auto_inc = 0
+        self._name = table_name
+
+        self._tbl_repl = r"\1{0}.\2\3".format(self.schema.get_name())
+
+    @property
+    def table_name(self):
+        """string: The fully qualified name of the Table.
+        """
+        return quote_multipart_identifier(parse_table_name(
+            self.schema.name, self._name))
+
+    def _get_table_opts(self):
+        options = []
+        options.append("AUTO_INCREMENT = {inc}")
+        if self._charset:
+            options.append("DEFAULT CHARACTER SET = {charset}")
+        if self._collation:
+            options.append("DEFAULT COLLATE = {collation}")
+        if self._comment:
+            options.append("COMMENT = {comment}")
+
+        table_opts = ",".join(options)
+        return table_opts.format(inc=self._auto_inc, charset=self._charset,
+            collation=self._collation, comment=self._comment)
+
+    def _get_create_def(self):
+        defs = []
+        if self._p_keys:
+            defs.append("PRIMARY KEY ({0})".format(",".join(self._p_keys)))
+        for col in self._columns:
+            defs.append(col.get_sql())
+        for key in self._f_keys:
+            defs.append(key.get_sql())
+        for index in self._indices:
+            defs.append(index.get_sql())
+        for index in self._u_indices:
+            defs.append(index.get_sql())
+
+        return ",".join(defs)
+
+    def like(self, table_name):
+        """Create table with the definition of another existing Table.
+
+        Args:
+            table_name (string): Name of the source table.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._like = quote_multipart_identifier(
+            parse_table_name(self.schema.name, table_name))
+        return self
+
+    def as_select(self, select):
+        """Create the Table and fill it with values from a Select Statement.
+
+        Args:
+            select (object): Select Statement. Can be a string or an instance of
+            :class`mysqlx.SelectStatement`.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        if isinstance(select, STRING_TYPES):
+            self._as = CreateTableStatement.tbl_frmt.sub(self._tbl_repl, select)
+        elif isinstance(select, SelectStatement):
+            self._as = select.get_sql()
+        return self
+
+    def add_column(self, column_def):
+        """Add a Column to the Table.
+
+        Args:
+            column_def (MySQLx.ColumnDef): Column Definition object.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        column_def.set_schema(self.schema.get_name())
+        self._columns.append(column_def)
+        return self
+
+    def add_primary_key(self, *keys):
+        """Add multiple Primary Keys to the Table.
+
+        Args:
+            *keys: Fields to be used as Primary Keys.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        keys = flexible_params(*keys)
+        self._p_keys.extend(keys)
+        return self
+
+    def add_index(self, index_name, *cols):
+        """Adds an Index to the Table.
+
+        Args:
+            index_name (string): Name of the Index.
+            *cols: Fields to be used as an Index.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._indices.append(TableIndex(index_name, TableIndex.INDEX,
+            flexible_params(*cols)))
+        return self
+
+    def add_unique_index(self, index_name, *cols):
+        """Adds a Unique Index to the Table.
+
+        Args:
+            index_name (string): Name of the Unique Index.
+            *cols: Fields to be used as a Unique Index.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._u_indices.append(TableIndex(index_name, TableIndex.UNIQUE_INDEX,
+            flexible_params(*cols)))
+        return self
+
+    def add_foreign_key(self, name, key):
+        """Adds a Foreign Key to the Table.
+
+        Args:
+            key (MySQLx.ForeignKeyDef): The Foreign Key Definition object.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        key.set_schema(self.schema.get_name())
+        key.set_name(name)
+        self._f_keys.append(key)
+        return self
+
+    def set_initial_autoincrement(self, inc):
+        """Set the initial Auto Increment value for the table.
+
+        Args:
+            inc (int): The initial AUTO_INCREMENT value for the table.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._auto_inc = inc
+        return self
+
+    def set_default_charset(self, charset):
+        """Sets the default Charset type for the Table.
+
+        Args:
+            charset (string): Charset type.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._charset = charset
+        return self
+
+    def set_default_collation(self, collation):
+        """Sets the default Collation type for the Table.
+
+        Args:
+            collation (string): Collation type.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._collation = collation
+        return self
+
+    def set_comment(self, comment):
+        """Add a comment to the Table.
+
+        Args:
+            comment (string): Comment to be added to the Table.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._comment = comment
+        return self
+
+    def temporary(self):
+        """Set the Table to be Temporary.
+
+        Returns:
+            mysqlx.CreateTableStatement: CreateTableStatement object.
+        """
+        self._temp = True
+        return self
+
+    def execute(self):
+        """Execute the statement.
+
+        Returns:
+            mysqlx.Table: Table object.
+        """
+        create = "CREATE {table_type} {name}".format(name=self.table_name,
+            table_type="TEMPORARY TABLE" if self._temp else "TABLE")
+        if self._like:
+            stmt = "{create} LIKE {query}"
+        else:
+            stmt = "{create} ({create_def}) {table_opts} {query}"
+
+        stmt = stmt.format(
+            create=create,
+            query=self._like or self._as or "",
+            create_def=self._get_create_def(),
+            table_opts=self._get_table_opts())
+
+        self._connection.execute_nonquery("sql", stmt, False)
+        return self.schema.get_table(self._name)
+
+
+class ColumnDefBase(object):
+    """A Base class defining the basic parameters required to define a column.
+
+    Args:
+        name (string): Name of the column.
+        type (MySQLx.ColumnType): Type of the column.
+        size (int): Size of the column.
+    """
+    def __init__(self, name, type, size):
+        self._default_schema = None
+        self._not_null = False
+        self._p_key = False
+        self._u_index = False
+        self._name = name
+        self._size = size
+        self._comment = ""
+        self._type = type
+
+    def not_null(self):
+        """Disable NULL values for this column.
+
+        Returns:
+            mysqlx.ColumnDefBase: ColumnDefBase object.
+        """
+        self._not_null = True
+        return self
+
+    def unique_index(self):
+        """Set current column as a Unique Index.
+
+        Returns:
+            mysqlx.ColumnDefBase: ColumnDefBase object.
+       """
+        self._u_index = True
+        return self
+
+    def comment(self, comment):
+        """Add a comment to the column.
+
+        Args:
+            comment (string): Comment to be added to the column.
+
+        Returns:
+            mysqlx.ColumnDefBase: ColumnDefBase object.
+        """
+        self._comment = comment
+        return self
+
+    def primary(self):
+        """Sets the Column as a Primary Key.
+
+        Returns:
+            mysqlx.ColumnDefBase: ColumnDefBase object.
+        """
+        self._p_key = True
+        return self
+
+    def set_schema(self, schema):
+        self._default_schema = schema
+
+
+class ColumnDef(ColumnDefBase):
+    """Class containing the complete definition of the Column.
+
+    Args:
+        name (string): Name of the column.
+        type (MySQL.ColumnType): Type of the column.
+        size (int): Size of the column.
+    """
+    def __init__(self, name, type, size=None):
+        super(ColumnDef, self).__init__(name, type, size)
+        self._ref = None
+        self._default = None
+        self._decimals = None
+        self._ref_table = None
+
+        self._binary = False
+        self._auto_inc = False
+        self._unsigned = False
+
+        self._values = []
+        self._ref_fields = []
+
+        self._charset = "utf8"
+        self._collation = "utf8_general_ci"
+
+    def _data_type(self):
+        type_def = ""
+        if self._size and (ColumnType.is_numeric(self._type) or \
+            ColumnType.is_char(self._type) or ColumnType.is_binary(self._type)):
+            type_def = "({0})".format(self._size)
+        elif ColumnType.is_decimals(self._type) and self._size:
+            type_def = "({0}, {1})".format(self._size, self._decimals or 0)
+        elif ColumnType.is_finite_set(self._type):
+            type_def = "({0})".format(",".join(self._values))
+        elif ColumnType.is_text(self._type):
+            type_def = "{0} CHARSET {1} COLLATE {2}".format("BINARY" if \
+                self._binary else "", self._charset, self._collation)
+
+        return "{0}{1}".format(ColumnType.to_string(self._type), type_def)
+
+    def _col_definition(self):
+        null = " NOT NULL" if self._not_null else " NULL"
+        auto_inc = " AUTO_INCREMENT" if self._auto_inc else ""
+        default = " DEFAULT {default}" if self._default else ""
+        comment = " COMMENT '{comment}'" if self._comment else ""
+
+        defn = "{0}{1}{2}{3}{4}".format(self._data_type(), null, default,
+            auto_inc, comment)
+
+        if self._p_key:
+            defn = "{0} PRIMARY KEY".format(defn)
+        elif self._u_index:
+            defn = "{0} UNIQUE INDEX".format(defn)
+        if self._ref_table and self._ref_fields:
+            ref_table = quote_multipart_identifier(parse_table_name(
+                self._default_schema, name))
+            defn = "{0} REFERENCES {1} ({2})".format(defn, ref_table,
+                ",".join(self._ref_fields))
+
+        return defn.format(default=self._default, comment=self._comment)
+
+    def set_default(self, default_val):
+        """Sets the default value of this Column.
+
+        Args:
+            default_val (object): The default value of the Column. Can be a
+            string, number or :class`MySQLx.Expr`.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        if isinstance(default_val, Expr):
+            self._default = default_val.expr
+        elif default_val is None:
+            self._default = "NULL"
+        else:
+            self._default = repr(default_val)
+
+        return self
+
+    def auto_increment(self):
+        """Set the Column to Auto Increment.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._auto_inc = True
+        return self
+
+    def foreign_key(self, name, *refs):
+        """Sets the Column as a Foreign Key.
+
+        Args:
+            name (string): Name of the referenced Table.
+            *refs: Fields this Column references.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._ref_fields = flexible_params(*refs)
+        self._ref_table = name
+        return self
+
+    def unsigned(self):
+        """Set the Column as unsigned.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._unsigned = True
+        return self
+
+    def decimals(self, size):
+        """Set the size of the decimal Column.
+
+        Args:
+            size (int): Size of the decimal.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._decimals = size
+        return self
+
+    def charset(self, charset):
+        """Set the Charset type of the Column.
+
+        Args:
+            charset (string): Charset type.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._charset = charset
+        return self
+
+    def collation(self, collation):
+        """Set the Collation type of the Column.
+
+        Args:
+            collation (string): Collation type.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._collation = collation
+        return self
+
+    def binary(self):
+        """Set the current column to binary type.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._binary = True
+        return self
+
+    def values(self, *values):
+        """Set the Enum/Set values.
+
+        Args:
+            *values: Values for Enum/Set type Column.
+
+        Returns:
+            mysqlx.ColumnDef: ColumnDef object.
+        """
+        self._values = map(repr, flexible_params(*values))
+        return self
+
+    def get_sql(self):
+        return "{0} {1}".format(self._name, self._col_definition())
+
+
+class GeneratedColumnDef(ColumnDef):
+    """Class used to describe a Generated Column.
+
+    Args:
+        name: Name of the column.
+        col_type: Type of the column.
+        expr: The Expression used to generate the value of this column.
+    """
+    def __init__(self, name, col_type, expr):
+        super(GeneratedColumnDef, self).__init__(name, col_type)
+        assert isinstance(expr, Expr)
+        self._stored = False
+        self._expr = expr.expr
+
+    def stored(self):
+        """Set the Generated Column to be stored.
+
+        Returns:
+            mysqlx.GeneratedColumnDef: GeneratedColumnDef object.
+        """
+        self._stored = True
+        return self
+
+    def get_sql(self):
+        return "{0} GENERATED ALWAYS AS ({1}){2}".format(
+            super(GeneratedColumnDef, self).get_sql(),
+            self._expr, " STORED" if self._stored else "")
+
+
+class ForeignKeyDef(object):
+    """Class describing a Foreign Key."""
+    NO_ACTION = 1
+    RESTRICT = 2
+    CASCADE = 3
+    SET_NULL = 4
+
+    def __init__(self):
+        self._fields = []
+        self._f_fields = []
+        self._name = None
+        self._f_table = None
+        self._default_schema = None
+        self._update_action = self._action(ForeignKeyDef.NO_ACTION)
+        self._delete_action = self._action(ForeignKeyDef.NO_ACTION)
+
+    def _action(self, action):
+        if action is ForeignKeyDef.RESTRICT:
+            return "RESTRICT"
+        elif action is ForeignKeyDef.CASCADE:
+            return "CASCADE"
+        elif action is ForeignKeyDef.SET_NULL:
+            return "SET NULL"
+        return "NO ACTION"
+
+    def set_name(self, name):
+        self._name = name
+
+    def set_schema(self, schema):
+        self._default_schema = schema
+
+    def fields(self, *fields):
+        """Add a list of fields in the parent table.
+
+        Args:
+            *fields: Fields in the given table which constitute the Foreign Key.
+
+        Returns:
+            mysqlx.ForeignKeyDef: ForeignKeyDef object.
+        """
+        self._fields = flexible_params(*fields)
+        return self
+
+    def refers_to(self, name, *refs):
+        """Add the child table name and the fields.
+
+        Args:
+            name (string): Name of the referenced table.
+            *refs: A list fields in the referenced table.
+
+        Returns:
+            mysqlx.ForeignKeyDef: ForeignKeyDef object.
+        """
+        self._f_fields = flexible_params(*refs)
+        self._f_table = name
+        return self
+
+    def on_update(self, action):
+        """Define the action on updating a Foreign Key.
+
+        Args:
+            action (int): Action to be performed on updating the reference.
+                          Can be any of the following values:
+                          1. ForeignKeyDef.NO_ACTION
+                          2. ForeignKeyDef.RESTRICT
+                          3. ForeignKeyDef.CASCADE
+                          4. ForeignKeyDef.SET_NULL
+
+        Returns:
+            mysqlx.ForeignKeyDef: ForeignKeyDef object.
+        """
+
+        self._update_action = self._action(action)
+        return self
+
+    def on_delete(self, action):
+        """Define the action on deleting a Foreign Key.
+
+        Args:
+            action (int): Action to be performed on updating the reference.
+                          Can be any of the following values:
+                          1. ForeignKeyDef.NO_ACTION
+                          2. ForeignKeyDef.RESTRICT
+                          3. ForeignKeyDef.CASCADE
+                          4. ForeignKeyDef.SET_NULL
+
+        Returns:
+            mysqlx.ForeignKeyDef: ForeignKeyDef object.
+        """
+        self._delete_action = self._action(action)
+        return self
+
+    def get_sql(self):
+        update = "ON UPDATE {0}".format(self._update_action)
+        delete = "ON DELETE {0}".format(self._delete_action)
+        key = "FOREIGN KEY {0}({1}) REFERENCES {2} ({3})".format(
+            self._name, ",".join(self._fields), quote_multipart_identifier(
+            parse_table_name(self._default_schema, self._f_table)),
+            ",".join(self._f_fields))
+        return "{0} {1} {2}".format(key, update, delete)
