@@ -25,9 +25,9 @@
 
 import re
 
-import constants
+from . import constants
 
-from .compat import STRING_TYPES, urlparse
+from .compat import STRING_TYPES, urlparse, parse_qsl
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
@@ -108,12 +108,16 @@ def _parse_connection_uri(uri):
     if parsed.hostname is None or parsed.username is None \
        or parsed.password is None:
         raise InterfaceError("Malformed URI '{0}'".format(uri))
+
     settings = {
         "user": parsed.username,
         "password": parsed.password,
         "schema": parsed.path.lstrip("/")
     }
 
+    query = dict(parse_qsl(parsed.query, True))
+    for opt, val in query.items():
+        settings[opt] = val.strip("() ") or True
     settings.update(_parse_address_list(parsed.netloc.split("@")[-1]))
     return settings
 
@@ -171,6 +175,10 @@ def _get_connection_settings(*args, **kwargs):
             _validate_settings(router)
     else:
         _validate_settings(settings)
+
+    ssl_opts = ["ssl-key", "ssl-cert", "ssl-ca", "ssl-crl"]
+    if any(key in settings for key in ssl_opts):
+        settings["ssl-enable"] = True
 
     return settings
 

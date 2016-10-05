@@ -33,6 +33,7 @@ from .protobuf import mysqlx_datatypes_pb2 as MySQLxDatatypes
 from .protobuf import mysqlx_resultset_pb2 as MySQLxResultset
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .protobuf import mysqlx_expr_pb2 as MySQLxExpr
+from .protobuf import mysqlx_connection_pb2 as MySQLxConnection
 from .result import ColumnMetaData
 from .compat import STRING_TYPES, INT_TYPES
 from .dbdoc import DbDoc
@@ -56,6 +57,7 @@ _SERVER_MESSAGES = [
     (MySQLx.ServerMessages.RESULTSET_FETCH_DONE_MORE_RESULTSETS,
      MySQLxResultset.FetchDoneMoreResultsets),
     (MySQLx.ServerMessages.OK, MySQLx.Ok),
+    (MySQLx.ServerMessages.CONN_CAPABILITIES, MySQLxConnection.Capabilities),
 ]
 
 
@@ -104,6 +106,24 @@ class Protocol(object):
         self._reader = reader_writer
         self._writer = reader_writer
         self._message = None
+
+    def get_capabilites(self):
+        msg = MySQLxConnection.CapabilitiesGet()
+        self._writer.write_message(
+            MySQLx.ClientMessages.CON_CAPABILITIES_GET, msg)
+        return self._reader.read_message()
+
+    def set_capabilities(self, **kwargs):
+        msg = MySQLxConnection.CapabilitiesSet()
+        for key, value in kwargs.items():
+            value = self._create_any(value)
+            capability = MySQLxConnection.Capability(name=key, value=value)
+            msg.capabilities.capabilities.extend([capability])
+
+        self._writer.write_message(
+            MySQLx.ClientMessages.CON_CAPABILITIES_SET, msg)
+
+        return self.read_ok()
 
     def send_auth_start(self, method):
         msg = MySQLxSession.AuthenticateStart(mech_name=method)

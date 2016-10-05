@@ -23,6 +23,12 @@
 
 """Implementation of communication for MySQL X servers."""
 
+try:
+    import ssl
+    SSL_AVAILABLE = True
+except:
+    SSL_AVAILABLE = False
+
 import socket
 
 from functools import wraps
@@ -42,6 +48,7 @@ _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
 class SocketStream(object):
     def __init__(self):
         self._socket = None
+        self._is_ssl = False
 
     def connect(self, host, port):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -67,6 +74,34 @@ class SocketStream(object):
     def close(self):
         self._socket.close()
         self._socket = None
+
+    def set_ssl(self, ssl_opts={}):
+        if not SSL_AVAILABLE:
+            raise RuntimeError("Python installation has no SSL support.")
+
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context.load_default_certs()
+        if "ssl-ca" in ssl_opts:
+            try:
+                context.load_verify_locations(ssl_opts["ssl-ca"])
+                context.verify_mode = ssl.CERT_REQUIRED
+            except (IOError, SSLError):
+                raise InterfaceError("Invalid CA certificate.")
+        if "ssl-crl" in ssl_opts:
+            try:
+                context.load_verify_locations(ssl_opts["ssl-crl"])
+                context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
+            except (IOError, SSLError):
+                raise InterfaceError("Invalid CRL.")
+        if "ssl-cert" in ssl_opts:
+            try:
+                context.load_cert_chain(ssl_opts["ssl-cert"],
+                    ssl_opts.get("ssl-key", None))
+            except (IOError, SSLError):
+                raise InterfaceError("Invalid Client Certificate/Key.")
+
+        self._socket = context.wrap_socket(self._socket)
+        self._is_ssl = True
 
 
 def catch_network_exception(func):
@@ -104,10 +139,16 @@ class Connection(object):
         self._authenticate()
 
     def _handle_capabilities(self):
-        # TODO: To implement
-        # caps = mysqlx_connection_pb2.CapabilitiesGet()
-        # data = caps.SerializeToString()
-        pass
+        if not self.settings.get("ssl-enable", False):
+            return
+
+        data = self.protocol.get_capabilites()
+        if not next((True for cap in data.capabilities \
+            if cap.name == "tls"), False):
+            raise OperationalError("SSL is not enabled on server.")
+
+        self.protocol.set_capabilities(tls=True)
+        self.stream.set_ssl(self.settings)
 
     def _authenticate(self):
         plugin = MySQL41AuthPlugin(self._user, self._password)
