@@ -244,20 +244,72 @@ class ColumnType(object):
     MEDIUMINT = 4
     INT = 5
     BIGINT = 6
-    FLOAT = 7
-    DECIMAL = 8
-    DOUBLE = 9
-    JSON = 10
-    STRING = 11
-    BYTES = 12
-    TIME = 13
-    DATE = 14
-    DATETIME = 15
-    TIMESTAMP = 16
-    SET = 17
-    ENUM = 18
-    GEOMETRY = 19
-    XML = 20
+    REAL = 7
+    FLOAT = 8
+    DECIMAL = 9
+    NUMERIC = 10
+    DOUBLE = 11
+    JSON = 12
+    STRING = 13
+    BYTES = 14
+    TIME = 15
+    DATE = 16
+    DATETIME = 17
+    TIMESTAMP = 18
+    SET = 19
+    ENUM = 20
+    GEOMETRY = 21
+    XML = 22
+    YEAR = 23
+    CHAR = 24
+    VARCHAR = 25
+    BINARY = 26
+    VARBINARY = 27
+    TINYBLOB = 28
+    BLOB = 29
+    MEDIUMBLOB = 30
+    LONGBLOB = 31
+    TINYTEXT = 32
+    TEXT = 33
+    MEDIUMTEXT = 34
+    LONGTEXT = 35
+
+    @classmethod
+    def to_string(cls, needle):
+        for key, value in vars(cls).items():
+            if value == needle:
+                return key
+
+    @classmethod
+    def from_string(cls, key):
+        return getattr(cls, key.upper(), None)
+
+    @classmethod
+    def is_char(cls, col_type):
+        return col_type in (cls.CHAR, cls.VARCHAR,)
+
+    @classmethod
+    def is_binary(cls, col_type):
+        return col_type in (cls.BINARY, cls.VARBINARY,)
+
+    @classmethod
+    def is_text(cls, col_type):
+        return col_type in (cls.TEXT, cls.TINYTEXT, cls.MEDIUMTEXT,
+            cls.LONGTEXT,)
+
+    @classmethod
+    def is_decimals(cls, col_type):
+        return col_type in (cls.REAL, cls.DOUBLE, cls.FLOAT, cls.DECIMAL,
+            cls.NUMERIC,)
+
+    @classmethod
+    def is_numeric(cls, col_type):
+        return col_type in (cls.BIT, cls.TINYINT, cls.SMALLINT, cls.MEDIUMINT,
+            cls.INT, cls.BIGINT,)
+
+    @classmethod
+    def is_finite_set(cls, col_type):
+        return col_type in (cls.SET, cls.ENUM,)
 
 
 class ColumnProtoType(object):

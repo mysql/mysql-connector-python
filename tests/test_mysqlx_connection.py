@@ -161,6 +161,17 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         except mysqlx.errors.InterfaceError as err:
             self.assertEqual(4001, err.errno)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
+    def test_mysqlx_socket(self):
+        # Connect with unix socket
+        uri = "mysqlx://{user}:{password}@({socket})".format(
+            user=self.connect_kwargs["user"],
+            password=self.connect_kwargs["password"],
+            socket=self.connect_kwargs["socket"])
+
+        session = mysqlx.get_session(uri)
+
+
     def test_connection_uri(self):
         uri = ("mysqlx://{user}:{password}@{host}:{port}/{schema}"
                "".format(user=self.connect_kwargs["user"],
@@ -273,6 +284,26 @@ class MySQLxXSessionTests(tests.MySQLxTests):
                 tests.MYSQL_SERVERS[0].start()
                 tests.MYSQL_SERVERS[0].wait_up()
 
+    def test_ssl_connection(self):
+        config = {}
+        config.update(self.connect_kwargs)
+        config["ssl-ca"] = tests.SSL_CA
+        config["ssl-cert"] = tests.SSL_CERT
+        config["ssl-key"] = tests.SSL_KEY
+
+        session = mysqlx.get_session(config)
+
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
+        self.assertEqual("ON", res[0][1])
+
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
+        self.assertTrue("TLS" in res[0][1])
+
+        session.close()
+
+
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxNodeSessionTests(tests.MySQLxTests):
 
@@ -310,6 +341,16 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
                 self.assertEqual(res, settings)
             except mysqlx.Error:
                 self.assertEqual(res, None)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
+    def test_mysqlx_socket(self):
+        # Connect with unix socket
+        uri = "mysqlx://{user}:{password}@({socket})".format(
+            user=self.connect_kwargs["user"],
+            password=self.connect_kwargs["password"],
+            socket=self.connect_kwargs["socket"])
+
+        session = mysqlx.get_session(uri)
 
     def test_get_schema(self):
         schema = self.session.get_schema(self.schema_name)
@@ -384,3 +425,22 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
         self.assertEqual(table.count(), 1)
 
         schema.drop_table(table_name)
+
+    def test_ssl_connection(self):
+        config = {}
+        config.update(self.connect_kwargs)
+        config["ssl-ca"] = tests.SSL_CA
+        config["ssl-cert"] = tests.SSL_CERT
+        config["ssl-key"] = tests.SSL_KEY
+
+        session = mysqlx.get_node_session(config)
+
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_active'") \
+                     .execute().fetch_all()
+        self.assertEqual("ON", res[0][1])
+
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'") \
+            .execute().fetch_all()
+        self.assertTrue("TLS" in res[0][1])
+
+        session.close()

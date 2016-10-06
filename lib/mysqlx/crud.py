@@ -29,7 +29,7 @@ from .statement import (FindStatement, AddStatement, RemoveStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement,
                         DropCollectionIndexStatement, CreateViewStatement,
-                        AlterViewStatement)
+                        AlterViewStatement, CreateTableStatement)
 
 
 _COUNT_VIEWS_QUERY = ("SELECT COUNT(*) FROM information_schema.views "
@@ -288,6 +288,16 @@ class Schema(DatabaseObject):
         """
         view = View(self, name)
         return view.get_alter_statement()
+
+    def create_table(self, name, reuse=False):
+        if not name:
+            raise ProgrammingError("Table name is invalid")
+        table = Table(self, name)
+        if not table.exists_in_database():
+            return CreateTableStatement(self, name)
+        elif not reuse:
+            raise ProgrammingError("Table already exists")
+        return table
 
 
 class Collection(DatabaseObject):

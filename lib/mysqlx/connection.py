@@ -23,6 +23,12 @@
 
 """Implementation of communication for MySQL X servers."""
 
+try:
+    import ssl
+    SSL_AVAILABLE = True
+except:
+    SSL_AVAILABLE = False
+
 import socket
 
 from functools import wraps
@@ -42,10 +48,12 @@ _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
 class SocketStream(object):
     def __init__(self):
         self._socket = None
+        self._is_ssl = False
 
-    def connect(self, host, port):
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.connect((host, port,))
+    def connect(self, params):
+        s_type = socket.AF_INET if isinstance(params, tuple) else socket.AF_UNIX
+        self._socket = socket.socket(s_type, socket.SOCK_STREAM)
+        self._socket.connect(params)
 
     def read(self, count):
         if self._socket is None:
@@ -67,6 +75,34 @@ class SocketStream(object):
     def close(self):
         self._socket.close()
         self._socket = None
+
+    def set_ssl(self, ssl_opts={}):
+        if not SSL_AVAILABLE:
+            raise RuntimeError("Python installation has no SSL support.")
+
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context.load_default_certs()
+        if "ssl-ca" in ssl_opts:
+            try:
+                context.load_verify_locations(ssl_opts["ssl-ca"])
+                context.verify_mode = ssl.CERT_REQUIRED
+            except (IOError, SSLError):
+                raise InterfaceError("Invalid CA certificate.")
+        if "ssl-crl" in ssl_opts:
+            try:
+                context.load_verify_locations(ssl_opts["ssl-crl"])
+                context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
+            except (IOError, SSLError):
+                raise InterfaceError("Invalid CRL.")
+        if "ssl-cert" in ssl_opts:
+            try:
+                context.load_cert_chain(ssl_opts["ssl-cert"],
+                    ssl_opts.get("ssl-key", None))
+            except (IOError, SSLError):
+                raise InterfaceError("Invalid Client Certificate/Key.")
+
+        self._socket = context.wrap_socket(self._socket)
+        self._is_ssl = True
 
 
 def catch_network_exception(func):
@@ -96,18 +132,31 @@ class Connection(object):
             self._active_result.fetch_all()
             self._active_result = None
 
-    def connect(self, host, port):
-        self.stream.connect(host, port)
+    def _connection_params(self):
+        if "host" in self.settings:
+            return self.settings["host"], self.settings.get("port", 33060)
+        if "socket" in self.settings:
+            return self.settings["socket"]
+        return ("localhost", 33060,)
+
+    def connect(self):
+        self.stream.connect(self._connection_params())
         self.reader_writer = MessageReaderWriter(self.stream)
         self.protocol = Protocol(self.reader_writer)
         self._handle_capabilities()
         self._authenticate()
 
     def _handle_capabilities(self):
-        # TODO: To implement
-        # caps = mysqlx_connection_pb2.CapabilitiesGet()
-        # data = caps.SerializeToString()
-        pass
+        if not self.settings.get("ssl-enable", False):
+            return
+
+        data = self.protocol.get_capabilites()
+        if not next((True for cap in data.capabilities \
+            if cap.name == "tls"), False):
+            raise OperationalError("SSL is not enabled on server.")
+
+        self.protocol.set_capabilities(tls=True)
+        self.stream.set_ssl(self.settings)
 
     def _authenticate(self):
         plugin = MySQL41AuthPlugin(self._user, self._password)
@@ -197,7 +246,7 @@ class XConnection(Connection):
     def __init__(self, settings):
         super(XConnection, self).__init__(settings)
         self.dependent_connections = []
-        self._routers = settings.get("routers", [])
+        self._routers = settings.pop("routers", [])
 
         if 'host' in settings and settings['host']:
             self._routers.append({
@@ -205,6 +254,8 @@ class XConnection(Connection):
                 'port': settings.pop('port', None)
             })
 
+        self._cur_router = -1
+        self._can_failover = True
         self._ensure_priorities()
         self._routers.sort(key=lambda x: x['priority'], reverse=True)
 
@@ -226,28 +277,41 @@ class XConnection(Connection):
             raise ProgrammingError("You must either assign no priority to any "
                 "of the routers or give a priority for every router", 4000)
 
-    def connect(self):
-        # Reset all router availibilty
-        if not all(x.get('available', None) for x in self._routers):
+    def _connection_params(self):
+        if not self._routers:
+            self._can_failover = False
+            return super(XConnection, self)._connection_params()
+
+        # Reset routers status once all are tried
+        if not self._can_failover or self._cur_router is -1:
+            self._cur_router = -1
+            self._can_failover = True
             for router in self._routers:
                 router['available'] = True
 
+        self._cur_router += 1
+        host = self._routers[self._cur_router]["host"]
+        port = self._routers[self._cur_router]["port"]
+
+        if self._cur_router > 0:
+            self._routers[self._cur_router-1]["available"] = False
+        if self._cur_router >= len(self._routers) - 1:
+            self._can_failover = False
+
+        return (host, port,)
+
+    def connect(self):
         # Loop and check
         error = None
-        for router in self._routers:
+        while self._can_failover:
             try:
-                super(XConnection, self).connect(router.get("host"),
-                                                 router.get("port"))
-                return
+                return super(XConnection, self).connect()
             except socket.error as err:
-                router['available'] = False
                 error = err
 
-        if len(self._routers) > 1:
-            raise InterfaceError("Failed to connect to any of the routers.",
-                4001)
-        else:
+        if len(self._routers) <= 1:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
+        raise InterfaceError("Failed to connect to any of the routers.", 4001)
 
     def bind_connection(self, connection):
         self.dependent_connections.append(connection)
@@ -266,12 +330,10 @@ class XConnection(Connection):
 class NodeConnection(Connection):
     def __init__(self, settings):
         super(NodeConnection, self).__init__(settings)
-        self._host = settings.get("host", "localhost")
-        self._port = settings.get("port", 33060)
 
     def connect(self):
         try:
-            super(NodeConnection, self).connect(self._host, self._port)
+            super(NodeConnection, self).connect()
         except socket.error as err:
             raise InterfaceError("Cannot connect to host: {0}".format(err))
 

@@ -32,7 +32,7 @@ PY3 = sys.version_info.major == 3
 
 
 if PY3:
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, unquote, parse_qsl
 
     def hexlify(data):
         return binascii.hexlify(data).decode("utf-8")
@@ -45,7 +45,7 @@ if PY3:
 
 
 else:
-    from urlparse import urlparse
+    from urlparse import urlparse, unquote, parse_qsl
 
     def hexlify(data):
         return data.encode("hex")

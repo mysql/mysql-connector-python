@@ -25,9 +25,9 @@
 
 import re
 
-import constants
+from . import constants
 
-from .compat import STRING_TYPES, urlparse
+from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
 from .connection import XSession, NodeSession
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
@@ -42,7 +42,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement,
                         DropCollectionIndexStatement, CreateViewStatement,
-                        AlterViewStatement)
+                        AlterViewStatement, ColumnDef,
+                        GeneratedColumnDef, ForeignKeyDef, Expr)
 
 
 def _parse_address_list(address_list):
@@ -99,19 +100,34 @@ def _parse_connection_uri(uri):
         Returns a dict with parsed values of credentials and address of the
         MySQL server/farm.
     """
-    settings = {}
-
     uri = "{0}{1}".format("" if uri.startswith("mysqlx://")
                           else "mysqlx://", uri)
     parsed = urlparse(uri)
-    if parsed.hostname is None or parsed.username is None \
-       or parsed.password is None:
+    if parsed.username is None or parsed.password is None:
         raise InterfaceError("Malformed URI '{0}'".format(uri))
+
     settings = {
         "user": parsed.username,
-        "password": parsed.password,
-        "schema": parsed.path.lstrip("/")
+        "password": parsed.password
     }
+
+    delimiter = ")" if ")" in parsed.path else "/"
+    socket, schema = parsed.path.rpartition(delimiter)[::2]
+    settings["schema"] = schema.lstrip("/")
+    if socket and parsed.hostname:
+        socket = "{0}{1}".format(parsed.hostname, socket).strip("()")
+
+    if socket.startswith(("/", ".", "..")):
+        settings["socket"] = unquote(socket).encode("utf-8")
+        return settings
+    elif socket.startswith("\\."):
+        raise InterfaceError("Windows Pipe is not supported.")
+    elif parsed.hostname is None:
+        raise InterfaceError("Malformed URI '{0}'".format(uri))
+
+    query = dict(parse_qsl(parsed.query, True))
+    for opt, val in query.items():
+        settings[opt] = val.strip("() ") or True
 
     settings.update(_parse_address_list(parsed.netloc.split("@")[-1]))
     return settings
@@ -136,7 +152,7 @@ def _validate_settings(settings):
             settings["port"] = int(settings["port"])
         except NameError:
             raise InterfaceError("Invalid port")
-    else:
+    elif "host" in settings:
         settings["port"] = 33060
 
 def _get_connection_settings(*args, **kwargs):
@@ -170,6 +186,10 @@ def _get_connection_settings(*args, **kwargs):
             _validate_settings(router)
     else:
         _validate_settings(settings)
+
+    ssl_opts = ["ssl-key", "ssl-cert", "ssl-ca", "ssl-crl"]
+    if any(key in settings for key in ssl_opts):
+        settings["ssl-enable"] = True
 
     return settings
 
@@ -235,4 +255,5 @@ __all__ = [
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
     "CreateViewStatement", "AlterViewStatement",
+    "ColumnDef", "GeneratedColumnDef", "ForeignKeyDef", "Expr",
 ]
