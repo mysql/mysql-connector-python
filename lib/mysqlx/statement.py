@@ -311,10 +311,9 @@ class AddStatement(Statement):
         Args:
             *values: The documents to be added into the collection.
 
-    Returns:
-        mysqlx.AddStatement: AddStatement object.
-    """
-    def add(self, *values):
+        Returns:
+            mysqlx.AddStatement: AddStatement object.
+        """
         for val in flexible_params(*values):
             if isinstance(val, DbDoc):
                 self._values.append(val)
