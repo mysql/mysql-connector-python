@@ -27,6 +27,7 @@
 from decimal import Decimal
 from operator import attrgetter
 
+import unittest
 import tests
 from tests import PY2, foreach_cnx
 
@@ -185,6 +186,8 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
             row = self.cnx.info_query("SELECT @@session.{0}".format(key))
             self.assertEqual(value, row[0])
 
+    @unittest.skipIf(tests.MYSQL_VERSION > (5, 7, 10),
+                     "As of MySQL 5.7.11, mysql_refresh() is deprecated")
     @foreach_cnx()
     def test_cmd_refresh(self):
         refresh = RefreshOption.LOG | RefreshOption.THREADS

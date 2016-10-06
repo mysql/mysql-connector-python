@@ -11,13 +11,14 @@ Full release notes:
 v2.1.4
 ======
 
+- BUG#22873551: Fix cleartext authentication issue
 - BUG#22545879: Fix usage of --ssl-cipher option
+- BUG#22529828: Fix potencial SQL injection
 - BUG#21881038: Fix duplicate entry in CHANGES.txt
 - BUG#21879914: Fix using SSL without key or certificate using C/Ext
 - BUG#21879859: Fix consuming results after calling procedure
 - BUG#21498719: Fix conversion of Python bytearray
 - BUG#21449996: Fix LOAD DATA with compression turned on
-- BUG#21449207: Fix fetching compressed data bigger than 16M
 - BUG#20834643: Attribute Error while promoting servers using MySQL Fabric
 - BUG#20811802: Fix buffered named tuple cursor with CExtension
 - BUG#20217174: Fix install command honouring --install-lib when given

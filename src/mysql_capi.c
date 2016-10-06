@@ -1030,7 +1030,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
 	PyObject *charset_name, *compress, *ssl_verify_cert;
 	const char* auth_plugin;
-	unsigned long ver;
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
 	unsigned int protocol= 0;
@@ -1065,7 +1064,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
     mysql_init(&self->session);
-    ver= mysql_get_client_version();
 
 #ifdef MS_WINDOWS
     if (NULL == host)
