@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -361,6 +361,8 @@ class MySQLCursorTests(tests.TestsCursor):
             datetime.time(20, 3, 23),
             st_now,
             datetime.timedelta(hours=40, minutes=30, seconds=12),
+            'foo %(t)s',
+            'foo %(s)s',
         )
         exp = (
             b'NULL',
@@ -382,6 +384,8 @@ class MySQLCursorTests(tests.TestsCursor):
             b"'" + time.strftime('%Y-%m-%d %H:%M:%S', st_now).encode('ascii')
             + b"'",
             b"'40:30:12'",
+            b"'foo %(t)s'",
+            b"'foo %(s)s'",
         )
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
@@ -421,28 +425,32 @@ class MySQLCursorTests(tests.TestsCursor):
             'p': datetime.time(20, 3, 23),
             'q': st_now,
             'r': datetime.timedelta(hours=40, minutes=30, seconds=12),
+            's': 'foo %(t)s',
+            't': 'foo %(s)s',
         }
         exp = {
-            b'%(a)s': b'NULL',
-            b'%(b)s': b'128',
-            b'%(c)s': b'1281288',
-            b'%(d)s': repr(float(3.14)) if PY2 else b'3.14',
-            b'%(e)s': b"'3.14'",
-            b'%(f)s': b"'back\\\\slash'",
-            b'%(g)s': b"'newline\\n'",
-            b'%(h)s': b"'return\\r'",
-            b'%(i)s': b"'\\'single\\''",
-            b'%(j)s': b'\'\\"double\\"\'',
-            b'%(k)s': b"'windows\\\x1a'",
-            b'%(l)s': b"'Strings are sexy'",
-            b'%(m)s': b"'\xe8\x8a\xb1'",
-            b'%(n)s': b"'2008-05-07 20:01:23'",
-            b'%(o)s': b"'2008-05-07'",
-            b'%(p)s': b"'20:03:23'",
-            b'%(q)s': b"'" +
+            b'a': b'NULL',
+            b'b': b'128',
+            b'c': b'1281288',
+            b'd': repr(float(3.14)) if PY2 else b'3.14',
+            b'e': b"'3.14'",
+            b'f': b"'back\\\\slash'",
+            b'g': b"'newline\\n'",
+            b'h': b"'return\\r'",
+            b'i': b"'\\'single\\''",
+            b'j': b'\'\\"double\\"\'',
+            b'k': b"'windows\\\x1a'",
+            b'l': b"'Strings are sexy'",
+            b'm': b"'\xe8\x8a\xb1'",
+            b'n': b"'2008-05-07 20:01:23'",
+            b'o': b"'2008-05-07'",
+            b'p': b"'20:03:23'",
+            b'q': b"'" +
             time.strftime('%Y-%m-%d %H:%M:%S', st_now).encode('ascii')
             + b"'",
-            b'%(r)s': b"'40:30:12'",
+            b'r': b"'40:30:12'",
+            b's': b"'foo %(t)s'",
+            b't': b"'foo %(s)s'",
         }
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
