@@ -11,6 +11,9 @@ Full release notes:
 v2.2.2
 ======
 
+- DevAPI: Schema.create_table
+- DevAPI: New transports: Unix domain socket
+- DevAPI: Core TLS/SSL options for the mysqlx URI scheme
 - DevAPI: View DDL with support for partitioning in a cluster / sharding
 - BUG24520850: Fix unexpected behavior when using an empty collection name
 
