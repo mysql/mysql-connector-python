@@ -1107,7 +1107,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 
     if (ssl_ca || ssl_cert || ssl_key) {
 #if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
-        printf(">>>> %d\n", MYSQL_VERSION_ID);
         {
             abool= 1;
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
@@ -1115,7 +1114,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
 #if MYSQL_VERSION_ID >= 50711
         {
-            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_REQUIRED);
+            tmp_uint= SSL_MODE_REQUIRED;
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, (char*)&tmp_uint);
         }
 #endif
 
@@ -1123,7 +1123,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         {
 #if MYSQL_VERSION_ID >= 50711
             {
-                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_VERIFY_IDENTITY);
+                tmp_uint= SSL_MODE_VERIFY_IDENTITY;
+                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, (char*)&tmp_uint);
             }
 #else
             {
@@ -1144,7 +1145,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
 #if MYSQL_VERSION_ID >= 50711
         {
-            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, SSL_MODE_DISABLED);
+            tmp_uint= SSL_MODE_DISABLED;
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, (char*)&tmp_uint);
         }
 #endif
     }
