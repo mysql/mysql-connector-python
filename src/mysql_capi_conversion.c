@@ -441,7 +441,7 @@ mytopy_datetime(const char *data, const unsigned long length)
     if (data != end && end - data >= 2 && *data == '.')
     {
         // Fractional part
-        int field_length= 6;   // max fractional - 1
+        int field_length= 5;
         data++;
         value= (unsigned int)(*data - '0');
         while (data++ != end && isdigit(*data))
@@ -449,6 +449,13 @@ mytopy_datetime(const char *data, const unsigned long length)
             if (field_length-- > 0)
             {
                 value= (value * 10) + (unsigned int)(*data - '0');
+            }
+        }
+        if (field_length >= 0)
+        {
+            while (field_length-- > 0)
+            {
+                value*= 10;
             }
         }
         parts[6]= value;
