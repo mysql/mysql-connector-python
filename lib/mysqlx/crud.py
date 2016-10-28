@@ -142,7 +142,10 @@ class Schema(DatabaseObject):
         for row in rows:
             if row.get_string("type") != "COLLECTION":
                 continue
-            collection = Collection(self, row.get_string("name"))
+            try:
+                collection = Collection(self, row.get_string("TABLE_NAME"))
+            except ValueError:
+                collection = Collection(self, row.get_string("name"))
             collections.append(collection)
         return collections
 
@@ -167,7 +170,10 @@ class Schema(DatabaseObject):
         object_types = ("TABLE", "VIEW",)
         for row in rows:
             if row.get_string("type") in object_types:
-                table = Table(self, row.get_string("name"))
+                try:
+                    table = Table(self, row.get_string("TABLE_NAME"))
+                except ValueError:
+                    table = Table(self, row.get_string("name"))
                 tables.append(table)
         return tables
 
