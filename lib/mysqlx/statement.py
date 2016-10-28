@@ -1269,7 +1269,7 @@ class ColumnDef(ColumnDefBase):
             defn = "{0} UNIQUE KEY".format(defn)
         if self._ref_table and self._ref_fields:
             ref_table = quote_multipart_identifier(parse_table_name(
-                self._default_schema, name))
+                self._default_schema, self._ref_table))
             defn = "{0} REFERENCES {1} ({2})".format(defn, ref_table,
                 ",".join(self._ref_fields))
 

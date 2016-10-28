@@ -284,7 +284,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             .add_column(mysqlx.ColumnDef('release_year',
                 mysqlx.ColumnType.YEAR, 4)) \
             .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
-                .unsigned().not_null()) \
+                .unsigned().not_null().foreign_key(table_a, 'language_id')) \
             .add_column(mysqlx.ColumnDef('original_language_id',
                 mysqlx.ColumnType.INT).unsigned())\
             .add_column(mysqlx.ColumnDef('rental_duration',
