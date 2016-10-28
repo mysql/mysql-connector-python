@@ -31,6 +31,8 @@ import unittest
 import tests
 import mysqlx
 
+from urllib import quote
+
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
@@ -287,9 +289,13 @@ class MySQLxXSessionTests(tests.MySQLxTests):
     def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
+        config["ssl-key"] = tests.SSL_KEY
+
+        self.assertRaises(mysqlx.errors.InterfaceError,
+                          mysqlx.get_session, config)
+
         config["ssl-ca"] = tests.SSL_CA
         config["ssl-cert"] = tests.SSL_CERT
-        config["ssl-key"] = tests.SSL_KEY
 
         session = mysqlx.get_session(config)
 
@@ -302,6 +308,18 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         self.assertTrue("TLS" in res[0][1])
 
         session.close()
+
+        uri = ("mysqlx://{0}:{1}@{2}?ssl-ca={3}&ssl-cert={4}&ssl-key={5}"
+               "".format(config["user"], config["password"], config["host"],
+                         quote(config["ssl-ca"]), quote(config["ssl-cert"]),
+                         quote(config["ssl-key"])))
+        session = mysqlx.get_session(uri)
+
+        uri = ("mysqlx://{0}:{1}@{2}?ssl-ca=({3})&ssl-cert=({4})&ssl-key=({5})"
+               "".format(config["user"], config["password"], config["host"],
+                         config["ssl-ca"], config["ssl-cert"],
+                         config["ssl-key"]))
+        session = mysqlx.get_session(uri)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -429,9 +447,13 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
     def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
+        config["ssl-key"] = tests.SSL_KEY
+
+        self.assertRaises(mysqlx.errors.InterfaceError,
+                          mysqlx.get_node_session, config)
+
         config["ssl-ca"] = tests.SSL_CA
         config["ssl-cert"] = tests.SSL_CERT
-        config["ssl-key"] = tests.SSL_KEY
 
         session = mysqlx.get_node_session(config)
 
@@ -444,3 +466,15 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
         self.assertTrue("TLS" in res[0][1])
 
         session.close()
+
+        uri = ("mysqlx://{0}:{1}@{2}?ssl-ca={3}&ssl-cert={4}&ssl-key={5}"
+               "".format(config["user"], config["password"], config["host"],
+                         quote(config["ssl-ca"]), quote(config["ssl-cert"]),
+                         quote(config["ssl-key"])))
+        session = mysqlx.get_node_session(uri)
+
+        uri = ("mysqlx://{0}:{1}@{2}?ssl-ca=({3})&ssl-cert=({4})&ssl-key=({5})"
+               "".format(config["user"], config["password"], config["host"],
+                         config["ssl-ca"], config["ssl-cert"],
+                         config["ssl-key"]))
+        session = mysqlx.get_node_session(uri)

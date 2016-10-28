@@ -127,7 +127,7 @@ def _parse_connection_uri(uri):
 
     query = dict(parse_qsl(parsed.query, True))
     for opt, val in query.items():
-        settings[opt] = val.strip("() ") or True
+        settings[opt] = unquote(val.strip("()")) or True
 
     settings.update(_parse_address_list(parsed.netloc.split("@")[-1]))
     return settings

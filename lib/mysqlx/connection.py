@@ -73,11 +73,15 @@ class SocketStream(object):
         self._socket.sendall(data)
 
     def close(self):
+        if not self._socket:
+            return
+
         self._socket.close()
         self._socket = None
 
     def set_ssl(self, ssl_opts={}):
         if not SSL_AVAILABLE:
+            self.close()
             raise RuntimeError("Python installation has no SSL support.")
 
         context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
@@ -87,19 +91,25 @@ class SocketStream(object):
                 context.load_verify_locations(ssl_opts["ssl-ca"])
                 context.verify_mode = ssl.CERT_REQUIRED
             except (IOError, ssl.SSLError):
+                self.close()
                 raise InterfaceError("Invalid CA certificate.")
         if "ssl-crl" in ssl_opts:
             try:
                 context.load_verify_locations(ssl_opts["ssl-crl"])
                 context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
             except (IOError, ssl.SSLError):
+                self.close()
                 raise InterfaceError("Invalid CRL.")
         if "ssl-cert" in ssl_opts:
             try:
                 context.load_cert_chain(ssl_opts["ssl-cert"],
                     ssl_opts.get("ssl-key", None))
             except (IOError, ssl.SSLError):
+                self.close()
                 raise InterfaceError("Invalid Client Certificate/Key.")
+        elif "ssl-key" in ssl_opts:
+            self.close()
+            raise InterfaceError("Client Certificate not provided.")
 
         self._socket = context.wrap_socket(self._socket)
         self._is_ssl = True
