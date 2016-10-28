@@ -1266,7 +1266,7 @@ class ColumnDef(ColumnDefBase):
         if self._p_key:
             defn = "{0} PRIMARY KEY".format(defn)
         elif self._u_index:
-            defn = "{0} UNIQUE INDEX".format(defn)
+            defn = "{0} UNIQUE KEY".format(defn)
         if self._ref_table and self._ref_fields:
             ref_table = quote_multipart_identifier(parse_table_name(
                 self._default_schema, name))

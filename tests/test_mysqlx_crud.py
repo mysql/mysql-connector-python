@@ -291,7 +291,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                 mysqlx.ColumnType.INT).unsigned().not_null().set_default(3)) \
             .add_column(mysqlx.ColumnDef('rental_rate',
                 mysqlx.ColumnType.DECIMAL, 4).decimals(2).not_null() \
-                .set_default(4.99)) \
+                .set_default(4.99).unique_index()) \
             .add_column(mysqlx.ColumnDef('length', mysqlx.ColumnType.INT) \
                 .unsigned()) \
             .add_column(mysqlx.ColumnDef('replacement_cost',
@@ -313,6 +313,9 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                 .refers_to(table_a,['language_id']).on_update('Cascade')) \
             .execute()
         self.assertTrue(film.exists_in_database())
+        self.assertEqual(1, len(self.node_session.sql('SHOW INDEXES FROM '
+            '{0}.{1} WHERE COLUMN_NAME = "{2}" AND NOT NON_UNIQUE'.format(
+            self.schema.name, table_b, 'rental_rate')).execute().fetch_all()))
 
         # Create table like another table
         lang = self.schema.create_table(table_c).like(table_a).execute()
