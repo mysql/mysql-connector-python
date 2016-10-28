@@ -279,8 +279,11 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                 .primary().auto_increment().unsigned().not_null()) \
             .add_column(mysqlx.ColumnDef('title', mysqlx.ColumnType.TEXT, 255) \
                 .not_null()) \
+            .add_column(mysqlx.ColumnDef('native_title',
+                mysqlx.ColumnType.VARCHAR, 255).charset("utf8mb4")
+                .collation("utf8mb4_general_ci")) \
             .add_column(mysqlx.ColumnDef('description',
-                mysqlx.ColumnType.TEXT)) \
+                mysqlx.ColumnType.TEXT).binary()) \
             .add_column(mysqlx.ColumnDef('release_year',
                 mysqlx.ColumnType.YEAR, 4)) \
             .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
@@ -311,11 +314,28 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             .add_foreign_key('fk_film_language_original',
                 mysqlx.ForeignKeyDef().fields(['original_language_id']) \
                 .refers_to(table_a,['language_id']).on_update('Cascade')) \
+            .set_default_charset('latin2') \
+            .set_default_collation('latin2_general_ci') \
             .execute()
+
         self.assertTrue(film.exists_in_database())
         self.assertEqual(1, len(self.node_session.sql('SHOW INDEXES FROM '
             '{0}.{1} WHERE COLUMN_NAME = "{2}" AND NOT NON_UNIQUE'.format(
             self.schema.name, table_b, 'rental_rate')).execute().fetch_all()))
+
+        res = self.node_session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
+                'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "{0}" '
+                'AND COLUMN_NAME = "{1}"'.format(table_b, 'native_title')) \
+            .execute().fetch_all()
+        self.assertEqual("utf8mb4", res[0]['CHARACTER_SET_NAME'])
+        self.assertEqual("utf8mb4_general_ci", res[0]['COLLATION_NAME'])
+
+        res = self.node_session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
+                'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "{0}" '
+                'AND COLUMN_NAME = "{1}"'.format(table_b, 'title')) \
+            .execute().fetch_all()
+        self.assertEqual("latin2", res[0]['CHARACTER_SET_NAME'])
+        self.assertEqual("latin2_general_ci", res[0]['COLLATION_NAME'])
 
         # Create table like another table
         lang = self.schema.create_table(table_c).like(table_a).execute()

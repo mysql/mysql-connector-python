@@ -1236,8 +1236,8 @@ class ColumnDef(ColumnDefBase):
         self._values = []
         self._ref_fields = []
 
-        self._charset = "utf8"
-        self._collation = "utf8_general_ci"
+        self._charset = None
+        self._collation = None
 
     def _data_type(self):
         type_def = ""
@@ -1248,11 +1248,17 @@ class ColumnDef(ColumnDefBase):
             type_def = "({0}, {1})".format(self._size, self._decimals or 0)
         elif ColumnType.is_finite_set(self._type):
             type_def = "({0})".format(",".join(self._values))
-        elif ColumnType.is_text(self._type):
-            type_def = "{0} CHARSET {1} COLLATE {2}".format("BINARY" if \
-                self._binary else "", self._charset, self._collation)
 
-        return "{0}{1}".format(ColumnType.to_string(self._type), type_def)
+        if self._unsigned:
+            type_def = "{0} UNSIGNED".format(type_def)
+        if self._binary:
+            type_def = "{0} BINARY".format(type_def)
+        if self._charset:
+            type_def = "{0} CHARACTER SET {1}".format(type_def, self._charset)
+        if self._collation:
+            type_def = "{0} COLLATE {1}".format(type_def, self._collation)
+
+        return "{0} {1}".format(ColumnType.to_string(self._type), type_def)
 
     def _col_definition(self):
         null = " NOT NULL" if self._not_null else " NULL"
