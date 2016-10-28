@@ -173,6 +173,40 @@ class MySQLxXSessionTests(tests.MySQLxTests):
 
         session = mysqlx.get_session(uri)
 
+        conn = mysqlx._get_connection_settings("root:@(/path/to/sock)")
+        self.assertEqual("/path/to/sock", conn["socket"])
+        self.assertEqual("", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@(/path/to/sock)/schema")
+        self.assertEqual("/path/to/sock", conn["socket"])
+        self.assertEqual("schema", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@/path%2Fto%2Fsock")
+        self.assertEqual("/path/to/sock", conn["socket"])
+        self.assertEqual("", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@/path%2Fto%2Fsock/schema")
+        self.assertEqual("/path/to/sock", conn["socket"])
+        self.assertEqual("schema", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@.%2Fpath%2Fto%2Fsock")
+        self.assertEqual("./path/to/sock", conn["socket"])
+        self.assertEqual("", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@.%2Fpath%2Fto%2Fsock"
+                                               "/schema")
+        self.assertEqual("./path/to/sock", conn["socket"])
+        self.assertEqual("schema", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@..%2Fpath%2Fto%2Fsock")
+        self.assertEqual("../path/to/sock", conn["socket"])
+        self.assertEqual("", conn["schema"])
+
+        conn = mysqlx._get_connection_settings("root:@..%2Fpath%2Fto%2Fsock"
+                                               "/schema")
+        self.assertEqual("../path/to/sock", conn["socket"])
+        self.assertEqual("schema", conn["schema"])
+
 
     def test_connection_uri(self):
         uri = ("mysqlx://{user}:{password}@{host}:{port}/{schema}"

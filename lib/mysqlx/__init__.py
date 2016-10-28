@@ -100,36 +100,31 @@ def _parse_connection_uri(uri):
         Returns a dict with parsed values of credentials and address of the
         MySQL server/farm.
     """
+    settings = {"schema": ""}
     uri = "{0}{1}".format("" if uri.startswith("mysqlx://")
                           else "mysqlx://", uri)
-    parsed = urlparse(uri)
-    if parsed.username is None or parsed.password is None:
+    scheme, temp = uri.split("://", 1)
+    userinfo, temp = temp.partition("@")[::2]
+    host, query_str = temp.partition("?")[::2]
+
+    pos = host.rfind("/")
+    if host[pos:].find(")") is -1 and pos > 0:
+        host, settings["schema"] = host.rsplit("/", 1)
+    host = host.strip("()")
+
+    if not host or not userinfo or ":" not in userinfo:
         raise InterfaceError("Malformed URI '{0}'".format(uri))
+    settings["user"], settings["password"] = userinfo.split(":", 1)
 
-    settings = {
-        "user": parsed.username,
-        "password": parsed.password
-    }
-
-    delimiter = ")" if ")" in parsed.path else "/"
-    socket, schema = parsed.path.rpartition(delimiter)[::2]
-    settings["schema"] = schema.lstrip("/")
-    if socket and parsed.hostname:
-        socket = "{0}{1}".format(parsed.hostname, socket).strip("()")
-
-    if socket.startswith(("/", ".", "..")):
-        settings["socket"] = unquote(socket).encode("utf-8")
-        return settings
-    elif socket.startswith("\\."):
+    if host.startswith(("/", "..", ".")):
+        settings["socket"] = unquote(host).encode("utf-8")
+    elif host.startswith("\\."):
         raise InterfaceError("Windows Pipe is not supported.")
-    elif parsed.hostname is None:
-        raise InterfaceError("Malformed URI '{0}'".format(uri))
+    else:
+        settings.update(_parse_address_list(host))
 
-    query = dict(parse_qsl(parsed.query, True))
-    for opt, val in query.items():
+    for opt, val in dict(parse_qsl(query_str, True)).items():
         settings[opt] = unquote(val.strip("()")) or True
-
-    settings.update(_parse_address_list(parsed.netloc.split("@")[-1]))
     return settings
 
 def _validate_settings(settings):
