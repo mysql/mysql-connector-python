@@ -955,7 +955,7 @@ class CreateTableStatement(Statement):
         if self._collation:
             options.append("DEFAULT COLLATE = {collation}")
         if self._comment:
-            options.append("COMMENT = {comment}")
+            options.append("COMMENT = '{comment}'")
 
         table_opts = ",".join(options)
         return table_opts.format(inc=self._auto_inc, charset=self._charset,

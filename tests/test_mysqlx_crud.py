@@ -256,7 +256,8 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         language = self.schema.create_table(table_a) \
             .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
                 .primary().auto_increment().unsigned().not_null()) \
-            .set_initial_auto_increment(12).execute()
+            .set_initial_auto_increment(12) \
+            .set_comment("Table Comment test").execute()
 
         self.assertTrue(language.exists_in_database())
         self.assertEqual(12,
@@ -264,6 +265,12 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                 'SELECT AUTO_INCREMENT '
                 'FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "{0}" AND '
                 'TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
+            .execute().fetch_all()[0][0])
+        self.assertEqual("Table Comment test",
+            self.node_session.sql(
+                'SELECT TABLE_COMMENT FROM INFORMATION_SCHEMA.TABLES '
+                'WHERE TABLE_SCHEMA = "{0}" '
+                'AND TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
             .execute().fetch_all()[0][0])
 
         # Create table with index and foreign keys
