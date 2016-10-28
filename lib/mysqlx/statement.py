@@ -1073,7 +1073,7 @@ class CreateTableStatement(Statement):
         self._f_keys.append(key)
         return self
 
-    def set_initial_autoincrement(self, inc):
+    def set_initial_auto_increment(self, inc):
         """Set the initial Auto Increment value for the table.
 
         Args:

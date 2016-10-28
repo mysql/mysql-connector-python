@@ -255,8 +255,16 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         # Simple create table
         language = self.schema.create_table(table_a) \
             .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
-                .primary().auto_increment().unsigned().not_null()).execute()
+                .primary().auto_increment().unsigned().not_null()) \
+            .set_initial_auto_increment(12).execute()
+
         self.assertTrue(language.exists_in_database())
+        self.assertEqual(12,
+            self.node_session.sql(
+                'SELECT AUTO_INCREMENT '
+                'FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "{0}" AND '
+                'TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
+            .execute().fetch_all()[0][0])
 
         # Create table with index and foreign keys
         film = self.schema.create_table(table_b) \
