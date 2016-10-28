@@ -187,10 +187,6 @@ def _get_connection_settings(*args, **kwargs):
     else:
         _validate_settings(settings)
 
-    ssl_opts = ["ssl-key", "ssl-cert", "ssl-ca", "ssl-crl"]
-    if any(key in settings for key in ssl_opts):
-        settings["ssl-enable"] = True
-
     return settings
 
 def get_session(*args, **kwargs):

@@ -289,11 +289,25 @@ class MySQLxXSessionTests(tests.MySQLxTests):
     def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
-        config["ssl-key"] = tests.SSL_KEY
 
+        # Secure by default
+        session = mysqlx.get_session(config)
+
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
+        self.assertEqual("ON", res[0][1])
+
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
+        self.assertTrue("TLS" in res[0][1])
+
+        session.close()
+
+        config["ssl-key"] = tests.SSL_KEY
         self.assertRaises(mysqlx.errors.InterfaceError,
                           mysqlx.get_session, config)
 
+        # Connection with ssl parameters
         config["ssl-ca"] = tests.SSL_CA
         config["ssl-cert"] = tests.SSL_CERT
 
@@ -447,11 +461,25 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
     def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
-        config["ssl-key"] = tests.SSL_KEY
 
+        # Secure by default
+        session = mysqlx.get_node_session(config)
+
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
+        self.assertEqual("ON", res[0][1])
+
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
+        self.assertTrue("TLS" in res[0][1])
+
+        session.close()
+
+        config["ssl-key"] = tests.SSL_KEY
         self.assertRaises(mysqlx.errors.InterfaceError,
                           mysqlx.get_node_session, config)
 
+        # Connection with ssl parameters
         config["ssl-ca"] = tests.SSL_CA
         config["ssl-cert"] = tests.SSL_CERT
 

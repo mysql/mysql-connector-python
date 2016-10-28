@@ -157,13 +157,11 @@ class Connection(object):
         self._authenticate()
 
     def _handle_capabilities(self):
-        if not self.settings.get("ssl-enable", False):
+        data = self.protocol.get_capabilites().capabilities
+        if not (data[0].name.lower() == "tls" if data else False):
+            if self.settings.get("ssl-enable", False):
+                raise OperationalError("SSL not enabled at server.")
             return
-
-        data = self.protocol.get_capabilites()
-        if not next((True for cap in data.capabilities \
-            if cap.name == "tls"), False):
-            raise OperationalError("SSL is not enabled on server.")
 
         self.protocol.set_capabilities(tls=True)
         self.stream.set_ssl(self.settings)
