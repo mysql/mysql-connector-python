@@ -86,19 +86,19 @@ class SocketStream(object):
             try:
                 context.load_verify_locations(ssl_opts["ssl-ca"])
                 context.verify_mode = ssl.CERT_REQUIRED
-            except (IOError, SSLError):
+            except (IOError, ssl.SSLError):
                 raise InterfaceError("Invalid CA certificate.")
         if "ssl-crl" in ssl_opts:
             try:
                 context.load_verify_locations(ssl_opts["ssl-crl"])
                 context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
-            except (IOError, SSLError):
+            except (IOError, ssl.SSLError):
                 raise InterfaceError("Invalid CRL.")
         if "ssl-cert" in ssl_opts:
             try:
                 context.load_cert_chain(ssl_opts["ssl-cert"],
                     ssl_opts.get("ssl-key", None))
-            except (IOError, SSLError):
+            except (IOError, ssl.SSLError):
                 raise InterfaceError("Invalid Client Certificate/Key.")
 
         self._socket = context.wrap_socket(self._socket)
