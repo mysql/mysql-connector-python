@@ -116,6 +116,16 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
+        self.schema.drop_table(view_name)
+
+        # using a non-updatable view
+        defined_as = ("SELECT COLUMN_TYPE, COLUMN_COMMENT FROM "
+                      "INFORMATION_SCHEMA.columns WHERE TABLE_NAME='{0}' "
+                      "AND COLUMN_NAME='id'".format(table_name))
+        view = self.schema.create_view(view_name, True) \
+                          .defined_as(defined_as) \
+                          .execute()
+
         self.schema.drop_table(table_name)
         self.schema.drop_table(view_name)
 
@@ -143,6 +153,14 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
         self.assertEqual(5, view.count())
+
+        # using a non-updatable view
+        defined_as = ("SELECT COLUMN_TYPE, COLUMN_COMMENT FROM "
+                      "INFORMATION_SCHEMA.columns WHERE TABLE_NAME='{0}' "
+                      "AND COLUMN_NAME='id'".format(table_name))
+        view = self.schema.alter_view(view_name) \
+                          .defined_as(defined_as) \
+                          .execute()
 
         self.schema.drop_table(table_name)
         self.schema.drop_table(view_name)

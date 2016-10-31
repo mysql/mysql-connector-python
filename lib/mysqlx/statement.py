@@ -29,7 +29,7 @@ import re
 from .errors import ProgrammingError
 from .expr import ExprParser
 from .compat import STRING_TYPES
-from .constants import Algorithms, Securities, CheckOptions
+from .constants import Algorithms, Securities
 from .dbdoc import DbDoc
 from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult, Result, ColumnType
@@ -784,7 +784,7 @@ class CreateViewStatement(Statement):
         self._security = Securities.DEFINER
         self._definer = None
         self._defined_as = None
-        self._check_option = CheckOptions.CASCADED
+        self._check_option = None
 
     def columns(self, columns):
         """Sets the column names.
@@ -870,14 +870,16 @@ class CreateViewStatement(Statement):
         columns = " ({0})".format(", ".join(self._columns)) \
                   if self._columns else ""
         view_name = quote_multipart_identifier((self._schema.name, self._name))
+        check_option = " WITH {0} CHECK OPTION".format(self._check_option) \
+                       if self._check_option else ""
         sql = ("CREATE{replace} ALGORITHM = {algorithm}{definer} "
                "SQL SECURITY {security} VIEW {view_name}{columns} "
-               "AS {defined_as} WITH {check_option} CHECK OPTION"
+               "AS {defined_as}{check_option}"
                "".format(replace=replace, algorithm=self._algorithm,
                          definer=definer, security=self._security,
                          view_name=view_name, columns=columns,
                          defined_as=self._defined_as,
-                         check_option=self._check_option))
+                         check_option=check_option))
 
         self._connection.execute_nonquery("sql", sql)
         return self._view
@@ -903,13 +905,15 @@ class AlterViewStatement(CreateViewStatement):
         columns = " ({0})".format(", ".join(self._columns)) \
                   if self._columns else ""
         view_name = quote_multipart_identifier((self._schema.name, self._name))
+        check_option = " WITH {0} CHECK OPTION".format(self._check_option) \
+                       if self._check_option else ""
         sql = ("ALTER ALGORITHM = {algorithm}{definer} "
                "SQL SECURITY {security} VIEW {view_name}{columns} "
-               "AS {defined_as} WITH {check_option} CHECK OPTION"
+               "AS {defined_as}{check_option}"
                "".format(algorithm=self._algorithm, definer=definer,
                          security=self._security, view_name=view_name,
                          columns=columns, defined_as=self._defined_as,
-                         check_option=self._check_option))
+                         check_option=check_option))
 
         self._connection.execute_nonquery("sql", sql)
         return self._view
