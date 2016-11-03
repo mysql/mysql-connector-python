@@ -29,6 +29,7 @@ try:
 except:
     SSL_AVAILABLE = False
 
+import sys
 import socket
 
 from functools import wraps
@@ -83,6 +84,11 @@ class SocketStream(object):
         if not SSL_AVAILABLE:
             self.close()
             raise RuntimeError("Python installation has no SSL support.")
+
+        if sys.version_info < (2, 7, 9):
+            self.close()
+            raise RuntimeError("The support for SSL is not available for this "
+                               "Python version.")
 
         context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         context.load_default_certs()
@@ -163,8 +169,10 @@ class Connection(object):
                 raise OperationalError("SSL not enabled at server.")
             return
 
-        self.protocol.set_capabilities(tls=True)
-        self.stream.set_ssl(self.settings)
+        ssl_opts_keys = ("ssl-ca", "ssl-crl", "ssl-cert", "ssl-key",)
+        if any(key in self.settings for key in ssl_opts_keys):
+            self.protocol.set_capabilities(tls=True)
+            self.stream.set_ssl(self.settings)
 
     def _authenticate(self):
         plugin = MySQL41AuthPlugin(self._user, self._password)

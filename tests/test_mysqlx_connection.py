@@ -27,7 +27,7 @@
 
 import logging
 import unittest
-
+import sys
 import tests
 import mysqlx
 
@@ -320,6 +320,8 @@ class MySQLxXSessionTests(tests.MySQLxTests):
                 tests.MYSQL_SERVERS[0].start()
                 tests.MYSQL_SERVERS[0].wait_up()
 
+    @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
+                     "not available for Python versions < 2.7.9.")
     def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
@@ -492,6 +494,8 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
 
         schema.drop_table(table_name)
 
+    @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
+                     "not available for Python versions < 2.7.9.")
     def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
