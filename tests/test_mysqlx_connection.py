@@ -31,8 +31,10 @@ import sys
 import tests
 import mysqlx
 
-from urllib import quote
-
+if mysqlx.compat.PY3:
+    from urllib.parse import quote
+else:
+    from urllib import quote
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 

@@ -117,7 +117,7 @@ def _parse_connection_uri(uri):
     settings["user"], settings["password"] = userinfo.split(":", 1)
 
     if host.startswith(("/", "..", ".")):
-        settings["socket"] = unquote(host).encode("utf-8")
+        settings["socket"] = unquote(host)
     elif host.startswith("\\."):
         raise InterfaceError("Windows Pipe is not supported.")
     else:

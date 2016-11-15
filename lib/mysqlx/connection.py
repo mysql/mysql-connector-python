@@ -85,11 +85,6 @@ class SocketStream(object):
             self.close()
             raise RuntimeError("Python installation has no SSL support.")
 
-        if sys.version_info < (2, 7, 9):
-            self.close()
-            raise RuntimeError("The support for SSL is not available for this "
-                               "Python version.")
-
         context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         context.load_default_certs()
         if "ssl-ca" in ssl_opts:
@@ -166,13 +161,19 @@ class Connection(object):
         data = self.protocol.get_capabilites().capabilities
         if not (data[0].name.lower() == "tls" if data else False):
             if self.settings.get("ssl-enable", False):
+                self.close()
                 raise OperationalError("SSL not enabled at server.")
             return
 
-        ssl_opts_keys = ("ssl-ca", "ssl-crl", "ssl-cert", "ssl-key",)
-        if any(key in self.settings for key in ssl_opts_keys):
-            self.protocol.set_capabilities(tls=True)
-            self.stream.set_ssl(self.settings)
+        if sys.version_info < (2, 7, 9):
+            if self.settings.get("ssl-enable", False):
+                self.close()
+                raise RuntimeError("The support for SSL is not available for "
+                    "this Python version.")
+            return
+
+        self.protocol.set_capabilities(tls=True)
+        self.stream.set_ssl(self.settings)
 
     def _authenticate(self):
         plugin = MySQL41AuthPlugin(self._user, self._password)
