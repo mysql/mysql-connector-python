@@ -1025,10 +1025,9 @@ MySQL_commit(MySQL *self)
 PyObject*
 MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
-	char *host= NULL, *user= NULL, *password= NULL, *database= NULL,
-	     *unix_socket= NULL;
+	char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
 	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
-	PyObject *charset_name, *compress, *ssl_verify_cert;
+	PyObject *charset_name, *compress, *ssl_verify_cert, *password;
 	const char* auth_plugin;
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
@@ -1045,7 +1044,11 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 		NULL
     };
 
+#ifdef PY3
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!", kwlist,
+#else
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!", kwlist,
+#endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
@@ -1170,9 +1173,25 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         client_flags= client_flags & ~CLIENT_CONNECT_WITH_DB;
     }
 
-    res= mysql_real_connect(&self->session,
-                            host, user, password, database,
-    						port, unix_socket, client_flags);
+
+#ifdef PY3
+    res= mysql_real_connect(&self->session, host, user, password, database,
+                            port, unix_socket, client_flags);
+#else
+    char* c_password;
+    if (PyUnicode_Check(password))
+    {
+        PyObject* u_password= PyUnicode_AsUTF8String(password);
+        c_password= PyString_AsString(u_password);
+        Py_DECREF(u_password);
+    }
+    else
+    {
+        c_password= PyString_AsString(password);
+    }
+    res= mysql_real_connect(&self->session, host, user, c_password, database,
+                            port, unix_socket, client_flags);
+#endif
 
     Py_END_ALLOW_THREADS
 
