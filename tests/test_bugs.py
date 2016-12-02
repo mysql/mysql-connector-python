@@ -3992,6 +3992,61 @@ class BugOra21476495(tests.MySQLConnectorTests):
         self.assertEqual(self.cnx._charset_id, old_val)
 
 
+class BugOra21477493(tests.MySQLConnectorTests):
+    """Bug 21477493 - EXECUTEMANY() API WITH INSERT INTO .. SELECT STATEMENT
+       RETURNS INTERFACEERROR
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        cursor = self.cnx.cursor()
+        cursor.execute("DROP TABLE IF EXISTS fun1")
+        cursor.execute("CREATE TABLE fun1(a CHAR(50), b INT)")
+        data=[('A',1),('B',2)]
+        cursor.executemany("INSERT INTO fun1 (a, b) VALUES (%s, %s)",data)
+        cursor.close()
+
+    def tearDown(self):
+        cursor = self.cnx.cursor()
+        cursor.execute("DROP TABLE IF EXISTS fun1")
+        cursor.close()
+
+    def test_insert_into_select_type1(self):
+        data = [('A',1),('B',2)]
+        cursor = self.cnx.cursor()
+        cursor.executemany("INSERT INTO fun1 SELECT CONCAT('VALUES', %s), "
+                           "b + %s FROM fun1", data)
+        cursor.close()
+
+        cursor = self.cnx.cursor()
+        cursor.execute("SELECT * FROM fun1")
+        self.assertEqual(8, len(cursor.fetchall()))
+
+    def test_insert_into_select_type2(self):
+        data = [('A',1),('B',2)]
+        cursor = self.cnx.cursor()
+        cursor.executemany("INSERT INTO fun1 SELECT CONCAT('VALUES(ab, cd)',"
+                           "%s), b + %s FROM fun1", data)
+        cursor.close()
+
+        cursor = self.cnx.cursor()
+        cursor.execute("SELECT * FROM fun1")
+        self.assertEqual(8, len(cursor.fetchall()))
+
+    def test_insert_into_select_type3(self):
+        config = tests.get_mysql_config()
+        data = [('A',1),('B',2)]
+        cursor = self.cnx.cursor()
+        cursor.executemany("INSERT INTO `{0}`.`fun1` SELECT CONCAT('"
+                           "VALUES(ab, cd)', %s), b + %s FROM fun1"
+                           "".format(config["database"]), data)
+        cursor.close()
+
+        cursor = self.cnx.cursor()
+        cursor.execute("SELECT * FROM fun1")
+        self.assertEqual(8, len(cursor.fetchall()))
+
+
 class BugOra21492815(tests.MySQLConnectorTests):
     """BUG#21492815: CALLPROC() HANGS WHEN CONSUME_RESULTS=TRUE
     """

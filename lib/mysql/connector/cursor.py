@@ -40,7 +40,8 @@ RE_SQL_ON_DUPLICATE = re.compile(
     r'''\s*ON\s+DUPLICATE\s+KEY(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$''',
     re.I | re.M | re.S)
 RE_SQL_INSERT_STMT = re.compile(
-    r"({0}|\s)*INSERT({0}|\s)*INTO.+VALUES.*".format(SQL_COMMENT),
+    r"({0}|\s)*INSERT({0}|\s)*INTO\s+[`'\"]?.+[`'\"]?(?:\.[`'\"]?.+[`'\"]?)"
+     "{{0,2}}\s+VALUES\s*\(.+(?:\s*,.+)*\)".format(SQL_COMMENT),
     re.I | re.M | re.S)
 RE_SQL_INSERT_VALUES = re.compile(r'.*VALUES\s*(\(.*\)).*', re.I | re.M | re.S)
 RE_PY_PARAM = re.compile(b'(%s)')
