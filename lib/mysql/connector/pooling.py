@@ -113,10 +113,13 @@ class PooledMySQLConnection(object):
         state will be cleared by re-authenticating the user.
         """
         cnx = self._cnx
-        if self._cnx_pool.reset_session:
-            cnx.reset_session()
+        try:
+            if self._cnx_pool.reset_session:
+                cnx.reset_session()
 
-        self._cnx_pool.add_connection(cnx)
+            self._cnx_pool.add_connection(cnx)
+        except errors.OperationalError as e:
+            self._cnx_pool.add_connection()
         self._cnx = None
 
     def config(self, **kwargs):
