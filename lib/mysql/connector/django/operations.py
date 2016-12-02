@@ -185,6 +185,10 @@ class DatabaseOperations(BaseDatabaseOperations):
                              'value for AutoField.')
         return value
 
+    if django.VERSION > (1, 8):
+        def adapt_datetimefield_value(self, value):
+            return self.value_to_db_datetime(value)
+
     def value_to_db_datetime(self, value):
         if value is None:
             return None
@@ -201,6 +205,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         if not self.connection.use_pure:
             return datetime_to_mysql(value)
         return self.connection.converter.to_mysql(value)
+
+    if django.VERSION > (1, 8):
+        def adapt_timefield_value(self, value):
+            return self.value_to_db_time(value)
 
     def value_to_db_time(self, value):
         if value is None:
