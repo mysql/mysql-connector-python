@@ -3086,6 +3086,46 @@ class BugOra19168737(tests.MySQLConnectorTests):
         self.assertEqual(exp, new_config)
 
 
+class BugOra21530100(tests.MySQLConnectorTests):
+    """BUG#21530100: CONNECT FAILS WHEN USING MULTIPLE OPTION_GROUPS WITH
+       PYTHON 3.3
+    """
+    def test_option_files_with_option_groups(self):
+        temp_cnf_file = os.path.join(os.getcwd(), 'temp.cnf')
+        temp_include_file = os.path.join(os.getcwd(), 'include.cnf')
+
+        try:
+            cnf_file = open(temp_cnf_file, "w+")
+            include_file = open(temp_include_file, "w+")
+
+            config = tests.get_mysql_config()
+
+            cnf = "[group32]\n"
+            cnf += '\n'.join(['{0} = {1}'.format(key, value)
+                             for key, value in config.items()])
+
+            cnf += "\n[group31]\n"
+            cnf += "!include {0}\n".format(temp_include_file)
+
+            include_cnf = "[group41]\n"
+            include_cnf += "charset=utf8\n"
+
+            cnf_file.write(cnf)
+            include_file.write(include_cnf)
+
+            cnf_file.close()
+            include_file.close()
+
+            conn = mysql.connector.connect(option_files=temp_cnf_file,
+                option_groups=['group31','group32','group41'])
+        except Exception as exc:
+            self.fail("Connection failed with option_files argument: {0}"
+                      "".format(exc))
+        finally:
+            os.remove(temp_cnf_file)
+            os.remove(temp_include_file)
+
+
 class BugOra19481761(tests.MySQLConnectorTests):
     """BUG#19481761: OPTION_FILES + !INCLUDE FAILS WITH TRAILING NEWLINE
     """
