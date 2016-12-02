@@ -90,6 +90,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._ssl_active = False
         self._auth_plugin = None
         self._pool_config_version = None
+        self._connattrs = None
 
         if len(kwargs) > 0:
             self.connect(**kwargs)
@@ -113,10 +114,11 @@ class MySQLConnection(MySQLConnectionAbstract):
         if handshake['capabilities'] & ClientFlag.PLUGIN_AUTH:
             self.set_client_flags([ClientFlag.PLUGIN_AUTH])
 
+        self.set_client_flags([ClientFlag.CONNECT_ARGS])
         self._handshake = handshake
 
     def _do_auth(self, username=None, password=None, database=None,
-                 client_flags=0, charset=33, ssl_options=None):
+                 client_flags=0, charset=33, ssl_options=None, connattrs=None):
         """Authenticate with the MySQL server
 
         Authentication happens in two parts. We first send a response to the
@@ -139,7 +141,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             username=username, password=password, database=database,
             charset=charset, client_flags=client_flags,
             ssl_enabled=self._ssl_active,
-            auth_plugin=self._auth_plugin)
+            auth_plugin=self._auth_plugin,
+            connattrs=connattrs)
         self._socket.send(packet)
         self._auth_switch_request(username, password)
 
@@ -207,7 +210,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._do_handshake()
         self._do_auth(self._user, self._password,
                       self._database, self._client_flags, self._charset_id,
-                      self._ssl)
+                      self._ssl, self._connattrs)
         self.set_converter_class(self._converter_class)
         if self._client_flags & ClientFlag.COMPRESS:
             self._socket.recv = self._socket.recv_compressed

@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from .constants import (
     FieldFlag, ServerCmd, FieldType, ClientFlag, MAX_MYSQL_TABLE_COLUMNS)
-from . import errors, utils
+from . import errors, utils, version
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
 from .errors import get_exception
@@ -74,7 +74,7 @@ class MySQLProtocol(object):
     def make_auth(self, handshake, username=None, password=None, database=None,
                   charset=33, client_flags=0,
                   max_allowed_packet=1073741824, ssl_enabled=False,
-                  auth_plugin=None):
+                  auth_plugin=None, connattrs=None):
         """Make a MySQL Authentication packet"""
 
         try:
@@ -106,7 +106,32 @@ class MySQLProtocol(object):
         if client_flags & ClientFlag.PLUGIN_AUTH:
             packet += auth_plugin.encode('utf8') + b'\x00'
 
+        if client_flags & ClientFlag.CONNECT_ARGS:
+            packet += self.make_connattrs(connattrs)
+
         return packet
+
+    def make_connattrs(self, connattrs):
+        """Encode the connection attributes"""
+
+        default_connattrs = {'_client_name': 'MySQL Connector/Python',
+                             '_client_version': version.VERSION_TEXT}
+
+        if isinstance(connattrs, dict):
+            default_connattrs.update(connattrs)
+            connattrs = default_connattrs
+        elif connattrs is None:
+            connattrs = default_connattrs
+        else:
+            raise ValueError('connattrs must be of type dict or None')
+
+	connattrs_len = sum([len(x) + len(connattrs[x]) for x in connattrs]) + len(connattrs.keys()) + len(connattrs.values())
+        connattrs_packet = struct.pack('<B', connattrs_len)
+        for item in connattrs:
+            connattrs_packet += struct.pack('<B', len(item)) + item
+            connattrs_packet += struct.pack('<B', len(connattrs[item])) + connattrs[item]
+
+        return connattrs_packet
 
     def make_auth_ssl(self, charset=33, client_flags=0,
                       max_allowed_packet=1073741824):
