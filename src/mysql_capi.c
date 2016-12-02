@@ -1032,6 +1032,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
 	unsigned int protocol= 0;
+  unsigned int ssl_mode;
 	my_bool abool;
 	MYSQL *res;
 
@@ -1118,7 +1119,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
 #if MYSQL_VERSION_ID >= 50711
         {
-            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_REQUIRED);
+            ssl_mode= SSL_MODE_REQUIRED;
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
         }
 #endif
 
@@ -1126,7 +1128,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         {
 #if MYSQL_VERSION_ID >= 50711
             {
-                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, SSL_MODE_VERIFY_IDENTITY);
+                ssl_mode= SSL_MODE_VERIFY_IDENTITY;
+                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
             }
 #else
             {
@@ -1147,7 +1150,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
 #if MYSQL_VERSION_ID >= 50711
         {
-            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, SSL_MODE_DISABLED);
+            ssl_mode= SSL_MODE_DISABLED;
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
         }
 #endif
     }
@@ -1173,6 +1177,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         client_flags= client_flags & ~CLIENT_CONNECT_WITH_DB;
     }
 
+    if (client_flags & CLIENT_LOCAL_FILES) {
+        abool= 1;
+        mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, (unsigned int*)&abool);
+    }
 
 #ifdef PY3
     res= mysql_real_connect(&self->session, host, user, password, database,
