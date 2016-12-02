@@ -279,9 +279,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     'unique': False,
                     'index': False,
                     'check': False,
-                    'foreign_key': (
-                        (ref_table, ref_column) if ref_column else None,
-                    )
+                    'foreign_key': (ref_table, ref_column) if ref_column else None,
                 }
             constraints[constraint]['columns'].add(column)
         # Now get the constraint types
