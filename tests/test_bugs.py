@@ -4001,6 +4001,30 @@ class BugOra21492428(tests.MySQLConnectorTests):
                 cnx.close()
 
 
+class BugOra21476495(tests.MySQLConnectorTests):
+    """Bug 21476495 - CHARSET VALUE REMAINS INVALID AFTER FAILED
+       SET_CHARSET_COLLATION() CALL
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+
+    def test_bad_set_charset_number(self):
+        old_val = self.cnx._charset_id
+        self.assertRaises(mysql.connector.Error,
+                          self.cnx.set_charset_collation, 19999)
+
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cursor = cnx.cursor(raw="true",buffered="true")
+        cursor.execute("SHOW VARIABLES LIKE 'character_set_connection'")
+        row = cursor.fetchone()
+        self.assertEqual(row[1], u"utf8")
+        cursor.close()
+
+        self.assertEqual(self.cnx._charset_id, old_val)
+
+
 class BugOra21492815(tests.MySQLConnectorTests):
     """BUG#21492815: CALLPROC() HANGS WHEN CONSUME_RESULTS=TRUE
     """
