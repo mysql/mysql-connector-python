@@ -1032,7 +1032,9 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
 	unsigned int protocol= 0;
-  unsigned int ssl_mode;
+#if MYSQL_VERSION_ID >= 50711
+	unsigned int ssl_mode;
+#endif
 	my_bool abool;
 	MYSQL *res;
 
