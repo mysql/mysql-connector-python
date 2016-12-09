@@ -321,10 +321,10 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         options = dict()
         for group in args:
             try:
-                options[group] = {key: value for key, value in
-                                  self._options_dict[group].items() if
-                                  key != "__name__" and
-                                  not key.startswith("!")}
+                options[group] = dict((key, value,) for key, value in
+                                      self._options_dict[group].items() if
+                                      key != "__name__" and
+                                      not key.startswith("!"))
             except KeyError:
                 pass
 
@@ -346,10 +346,10 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         options = dict()
         for group in args:
             try:
-                options[group] = {key: value[0] for key, value in
-                                  self._options_dict[group].items() if
-                                  key != "__name__" and
-                                  not key.startswith("!")}
+                options[group] = dict((key, value[0],) for key, value in
+                                      self._options_dict[group].items() if
+                                      key != "__name__" and
+                                      not key.startswith("!"))
             except KeyError:
                 pass
 
