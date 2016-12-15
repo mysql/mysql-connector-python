@@ -4143,3 +4143,56 @@ class BugOra21492815(tests.MySQLConnectorTests):
             results.append(result.fetchall())
         self.assertEqual(exp, results)
         cur.close()
+
+
+@unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+class BugOra21656282(tests.MySQLConnectorTests):
+    """BUG#21656282: CONNECT FAILURE WITH C-EXT WHEN PASSWORD CONTAINS UNICODE
+    CHARACTER
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.host = 'localhost' if config['unix_socket'] and os.name != 'nt' \
+                    else config['host']
+        self.user = 'unicode_user'
+        self.password = u'步'
+
+        # Use utf8mb4 character set
+        self.cnx.cmd_query("SET character_set_server='utf8mb4'")
+
+        # Drop user if exists
+        self._drop_user(self.host, self.user)
+
+        # Create the user with unicode password
+        create_user = (u"CREATE USER '{user}'@'{host}' IDENTIFIED BY "
+                       u"'{password}'")
+        self.cnx.cmd_query(create_user.format(user=self.user, host=self.host,
+                                              password=self.password))
+
+        # Grant all to new user on database
+        grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
+        self.cnx.cmd_query(grant.format(database=config['database'],
+                                        user=self.user, host=self.host))
+
+    def tearDown(self):
+        self._drop_user(self.host, self.user)
+
+    def _drop_user(self, host, user):
+        try:
+            drop_user = "DROP USER '{user}'@'{host}'"
+            self.cnx.cmd_query(drop_user.format(user=user, host=host))
+        except errors.DatabaseError:
+            # It's OK when drop user fails
+            pass
+
+    def test_unicode_password(self):
+        config = tests.get_mysql_config()
+        config['user'] = self.user
+        config['password'] = self.password
+        try:
+            cnx = CMySQLConnection(**config)
+        except:
+            self.fail('Failed using password with unicode characters')
+        else:
+            cnx.close()
