@@ -4215,17 +4215,17 @@ class BugOra21530841(tests.MySQLConnectorTests):
     def test_big_column_count(self):
         cur = self.cnx.cursor(raw=False, buffered=False)
         # Create table with 512 Columns
-        table = "CREATE TABLE t ({0})".format(
+        table = "CREATE TABLE {0} ({1})".format(self.tbl,
             ", ".join(["c{0} INT".format(idx) for idx in range(512)]))
         cur.execute(table)
 
         # Insert 1 record
-        cur.execute("INSERT INTO t(c1) values (1) ")
+        cur.execute("INSERT INTO {0}(c1) values (1) ".format(self.tbl))
         self.cnx.commit()
 
         # Select from 10 tables
         query = "SELECT * FROM {0} WHERE a1.c1 > 0".format(
-            ", ".join(["t a{0}".format(idx) for idx in range(10)]))
+            ", ".join(["{0} a{1}".format(self.tbl, idx) for idx in range(10)]))
         cur.execute(query)
         cur.fetchone()
         cur.close()
