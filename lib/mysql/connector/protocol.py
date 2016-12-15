@@ -227,8 +227,6 @@ class MySQLProtocol(object):
         """Parse a MySQL packet with the number of columns in result set"""
         try:
             count = utils.read_lc_int(packet[4:])[1]
-            if count > MAX_MYSQL_TABLE_COLUMNS:
-                return None
             return count
         except (struct.error, ValueError):
             raise errors.InterfaceError("Failed parsing column count")
