@@ -318,7 +318,6 @@ class MySQLProtocol(object):
         eof = None
         rowdata = None
         i = 0
-        eof57 = version >= (5, 7, 5)
         while True:
             if eof or i == count:
                 break
@@ -333,10 +332,6 @@ class MySQLProtocol(object):
                 rowdata = utils.read_lc_string_list(bytearray(b'').join(datas))
             elif (packet[4] == 254 and packet[0] < 7):
                 eof = self.parse_eof(packet)
-                rowdata = None
-            elif eof57 and (packet[4] == 0 and packet[0] > 9):
-                # EOF deprecation: make sure we catch it whether flag is set or not
-                eof = self.parse_ok(packet)
                 rowdata = None
             else:
                 eof = None
