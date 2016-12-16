@@ -54,6 +54,7 @@ else:
     HAVE_CMYSQL = True
 # pylint: enable=F0401,C0413
 
+
 class CMySQLConnection(MySQLConnectionAbstract):
 
     """Class initiating a MySQL Connection using Connector/C"""
@@ -139,8 +140,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def _open_connection(self):
         charset_name = CharacterSet.get_info(self._charset_id)[0]
-
-        self._cmysql = _mysql_connector.MySQL(
+        self._cmysql = _mysql_connector.MySQL(  # pylint: disable=E1101
             buffered=self._buffered,
             raw=self._raw,
             charset_name=charset_name,
@@ -260,6 +260,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise AttributeError("count should be 1 or higher, or None")
 
         counter = 0
+        # pylint: disable=R0204
         try:
             row = self._cmysql.fetch_row()
             while row:
@@ -278,7 +279,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             self.free_result()
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
-
+        # pylint: enable=R0204
         return rows
 
     def get_row(self, binary=False, columns=None):

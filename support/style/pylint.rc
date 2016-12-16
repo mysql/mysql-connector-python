@@ -9,7 +9,7 @@ load-plugins=
 [MESSAGES CONTROL]
 
 #enable=
-disable=W0702,W0142,R0902,R0903,R0904,R0911,R0913,R0914,R0915,W0613,R0201,I0011,R0922,I0012
+disable=W0702,W0142,R0902,R0903,R0904,R0911,R0913,R0914,R0915,W0613,R0201,I0011,R0922,I0012,W1202
 
 [REPORTS]
 
@@ -81,6 +81,7 @@ max-parents=7
 max-attributes=7
 min-public-methods=2
 max-public-methods=20
+max-nested-blocks=7
 
 [IMPORTS]
 

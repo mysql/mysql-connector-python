@@ -686,7 +686,7 @@ class CharacterSet(_Constants):
         return tuple(res)
 
 
-class SQLMode(_Constants):  # pylint: disable=R0921
+class SQLMode(_Constants):
     """MySQL SQL Modes
 
     The numeric values of SQL Modes are not interesting, only the names

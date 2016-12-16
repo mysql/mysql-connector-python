@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -27,12 +27,33 @@ import sys
 import datetime
 import time
 import uuid
-from base64 import b16decode
-from bisect import bisect
-from hashlib import md5
 import logging
 import socket
 import collections
+
+from base64 import b16decode
+from bisect import bisect
+from hashlib import md5
+
+import mysql.connector
+
+from ..connection import MySQLConnection
+from ..conversion import MySQLConverter
+from ..pooling import MySQLConnectionPool
+from ..errors import (
+    Error, InterfaceError, NotSupportedError, MySQLFabricError, InternalError,
+    DatabaseError
+)
+from ..cursor import (
+    MySQLCursor, MySQLCursorBuffered,
+    MySQLCursorRaw, MySQLCursorBufferedRaw
+)
+from .. import errorcode
+from . import FabricMySQLServer, FabricShard
+from .caching import FabricCache
+from .balancing import WeightedRoundRobin
+from .. import version
+from ..catch23 import PY2, isunicode, UNICODE_TYPES
 
 # pylint: disable=F0401,E0611
 try:
@@ -59,26 +80,7 @@ else:
         HAVE_SSL = False
     else:
         HAVE_SSL = True
-# pylint: enable=F0401,E0611
 
-import mysql.connector
-from ..connection import MySQLConnection
-from ..conversion import MySQLConverter
-from ..pooling import MySQLConnectionPool
-from ..errors import (
-    Error, InterfaceError, NotSupportedError, MySQLFabricError, InternalError,
-    DatabaseError
-)
-from ..cursor import (
-    MySQLCursor, MySQLCursorBuffered,
-    MySQLCursorRaw, MySQLCursorBufferedRaw
-)
-from .. import errorcode
-from . import FabricMySQLServer, FabricShard
-from .caching import FabricCache
-from .balancing import WeightedRoundRobin
-from .. import version
-from ..catch23 import PY2, isunicode, UNICODE_TYPES
 
 RESET_CACHE_ON_ERROR = (
     errorcode.CR_SERVER_LOST,
@@ -213,8 +215,7 @@ class MySQLRPCProtocol(object):
             kwargs = self._process_params_dict(kwargs)
             params.extend(kwargs)
 
-        params = ', '.join(params)
-        return params
+        return ', '.join(params)
 
     def execute(self, group, command, *args, **kwargs):
         """Executes the given command with MySQL protocol

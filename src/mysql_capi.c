@@ -363,7 +363,7 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 
     // Initialization expect -1 when parsing arguments failed
     if (!PyArg_ParseTupleAndKeywords(args, kwds,
-                                     "|O!O!O!O!O!O", kwlist,
+                                     "|O!O!O!O!O!O!", kwlist,
                                      &PyBool_Type, &self->buffered_at_connect,
                                      &PyBool_Type, &self->raw_at_connect,
                                      &PyStringType, &self->charset_name,
@@ -393,6 +393,10 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 
     if (auth_plugin)
     {
+        if (strcmp(PyStringAsString(auth_plugin), "") == 0)
+        {
+            auth_plugin= Py_None;
+        }
         if (auth_plugin != Py_None)
         {
             tmp= self->auth_plugin;
@@ -1036,6 +1040,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	unsigned int ssl_mode;
 #endif
 	my_bool abool;
+	my_bool ssl_enabled= 0;
 	MYSQL *res;
 
 	static char *kwlist[]=
@@ -1112,6 +1117,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, (char*)&tmp_uint);
 
     if (ssl_ca || ssl_cert || ssl_key) {
+        ssl_enabled= 1;
 #if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
         printf(">>>> %d\n", MYSQL_VERSION_ID);
         {
@@ -1158,9 +1164,27 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
     }
 
+    Py_END_ALLOW_THREADS
     if (PyString_Check(self->auth_plugin)) {
         auth_plugin= PyStringAsString(self->auth_plugin);
         mysql_options(&self->session, MYSQL_DEFAULT_AUTH, auth_plugin);
+        if (strcmp(auth_plugin, "sha256_password") == 0 && !ssl_enabled)
+        {
+            PyObject *exc_type= MySQLInterfaceError;
+            PyObject *err_no= PyInt_FromLong(2002);
+            PyObject *err_msg= PyStringFromString("sha256_password requires SSL");
+            PyObject *err_obj= NULL;
+            err_obj= PyObject_CallFunctionObjArgs(exc_type, err_msg, NULL);
+            PyObject_SetAttr(err_obj, PyStringFromString("sqlstate"), Py_None);
+            PyObject_SetAttr(err_obj, PyStringFromString("errno"), err_no);
+            PyObject_SetAttr(err_obj, PyStringFromString("msg"), err_msg);
+            PyErr_SetObject(exc_type, err_obj);
+            Py_XDECREF(exc_type);
+            Py_XDECREF(err_no);
+            Py_XDECREF(err_msg);
+            return NULL;
+        }
+
         if (strcmp(auth_plugin, "mysql_clear_password") == 0)
         {
             abool= 1;
@@ -1168,6 +1192,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                           (char*)&abool);
         }
     }
+    Py_BEGIN_ALLOW_THREADS
 
     if (database && strlen(database) == 0)
     {

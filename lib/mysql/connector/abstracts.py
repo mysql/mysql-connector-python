@@ -231,6 +231,13 @@ class MySQLConnectionAbstract(object):
         except KeyError:
             self._consume_results = False
 
+        # Configure auth_plugin
+        try:
+            self._auth_plugin = config['auth_plugin']
+            del config['auth_plugin']
+        except KeyError:
+            self._auth_plugin = ''
+
         # Configure character set and collation
         if 'charset' in config or 'collation' in config:
             try:

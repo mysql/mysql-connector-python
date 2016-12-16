@@ -2406,6 +2406,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
         user = self.users['sha256user']
         config['user'] = user['username']
         config['password'] = user['password']
+        config['auth_plugin'] = user['auth_plugin']
         self.assertRaises(errors.InterfaceError, connection.MySQLConnection,
                           **config)
         if CMySQLConnection:

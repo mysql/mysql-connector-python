@@ -170,7 +170,7 @@ class BaseMySQLSocket(object):
                     tmpbuf += pkt
                 tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
             else:
-                tmpbuf = b''.join(pkts)
+                tmpbuf = b''.join(pkts)  # pylint: disable=R0204
             del pkts
             zbuf = zlib.compress(tmpbuf[:16384])
             header = (struct.pack('<I', len(zbuf))[0:3]
@@ -181,7 +181,7 @@ class BaseMySQLSocket(object):
             zpkts.append(header + zbuf)
             tmpbuf = tmpbuf[16384:]
             pllen = len(tmpbuf)
-            self.next_compressed_packet_number
+            self.next_compressed_packet_number  # pylint: disable=W0104
             while pllen > maxpktlen:
                 zbuf = zlib.compress(tmpbuf[:maxpktlen])
                 header = (struct.pack('<I', len(zbuf))[0:3]
@@ -192,7 +192,7 @@ class BaseMySQLSocket(object):
                 zpkts.append(header + zbuf)
                 tmpbuf = tmpbuf[maxpktlen:]
                 pllen = len(tmpbuf)
-                self.next_compressed_packet_number
+                self.next_compressed_packet_number  # pylint: disable=W0104
             if tmpbuf:
                 zbuf = zlib.compress(tmpbuf)
                 header = (struct.pack('<I', len(zbuf))[0:3]
