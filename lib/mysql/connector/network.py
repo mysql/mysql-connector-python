@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -168,7 +168,7 @@ class BaseMySQLSocket(object):
                 tmpbuf = bytearray()
                 for pkt in pkts:
                     tmpbuf += pkt
-                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
+                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602,R0204
             else:
                 tmpbuf = b''.join(pkts)  # pylint: disable=R0204
             del pkts

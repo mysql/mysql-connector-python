@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -68,7 +68,7 @@ except ImportError:
 
 if sys.version_info[0] == 2:
     try:
-        from httplib import HTTPSConnection
+        from httplib import HTTPSConnection  # pylint: disable=C0412
     except ImportError:
         HAVE_SSL = False
     else:
@@ -461,7 +461,7 @@ if HAVE_SSL:
             if PY2:
                 urllib2.HTTPSHandler.__init__(self)
             else:
-                super().__init__()  # pylint: disable=W0104
+                super().__init__()  # pylint: disable=W0104,E1004
             self._ssl_config = ssl_config
 
         def https_open(self, req):
@@ -489,7 +489,7 @@ class FabricTransport(Transport):
         if PY2:
             Transport.__init__(self, use_datetime=False)
         else:
-            super().__init__(use_datetime=False)
+            super().__init__(use_datetime=False)  # pylint: disable=E1004
         self._username = username
         self._password = password
         self._use_datetime = use_datetime
