@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -326,6 +326,18 @@ _UNITTESTS_CMD_ARGS = {
         'default': None,
         'help': ("Location of MySQL C API installation "
                  "or full path to mysql_config")
+    },
+
+    ('', '--with-protobuf-include-dir'): {
+        'dest': 'protobuf_include_dir', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Location of Protobuf include directory")
+    },
+
+    ('', '--with-protobuf-lib-dir'): {
+        'dest': 'protobuf_lib_dir', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Location of Protobuf library directory")
     },
 
     ('', '--with-fabric'): {
@@ -776,7 +788,19 @@ def main():
 
     tests.MYSQL_CAPI = options.mysql_capi
     if not options.skip_install:
+        protobuf_include_dir = options.protobuf_include_dir or \
+            os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR")
+        protobuf_lib_dir = options.protobuf_lib_dir or \
+            os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
+        if not protobuf_include_dir:
+            LOGGER.error("Unable to find Protobuf include directory.")
+            sys.exit(1)
+        if not protobuf_lib_dir:
+            LOGGER.error("Unable to find Protobuf library directory.")
+            sys.exit(1)
         tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
+                                protobuf_include_dir,
+                                protobuf_lib_dir,
                                 options.mysql_capi)
 
     # Which tests cases to run

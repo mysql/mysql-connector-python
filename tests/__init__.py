@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -799,7 +799,8 @@ def setup_logger(logger, debug=False, logfile=None):
     LOGGER.addHandler(handler)
 
 
-def install_connector(root_dir, install_dir, connc_location=None):
+def install_connector(root_dir, install_dir, protobuf_include_dir,
+                      protobuf_lib_dir, connc_location=None):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -822,11 +823,14 @@ def install_connector(root_dir, install_dir, connc_location=None):
     cmd.extend([
         'install',
         '--root', install_dir,
-        '--install-lib', '.'
+        '--install-lib', '.',
+        '--with-protobuf-include-dir', protobuf_include_dir,
+        '--with-protobuf-lib-dir', protobuf_lib_dir,
+        '--static',
     ])
 
     if connc_location:
-        cmd.extend(['--static', '--with-mysql-capi', connc_location])
+        cmd.extend(['--with-mysql-capi', connc_location])
 
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,

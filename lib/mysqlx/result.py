@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -64,7 +64,7 @@ def from_protobuf(col_type, payload):
 
 def bytes_from_protobuf(payload):
     # Strip trailing char
-    return payload[:-1]
+    return decode_from_bytes(payload[:-1])
 
 
 def float_from_protobuf(payload):
@@ -739,13 +739,11 @@ class BufferingResult(BaseResult):
         row = self._connection.read_row(self)
         if row is None:
             return None
-        item = [None] * len(row.field)
+        item = [None] * len(row["field"])
         if not dumping:
-            for x in range(len(row.field)):
+            for x in range(len(row["field"])):
                 col = self._columns[x]
-                value = (decode_from_bytes(row.field[x])
-                         if col.is_bytes() else row.field[x])
-                item[x] = from_protobuf(col._proto_type, value)
+                item[x] = from_protobuf(col._proto_type, row["field"][x])
         return Row(self, item)
 
     def _page_in_items(self):

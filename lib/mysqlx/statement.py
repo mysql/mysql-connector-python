@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -31,8 +31,9 @@ from .expr import ExprParser
 from .compat import STRING_TYPES
 from .constants import Algorithms, Securities
 from .dbdoc import DbDoc
-from .protobuf import mysqlx_crud_pb2 as MySQLxCrud
 from .result import SqlResult, Result, ColumnType
+from .protobuf import mysqlxpb_enum
+
 
 class Expr(object):
     def __init__(self, expr):
@@ -338,7 +339,8 @@ class AddStatement(Statement):
 
 class UpdateSpec(object):
     def __init__(self, update_type, source, value=None):
-        if update_type == MySQLxCrud.UpdateOperation.SET:
+        if update_type == mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.SET"):
             self._table_set(source, value)
         else:
             self.update_type = update_type
@@ -350,7 +352,8 @@ class UpdateSpec(object):
             self.value = value
 
     def _table_set(self, source, value):
-        self.update_type = MySQLxCrud.UpdateOperation.SET
+        self.update_type = mysqlxpb_enum(
+            "Mysqlx.Crud.UpdateOperation.UpdateType.SET")
         self.source = ExprParser(source, True).parse_table_update_field()
         self.value = value
 
@@ -378,8 +381,9 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_SET, doc_path, value))
+        self._update_ops.append(UpdateSpec(mysqlxpb_enum(
+            "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_SET"),
+            doc_path, value))
         return self
 
     def change(self, doc_path, value):
@@ -393,9 +397,9 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REPLACE, doc_path,
-                       value))
+        self._update_ops.append(UpdateSpec(mysqlxpb_enum(
+            "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"),
+            doc_path, value))
         return self
 
     def unset(self, *doc_paths):
@@ -409,8 +413,9 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         self._update_ops.extend([
-            UpdateSpec(MySQLxCrud.UpdateOperation.ITEM_REMOVE, x)
-            for x in flexible_params(*doc_paths)])
+            UpdateSpec(mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REMOVE"), item)
+            for item in flexible_params(*doc_paths)])
         return self
 
     def array_insert(self, field, value):
@@ -426,7 +431,9 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.ARRAY_INSERT, field, value))
+            UpdateSpec(mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"),
+                field, value))
         return self
 
     def array_append(self, doc_path, value):
@@ -443,8 +450,9 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.ARRAY_APPEND, doc_path,
-                       value))
+            UpdateSpec(mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"),
+                doc_path, value))
         return self
 
     def execute(self):
@@ -634,7 +642,8 @@ class UpdateStatement(FilterableStatement):
             mysqlx.UpdateStatement: UpdateStatement object.
         """
         self._update_ops.append(
-            UpdateSpec(MySQLxCrud.UpdateOperation.SET, field, value))
+            UpdateSpec(mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.SET"), field, value))
         return self
 
     def execute(self):
