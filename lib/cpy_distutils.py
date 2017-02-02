@@ -483,6 +483,12 @@ class BuildExtDynamic(build_ext):
         if os.name != 'nt':
             ext.extra_compile_args.append('-Wno-unknown-pragmas')
 
+        # Add Protobuf include and library dirs
+        for ext in self.extensions:
+            if ext.name == "_mysqlxpb":
+                ext.include_dirs.append(self.with_protobuf_include_dir)
+                ext.library_dirs.append(self.with_protobuf_lib_dir)
+
     def run(self):
         """Run the command"""
         if os.name == 'nt':
