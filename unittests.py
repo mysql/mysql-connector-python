@@ -340,6 +340,12 @@ _UNITTESTS_CMD_ARGS = {
         'help': ("Location of Protobuf library directory")
     },
 
+    ('', '--with-protoc'): {
+        'dest': 'protoc', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Location of Protobuf protoc binary")
+    },
+
     ('', '--with-fabric'): {
         'dest': 'fabric_config', 'metavar': 'NAME',
         'default': None,
@@ -792,15 +798,20 @@ def main():
             os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR")
         protobuf_lib_dir = options.protobuf_lib_dir or \
             os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
+        protoc = options.protoc or os.environ.get("MYSQLXPB_PROTOC")
         if not protobuf_include_dir:
             LOGGER.error("Unable to find Protobuf include directory.")
             sys.exit(1)
         if not protobuf_lib_dir:
             LOGGER.error("Unable to find Protobuf library directory.")
             sys.exit(1)
+        if not protoc:
+            LOGGER.error("Unable to find Protobuf protoc binary.")
+            sys.exit(1)
         tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
                                 protobuf_include_dir,
                                 protobuf_lib_dir,
+                                protoc,
                                 options.mysql_capi)
 
     # Which tests cases to run

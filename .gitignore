@@ -12,5 +12,6 @@ cpy_server*/
 *_output.txt
 tests_*.log
 dev*.py
-/lib/mysqlx/expr_backup.py
-/lib/test.py
+venv
+src/mysqlxpb/mysqlx/mysqlx*
+

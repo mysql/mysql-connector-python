@@ -35,7 +35,7 @@ from glob import glob
 import os
 import shlex
 import struct
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE, STDOUT, check_call
 import sys
 import platform
 
@@ -48,7 +48,9 @@ CEXT_OPTIONS = [
     ('with-protobuf-include-dir=', None,
      "Location of Protobuf include directory"),
     ('with-protobuf-lib-dir=', None,
-     "Location of Protobuf library directory")
+     "Location of Protobuf library directory"),
+    ('with-protoc=', None,
+     "Location of Protobuf protoc binary")
 ]
 
 CEXT_STATIC_OPTIONS = [
@@ -280,6 +282,7 @@ class BuildExtDynamic(build_ext):
         self.with_mysql_capi = None
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
+        self.with_protoc = None
 
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
@@ -402,7 +405,8 @@ class BuildExtDynamic(build_ext):
             'install',
             ('with_mysql_capi', 'with_mysql_capi'),
             ('with_protobuf_include_dir', 'with_protobuf_include_dir'),
-            ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'))
+            ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'),
+            ('with_protoc', 'with_protoc'))
 
         build_ext.finalize_options(self)
 
@@ -420,6 +424,9 @@ class BuildExtDynamic(build_ext):
             self.with_protobuf_lib_dir = \
                 os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
 
+        if not self.with_protoc:
+            self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
+
         if self.with_protobuf_include_dir:
             print("# Protobuf include directory: {0}"
                   "".format(self.with_protobuf_include_dir))
@@ -433,6 +440,21 @@ class BuildExtDynamic(build_ext):
         else:
             log.error("Unable to find Protobuf library directory.")
             sys.exit(1)
+
+        if self.with_protoc:
+            print("# Protobuf protoc binary: {0}".format(self.with_protoc))
+        else:
+            log.error("Unable to find Protobuf protoc binary.")
+            sys.exit(1)
+
+    def run_protoc(self):
+        base_path = os.path.join(os.getcwd(), "src", "mysqlxpb", "mysqlx")
+        command = [self.with_protoc, "-I"]
+        command.append(os.path.join(base_path, "protocol"))
+        command.extend(glob(os.path.join(base_path, "protocol", "*.proto")))
+        command.append("--cpp_out={0}".format(base_path))
+        log.info("# Running protoc command: {0}".format(" ".join(command)))
+        check_call(command)
 
     def fix_compiler(self):
         platform = get_platform()
@@ -498,6 +520,7 @@ class BuildExtDynamic(build_ext):
             self.build_extensions = lambda: None
             build_ext.run(self)
             self.fix_compiler()
+            self.run_protoc()
             self.real_build_extensions()
 
 
@@ -520,6 +543,10 @@ class BuildExtStatic(BuildExtDynamic):
             self.set_undefined_options(
                 'install',
                 ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'))
+        if not self.with_protoc:
+            self.set_undefined_options(
+                'install',
+                ('with_protoc', 'with_protoc'))
 
         build_ext.finalize_options(self)
 
@@ -540,6 +567,9 @@ class BuildExtStatic(BuildExtDynamic):
             self.with_protobuf_lib_dir = \
                 os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
 
+        if not self.with_protoc:
+            self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
+
         if self.with_protobuf_include_dir:
             print("# Protobuf include directory: {0}"
                   "".format(self.with_protobuf_include_dir))
@@ -552,6 +582,12 @@ class BuildExtStatic(BuildExtDynamic):
                   "".format(self.with_protobuf_lib_dir))
         else:
             log.error("Unable to find Protobuf library directory.")
+            sys.exit(1)
+
+        if self.with_protoc:
+            print("# Protobuf protoc binary: {0}".format(self.with_protoc))
+        else:
+            log.error("Unable to find Protobuf protoc binary.")
             sys.exit(1)
 
     def _finalize_connector_c(self, connc_loc):
@@ -577,7 +613,7 @@ class BuildExtStatic(BuildExtDynamic):
 
         include_dirs = []
         library_dirs = []
-        libraries = []
+        libraries = ["protobuf"]
 
         if os.name == 'posix':
             include_dirs.append(self.connc_include)
@@ -646,6 +682,7 @@ class Install(install):
         self.with_mysql_capi = None
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
+        self.with_protoc = None
         self.byte_code_only = None
         self.static = None
 

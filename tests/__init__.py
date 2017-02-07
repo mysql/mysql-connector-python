@@ -800,7 +800,7 @@ def setup_logger(logger, debug=False, logfile=None):
 
 
 def install_connector(root_dir, install_dir, protobuf_include_dir,
-                      protobuf_lib_dir, connc_location=None):
+                      protobuf_lib_dir, protoc, connc_location=None):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -826,6 +826,7 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
         '--install-lib', '.',
         '--with-protobuf-include-dir', protobuf_include_dir,
         '--with-protobuf-lib-dir', protobuf_lib_dir,
+        '--with-protoc', protoc,
         '--static',
     ])
 
