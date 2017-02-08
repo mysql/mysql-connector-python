@@ -357,6 +357,12 @@ _UNITTESTS_CMD_ARGS = {
         'default': 'xmlrpc',
         'help': ("Protocol to talk to MySQL Fabric")
     },
+
+    ('', '--extra-compile-args'): {
+        'dest': 'extra_compile_args', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Extra compile args for the C extension")
+    },
 }
 
 
@@ -812,7 +818,8 @@ def main():
                                 protobuf_include_dir,
                                 protobuf_lib_dir,
                                 protoc,
-                                options.mysql_capi)
+                                options.mysql_capi,
+                                options.extra_compile_args)
 
     # Which tests cases to run
     testcases = []

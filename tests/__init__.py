@@ -800,7 +800,8 @@ def setup_logger(logger, debug=False, logfile=None):
 
 
 def install_connector(root_dir, install_dir, protobuf_include_dir,
-                      protobuf_lib_dir, protoc, connc_location=None):
+                      protobuf_lib_dir, protoc, connc_location=None,
+                      extra_compile_args=None):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -832,6 +833,9 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
 
     if connc_location:
         cmd.extend(['--with-mysql-capi', connc_location])
+
+    if extra_compile_args:
+        cmd.extend(['--extra-compile-args', extra_compile_args])
 
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,

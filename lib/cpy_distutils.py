@@ -38,6 +38,8 @@ import struct
 from subprocess import Popen, PIPE, STDOUT, check_call
 import sys
 import platform
+import shutil
+
 
 ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
 py_arch = '64-bit' if ARCH_64BIT else '32-bit'
@@ -50,7 +52,9 @@ CEXT_OPTIONS = [
     ('with-protobuf-lib-dir=', None,
      "Location of Protobuf library directory"),
     ('with-protoc=', None,
-     "Location of Protobuf protoc binary")
+     "Location of Protobuf protoc binary"),
+    ('extra-compile-args=', None,
+     "Extra compile args")
 ]
 
 CEXT_STATIC_OPTIONS = [
@@ -279,6 +283,7 @@ class BuildExtDynamic(build_ext):
 
     def initialize_options(self):
         build_ext.initialize_options(self)
+        self.extra_compile_args = None
         self.with_mysql_capi = None
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
@@ -403,6 +408,7 @@ class BuildExtDynamic(build_ext):
     def finalize_options(self):
         self.set_undefined_options(
             'install',
+            ('extra_compile_args', 'extra_compile_args'),
             ('with_mysql_capi', 'with_mysql_capi'),
             ('with_protobuf_include_dir', 'with_protobuf_include_dir'),
             ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'),
@@ -497,6 +503,14 @@ class BuildExtDynamic(build_ext):
         # Add system headers to Extensions extra_compile_args
         sysheaders = [ '-isystem' + dir for dir in cc.include_dirs]
         for ext in self.extensions:
+            # Add Protobuf include and library dirs
+            if ext.name == "_mysqlxpb":
+                ext.include_dirs.append(self.with_protobuf_include_dir)
+                ext.library_dirs.append(self.with_protobuf_lib_dir)
+            # Add extra compile args
+            if self.extra_compile_args:
+                ext.extra_compile_args.append(self.extra_compile_args)
+            # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
                     ext.extra_compile_args.append(sysheader)
@@ -504,12 +518,6 @@ class BuildExtDynamic(build_ext):
         # Stop warnings about unknown pragma
         if os.name != 'nt':
             ext.extra_compile_args.append('-Wno-unknown-pragmas')
-
-        # Add Protobuf include and library dirs
-        for ext in self.extensions:
-            if ext.name == "_mysqlxpb":
-                ext.include_dirs.append(self.with_protobuf_include_dir)
-                ext.library_dirs.append(self.with_protobuf_lib_dir)
 
     def run(self):
         """Run the command"""
@@ -531,6 +539,10 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
+        if not self.extra_compile_args:
+            self.set_undefined_options(
+                'install',
+                ('extra_compile_args', 'extra_compile_args'))
         if not self.with_mysql_capi:
             self.set_undefined_options(
                 'install',
@@ -555,6 +567,8 @@ class BuildExtStatic(BuildExtDynamic):
 
         self.connc_lib = os.path.join(self.build_temp, 'connc', 'lib')
         self.connc_include = os.path.join(self.build_temp, 'connc', 'include')
+        self.protobuf_lib = os.path.join(self.build_temp, 'protobuf', 'lib')
+        self.protobuf_include = os.path.join(self.build_temp, 'protobuf', 'include')
 
         if self.with_mysql_capi:
             self._finalize_connector_c(self.with_mysql_capi)
@@ -590,6 +604,8 @@ class BuildExtStatic(BuildExtDynamic):
             log.error("Unable to find Protobuf protoc binary.")
             sys.exit(1)
 
+        self._finalize_protobuf()
+
     def _finalize_connector_c(self, connc_loc):
         if not os.path.isdir(connc_loc):
             log.error("MySQL C API should be a directory")
@@ -608,12 +624,46 @@ class BuildExtStatic(BuildExtDynamic):
                 if os.path.isfile(lib_file_path) and not lib_file.endswith('.a'):
                     os.unlink(os.path.join(self.connc_lib, lib_file))
 
+    def _finalize_protobuf(self):
+        if not os.path.isdir(self.with_protobuf_lib_dir):
+            log.error("Protobuf library dir should be a directory")
+            sys.exit(1)
+
+        if not os.path.isdir(self.with_protobuf_include_dir):
+            log.error("Protobuf include dir should be a directory")
+            sys.exit(1)
+
+        if not os.path.exists(self.protobuf_lib):
+            os.makedirs(self.protobuf_lib)
+
+        if not os.path.exists(self.protobuf_include):
+            os.makedirs(self.protobuf_include)
+
+        log.info("Copying Protobuf libraries")
+        lib_files = glob(os.path.join(self.with_protobuf_lib_dir, "libprotobuf*"))
+        for lib_file in lib_files:
+            if os.path.isfile(lib_file):
+                log.info("copying {0} -> {1}".format(lib_file, self.protobuf_lib))
+                shutil.copy2(lib_file, self.protobuf_lib)
+
+        log.info("Copying Protobuf header files")
+        copy_tree(self.with_protobuf_include_dir, self.protobuf_include)
+
+        # Remove all but static libraries to force static linking
+        if os.name == "posix":
+            log.info("Removing non-static Protobuf libraries from {0}"
+                     "".format(self.protobuf_lib))
+            for lib_file in os.listdir(self.protobuf_lib):
+                lib_file_path = os.path.join(self.protobuf_lib, lib_file)
+                if os.path.isfile(lib_file_path) and not lib_file.endswith(".a"):
+                    os.unlink(os.path.join(self.protobuf_lib, lib_file))
+
     def fix_compiler(self):
         BuildExtDynamic.fix_compiler(self)
 
         include_dirs = []
         library_dirs = []
-        libraries = ["protobuf"]
+        libraries = []
 
         if os.name == 'posix':
             include_dirs.append(self.connc_include)
@@ -631,6 +681,9 @@ class BuildExtStatic(BuildExtDynamic):
             ext.include_dirs.extend(include_dirs)
             ext.library_dirs.extend(library_dirs)
             ext.libraries.extend(libraries)
+            # Add extra compile args
+            if self.extra_compile_args:
+                ext.extra_compile_args.append(self.extra_compile_args)
 
 
 class InstallLib(install_lib):
@@ -679,6 +732,7 @@ class Install(install):
 
     def initialize_options(self):
         install.initialize_options(self)
+        self.extra_compile_args = None
         self.with_mysql_capi = None
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
