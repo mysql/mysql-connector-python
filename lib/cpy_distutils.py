@@ -522,6 +522,15 @@ class BuildExtDynamic(build_ext):
     def run(self):
         """Run the command"""
         if os.name == 'nt':
+            self.run_protoc()
+            for ext in self.extensions:
+                # Add Protobuf include and library dirs
+                if ext.name == "_mysqlxpb":
+                    ext.include_dirs.append(self.with_protobuf_include_dir)
+                    ext.library_dirs.append(self.with_protobuf_lib_dir)
+                # Add extra compile args
+                if self.extra_compile_args:
+                    ext.extra_compile_args.append(self.extra_compile_args)
             build_ext.run(self)
         else:
             self.real_build_extensions = self.build_extensions
