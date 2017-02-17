@@ -433,6 +433,7 @@ class BuildExtDynamic(build_ext):
         if not self.with_protoc:
             self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
 
+    def run_protoc(self):
         if self.with_protobuf_include_dir:
             print("# Protobuf include directory: {0}"
                   "".format(self.with_protobuf_include_dir))
@@ -453,7 +454,6 @@ class BuildExtDynamic(build_ext):
             log.error("Unable to find Protobuf protoc binary.")
             sys.exit(1)
 
-    def run_protoc(self):
         base_path = os.path.join(os.getcwd(), "src", "mysqlxpb", "mysqlx")
         command = [self.with_protoc, "-I"]
         command.append(os.path.join(base_path, "protocol"))
