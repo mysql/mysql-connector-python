@@ -507,6 +507,10 @@ class BuildExtDynamic(build_ext):
             if ext.name == "_mysqlxpb":
                 ext.include_dirs.append(self.with_protobuf_include_dir)
                 ext.library_dirs.append(self.with_protobuf_lib_dir)
+                if os.name == 'nt':
+                    ext.libraries.append("libprotobuf")
+                else:
+                    ext.libraries.append("protobuf")
             # Add extra compile args
             if self.extra_compile_args:
                 ext.extra_compile_args.append(self.extra_compile_args)
@@ -522,7 +526,6 @@ class BuildExtDynamic(build_ext):
     def run(self):
         """Run the command"""
         if os.name == 'nt':
-            self.libraries.append("libprotobuf")
             for ext in self.extensions:
                 # Add Protobuf include and library dirs
                 if ext.name == "_mysqlxpb":
@@ -536,7 +539,6 @@ class BuildExtDynamic(build_ext):
             self.run_protoc()
             build_ext.run(self)
         else:
-            self.libraries.append("protobuf")
             self.real_build_extensions = self.build_extensions
             self.build_extensions = lambda: None
             build_ext.run(self)
@@ -691,9 +693,13 @@ class BuildExtStatic(BuildExtDynamic):
                 libraries.append("rt")
 
         for ext in self.extensions:
-            ext.include_dirs.extend(include_dirs)
-            ext.library_dirs.extend(library_dirs)
-            ext.libraries.extend(libraries)
+            if ext.name == "_mysql_connector":
+                ext.include_dirs.extend(include_dirs)
+                ext.library_dirs.extend(library_dirs)
+                ext.libraries.extend(libraries)
+            elif ext.name == "_mysqlxpb" \
+                 and platform.system() not in ["Darwin", "Windows"]:
+                ext.libraries.append("rt")
             # Add extra compile args
             if self.extra_compile_args:
                 ext.extra_compile_args.append(self.extra_compile_args)
