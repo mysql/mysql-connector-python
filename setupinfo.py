@@ -84,9 +84,7 @@ extensions = [
                   "src/mysqlxpb/mysqlx/mysqlx_session.pb.cc",
                   "src/mysqlxpb/mysqlx/mysqlx_sql.pb.cc",
                   "src/mysqlxpb/mysqlxpb.cc"
-              ],
-              libraries=["protobuf"],
-              extra_compile_args=["-std=c++11"])
+              ])
 ]
 
 packages = [

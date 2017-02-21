@@ -32,7 +32,37 @@
 #include <string>
 
 
-constexpr const char* kMessageTypeKey = "_mysqlxpb_type_name";
+// This is a C++98-compatible class template to hold a pointer, which ensures
+// that an object is deleted when a scope is left. For Python 2.7 compatibility
+// on Windows C+11's unique_ptr can't be used. Once the Windows compiler is
+// migrated this class should be replaced with unique_ptr for better
+// maintenance.
+
+template <typename T>
+class MyScopedPtr {
+  T *ptr;
+
+  MyScopedPtr();
+  MyScopedPtr(const MyScopedPtr &other); // make this non-construction-copyable
+  MyScopedPtr &operator=(const MyScopedPtr &); // make this non-copyable
+public:
+  MyScopedPtr(T *ptr) : ptr(ptr) {}
+  ~MyScopedPtr() { delete ptr; }
+
+  operator bool() const {
+    return ptr != NULL;
+  }
+
+  T& operator*() const {
+    return *ptr;
+  }
+
+  T* operator->() const {
+    return ptr;
+  }
+};
+
+const char* kMessageTypeKey = "_mysqlxpb_type_name";
 
 
 static PyObject* CreateMessage(const google::protobuf::Message& message);
@@ -84,7 +114,7 @@ static PyObject* ConvertPbToPyRequired(
     }
 
     case google::protobuf::FieldDescriptor::TYPE_STRING: {
-      auto str = message.GetReflection()->GetString(message, &field);
+      std::string str = message.GetReflection()->GetString(message, &field);
       return PyString_FromStringAndSize(str.c_str(), str.size());
     }
 
@@ -94,7 +124,7 @@ static PyObject* ConvertPbToPyRequired(
     }
 
     case google::protobuf::FieldDescriptor::TYPE_BYTES: {
-      auto str = message.GetReflection()->GetString(message, &field);
+      std::string str = message.GetReflection()->GetString(message, &field);
 #ifdef PY3
       return PyBytes_FromStringAndSize(str.c_str(), str.size());
 #else
@@ -134,7 +164,7 @@ static PyObject* ConvertPbToPyRequired(
   }
 
   assert(false);
-  return nullptr;
+  return NULL;
 }
 
 
@@ -183,7 +213,7 @@ static PyObject* ConvertPbToPyRepeated(int index,
     }
 
     case google::protobuf::FieldDescriptor::TYPE_STRING: {
-      auto str = message.GetReflection()->
+      std::string str = message.GetReflection()->
           GetRepeatedString(message, &field, index);
       return PyString_FromStringAndSize(str.c_str(), str.size());
     }
@@ -194,7 +224,7 @@ static PyObject* ConvertPbToPyRepeated(int index,
     }
 
     case google::protobuf::FieldDescriptor::TYPE_BYTES: {
-      auto str = message.GetReflection()->
+      std::string str = message.GetReflection()->
           GetRepeatedString(message, &field, index);
 #ifdef PY3
       return PyBytes_FromStringAndSize(str.c_str(), str.size());
@@ -235,7 +265,7 @@ static PyObject* ConvertPbToPyRepeated(int index,
   }
 
   assert(false);
-  return nullptr;
+  return NULL;
 };
 
 
@@ -361,9 +391,9 @@ static void AddPyListToMessageRepeatedField(
     google::protobuf::Message& message,
     const google::protobuf::FieldDescriptor& field,
     PyObject* list) {
-  auto mutable_field = message.GetReflection()->MutableRepeatedField<T>(
-      &message, &field);
-  auto list_size = PyList_Size(list);
+  google::protobuf::RepeatedField<T>* mutable_field =
+      message.GetReflection()->MutableRepeatedField<T>(&message, &field);
+  Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
     mutable_field->Reserve(list_size);
@@ -379,9 +409,10 @@ static void AddPyListToMessageRepeatedMessage(
     const google::protobuf::FieldDescriptor& field,
     google::protobuf::DynamicMessageFactory& factory,
     PyObject* list) {
-  auto mutable_field = message.GetReflection()->
+  google::protobuf::RepeatedPtrField<google::protobuf::Message>* mutable_field =
+      message.GetReflection()->
       MutableRepeatedPtrField<google::protobuf::Message>(&message, &field);
-  auto list_size = PyList_Size(list);
+  Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
     mutable_field->Reserve(list_size);
@@ -397,9 +428,10 @@ static void AddPyListToMessageRepeatedString(
     google::protobuf::Message& message,
     const google::protobuf::FieldDescriptor& field,
     PyObject* list) {
-  auto mutable_field = message.GetReflection()->
+  google::protobuf::RepeatedPtrField<google::protobuf::string>* mutable_field =
+      message.GetReflection()->
       MutableRepeatedPtrField<google::protobuf::string>(&message, &field);
-  auto list_size = PyList_Size(list);
+  Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
     mutable_field->Reserve(list_size);
@@ -417,13 +449,14 @@ static void AddPyListToMessageRepeatedEnum(
     PyObject* list) {
   // TODO: Investigate if it is possible to preallocate repeated enum
   //       field in Protobuf (like in case of scalars and messages).
-  auto list_size = PyList_Size(list);
+  Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      auto enum_int_value = python_cast<google::protobuf::int32>(
-          PyList_GetItem(list, idx));
-      auto enum_value = field.enum_type()->FindValueByNumber(enum_int_value);
+      google::protobuf::int32 enum_int_value =
+          python_cast<google::protobuf::int32>(PyList_GetItem(list, idx));
+      const google::protobuf::EnumValueDescriptor* enum_value =
+          field.enum_type()->FindValueByNumber(enum_int_value);
 
       message.GetReflection()->SetRepeatedEnum(&message, &field, idx,
                                                enum_value);
@@ -549,7 +582,7 @@ static const google::protobuf::Descriptor* MessageDescriptorByName(
 static void PythonAddDict(PyObject* dict,
                           const google::protobuf::Message& message,
                           const google::protobuf::FieldDescriptor& field) {
-  auto obj = ConvertPbToPyRequired(message, field);
+  PyObject* obj = ConvertPbToPyRequired(message, field);
 
   if (!obj) {
     throw std::runtime_error(
@@ -564,7 +597,7 @@ static void PythonAddDict(PyObject* dict,
 static void PythonAddList(PyObject* list, int index,
                           const google::protobuf::Message& message,
                           const google::protobuf::FieldDescriptor& field) {
-  auto obj = ConvertPbToPyRepeated(index, message, field);
+  PyObject* obj = ConvertPbToPyRepeated(index, message, field);
 
   if (!obj) {
     throw std::runtime_error(
@@ -577,16 +610,16 @@ static void PythonAddList(PyObject* list, int index,
 
 
 static PyObject* CreateMessage(const google::protobuf::Message& message) {
-  auto dict = PyDict_New();
-  auto descriptor = message.GetDescriptor();
-  auto reflection = message.GetReflection();
+  PyObject* dict = PyDict_New();
+  const google::protobuf::Descriptor* descriptor = message.GetDescriptor();
+  const google::protobuf::Reflection* reflection = message.GetReflection();
 
   try {
     PyDict_SetItemString(dict, kMessageTypeKey,
         PyString_FromString(descriptor->full_name().c_str()));
 
     for (int idx = 0; idx < descriptor->field_count(); ++idx) {
-      auto field = descriptor->field(idx);
+      const google::protobuf::FieldDescriptor* field = descriptor->field(idx);
 
       switch (field->label()) {
         case google::protobuf::FieldDescriptor::LABEL_REQUIRED: {
@@ -599,8 +632,8 @@ static PyObject* CreateMessage(const google::protobuf::Message& message) {
           break;
         }
         case google::protobuf::FieldDescriptor::LABEL_REPEATED: {
-          auto listSize = reflection->FieldSize(message, field);
-          auto list = PyList_New(listSize);
+          int listSize = reflection->FieldSize(message, field);
+          PyObject* list = PyList_New(listSize);
 
           for (int idx = 0; idx < listSize; ++idx)
             PythonAddList(list, idx, message, *field);
@@ -611,7 +644,7 @@ static PyObject* CreateMessage(const google::protobuf::Message& message) {
     }
   } catch(std::exception& e) {
     Py_DECREF(dict);
-    dict = nullptr;
+    dict = NULL;
     PyErr_SetString(PyExc_RuntimeError, e.what());
   }
 
@@ -622,14 +655,15 @@ static PyObject* CreateMessage(const google::protobuf::Message& message) {
 static google::protobuf::Message* CreateMessage(PyObject* dict,
   google::protobuf::DynamicMessageFactory& factory)
 {
-  google::protobuf::Message* message = nullptr;
+  google::protobuf::Message* message = NULL;
 
   if (PyDict_CheckExact(dict)) {
-    auto type_name_obj = PyDict_GetItemString(dict, kMessageTypeKey);
+    PyObject* type_name_obj = PyDict_GetItemString(dict, kMessageTypeKey);
 
     if (type_name_obj && PyString_CheckExact(type_name_obj)) {
-      auto type_name = PyString_AsString(type_name_obj);
-      auto descriptor = MessageDescriptorByName(type_name);
+      char* type_name = PyString_AsString(type_name_obj);
+      const google::protobuf::Descriptor* descriptor =
+          MessageDescriptorByName(type_name);
 
       if (descriptor) {
         message = factory.GetPrototype(descriptor)->New();
@@ -642,12 +676,13 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
 
             while (PyDict_Next(dict, &pos, &key, &value)) {
               if (key && PyString_CheckExact(key)) {
-                auto key_name = PyString_AsString(key);
+                char* key_name = PyString_AsString(key);
 
                 if (::strcmp(key_name, kMessageTypeKey) == 0)
                   continue;
 
-                auto field = descriptor->FindFieldByName(key_name);
+                const google::protobuf::FieldDescriptor* field =
+                    descriptor->FindFieldByName(key_name);
 
                 switch (field->label()) {
                   case google::protobuf::FieldDescriptor::LABEL_OPTIONAL:
@@ -667,7 +702,7 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
             }
           } catch(...) {
             delete message;
-            message = nullptr;
+            message = NULL;
             PyErr_Format(PyExc_RuntimeError,
                          "Failed to initialize a message: %s", type_name);
           }
@@ -692,8 +727,9 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
 
 
 static PyObject* NewMessageImpl(const char* type_name) {
-  PyObject* result = nullptr;
-  auto descriptor = MessageDescriptorByName(type_name);
+  PyObject* result = NULL;
+  const google::protobuf::Descriptor* descriptor =
+      MessageDescriptorByName(type_name);
 
   if (descriptor) {
     google::protobuf::DynamicMessageFactory factory;
@@ -708,7 +744,7 @@ static PyObject* NewMessageImpl(const char* type_name) {
 
 
 static PyObject* NewMessage(PyObject* self, PyObject* args) {
-  PyObject* result = nullptr;
+  PyObject* result = NULL;
   const char* type_name;
 
   if (PyArg_ParseTuple(args, "s", &type_name))
@@ -721,12 +757,13 @@ static PyObject* NewMessage(PyObject* self, PyObject* args) {
 static PyObject* ParseMessageImpl(const char* type_name,
                                   const char* message_data,
                                   int message_data_size) {
-  PyObject* result = nullptr;
-  auto descriptor = MessageDescriptorByName(type_name);
+  PyObject* result = NULL;
+  const google::protobuf::Descriptor* descriptor =
+      MessageDescriptorByName(type_name);
 
   if (descriptor) {
     google::protobuf::DynamicMessageFactory dynamic_factory;
-    std::unique_ptr<google::protobuf::Message> message(
+    MyScopedPtr<google::protobuf::Message> message(
         dynamic_factory.GetPrototype(descriptor)->New());
 
     if (message) {
@@ -749,7 +786,7 @@ static PyObject* ParseMessageImpl(const char* type_name,
 
 
 static PyObject* ParseMessage(PyObject* self, PyObject* args) {
-  PyObject* result = nullptr;
+  PyObject* result = NULL;
   const char* type_name;
   const char* data;
   int data_size;
@@ -798,19 +835,19 @@ static const char* GetMessageNameByTypeId(Mysqlx::ServerMessages::Type type) {
   }
 
   assert(false);
-  return nullptr;
+  return NULL;
 };
 
 
 static PyObject* ParseServerMessage(PyObject* self, PyObject* args) {
-  PyObject* result = nullptr;
+  PyObject* result = NULL;
   int type;
   const char* message_data;
   int message_data_size;
 
   if (PyArg_ParseTuple(args, "is#", &type, &message_data, &message_data_size))
   {
-    auto type_name = GetMessageNameByTypeId(
+    const char* type_name = GetMessageNameByTypeId(
         static_cast<Mysqlx::ServerMessages::Type>(type));
 
     if (type_name)
@@ -824,16 +861,16 @@ static PyObject* ParseServerMessage(PyObject* self, PyObject* args) {
 
 
 static PyObject* SerializeMessage(PyObject* self, PyObject* args) {
-  PyObject* result = nullptr;
+  PyObject* result = NULL;
   PyObject* dict;
   google::protobuf::DynamicMessageFactory factory;
 
   if (PyArg_ParseTuple(args, "O", &dict)) {
-    std::unique_ptr<google::protobuf::Message> message(
+    MyScopedPtr<google::protobuf::Message> message(
         CreateMessage(dict, factory));
 
     if (message) {
-      auto buffer = message->SerializeAsString();
+      std::string buffer = message->SerializeAsString();
 
 #ifdef PY3
       result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
@@ -848,21 +885,23 @@ static PyObject* SerializeMessage(PyObject* self, PyObject* args) {
 
 
 static PyObject* EnumValue(PyObject* self, PyObject* args) {
-  PyObject* result = nullptr;
+  PyObject* result = NULL;
   const char* enum_full_value_name;
 
   if (PyArg_ParseTuple(args, "s", &enum_full_value_name)) {
-    auto last_dot = std::strrchr(enum_full_value_name, '.');
+    const char* last_dot = std::strrchr(enum_full_value_name, '.');
 
     if (last_dot) {
       std::string enum_type_name(enum_full_value_name, last_dot);
       std::string enum_value_name(last_dot + 1);
 
-      auto enum_type = google::protobuf::DescriptorPool::generated_pool()->
+      const google::protobuf::EnumDescriptor* enum_type =
+          google::protobuf::DescriptorPool::generated_pool()->
           FindEnumTypeByName(enum_type_name);
 
       if (enum_type) {
-        auto enum_value = enum_type->FindValueByName(enum_value_name);
+        const google::protobuf::EnumValueDescriptor* enum_value =
+            enum_type->FindValueByName(enum_value_name);
 
         if (enum_value) {
           result = PyLong_FromLong(enum_value->number());
@@ -890,7 +929,7 @@ PyInit__mysqlxpb() {
 #else
 init_mysqlxpb() {
 #endif
-  static constexpr const char* kModuleName = "_mysqlxpb";
+  static const char* kModuleName = "_mysqlxpb";
 
   static PyMethodDef methods_definition[] = {
     { "new_message", NewMessage, METH_VARARGS, "Create a new message." },
