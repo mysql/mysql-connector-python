@@ -554,26 +554,10 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
-        if not self.extra_compile_args:
-            self.set_undefined_options(
-                'install',
-                ('extra_compile_args', 'extra_compile_args'))
         if not self.with_mysql_capi:
             self.set_undefined_options(
                 'install',
                 ('with_mysql_capi', 'with_mysql_capi'))
-        if not self.with_protobuf_include_dir:
-            self.set_undefined_options(
-                'install',
-                ('with_protobuf_include_dir', 'with_protobuf_include_dir'))
-        if not self.with_protobuf_lib_dir:
-            self.set_undefined_options(
-                'install',
-                ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'))
-        if not self.with_protoc:
-            self.set_undefined_options(
-                'install',
-                ('with_protoc', 'with_protoc'))
 
         build_ext.finalize_options(self)
 
