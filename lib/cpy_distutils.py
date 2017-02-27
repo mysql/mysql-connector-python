@@ -531,6 +531,7 @@ class BuildExtDynamic(build_ext):
                 if ext.name == "_mysqlxpb":
                     ext.include_dirs.append(self.with_protobuf_include_dir)
                     ext.library_dirs.append(self.with_protobuf_lib_dir)
+                    ext.libraries.append("libprotobuf")
                 # Use the multithread, static version of the run-time library
                 ext.extra_compile_args.append("/MT")
                 # Add extra compile args
