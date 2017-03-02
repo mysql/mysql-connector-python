@@ -56,9 +56,9 @@ _SERVER_MESSAGES_TUPLES = (
      "Mysqlx.Resultset.FetchDoneMoreOutParams"),
 )
 
-SERVER_MESSAGES = {int(_mysqlxpb.enum_value(key)): val
-                   for key, val in _SERVER_MESSAGES_TUPLES}
 
+SERVER_MESSAGES = dict([(int(_mysqlxpb.enum_value(key)), val)
+                        for key, val in _SERVER_MESSAGES_TUPLES])
 
 def mysqlxpb_enum(name):
     """Returns the value of a MySQL X Protobuf enumerator.
