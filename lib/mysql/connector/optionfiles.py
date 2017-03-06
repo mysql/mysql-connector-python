@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -286,19 +286,19 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
             args = self._options_dict.keys()
 
         options = {}
+        priority = {}
         for group in args:
             try:
-                for option, value in self._options_dict[group].items():
-                    if option not in options or options[option][1] <= value[1]:
-                        options[option] = value
+                for option, value in [(key, value,) for key, value in
+                                      self._options_dict[group].items() if
+                                      key != "__name__" and
+                                      not key.startswith("!")]:
+                    if option not in options or priority[option] <= value[1]:
+                        priority[option] = value[1]
+                        options[option] = value[0]
             except KeyError:
                 pass
 
-        for key in options.keys():
-            if key == '__name__' or key.startswith('!'):
-                del options[key]
-            else:
-                options[key] = options[key][0]
         return options
 
     def get_groups_as_dict_with_priority(self, *args): # pylint: disable=C0103
@@ -321,14 +321,13 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         options = dict()
         for group in args:
             try:
-                options[group] = dict(self._options_dict[group])
+                options[group] = dict((key, value,) for key, value in
+                                      self._options_dict[group].items() if
+                                      key != "__name__" and
+                                      not key.startswith("!"))
             except KeyError:
                 pass
 
-        for group in options.keys():
-            for key in options[group].keys():
-                if key == '__name__' or key.startswith('!'):
-                    del options[group][key]
         return options
 
     def get_groups_as_dict(self, *args):
@@ -347,14 +346,11 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         options = dict()
         for group in args:
             try:
-                options[group] = dict(self._options_dict[group])
+                options[group] = dict((key, value[0],) for key, value in
+                                      self._options_dict[group].items() if
+                                      key != "__name__" and
+                                      not key.startswith("!"))
             except KeyError:
                 pass
 
-        for group in options.keys():
-            for key in options[group].keys():
-                if key == '__name__' or key.startswith('!'):
-                    del options[group][key]
-                else:
-                    options[group][key] = options[group][key][0]
         return options

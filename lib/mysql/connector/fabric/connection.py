@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -27,41 +27,16 @@ import sys
 import datetime
 import time
 import uuid
-from base64 import b16decode
-from bisect import bisect
-from hashlib import md5
 import logging
 import socket
 import collections
 
-# pylint: disable=F0401,E0611
-try:
-    from xmlrpclib import Fault, ServerProxy, Transport
-    import urllib2
-    from httplib import BadStatusLine
-except ImportError:
-    # Python v3
-    from xmlrpc.client import Fault, ServerProxy, Transport
-    import urllib.request as urllib2
-    from http.client import BadStatusLine
-
-if sys.version_info[0] == 2:
-    try:
-        from httplib import HTTPSConnection
-    except ImportError:
-        HAVE_SSL = False
-    else:
-        HAVE_SSL = True
-else:
-    try:
-        from http.client import HTTPSConnection
-    except ImportError:
-        HAVE_SSL = False
-    else:
-        HAVE_SSL = True
-# pylint: enable=F0401,E0611
+from base64 import b16decode
+from bisect import bisect
+from hashlib import md5
 
 import mysql.connector
+
 from ..connection import MySQLConnection
 from ..conversion import MySQLConverter
 from ..pooling import MySQLConnectionPool
@@ -79,6 +54,33 @@ from .caching import FabricCache
 from .balancing import WeightedRoundRobin
 from .. import version
 from ..catch23 import PY2, isunicode, UNICODE_TYPES
+
+# pylint: disable=F0401,E0611
+try:
+    from xmlrpclib import Fault, ServerProxy, Transport
+    import urllib2
+    from httplib import BadStatusLine
+except ImportError:
+    # Python v3
+    from xmlrpc.client import Fault, ServerProxy, Transport
+    import urllib.request as urllib2
+    from http.client import BadStatusLine
+
+if sys.version_info[0] == 2:
+    try:
+        from httplib import HTTPSConnection  # pylint: disable=C0412
+    except ImportError:
+        HAVE_SSL = False
+    else:
+        HAVE_SSL = True
+else:
+    try:
+        from http.client import HTTPSConnection
+    except ImportError:
+        HAVE_SSL = False
+    else:
+        HAVE_SSL = True
+
 
 RESET_CACHE_ON_ERROR = (
     errorcode.CR_SERVER_LOST,
@@ -213,8 +215,7 @@ class MySQLRPCProtocol(object):
             kwargs = self._process_params_dict(kwargs)
             params.extend(kwargs)
 
-        params = ', '.join(params)
-        return params
+        return ', '.join(params)
 
     def execute(self, group, command, *args, **kwargs):
         """Executes the given command with MySQL protocol
@@ -460,7 +461,7 @@ if HAVE_SSL:
             if PY2:
                 urllib2.HTTPSHandler.__init__(self)
             else:
-                super().__init__()  # pylint: disable=W0104
+                super().__init__()  # pylint: disable=W0104,E1004
             self._ssl_config = ssl_config
 
         def https_open(self, req):
@@ -488,7 +489,7 @@ class FabricTransport(Transport):
         if PY2:
             Transport.__init__(self, use_datetime=False)
         else:
-            super().__init__(use_datetime=False)
+            super().__init__(use_datetime=False)  # pylint: disable=E1004
         self._username = username
         self._password = password
         self._use_datetime = use_datetime

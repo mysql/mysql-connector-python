@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -168,9 +168,9 @@ class BaseMySQLSocket(object):
                 tmpbuf = bytearray()
                 for pkt in pkts:
                     tmpbuf += pkt
-                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
+                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602,R0204
             else:
-                tmpbuf = b''.join(pkts)
+                tmpbuf = b''.join(pkts)  # pylint: disable=R0204
             del pkts
             zbuf = zlib.compress(tmpbuf[:16384])
             header = (struct.pack('<I', len(zbuf))[0:3]
@@ -181,7 +181,7 @@ class BaseMySQLSocket(object):
             zpkts.append(header + zbuf)
             tmpbuf = tmpbuf[16384:]
             pllen = len(tmpbuf)
-            self.next_compressed_packet_number
+            self.next_compressed_packet_number  # pylint: disable=W0104
             while pllen > maxpktlen:
                 zbuf = zlib.compress(tmpbuf[:maxpktlen])
                 header = (struct.pack('<I', len(zbuf))[0:3]
@@ -192,7 +192,7 @@ class BaseMySQLSocket(object):
                 zpkts.append(header + zbuf)
                 tmpbuf = tmpbuf[maxpktlen:]
                 pllen = len(tmpbuf)
-                self.next_compressed_packet_number
+                self.next_compressed_packet_number  # pylint: disable=W0104
             if tmpbuf:
                 zbuf = zlib.compress(tmpbuf)
                 header = (struct.pack('<I', len(zbuf))[0:3]
