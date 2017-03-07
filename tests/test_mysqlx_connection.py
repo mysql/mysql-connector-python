@@ -440,6 +440,16 @@ class MySQLxXSessionTests(tests.MySQLxTests):
                         ssl_cert=ssl_cert, ssl_key=ssl_key)
         session = mysqlx.get_session(uri)
 
+    def test_disabled_x_protocol(self):
+        node_session = mysqlx.get_node_session(self.connect_kwargs)
+        res = node_session.sql("SHOW VARIABLES WHERE Variable_name = 'port'") \
+                          .execute().fetch_all()
+        settings = self.connect_kwargs.copy()
+        settings["port"] = res[0][1]  # Lets use the MySQL classic port
+        node_session.close()
+        self.assertRaises(mysqlx.errors.ProgrammingError, mysqlx.get_session,
+                          settings)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxNodeSessionTests(tests.MySQLxTests):
@@ -619,3 +629,11 @@ class MySQLxNodeSessionTests(tests.MySQLxTests):
                         host=config["host"], ssl_ca=ssl_ca,
                         ssl_cert=ssl_cert, ssl_key=ssl_key)
         session = mysqlx.get_node_session(uri)
+
+    def test_disabled_x_protocol(self):
+        res = self.session.sql("SHOW VARIABLES WHERE Variable_name = 'port'") \
+                          .execute().fetch_all()
+        settings = self.connect_kwargs.copy()
+        settings["port"] = res[0][1]  # Lets use the MySQL classic port
+        self.assertRaises(mysqlx.errors.ProgrammingError,
+                          mysqlx.get_node_session, settings)
