@@ -536,6 +536,18 @@ class SelectStatement(FilterableStatement):
         super(SelectStatement, self).__init__(table, False)
         self._projection(*fields)
 
+    def order_by(self, *clauses):
+        """Sets the order by criteria.
+
+        Args:
+            *clauses: The expression strings defining the order by criteria.
+
+        Returns:
+            mysqlx.SelectStatement: SelectStatement object.
+        """
+        self.sort(*clauses)
+        return self
+
     def group_by(self, *fields):
         """Sets a grouping criteria for the resultset.
 

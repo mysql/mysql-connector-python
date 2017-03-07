@@ -1103,7 +1103,7 @@ class MySQLxTableTests(tests.MySQLxTests):
                               "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
-        result = table.select().sort("age DESC").execute()
+        result = table.select().order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
         self.assertEqual(67, rows[0]["age"])
@@ -1114,7 +1114,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
 
         # test flexible params
-        result = table.select(['age', 'name']).sort("age DESC").execute()
+        result = table.select(['age', 'name']).order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
 
@@ -1199,20 +1199,21 @@ class MySQLxTableTests(tests.MySQLxTests):
                               "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
-        result = table.select().group_by("gender").sort("age ASC").execute()
+        result = table.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(21, rows[0]["age"])
         self.assertEqual(42, rows[1]["age"])
 
         result = table.select().group_by("gender").having("gender = 'F'") \
-                                                  .sort("age ASC").execute()
+                                                  .order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
         self.assertEqual(42, rows[0]["age"])
 
         # test flexible params
-        result = table.select().group_by(["gender"]).sort(["name DESC", "age ASC"]).execute()
+        result = table.select().group_by(["gender"]) \
+                               .order_by(["name DESC", "age ASC"]).execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(42, rows[0]["age"])
@@ -1467,7 +1468,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         view = self.schema.create_view(self.view_name) \
                           .defined_as(defined_as) \
                           .execute()
-        result = view.select().sort("age DESC").execute()
+        result = view.select().order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
         self.assertEqual(67, rows[0]["age"])
@@ -1478,7 +1479,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
 
         # test flexible params
-        result = view.select(['age', 'name']).sort("age DESC").execute()
+        result = view.select(['age', 'name']).order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
 
@@ -1500,21 +1501,21 @@ class MySQLxViewTests(tests.MySQLxTests):
         view = self.schema.create_view(self.view_name) \
                           .defined_as(defined_as) \
                           .execute()
-        result = view.select().group_by("gender").sort("age ASC").execute()
+        result = view.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(21, rows[0]["age"])
         self.assertEqual(42, rows[1]["age"])
 
         result = view.select().group_by("gender").having("gender = 'F'") \
-                                                 .sort("age ASC").execute()
+                                                 .order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
         self.assertEqual(42, rows[0]["age"])
 
         # test flexible params
         result = view.select().group_by(["gender"]) \
-                              .sort(["name DESC", "age ASC"]).execute()
+                              .order_by(["name DESC", "age ASC"]).execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(42, rows[0]["age"])
