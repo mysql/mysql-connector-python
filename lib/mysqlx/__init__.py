@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -24,7 +24,6 @@
 """MySQL X DevAPI Python implementation"""
 
 import re
-
 from . import constants
 
 from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
@@ -45,49 +44,42 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         AlterViewStatement, ColumnDef,
                         GeneratedColumnDef, ForeignKeyDef, Expr)
 
+_SPLIT = re.compile(r',(?![^\(\)]*\))')
+_PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 
-def _parse_address_list(address_list):
+def _parse_address_list(path):
     """Parses a list of host, port pairs
 
     Args:
-        address_list: String containing a list of routers or just router
+        path: String containing a list of routers or just router
 
     Returns:
         Returns a dict with parsed values of host, port and priority if
         specified.
     """
-    is_list  = re.compile(r'^\[(?![^,]*\]).*]$')
-    hst_list = re.compile(r',(?![^\(\)]*\))')
-    pri_addr = re.compile(r'^\(address\s*=\s*(?P<address>.+)\s*,\s*priority\s*=\s*(?P<priority>\d+)\)$')
+    path = path.replace(" ", "")
+    array  = not("," not in path and path.count(":") > 1
+                 and path.count("[") == 1) and \
+             path.startswith("[") and path.endswith("]")
 
     routers = []
-    if is_list.match(address_list):
-        address_list = address_list.strip("[]")
-        address_list = hst_list.split(address_list)
-    else:
-        match = urlparse("//{0}".format(address_list))
-        return {
-            "host": match.hostname,
-            "port": match.port
-        }
-
-    while address_list:
+    address_list = _SPLIT.split(path[1:-1] if array else path)
+    for address in address_list:
         router = {}
-        address = address_list.pop(0).strip()
-        match = pri_addr.match(address)
+
+        match = _PRIORITY.match(address)
         if match:
-            address = match.group("address").strip()
-            router["priority"] = int(match.group("priority"))
+            address = match.group(1)
+            router["priority"] = int(match.group(2))
 
         match = urlparse("//{0}".format(address))
         if not match.hostname:
             raise InterfaceError("Invalid address: {0}".format(address))
 
-        router["host"] = match.hostname
-        router["port"] = match.port
+        router.update(host=match.hostname, port=match.port)
         routers.append(router)
 
-    return { "routers": routers }
+    return {"routers": routers} if array else routers[0]
 
 def _parse_connection_uri(uri):
     """Parses the connection string and returns a dictionary with the

@@ -52,7 +52,10 @@ class SocketStream(object):
         self._is_ssl = False
 
     def connect(self, params):
-        s_type = socket.AF_INET if isinstance(params, tuple) else socket.AF_UNIX
+        if isinstance(params, tuple):
+            s_type = socket.AF_INET6 if ":" in params[0] else socket.AF_INET
+        else:
+            s_type = socket.AF_UNIX
         self._socket = socket.socket(s_type, socket.SOCK_STREAM)
         self._socket.connect(params)
 

@@ -102,6 +102,7 @@ MY_CNF = """
 [mysqld-5.7]
 plugin-load={mysqlx_plugin}
 loose_mysqlx_port={mysqlx_port}
+{mysqlx_bind_address}
 
 [mysqld-5.6]
 innodb_compression_level = 0
@@ -626,6 +627,11 @@ def setup_stats_db(cnx):
 def init_mysql_server(port, options):
     """Initialize a MySQL Server"""
     name = 'server{0}'.format(len(tests.MYSQL_SERVERS) + 1)
+    extra_args = [{
+        "version": (5, 7, 17),
+        "options": {"mysqlx_bind_address": "mysqlx_bind_address={0}".format("::"
+                    if tests.IPV6_AVAILABLE else "0.0.0.0")}
+    }]
 
     try:
         mysql_server = mysqld.MySQLServer(
@@ -638,6 +644,7 @@ def init_mysql_server(port, options):
             unix_socket_folder=options.unix_socket_folder,
             ssl_folder=os.path.abspath(tests.SSL_DIR),
             name=name,
+            extra_args=extra_args,
             sharedir=options.mysql_sharedir)
     except tests.mysqld.MySQLBootstrapError as err:
         LOGGER.error("Failed initializing MySQL server "
