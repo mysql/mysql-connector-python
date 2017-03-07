@@ -424,6 +424,341 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    def test_ilri_expressions(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # is
+        result = collection.find("$.key is null").execute()
+        self.assertEqual(4, len(result.fetch_all()))
+
+        # is_not
+        result = collection.find("$.key is not null").execute()
+        self.assertEqual(0, len(result.fetch_all()))
+
+        # regexp
+        result = collection.find("$.name regexp 'F.*'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # not_regexp
+        result = collection.find("$.name not regexp 'F.*'").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # like
+        result = collection.find("$.name like 'F%'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # not_like
+        result = collection.find("$.name not like 'F%'").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # in
+        result = collection.find("$.age in (21, 28)").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # not_in
+        result = collection.find("$.age not in (21, 28)").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # between
+        result = collection.find("$.age between 20 and 29").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # between_not
+        result = collection.find("$.age not between 20 and 29").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        self.schema.drop_collection(collection_name)
+
+    def test_unary_operators(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # sign_plus
+        result = collection.find("$.age == 21") \
+                           .fields("+($.age * -1) as test").execute()
+        self.assertEqual(-21, result.fetch_all()[0]["test"])
+
+        # sign_minus
+        result = collection.find("$.age == 21") \
+                           .fields("-$.age as test").execute()
+        self.assertEqual(-21, result.fetch_all()[0]["test"])
+
+        # !
+        result = collection.find("$.age == 21") \
+                           .fields("! ($.age == 21) as test").execute()
+        self.assertFalse(result.fetch_all()[0]["test"])
+
+        # not
+        result = collection.find("$.age == 21") \
+                           .fields("not ($.age == 21) as test").execute()
+        self.assertFalse(result.fetch_all()[0]["test"])
+
+        # ~
+        result = collection.find("$.age == 21") \
+                           .fields("5 & ~1 as test").execute()
+        self.assertEqual(4, result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_interval_expressions(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+                {"adate": "2000-01-01", "adatetime": "2000-01-01 12:00:01"},
+        ).execute()
+
+
+        result = collection.find().fields("$.adatetime + interval 1000000 "
+                                          "microsecond = '2000-01-01 12:00:02'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval 1 second = "
+                                          "'2000-01-01 12:00:02' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval 2 minute = "
+                                          "'2000-01-01 12:02:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval 4 hour = "
+                                          "'2000-01-01 16:00:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval 10 day = "
+                                          "'2000-01-11' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval 2 week = "
+                                          "'2000-01-15' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate - interval 2 month = "
+                                          "'1999-11-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval 2 quarter = "
+                                          "'2000-07-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate - interval 1 year = "
+                                          "'1999-01-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '3.1000000' "
+                                          "second_microsecond = '2000-01-01 "
+                                          "12:00:05' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1.1' "
+                                          "minute_microsecond = "
+                                          "'2000-01-01 12:01:02.100000' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval "
+                                          "'1:1' minute_second "
+                                          "= '2000-01-01 12:01:02'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1:1.1' "
+                                          "hour_microsecond = "
+                                          "'2000-01-01 13:01:02.100000'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1:1' "
+                                          "hour_second = '2000-01-01 13:01:02'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1' "
+                                          "hour_minute = '2000-01-01 13:01:01'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval "
+                                          "'2 3:4:5.600' day_microsecond = "
+                                          "'2000-01-03 15:04:06.600000'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '2 3:4:5' "
+                                          "day_second = '2000-01-03 15:04:06' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '2 3:4' "
+                                          "day_minute = '2000-01-03 15:04:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '2 3' "
+                                          "day_hour = '2000-01-03 15:00:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval '2-3' "
+                                          "year_month = "
+                                          "'2002-04-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_bitwise_operators(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # &
+        result = collection.find("$.age = 21") \
+                           .fields("$.age & 1 as test").execute()
+        self.assertEqual(1, result.fetch_all()[0]["test"])
+
+        # |
+        result = collection.find("$.age == 21") \
+                           .fields("0 | 1 as test").execute()
+        self.assertEqual(1, result.fetch_all()[0]["test"])
+
+        # ^
+        result = collection.find("$.age = 21") \
+                           .fields("$.age ^ 1 as test").execute()
+        self.assertEqual(20, result.fetch_all()[0]["test"])
+
+        # <<
+        result = collection.find("$.age == 21") \
+                           .fields("1 << 2 as test").execute()
+        self.assertEqual(4, result.fetch_all()[0]["test"])
+
+        # >>
+        result = collection.find("$.age == 21") \
+                           .fields("4 >> 2 as test").execute()
+        self.assertEqual(1, result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_numeric_operators(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # =
+        result = collection.find("$.age = 21").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # ==
+        result = collection.find("$.age == 21").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # &&
+        result = collection.find("$.age == 21 && $.name == 'Fred'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # and
+        result = collection.find("$.age == 21 and $.name == 'Fred'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # or
+        result = collection.find("$.age == 21 or $.age == 42").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # ||
+        result = collection.find("$.age == 21 || $.age == 42").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # xor
+        result = collection.find().fields("$.age xor 1 as test").execute()
+        docs = result.fetch_all()
+        self.assertTrue(all([i["test"] is False for i in docs]))
+
+        # !=
+        result = collection.find("$.age != 21").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # <>
+        result = collection.find("$.age <> 21").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # >
+        result = collection.find("$.age > 28").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # >=
+        result = collection.find("$.age >= 28").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # <
+        result = collection.find("$.age < 28").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # <=
+        result = collection.find("$.age <= 28").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # +
+        result = collection.find("$.age == 21") \
+                           .fields("$.age + 10 as test").execute()
+        self.assertEqual(31, result.fetch_all()[0]["test"])
+
+        # -
+        result = collection.find("$.age == 21") \
+                           .fields("$.age - 10 as test").execute()
+        self.assertEqual(11, result.fetch_all()[0]["test"])
+
+        # *
+        result = collection.find("$.age == 21") \
+                           .fields("$.age * 10 as test").execute()
+        self.assertEqual(210, result.fetch_all()[0]["test"])
+
+        # /
+        result = collection.find("$.age == 21") \
+                           .fields("$.age / 7 as test").execute()
+        self.assertEqual(3, result.fetch_all()[0]["test"])
+
+        # div
+        result = collection.find("$.age == 21") \
+                           .fields("$.age div 7 as test").execute()
+        self.assertEqual(3, result.fetch_all()[0]["test"])
+
+        # %
+        result = collection.find("$.age == 21") \
+                           .fields("$.age % 7 as test").execute()
+        self.assertEqual(0, result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
     def test_get_document_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -755,7 +1090,55 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertTrue("age + 100" == result.columns[0].get_column_name())
 
+        # test cast operators
+        result = table.select("cast(age as binary(10)) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.BYTES)
+
+        result = table.select("cast('1994-12-11' as date) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.DATE)
+
+        result = table.select("cast('1994-12-11:12:00:00' as datetime) as "
+                              "test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.DATETIME)
+
+        result = table.select("cast(age as decimal(10, 7)) as test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.DECIMAL)
+
+        result = table.select("cast('{\"a\": 24}' as json) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.JSON)
+
+        result = table.select("cast(age as signed) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.INT)
+
+        result = table.select("cast(age as unsigned) as test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.BIGINT)
+
+        result = table.select("cast(age as signed integer) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.INT)
+
+        result = table.select("cast(age as unsigned integer) as "
+                              "test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.BIGINT)
+
+        result = table.select("cast('12:00:00' as time) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.TIME)
+
         self.schema.drop_table("test")
+
+        coll = self.schema.create_collection("test")
+        coll.add({"a": 21}, {"a": 22}, {"a": 23}, {"a": 24}).execute()
+
+        table = self.schema.get_collection_as_table("test")
+        result = table.select("doc->'$.a' as a").execute()
+        rows = result.fetch_all()
+        self.assertEqual("a", result.columns[0].get_column_name())
+        self.assertEqual(4, len(rows))
+
+        self.schema.drop_collection("test")
 
     def test_having(self):
         table_name = "{0}.test".format(self.schema_name)
