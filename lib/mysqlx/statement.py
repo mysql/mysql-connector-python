@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -23,6 +23,7 @@
 
 """Implementation of Statements."""
 
+import copy
 import json
 import re
 
@@ -580,8 +581,7 @@ class SelectStatement(FilterableStatement):
             self._limit_offset) if self._has_limit else ""
 
         stmt = ("SELECT {select} FROM {schema}.{table}{where}{group}{having}"
-                "{order}{limit}".format(
-                select=getattr(self, '_projection_str', "*"),
+                "{order}{limit}".format(select=self._projection_str or "*",
                 schema=self.schema.name, table=self.target.name, limit=limit,
                 where=where, group=group_by, having=having, order=order_by))
 
@@ -852,7 +852,11 @@ class CreateViewStatement(Statement):
         Returns:
             mysqlx.CreateViewStatement: CreateViewStatement object.
         """
-        self._defined_as = statement
+        if not isinstance(statement, SelectStatement) and \
+           not isinstance(statement, STRING_TYPES):
+            raise ProgrammingError("The statement must be an instance of "
+                                   "SelectStatement or a SQL string.")
+        self._defined_as = copy.copy(statement)  # Prevent modifications
         return self
 
     def with_check_option(self, check_option):
@@ -878,6 +882,9 @@ class CreateViewStatement(Statement):
                   if self._definer else ""
         columns = " ({0})".format(", ".join(self._columns)) \
                   if self._columns else ""
+        defined_as = self._defined_as.get_sql() \
+                     if isinstance(self._defined_as, SelectStatement) \
+                     else self._defined_as
         view_name = quote_multipart_identifier((self._schema.name, self._name))
         check_option = " WITH {0} CHECK OPTION".format(self._check_option) \
                        if self._check_option else ""
@@ -887,8 +894,7 @@ class CreateViewStatement(Statement):
                "".format(replace=replace, algorithm=self._algorithm,
                          definer=definer, security=self._security,
                          view_name=view_name, columns=columns,
-                         defined_as=self._defined_as,
-                         check_option=check_option))
+                         defined_as=defined_as, check_option=check_option))
 
         self._connection.execute_nonquery("sql", sql)
         return self._view
@@ -913,6 +919,9 @@ class AlterViewStatement(CreateViewStatement):
                   if self._definer else ""
         columns = " ({0})".format(", ".join(self._columns)) \
                   if self._columns else ""
+        defined_as = self._defined_as.get_sql() \
+                     if isinstance(self._defined_as, SelectStatement) \
+                     else self._defined_as
         view_name = quote_multipart_identifier((self._schema.name, self._name))
         check_option = " WITH {0} CHECK OPTION".format(self._check_option) \
                        if self._check_option else ""
@@ -921,7 +930,7 @@ class AlterViewStatement(CreateViewStatement):
                "AS {defined_as}{check_option}"
                "".format(algorithm=self._algorithm, definer=definer,
                          security=self._security, view_name=view_name,
-                         columns=columns, defined_as=self._defined_as,
+                         columns=columns, defined_as=defined_as,
                          check_option=check_option))
 
         self._connection.execute_nonquery("sql", sql)

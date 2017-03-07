@@ -116,7 +116,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
-        self.schema.drop_table(view_name)
+        self.schema.drop_view(view_name)
 
         # using a non-updatable view
         defined_as = ("SELECT COLUMN_TYPE, COLUMN_COMMENT FROM "
@@ -126,8 +126,30 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
+        self.schema.drop_view(view_name)
+
+        # create view from Table.select()
+        table = self.schema.get_table(table_name)
+        table.insert("id").values(2).values(3).execute()
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select).execute()
+        self.assertEqual(3, view.count())
+
+        self.schema.drop_view(view_name)
+
+        # ensure that the object passed to defined_as() does not affect the
+        # view if changed later
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select)
+        select = select.where("id > 1")
+        self.assertEqual(3, view.execute().count())
+
+        # defined_as() should only accepts SelectStatement and strings
+        view = self.schema.create_view(view_name)
+        self.assertRaises(mysqlx.ProgrammingError, view.defined_as, 123)
+
+        self.schema.drop_view(view_name)
         self.schema.drop_table(table_name)
-        self.schema.drop_table(view_name)
 
     def test_alter_view(self):
         table_name = "table_test"
@@ -162,8 +184,30 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
+        self.schema.drop_view(view_name)
+
+        # create view from Table.select()
+        table = self.schema.get_table(table_name)
+        table.insert("id").values(2).values(3).execute()
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select).execute()
+        self.assertEqual(12, view.count())
+
+        self.schema.drop_view(view_name)
+
+        # ensure that the object passed to defined_as() does not affect the
+        # view if changed later
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select)
+        select = select.where("id > 1")
+        self.assertEqual(12, view.execute().count())
+
+        # defined_as() should only accepts SelectStatement and strings
+        view = self.schema.create_view(view_name)
+        self.assertRaises(mysqlx.ProgrammingError, view.defined_as, 123)
+
+        self.schema.drop_view(view_name)
         self.schema.drop_table(table_name)
-        self.schema.drop_table(view_name)
 
     def test_get_collection(self):
         collection_name = "collection_test"
