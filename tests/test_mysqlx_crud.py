@@ -490,6 +490,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
 
+        # test like operator
+        result = collection.find("$.name like 'B%'").execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+
         self.schema.drop_collection(collection_name)
 
     def test_modify(self):
@@ -722,6 +727,11 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.select(['age', 'name']).sort("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
+
+        # test like operator
+        result = table.select().where("name like 'B%'").execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
 
         self.schema.drop_table("test")
 

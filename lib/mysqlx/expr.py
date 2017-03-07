@@ -256,7 +256,7 @@ class ExprParser:
             i = i + 1
         val = self.string[start:i]
         try:
-            token = Token(reservedWords[val.lower()], val.upper(), len(val))
+            token = Token(reservedWords[val.lower()], val.lower(), len(val))
         except KeyError:
             token = Token(TokenType.IDENT, val, len(val))
         return token
