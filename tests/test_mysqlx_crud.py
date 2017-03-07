@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -495,6 +495,17 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
 
+        # test aggregation functions without alias
+        result = collection.find().fields("sum($.age)").execute()
+        docs = result.fetch_all()
+        self.assertTrue("sum($.age)" in docs[0].keys())
+        self.assertEqual(158, docs[0]["sum($.age)"])
+
+        # test operators without alias
+        result = collection.find().fields("$.age + 100").execute()
+        docs = result.fetch_all()
+        self.assertTrue("$.age + 100" in docs[0].keys())
+
         self.schema.drop_collection(collection_name)
 
     def test_modify(self):
@@ -732,6 +743,17 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.select().where("name like 'B%'").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
+
+        # test aggregation functions
+        result = table.select("sum(age)").execute()
+        rows = result.fetch_all()
+        self.assertTrue("sum(age)" == result.columns[0].get_column_name())
+        self.assertEqual(158, rows[0]["sum(age)"])
+
+        # test operators without alias
+        result = table.select("age + 100").execute()
+        rows = result.fetch_all()
+        self.assertTrue("age + 100" == result.columns[0].get_column_name())
 
         self.schema.drop_table("test")
 

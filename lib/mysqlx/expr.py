@@ -784,9 +784,21 @@ class ExprParser:
     def parse_table_update_field(self):
         return self.column_identifier().identifier
 
+    def _table_fields(self):
+        fields = []
+        temp = self.string.split(",")
+        temp.reverse()
+        while temp:
+            field = temp.pop()
+            while field.count("(") != field.count(")"):
+                field = "{0}{1}".format(temp.pop(), field)
+            fields.append(field.strip())
+        return fields
+
     def parse_table_select_projection(self):
         project_expr = []
         first = True
+        fields = self._table_fields()
         while self.pos < len(self.tokens):
             if not first:
                 self.consume_token(TokenType.COMMA)
@@ -795,10 +807,14 @@ class ExprParser:
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection["alias"] = self.consume_token(TokenType.IDENT)
-            else:
+            elif projection["source"]["type"] is \
+                mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT"):
                 self.pos -= 1
                 projection["alias"] = self.consume_token(TokenType.IDENT)
+            else:
+                projection["alias"] = fields[len(project_expr)]
             project_expr.append(projection.get_message())
+
         return project_expr
 
     def parse_order_spec(self):
