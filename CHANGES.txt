@@ -3,10 +3,24 @@ MySQL Connector/Python 2.2 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
+
+v2.2.3
+======
+WL#10452: Add Protobuf C++ extension for Linux variants and Mac OSX
+WL#10081: DevAPI: IPv6 support
+BUG#25614860: Fix defined_as method in the view creation
+BUG#25519251: SelectStatement does not implement order_by() method
+BUG#25436568: Update available operators for XPlugin
+BUG#24954006: Add missing items in CHANGES.txt
+BUG#24953913: Fix unittests that are failing in Linux
+BUG#24578507: Fix import error using Python 2.6
+BUG#23636962: Fix improper error message when creating a Session
+BUG#23568207: Fix default aliases for projection fields
+BUG#23567724: Fix operator names
 
 v2.2.2
 ======
