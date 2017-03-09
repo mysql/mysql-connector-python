@@ -1027,8 +1027,8 @@ class CreateTableStatement(Statement):
         """Create the Table and fill it with values from a Select Statement.
 
         Args:
-            select (object): Select Statement. Can be a string or an instance of
-            :class`mysqlx.SelectStatement`.
+            select (object): Select Statement. Can be a string or an instance
+                             of :class:`mysqlx.SelectStatement`.
 
         Returns:
             mysqlx.CreateTableStatement: CreateTableStatement object.

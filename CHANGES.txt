@@ -16,7 +16,6 @@ BUG#25614860: Fix defined_as method in the view creation
 BUG#25519251: SelectStatement does not implement order_by() method
 BUG#25436568: Update available operators for XPlugin
 BUG#24954006: Add missing items in CHANGES.txt
-BUG#24953913: Fix unittests that are failing in Linux
 BUG#24578507: Fix import error using Python 2.6
 BUG#23636962: Fix improper error message when creating a Session
 BUG#23568207: Fix default aliases for projection fields

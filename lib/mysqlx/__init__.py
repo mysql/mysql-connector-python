@@ -40,8 +40,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement,
-                        DropCollectionIndexStatement, CreateViewStatement,
-                        AlterViewStatement, ColumnDef,
+                        DropCollectionIndexStatement, CreateTableStatement,
+                        CreateViewStatement, AlterViewStatement, ColumnDef,
                         GeneratedColumnDef, ForeignKeyDef, Expr)
 
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
@@ -237,6 +237,6 @@ __all__ = [
     "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
-    "CreateViewStatement", "AlterViewStatement",
+    "CreateTableStatement", "CreateViewStatement", "AlterViewStatement",
     "ColumnDef", "GeneratedColumnDef", "ForeignKeyDef", "Expr",
 ]
