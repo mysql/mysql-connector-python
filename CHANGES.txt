@@ -8,6 +8,16 @@ Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v2.1.5
+======
+
+- BUG#25111218: Fix duplicate logic for reading EOF packet
+- BUG#21656282: Connection fails using unicode passwords with C extension
+- BUG#21530841: Select statement fails for results with more than 4096 columns
+- BUG#21530100: Fix reading option files
+- BUG#21477493: Fix RE_SQL_INSERT_STMT to correctly match Insert Statement
+- BUG#21476495: Fix set_charset_collation() for an invalid charset provided
+
 v2.1.4
 ======
 

@@ -3086,6 +3086,46 @@ class BugOra19168737(tests.MySQLConnectorTests):
         self.assertEqual(exp, new_config)
 
 
+class BugOra21530100(tests.MySQLConnectorTests):
+    """BUG#21530100: CONNECT FAILS WHEN USING MULTIPLE OPTION_GROUPS WITH
+       PYTHON 3.3
+    """
+    def test_option_files_with_option_groups(self):
+        temp_cnf_file = os.path.join(os.getcwd(), 'temp.cnf')
+        temp_include_file = os.path.join(os.getcwd(), 'include.cnf')
+
+        try:
+            cnf_file = open(temp_cnf_file, "w+")
+            include_file = open(temp_include_file, "w+")
+
+            config = tests.get_mysql_config()
+
+            cnf = "[group32]\n"
+            cnf += '\n'.join(['{0} = {1}'.format(key, value)
+                             for key, value in config.items()])
+
+            cnf += "\n[group31]\n"
+            cnf += "!include {0}\n".format(temp_include_file)
+
+            include_cnf = "[group41]\n"
+            include_cnf += "charset=utf8\n"
+
+            cnf_file.write(cnf)
+            include_file.write(include_cnf)
+
+            cnf_file.close()
+            include_file.close()
+
+            conn = mysql.connector.connect(option_files=temp_cnf_file,
+                option_groups=['group31','group32','group41'])
+        except Exception as exc:
+            self.fail("Connection failed with option_files argument: {0}"
+                      "".format(exc))
+        finally:
+            os.remove(temp_cnf_file)
+            os.remove(temp_include_file)
+
+
 class BugOra19481761(tests.MySQLConnectorTests):
     """BUG#19481761: OPTION_FILES + !INCLUDE FAILS WITH TRAILING NEWLINE
     """
@@ -3928,6 +3968,85 @@ class BugOra21492428(tests.MySQLConnectorTests):
                 cnx.close()
 
 
+class BugOra21476495(tests.MySQLConnectorTests):
+    """Bug 21476495 - CHARSET VALUE REMAINS INVALID AFTER FAILED
+       SET_CHARSET_COLLATION() CALL
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+
+    def test_bad_set_charset_number(self):
+        old_val = self.cnx._charset_id
+        self.assertRaises(mysql.connector.Error,
+                          self.cnx.set_charset_collation, 19999)
+
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cursor = cnx.cursor(raw="true",buffered="true")
+        cursor.execute("SHOW VARIABLES LIKE 'character_set_connection'")
+        row = cursor.fetchone()
+        self.assertEqual(row[1], u"utf8")
+        cursor.close()
+
+        self.assertEqual(self.cnx._charset_id, old_val)
+
+
+class BugOra21477493(tests.MySQLConnectorTests):
+    """Bug 21477493 - EXECUTEMANY() API WITH INSERT INTO .. SELECT STATEMENT
+       RETURNS INTERFACEERROR
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        cursor = self.cnx.cursor()
+        cursor.execute("DROP TABLE IF EXISTS fun1")
+        cursor.execute("CREATE TABLE fun1(a CHAR(50), b INT)")
+        data=[('A',1),('B',2)]
+        cursor.executemany("INSERT INTO fun1 (a, b) VALUES (%s, %s)",data)
+        cursor.close()
+
+    def tearDown(self):
+        cursor = self.cnx.cursor()
+        cursor.execute("DROP TABLE IF EXISTS fun1")
+        cursor.close()
+
+    def test_insert_into_select_type1(self):
+        data = [('A',1),('B',2)]
+        cursor = self.cnx.cursor()
+        cursor.executemany("INSERT INTO fun1 SELECT CONCAT('VALUES', %s), "
+                           "b + %s FROM fun1", data)
+        cursor.close()
+
+        cursor = self.cnx.cursor()
+        cursor.execute("SELECT * FROM fun1")
+        self.assertEqual(8, len(cursor.fetchall()))
+
+    def test_insert_into_select_type2(self):
+        data = [('A',1),('B',2)]
+        cursor = self.cnx.cursor()
+        cursor.executemany("INSERT INTO fun1 SELECT CONCAT('VALUES(ab, cd)',"
+                           "%s), b + %s FROM fun1", data)
+        cursor.close()
+
+        cursor = self.cnx.cursor()
+        cursor.execute("SELECT * FROM fun1")
+        self.assertEqual(8, len(cursor.fetchall()))
+
+    def test_insert_into_select_type3(self):
+        config = tests.get_mysql_config()
+        data = [('A',1),('B',2)]
+        cursor = self.cnx.cursor()
+        cursor.executemany("INSERT INTO `{0}`.`fun1` SELECT CONCAT('"
+                           "VALUES(ab, cd)', %s), b + %s FROM fun1"
+                           "".format(config["database"]), data)
+        cursor.close()
+
+        cursor = self.cnx.cursor()
+        cursor.execute("SELECT * FROM fun1")
+        self.assertEqual(8, len(cursor.fetchall()))
+
+
 class BugOra21492815(tests.MySQLConnectorTests):
     """BUG#21492815: CALLPROC() HANGS WHEN CONSUME_RESULTS=TRUE
     """
@@ -3990,4 +4109,90 @@ class BugOra21492815(tests.MySQLConnectorTests):
         for result in cur.stored_results():
             results.append(result.fetchall())
         self.assertEqual(exp, results)
+        cur.close()
+
+
+@unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+class BugOra21656282(tests.MySQLConnectorTests):
+    """BUG#21656282: CONNECT FAILURE WITH C-EXT WHEN PASSWORD CONTAINS UNICODE
+    CHARACTER
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.host = 'localhost' if config['unix_socket'] and os.name != 'nt' \
+                    else config['host']
+        self.user = 'unicode_user'
+        self.password = u'步'
+
+        # Use utf8mb4 character set
+        self.cnx.cmd_query("SET character_set_server='utf8mb4'")
+
+        # Drop user if exists
+        self._drop_user(self.host, self.user)
+
+        # Create the user with unicode password
+        create_user = (u"CREATE USER '{user}'@'{host}' IDENTIFIED BY "
+                       u"'{password}'")
+        self.cnx.cmd_query(create_user.format(user=self.user, host=self.host,
+                                              password=self.password))
+
+        # Grant all to new user on database
+        grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
+        self.cnx.cmd_query(grant.format(database=config['database'],
+                                        user=self.user, host=self.host))
+
+    def tearDown(self):
+        self._drop_user(self.host, self.user)
+
+    def _drop_user(self, host, user):
+        try:
+            drop_user = "DROP USER '{user}'@'{host}'"
+            self.cnx.cmd_query(drop_user.format(user=user, host=host))
+        except errors.DatabaseError:
+            # It's OK when drop user fails
+            pass
+
+    def test_unicode_password(self):
+        config = tests.get_mysql_config()
+        config['user'] = self.user
+        config['password'] = self.password
+        try:
+            cnx = CMySQLConnection(**config)
+        except:
+            self.fail('Failed using password with unicode characters')
+        else:
+            cnx.close()
+
+
+class BugOra21530841(tests.MySQLConnectorTests):
+    """BUG#21530841: SELECT FAILS WITH ILLEGAL RESULT SET ERROR WHEN COLUMN
+    COUNT IN RESULT > 4096
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.tbl = "Bug21530841"
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+    def tearDown(self):
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cnx.close()
+
+    def test_big_column_count(self):
+        cur = self.cnx.cursor(raw=False, buffered=False)
+        # Create table with 512 Columns
+        table = "CREATE TABLE t ({0})".format(
+            ", ".join(["c{0} INT".format(idx) for idx in range(512)]))
+        cur.execute(table)
+
+        # Insert 1 record
+        cur.execute("INSERT INTO t(c1) values (1) ")
+        self.cnx.commit()
+
+        # Select from 10 tables
+        query = "SELECT * FROM {0} WHERE a1.c1 > 0".format(
+            ", ".join(["t a{0}".format(idx) for idx in range(10)]))
+        cur.execute(query)
+        cur.fetchone()
         cur.close()

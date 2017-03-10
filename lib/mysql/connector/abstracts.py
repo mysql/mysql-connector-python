@@ -634,7 +634,6 @@ class MySQLConnectionAbstract(object):
         """
         if charset:
             if isinstance(charset, int):
-                self._charset_id = charset
                 (self._charset_id, charset_name, collation_name) = \
                     CharacterSet.get_charset_info(charset)
             elif isinstance(charset, str):
