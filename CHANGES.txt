@@ -10,16 +10,16 @@ Full release notes:
 
 v2.2.3
 ======
-WL#10452: Add Protobuf C++ extension for Linux variants and Mac OSX
-WL#10081: DevAPI: IPv6 support
-BUG#25614860: Fix defined_as method in the view creation
-BUG#25519251: SelectStatement does not implement order_by() method
-BUG#25436568: Update available operators for XPlugin
-BUG#24954006: Add missing items in CHANGES.txt
-BUG#24578507: Fix import error using Python 2.6
-BUG#23636962: Fix improper error message when creating a Session
-BUG#23568207: Fix default aliases for projection fields
-BUG#23567724: Fix operator names
+- WL#10452: Add Protobuf C++ extension for Linux variants and Mac OSX
+- WL#10081: DevAPI: IPv6 support
+- BUG#25614860: Fix defined_as method in the view creation
+- BUG#25519251: SelectStatement does not implement order_by() method
+- BUG#25436568: Update available operators for XPlugin
+- BUG#24954006: Add missing items in CHANGES.txt
+- BUG#24578507: Fix import error using Python 2.6
+- BUG#23636962: Fix improper error message when creating a Session
+- BUG#23568207: Fix default aliases for projection fields
+- BUG#23567724: Fix operator names
 
 v2.2.2
 ======
@@ -29,7 +29,7 @@ v2.2.2
 - DevAPI: New transports: Unix domain socket
 - DevAPI: Core TLS/SSL options for the mysqlx URI scheme
 - DevAPI: View DDL with support for partitioning in a cluster / sharding
-- BUG24520850: Fix unexpected behavior when using an empty collection name
+- BUG#24520850: Fix unexpected behavior when using an empty collection name
 
 v2.2.1
 ======
@@ -40,11 +40,11 @@ v2.2.1
 - DevAPI: Per ReplicaSet SQL execution
 - DevAPI: XSession accepts a list of routers
 - DevAPI: Define action on adding empty list of documents
-- BUG23729357: Fix fetching BIT datatype
-- BUG23583381: Add who_am_i and am_i_real methods to DatabaseObject
-- BUG23568257: Add fetch_one method to mysqlx.result
-- BUG23550743: Add close method to XSession and NodeSession
-- BUG23550057: Add support for URI as connection data
+- BUG#23729357: Fix fetching BIT datatype
+- BUG#23583381: Add who_am_i and am_i_real methods to DatabaseObject
+- BUG#23568257: Add fetch_one method to mysqlx.result
+- BUG#23550743: Add close method to XSession and NodeSession
+- BUG#23550057: Add support for URI as connection data
 
 v2.2.0
 ======
