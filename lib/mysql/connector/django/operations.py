@@ -185,6 +185,10 @@ class DatabaseOperations(BaseDatabaseOperations):
                              'value for AutoField.')
         return value
 
+    if django.VERSION > (1, 8):
+        def adapt_datetimefield_value(self, value):
+            return self.value_to_db_datetime(value)
+
     def value_to_db_datetime(self, value):
         if value is None:
             return None
@@ -202,6 +206,10 @@ class DatabaseOperations(BaseDatabaseOperations):
             return datetime_to_mysql(value)
         return self.connection.converter.to_mysql(value)
 
+    if django.VERSION > (1, 8):
+        def adapt_timefield_value(self, value):
+            return self.value_to_db_time(value)
+
     def value_to_db_time(self, value):
         if value is None:
             return None
@@ -218,9 +226,15 @@ class DatabaseOperations(BaseDatabaseOperations):
     def max_name_length(self):
         return 64
 
-    def bulk_insert_sql(self, fields, num_values):
-        items_sql = "({0})".format(", ".join(["%s"] * len(fields)))
-        return "VALUES " + ", ".join([items_sql] * num_values)
+    if django.VERSION < (1, 9):
+        def bulk_insert_sql(self, fields, num_values):
+            items_sql = "({0})".format(", ".join(["%s"] * len(fields)))
+            return "VALUES " + ", ".join([items_sql] * num_values)
+    else:
+        def bulk_insert_sql(self, fields, placeholder_rows):
+            placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
+            values_sql = ", ".join("({0})".format(sql) for sql in placeholder_rows_sql)
+            return "VALUES " + values_sql
 
     if django.VERSION < (1, 8):
         def year_lookup_bounds(self, value):
