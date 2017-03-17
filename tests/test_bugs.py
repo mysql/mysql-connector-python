@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -62,6 +62,8 @@ except ImportError:
 ERR_NO_CEXT = "C Extension not available"
 
 
+@unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
+                 "Bug328998 not tested with MySQL version 5.7.4")
 class Bug328998Tests(tests.MySQLConnectorTests):
     """Tests where connection timeout has been set"""
 

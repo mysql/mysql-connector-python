@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most

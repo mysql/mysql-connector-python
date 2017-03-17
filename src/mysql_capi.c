@@ -1127,7 +1127,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     if (ssl_ca || ssl_cert || ssl_key) {
         ssl_enabled= 1;
 #if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
-        printf(">>>> %d\n", MYSQL_VERSION_ID);
         {
             abool= 1;
             mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
