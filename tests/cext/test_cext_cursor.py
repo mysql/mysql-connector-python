@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -29,6 +29,7 @@ import logging
 import unittest
 
 from mysql.connector import errors, errorcode
+from .. import PY2
 
 import tests
 
@@ -515,6 +516,28 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
 
         cur.close()
         self.cnx.rollback()
+
+        cur = self._get_cursor(self.cnx)
+        cur.execute("DROP PROCEDURE IF EXISTS multi_results")
+        procedure = (
+            "CREATE PROCEDURE multi_results () "
+            "BEGIN SELECT 1; SELECT 'ham'; END"
+        )
+        cur.execute(procedure)
+        stmt = "CALL multi_results()"
+        if not PY2:
+            stmt = b"CALL multi_results()"
+        exp_result = [[(1,)], [(u'ham',)]]
+        results = []
+        for result in cur.execute(stmt, multi=True):
+            if result.with_rows:
+                self.assertEqual(stmt, result._executed)
+                results.append(result.fetchall())
+
+        self.assertEqual(exp_result, results)
+        cur.execute("DROP PROCEDURE multi_results")
+
+        cur.close()
 
 
 class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
