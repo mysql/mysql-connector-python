@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -194,7 +194,13 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         exp = {'insert_id': 0, 'affected_rows': 0,
                'field_count': 0, 'warning_count': 0,
                'status_flag': 0}
-        self.assertEqual(exp, self.cnx.cmd_refresh(refresh))
+        result = self.cnx.cmd_refresh(refresh)
+        for key in set(result.keys()) ^ set(exp.keys()):
+            try:
+                del result[key]
+            except KeyError:
+                del exp[key]
+        self.assertEqual(exp, result)
 
         query = "SHOW GLOBAL STATUS LIKE 'Uptime_since_flush_status'"
         pre_flush = int(self.cnx.info_query(query)[1])

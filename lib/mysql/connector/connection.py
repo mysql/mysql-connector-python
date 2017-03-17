@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -184,6 +184,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns subclass of MySQLBaseSocket.
         """
+        # pylint: disable=R0204
         conn = None
         if self.unix_socket and os.name != 'nt':
             conn = MySQLUnixSocket(unix_socket=self.unix_socket)
@@ -191,6 +192,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             conn = MySQLTCPSocket(host=self.server_host,
                                   port=self.server_port,
                                   force_ipv6=self._force_ipv6)
+        # pylint: enable=R0204
         conn.set_connection_timeout(self._connection_timeout)
         return conn
 
@@ -440,14 +442,17 @@ class MySQLConnection(MySQLConnectionAbstract):
                 rows = self._protocol.read_binary_result(
                     self._socket, columns, count)
             else:
-                rows = self._protocol.read_text_result(self._socket, self._server_version, count=count)
+                rows = self._protocol.read_text_result(self._socket,
+                                                       self._server_version,
+                                                       count=count)
         except errors.Error as err:
             self.unread_result = False
             raise err
 
         if rows[-1] is not None:
-            ek = rows[-1] # OK or EOF
-            self._handle_server_status(ek['status_flag'] if 'status_flag' in ek else ek['server_status'])
+            row = rows[-1]  # OK or EOF
+            self._handle_server_status(row['status_flag'] if 'status_flag' in
+                                       row else row['server_status'])
             self.unread_result = False
 
         return rows

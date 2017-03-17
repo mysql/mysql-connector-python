@@ -529,6 +529,8 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.set_character_set('big5')
         self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
+    @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
+                     "test_get_ssl_cipher not tested with MySQL version 5.7.4")
     def test_get_ssl_cipher(self):
         cmy1 = MySQL(buffered=True)
         self.assertRaises(MySQLInterfaceError, cmy1.get_ssl_cipher)

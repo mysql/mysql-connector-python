@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -28,6 +28,8 @@ from collections import namedtuple
 import re
 import weakref
 
+from _mysql_connector import MySQLInterfaceError  # pylint: disable=F0401,E0611
+
 from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
 from .catch23 import PY2, isunicode
 from . import errors
@@ -39,7 +41,6 @@ from .cursor import (
     RE_SQL_SPLIT_STMTS
 )
 
-from _mysql_connector import MySQLInterfaceError  # pylint: disable=F0401
 
 class _ParamSubstitutor(object):
 
@@ -429,14 +430,14 @@ class CMySQLCursor(MySQLCursorAbstract):
             results = []
             while self._cnx.result_set_available:
                 result = self._cnx.fetch_eof_columns()
-                # pylint: disable=W0212
+                # pylint: disable=W0212,R0204
                 if self._raw:
                     cur = CMySQLCursorBufferedRaw(self._cnx._get_self())
                 else:
                     cur = CMySQLCursorBuffered(self._cnx._get_self())
                 cur._executed = "(a result of {0})".format(call)
                 cur._handle_result(result)
-                # pylint: enable=W0212
+                # pylint: enable=W0212,R0204
                 results.append(cur)
                 self._cnx.next_result()
             self._stored_results = results
@@ -807,4 +808,3 @@ class CMySQLCursorPrepared(CMySQLCursor):
         super(CMySQLCursorPrepared, self).__init__(connection)
         raise NotImplementedError(
             "Alternative: Use connection.MySQLCursorPrepared")
-

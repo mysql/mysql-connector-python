@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -29,7 +29,7 @@ import datetime
 from decimal import Decimal
 
 from .constants import (
-    FieldFlag, ServerCmd, FieldType, ClientFlag, MAX_MYSQL_TABLE_COLUMNS)
+    FieldFlag, ServerCmd, FieldType, ClientFlag)
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
@@ -61,7 +61,7 @@ class MySQLProtocol(object):
                 ssl_enabled=ssl_enabled)
             plugin_auth_response = auth.auth_response()
         except (TypeError, errors.InterfaceError) as exc:
-            raise errors.ProgrammingError(
+            raise errors.InterfaceError(
                 "Failed authentication: {0}".format(str(exc)))
 
         if client_flags & ClientFlag.SECURE_CONNECTION:
@@ -90,7 +90,7 @@ class MySQLProtocol(object):
             username_bytes = username.encode('utf8')  # pylint: disable=E1103
         except AttributeError:
             # Username is already bytes
-            username_bytes = username
+            username_bytes = username  # pylint: disable=R0204
         packet = struct.pack('<IIB{filler}{usrlen}sx'.format(
             filler='x' * 23, usrlen=len(username_bytes)),
                              client_flags, max_allowed_packet, charset,
@@ -141,7 +141,7 @@ class MySQLProtocol(object):
             username_bytes = username.encode('utf8')  # pylint: disable=E1103
         except AttributeError:
             # Username is already bytes
-            username_bytes = username
+            username_bytes = username  # pylint: disable=R0204
         packet = struct.pack('<B{usrlen}sx'.format(usrlen=len(username_bytes)),
                              ServerCmd.CHANGE_USER, username_bytes)
 
@@ -328,7 +328,7 @@ class MySQLProtocol(object):
                     packet = sock.recv()
                 datas.append(packet[4:])
                 rowdata = utils.read_lc_string_list(bytearray(b'').join(datas))
-            elif (packet[4] == 254 and packet[0] < 7):
+            elif packet[4] == 254 and packet[0] < 7:
                 eof = self.parse_eof(packet)
                 rowdata = None
             else:
@@ -385,7 +385,7 @@ class MySQLProtocol(object):
             mcs = 0
             if length == 11:
                 mcs = struct_unpack('I', packet[8:length + 1])[0]
-            value = datetime.datetime(
+            value = datetime.datetime(  # pylint: disable=R0204
                 year=struct_unpack('H', packet[1:3])[0],
                 month=packet[3],
                 day=packet[4],

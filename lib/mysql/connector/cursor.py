@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -41,7 +41,7 @@ RE_SQL_ON_DUPLICATE = re.compile(
     re.I | re.M | re.S)
 RE_SQL_INSERT_STMT = re.compile(
     r"({0}|\s)*INSERT({0}|\s)*INTO\s+[`'\"]?.+[`'\"]?(?:\.[`'\"]?.+[`'\"]?)"
-     "{{0,2}}\s+VALUES\s*\(.+(?:\s*,.+)*\)".format(SQL_COMMENT),
+    r"{{0,2}}\s+VALUES\s*\(.+(?:\s*,.+)*\)".format(SQL_COMMENT),
     re.I | re.M | re.S)
 RE_SQL_INSERT_VALUES = re.compile(r'.*VALUES\s*(\(.*\)).*', re.I | re.M | re.S)
 RE_PY_PARAM = re.compile(b'(%s)')
@@ -97,6 +97,7 @@ def _bytestr_format_dict(bytestr, value_dict):
     b'x=%(y)s y=%(x)s'
     """
     def replace(matchobj):
+        """Replace pattern."""
         value = None
         groups = matchobj.groupdict()
         if groups["conversion_type"] == b"%":
@@ -111,6 +112,7 @@ def _bytestr_format_dict(bytestr, value_dict):
         return value.decode("utf-8") if PY2 else value
     return RE_PY_MAPPING_PARAM.sub(replace, bytestr.decode("utf-8")
                                    if PY2 else bytestr)
+
 
 class CursorBase(MySQLCursorAbstract):
     """
@@ -749,10 +751,12 @@ class MySQLCursor(CursorBase):
             can_consume_results = self._connection._consume_results
             for result in self._connection.cmd_query_iter(call):
                 self._connection._consume_results = False
+                # pylint: disable=R0204
                 if self._raw:
                     tmp = MySQLCursorBufferedRaw(self._connection._get_self())
                 else:
                     tmp = MySQLCursorBuffered(self._connection._get_self())
+                # pylint: enable=R0204
                 tmp._executed = "(a result of {0})".format(call)
                 tmp._handle_result(result)
                 if tmp._warnings is not None:
@@ -760,7 +764,7 @@ class MySQLCursor(CursorBase):
                 if 'columns' in result:
                     results.append(tmp)
             self._connection._consume_results = can_consume_results
-            #pylint: enable=W0212
+            # pylint: enable=W0212
 
             if argnames:
                 select = "SELECT {0}".format(','.join(argtypes))

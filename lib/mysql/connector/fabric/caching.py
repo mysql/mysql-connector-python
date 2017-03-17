@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -116,32 +116,33 @@ class CacheShardTable(CacheEntry):
     def add_partition(self, key, group):
         """Add sharding information for a group"""
         if self.shard_type == 'RANGE':
-            key = int(key)
+            _key = int(key)
         elif self.shard_type == 'RANGE_DATETIME':
             try:
                 if ':' in key:
-                    key = datetime.strptime(key, "%Y-%m-%d %H:%M:%S")
+                    # pylint: disable=R0204
+                    _key = datetime.strptime(key, "%Y-%m-%d %H:%M:%S")
                 else:
-                    key = datetime.strptime(key, "%Y-%m-%d").date()
+                    _key = datetime.strptime(key, "%Y-%m-%d").date()
             except:
                 raise ValueError(
                     "RANGE_DATETIME key could not be parsed, was: {0}".format(
                         key
                     ))
         elif self.shard_type == 'RANGE_STRING':
-            pass
+            _key = key
         elif self.shard_type == "HASH":
-            pass
+            _key = key
         else:
             raise ValueError("Unsupported sharding type {0}".format(
                 self.shard_type
             ))
-        self.partitioning[key] = {
+        self.partitioning[_key] = {
             'group': group,
         }
         self.reset_ttl()
-        bisect.insort_right(self.keys, key)
-        insort_right_rev(self.keys_reversed, key)
+        bisect.insort_right(self.keys, _key)
+        insort_right_rev(self.keys_reversed, _key)
 
     @classmethod
     def hash_index(cls, part1, part2=None):
@@ -174,6 +175,7 @@ class CacheGroup(CacheEntry):
             class_=self.__class__,
             group=self.group_name,
         )
+
 
 class FabricCache(object):
     """Singleton class for caching Fabric data
