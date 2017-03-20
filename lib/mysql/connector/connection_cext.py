@@ -65,7 +65,6 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise RuntimeError(
                 "MySQL Connector/Python C Extension not available")
         self._cmysql = None
-        self._connection_timeout = 2
         self._columns = []
         self.converter = None
         super(CMySQLConnection, self).__init__(**kwargs)
@@ -144,7 +143,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             buffered=self._buffered,
             raw=self._raw,
             charset_name=charset_name,
-            connection_timeout=int(self._connection_timeout or 10),
+            connection_timeout=(self._connection_timeout or 0),
             use_unicode=self._use_unicode,
             auth_plugin=self._auth_plugin)
 

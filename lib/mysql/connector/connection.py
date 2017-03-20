@@ -78,7 +78,6 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._use_unicode = True
         self._get_warnings = False
         self._raise_on_warnings = False
-        self._connection_timeout = None
         self._buffered = False
         self._unread_result = False
         self._have_next_result = False

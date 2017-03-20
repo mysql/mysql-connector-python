@@ -62,7 +62,7 @@ class MySQLConnectionAbstract(object):
         self._use_unicode = True
         self._get_warnings = False
         self._raise_on_warnings = False
-        self._connection_timeout = None
+        self._connection_timeout = DEFAULT_CONFIGURATION["connect_timeout"]
         self._buffered = False
         self._unread_result = False
         self._have_next_result = False
