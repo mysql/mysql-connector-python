@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -112,12 +112,13 @@ class PooledMySQLConnection(object):
         When the pool is configured to reset the session, the session
         state will be cleared by re-authenticating the user.
         """
-        cnx = self._cnx
-        if self._cnx_pool.reset_session:
-            cnx.reset_session()
-
-        self._cnx_pool.add_connection(cnx)
-        self._cnx = None
+        try:
+            cnx = self._cnx
+            if self._cnx_pool.reset_session:
+                cnx.reset_session()
+        finally:
+            self._cnx_pool.add_connection(cnx)
+            self._cnx = None
 
     def config(self, **kwargs):
         """Configuration is done through the pool"""

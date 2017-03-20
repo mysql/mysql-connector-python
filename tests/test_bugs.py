@@ -4342,3 +4342,36 @@ class BugOra25589496(tests.MySQLConnectorTests):
         self.cnx.commit()
         self.assertEqual(1, cursor.lastrowid)
         cursor.close()
+
+
+class BugOra25383644(tests.MySQLConnectorTests):
+    """BUG#25383644: LOST SERVER CONNECTION LEAKS POOLED CONNECTIONS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config["pool_size"] = 3
+        self.cnxpool = pooling.MySQLConnectionPool(**config)
+        self.mysql_server = tests.MYSQL_SERVERS[0]
+
+    def test_pool_exhaustion(self):
+        sql = "SELECT * FROM dummy"
+
+        i = 4
+        while i > 0:
+            cnx = self.cnxpool.get_connection()
+            cur = cnx.cursor()
+            try:
+                self.mysql_server.stop()
+                self.mysql_server.wait_down()
+                cur.execute(sql)
+            except mysql.connector.errors.OperationalError:
+                try:
+                    cur.close()
+                    cnx.close()
+                except mysql.connector.errors.OperationalError:
+                    pass
+            finally:
+                i -= 1
+                if not self.mysql_server.check_running():
+                    self.mysql_server.start()
+                    self.mysql_server.wait_up()
