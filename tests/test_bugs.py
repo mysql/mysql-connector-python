@@ -44,6 +44,7 @@ from threading import Thread
 import traceback
 import time
 import unittest
+import pickle
 
 import tests
 from tests import foreach_cnx, cnx_config
@@ -4270,3 +4271,39 @@ class BugOra25397650(tests.MySQLConnectorTests):
             mysql.connector.connect, **self.config)
         self.config['ssl_verify_cert'] = False
         mysql.connector.connect(**self.config)
+
+
+class BugOra25589496(tests.MySQLConnectorTests):
+    """BUG#25589496: COMMITS RELATED TO "BUG22529828" BROKE BINARY DATA
+    HANDLING FOR PYTHON 2.7
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.tbl = "Bug25589496"
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+
+    def tearDown(self):
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cnx.close()
+
+    def test_insert_binary(self):
+        table = """
+        CREATE TABLE {0} (
+            `id` int(10) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `section` VARCHAR(50) NOT NULL,
+            `pickled` LONGBLOB NOT NULL
+        )
+        """.format(self.tbl)
+        cursor = self.cnx.cursor()
+        cursor.execute(table)
+
+        pickled = pickle.dumps({'a': 'b'}, pickle.HIGHEST_PROTOCOL)
+        add_row_q = "INSERT INTO {0} (section, pickled) " \
+                    "VALUES (%(section)s, %(pickled)s)".format(self.tbl)
+
+        new_row = cursor.execute(add_row_q, {'section': 'foo',
+                                             'pickled': pickled})
+        self.cnx.commit()
+        self.assertEqual(1, cursor.lastrowid)
+        cursor.close()

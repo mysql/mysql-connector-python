@@ -103,15 +103,20 @@ def _bytestr_format_dict(bytestr, value_dict):
         if groups["conversion_type"] == b"%":
             value = b"%"
         if groups["conversion_type"] == b"s":
-            key = groups["mapping_key"].encode("utf-8") \
-                  if PY2 else groups["mapping_key"]
+            key = groups["mapping_key"]
             value = value_dict[key]
         if value is None:
             raise ValueError("Unsupported conversion_type: {0}"
                              "".format(groups["conversion_type"]))
-        return value.decode("utf-8") if PY2 else value
-    return RE_PY_MAPPING_PARAM.sub(replace, bytestr.decode("utf-8")
-                                   if PY2 else bytestr)
+        return bytes(value) if PY2 else value
+
+    stmt = RE_PY_MAPPING_PARAM.sub(replace, bytestr)
+    if PY2:
+        try:
+            return stmt.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+    return stmt
 
 
 class CursorBase(MySQLCursorAbstract):
