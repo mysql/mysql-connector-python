@@ -4234,3 +4234,74 @@ class BugOra21530841(tests.MySQLConnectorTests):
         cur.execute(query)
         cur.fetchone()
         cur.close()
+
+
+class BugOra25397650(tests.MySQLConnectorTests):
+    """BUG#25397650: CERTIFICATE VALIDITY NOT VERIFIED 
+    """
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config = tests.get_mysql_config()
+        self.config.update({
+            'ssl_ca': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem')),
+            'ssl_cert': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_cert.pem')),
+            'ssl_key': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_key.pem')),
+        })
+        self.mysql_server = tests.MYSQL_SERVERS[0]
+        self._use_expired_cert()
+
+    def tearDown(self):
+        self._use_original_cert()
+        self._ensure_up()
+
+    def _ensure_up(self):
+        # Start the MySQL server again
+        if not self.mysql_server.check_running():
+            self.mysql_server.start()
+
+            if not self.mysql_server.wait_up():
+                self.fail("Failed restarting MySQL server after test")
+
+    def _use_original_cert(self):
+        self.mysql_server.stop()
+        self.mysql_server.wait_down()
+
+        self.mysql_server.start()
+        self.mysql_server.wait_up()
+        time.sleep(2)
+
+    def _use_expired_cert(self):
+        self.mysql_server.stop()
+        self.mysql_server.wait_down()
+
+        cert = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_expired_server_cert.pem'))
+        key = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_expired_server_key.pem'))
+        if os.name == 'nt':
+            cert = os.path.normpath(cert)
+            cert = cert.replace('\\', '\\\\')
+            key = os.path.normpath(key)
+            key = key.replace('\\', '\\\\')
+        self.mysql_server.start(ssl_cert=cert, ssl_key=key)
+        self.mysql_server.wait_up()
+        time.sleep(2)
+
+    def test_pure_verify_server_certifcate(self):
+        self.config["use_pure"] = True
+        self.config['ssl_verify_cert'] = True
+        self.assertRaises(errors.InterfaceError,
+            mysql.connector.connect, **self.config)
+        self.config['ssl_verify_cert'] = False
+        mysql.connector.connect(**self.config)
+
+    def test_cext_verify_server_certifcate(self):
+        self.config["use_pure"] = False
+        self.config['ssl_verify_cert'] = True
+        self.assertRaises(errors.InterfaceError,
+            mysql.connector.connect, **self.config)
+        self.config['ssl_verify_cert'] = False
+        mysql.connector.connect(**self.config)

@@ -1,6 +1,6 @@
 #!/bin/sh
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -47,16 +47,58 @@ if [ ! -d $DESTDIR ]; then
     exit 2
 fi
 
+mkdir -p $DESTDIR/ca.db.certs   # Signed certificates storage
+touch $DESTDIR/ca.db.index      # Index of signed certificates
+echo 01 > $DESTDIR/ca.db.serial # Next (sequential) serial number
+
+# Configuration
+cat>$DESTDIR/ca.conf<<'EOF'
+[ ca ]
+default_ca = ca_default
+
+[ ca_default ]
+dir = REPLACE_LATER
+certs = $dir
+new_certs_dir = $dir/ca.db.certs
+database = $dir/ca.db.index
+serial = $dir/ca.db.serial
+RANDFILE = $dir/ca.db.rand
+certificate = $dir/ca.crt
+private_key = $dir/ca.key
+default_days = 365
+default_crl_days = 30
+default_md = md5
+preserve = no
+policy = generic_policy
+[ generic_policy ]
+countryName = optional
+stateOrProvinceName = optional
+localityName = optional
+organizationName = optional
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+EOF
+
+sed -i "s|REPLACE_LATER|$DESTDIR|" $DESTDIR/ca.conf
+
 echo
 echo "Generating Root Certificate"
 echo
-$OPENSSL genrsa 2048 > $DESTDIR/tests_CA_key.pem
+$OPENSSL genrsa -out $DESTDIR/tests_CA_key.pem 2048
 if [ $? -ne 0 ]; then
     exit 3
 fi
 SUBJ="/OU=$OU Root CA/CN=MyConnPy Root CA"
-$OPENSSL req -batch -new -x509 -nodes -days $DAYS -subj "$SUBJ" \
-    -key $DESTDIR/tests_CA_key.pem -out $DESTDIR/tests_CA_cert.pem
+$OPENSSL req -new -key $DESTDIR/tests_CA_key.pem \
+    -out $DESTDIR/tests_CA_req.csr -subj "$SUBJ"
+if [ $? -ne 0 ]; then
+    exit 3
+fi
+$OPENSSL x509 -req -days $DAYS \
+    -in $DESTDIR/tests_CA_req.csr \
+    -out $DESTDIR/tests_CA_cert.pem \
+    -signkey $DESTDIR/tests_CA_key.pem
 if [ $? -ne 0 ]; then
     exit 3
 fi
@@ -66,41 +108,64 @@ echo
 echo "Generating Server Certificate"
 echo
 SUBJ="/OU=$OU Server Cert/CN=localhost"
-$OPENSSL req -batch -newkey rsa:2048 -days $DAYS -nodes -subj "$SUBJ" \
-    -keyout $DESTDIR/tests_server_key.pem -out $DESTDIR/tests_server_req.pem
+$OPENSSL genrsa -out $DESTDIR/tests_server_key.pem 2048
 if [ $? -ne 0 ]; then
     exit 3
 fi
-$OPENSSL rsa -in $DESTDIR/tests_server_key.pem \
-    -out $DESTDIR/tests_server_key.pem
+$OPENSSL req -new -key $DESTDIR/tests_server_key.pem \
+    -out $DESTDIR/tests_server_req.csr -subj "$SUBJ"
 if [ $? -ne 0 ]; then
     exit 3
 fi
-$OPENSSL x509 -req -in $DESTDIR/tests_server_req.pem -days $DAYS \
-    -CA $DESTDIR/tests_CA_cert.pem -CAkey $DESTDIR/tests_CA_key.pem \
-    -set_serial 01 -out $DESTDIR/tests_server_cert.pem
+$OPENSSL ca -config $DESTDIR/ca.conf -in $DESTDIR/tests_server_req.csr \
+    -cert $DESTDIR/tests_CA_cert.pem \
+    -keyfile $DESTDIR/tests_CA_key.pem \
+    -out $DESTDIR/tests_server_cert.pem -batch
 if [ $? -ne 0 ]; then
     exit 3
 fi
 
-# MySQL Client Certificate: generate, remove passphase, sign
+# MySQL Expired Server Certificate: generate, remove passphrase, sign
+echo
+echo "Generating Expired Server Certificate"
+echo
+SUBJ="/OU=$OU Expired Server Cert/CN=localhost"
+$OPENSSL genrsa -out $DESTDIR/tests_expired_server_key.pem 2048
+if [ $? -ne 0 ]; then
+    exit 3
+fi
+$OPENSSL req -new -key $DESTDIR/tests_expired_server_key.pem \
+    -out $DESTDIR/tests_expired_server_req.csr -subj "$SUBJ"
+if [ $? -ne 0 ]; then
+    exit 3
+fi
+$OPENSSL ca -config $DESTDIR/ca.conf -in $DESTDIR/tests_expired_server_req.csr \
+    -cert $DESTDIR/tests_CA_cert.pem \
+    -keyfile $DESTDIR/tests_CA_key.pem \
+    -out $DESTDIR/tests_expired_server_cert.pem -batch \
+    -startdate 120815080000Z -enddate 120815090000Z
+if [ $? -ne 0 ]; then
+    exit 3
+fi
+
+# MySQL Client Certificate: generate, remove passphrase, sign
 echo
 echo "Generating Client Certificate"
 echo
 SUBJ="/OU=$OU Client Cert/CN=localhost"
-$OPENSSL req -batch -newkey rsa:2048 -days $DAYS -nodes -subj "$SUBJ" \
-    -keyout $DESTDIR/tests_client_key.pem -out $DESTDIR/tests_client_req.pem
+$OPENSSL genrsa -out $DESTDIR/tests_client_key.pem 2048
 if [ $? -ne 0 ]; then
     exit 3
 fi
-$OPENSSL rsa -in $DESTDIR/tests_client_key.pem \
-    -out $DESTDIR/tests_client_key.pem
+$OPENSSL req -new -key $DESTDIR/tests_client_key.pem \
+    -out $DESTDIR/tests_client_req.csr -subj "$SUBJ"
 if [ $? -ne 0 ]; then
     exit 3
 fi
-$OPENSSL x509 -req -in $DESTDIR/tests_client_req.pem -days $DAYS \
-    -CA $DESTDIR/tests_CA_cert.pem -CAkey $DESTDIR/tests_CA_key.pem \
-    -set_serial 01 -out $DESTDIR/tests_client_cert.pem
+$OPENSSL ca -config $DESTDIR/ca.conf -in $DESTDIR/tests_client_req.csr \
+    -cert $DESTDIR/tests_CA_cert.pem \
+    -keyfile $DESTDIR/tests_CA_key.pem \
+    -out $DESTDIR/tests_client_cert.pem -batch
 if [ $? -ne 0 ]; then
     exit 3
 fi
@@ -109,5 +174,7 @@ fi
 echo
 echo "Cleaning up"
 echo
-(cd $DESTDIR; rm tests_server_req.pem tests_client_req.pem)
+(cd $DESTDIR; rm -rf tests_server_req.pem tests_client_req.pem \
+    ca.db.certs ca.db.index* ca.db.serial* ca.conf tests_CA_req.csr \
+    tests_server_req.csr tests_expired_server_req.csr tests_client_req.csr)
 

@@ -1153,8 +1153,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                               MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
             }
 #endif
+          mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
+        } else {
+          mysql_ssl_set(&self->session, ssl_key, ssl_cert, NULL, NULL, NULL); 
         }
-        mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
     } else {
         // Make sure to not enforce SSL
 #if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
