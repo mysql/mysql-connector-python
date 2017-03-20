@@ -4340,3 +4340,32 @@ class BugOra25383644(tests.MySQLConnectorTests):
                 if not self.mysql_server.check_running():
                     self.mysql_server.start()
                     self.mysql_server.wait_up()
+
+
+class BugOra25558885(tests.MySQLConnectorTests):
+    """BUG#25558885: ERROR 2013 (LOST CONNECTION TO MYSQL SERVER) USING C
+    EXTENSIONS
+    """
+    def setUp(self):
+        pass
+
+    def _long_query(self, config, cursor_class):
+        db_conn = mysql.connector.connect(**config)
+        cur = db_conn.cursor(cursor_class=cursor_class)
+        cur.execute("select sleep(15)")
+        cur.close()
+        db_conn.disconnect()
+
+    def test_cext_cnx(self):
+        config = tests.get_mysql_config()
+        config["use_pure"] = False
+        del config["connection_timeout"]
+        cursor_class = mysql.connector.cursor_cext.CMySQLCursorBufferedRaw
+        self._long_query(config, cursor_class)
+
+    def test_pure_cnx(self):
+        config = tests.get_mysql_config()
+        config["use_pure"] = True
+        del config["connection_timeout"]
+        cursor_class = mysql.connector.cursor.MySQLCursorBufferedRaw
+        self._long_query(config, cursor_class)
