@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -144,17 +144,17 @@ ssl
 # Platform specifics
 if os.name == 'nt':
     MY_CNF += '\n'.join((
-        "ssl-ca = {ssl_dir}\\\\tests_CA_cert.pem",
-        "ssl-cert = {ssl_dir}\\\\tests_server_cert.pem",
-        "ssl-key = {ssl_dir}\\\\tests_server_key.pem",
+        "ssl-ca = {ssl_ca}",
+        "ssl-cert = {ssl_cert}",
+        "ssl-key = {ssl_key}",
     ))
     MYSQL_DEFAULT_BASE = os.path.join(
         "C:/", "Program Files", "MySQL", "MySQL Server 5.6")
 else:
     MY_CNF += '\n'.join((
-        "ssl-ca = {ssl_dir}/tests_CA_cert.pem",
-        "ssl-cert = {ssl_dir}/tests_server_cert.pem",
-        "ssl-key = {ssl_dir}/tests_server_key.pem",
+        "ssl-ca = {ssl_ca}",
+        "ssl-cert = {ssl_cert}",
+        "ssl-key = {ssl_key}",
         "innodb_flush_method = O_DIRECT",
     ))
     MYSQL_DEFAULT_BASE = os.path.join('/', 'usr', 'local', 'mysql')
@@ -603,6 +603,9 @@ def init_mysql_server(port, options):
             port=port,
             unix_socket_folder=options.unix_socket_folder,
             ssl_folder=os.path.abspath(tests.SSL_DIR),
+            ssl_ca="tests_CA_cert.pem",
+            ssl_cert="tests_server_cert.pem",
+            ssl_key="tests_server_key.pem",
             name=name,
             sharedir=options.mysql_sharedir)
     except tests.mysqld.MySQLBootstrapError as err:

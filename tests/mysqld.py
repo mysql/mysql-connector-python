@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -343,9 +343,10 @@ class MySQLServerBase(object):
 class MySQLServer(MySQLServerBase):
     """Class for managing a MySQL server"""
 
-    def __init__(self, basedir, topdir, cnf, bind_address, port,
-                 name, datadir=None, tmpdir=None,
-                 unix_socket_folder=None, ssl_folder=None, sharedir=None):
+    def __init__(self, basedir, topdir, cnf, bind_address, port, name,
+                 datadir=None, tmpdir=None, unix_socket_folder=None,
+                 ssl_folder=None, ssl_ca=None, ssl_cert=None, ssl_key=None,
+                 sharedir=None):
         self._cnf = cnf
         self._option_file = os.path.join(topdir, 'my.cnf')
         self._bind_address = bind_address
@@ -353,6 +354,9 @@ class MySQLServer(MySQLServerBase):
         self._topdir = topdir
         self._basedir = basedir
         self._ssldir = ssl_folder or topdir
+        self._ssl_ca = os.path.join(self._ssldir, ssl_ca)
+        self._ssl_cert = os.path.join(self._ssldir, ssl_cert)
+        self._ssl_key = os.path.join(self._ssldir, ssl_key)
         self._datadir = datadir or os.path.join(topdir, 'data')
         self._tmpdir = tmpdir or os.path.join(topdir, 'tmp')
         self._name = name
@@ -540,13 +544,7 @@ class MySQLServer(MySQLServerBase):
         """Return the unix socket of the server"""
         return self._unix_socket
 
-    def start(self):
-        """Start a MySQL server"""
-        if self.check_running():
-            LOGGER.error("MySQL server '{name}' already running".format(
-                name=self.name))
-            return
-
+    def update_config(self, **kwargs):
         options = {
             'name': self._name,
             'basedir': _convert_forward_slash(self._basedir),
@@ -555,16 +553,31 @@ class MySQLServer(MySQLServerBase):
             'bind_address': self._bind_address,
             'port': self._port,
             'unix_socket': _convert_forward_slash(self._unix_socket),
-            'ssl_dir': _convert_forward_slash(self._ssldir),
+            'ssl_ca': _convert_forward_slash(self._ssl_ca),
+            'ssl_cert': _convert_forward_slash(self._ssl_cert),
+            'ssl_key': _convert_forward_slash(self._ssl_key),
             'pid_file': _convert_forward_slash(self._pid_file),
             'serverid': self._serverid,
             'lc_messages_dir': _convert_forward_slash(
                 self._lc_messages_dir),
         }
+        options.update(**kwargs)
         try:
             fp = open(self._option_file, 'w')
             fp.write(self._cnf.format(**options))
             fp.close()
+        except Exception as ex:
+            LOGGER.error("Failed to write config file {0}".format(ex))
+            sys.exit(1)
+
+    def start(self, **kwargs):
+        if self.check_running():
+            LOGGER.error("MySQL server '{name}' already running".format(
+                name=self.name))
+            return
+
+        self.update_config(**kwargs)
+        try:
             self._start_server()
             for i in range(10):
                 if self.check_running():
