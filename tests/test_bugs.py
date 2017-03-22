@@ -53,6 +53,7 @@ from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
 from mysql.connector.optionfiles import read_option_files
 import mysql.connector
+import cpy_distutils
 
 try:
     from mysql.connector.connection_cext import CMySQLConnection
@@ -4404,3 +4405,31 @@ class BugOra25558885(tests.MySQLConnectorTests):
         del config["connection_timeout"]
         cursor_class = mysql.connector.cursor.MySQLCursorBufferedRaw
         self._long_query(config, cursor_class)
+
+
+class BugOra20736339(tests.MySQLConnectorTests):
+    """BUG#20736339: C EXTENSION FAILS TO COMPILE IF MYSQL_CONFIG RETURN MORE
+    THAN ONE INCLUDE DIR
+    """
+    def test_parse_mysql_config(self):
+        options = ['cflags', 'include', 'libs', 'libs_r', 'plugindir', 'version']
+        includes = ["/mysql/include", "/mysql/another_include"]
+        config = """
+        -I/mysql/include -fabi-version=2 -fno-omit-frame-pointer
+        -I{0}
+        -L/mysql/lib -lmysqlclient -lpthread -lm -lrt -lssl -lcrypto -ldl
+        -L/mysql/lib -lmysqlclient -lpthread -lm -lrt -lssl -lcrypto -ldl
+        /mysql/lib/plugin
+        5.7.17
+        """
+
+        info = cpy_distutils.parse_mysql_config_info(options,
+            config.strip().format(includes[0]))
+        self.assertEqual(1, len(info["include"]))
+        self.assertEqual(includes[0], info["include"][0])
+
+        info = cpy_distutils.parse_mysql_config_info(options,
+            config.strip().format(" -I".join(includes)))
+        self.assertEqual(2, len(info["include"]))
+        self.assertEqual(includes[0], info["include"][0])
+        self.assertEqual(includes[1], info["include"][1])
