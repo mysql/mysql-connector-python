@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -136,21 +136,7 @@ def unix_lib_is64bit(lib_file):
     return False
 
 
-def get_mysql_config_info(mysql_config):
-    """Get MySQL information using mysql_config tool
-
-    Returns a dict.
-    """
-    options = ['cflags', 'include', 'libs', 'libs_r', 'plugindir', 'version']
-
-    cmd = [mysql_config] + [ "--{0}".format(opt) for opt in options ]
-
-    try:
-        proc = Popen(cmd, stdout=PIPE, universal_newlines=True)
-        stdout, _ = proc.communicate()
-    except OSError as exc:
-        raise DistutilsExecError("Failed executing mysql_config: {0}".format(
-            str(exc)))
+def parse_mysql_config_info(options, stdout):
     log.debug("# stdout: {0}".format(stdout))
     info = {}
     for option, line in zip(options, stdout.split('\n')):
@@ -173,7 +159,28 @@ def get_mysql_config_info(mysql_config):
     info['lib_r_dir'] = libs[0].replace('-L', '')
     info['libs_r'] = [ lib.replace('-l', '') for lib in libs[1:] ]
 
-    info['include'] = info['include'].replace('-I', '')
+    info['include'] = [x.strip() for x in info['include'].split('-I')[1:]]
+
+    return info
+
+
+def get_mysql_config_info(mysql_config):
+    """Get MySQL information using mysql_config tool
+
+    Returns a dict.
+    """
+    options = ['cflags', 'include', 'libs', 'libs_r', 'plugindir', 'version']
+
+    cmd = [mysql_config] + [ "--{0}".format(opt) for opt in options ]
+
+    try:
+        proc = Popen(cmd, stdout=PIPE, universal_newlines=True)
+        stdout, _ = proc.communicate()
+    except OSError as exc:
+        raise DistutilsExecError("Failed executing mysql_config: {0}".format(
+            str(exc)))
+
+    info = parse_mysql_config_info(options, stdout)
 
     # Try to figure out the architecture
     info['arch'] = None
@@ -316,7 +323,7 @@ class BuildExtDynamic(build_ext):
                 else:
                     raise OSError("Unsupported platform: %s" % os.name)
 
-                include_dir = os.path.join(connc_loc, 'include')
+                include_dirs = [os.path.join(connc_loc, 'include')]
                 if os.name == 'nt':
                     libraries = ['libmysql']
                 else:
@@ -341,19 +348,20 @@ class BuildExtDynamic(build_ext):
                 log.error(err_version)
                 sys.exit(1)
 
-            include_dir = myc_info['include']
+            include_dirs = myc_info['include']
             libraries = myc_info['libs']
             library_dirs = myc_info['lib_dir']
             self._mysql_config_info = myc_info
             self.arch = self._mysql_config_info['arch']
             connc_64bit = self.arch == 'x86_64'
 
-        if not os.path.exists(include_dir):
-            log.error(err_invalid_loc, connc_loc)
-            sys.exit(1)
+        for include_dir in include_dirs:
+            if not os.path.exists(include_dir):
+                log.error(err_invalid_loc, connc_loc)
+                sys.exit(1)
 
         # Set up the build_ext class
-        self.include_dirs.append(include_dir)
+        self.include_dirs.extend(include_dirs)
         self.libraries.extend(libraries)
         self.library_dirs.append(library_dirs)
 
