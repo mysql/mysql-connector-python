@@ -26,6 +26,7 @@
 
 from collections import namedtuple
 import re
+import warnings
 import weakref
 
 from . import errors
@@ -380,7 +381,12 @@ class MySQLCursor(CursorBase):
         if self._connection is None:
             return False
 
-        self._connection.handle_unread_result()
+        try:
+            self._connection.handle_unread_result()
+        except errors.InternalError as ex:
+            # Don't hide other exceptions which might have occured on closing
+            if ex.msg != "Unread result found":
+                raise
         self._reset_result()
         self._connection = None
 
@@ -438,9 +444,6 @@ class MySQLCursor(CursorBase):
                 "Failed handling non-resultset; {0}".format(err))
 
         self._handle_warnings()
-        if self._connection.raise_on_warnings is True and self._warnings:
-            raise errors.get_mysql_exception(
-                self._warnings[0][1], self._warnings[0][2])
 
     def _handle_resultset(self):
         """Handles result set
@@ -814,9 +817,22 @@ class MySQLCursor(CursorBase):
         return None
 
     def _handle_warnings(self):
-        """Handle possible warnings after all results are consumed"""
+        """Handle possible warnings after all results are consumed
+
+        Also raises exceptions if raise_on_warnings is set
+        """
         if self._connection.get_warnings is True and self._warning_count:
             self._warnings = self._fetch_warnings()
+            # should not happen given self._warning_count is set?
+            if not self._warnings:
+                return
+
+            warning = errors.get_mysql_exception(
+                self._warnings[0][1], self._warnings[0][2], warning=True)
+            if self._connection.raise_on_warnings:
+                raise warning
+            else:
+                warnings.warn(warning, stacklevel=4)
 
     def _handle_eof(self, eof):
         """Handle EOF packet"""
@@ -824,9 +840,6 @@ class MySQLCursor(CursorBase):
         self._nextrow = (None, None)
         self._warning_count = eof['warning_count']
         self._handle_warnings()
-        if self._connection.raise_on_warnings is True and self._warnings:
-            raise errors.get_mysql_exception(
-                self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self):
         """Returns the next row in the result set

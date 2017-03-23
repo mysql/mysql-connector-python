@@ -98,7 +98,7 @@ def custom_error_exception(error=None, exception=None):
 
     return _CUSTOM_ERROR_EXCEPTIONS
 
-def get_mysql_exception(errno, msg=None, sqlstate=None):
+def get_mysql_exception(errno, msg=None, sqlstate=None, warning=False):
     """Get the exception matching the MySQL error
 
     This function will return an exception based on the SQLState. The given
@@ -124,7 +124,11 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
         pass
 
     if not sqlstate:
-        return DatabaseError(msg=msg, errno=errno)
+        if warning:
+            # match order of Warning arguments with Error
+            return Warning(errno, msg)
+        else:
+            return DatabaseError(msg=msg, errno=errno)
 
     try:
         return _SQLSTATE_CLASS_EXCEPTION[sqlstate[0:2]](
@@ -206,7 +210,7 @@ class Error(Exception):
         return self._full_msg
 
 
-class Warning(Exception):  # pylint: disable=W0622
+class Warning(Warning, Exception):  # pylint: disable=W0622
     """Exception for important warnings"""
     pass
 
