@@ -24,9 +24,10 @@
 """Implements the DistUtils command 'build_ext'
 """
 
-from distutils.command.build_ext import build_ext
-from distutils.command.install import install
-from distutils.command.install_lib import install_lib
+from setuptools.command.build_ext import build_ext
+from setuptools.command.install import install
+from setuptools.command.install_lib import install_lib
+
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.dir_util import copy_tree
