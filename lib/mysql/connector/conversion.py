@@ -169,6 +169,8 @@ class MySQLConverter(MySQLConverterBase):
                 return str(buf).encode('ascii')
         elif isinstance(buf, type(None)):
             return bytearray(b"NULL")
+        elif not PY2 and isinstance(buf, (bytes, bytearray)):
+            return bytearray(b"_binary'" + buf + b"'")
         else:
             return bytearray(b"'" + buf + b"'")
 

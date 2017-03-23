@@ -1832,7 +1832,7 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         }
         else if (PyBytes_Check(new_value))
         {
-            quoted= PyBytes_FromFormat("'%s'", PyBytes_AsString(new_value));
+            quoted= PyBytes_FromFormat("_binary'%s'", PyBytes_AsString(new_value));
             PyTuple_SET_ITEM(prepared, i, quoted);
 #endif
         }
