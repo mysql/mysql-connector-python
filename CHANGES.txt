@@ -3,10 +3,22 @@ MySQL Connector/Python 2.1 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
+
+v2.1.6
+======
+
+- BUG#25726671: Fix compatibility issues with the latest Django versions
+- BUG#25558885: Set default connection timeout to pure connector/python
+- BUG#25397650: Verify server certificate only if ssl_verify_cert is True
+- BUG#25589496: Don't convert to unicode if non-ascii data is present
+- BUG#25383644: Add connection back to pool on exception
+- BUG#22476689: Importing world.sql fails with cext enabled
+- BUG#20736339: Expect multiple include directories from mysql_config
+- BUG#19685386: C extension tests are failing using MySQL 5.7.4
 
 v2.1.5
 ======
