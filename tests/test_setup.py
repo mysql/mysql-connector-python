@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -132,7 +132,8 @@ class SetupInfoTests(tests.MySQLConnectorTests):
         for clsfr in setupinfo.classifiers:
             if 'Programming Language :: Python' in clsfr:
                 ver = clsfr.replace('Programming Language :: Python :: ', '')
-                if ver not in ('2.6', '2.7', '3', '3.1', '3.2', '3.3'):
+                if ver not in ('2.6', '2.7', '3', '3.1', '3.2', '3.3', '3.4',
+                               '3.5'):
                     self.fail('Unsupported version in classifiers')
             if 'Development Status ::' in clsfr:
                 status = clsfr.replace('Development Status :: ', '')
