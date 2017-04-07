@@ -152,7 +152,7 @@ def build_uri(**kwargs):
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
-class MySQLxXSessionTests(tests.MySQLxTests):
+class MySQLxSessionTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
@@ -169,14 +169,14 @@ class MySQLxXSessionTests(tests.MySQLxTests):
             "username": "root",
             "password": ""
         }
-        self.assertRaises(TypeError, mysqlx.XSession, bad_config)
+        self.assertRaises(TypeError, mysqlx.Session, bad_config)
 
         host = self.connect_kwargs["host"]
         port = self.connect_kwargs["port"]
         user = self.connect_kwargs["user"]
         password = self.connect_kwargs["password"]
 
-        # XSession to a farm using one of many routers (prios)
+        # Session to a farm using one of many routers (prios)
         # Loop during connect because of network error (succeed)
         routers = [{"host": "bad_host","priority": 100},
                    {"host": host, "port": port, "priority": 98}]
@@ -184,7 +184,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         session = mysqlx.get_session(uri)
         session.close()
 
-        # XSession to a farm using one of many routers (incomplete prios)
+        # Session to a farm using one of many routers (incomplete prios)
         routers = [{"host": "bad_host", "priority": 100},
                    {"host": host, "port": port}]
         uri = build_uri(user=user, password=password, routers=routers)
@@ -195,7 +195,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         except mysqlx.errors.ProgrammingError as err:
             self.assertEqual(4000, err.errno)
 
-        # XSession to a farm using invalid priorities (out of range)
+        # Session to a farm using invalid priorities (out of range)
         routers = [{"host": "bad_host", "priority": 100},
                    {"host": host, "port": port, "priority": 101}]
         uri = build_uri(user=user, password=password, routers=routers)
@@ -206,7 +206,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         except mysqlx.errors.ProgrammingError as err:
             self.assertEqual(4007, err.errno)
 
-        # Establish an XSession to a farm using one of many routers (no prios)
+        # Establish an Session to a farm using one of many routers (no prios)
         routers = [{"host": "bad_host"}, {"host": host, "port": port}]
         uri = build_uri(user=user, password=password, routers=routers)
         session = mysqlx.get_session(uri)
@@ -278,7 +278,15 @@ class MySQLxXSessionTests(tests.MySQLxTests):
                          port=self.connect_kwargs["port"],
                          schema=self.connect_kwargs["schema"])
         session = mysqlx.get_session(uri)
-        self.assertIsInstance(session, mysqlx.XSession)
+        self.assertIsInstance(session, mysqlx.Session)
+
+        # Test URI parser function
+        for uri, res in _URI_TEST_RESULTS:
+            try:
+                settings = mysqlx._get_connection_settings(uri)
+                self.assertEqual(res, settings)
+            except mysqlx.Error:
+                self.assertEqual(res, None)
 
         # Test URI parser function
         for uri, res in _ROUTER_LIST_RESULTS:
@@ -306,7 +314,7 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         session.close()
 
     def test_drop_schema(self):
-        test_schema = 'mysql_xsession_test_drop_schema'
+        test_schema = 'mysql_session_test_drop_schema'
         schema = self.session.create_schema(test_schema)
 
         self.session.drop_schema(test_schema)
@@ -316,6 +324,52 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         schema = self.session.create_schema(self.schema_name)
         self.assertTrue(schema.exists_in_database())
 
+    def test_sql(self):
+        statement = self.session.sql("SELECT VERSION()")
+        self.assertTrue(isinstance(statement, mysqlx.statement.Statement))
+
+    def test_rollback(self):
+        table_name = "t2"
+        schema = self.session.get_schema(self.schema_name)
+
+        if not schema.exists_in_database():
+            self.session.create_schema(self.schema_name)
+
+        stmt = "CREATE TABLE {0}.{1}(_id INT)"
+        self.session.sql(stmt.format(self.schema_name, table_name)).execute()
+        table = schema.get_table(table_name)
+
+        self.session.start_transaction()
+
+        table.insert("_id").values(1).execute()
+        self.assertEqual(table.count(), 1)
+
+        self.session.rollback()
+        self.assertEqual(table.count(), 0)
+
+        schema.drop_table(table_name)
+
+    def test_commit(self):
+        table_name = "t2"
+        schema = self.session.get_schema(self.schema_name)
+
+        if not schema.exists_in_database():
+            self.session.create_schema(self.schema_name)
+
+        stmt = "CREATE TABLE {0}.{1}(_id INT)"
+        self.session.sql(stmt.format(self.schema_name, table_name)).execute()
+        table = schema.get_table(table_name)
+
+        self.session.start_transaction()
+
+        table.insert("_id").values(1).execute()
+        self.assertEqual(table.count(), 1)
+
+        self.session.commit()
+        self.assertEqual(table.count(), 1)
+
+        schema.drop_table(table_name)
+
     def test_close(self):
         session = mysqlx.get_session(self.connect_kwargs)
         schema = session.get_schema(self.schema_name)
@@ -323,68 +377,9 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         session.close()
         self.assertRaises(mysqlx.OperationalError, schema.exists_in_database)
 
-    def test_bind_to_default_shard(self):
-        try:
-            # Getting a NodeSession to the default shard
-            sess = mysqlx.get_session(self.connect_kwargs)
-            nsess = sess.bind_to_default_shard()
-            self.assertEqual(sess._settings, nsess._settings)
-
-            # Close XSession and all dependent NodeSessions
-            sess.close()
-            self.assertFalse(nsess.is_open())
-
-            # Connection error on XSession
-            sess = mysqlx.get_session(self.connect_kwargs)
-            nsess_a = sess.bind_to_default_shard()
-            nsess_b = sess.bind_to_default_shard()
-            tests.MYSQL_SERVERS[0].stop()
-            tests.MYSQL_SERVERS[0].wait_down()
-
-            self.assertRaises(mysqlx.errors.InterfaceError,
-                              sess.get_default_schema().exists_in_database)
-            self.assertFalse(sess.is_open())
-            self.assertFalse(nsess_a.is_open())
-            self.assertFalse(nsess_b.is_open())
-
-            tests.MYSQL_SERVERS[0].start()
-            tests.MYSQL_SERVERS[0].wait_up()
-
-            # Connection error on dependent NodeSession
-            sess = mysqlx.get_session(self.connect_kwargs)
-            nsess_a = sess.bind_to_default_shard()
-            nsess_b = sess.bind_to_default_shard()
-            tests.MYSQL_SERVERS[0].stop()
-            tests.MYSQL_SERVERS[0].wait_down()
-
-            self.assertRaises(mysqlx.errors.InterfaceError,
-                              nsess_a.sql("SELECT 1").execute)
-            self.assertFalse(nsess_a.is_open())
-            self.assertTrue(nsess_b.is_open())
-            self.assertTrue(sess.is_open())
-
-            tests.MYSQL_SERVERS[0].start()
-            tests.MYSQL_SERVERS[0].wait_up()
-
-            # Getting a NodeSession a shard (connect error)
-            sess = mysqlx.get_session(self.connect_kwargs)
-            tests.MYSQL_SERVERS[0].stop()
-            tests.MYSQL_SERVERS[0].wait_down()
-
-            self.assertRaises(mysqlx.errors.InterfaceError,
-                              sess.bind_to_default_shard)
-
-            tests.MYSQL_SERVERS[0].start()
-            tests.MYSQL_SERVERS[0].wait_up()
-
-        finally:
-            if not tests.MYSQL_SERVERS[0].check_running():
-                tests.MYSQL_SERVERS[0].start()
-                tests.MYSQL_SERVERS[0].wait_up()
-
     @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
                      "not available for Python versions < 2.7.9.")
-    def test_ssl_connection(self):
+    def __test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
 
@@ -441,199 +436,11 @@ class MySQLxXSessionTests(tests.MySQLxTests):
         session = mysqlx.get_session(uri)
 
     def test_disabled_x_protocol(self):
-        node_session = mysqlx.get_node_session(self.connect_kwargs)
-        res = node_session.sql("SHOW VARIABLES WHERE Variable_name = 'port'") \
-                          .execute().fetch_all()
+        session = mysqlx.get_session(self.connect_kwargs)
+        res = session.sql("SHOW VARIABLES WHERE Variable_name = 'port'") \
+                     .execute().fetch_all()
         settings = self.connect_kwargs.copy()
         settings["port"] = res[0][1]  # Lets use the MySQL classic port
-        node_session.close()
+        session.close()
         self.assertRaises(mysqlx.errors.ProgrammingError, mysqlx.get_session,
                           settings)
-
-
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
-class MySQLxNodeSessionTests(tests.MySQLxTests):
-
-    def setUp(self):
-        self.connect_kwargs = tests.get_mysqlx_config()
-        self.schema_name = self.connect_kwargs["schema"]
-        try:
-            self.session = mysqlx.get_node_session(self.connect_kwargs)
-        except mysqlx.Error as err:
-            self.fail("{0}".format(err))
-
-    def test___init__(self):
-        bad_config = {
-            "host": "bad_host",
-            "port": "",
-            "username": "root",
-            "password": ""
-        }
-        self.assertRaises(TypeError, mysqlx.NodeSession, bad_config)
-
-    def test_connection_uri(self):
-        uri = build_uri(user=self.connect_kwargs["user"],
-                        password=self.connect_kwargs["password"],
-                        host=self.connect_kwargs["host"],
-                        port=self.connect_kwargs["port"],
-                        schema=self.connect_kwargs["schema"])
-        session = mysqlx.get_node_session(uri)
-        self.assertIsInstance(session, mysqlx.NodeSession)
-
-        # Test URI parser function
-        for uri, res in _URI_TEST_RESULTS:
-            try:
-                settings = mysqlx._get_connection_settings(uri)
-                self.assertEqual(res, settings)
-            except mysqlx.Error:
-                self.assertEqual(res, None)
-
-    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
-    def test_mysqlx_socket(self):
-        # Connect with unix socket
-        uri = "mysqlx://{user}:{password}@({socket})".format(
-            user=self.connect_kwargs["user"],
-            password=self.connect_kwargs["password"],
-            socket=self.connect_kwargs["socket"])
-
-        session = mysqlx.get_session(uri)
-
-    def test_get_schema(self):
-        schema = self.session.get_schema(self.schema_name)
-        self.assertTrue(schema, mysqlx.Schema)
-        self.assertEqual(schema.get_name(), self.schema_name)
-
-    def test_get_default_schema(self):
-        schema = self.session.get_default_schema()
-        self.assertTrue(schema, mysqlx.Schema)
-        self.assertEqual(schema.get_name(), self.connect_kwargs["schema"])
-
-        # Test without default schema configured at connect time
-        settings = self.connect_kwargs.copy()
-        settings["schema"] = None
-        session = mysqlx.get_node_session(settings)
-        self.assertRaises(mysqlx.ProgrammingError, session.get_default_schema)
-        session.close()
-
-    def test_drop_schema(self):
-        test_schema = 'mysql_nodesession_test_drop_schema'
-        schema = self.session.create_schema(test_schema)
-
-        self.session.drop_schema(test_schema)
-        self.assertFalse(schema.exists_in_database())
-
-    def test_create_schema(self):
-        schema = self.session.create_schema(self.schema_name)
-        self.assertTrue(schema.exists_in_database())
-
-    def test_sql(self):
-        statement = self.session.sql("SELECT VERSION()")
-        self.assertTrue(isinstance(statement, mysqlx.statement.Statement))
-
-    def test_rollback(self):
-        table_name = "t2"
-        schema = self.session.get_schema(self.schema_name)
-
-        if not schema.exists_in_database():
-            self.session.create_schema(self.schema_name)
-
-        stmt = "CREATE TABLE {0}.{1}(_id INT)"
-        self.session.sql(stmt.format(self.schema_name, table_name)).execute()
-        table = schema.get_table(table_name)
-
-        self.session.start_transaction()
-
-        table.insert("_id").values(1).execute()
-        self.assertEqual(table.count(), 1)
-
-        self.session.rollback()
-        self.assertEqual(table.count(), 0)
-
-        schema.drop_table(table_name)
-
-    def test_commit(self):
-        table_name = "t2"
-        schema = self.session.get_schema(self.schema_name)
-
-        if not schema.exists_in_database():
-            self.session.create_schema(self.schema_name)
-
-        stmt = "CREATE TABLE {0}.{1}(_id INT)"
-        self.session.sql(stmt.format(self.schema_name, table_name)).execute()
-        table = schema.get_table(table_name)
-
-        self.session.start_transaction()
-
-        table.insert("_id").values(1).execute()
-        self.assertEqual(table.count(), 1)
-
-        self.session.commit()
-        self.assertEqual(table.count(), 1)
-
-        schema.drop_table(table_name)
-
-    @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
-                     "not available for Python versions < 2.7.9.")
-    def test_ssl_connection(self):
-        config = {}
-        config.update(self.connect_kwargs)
-
-        # Secure by default
-        session = mysqlx.get_node_session(config)
-
-        res = mysqlx.statement.SqlStatement(session._connection,
-            "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
-        self.assertEqual("ON", res[0][1])
-
-        res = mysqlx.statement.SqlStatement(session._connection,
-            "SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
-        self.assertTrue("TLS" in res[0][1])
-
-        session.close()
-
-        config["ssl-key"] = tests.SSL_KEY
-        self.assertRaises(mysqlx.errors.InterfaceError,
-                          mysqlx.get_node_session, config)
-
-        # Connection with ssl parameters
-        config["ssl-ca"] = tests.SSL_CA
-        config["ssl-cert"] = tests.SSL_CERT
-
-        session = mysqlx.get_node_session(config)
-
-        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_active'") \
-                     .execute().fetch_all()
-        self.assertEqual("ON", res[0][1])
-
-        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'") \
-            .execute().fetch_all()
-        self.assertTrue("TLS" in res[0][1])
-
-        session.close()
-
-        ssl_ca="{0}{1}".format(config["ssl-ca"][0],
-                               quote_plus(config["ssl-ca"][1:]))
-        ssl_key="{0}{1}".format(config["ssl-key"][0],
-                                quote_plus(config["ssl-key"][1:]))
-        ssl_cert="{0}{1}".format(config["ssl-ca"][0],
-                                 quote_plus(config["ssl-cert"][1:]))
-        uri = build_uri(user=config["user"], password=config["password"],
-                        host=config["host"], ssl_ca=ssl_ca,
-                        ssl_cert=ssl_cert, ssl_key=ssl_key)
-        session = mysqlx.get_node_session(uri)
-
-        ssl_ca = "({0})".format(config["ssl-ca"])
-        ssl_cert = "({0})".format(config["ssl-cert"])
-        ssl_key = "({0})".format(config["ssl-key"])
-        uri = build_uri(user=config["user"], password=config["password"],
-                        host=config["host"], ssl_ca=ssl_ca,
-                        ssl_cert=ssl_cert, ssl_key=ssl_key)
-        session = mysqlx.get_node_session(uri)
-
-    def test_disabled_x_protocol(self):
-        res = self.session.sql("SHOW VARIABLES WHERE Variable_name = 'port'") \
-                          .execute().fetch_all()
-        settings = self.connect_kwargs.copy()
-        settings["port"] = res[0][1]  # Lets use the MySQL classic port
-        self.assertRaises(mysqlx.errors.ProgrammingError,
-                          mysqlx.get_node_session, settings)

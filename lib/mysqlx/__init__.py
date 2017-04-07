@@ -27,7 +27,7 @@ import re
 from . import constants
 
 from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
-from .connection import XSession, NodeSession
+from .connection import Session
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
@@ -154,7 +154,7 @@ def _get_connection_settings(*args, **kwargs):
                   connect to the database.
 
     Returns:
-        mysqlx.XSession: XSession object.
+        mysqlx.Session: Session object.
     """
     settings = {}
     if args:
@@ -177,7 +177,7 @@ def _get_connection_settings(*args, **kwargs):
     return settings
 
 def get_session(*args, **kwargs):
-    """Creates a XSession instance using the provided connection data.
+    """Creates a Session instance using the provided connection data.
 
     Args:
         *args: Variable length argument list with the connection data used
@@ -187,35 +187,15 @@ def get_session(*args, **kwargs):
                   connect to the database.
 
     Returns:
-        mysqlx.XSession: XSession object.
+        mysqlx.Session: Session object.
     """
     settings = _get_connection_settings(*args, **kwargs)
-    return XSession(settings)
-
-
-def get_node_session(*args, **kwargs):
-    """Creates a NodeSession instance using the provided connection data.
-
-    Args:
-        *args: Variable length argument list with the connection data used
-               to connect to the database. It can be a dictionary or a
-               connection string.
-        **kwargs: Arbitrary keyword arguments with connection data used to
-                  connect to the database.
-
-    Returns:
-        mysqlx.XSession: XSession object.
-    """
-    settings = _get_connection_settings(*args, **kwargs)
-    if "routers" in settings:
-        raise InterfaceError("NodeSession expects only one pair of host and port")
-
-    return NodeSession(settings)
+    return Session(settings)
 
 
 __all__ = [
     # mysqlx.connection
-    "XSession", "NodeSession", "get_session", "get_node_session",
+    "Session", "get_session",
 
     # mysqlx.constants
     "constants",
