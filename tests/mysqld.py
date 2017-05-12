@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -344,8 +344,9 @@ class MySQLServer(MySQLServerBase):
     """Class for managing a MySQL server"""
 
     def __init__(self, basedir, topdir, cnf, bind_address, port, mysqlx_port,
-                 name, datadir=None, tmpdir=None,
+                 name, datadir=None, tmpdir=None, extra_args={},
                  unix_socket_folder=None, ssl_folder=None, sharedir=None):
+        self._extra_args = extra_args
         self._cnf = cnf
         self._option_file = os.path.join(topdir, 'my.cnf')
         self._bind_address = bind_address
@@ -454,6 +455,11 @@ class MySQLServer(MySQLServerBase):
         ]
         insert = (
             "INSERT INTO mysql.user VALUES ('localhost','root'{0},"
+            "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+            "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+            "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
+            "@@default_authentication_plugin,'','N',"
+            "CURRENT_TIMESTAMP,NULL{1}), ('::1','root'{0},"
             "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
             "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
             "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
@@ -573,6 +579,13 @@ class MySQLServer(MySQLServerBase):
             'lc_messages_dir': _convert_forward_slash(
                 self._lc_messages_dir),
         }
+
+        for arg in self._extra_args:
+            if self._version < arg["version"]:
+                options.update(dict([(key, '') for key in
+                                     arg["options"].keys()]))
+            else:
+                options.update(arg["options"])
         try:
             fp = open(self._option_file, 'w')
             fp.write(self._cnf.format(**options))

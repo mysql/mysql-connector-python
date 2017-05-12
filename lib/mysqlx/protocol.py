@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -58,6 +58,9 @@ class MessageReaderWriter(object):
     def _read_message(self):
         hdr = self._stream.read(5)
         msg_len, msg_type = struct.unpack("<LB", hdr)
+        if msg_type == 10:
+            raise ProgrammingError("The connected server does not have the "
+                                   "MySQL X protocol plugin enabled")
         payload = self._stream.read(msg_len - 1)
         msg_type_name = SERVER_MESSAGES.get(msg_type)
         if not msg_type_name:

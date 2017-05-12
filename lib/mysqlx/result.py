@@ -147,11 +147,11 @@ def set_from_protobuf(payload):
 def decimal_from_protobuf(payload):
     digits = []
     sign = None
-    scale = ord(payload[0])
+    scale = payload[0] if isinstance(payload[0], int) else ord(payload[0])
     payload = payload[1:]
 
     for c in payload:
-        ch = ord(c)
+        ch = c if isinstance(c, int) else ord(c)
         high_bcd = (ch & 0xf0) >> 4
         low_bcd = ch & 0x0f
         if high_bcd < 0x0a:

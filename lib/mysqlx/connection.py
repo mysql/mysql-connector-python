@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -52,7 +52,10 @@ class SocketStream(object):
         self._is_ssl = False
 
     def connect(self, params):
-        s_type = socket.AF_INET if isinstance(params, tuple) else socket.AF_UNIX
+        if isinstance(params, tuple):
+            s_type = socket.AF_INET6 if ":" in params[0] else socket.AF_INET
+        else:
+            s_type = socket.AF_UNIX
         self._socket = socket.socket(s_type, socket.SOCK_STREAM)
         self._socket.connect(params)
 
@@ -129,33 +132,94 @@ def catch_network_exception(func):
 
 class Connection(object):
     def __init__(self, settings):
-        self._user = settings.get("user")
-        self._password = settings.get("password")
-        self._schema = settings.get("schema")
-        self._active_result = None
         self.settings = settings
         self.stream = SocketStream()
         self.reader_writer = None
         self.protocol = None
+        self._user = settings.get("user")
+        self._password = settings.get("password")
+        self._schema = settings.get("schema")
+        self._active_result = None
+        self._routers = settings.get("routers", [])
+
+        if 'host' in settings and settings['host']:
+            self._routers.append({
+                'host': settings.get('host'),
+                'port': settings.get('port', None)
+            })
+
+        self._cur_router = -1
+        self._can_failover = True
+        self._ensure_priorities()
+        self._routers.sort(key=lambda x: x['priority'], reverse=True)
 
     def fetch_active_result(self):
         if self._active_result is not None:
             self._active_result.fetch_all()
             self._active_result = None
 
+    def _ensure_priorities(self):
+        priority_count = 0
+        priority = 100
+
+        for router in self._routers:
+            pri = router.get('priority', None)
+            if pri is None:
+                priority_count += 1
+                router["priority"] = priority
+            elif pri > 100:
+                raise ProgrammingError("The priorities must be between 0 and "
+                    "100", 4007)
+            priority -= 1
+
+        if 0 < priority_count < len(self._routers):
+            raise ProgrammingError("You must either assign no priority to any "
+                "of the routers or give a priority for every router", 4000)
+
     def _connection_params(self):
-        if "host" in self.settings:
-            return self.settings["host"], self.settings.get("port", 33060)
-        if "socket" in self.settings:
-            return self.settings["socket"]
-        return ("localhost", 33060,)
+        if not self._routers:
+            self._can_failover = False
+            if "host" in self.settings:
+                return self.settings["host"], self.settings.get("port", 33060)
+            if "socket" in self.settings:
+                return self.settings["socket"]
+            return ("localhost", 33060,)
+
+        # Reset routers status once all are tried
+        if not self._can_failover or self._cur_router is -1:
+            self._cur_router = -1
+            self._can_failover = True
+            for router in self._routers:
+                router['available'] = True
+
+        self._cur_router += 1
+        host = self._routers[self._cur_router]["host"]
+        port = self._routers[self._cur_router]["port"]
+
+        if self._cur_router > 0:
+            self._routers[self._cur_router-1]["available"] = False
+        if self._cur_router >= len(self._routers) - 1:
+            self._can_failover = False
+
+        return (host, port,)
 
     def connect(self):
-        self.stream.connect(self._connection_params())
-        self.reader_writer = MessageReaderWriter(self.stream)
-        self.protocol = Protocol(self.reader_writer)
-        self._handle_capabilities()
-        self._authenticate()
+        # Loop and check
+        error = None
+        while self._can_failover:
+            try:
+                self.stream.connect(self._connection_params())
+                self.reader_writer = MessageReaderWriter(self.stream)
+                self.protocol = Protocol(self.reader_writer)
+                self._handle_capabilities()
+                self._authenticate()
+                return
+            except socket.error as err:
+                error = err
+
+        if len(self._routers) <= 1:
+            raise InterfaceError("Cannot connect to host: {0}".format(error))
+        raise InterfaceError("Failed to connect to any of the routers.", 4001)
 
     def _handle_capabilities(self):
         data = self.protocol.get_capabilites().capabilities
@@ -259,121 +323,32 @@ class Connection(object):
         self.stream.close()
 
 
-class XConnection(Connection):
-    def __init__(self, settings):
-        super(XConnection, self).__init__(settings)
-        self.dependent_connections = []
-        self._routers = settings.pop("routers", [])
+class Session(object):
+    """Enables interaction with a X Protocol enabled MySQL Product.
 
-        if 'host' in settings and settings['host']:
-            self._routers.append({
-                'host': settings.pop('host'),
-                'port': settings.pop('port', None)
-            })
+    The functionality includes:
 
-        self._cur_router = -1
-        self._can_failover = True
-        self._ensure_priorities()
-        self._routers.sort(key=lambda x: x['priority'], reverse=True)
-
-    def _ensure_priorities(self):
-        priority_count = 0
-        priority = 100
-
-        for router in self._routers:
-            pri = router.get('priority', None)
-            if pri is None:
-                priority_count += 1
-                router["priority"] = priority
-            elif pri > 100:
-                raise ProgrammingError("The priorities must be between 0 and "
-                    "100", 4007)
-            priority -= 1
-
-        if 0 < priority_count < len(self._routers):
-            raise ProgrammingError("You must either assign no priority to any "
-                "of the routers or give a priority for every router", 4000)
-
-    def _connection_params(self):
-        if not self._routers:
-            self._can_failover = False
-            return super(XConnection, self)._connection_params()
-
-        # Reset routers status once all are tried
-        if not self._can_failover or self._cur_router is -1:
-            self._cur_router = -1
-            self._can_failover = True
-            for router in self._routers:
-                router['available'] = True
-
-        self._cur_router += 1
-        host = self._routers[self._cur_router]["host"]
-        port = self._routers[self._cur_router]["port"]
-
-        if self._cur_router > 0:
-            self._routers[self._cur_router-1]["available"] = False
-        if self._cur_router >= len(self._routers) - 1:
-            self._can_failover = False
-
-        return (host, port,)
-
-    def connect(self):
-        # Loop and check
-        error = None
-        while self._can_failover:
-            try:
-                return super(XConnection, self).connect()
-            except socket.error as err:
-                error = err
-
-        if len(self._routers) <= 1:
-            raise InterfaceError("Cannot connect to host: {0}".format(error))
-        raise InterfaceError("Failed to connect to any of the routers.", 4001)
-
-    def bind_connection(self, connection):
-        self.dependent_connections.append(connection)
-
-    def close(self):
-        while self.dependent_connections:
-            self.dependent_connections.pop().close()
-        super(XConnection, self).close()
-
-    def disconnect(self):
-        while self.dependent_connections:
-            self.dependent_connections.pop().disconnect()
-        super(XConnection, self).disconnect()
-
-
-class NodeConnection(Connection):
-    def __init__(self, settings):
-        super(NodeConnection, self).__init__(settings)
-
-    def connect(self):
-        try:
-            super(NodeConnection, self).connect()
-        except socket.error as err:
-            raise InterfaceError("Cannot connect to host: {0}".format(err))
-
-
-class BaseSession(object):
-    """Base functionality for Session classes through the X Protocol.
-
-    This class encloses the core functionality to be made available on both
-    the XSession and NodeSession classes, such functionality includes:
-
-        - Accessing available schemas.
-        - Schema management operations.
-        - Enabling/disabling warning generation.
-        - Retrieval of connection information.
+    - Accessing available schemas.
+    - Schema management operations.
+    - Enabling/disabling warning generation.
+    - Retrieval of connection information.
 
     Args:
         settings (dict): Connection data used to connect to the database.
     """
     def __init__(self, settings):
         self._settings = settings
+        self._connection = Connection(self._settings)
+        self._connection.connect()
 
     def is_open(self):
         return self._connection.stream._socket is not None
+
+    def sql(self, sql):
+        """Creates a :class:`mysqlx.SqlStatement` object to allow running the
+        SQL statement on the target MySQL Server.
+        """
+        return SqlStatement(self._connection, sql)
 
     def get_schema(self, name):
         """Retrieves a Schema object from the current session by it's name.
@@ -440,56 +415,3 @@ class BaseSession(object):
 
     def close(self):
         self._connection.close()
-
-
-class XSession(BaseSession):
-    """Enables interaction with a X Protocol enabled MySQL Product.
-
-    The functionality includes:
-
-    - Accessing available schemas.
-    - Schema management operations.
-    - Enabling/disabling warning generation.
-    - Retrieval of connection information.
-
-    Args:
-        settings (dict): Connection data used to connect to the database.
-    """
-    def __init__(self, settings):
-        super(XSession, self).__init__(settings)
-        self._connection = XConnection(self._settings)
-        self._connection.connect()
-
-    def bind_to_default_shard(self):
-        if not self.is_open():
-            raise OperationalError("XSession is not connected to a farm.")
-
-        nsess = NodeSession(self._settings)
-        self._connection.bind_connection(nsess._connection)
-        return nsess
-
-
-class NodeSession(BaseSession):
-    """Enables interaction with a X Protocol enabled MySQL Server.
-
-    The functionality includes:
-
-    - Accessing available schemas.
-    - Schema management operations.
-    - Enabling/disabling warning generation.
-    - Retrieval of connection information.
-    - Includes SQL Execution.
-
-    Args:
-        settings (dict): Connection data used to connect to the database.
-    """
-    def __init__(self, settings):
-        super(NodeSession, self).__init__(settings)
-        self._connection = NodeConnection(self._settings)
-        self._connection.connect()
-
-    def sql(self, sql):
-        """Creates a :class:`mysqlx.SqlStatement` object to allow running the
-        SQL statement on the target MySQL Server.
-        """
-        return SqlStatement(self._connection, sql)

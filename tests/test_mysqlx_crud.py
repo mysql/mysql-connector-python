@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -49,14 +49,12 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
-            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
         self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
         self.session.close()
-        self.node_session.close()
 
     def test_get_session(self):
         session = self.schema.get_session()
@@ -92,9 +90,9 @@ class MySQLxSchemaTests(tests.MySQLxTests):
     def test_create_view(self):
         table_name = "table_test"
         view_name = "view_test"
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
-        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, table_name, "1")).execute()
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
@@ -116,7 +114,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
-        self.schema.drop_table(view_name)
+        self.schema.drop_view(view_name)
 
         # using a non-updatable view
         defined_as = ("SELECT COLUMN_TYPE, COLUMN_COMMENT FROM "
@@ -126,17 +124,39 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
+        self.schema.drop_view(view_name)
+
+        # create view from Table.select()
+        table = self.schema.get_table(table_name)
+        table.insert("id").values(2).values(3).execute()
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select).execute()
+        self.assertEqual(3, view.count())
+
+        self.schema.drop_view(view_name)
+
+        # ensure that the object passed to defined_as() does not affect the
+        # view if changed later
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select)
+        select = select.where("id > 1")
+        self.assertEqual(3, view.execute().count())
+
+        # defined_as() should only accepts SelectStatement and strings
+        view = self.schema.create_view(view_name)
+        self.assertRaises(mysqlx.ProgrammingError, view.defined_as, 123)
+
+        self.schema.drop_view(view_name)
         self.schema.drop_table(table_name)
-        self.schema.drop_table(view_name)
 
     def test_alter_view(self):
         table_name = "table_test"
         view_name = "view_test"
 
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
         for i in range(10):
-            self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
                 self.schema_name, table_name, "{0}".format(i + 1))
             ).execute()
 
@@ -162,8 +182,30 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           .defined_as(defined_as) \
                           .execute()
 
+        self.schema.drop_view(view_name)
+
+        # create view from Table.select()
+        table = self.schema.get_table(table_name)
+        table.insert("id").values(2).values(3).execute()
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select).execute()
+        self.assertEqual(12, view.count())
+
+        self.schema.drop_view(view_name)
+
+        # ensure that the object passed to defined_as() does not affect the
+        # view if changed later
+        select = table.select()
+        view = self.schema.create_view(view_name).defined_as(select)
+        select = select.where("id > 1")
+        self.assertEqual(12, view.execute().count())
+
+        # defined_as() should only accepts SelectStatement and strings
+        view = self.schema.create_view(view_name)
+        self.assertRaises(mysqlx.ProgrammingError, view.defined_as, 123)
+
+        self.schema.drop_view(view_name)
         self.schema.drop_table(table_name)
-        self.schema.drop_table(view_name)
 
     def test_get_collection(self):
         collection_name = "collection_test"
@@ -180,7 +222,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         view = self.schema.get_view(view_name)
         self.assertFalse(view.exists_in_database())
 
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
@@ -218,13 +260,13 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         tables = self.schema.get_tables()
         self.assertEqual(0, len(tables), "Should have returned 0 objects")
 
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, "table1")).execute()
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, "table2")).execute()
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, "table3")).execute()
-        self.node_session.sql(_CREATE_TEST_VIEW_QUERY.format(
+        self.session.sql(_CREATE_TEST_VIEW_QUERY.format(
             self.schema_name, "view1",
             self.schema_name, "table1")).execute()
         tables = self.schema.get_tables()
@@ -251,7 +293,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
     def test_drop_table(self):
         table_name = "table_test"
         try:
-            self.node_session.sql(
+            self.session.sql(
                 _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
             ).execute()
         except mysqlx.Error as err:
@@ -279,13 +321,13 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         self.assertTrue(language.exists_in_database())
         self.assertEqual(12,
-            self.node_session.sql(
+            self.session.sql(
                 'SELECT AUTO_INCREMENT '
                 'FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "{0}" AND '
                 'TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
             .execute().fetch_all()[0][0])
         self.assertEqual("Table Comment test",
-            self.node_session.sql(
+            self.session.sql(
                 'SELECT TABLE_COMMENT FROM INFORMATION_SCHEMA.TABLES '
                 'WHERE TABLE_SCHEMA = "{0}" '
                 'AND TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
@@ -337,18 +379,18 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             .execute()
 
         self.assertTrue(film.exists_in_database())
-        self.assertEqual(1, len(self.node_session.sql('SHOW INDEXES FROM '
+        self.assertEqual(1, len(self.session.sql('SHOW INDEXES FROM '
             '{0}.{1} WHERE COLUMN_NAME = "{2}" AND NOT NON_UNIQUE'.format(
             self.schema.name, table_b, 'rental_rate')).execute().fetch_all()))
 
-        res = self.node_session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
+        res = self.session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
                 'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "{0}" '
                 'AND COLUMN_NAME = "{1}"'.format(table_b, 'native_title')) \
             .execute().fetch_all()
         self.assertEqual("utf8mb4", res[0]['CHARACTER_SET_NAME'])
         self.assertEqual("utf8mb4_general_ci", res[0]['COLLATION_NAME'])
 
-        res = self.node_session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
+        res = self.session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
                 'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "{0}" '
                 'AND COLUMN_NAME = "{1}"'.format(table_b, 'title')) \
             .execute().fetch_all()
@@ -388,14 +430,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
-            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
         self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
         self.session.close()
-        self.node_session.close()
 
     def test_exists_in_database(self):
         collection_name = "collection_test"
@@ -421,6 +461,341 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                                 '{"name": "Pebbles", "age": 8}').execute()
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
+
+        self.schema.drop_collection(collection_name)
+
+    def test_ilri_expressions(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # is
+        result = collection.find("$.key is null").execute()
+        self.assertEqual(4, len(result.fetch_all()))
+
+        # is_not
+        result = collection.find("$.key is not null").execute()
+        self.assertEqual(0, len(result.fetch_all()))
+
+        # regexp
+        result = collection.find("$.name regexp 'F.*'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # not_regexp
+        result = collection.find("$.name not regexp 'F.*'").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # like
+        result = collection.find("$.name like 'F%'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # not_like
+        result = collection.find("$.name not like 'F%'").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # in
+        result = collection.find("$.age in (21, 28)").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # not_in
+        result = collection.find("$.age not in (21, 28)").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # between
+        result = collection.find("$.age between 20 and 29").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # between_not
+        result = collection.find("$.age not between 20 and 29").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        self.schema.drop_collection(collection_name)
+
+    def test_unary_operators(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # sign_plus
+        result = collection.find("$.age == 21") \
+                           .fields("+($.age * -1) as test").execute()
+        self.assertEqual(-21, result.fetch_all()[0]["test"])
+
+        # sign_minus
+        result = collection.find("$.age == 21") \
+                           .fields("-$.age as test").execute()
+        self.assertEqual(-21, result.fetch_all()[0]["test"])
+
+        # !
+        result = collection.find("$.age == 21") \
+                           .fields("! ($.age == 21) as test").execute()
+        self.assertFalse(result.fetch_all()[0]["test"])
+
+        # not
+        result = collection.find("$.age == 21") \
+                           .fields("not ($.age == 21) as test").execute()
+        self.assertFalse(result.fetch_all()[0]["test"])
+
+        # ~
+        result = collection.find("$.age == 21") \
+                           .fields("5 & ~1 as test").execute()
+        self.assertEqual(4, result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_interval_expressions(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+                {"adate": "2000-01-01", "adatetime": "2000-01-01 12:00:01"},
+        ).execute()
+
+
+        result = collection.find().fields("$.adatetime + interval 1000000 "
+                                          "microsecond = '2000-01-01 12:00:02'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval 1 second = "
+                                          "'2000-01-01 12:00:02' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval 2 minute = "
+                                          "'2000-01-01 12:02:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval 4 hour = "
+                                          "'2000-01-01 16:00:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval 10 day = "
+                                          "'2000-01-11' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval 2 week = "
+                                          "'2000-01-15' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate - interval 2 month = "
+                                          "'1999-11-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval 2 quarter = "
+                                          "'2000-07-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate - interval 1 year = "
+                                          "'1999-01-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '3.1000000' "
+                                          "second_microsecond = '2000-01-01 "
+                                          "12:00:05' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1.1' "
+                                          "minute_microsecond = "
+                                          "'2000-01-01 12:01:02.100000' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval "
+                                          "'1:1' minute_second "
+                                          "= '2000-01-01 12:01:02'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1:1.1' "
+                                          "hour_microsecond = "
+                                          "'2000-01-01 13:01:02.100000'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1:1' "
+                                          "hour_second = '2000-01-01 13:01:02'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '1:1' "
+                                          "hour_minute = '2000-01-01 13:01:01'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval "
+                                          "'2 3:4:5.600' day_microsecond = "
+                                          "'2000-01-03 15:04:06.600000'"
+                                          " as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '2 3:4:5' "
+                                          "day_second = '2000-01-03 15:04:06' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '2 3:4' "
+                                          "day_minute = '2000-01-03 15:04:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adatetime + interval '2 3' "
+                                          "day_hour = '2000-01-03 15:00:01' "
+                                          "as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        result = collection.find().fields("$.adate + interval '2-3' "
+                                          "year_month = "
+                                          "'2002-04-01' as test").execute()
+        self.assertTrue(result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_bitwise_operators(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # &
+        result = collection.find("$.age = 21") \
+                           .fields("$.age & 1 as test").execute()
+        self.assertEqual(1, result.fetch_all()[0]["test"])
+
+        # |
+        result = collection.find("$.age == 21") \
+                           .fields("0 | 1 as test").execute()
+        self.assertEqual(1, result.fetch_all()[0]["test"])
+
+        # ^
+        result = collection.find("$.age = 21") \
+                           .fields("$.age ^ 1 as test").execute()
+        self.assertEqual(20, result.fetch_all()[0]["test"])
+
+        # <<
+        result = collection.find("$.age == 21") \
+                           .fields("1 << 2 as test").execute()
+        self.assertEqual(4, result.fetch_all()[0]["test"])
+
+        # >>
+        result = collection.find("$.age == 21") \
+                           .fields("4 >> 2 as test").execute()
+        self.assertEqual(1, result.fetch_all()[0]["test"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_numeric_operators(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        result = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        # =
+        result = collection.find("$.age = 21").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # ==
+        result = collection.find("$.age == 21").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # &&
+        result = collection.find("$.age == 21 && $.name == 'Fred'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # and
+        result = collection.find("$.age == 21 and $.name == 'Fred'").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # or
+        result = collection.find("$.age == 21 or $.age == 42").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # ||
+        result = collection.find("$.age == 21 || $.age == 42").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # xor
+        result = collection.find().fields("$.age xor 1 as test").execute()
+        docs = result.fetch_all()
+        self.assertTrue(all([i["test"] is False for i in docs]))
+
+        # !=
+        result = collection.find("$.age != 21").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # <>
+        result = collection.find("$.age <> 21").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # >
+        result = collection.find("$.age > 28").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # >=
+        result = collection.find("$.age >= 28").execute()
+        self.assertEqual(3, len(result.fetch_all()))
+
+        # <
+        result = collection.find("$.age < 28").execute()
+        self.assertEqual(1, len(result.fetch_all()))
+
+        # <=
+        result = collection.find("$.age <= 28").execute()
+        self.assertEqual(2, len(result.fetch_all()))
+
+        # +
+        result = collection.find("$.age == 21") \
+                           .fields("$.age + 10 as test").execute()
+        self.assertEqual(31, result.fetch_all()[0]["test"])
+
+        # -
+        result = collection.find("$.age == 21") \
+                           .fields("$.age - 10 as test").execute()
+        self.assertEqual(11, result.fetch_all()[0]["test"])
+
+        # *
+        result = collection.find("$.age == 21") \
+                           .fields("$.age * 10 as test").execute()
+        self.assertEqual(210, result.fetch_all()[0]["test"])
+
+        # /
+        result = collection.find("$.age == 21") \
+                           .fields("$.age / 7 as test").execute()
+        self.assertEqual(3, result.fetch_all()[0]["test"])
+
+        # div
+        result = collection.find("$.age == 21") \
+                           .fields("$.age div 7 as test").execute()
+        self.assertEqual(3, result.fetch_all()[0]["test"])
+
+        # %
+        result = collection.find("$.age == 21") \
+                           .fields("$.age % 7 as test").execute()
+        self.assertEqual(0, result.fetch_all()[0]["test"])
 
         self.schema.drop_collection(collection_name)
 
@@ -489,6 +864,22 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(2, len(docs))
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
+
+        # test like operator
+        result = collection.find("$.name like 'B%'").execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+
+        # test aggregation functions without alias
+        result = collection.find().fields("sum($.age)").execute()
+        docs = result.fetch_all()
+        self.assertTrue("sum($.age)" in docs[0].keys())
+        self.assertEqual(158, docs[0]["sum($.age)"])
+
+        # test operators without alias
+        result = collection.find().fields("$.age + 100").execute()
+        docs = result.fetch_all()
+        self.assertTrue("$.age + 100" in docs[0].keys())
 
         self.schema.drop_collection(collection_name)
 
@@ -564,7 +955,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     #         "".format(self.schema_name, collection_name, index_name)
     #     )
     #
-    #     result = self.node_session.sql(show_indexes_sql).execute()
+    #     result = self.session.sql(show_indexes_sql).execute()
     #     rows = result.fetch_all()
     #     self.assertEqual(1, len(rows))
 
@@ -581,12 +972,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     #         "".format(self.schema_name, collection_name, index_name)
     #     )
     #
-    #     result = self.node_session.sql(show_indexes_sql).execute()
+    #     result = self.session.sql(show_indexes_sql).execute()
     #     rows = result.fetch_all()
     #     self.assertEqual(1, len(rows))
     #
     #     collection.drop_index(index_name).execute()
-    #     result = self.node_session.sql(show_indexes_sql).execute()
+    #     result = self.session.sql(show_indexes_sql).execute()
     #     rows = result.fetch_all()
     #     self.assertEqual(0, len(rows))
 
@@ -673,20 +1064,18 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.schema_name = self.connect_kwargs["schema"]
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
-            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
         self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
         self.session.close()
-        self.node_session.close()
 
     def test_exists_in_database(self):
         table_name = "table_test"
         try:
             sql = _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
-            self.node_session.sql(sql).execute()
+            self.session.sql(sql).execute()
         except mysqlx.Error as err:
             LOGGER.info("{0}".format(err))
         table = self.schema.get_table(table_name)
@@ -696,19 +1085,19 @@ class MySQLxTableTests(tests.MySQLxTests):
     def test_select(self):
         table_name = "{0}.test".format(self.schema_name)
 
-        self.node_session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty')"
-                              "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (42, 'Wilma')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (67, 'Betty')"
+                         "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
-        result = table.select().sort("age DESC").execute()
+        result = table.select().order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
         self.assertEqual(67, rows[0]["age"])
@@ -719,41 +1108,106 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
 
         # test flexible params
-        result = table.select(['age', 'name']).sort("age DESC").execute()
+        result = table.select(['age', 'name']).order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
 
+        # test like operator
+        result = table.select().where("name like 'B%'").execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
+
+        # test aggregation functions
+        result = table.select("sum(age)").execute()
+        rows = result.fetch_all()
+        self.assertTrue("sum(age)" == result.columns[0].get_column_name())
+        self.assertEqual(158, rows[0]["sum(age)"])
+
+        # test operators without alias
+        result = table.select("age + 100").execute()
+        rows = result.fetch_all()
+        self.assertTrue("age + 100" == result.columns[0].get_column_name())
+
+        # test cast operators
+        result = table.select("cast(age as binary(10)) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.BYTES)
+
+        result = table.select("cast('1994-12-11' as date) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.DATE)
+
+        result = table.select("cast('1994-12-11:12:00:00' as datetime) as "
+                              "test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.DATETIME)
+
+        result = table.select("cast(age as decimal(10, 7)) as test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.DECIMAL)
+
+        result = table.select("cast('{\"a\": 24}' as json) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.JSON)
+
+        result = table.select("cast(age as signed) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.INT)
+
+        result = table.select("cast(age as unsigned) as test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.BIGINT)
+
+        result = table.select("cast(age as signed integer) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.INT)
+
+        result = table.select("cast(age as unsigned integer) as "
+                              "test").execute()
+        self.assertEqual(result.columns[0].get_type(),
+                         mysqlx.ColumnType.BIGINT)
+
+        result = table.select("cast('12:00:00' as time) as test").execute()
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.TIME)
+
         self.schema.drop_table("test")
+
+        coll = self.schema.create_collection("test")
+        coll.add({"a": 21}, {"a": 22}, {"a": 23}, {"a": 24}).execute()
+
+        table = self.schema.get_collection_as_table("test")
+        result = table.select("doc->'$.a' as a").execute()
+        rows = result.fetch_all()
+        self.assertEqual("a", result.columns[0].get_column_name())
+        self.assertEqual(4, len(rows))
+
+        self.schema.drop_collection("test")
 
     def test_having(self):
         table_name = "{0}.test".format(self.schema_name)
 
-        self.node_session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50), "
-                              "gender CHAR(1))".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred', 'M')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney', 'M')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma', 'F')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty', 'F')"
-                              "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50), "
+                         "gender CHAR(1))".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (21, 'Fred', 'M')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (28, 'Barney', 'M')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (42, 'Wilma', 'F')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (67, 'Betty', 'F')"
+                         "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
-        result = table.select().group_by("gender").sort("age ASC").execute()
+        result = table.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(21, rows[0]["age"])
         self.assertEqual(42, rows[1]["age"])
 
         result = table.select().group_by("gender").having("gender = 'F'") \
-                                                  .sort("age ASC").execute()
+                                                  .order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
         self.assertEqual(42, rows[0]["age"])
 
         # test flexible params
-        result = table.select().group_by(["gender"]).sort(["name DESC", "age ASC"]).execute()
+        result = table.select().group_by(["gender"]) \
+                               .order_by(["name DESC", "age ASC"]).execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(42, rows[0]["age"])
@@ -762,9 +1216,9 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.schema.drop_table("test")
 
     def test_insert(self):
-        self.node_session.sql("CREATE TABLE {0}.test(age INT, name "
-                              "VARCHAR(50), gender CHAR(1))"
-                              "".format(self.schema_name)).execute()
+        self.session.sql("CREATE TABLE {0}.test(age INT, name "
+                         "VARCHAR(50), gender CHAR(1))"
+                         "".format(self.schema_name)).execute()
         table = self.schema.get_table("test")
 
         result = table.insert("age", "name") \
@@ -789,9 +1243,9 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.schema.drop_table("test")
 
     def test_update(self):
-        self.node_session.sql("CREATE TABLE {0}.test(age INT, name "
-                              "VARCHAR(50), gender CHAR(1))"
-                              "".format(self.schema_name)).execute()
+        self.session.sql("CREATE TABLE {0}.test(age INT, name "
+                         "VARCHAR(50), gender CHAR(1))"
+                         "".format(self.schema_name)).execute()
         table = self.schema.get_table("test")
 
         result = table.insert("age", "name") \
@@ -807,9 +1261,9 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_delete(self):
         table_name = "table_test"
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
-        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, table_name, "1")).execute()
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
@@ -820,9 +1274,9 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_count(self):
         table_name = "table_test"
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
-        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, table_name, "1")).execute()
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
@@ -832,12 +1286,12 @@ class MySQLxTableTests(tests.MySQLxTests):
     def test_results(self):
         table_name = "{0}.test".format(self.schema_name)
 
-        self.node_session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
-                              "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                         "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
         result = table.select().execute()
@@ -849,12 +1303,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.schema.drop_table("test")
 
     def test_multiple_resultsets(self):
-        self.node_session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "
-                              "SELECT 2; SELECT 'a'; END"
-                              "".format(self.schema_name)).execute()
+        self.session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "
+                         "SELECT 2; SELECT 'a'; END"
+                         "".format(self.schema_name)).execute()
 
-        result = self.node_session.sql(" CALL {0}.spProc"
-                                       "".format(self.schema_name)).execute()
+        result = self.session.sql(" CALL {0}.spProc"
+                                  "".format(self.schema_name)).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
         self.assertEqual(1, rows[0][0])
@@ -868,16 +1322,17 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("a", rows[0][0])
         self.assertEqual(False, result.next_result())
 
-        self.node_session.sql("DROP PROCEDURE IF EXISTS {0}.spProc".format(self.schema_name)).execute()
+        self.session.sql("DROP PROCEDURE IF EXISTS {0}.spProc"
+                         "".format(self.schema_name)).execute()
 
     def test_auto_inc_value(self):
         table_name = "{0}.test".format(self.schema_name)
 
-        self.node_session.sql(
+        self.session.sql(
             "CREATE TABLE {0}(id INT KEY AUTO_INCREMENT, name VARCHAR(50))"
             "".format(table_name)).execute()
-        result = self.node_session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')"
-                                       "".format(table_name)).execute()
+        result = self.session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')"
+                                  "".format(table_name)).execute()
         self.assertEqual(1, result.get_autoincrement_value())
         table = self.schema.get_table("test")
         result2 = table.insert("id", "name").values(None, "Boo").execute()
@@ -888,20 +1343,20 @@ class MySQLxTableTests(tests.MySQLxTests):
     def test_column_metadata(self):
         table_name = "{0}.test".format(self.schema_name)
 
-        self.node_session.sql(
+        self.session.sql(
             "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
             "config JSON, created DATE, active BIT)"
             "".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
             "".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
             ", 0)".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', 1)"
             "".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', 0)"
             "".format(table_name)).execute()
 
@@ -940,14 +1395,14 @@ class MySQLxTableTests(tests.MySQLxTests):
     def test_is_view(self):
         table_name = "table_test"
         view_name = "view_test"
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
-        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, table_name, "1")).execute()
         table = self.schema.get_table(table_name)
         self.assertFalse(table.is_view())
 
-        self.node_session.sql(_CREATE_TEST_VIEW_QUERY.format(
+        self.session.sql(_CREATE_TEST_VIEW_QUERY.format(
             self.schema_name, view_name,
             self.schema_name, table_name)).execute()
         view = self.schema.get_table(view_name)
@@ -967,7 +1422,6 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.view_name = "view_test"
         try:
             self.session = mysqlx.get_session(self.connect_kwargs)
-            self.node_session = mysqlx.get_node_session(self.connect_kwargs)
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
         self.schema = self.session.get_schema(self.schema_name)
@@ -976,12 +1430,11 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.schema.drop_table(self.table_name)
         self.schema.drop_view(self.view_name)
         self.session.close()
-        self.node_session.close()
 
     def test_exists_in_database(self):
         view = self.schema.get_view(self.view_name)
         self.assertFalse(view.exists_in_database())
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, self.table_name)).execute()
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
                                                      self.table_name)
@@ -993,22 +1446,22 @@ class MySQLxViewTests(tests.MySQLxTests):
     def test_select(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50))"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty')"
-                              "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50))"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (42, 'Wilma')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (67, 'Betty')"
+                         "".format(table_name)).execute()
 
         defined_as = "SELECT age, name FROM {0}".format(table_name)
         view = self.schema.create_view(self.view_name) \
                           .defined_as(defined_as) \
                           .execute()
-        result = view.select().sort("age DESC").execute()
+        result = view.select().order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
         self.assertEqual(67, rows[0]["age"])
@@ -1019,43 +1472,43 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertEqual(1, len(rows))
 
         # test flexible params
-        result = view.select(['age', 'name']).sort("age DESC").execute()
+        result = view.select(['age', 'name']).order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
 
     def test_having(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
-                              "gender CHAR(1))".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred', 'M')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney', 'M')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (42, 'Wilma', 'F')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (67, 'Betty', 'F')"
-                              "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
+                         "gender CHAR(1))".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (21, 'Fred', 'M')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (28, 'Barney', 'M')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (42, 'Wilma', 'F')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (67, 'Betty', 'F')"
+                         "".format(table_name)).execute()
 
         defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
         view = self.schema.create_view(self.view_name) \
                           .defined_as(defined_as) \
                           .execute()
-        result = view.select().group_by("gender").sort("age ASC").execute()
+        result = view.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(21, rows[0]["age"])
         self.assertEqual(42, rows[1]["age"])
 
         result = view.select().group_by("gender").having("gender = 'F'") \
-                                                 .sort("age ASC").execute()
+                                                 .order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
         self.assertEqual(42, rows[0]["age"])
 
         # test flexible params
         result = view.select().group_by(["gender"]) \
-                              .sort(["name DESC", "age ASC"]).execute()
+                              .order_by(["name DESC", "age ASC"]).execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(42, rows[0]["age"])
@@ -1064,8 +1517,8 @@ class MySQLxViewTests(tests.MySQLxTests):
     def test_insert(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
-                              "gender CHAR(1))".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
+                         "gender CHAR(1))".format(table_name)).execute()
         defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
         view = self.schema.create_view(self.view_name) \
                           .defined_as(defined_as) \
@@ -1089,8 +1542,8 @@ class MySQLxViewTests(tests.MySQLxTests):
     def test_update(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
-                              "gender CHAR(1))".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
+                         "gender CHAR(1))".format(table_name)).execute()
         defined_as = ("SELECT age, name, gender FROM {0}".format(table_name))
         view = self.schema.create_view(self.view_name) \
                           .defined_as(defined_as) \
@@ -1105,9 +1558,9 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.schema.drop_table("test")
 
     def test_delete(self):
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, self.table_name)).execute()
-        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, self.table_name, "1")).execute()
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
@@ -1120,9 +1573,9 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertEqual(view.count(), 0)
 
     def test_count(self):
-        self.node_session.sql(_CREATE_TEST_TABLE_QUERY.format(
+        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, self.table_name)).execute()
-        self.node_session.sql(_INSERT_TEST_TABLE_QUERY.format(
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, self.table_name, "1")).execute()
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
@@ -1135,12 +1588,12 @@ class MySQLxViewTests(tests.MySQLxTests):
     def test_results(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50))"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
-                              "".format(table_name)).execute()
-        self.node_session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
-                              "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50))"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
+                         "".format(table_name)).execute()
+        self.session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
+                         "".format(table_name)).execute()
 
         defined_as = "SELECT age, name FROM {0}".format(table_name)
         view = self.schema.create_view(self.view_name) \
@@ -1155,10 +1608,10 @@ class MySQLxViewTests(tests.MySQLxTests):
     def test_auto_inc_value(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql("CREATE TABLE {0} (id INT KEY AUTO_INCREMENT, "
-                              "name VARCHAR(50))".format(table_name)).execute()
-        result = self.node_session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')"
-                                       "".format(table_name)).execute()
+        self.session.sql("CREATE TABLE {0} (id INT KEY AUTO_INCREMENT, "
+                         "name VARCHAR(50))".format(table_name)).execute()
+        result = self.session.sql("INSERT INTO {0} VALUES (NULL, 'Fred')"
+                                  "".format(table_name)).execute()
         self.assertEqual(1, result.get_autoincrement_value())
 
         defined_as = "SELECT id, name FROM {0}".format(table_name)
@@ -1171,20 +1624,20 @@ class MySQLxViewTests(tests.MySQLxTests):
     def test_column_metadata(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
-        self.node_session.sql(
+        self.session.sql(
             "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
             "config JSON, created DATE, active BIT)"
             "".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
             "".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
             ", 0)".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', 1)"
             "".format(table_name)).execute()
-        self.node_session.sql(
+        self.session.sql(
             "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', 0)"
             "".format(table_name)).execute()
 
