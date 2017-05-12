@@ -54,7 +54,9 @@ CEXT_OPTIONS = [
     ('with-protoc=', None,
      "Location of Protobuf protoc binary"),
     ('extra-compile-args=', None,
-     "Extra compile args")
+     "Extra compile args"),
+    ('extra-link-args=', None,
+     "Extra link args")
 ]
 
 CEXT_STATIC_OPTIONS = [
@@ -284,6 +286,7 @@ class BuildExtDynamic(build_ext):
     def initialize_options(self):
         build_ext.initialize_options(self)
         self.extra_compile_args = None
+        self.extra_link_args = None
         self.with_mysql_capi = None
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
@@ -409,6 +412,7 @@ class BuildExtDynamic(build_ext):
         self.set_undefined_options(
             'install',
             ('extra_compile_args', 'extra_compile_args'),
+            ('extra_link_args', 'extra_link_args'),
             ('with_mysql_capi', 'with_mysql_capi'),
             ('with_protobuf_include_dir', 'with_protobuf_include_dir'),
             ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'),
@@ -514,6 +518,9 @@ class BuildExtDynamic(build_ext):
             # Add extra compile args
             if self.extra_compile_args:
                 ext.extra_compile_args.append(self.extra_compile_args)
+            # Add extra link args
+            if self.extra_link_args:
+                ext.extra_link_args.append(self.extra_link_args)
             # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
@@ -537,6 +544,9 @@ class BuildExtDynamic(build_ext):
                 # Add extra compile args
                 if self.extra_compile_args:
                     ext.extra_compile_args.extend(self.extra_compile_args)
+                # Add extra link args
+                if self.extra_link_args:
+                    ext.extra_link_args.extend(self.extra_link_args)
             self.run_protoc()
             build_ext.run(self)
         else:
@@ -556,6 +566,10 @@ class BuildExtStatic(BuildExtDynamic):
 
     def finalize_options(self):
         options_pairs = []
+        if not self.extra_compile_args:
+            options_pairs.append(('extra_compile_args', 'extra_compile_args'))
+        if not self.extra_link_args:
+            options_pairs.append(('extra_link_args', 'extra_link_args'))
         if not self.with_mysql_capi:
             options_pairs.append(('with_mysql_capi', 'with_mysql_capi'))
         if not self.with_protobuf_include_dir:
@@ -697,6 +711,9 @@ class BuildExtStatic(BuildExtDynamic):
             # Add extra compile args
             if self.extra_compile_args:
                 ext.extra_compile_args.append(self.extra_compile_args)
+            # Add extra link args
+            if self.extra_link_args:
+                ext.extra_link_args.append(self.extra_link_args)
 
 
 class InstallLib(install_lib):
@@ -746,6 +763,7 @@ class Install(install):
     def initialize_options(self):
         install.initialize_options(self)
         self.extra_compile_args = None
+        self.extra_link_args = None
         self.with_mysql_capi = None
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
