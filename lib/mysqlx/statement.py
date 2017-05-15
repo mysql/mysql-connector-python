@@ -260,13 +260,20 @@ class FilterableStatement(Statement):
             self._bindings.append({"name": args[0], "value": args[1]})
         return self
 
-    def _bind_single(self, object):
-        if isinstance(object, DbDoc):
-            self.bind(str(object))
-        elif isinstance(object, STRING_TYPES):
-            dict = json.loads(object)
-            for key in dict.keys():
-                self.bind(key, dict[key])
+    def _bind_single(self, obj):
+        if isinstance(obj, DbDoc):
+            self.bind(str(obj))
+        elif isinstance(obj, STRING_TYPES):
+            try:
+                res = json.loads(obj)
+                if not isinstance(res, dict):
+                    raise ValueError
+            except ValueError:
+                raise ProgrammingError("Invalid JSON string to bind")
+            for key in res.keys():
+                self.bind(key, res[key])
+        else:
+            raise ProgrammingError("Invalid JSON string or object to bind")
 
     def execute(self):
         """Execute the statement.

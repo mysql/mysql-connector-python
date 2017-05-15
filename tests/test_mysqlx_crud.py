@@ -1030,6 +1030,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
 
+        # Binding anonymous parameters are not allowed in crud operations
+        self.assertRaises(mysqlx.ProgrammingError,
+                          collection.find("$.age = ?").bind, 42)
+        self.assertRaises(mysqlx.ProgrammingError,
+                          collection.find("$.name = ?").bind, "Fred")
         self.schema.drop_collection(collection_name)
 
     def test_unicode_parameter_binding(self):
