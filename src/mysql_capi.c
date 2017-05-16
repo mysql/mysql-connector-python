@@ -30,6 +30,9 @@
 #include <Python.h>
 #include <datetime.h>
 
+#ifdef MS_WINDOWS
+#include <windows.h>
+#endif
 #include <mysql.h>
 
 #include "catch23.h"

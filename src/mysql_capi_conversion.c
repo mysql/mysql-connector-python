@@ -1,6 +1,6 @@
 /*
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -29,6 +29,9 @@
 #include <Python.h>
 #include <datetime.h>
 
+#ifdef MS_WINDOWS
+#include <windows.h>
+#endif
 #include <mysql.h>
 
 #include "catch23.h"
