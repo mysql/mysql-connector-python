@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -55,7 +55,9 @@ class DbDoc(object):
 
     def ensure_id(self):
         if "_id" not in self.__dict__:
-            self.__dict__["_id"] = uuid.uuid4().hex
+            uuid1 = str(uuid.uuid1()).upper().split("-")
+            uuid1.reverse()
+            self.__dict__["_id"] = "".join(uuid1)
         return self.__dict__["_id"]
 
     def __str__(self):
