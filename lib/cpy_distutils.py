@@ -517,10 +517,10 @@ class BuildExtDynamic(build_ext):
                     ext.libraries.append("protobuf")
             # Add extra compile args
             if self.extra_compile_args:
-                ext.extra_compile_args.append(self.extra_compile_args)
+                ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
             if self.extra_link_args:
-                ext.extra_link_args.append(self.extra_link_args)
+                ext.extra_link_args.extend(self.extra_link_args.split())
             # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
@@ -543,10 +543,10 @@ class BuildExtDynamic(build_ext):
                 ext.extra_compile_args.append("/MT")
                 # Add extra compile args
                 if self.extra_compile_args:
-                    ext.extra_compile_args.extend(self.extra_compile_args)
+                    ext.extra_compile_args.extend(self.extra_compile_args.split())
                 # Add extra link args
                 if self.extra_link_args:
-                    ext.extra_link_args.extend(self.extra_link_args)
+                    ext.extra_link_args.extend(self.extra_link_args.split())
             self.run_protoc()
             build_ext.run(self)
         else:
@@ -710,10 +710,10 @@ class BuildExtStatic(BuildExtDynamic):
                 ext.libraries.append("rt")
             # Add extra compile args
             if self.extra_compile_args:
-                ext.extra_compile_args.append(self.extra_compile_args)
+                ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
             if self.extra_link_args:
-                ext.extra_link_args.append(self.extra_link_args)
+                ext.extra_link_args.extend(self.extra_link_args.split())
 
 
 class InstallLib(install_lib):
