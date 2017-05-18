@@ -565,6 +565,14 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
+        install_obj = self.distribution.get_command_obj('install')
+        install_obj.with_mysql_capi = self.with_mysql_capi
+        install_obj.with_protobuf_include_dir = self.with_protobuf_include_dir
+        install_obj.with_protobuf_lib_dir = self.with_protobuf_lib_dir
+        install_obj.with_protoc = self.with_protoc
+        install_obj.extra_compile_args = self.extra_compile_args
+        install_obj.extra_link_args = self.extra_link_args
+
         options_pairs = []
         if not self.extra_compile_args:
             options_pairs.append(('extra_compile_args', 'extra_compile_args'))
@@ -779,11 +787,15 @@ class Install(install):
         if self.byte_code_only is None:
             self.byte_code_only = False
 
+        build_ext_obj = self.distribution.get_command_obj('build_ext')
+        build_ext_obj.with_mysql_capi = self.with_mysql_capi
+        build_ext_obj.with_protobuf_include_dir = self.with_protobuf_include_dir
+        build_ext_obj.with_protobuf_lib_dir = self.with_protobuf_lib_dir
+        build_ext_obj.with_protoc = self.with_protoc
+        build_ext_obj.extra_compile_args = self.extra_compile_args
+        build_ext_obj.extra_link_args = self.extra_link_args
+
         if self.with_mysql_capi:
-            build_ext = self.distribution.get_command_obj('build_ext')
-            build_ext.with_mysql_capi = self.with_mysql_capi
-            build = self.distribution.get_command_obj('build_ext')
-            build.with_mysql_capi = self.with_mysql_capi
             self.need_ext = True
 
         if not self.need_ext:
