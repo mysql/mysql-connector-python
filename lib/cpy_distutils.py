@@ -572,6 +572,7 @@ class BuildExtStatic(BuildExtDynamic):
         install_obj.with_protoc = self.with_protoc
         install_obj.extra_compile_args = self.extra_compile_args
         install_obj.extra_link_args = self.extra_link_args
+        install_obj.static = True
 
         options_pairs = []
         if not self.extra_compile_args:
@@ -795,6 +796,7 @@ class Install(install):
         build_ext_obj.with_protoc = self.with_protoc
         build_ext_obj.extra_compile_args = self.extra_compile_args
         build_ext_obj.extra_link_args = self.extra_link_args
+        build_ext_obj.static = self.static
 
         if self.with_mysql_capi:
             self.need_ext = True
