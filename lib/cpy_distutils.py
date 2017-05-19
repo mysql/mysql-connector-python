@@ -686,7 +686,8 @@ class BuildExtStatic(BuildExtDynamic):
                      "".format(self.protobuf_lib))
             for lib_file in os.listdir(self.protobuf_lib):
                 lib_file_path = os.path.join(self.protobuf_lib, lib_file)
-                if os.path.isfile(lib_file_path) and not lib_file.endswith(".a"):
+                if os.path.isfile(lib_file_path) and \
+                   not lib_file.endswith((".a", ".dylib",)):
                     os.unlink(os.path.join(self.protobuf_lib, lib_file))
 
     def fix_compiler(self):
