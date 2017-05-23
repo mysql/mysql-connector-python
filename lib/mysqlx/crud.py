@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -27,8 +27,7 @@ from .errors import ProgrammingError
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
-                        CreateCollectionIndexStatement,
-                        DropCollectionIndexStatement, CreateViewStatement,
+                        CreateCollectionIndexStatement, CreateViewStatement,
                         AlterViewStatement, CreateTableStatement)
 
 
@@ -407,7 +406,8 @@ class Collection(DatabaseObject):
         Args:
             index_name (str): Index name.
         """
-        return DropCollectionIndexStatement(self, index_name)
+        self._connection.execute_nonquery("xplugin", "drop_collection_index",
+            True, self._schema.name, self._name, index_name)
 
 
 class Table(DatabaseObject):

@@ -760,28 +760,6 @@ class CreateCollectionIndexStatement(Statement):
             self._is_unique, *fields)
 
 
-class DropCollectionIndexStatement(Statement):
-    """A statement that drops an index on a collection.
-
-    Args:
-        collection (mysqlx.Collection): The Collection object.
-        index_name (string): The index name.
-    """
-    def __init__(self, collection, index_name):
-        super(DropCollectionIndexStatement, self).__init__(target=collection)
-        self._index_name = index_name
-
-    def execute(self):
-        """Execute the statement.
-
-        Returns:
-            mysqlx.Result: Result object.
-        """
-        return self._connection.execute_nonquery(
-            "xplugin", "drop_collection_index", True,
-            self._target.schema.name, self._target.name, self._index_name)
-
-
 class TableIndex(object):
     UNIQUE_INDEX = 1
     INDEX = 2

@@ -957,44 +957,48 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
-    # def test_create_index(self):
-    #     collection_name = "collection_test"
-    #     collection = self.schema.create_collection(collection_name)
-    #
-    #     index_name = "age_idx"
-    #     collection.create_index(index_name, True) \
-    #         .field("$.age", "INT", False).execute()
-    #
-    #     show_indexes_sql = (
-    #         "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-    #         "".format(self.schema_name, collection_name, index_name)
-    #     )
-    #
-    #     result = self.session.sql(show_indexes_sql).execute()
-    #     rows = result.fetch_all()
-    #     self.assertEqual(1, len(rows))
+    def test_create_index(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
 
-    # def test_drop_index(self):
-    #     collection_name = "collection_test"
-    #     collection = self.schema.create_collection(collection_name)
-    #
-    #     index_name = "age_idx"
-    #     collection.create_index(index_name, True) \
-    #         .field("$.age", "INT", False).execute()
-    #
-    #     show_indexes_sql = (
-    #         "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-    #         "".format(self.schema_name, collection_name, index_name)
-    #     )
-    #
-    #     result = self.session.sql(show_indexes_sql).execute()
-    #     rows = result.fetch_all()
-    #     self.assertEqual(1, len(rows))
-    #
-    #     collection.drop_index(index_name).execute()
-    #     result = self.session.sql(show_indexes_sql).execute()
-    #     rows = result.fetch_all()
-    #     self.assertEqual(0, len(rows))
+        index_name = "age_idx"
+        collection.create_index(index_name, True) \
+            .field("$.age", "INT", False).execute()
+
+        show_indexes_sql = (
+            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+            "".format(self.schema_name, collection_name, index_name)
+        )
+
+        result = self.session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+
+        self.schema.drop_collection(collection_name)
+
+    def test_drop_index(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+
+        index_name = "age_idx"
+        collection.create_index(index_name, True) \
+            .field("$.age", "INT", False).execute()
+
+        show_indexes_sql = (
+            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+            "".format(self.schema_name, collection_name, index_name)
+        )
+
+        result = self.session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+
+        collection.drop_index(index_name)
+        result = self.session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(0, len(rows))
+
+        self.schema.drop_collection(collection_name)
 
     def test_parameter_binding(self):
         collection_name = "collection_test"

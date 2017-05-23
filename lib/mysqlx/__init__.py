@@ -39,8 +39,7 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
-                        CreateCollectionIndexStatement,
-                        DropCollectionIndexStatement, CreateTableStatement,
+                        CreateCollectionIndexStatement, CreateTableStatement,
                         CreateViewStatement, AlterViewStatement, ColumnDef,
                         GeneratedColumnDef, ForeignKeyDef, Expr)
 
@@ -216,7 +215,7 @@ __all__ = [
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
     "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
-    "CreateCollectionIndexStatement", "DropCollectionIndexStatement",
-    "CreateTableStatement", "CreateViewStatement", "AlterViewStatement",
-    "ColumnDef", "GeneratedColumnDef", "ForeignKeyDef", "Expr",
+    "CreateCollectionIndexStatement", "CreateTableStatement",
+    "CreateViewStatement", "AlterViewStatement","ColumnDef",
+    "GeneratedColumnDef", "ForeignKeyDef", "Expr",
 ]
