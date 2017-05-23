@@ -821,6 +821,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, result.get_affected_items_count())
         self.assertEqual(0, collection.count())
 
+        # Collection.remove() is not allowed without a condition
+        result = collection.remove()
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
+
         self.schema.drop_collection(collection_name)
 
     def test_find(self):
@@ -910,8 +914,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(0, len(docs))
 
         # test flexible params
-        result = collection.modify().unset(["young"]).execute()
+        result = collection.modify("TRUE").unset(["young"]).execute()
         self.assertEqual(1, result.get_affected_items_count())
+
+        # Collection.modify() is not allowed without a condition
+        result = collection.modify().unset(["young"])
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
 
         self.schema.drop_collection(collection_name)
 
@@ -1257,6 +1265,10 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.update().set("age", 25).where("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
 
+        # Table.update() is not allowed without a condition
+        result = table.update().set("age", 25)
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
+
         self.schema.drop_table("test")
 
     def test_delete(self):
@@ -1270,6 +1282,10 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(table.count(), 1)
         table.delete("id = 1").execute()
         self.assertEqual(table.count(), 0)
+
+        # Table.delete() is not allowed without a condition
+        result = table.delete()
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
         self.schema.drop_table(table_name)
 
     def test_count(self):

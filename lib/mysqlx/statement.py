@@ -462,6 +462,8 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
+        if not self._has_where:
+            raise ProgrammingError("No condition was found for modify.")
         return self._connection.update(self)
 
 
@@ -664,6 +666,8 @@ class UpdateStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object
         """
+        if not self._has_where:
+            raise ProgrammingError("No condition was found for update.")
         return self._connection.update(self)
 
 
@@ -682,6 +686,8 @@ class RemoveStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
+        if not self._has_where:
+            raise ProgrammingError("No condition was found for remove.")
         return self._connection.delete(self)
 
 
@@ -704,6 +710,8 @@ class DeleteStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
+        if not self._has_where:
+            raise ProgrammingError("No condition was found for delete.")
         return self._connection.delete(self)
 
 
