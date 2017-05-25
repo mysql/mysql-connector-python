@@ -462,6 +462,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
 
+        # ensure _id is created
+        persons = [{"name": "Wilma", "age": 33}, {"name": "Barney", "age": 42}]
+        result = collection.add(persons).execute()
+        for person in persons:
+            self.assertTrue(person.has_key("_id"))
+            self.assertEqual(len(person["_id"]), 32)
+
         self.schema.drop_collection(collection_name)
 
     def test_ilri_expressions(self):
