@@ -163,7 +163,7 @@ class FilterableStatement(Statement):
         self._has_bindings = False
         self._binding_map = {}
         self._bindings = []
-        if condition is not None:
+        if condition:
             self.where(condition)
 
     def where(self, condition):

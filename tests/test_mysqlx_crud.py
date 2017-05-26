@@ -920,6 +920,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # Collection.modify() is not allowed without a condition
         result = collection.modify().unset(["young"])
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
+        result = collection.modify("").unset(["young"])
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
 
         self.schema.drop_collection(collection_name)
 
