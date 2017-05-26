@@ -815,11 +815,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_remove(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        collection.add({"name": "Fred", "age": 21}).execute()
-        self.assertEqual(1, collection.count())
+        collection.add({"name": "Fred", "age": 21},
+                       {"name": "Barney", "age": 45},
+                       {"name": "Wilma", "age": 42}).execute()
+        self.assertEqual(3, collection.count())
         result = collection.remove("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
-        self.assertEqual(0, collection.count())
+        self.assertEqual(2, collection.count())
 
         # Collection.remove() is not allowed without a condition
         result = collection.remove()
@@ -1279,11 +1281,15 @@ class MySQLxTableTests(tests.MySQLxTests):
             self.schema_name, table_name)).execute()
         self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
             self.schema_name, table_name, "1")).execute()
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name, "2")).execute()
+        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
+            self.schema_name, table_name, "3")).execute()
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
-        self.assertEqual(table.count(), 1)
+        self.assertEqual(table.count(), 3)
         table.delete("id = 1").execute()
-        self.assertEqual(table.count(), 0)
+        self.assertEqual(table.count(), 2)
 
         # Table.delete() is not allowed without a condition
         result = table.delete()

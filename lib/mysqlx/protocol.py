@@ -203,6 +203,7 @@ class Protocol(object):
                              schema=stmt.schema.name)
         msg = Message("Mysqlx.Crud.Delete", data_model=data_model,
                       collection=collection)
+        self._apply_filter(msg, stmt)
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_DELETE"), msg)
 
