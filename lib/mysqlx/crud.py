@@ -407,7 +407,7 @@ class Collection(DatabaseObject):
             index_name (str): Index name.
         """
         self._connection.execute_nonquery("xplugin", "drop_collection_index",
-            True, self._schema.name, self._name, index_name)
+            False, self._schema.name, self._name, index_name)
 
 
 class Table(DatabaseObject):

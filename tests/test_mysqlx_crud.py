@@ -998,6 +998,9 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(0, len(rows))
 
+        # dropping an non-existing index should succeed silently
+        collection.drop_index(index_name)
+
         self.schema.drop_collection(collection_name)
 
     def test_parameter_binding(self):

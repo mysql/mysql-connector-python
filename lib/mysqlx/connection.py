@@ -275,9 +275,13 @@ class Connection(object):
         return Result(self)
 
     @catch_network_exception
-    def execute_nonquery(self, namespace, cmd, raise_on_fail=True, *args):
-        self.protocol.send_execute_statement(namespace, cmd, args)
-        return Result(self)
+    def execute_nonquery(self, namespace, cmd, raise_on_fail=False, *args):
+        try:
+            self.protocol.send_execute_statement(namespace, cmd, args)
+            return Result(self)
+        except OperationalError:
+            if raise_on_fail:
+                raise
 
     @catch_network_exception
     def execute_sql_scalar(self, sql, *args):
