@@ -178,8 +178,11 @@ class FilterableStatement(Statement):
         """
         self._has_where = True
         self._where = condition
-        expr = ExprParser(condition, not self._doc_based)
-        self._where_expr = expr.expr()
+        try:
+            expr = ExprParser(condition, not self._doc_based)
+            self._where_expr = expr.expr()
+        except ValueError:
+            raise ProgrammingError("Invalid condition")
         self._binding_map = expr.placeholder_name_to_position
         return self
 
@@ -463,7 +466,7 @@ class ModifyStatement(FilterableStatement):
             mysqlx.Result: Result object.
         """
         if not self._has_where:
-            raise ProgrammingError("No condition was found for modify.")
+            raise ProgrammingError("No condition was found for modify")
         return self._connection.update(self)
 
 
@@ -667,7 +670,7 @@ class UpdateStatement(FilterableStatement):
             mysqlx.Result: Result object
         """
         if not self._has_where:
-            raise ProgrammingError("No condition was found for update.")
+            raise ProgrammingError("No condition was found for update")
         return self._connection.update(self)
 
 
@@ -687,7 +690,7 @@ class RemoveStatement(FilterableStatement):
             mysqlx.Result: Result object.
         """
         if not self._has_where:
-            raise ProgrammingError("No condition was found for remove.")
+            raise ProgrammingError("No condition was found for remove")
         return self._connection.delete(self)
 
 
@@ -711,7 +714,7 @@ class DeleteStatement(FilterableStatement):
             mysqlx.Result: Result object.
         """
         if not self._has_where:
-            raise ProgrammingError("No condition was found for delete.")
+            raise ProgrammingError("No condition was found for delete")
         return self._connection.delete(self)
 
 
@@ -875,7 +878,7 @@ class CreateViewStatement(Statement):
         if not isinstance(statement, SelectStatement) and \
            not isinstance(statement, STRING_TYPES):
             raise ProgrammingError("The statement must be an instance of "
-                                   "SelectStatement or a SQL string.")
+                                   "SelectStatement or a SQL string")
         self._defined_as = copy.copy(statement)  # Prevent modifications
         return self
 

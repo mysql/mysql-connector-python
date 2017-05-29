@@ -826,6 +826,9 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # Collection.remove() is not allowed without a condition
         result = collection.remove()
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
+        result = collection.remove("")
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
+        self.assertRaises(mysqlx.ProgrammingError, collection.remove, " ")
 
         self.schema.drop_collection(collection_name)
 
@@ -1294,6 +1297,10 @@ class MySQLxTableTests(tests.MySQLxTests):
         # Table.delete() is not allowed without a condition
         result = table.delete()
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
+        result = table.delete("")
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
+        self.assertRaises(mysqlx.ProgrammingError, table.delete, " ")
+
         self.schema.drop_table(table_name)
 
     def test_count(self):
