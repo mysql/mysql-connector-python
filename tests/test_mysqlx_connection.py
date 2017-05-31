@@ -327,6 +327,12 @@ class MySQLxSessionTests(tests.MySQLxTests):
     def test_sql(self):
         statement = self.session.sql("SELECT VERSION()")
         self.assertTrue(isinstance(statement, mysqlx.statement.Statement))
+        # SQL statements should be strings
+        statement = self.session.sql(123)
+        self.assertRaises(mysqlx.ProgrammingError, statement.execute)
+        # Test unicode statements
+        statement = self.session.sql(u"SELECT VERSION()").execute()
+        self.assertTrue(isinstance(statement, mysqlx.statement.SqlResult))
 
     def test_rollback(self):
         table_name = "t2"

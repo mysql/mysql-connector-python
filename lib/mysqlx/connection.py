@@ -36,6 +36,7 @@ from functools import wraps
 
 from .authentication import MySQL41AuthPlugin
 from .errors import InterfaceError, OperationalError, ProgrammingError
+from .compat import PY3, STRING_TYPES, UNICODE_TYPES
 from .crud import Schema
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
@@ -249,7 +250,13 @@ class Connection(object):
 
     @catch_network_exception
     def send_sql(self, sql, *args):
-        self.protocol.send_execute_statement("sql", sql, args)
+        if not isinstance(sql, STRING_TYPES):
+            raise ProgrammingError("The SQL statement is not a valid string")
+        elif not PY3 and isinstance(sql, UNICODE_TYPES):
+            self.protocol.send_execute_statement(
+                "sql", bytes(bytearray(sql, "utf-8")), args)
+        else:
+            self.protocol.send_execute_statement("sql", sql, args)
 
     @catch_network_exception
     def send_insert(self, statement):
