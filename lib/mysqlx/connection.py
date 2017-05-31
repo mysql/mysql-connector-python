@@ -243,11 +243,11 @@ class Connection(object):
 
         data = self.protocol.get_capabilites().capabilities
         if not (data[0]["name"].lower() == "tls" if data else False):
-            self.close()
+            self.close_connection()
             raise OperationalError("SSL not enabled at server.")
 
         if sys.version_info < (2, 7, 9):
-            self.close()
+            self.close_connection()
             raise RuntimeError("The support for SSL is not available for "
                 "this Python version.")
 
@@ -342,12 +342,26 @@ class Connection(object):
             return
         self.stream.close()
 
-    def close(self):
+    def close_session(self):
+        """Close a sucessfully authenticated session.
+        """
         if not self.is_open():
             return
         if self._active_result is not None:
             self._active_result.fetch_all()
         self.protocol.send_close()
+        self.protocol.read_ok()
+        self.stream.close()
+
+    def close_connection(self):
+        """Announce to the server that the client wants to close the
+        connection. Discards any session state of the server.
+        """
+        if not self.is_open():
+            return
+        if self._active_result is not None:
+            self._active_result.fetch_all()
+        self.protocol.send_connection_close()
         self.protocol.read_ok()
         self.stream.close()
 
@@ -443,4 +457,4 @@ class Session(object):
         self._connection.execute_nonquery("sql", "ROLLBACK", True)
 
     def close(self):
-        self._connection.close()
+        self._connection.close_session()

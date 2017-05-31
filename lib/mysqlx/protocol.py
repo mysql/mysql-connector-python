@@ -371,6 +371,11 @@ class Protocol(object):
         if msg.type != "Mysqlx.Ok":
             raise InterfaceError("Unexpected message encountered")
 
+    def send_connection_close(self):
+        msg = Message("Mysqlx.Connection.Close")
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ClientMessages.Type.CON_CLOSE"), msg)
+
     def send_close(self):
         msg = Message("Mysqlx.Session.Close")
         self._writer.write_message(mysqlxpb_enum(
