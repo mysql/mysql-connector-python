@@ -47,6 +47,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 ssl_opts = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
+sess_opts = ssl_opts + ["user", "password", "schema", "host", "port",
+                        "routers", "socket", "ssl-mode"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -135,18 +137,27 @@ def _validate_settings(settings):
     Args:
         settings: dict containing connection settings.
     """
+    invalid_opts = set(settings.keys()).difference(sess_opts)
+    if invalid_opts:
+        raise ProgrammingError("Invalid options: {0}."
+                               "".format(", ".join(invalid_opts)))
+
     if "routers" in settings:
         for router in settings["routers"]:
             _validate_hosts(router)
     elif "host" in settings:
         _validate_hosts(settings)
 
-    if "ssl-mode" in settings and settings["ssl-mode"] not in SSLMode:
-        raise InterfaceError("Invalid SSL Mode '{0}'."
-                             "".format(settings["ssl-mode"]))
-    elif settings.get("ssl-mode") == SSLMode.DISABLED and \
-        any(key in settings for key in ssl_opts):
-        raise InterfaceError("SSL options used with ssl-mode 'disabled'.")
+    if "ssl-mode" in settings:
+        try:
+            settings["ssl-mode"] = settings["ssl-mode"].lower()
+            SSLMode.index(settings["ssl-mode"])
+        except (AttributeError, ValueError):
+            raise InterfaceError("Invalid SSL Mode '{0}'."
+                                 "".format(settings["ssl-mode"]))
+        if settings["ssl-mode"] == SSLMode.DISABLED and \
+            any(key in settings for key in ssl_opts):
+            raise InterfaceError("SSL options used with ssl-mode 'disabled'.")
 
     if "ssl-crl" in settings and not "ssl-ca" in settings:
         raise InterfaceError("CA Certificate not provided.")

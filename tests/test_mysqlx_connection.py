@@ -231,6 +231,24 @@ class MySQLxSessionTests(tests.MySQLxTests):
         except InterfaceError as err:
             self.assertEqual(4001, err.errno)
 
+        # Invalid option with URI
+        uri = "mysqlx://{0}:{1}@{2}:{3}?invalid=option" \
+              "".format(user, password, host, port)
+        self.assertRaises(ProgrammingError, mysqlx.get_session, uri)
+
+        # Invalid option with dict
+        config = {
+            "user": user,
+            "password": password,
+            "host": host,
+            "port": port,
+            "invalid": "option"
+        }
+        self.assertRaises(ProgrammingError, mysqlx.get_session, config)
+
+        # Invalid option with kwargs
+        self.assertRaises(ProgrammingError, mysqlx.get_session, **config)
+
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
     def test_mysqlx_socket(self):
         # Connect with unix socket
