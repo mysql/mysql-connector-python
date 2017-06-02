@@ -1422,6 +1422,9 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("name", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.STRING, col.get_type())
+        if tests.MYSQL_VERSION >= (8, 0, 1):
+            self.assertEqual("utf8mb4_0900_ai_ci", col.get_collation_name())
+            self.assertEqual("utf8mb4", col.get_character_set_name())
 
         col = result.columns[2]
         self.assertEqual("pic", col.get_column_name())

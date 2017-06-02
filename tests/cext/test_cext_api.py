@@ -301,10 +301,10 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         version = cmy.get_server_version()
         self.assertIsInstance(version, tuple)
         self.assertEqual(3, len(version))
-        self.assertTrue(all([isinstance(v, int) and v > 0 for v in version]))
+        self.assertTrue(all([isinstance(v, int) for v in version]))
 
-        self.assertTrue(3 < version[0] < 7)
-        self.assertTrue(0 < version[1] < 20)
+        self.assertTrue(3 < version[0] < 9)
+        self.assertTrue(0 <= version[1] < 20)
         self.assertTrue(0 < version[2] < 99)
 
     def test_thread_id(self):

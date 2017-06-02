@@ -1042,8 +1042,13 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #if MYSQL_VERSION_ID >= 50711
 	unsigned int ssl_mode;
 #endif
-	my_bool abool;
-	my_bool ssl_enabled= 0;
+#if MYSQL_VERSION_ID >= 80001
+	bool abool;
+	bool ssl_enabled= 0;
+#else
+  my_bool abool;
+  my_bool ssl_enabled= 0;
+#endif
 	MYSQL *res;
 
 	static char *kwlist[]=

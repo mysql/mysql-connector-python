@@ -1821,6 +1821,8 @@ class BugOra17002411(tests.MySQLConnectorTests):
         self.assertEqual(self.exp_rows, cur.fetchone()[0])
 
 
+@unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
+                 "BugOra17422299 not tested with MySQL version >= 8.0.1")
 class BugOra17422299(tests.MySQLConnectorTests):
     """BUG#17422299: cmd_shutdown fails with malformed connection packet
     """
