@@ -28,6 +28,7 @@ from . import constants
 
 from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
 from .connection import Session
+from .constants import SSLMode
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
@@ -45,6 +46,7 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
 
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
+ssl_opts = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -114,8 +116,14 @@ def _parse_connection_uri(uri):
     else:
         settings.update(_parse_address_list(host))
 
-    for opt, val in dict(parse_qsl(query_str, True)).items():
-        settings[opt] = unquote(val.strip("()")) or True
+    for key, val in parse_qsl(query_str, True):
+        opt = key.lower()
+        if opt in settings:
+            raise InterfaceError("Duplicate option '{0}'.".format(key))
+        if opt in ssl_opts:
+            settings[opt] = unquote(val.strip("()"))
+        else:
+            settings[opt] = val.lower()
     return settings
 
 def _validate_settings(settings):
@@ -127,6 +135,33 @@ def _validate_settings(settings):
     Args:
         settings: dict containing connection settings.
     """
+    if "routers" in settings:
+        for router in settings["routers"]:
+            _validate_hosts(router)
+    elif "host" in settings:
+        _validate_hosts(settings)
+
+    if "ssl-mode" in settings and settings["ssl-mode"] not in SSLMode:
+        raise InterfaceError("Invalid SSL Mode '{0}'."
+                             "".format(settings["ssl-mode"]))
+    elif settings.get("ssl-mode") == SSLMode.DISABLED and \
+        any(key in settings for key in ssl_opts):
+        raise InterfaceError("SSL options used with ssl-mode 'disabled'.")
+
+    if "ssl-crl" in settings and not "ssl-ca" in settings:
+        raise InterfaceError("CA Certificate not provided.")
+    if "ssl-key" in settings and not "ssl-cert" in settings:
+        raise InterfaceError("Client Certificate not provided.")
+
+    if not "ssl-ca" in settings and settings.get("ssl-mode") \
+        in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
+        raise InterfaceError("Cannot verify Server without CA.")
+    if "ssl-ca" in settings and settings.get("ssl-mode") \
+        not in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
+        raise InterfaceError("Must verify Server if CA is provided.")
+
+
+def _validate_hosts(settings):
     if "priority" in settings and settings["priority"]:
         try:
             settings["priority"] = int(settings["priority"])
@@ -163,16 +198,14 @@ def _get_connection_settings(*args, **kwargs):
             settings.update(args[0])
     elif kwargs:
         settings.update(kwargs)
+        for key, val in settings.items():
+            if "_" in key:
+                settings[key.replace("_", "-")] = settings.pop(key)
 
     if not settings:
         raise InterfaceError("Settings not provided")
 
-    if "routers" in settings:
-        for router in settings.get("routers"):
-            _validate_settings(router)
-    else:
-        _validate_settings(settings)
-
+    _validate_settings(settings)
     return settings
 
 def get_session(*args, **kwargs):

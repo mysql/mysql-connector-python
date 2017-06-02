@@ -31,6 +31,7 @@ except:
 
 import sys
 import socket
+import logging
 
 from functools import wraps
 
@@ -38,6 +39,7 @@ from .authentication import MySQL41AuthPlugin
 from .errors import InterfaceError, OperationalError, ProgrammingError
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES
 from .crud import Schema
+from .constants import SSLMode
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
 from .statement import SqlStatement, AddStatement
@@ -45,15 +47,17 @@ from .statement import SqlStatement, AddStatement
 
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
-
+_LOGGER = logging.getLogger("mysqlx")
 
 class SocketStream(object):
     def __init__(self):
         self._socket = None
         self._is_ssl = False
+        self._host = None
 
     def connect(self, params):
         if isinstance(params, tuple):
+            self._host = params[0]
             s_type = socket.AF_INET6 if ":" in params[0] else socket.AF_INET
         else:
             s_type = socket.AF_UNIX
@@ -84,39 +88,46 @@ class SocketStream(object):
         self._socket.close()
         self._socket = None
 
-    def set_ssl(self, ssl_opts={}):
+    def set_ssl(self, ssl_mode, ssl_ca, ssl_crl, ssl_cert, ssl_key):
         if not SSL_AVAILABLE:
             self.close()
             raise RuntimeError("Python installation has no SSL support.")
 
         context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         context.load_default_certs()
-        if "ssl-ca" in ssl_opts:
+
+        if ssl_ca:
             try:
-                context.load_verify_locations(ssl_opts["ssl-ca"])
+                context.load_verify_locations(ssl_ca)
                 context.verify_mode = ssl.CERT_REQUIRED
-            except (IOError, ssl.SSLError):
+            except (IOError, ssl.SSLError) as err:
                 self.close()
-                raise InterfaceError("Invalid CA certificate.")
-        if "ssl-crl" in ssl_opts:
+                raise InterfaceError("Invalid CA Certificate: {}".format(err))
+
+        if ssl_crl:
             try:
-                context.load_verify_locations(ssl_opts["ssl-crl"])
-                context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
-            except (IOError, ssl.SSLError):
+                context.load_verify_locations(ssl_crl)
+                context.verify_flags = ssl.VERIFY_CRL_CHECK_LEAF
+            except (IOError, ssl.SSLError) as err:
                 self.close()
-                raise InterfaceError("Invalid CRL.")
-        if "ssl-cert" in ssl_opts:
+                raise InterfaceError("Invalid CRL: {}".format(err))
+
+        if ssl_cert:
             try:
-                context.load_cert_chain(ssl_opts["ssl-cert"],
-                    ssl_opts.get("ssl-key", None))
-            except (IOError, ssl.SSLError):
+                context.load_cert_chain(ssl_cert, ssl_key)
+            except (IOError, ssl.SSLError) as err:
                 self.close()
-                raise InterfaceError("Invalid Client Certificate/Key.")
-        elif "ssl-key" in ssl_opts:
-            self.close()
-            raise InterfaceError("Client Certificate not provided.")
+                raise InterfaceError("Invalid Certificate/Key: {}".format(err))
 
         self._socket = context.wrap_socket(self._socket)
+        if ssl_mode == SSLMode.VERIFY_IDENTITY:
+            try:
+                hostname = socket.gethostbyaddr(self._host)
+                ssl.match_hostname(self._socket.getpeercert(), hostname[0])
+            except ssl.CertificateError as err:
+                self.close()
+                raise InterfaceError("Unable to verify server identity: {}"
+                                     "".format(err))
         self._is_ssl = True
 
 
@@ -223,22 +234,29 @@ class Connection(object):
         raise InterfaceError("Failed to connect to any of the routers.", 4001)
 
     def _handle_capabilities(self):
+        if self.settings.get("ssl-mode") == SSLMode.DISABLED:
+            return
+        if "socket" in self.settings:
+            if self.settings.get("ssl-mode"):
+                _LOGGER.warning("SSL not required when using Unix socket.")
+            return
+
         data = self.protocol.get_capabilites().capabilities
         if not (data[0]["name"].lower() == "tls" if data else False):
-            if self.settings.get("ssl-enable", False):
-                self.close()
-                raise OperationalError("SSL not enabled at server.")
-            return
+            self.close()
+            raise OperationalError("SSL not enabled at server.")
 
         if sys.version_info < (2, 7, 9):
-            if self.settings.get("ssl-enable", False):
-                self.close()
-                raise RuntimeError("The support for SSL is not available for "
-                    "this Python version.")
-            return
+            self.close()
+            raise RuntimeError("The support for SSL is not available for "
+                "this Python version.")
 
         self.protocol.set_capabilities(tls=True)
-        self.stream.set_ssl(self.settings)
+        self.stream.set_ssl(self.settings.get("ssl-mode", SSLMode.REQUIRED),
+                            self.settings.get("ssl-ca"),
+                            self.settings.get("ssl-crl"),
+                            self.settings.get("ssl-cert"),
+                            self.settings.get("ssl-key"))
 
     def _authenticate(self):
         plugin = MySQL41AuthPlugin(self._user, self._password)

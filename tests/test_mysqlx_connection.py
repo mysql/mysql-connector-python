@@ -31,6 +31,8 @@ import sys
 import tests
 import mysqlx
 
+from mysqlx.errors import InterfaceError, ProgrammingError
+
 if mysqlx.compat.PY3:
     from urllib.parse import quote_plus
 else:
@@ -109,6 +111,11 @@ _ROUTER_LIST_RESULTS = (  # (uri, result)
      "priority": 98}], "password": "password", "user": "user"}),
 )
 
+def file_uri(path, brackets=True):
+    if brackets:
+        return "{0}{1}".format(path[0], quote_plus(path[1:]))
+    return "({0})".format(path)
+
 def build_uri(**kwargs):
     uri = "mysqlx://{0}:{1}".format(kwargs["user"], kwargs["password"])
 
@@ -130,7 +137,7 @@ def build_uri(**kwargs):
 
         uri = "{0}@[{1}]".format(uri, ",".join(routers))
     else:
-        raise mysqlx.errors.ProgrammingError("host or routers required.")
+        raise ProgrammingError("host or routers required.")
 
     if "port" in kwargs:
         uri = "{0}:{1}".format(uri, kwargs["port"])
@@ -138,6 +145,8 @@ def build_uri(**kwargs):
         uri = "{0}/{1}".format(uri, kwargs["schema"])
 
     query = []
+    if "ssl_mode" in kwargs:
+        query.append("ssl-mode={0}".format(kwargs["ssl_mode"]))
     if "ssl_ca" in kwargs:
         query.append("ssl-ca={0}".format(kwargs["ssl_ca"]))
     if "ssl_cert" in kwargs:
@@ -188,22 +197,20 @@ class MySQLxSessionTests(tests.MySQLxTests):
         routers = [{"host": "bad_host", "priority": 100},
                    {"host": host, "port": port}]
         uri = build_uri(user=user, password=password, routers=routers)
-        self.assertRaises(mysqlx.errors.ProgrammingError,
-                          mysqlx.get_session, uri)
+        self.assertRaises(ProgrammingError, mysqlx.get_session, uri)
         try:
             session = mysqlx.get_session(uri)
-        except mysqlx.errors.ProgrammingError as err:
+        except ProgrammingError as err:
             self.assertEqual(4000, err.errno)
 
         # Session to a farm using invalid priorities (out of range)
         routers = [{"host": "bad_host", "priority": 100},
                    {"host": host, "port": port, "priority": 101}]
         uri = build_uri(user=user, password=password, routers=routers)
-        self.assertRaises(mysqlx.errors.ProgrammingError,
-                          mysqlx.get_session, uri)
+        self.assertRaises(ProgrammingError, mysqlx.get_session, uri)
         try:
             session = mysqlx.get_session(uri)
-        except mysqlx.errors.ProgrammingError as err:
+        except ProgrammingError as err:
             self.assertEqual(4007, err.errno)
 
         # Establish an Session to a farm using one of many routers (no prios)
@@ -214,16 +221,14 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Break loop during connect (non-network error)
         uri = build_uri(user=user, password="bad_pass", routers=routers)
-        self.assertRaises(mysqlx.errors.InterfaceError,
-                          mysqlx.get_session, uri)
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Break loop during connect (none left)
         uri = "mysqlx://{0}:{1}@[bad_host, another_bad_host]".format(user, password)
-        self.assertRaises(mysqlx.errors.InterfaceError,
-                          mysqlx.get_session, uri)
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
         try:
             session = mysqlx.get_session(uri)
-        except mysqlx.errors.InterfaceError as err:
+        except InterfaceError as err:
             self.assertEqual(4001, err.errno)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
@@ -236,6 +241,14 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         session = mysqlx.get_session(uri)
 
+        # No SSL with Unix Sockets
+        res = mysqlx.statement.SqlStatement(session._connection,
+            "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
+        self.assertEqual("OFF", res[0][1])
+
+        session.close()
+
+        # Socket parsing tests
         conn = mysqlx._get_connection_settings("root:@(/path/to/sock)")
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
@@ -385,9 +398,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
                      "not available for Python versions < 2.7.9.")
-    def __test_ssl_connection(self):
+    def test_ssl_connection(self):
         config = {}
         config.update(self.connect_kwargs)
+        socket = config.pop("socket")
 
         # Secure by default
         session = mysqlx.get_session(config)
@@ -402,14 +416,34 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         session.close()
 
+        # Error on setting Client key without Client Certificate
         config["ssl-key"] = tests.SSL_KEY
-        self.assertRaises(mysqlx.errors.InterfaceError,
-                          mysqlx.get_session, config)
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
 
-        # Connection with ssl parameters
+        # Error on settings CRL without setting CA Certificate
+        config["ssl-crl"] = "/dummy/path"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+        config.pop("ssl-crl")
+
+        # Error on setting SSL Mode to disabled with any SSL option
+        config["ssl-mode"] = "disabled"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Error on setting SSL Mode to verify_* without ssl_ca
+        config["ssl-mode"] = "verify_ca"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        config["ssl-mode"] = "verify_identity"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Error on SSL Mode set to required with CA set
         config["ssl-ca"] = tests.SSL_CA
         config["ssl-cert"] = tests.SSL_CERT
+        config["ssl-mode"] = "required"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
 
+        # Connection with ssl parameters
+        config["ssl-mode"] = "verify_identity"
         session = mysqlx.get_session(config)
 
         res = mysqlx.statement.SqlStatement(session._connection,
@@ -422,23 +456,30 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         session.close()
 
-        ssl_ca="{0}{1}".format(config["ssl-ca"][0],
-                               quote_plus(config["ssl-ca"][1:]))
-        ssl_key="{0}{1}".format(config["ssl-key"][0],
-                                quote_plus(config["ssl-key"][1:]))
-        ssl_cert="{0}{1}".format(config["ssl-ca"][0],
-                                 quote_plus(config["ssl-cert"][1:]))
-        uri = build_uri(user=config["user"], password=config["password"],
-                        host=config["host"], ssl_ca=ssl_ca,
-                        ssl_cert=ssl_cert, ssl_key=ssl_key)
+        # Error if ssl-mode=disabled and ssl_* set
+        extra = [("ssl_mode", "disabled"),
+                 ("ssl_ca", "({0})".format(tests.SSL_CA))]
+        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        # Error if invalid ssl-mode
+        extra = [("ssl_mode", "invalid")]
+        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        # Parsing SSL Certificates
+        extra = [("ssl_mode", "verify_ca"),
+                 ("ssl_ca", file_uri(tests.SSL_CA, False)),
+                 ("ssl_key", file_uri(tests.SSL_KEY, False)),
+                 ("ssl_cert", file_uri(tests.SSL_CERT, False))]
+        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
         session = mysqlx.get_session(uri)
 
-        ssl_ca = "({0})".format(config["ssl-ca"])
-        ssl_cert = "({0})".format(config["ssl-cert"])
-        ssl_key = "({0})".format(config["ssl-key"])
-        uri = build_uri(user=config["user"], password=config["password"],
-                        host=config["host"], ssl_ca=ssl_ca,
-                        ssl_cert=ssl_cert, ssl_key=ssl_key)
+        extra = [("ssl_mode", "verify_ca"),
+                 ("ssl_ca", file_uri(tests.SSL_CA)),
+                 ("ssl_key", file_uri(tests.SSL_KEY)),
+                 ("ssl_cert", file_uri(tests.SSL_CERT))]
+        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
         session = mysqlx.get_session(uri)
 
     def test_disabled_x_protocol(self):
@@ -448,5 +489,4 @@ class MySQLxSessionTests(tests.MySQLxTests):
         settings = self.connect_kwargs.copy()
         settings["port"] = res[0][1]  # Lets use the MySQL classic port
         session.close()
-        self.assertRaises(mysqlx.errors.ProgrammingError, mysqlx.get_session,
-                          settings)
+        self.assertRaises(ProgrammingError, mysqlx.get_session, settings)
