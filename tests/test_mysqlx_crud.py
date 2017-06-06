@@ -466,7 +466,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         persons = [{"name": "Wilma", "age": 33}, {"name": "Barney", "age": 42}]
         result = collection.add(persons).execute()
         for person in persons:
-            self.assertTrue(person.has_key("_id"))
+            if tests.PY2:
+                self.assertTrue(person.has_key("_id"))
+            else:
+                self.assertTrue("_id" in person)
             self.assertEqual(len(person["_id"]), 32)
 
         self.schema.drop_collection(collection_name)

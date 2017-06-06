@@ -477,12 +477,12 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Error if ssl-mode=disabled and ssl_* set
         extra = [("ssl_mode", "disabled"),
                  ("ssl_ca", "({0})".format(tests.SSL_CA))]
-        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
+        uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Error if invalid ssl-mode
         extra = [("ssl_mode", "invalid")]
-        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
+        uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Parsing SSL Certificates
@@ -490,14 +490,14 @@ class MySQLxSessionTests(tests.MySQLxTests):
                  ("ssl_ca", file_uri(tests.SSL_CA, False)),
                  ("ssl_key", file_uri(tests.SSL_KEY, False)),
                  ("ssl_cert", file_uri(tests.SSL_CERT, False))]
-        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
+        uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
         session = mysqlx.get_session(uri)
 
         extra = [("ssl_mode", "verify_ca"),
                  ("ssl_ca", file_uri(tests.SSL_CA)),
                  ("ssl_key", file_uri(tests.SSL_KEY)),
                  ("ssl_cert", file_uri(tests.SSL_CERT))]
-        uri = build_uri(**dict(self.connect_kwargs.items() + extra))
+        uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
         session = mysqlx.get_session(uri)
 
     def test_disabled_x_protocol(self):
