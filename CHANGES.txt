@@ -10,7 +10,19 @@ Full release notes:
 
 v8.0.4
 ======
+- WL#10772: Cleanup Drop APIs
+- WL#10770: Ensure all Session connections are secure by default
+- WL#10754: Forbid modify() and remove() with no condition
+- WL#10659: Support utf8mb4 as default charset
+- WL#10658: Remove concept of NodeSession
 - WL#10657: Move version number to 8.0
+- WL#10198: Add Protobuf C++ extension implementation
+- WL#10004: Document UUID generation
+- BUG#26175003: Fix Session.sql() when using unicode SQL statements with Python 2.7
+- BUG#26161838: Dropping an non-existing index should succeed silently
+- BUG#26160876: Fix issue when using empty condition in Collection.remove() and Table.delete()
+- BUG#26029811: Improve error thrown when using an invalid parameter in bind()
+- BUG#25991574: Fix Collection.remove() and Table.delete() missing filters
 
 v2.2.3
 ======
