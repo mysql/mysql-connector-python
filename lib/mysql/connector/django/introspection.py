@@ -72,7 +72,53 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         else:
             return [row[0] for row in cursor.fetchall()]
 
-    if django.VERSION >= (1, 8):
+    if django.VERSION >= (1, 11):
+        def get_table_description(self, cursor, table_name):
+            """
+            Returns a description of the table, with the DB-API
+            cursor.description interface."
+            """
+            # - information_schema database gives more accurate results for
+            #   some figures:
+            # - varchar length returned by cursor.description is an internal
+            #   length, not visible length (#5725)
+            # - precision and scale (for decimal fields) (#5014)
+            # - auto_increment is not available in cursor.description
+
+            InfoLine = namedtuple('InfoLine', 'col_name data_type max_len '
+                                  'num_prec num_scale extra column_default')
+            cursor.execute("""
+                SELECT column_name, data_type, character_maximum_length,
+                numeric_precision, numeric_scale, extra, column_default
+                FROM information_schema.columns
+                WHERE table_name = %s AND table_schema = DATABASE()""",
+                           [table_name])
+            field_info = dict(
+                (line[0], InfoLine(*line)) for line in cursor.fetchall()
+            )
+
+            cursor.execute("SELECT * FROM %s LIMIT 1"
+                           % self.connection.ops.quote_name(table_name))
+            to_int = lambda i: int(i) if i is not None else i
+            fields = []
+            for line in cursor.description:
+                col_name = force_text(line[0])
+                fields.append(
+                    FieldInfo(*(
+                        (col_name,) +
+                        line[1:3] +
+                        (
+                            to_int(field_info[col_name].max_len) or line[3],
+                            to_int(field_info[col_name].num_prec) or line[4],
+                            to_int(field_info[col_name].num_scale) or line[5],
+                            line[6],
+                            field_info[col_name].column_default,
+                            field_info[col_name].extra,
+                        )
+                    ))
+                )
+            return fields
+    elif django.VERSION >= (1, 8):
         def get_table_description(self, cursor, table_name):
             """
             Returns a description of the table, with the DB-API
