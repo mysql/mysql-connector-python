@@ -148,8 +148,12 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
             if sys.version_info < (2, 7):
                 self.assertTrue(exp in self.introspect.get_table_list(cur))
             else:
-                res = any(table.name == exp
-                          for table in self.introspect.get_table_list(cur))
+                if tests.DJANGO_VERSION < (1, 8):
+                    res = any(table == exp
+                              for table in self.introspect.get_table_list(cur))
+                else:
+                    res = any(table.name == exp
+                              for table in self.introspect.get_table_list(cur))
                 self.assertTrue(res, "Table {table_name} not in table list"
                                      "".format(table_name=exp))
 
@@ -174,7 +178,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
                           internal_size=20, precision=None, scale=None,
                           null_ok=1)
             ]
-        else:
+        elif tests.DJANGO_VERSION < (1, 11):
             exp = [
                 FieldInfo(name=u'id', type_code=3, display_size=None,
                           internal_size=None, precision=10, scale=None,
@@ -185,6 +189,18 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
                 FieldInfo(name=u'c2', type_code=253, display_size=None,
                           internal_size=20, precision=None, scale=None,
                           null_ok=1, extra=u'')
+            ]
+        else:
+            exp = [
+                FieldInfo(name=u'id', type_code=3, display_size=None,
+                          internal_size=None, precision=10, scale=None,
+                          null_ok=0, default=None, extra=u'auto_increment'),
+                FieldInfo(name=u'c1', type_code=3, display_size=None,
+                          internal_size=None, precision=10, scale=None,
+                          null_ok=1, default=None, extra=u''),
+                FieldInfo(name=u'c2', type_code=253, display_size=None,
+                          internal_size=20, precision=None, scale=None,
+                          null_ok=1, default=None, extra=u'')
             ]
         res = self.introspect.get_table_description(cur, 'django_t1')
         self.assertEqual(exp, res)

@@ -22,6 +22,7 @@ import sys
 import warnings
 
 import django
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.functional import cached_property
 
 try:
@@ -29,7 +30,6 @@ try:
     from mysql.connector.conversion import MySQLConverter, MySQLConverterBase
     from mysql.connector.catch23 import PY2
 except ImportError as err:
-    from django.core.exceptions import ImproperlyConfigured
     raise ImproperlyConfigured(
         "Error loading mysql.connector module: {0}".format(err))
 
@@ -47,7 +47,6 @@ else:
     HAVE_CEXT = True
 
 if version < (1, 1):
-    from django.core.exceptions import ImproperlyConfigured
     raise ImproperlyConfigured(
         "MySQL Connector/Python v1.1.0 or newer "
         "is required; you have %s" % mysql.connector.__version__)
@@ -332,6 +331,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     SchemaEditorClass = DatabaseSchemaEditor
     Database = mysql.connector
 
+    if django.VERSION >= (1, 11):
+        client_class = DatabaseClient
+        creation_class = DatabaseCreation
+        features_class = DatabaseFeatures
+        introspection_class = DatabaseIntrospection
+        ops_class = DatabaseOperations
+        validation_class = DatabaseValidation
+
     def __init__(self, *args, **kwargs):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
 
@@ -344,12 +351,13 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             self.converter = DjangoCMySQLConverter()
         else:
             self.converter = DjangoMySQLConverter()
-        self.ops = DatabaseOperations(self)
-        self.features = DatabaseFeatures(self)
-        self.client = DatabaseClient(self)
-        self.creation = DatabaseCreation(self)
-        self.introspection = DatabaseIntrospection(self)
-        self.validation = DatabaseValidation(self)
+        if django.VERSION < (1, 11):
+            self.ops = DatabaseOperations(self)
+            self.features = DatabaseFeatures(self)
+            self.client = DatabaseClient(self)
+            self.creation = DatabaseCreation(self)
+            self.introspection = DatabaseIntrospection(self)
+            self.validation = DatabaseValidation(self)
 
     def _valid_connection(self):
         if self.connection:
@@ -418,7 +426,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             except AttributeError:
                 self._set_autocommit(self.settings_dict['AUTOCOMMIT'])
 
-    def create_cursor(self):
+    def create_cursor(self, name=None):
         # Django 1.6
         cursor = self.connection.cursor()
         return CursorWrapper(cursor)
