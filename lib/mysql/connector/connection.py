@@ -91,7 +91,12 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._pool_config_version = None
 
         if len(kwargs) > 0:
-            self.connect(**kwargs)
+            try:
+                self.connect(**kwargs)
+            except:
+                # Tidy-up underlying socket on failure
+                self.close()
+                raise
 
     def _do_handshake(self):
         """Get the handshake from the MySQL server"""
@@ -224,6 +229,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._socket.shutdown()
         except (AttributeError, errors.Error):
             pass  # Getting an exception would mean we are disconnected.
+        self._socket = None
 
     def close(self):
         """Disconnect from the MySQL server"""
@@ -235,6 +241,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._socket.close_connection()
         except (AttributeError, errors.Error):
             pass  # Getting an exception would mean we are disconnected.
+        self._socket = None
+
     disconnect = close
 
     def _send_cmd(self, command, argument=None, packet_number=0, packet=None,
