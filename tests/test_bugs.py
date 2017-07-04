@@ -4433,3 +4433,30 @@ class BugOra20736339(tests.MySQLConnectorTests):
         self.assertEqual(2, len(info["include"]))
         self.assertEqual(includes[0], info["include"][0])
         self.assertEqual(includes[1], info["include"][1])
+
+
+class BugOra22564149(tests.MySQLConnectorTests):
+    """BUG#22564149: CMD_QUERY_ITER ERRONEOUSLY CALLS ".ENCODE('UTF8')" ON
+    BYTESTRINGS
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.tbl = "BugOra22564149"
+        self.cnx = connection.MySQLConnection(**config)
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cnx.cmd_query("CREATE TABLE {0} (id INT, name VARCHAR(50))"
+                           "".format(self.tbl))
+
+    def tearDown(self):
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cnx.close()
+
+    def test_cmd_query_iter(self):
+        stmt = (u"SELECT 1; INSERT INTO {0} VALUES (1, 'João'),(2, 'André'); "
+                u"SELECT 3")
+        results = []
+        for result in self.cnx.cmd_query_iter(
+                stmt.format(self.tbl).encode("utf-8")):
+            results.append(result)
+            if "columns" in result:
+                results.append(self.cnx.get_rows())

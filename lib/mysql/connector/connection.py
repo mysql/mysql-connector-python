@@ -29,7 +29,7 @@ import os
 import time
 
 from .authentication import get_auth_plugin
-from .catch23 import PY2, isstr
+from .catch23 import PY2, isstr, UNICODE_TYPES
 from .constants import (
     ClientFlag, ServerCmd, ServerFlag,
     flag_is_set, ShutdownType, NET_BUFFER_LENGTH
@@ -517,10 +517,9 @@ class MySQLConnection(MySQLConnectionAbstract):
         Returns a generator.
         """
         if not isinstance(statements, bytearray):
-            if isstr(statements):
-                statements = bytearray(statements.encode('utf-8'))
-            else:
-                statements = bytearray(statements)
+            if isstr(statements) and isinstance(statements, UNICODE_TYPES):
+                statements = statements.encode('utf8')
+            statements = bytearray(statements)
 
         # Handle the first query result
         yield self._handle_result(self._send_cmd(ServerCmd.QUERY, statements))
