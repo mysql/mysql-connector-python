@@ -30,7 +30,8 @@ import weakref
 
 from _mysql_connector import MySQLInterfaceError  # pylint: disable=F0401,E0611
 
-from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
+from .abstracts import (MySQLConnectionAbstract, MySQLCursorAbstract,
+                        NAMED_TUPLE_CACHE)
 from .catch23 import PY2, isunicode
 from . import errors
 from .errorcode import CR_NO_RESULT_SET
@@ -757,7 +758,12 @@ class CMySQLCursorNamedTuple(CMySQLCursor):
         """Handle a result set"""
         super(CMySQLCursorNamedTuple, self)._handle_resultset()
         # pylint: disable=W0201
-        self.named_tuple = namedtuple('Row', self.column_names)
+        columns = tuple(self.column_names)
+        try:
+            self.named_tuple = NAMED_TUPLE_CACHE[columns]
+        except KeyError:
+            self.named_tuple = namedtuple('Row', columns)
+            NAMED_TUPLE_CACHE[columns] = self.named_tuple
         # pylint: enable=W0201
 
     def fetchone(self):
