@@ -4460,3 +4460,27 @@ class BugOra22564149(tests.MySQLConnectorTests):
             results.append(result)
             if "columns" in result:
                 results.append(self.cnx.get_rows())
+
+
+class BugOra24659561(tests.MySQLConnectorTests):
+    """BUG#24659561: LOOKUPERROR: UNKNOWN ENCODING: UTF8MB4
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config["charset"] = "utf8mb4"
+        self.tbl = "BugOra24659561"
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute("CREATE TABLE {0} (id INT, name VARCHAR(100))"
+                         "".format(self.tbl))
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+
+    def test_executemany_utf8mb4(self):
+        self.cur.executemany(
+            "INSERT INTO {0} VALUES (%s, %s)".format(self.tbl),
+            [(1, "Nuno"), (2, "Amitabh"), (3, "Rafael")]
+        )

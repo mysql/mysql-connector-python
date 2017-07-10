@@ -589,11 +589,11 @@ class MySQLCursor(CursorBase):
                 "Failed rewriting statement for multi-row INSERT. "
                 "Check SQL syntax."
             )
-        fmt = matches.group(1).encode(self._connection.charset)
+        fmt = matches.group(1).encode(self._connection.python_charset)
         values = []
 
         try:
-            stmt = operation.encode(self._connection.charset)
+            stmt = operation.encode(self._connection.python_charset)
             for params in seq_params:
                 tmp = fmt
                 if isinstance(params, dict):
