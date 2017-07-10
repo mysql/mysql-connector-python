@@ -31,6 +31,7 @@ import weakref
 from . import errors
 from .abstracts import MySQLCursorAbstract, NAMED_TUPLE_CACHE
 from .catch23 import PY2
+from .constants import ServerFlag
 
 SQL_COMMENT = r"\/\*.*?\*\/"
 RE_SQL_COMMENT = re.compile(
@@ -60,6 +61,7 @@ RE_SQL_FIND_PARAM = re.compile(
 
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
+MAX_RESULTS = 4294967295
 
 class _ParamSubstitutor(object):
     """
@@ -1080,6 +1082,36 @@ class MySQLCursorPrepared(MySQLCursor):
         self._prepared = None
         self._binary = True
         self._have_result = None
+        self._last_row_sent = False
+        self._cursor_exists = False
+
+    def reset(self, free=True):
+        if self._prepared:
+            try:
+                self._connection.cmd_stmt_close(self._prepared['statement_id'])
+            except errors.Error:
+                # We tried to deallocate, but it's OK when we fail.
+                pass
+            self._prepared = None
+        self._last_row_sent = False
+        self._cursor_exists = False
+
+    def _handle_noresultset(self, res):
+        self._handle_server_status(res.get('status_flag',
+                                           res.get('server_status', 0)))
+        super(MySQLCursorPrepared, self)._handle_noresultset(res)
+
+    def _handle_server_status(self, flags):
+        """Check for SERVER_STATUS_CURSOR_EXISTS and
+           SERVER_STATUS_LAST_ROW_SENT flags set by the server.
+        """
+        self._cursor_exists = flags & ServerFlag.STATUS_CURSOR_EXISTS != 0
+        self._last_row_sent = flags & ServerFlag.STATUS_LAST_ROW_SENT != 0
+
+    def _handle_eof(self, eof):
+        self._handle_server_status(eof.get('status_flag',
+                                           eof.get('server_status', 0)))
+        super(MySQLCursorPrepared, self)._handle_eof(eof)
 
     def callproc(self, *args, **kwargs):
         """Calls a stored procedue
@@ -1094,13 +1126,7 @@ class MySQLCursorPrepared(MySQLCursor):
         This method will try to deallocate the prepared statement and close
         the cursor.
         """
-        if self._prepared:
-            try:
-                self._connection.cmd_stmt_close(self._prepared['statement_id'])
-            except errors.Error:
-                # We tried to deallocate, but it's OK when we fail.
-                pass
-            self._prepared = None
+        self.reset()
         super(MySQLCursorPrepared, self).close()
 
     def _row_to_python(self, rowdata, desc=None):
@@ -1121,6 +1147,11 @@ class MySQLCursorPrepared(MySQLCursor):
             self._description = res[1]
             self._connection.unread_result = True
             self._have_result = True
+
+            if 'status_flag' in res[2]:
+                self._handle_server_status(res[2]['status_flag'])
+            elif 'server_status' in res[2]:
+                self._handle_server_status(res[2]['server_status'])
 
     def execute(self, operation, params=(), multi=False):  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
@@ -1199,6 +1230,8 @@ class MySQLCursorPrepared(MySQLCursor):
 
         Returns a tuple or None.
         """
+        if self._cursor_exists:
+            self._connection.cmd_stmt_fetch(self._prepared['statement_id'])
         return self._fetch_row() or None
 
     def fetchmany(self, size=None):
@@ -1214,10 +1247,18 @@ class MySQLCursorPrepared(MySQLCursor):
     def fetchall(self):
         if not self._have_unread_result():
             raise errors.InterfaceError("No result set to fetch from.")
-        (rows, eof) = self._connection.get_rows(
-            binary=self._binary, columns=self.description)
+        rows = []
+        if self._nextrow[0]:
+            rows.append(self._nextrow[0])
+        while self._have_unread_result():
+            if self._cursor_exists:
+                self._connection.cmd_stmt_fetch(
+                    self._prepared['statement_id'], MAX_RESULTS)
+            (tmp, eof) = self._connection.get_rows(
+                binary=self._binary, columns=self.description)
+            rows.extend(tmp)
+            self._handle_eof(eof)
         self._rowcount = len(rows)
-        self._handle_eof(eof)
         return rows
 
 

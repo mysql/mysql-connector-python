@@ -472,6 +472,11 @@ class ServerFlag(_Flags):
     STATUS_LAST_ROW_SENT = 1 << 7
     STATUS_DB_DROPPED = 1 << 8
     STATUS_NO_BACKSLASH_ESCAPES = 1 << 9
+    SERVER_STATUS_METADATA_CHANGED = 1 << 10
+    SERVER_QUERY_WAS_SLOW = 1 << 11
+    SERVER_PS_OUT_PARAMS = 1 << 12
+    SERVER_STATUS_IN_TRANS_READONLY = 1 << 13
+    SERVER_SESSION_STATE_CHANGED = 1 << 14
 
     desc = {
         'SERVER_STATUS_IN_TRANS': (1 << 0,
@@ -483,10 +488,31 @@ class ServerFlag(_Flags):
                                        'next query exists'),
         'SERVER_QUERY_NO_GOOD_INDEX_USED': (1 << 4, ''),
         'SERVER_QUERY_NO_INDEX_USED': (1 << 5, ''),
-        'SERVER_STATUS_CURSOR_EXISTS': (1 << 6, ''),
-        'SERVER_STATUS_LAST_ROW_SENT': (1 << 7, ''),
+        'SERVER_STATUS_CURSOR_EXISTS': (1 << 6,
+                                        'Set when server opened a read-only '
+                                        'non-scrollable cursor for a query.'),
+        'SERVER_STATUS_LAST_ROW_SENT': (1 << 7,
+                                        'Set when a read-only cursor is '
+                                        'exhausted'),
         'SERVER_STATUS_DB_DROPPED': (1 << 8, 'A database was dropped'),
         'SERVER_STATUS_NO_BACKSLASH_ESCAPES': (1 << 9, ''),
+        'SERVER_STATUS_METADATA_CHANGED': (1024,
+                                           'Set if after a prepared statement '
+                                           'reprepare we discovered that the '
+                                           'new statement returns a different '
+                                           'number of result set columns.'),
+        'SERVER_QUERY_WAS_SLOW': (2048, ''),
+        'SERVER_PS_OUT_PARAMS': (4096,
+                                 'To mark ResultSet containing output '
+                                 'parameter values.'),
+        'SERVER_STATUS_IN_TRANS_READONLY': (8192,
+                                            'Set if multi-statement '
+                                            'transaction is a read-only '
+                                            'transaction.'),
+        'SERVER_SESSION_STATE_CHANGED': (1 << 14,
+                                         'Session state has changed on the '
+                                         'server because of the execution of '
+                                         'the last statement'),
     }
 
 

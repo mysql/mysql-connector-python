@@ -933,6 +933,17 @@ class MySQLConnection(MySQLConnectionAbstract):
         eof = self._handle_eof(self._socket.recv())
         return (column_count, columns, eof)
 
+    def cmd_stmt_fetch(self, statement_id, rows=1):
+        """Fetch a MySQL statement Result Set
+
+        This method will send the FETCH command to MySQL together with the
+        given statement id and the number of rows to fetch.
+        """
+        packet = self._protocol.make_stmt_fetch(statement_id, rows)
+        self.unread_result = False
+        self._send_cmd(ServerCmd.STMT_FETCH, packet, expect_response=False)
+        self.unread_result = True
+
     def cmd_stmt_prepare(self, statement):
         """Prepare a MySQL statement
 
