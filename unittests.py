@@ -96,10 +96,12 @@ else:
     tests.TEST_BUILD_DIR = os.path.join(_TOPDIR, 'build', 'testing')
     sys.path.insert(0, tests.TEST_BUILD_DIR)
 
-
 # MySQL option file template. Platform specifics dynamically added later.
 MY_CNF = """
 # MySQL option file for MySQL Connector/Python tests
+[mysqld-8.0]
+information-schema-stats=LATEST
+
 [mysqld-5.6]
 innodb_compression_level = 0
 innodb_compression_failure_threshold_pct = 0
@@ -329,6 +331,12 @@ _UNITTESTS_CMD_ARGS = {
         'dest': 'fabric_protocol', 'metavar': 'NAME',
         'default': 'xmlrpc',
         'help': ("Protocol to talk to MySQL Fabric")
+    },
+
+    ('', '--extra-compile-args'): {
+        'dest': 'extra_compile_args', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Extra compile args for the C extension")
     },
 }
 
@@ -593,6 +601,7 @@ def setup_stats_db(cnx):
 def init_mysql_server(port, options):
     """Initialize a MySQL Server"""
     name = 'server{0}'.format(len(tests.MYSQL_SERVERS) + 1)
+    extra_args = []
 
     try:
         mysql_server = mysqld.MySQLServer(
@@ -607,6 +616,7 @@ def init_mysql_server(port, options):
             ssl_cert="tests_server_cert.pem",
             ssl_key="tests_server_key.pem",
             name=name,
+            extra_args=extra_args,
             sharedir=options.mysql_sharedir)
     except tests.mysqld.MySQLBootstrapError as err:
         LOGGER.error("Failed initializing MySQL server "
@@ -758,7 +768,8 @@ def main():
     tests.MYSQL_CAPI = options.mysql_capi
     if not options.skip_install:
         tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
-                                options.mysql_capi)
+                                options.mysql_capi,
+                                options.extra_compile_args)
 
     # Which tests cases to run
     testcases = []

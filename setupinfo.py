@@ -59,7 +59,6 @@ command_classes = {
 package_dir = {'': 'lib'}
 name = 'mysql-connector-python'
 version = '{0}.{1}.{2}'.format(*VERSION[0:3])
-
 extensions = [
     Extension("_mysql_connector",
               sources=[
@@ -69,8 +68,7 @@ extensions = [
                   "src/mysql_connector.c",
                   "src/force_cpp_linkage.cc",
               ],
-              include_dirs=['src/include'],
-    )
+              include_dirs=['src/include']),
 ]
 
 packages = [

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -1340,6 +1340,7 @@ class MySQLCursorBufferedDictTests(tests.TestsCursor):
                          'name VARCHAR(20), city VARCHAR(20))')
 
     def tearDown(self):
+        self.cur.execute('DROP TABLE IF EXISTS MySQLCursorBufferedDictTests')
         self.cur.close()
         self.connection.close()
 
@@ -1414,6 +1415,9 @@ class MySQLCursorBufferedNamedTupleTests(tests.TestsCursor):
                          'id INT(10), name VARCHAR(20), city VARCHAR(20))')
 
     def tearDown(self):
+        self.cur.execute('DROP TABLE IF EXISTS '
+                         'MySQLCursorBufferedNamedTupleTests')
+
         self.cur.close()
         self.connection.close()
 

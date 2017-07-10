@@ -35,9 +35,11 @@ from glob import glob
 import os
 import shlex
 import struct
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE, STDOUT, check_call
 import sys
 import platform
+import shutil
+
 
 ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
 py_arch = '64-bit' if ARCH_64BIT else '32-bit'
@@ -45,6 +47,10 @@ py_arch = '64-bit' if ARCH_64BIT else '32-bit'
 CEXT_OPTIONS = [
     ('with-mysql-capi=', None,
      "Location of MySQL C API installation or path to mysql_config"),
+    ('extra-compile-args=', None,
+     "Extra compile args"),
+    ('extra-link-args=', None,
+     "Extra link args")
 ]
 
 CEXT_STATIC_OPTIONS = [
@@ -125,7 +131,11 @@ def unix_lib_is64bit(lib_file):
         lib_file = mysqlclient_libs[-1]
 
     log.debug("# Using file command to test lib_file {0}".format(lib_file))
-    prc = Popen(['file', '-L', lib_file], stdin=PIPE, stderr=STDOUT,
+    if platform.uname() == 'SunOS':
+        cmd_list = ['file', '-L', lib_file]
+    else:
+        cmd_list = ['file', '-L', lib_file]
+    prc = Popen(cmd_list, stdin=PIPE, stderr=STDOUT,
                 stdout=PIPE)
     stdout = prc.communicate()[0]
     stdout = stdout.split(':')[1]
@@ -152,6 +162,9 @@ def parse_mysql_config_info(options, stdout):
     libs = shlex.split(info['libs'])
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
+    if platform.uname()[0] == 'SunOS':
+        info['lib_dir'] = info['lib_dir'].replace('-R', '')
+        info['libs'] = [lib.replace('-R', '') for lib in info['libs']]
     log.debug("# info['libs']: ")
     for lib in info['libs']:
         log.debug("#   {0}".format(lib))
@@ -185,7 +198,17 @@ def get_mysql_config_info(mysql_config):
     # Try to figure out the architecture
     info['arch'] = None
     if os.name == 'posix':
-        pathname = os.path.join(info['lib_dir'], 'lib' + info['libs'][0]) + '*'
+        if platform.uname()[0] == 'SunOS':
+            print("info['lib_dir']: {0}".format(info['lib_dir']))
+            print("info['libs'][0]: {0}".format(info['libs'][0]))
+            pathname = os.path.abspath(os.path.join(info['lib_dir'],
+                                                    'lib',
+                                                    info['libs'][0])) + '/*'
+        else:
+            pathname = os.path.join(info['lib_dir'],
+                                    'lib' + info['libs'][0]) + '*'
+        print("# Looking mysqlclient_lib at path: {0}".format(pathname))
+        log.debug("# searching mysqlclient_lib at: %s", pathname)
         libs = glob(pathname)
         mysqlclient_libs = []
         for filepath in libs:
@@ -205,7 +228,12 @@ def get_mysql_config_info(mysql_config):
                 log.debug("#+   {0}".format(mysqlclient_lib))
             log.debug("# tested mysqlclient_lib[-1]: "
                       "{0}".format(mysqlclient_libs[-1]))
-            proc = Popen(['file', '-L', mysqlclient_libs[-1]], stdout=PIPE,
+            if platform.uname()[0] == 'SunOS':
+                print("mysqlclient_lib: {0}".format(mysqlclient_libs[-1]))
+                cmd_list = ['file', mysqlclient_libs[-1]]
+            else:
+                cmd_list = ['file', '-L', mysqlclient_libs[-1]]
+            proc = Popen(cmd_list, stdout=PIPE,
                          universal_newlines=True)
             stdout, _ = proc.communicate()
             stdout = stdout.split(':')[1]
@@ -258,6 +286,8 @@ class BuildExtDynamic(build_ext):
 
     def initialize_options(self):
         build_ext.initialize_options(self)
+        self.extra_compile_args = None
+        self.extra_link_args = None
         self.with_mysql_capi = None
 
     def _finalize_connector_c(self, connc_loc):
@@ -367,10 +397,7 @@ class BuildExtDynamic(build_ext):
 
         # We try to offer a nice message when the architecture of Python
         # is not the same as MySQL Connector/C binaries.
-        py_arch = '64-bit' if ARCH_64BIT else '32-bit'
-        log.debug("# Python architecture: {0}".format(py_arch))
-        log.debug("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
-        log.debug("# self.arch: {0}".format(self.arch))
+        print("# self.arch: {0}".format(self.arch))
         if ARCH_64BIT != connc_64bit:
             log.error("Python is {0}, but does not "
                       "match MySQL C API {1} architecture, "
@@ -381,10 +408,16 @@ class BuildExtDynamic(build_ext):
             sys.exit(1)
 
     def finalize_options(self):
-        self.set_undefined_options('install',
-                                   ('with_mysql_capi', 'with_mysql_capi'))
+        self.set_undefined_options(
+            'install',
+            ('extra_compile_args', 'extra_compile_args'),
+            ('extra_link_args', 'extra_link_args'),
+            ('with_mysql_capi', 'with_mysql_capi'))
 
         build_ext.finalize_options(self)
+
+        print("# Python architecture: {0}".format(py_arch))
+        print("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
 
         if self.with_mysql_capi:
             self._finalize_connector_c(self.with_mysql_capi)
@@ -430,6 +463,13 @@ class BuildExtDynamic(build_ext):
         # Add system headers to Extensions extra_compile_args
         sysheaders = [ '-isystem' + dir for dir in cc.include_dirs]
         for ext in self.extensions:
+            # Add extra compile args
+            if self.extra_compile_args:
+                ext.extra_compile_args.extend(self.extra_compile_args.split())
+            # Add extra link args
+            if self.extra_link_args:
+                ext.extra_link_args.extend(self.extra_link_args.split())
+            # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
                     ext.extra_compile_args.append(sysheader)
@@ -440,10 +480,16 @@ class BuildExtDynamic(build_ext):
 
     def run(self):
         """Run the command"""
-        if not self.with_mysql_capi:
-            return
-
         if os.name == 'nt':
+            for ext in self.extensions:
+                # Use the multithread, static version of the run-time library
+                ext.extra_compile_args.append("/MT")
+                # Add extra compile args
+                if self.extra_compile_args:
+                    ext.extra_compile_args.extend(self.extra_compile_args.split())
+                # Add extra link args
+                if self.extra_link_args:
+                    ext.extra_link_args.extend(self.extra_link_args.split())
             build_ext.run(self)
         else:
             self.real_build_extensions = self.build_extensions
@@ -460,11 +506,27 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
+        install_obj = self.distribution.get_command_obj('install')
+        install_obj.with_mysql_capi = self.with_mysql_capi
+        install_obj.extra_compile_args = self.extra_compile_args
+        install_obj.extra_link_args = self.extra_link_args
+        install_obj.static = True
+
+        options_pairs = []
+        if not self.extra_compile_args:
+            options_pairs.append(('extra_compile_args', 'extra_compile_args'))
+        if not self.extra_link_args:
+            options_pairs.append(('extra_link_args', 'extra_link_args'))
         if not self.with_mysql_capi:
-            self.set_undefined_options('install',
-                                       ('with_mysql_capi', 'with_mysql_capi'))
+            options_pairs.append(('with_mysql_capi', 'with_mysql_capi'))
+        if options_pairs:
+            self.set_undefined_options('install', *options_pairs)
 
         build_ext.finalize_options(self)
+
+        print("# Python architecture: {0}".format(py_arch))
+        print("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
+
         self.connc_lib = os.path.join(self.build_temp, 'connc', 'lib')
         self.connc_include = os.path.join(self.build_temp, 'connc', 'include')
 
@@ -500,7 +562,8 @@ class BuildExtStatic(BuildExtDynamic):
         if os.name == 'posix':
             include_dirs.append(self.connc_include)
             library_dirs.append(self.connc_lib)
-            libraries.append("mysqlclient")
+            if self.with_mysql_capi:
+                libraries.append("mysqlclient")
 
             # As we statically link and the "libmysqlclient.a" library
             # carry no information what it depends on, we need to
@@ -512,6 +575,12 @@ class BuildExtStatic(BuildExtDynamic):
             ext.include_dirs.extend(include_dirs)
             ext.library_dirs.extend(library_dirs)
             ext.libraries.extend(libraries)
+            # Add extra compile args
+            if self.extra_compile_args:
+                ext.extra_compile_args.extend(self.extra_compile_args.split())
+            # Add extra link args
+            if self.extra_link_args:
+                ext.extra_link_args.extend(self.extra_link_args.split())
 
 
 class InstallLib(install_lib):
@@ -560,23 +629,27 @@ class Install(install):
 
     def initialize_options(self):
         install.initialize_options(self)
+        self.extra_compile_args = None
+        self.extra_link_args = None
         self.with_mysql_capi = None
         self.byte_code_only = None
         self.static = None
 
     def finalize_options(self):
         if self.static:
-            log.info("Linking CExtension statically with MySQL libraries")
+            log.info("Linking C Extension statically with libraries")
             self.distribution.cmdclass['build_ext'] = BuildExtStatic
 
         if self.byte_code_only is None:
             self.byte_code_only = False
 
+        build_ext_obj = self.distribution.get_command_obj('build_ext')
+        build_ext_obj.with_mysql_capi = self.with_mysql_capi
+        build_ext_obj.extra_compile_args = self.extra_compile_args
+        build_ext_obj.extra_link_args = self.extra_link_args
+        build_ext_obj.static = self.static
+
         if self.with_mysql_capi:
-            build_ext = self.distribution.get_command_obj('build_ext')
-            build_ext.with_mysql_capi = self.with_mysql_capi
-            build = self.distribution.get_command_obj('build_ext')
-            build.with_mysql_capi = self.with_mysql_capi
             self.need_ext = True
 
         if not self.need_ext:
@@ -586,7 +659,7 @@ class Install(install):
 
     def run(self):
         if not self.need_ext:
-            log.info("Not Installing C Extension")
+            log.info("Not Installing MySQL C Extension")
         else:
-            log.info("Installing C Extension")
+            log.info("Installing MySQL C Extension")
         install.run(self)

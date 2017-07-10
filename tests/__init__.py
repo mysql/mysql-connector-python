@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -40,7 +40,6 @@ import traceback
 from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
-
 
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
@@ -752,7 +751,8 @@ def setup_logger(logger, debug=False, logfile=None):
     LOGGER.addHandler(handler)
 
 
-def install_connector(root_dir, install_dir, connc_location=None):
+def install_connector(root_dir, install_dir, connc_location=None,
+                      extra_compile_args=None):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -775,11 +775,15 @@ def install_connector(root_dir, install_dir, connc_location=None):
     cmd.extend([
         'install',
         '--root', install_dir,
-        '--install-lib', '.'
+        '--install-lib', '.',
+        '--static',
     ])
 
     if connc_location:
-        cmd.extend(['--static', '--with-mysql-capi', connc_location])
+        cmd.extend(['--with-mysql-capi', connc_location])
+
+    if extra_compile_args:
+        cmd.extend(['--extra-compile-args', extra_compile_args])
 
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,

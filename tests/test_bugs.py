@@ -113,6 +113,8 @@ class Bug441430Tests(tests.MySQLConnectorTests):
         self.assertEqual(6, cur.rowcount)
         res = cur.execute("UPDATE %s SET id = id + %%s" % tbl, (10,))
         self.assertEqual(8, cur.rowcount)
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
         cur.close()
         self.cnx.close()
 
@@ -661,6 +663,13 @@ class BugOra13395083(tests.MySQLConnectorTests):
     def setUp(self):
         self.table_name = 'BugOra13395083'
 
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_name))
+
     @cnx_config(time_zone="+00:00")
     @foreach_cnx()
     def test_time_zone(self):
@@ -860,6 +869,12 @@ class BugOra14208326(tests.MySQLConnectorTests):
         self.cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.table)
         self.cnx.cmd_query("CREATE TABLE %s (id INT)" % self.table)
 
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table))
+
     @foreach_cnx(connection.MySQLConnection)
     def test_cmd_query(self):
         self._setup()
@@ -946,6 +961,12 @@ class BugOra14259954(tests.MySQLConnectorTests):
                   "`c1` int(11) NOT NULL DEFAULT '0', "
                   "PRIMARY KEY (`id`,`c1`))" % (self.tbl))
         cur.execute(create)
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
     @foreach_cnx()
     def test_executemany(self):
@@ -1804,6 +1825,8 @@ class BugOra17002411(tests.MySQLConnectorTests):
         self.assertEqual(self.exp_rows, cur.fetchone()[0])
 
 
+@unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
+                 "BugOra17422299 not tested with MySQL version >= 8.0.1")
 class BugOra17422299(tests.MySQLConnectorTests):
     """BUG#17422299: cmd_shutdown fails with malformed connection packet
     """
@@ -2113,6 +2136,10 @@ class BugOra17826833(tests.MySQLConnectorTests):
                   "`name` varchar(20) NOT NULL, "
                   "PRIMARY KEY (`id`))" % (self.city_tbl))
         self.cursor.execute(create)
+
+    def tearDown(self):
+        self.cursor.execute("DROP TABLE IF EXISTS {0}".format(self.city_tbl))
+        self.cursor.execute("DROP TABLE IF EXISTS {0}".format(self.emp_tbl))
 
     def test_executemany(self):
         stmt = "INSERT INTO {0} (id,name) VALUES (%s,%s)".format(
@@ -2453,6 +2480,15 @@ class BugOra18144971(tests.MySQLConnectorTests):
         cur.execute(create)
         cnx.close()
 
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        config['use_unicode'] = True
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_cp1251))
+
     @cnx_config(use_unicode=True)
     @foreach_cnx(connection.MySQLConnection)
     def test_prepared_statement(self):
@@ -2658,7 +2694,6 @@ class BugOra18694096(tests.MySQLConnectorTests):
         self.cnx.cmd_query(create)
 
     def tearDown(self):
-        return
         if self.cnx:
             self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
@@ -4187,17 +4222,17 @@ class BugOra21530841(tests.MySQLConnectorTests):
     def test_big_column_count(self):
         cur = self.cnx.cursor(raw=False, buffered=False)
         # Create table with 512 Columns
-        table = "CREATE TABLE t ({0})".format(
+        table = "CREATE TABLE {0} ({1})".format(self.tbl,
             ", ".join(["c{0} INT".format(idx) for idx in range(512)]))
         cur.execute(table)
 
         # Insert 1 record
-        cur.execute("INSERT INTO t(c1) values (1) ")
+        cur.execute("INSERT INTO {0}(c1) values (1) ".format(self.tbl))
         self.cnx.commit()
 
         # Select from 10 tables
         query = "SELECT * FROM {0} WHERE a1.c1 > 0".format(
-            ", ".join(["t a{0}".format(idx) for idx in range(10)]))
+            ", ".join(["{0} a{1}".format(self.tbl, idx) for idx in range(10)]))
         cur.execute(query)
         cur.fetchone()
         cur.close()

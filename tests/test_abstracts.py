@@ -213,6 +213,8 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.cnx.cmd_quit()
         self.assertFalse(self.cnx.is_connected())
 
+    @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
+                     "As of MySQL 8.0.1, CMD_SHUTDOWN is not recognized.")
     @foreach_cnx()
     def test_cmd_shutdown(self):
         server = tests.MYSQL_SERVERS[0]

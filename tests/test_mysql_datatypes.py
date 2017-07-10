@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -84,16 +84,14 @@ class TestsDataTypes(tests.MySQLConnectorTests):
 class TestsCursor(TestsDataTypes):
 
     def setUp(self):
-        pass
-        #self.config = tests.get_mysql_config()
-        #cnx = connection.MySQLConnection(**self.config)
-        #self.drop_tables(cnx)
+        self.config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**self.config)
+        self.drop_tables(cnx)
 
     def tearDown(self):
-        pass
-        #cnx = connection.MySQLConnection(**self.config)
-        #self.drop_tables(cnx)
-        #cnx.close()
+        cnx = connection.MySQLConnection(**self.config)
+        self.drop_tables(cnx)
+        cnx.close()
 
     @foreach_cnx()
     def test_numeric_int(self):

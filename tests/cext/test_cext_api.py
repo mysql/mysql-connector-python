@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -301,10 +301,10 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         version = cmy.get_server_version()
         self.assertIsInstance(version, tuple)
         self.assertEqual(3, len(version))
-        self.assertTrue(all([isinstance(v, int) and v > 0 for v in version]))
+        self.assertTrue(all([isinstance(v, int) for v in version]))
 
-        self.assertTrue(3 < version[0] < 7)
-        self.assertTrue(0 < version[1] < 20)
+        self.assertTrue(3 < version[0] < 9)
+        self.assertTrue(0 <= version[1] < 20)
         self.assertTrue(0 < version[2] < 99)
 
     def test_thread_id(self):
@@ -426,6 +426,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy2.query("SELECT * FROM {0} WHERE c1 > 3".format(table))
         self.assertEqual([(4,), (5,), (6,)], fetch_rows(cmy2))
 
+        cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
         cmy1.close()
         cmy2.close()
 
@@ -770,3 +771,4 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             have_more = cmy.next_result()
 
         self.assertEqual(exp, result)
+        cmy.query("DROP TABLE IF EXISTS {0}".format(table))

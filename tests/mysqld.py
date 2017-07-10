@@ -343,10 +343,11 @@ class MySQLServerBase(object):
 class MySQLServer(MySQLServerBase):
     """Class for managing a MySQL server"""
 
-    def __init__(self, basedir, topdir, cnf, bind_address, port, name,
-                 datadir=None, tmpdir=None, unix_socket_folder=None,
-                 ssl_folder=None, ssl_ca=None, ssl_cert=None, ssl_key=None,
-                 sharedir=None):
+    def __init__(self, basedir, topdir, cnf, bind_address, port,
+                 name, datadir=None, tmpdir=None, extra_args={},
+                 unix_socket_folder=None, ssl_folder=None, ssl_ca=None,
+                 ssl_cert=None, ssl_key=None, sharedir=None):
+        self._extra_args = extra_args
         self._cnf = cnf
         self._option_file = os.path.join(topdir, 'my.cnf')
         self._bind_address = bind_address
@@ -375,6 +376,7 @@ class MySQLServer(MySQLServerBase):
         super(MySQLServer, self).__init__(self._basedir,
                                           self._option_file,
                                           sharedir=self._sharedir)
+        self._init_sql = os.path.join(self._topdir, 'init.sql')
 
     def _create_directories(self):
         """Create directory structure for bootstrapping
@@ -388,9 +390,12 @@ class MySQLServer(MySQLServerBase):
         dirs = [
             self._topdir,
             os.path.join(self._topdir, 'tmp'),
-            self._datadir,
-            os.path.join(self._datadir, 'mysql')
         ]
+
+        if self._version[0:3] < (8, 0, 1):
+            dirs.append(self._datadir)
+            dirs.append(os.path.join(self._datadir, 'mysql'))
+
         for adir in dirs:
             LOGGER.debug("Creating directory %s", adir)
             os.mkdir(adir)
@@ -406,7 +411,6 @@ class MySQLServer(MySQLServerBase):
         cmd = [
             os.path.join(self._sbindir, EXEC_MYSQLD),
             '--no-defaults',
-            '--bootstrap',
             '--basedir=%s' % self._basedir,
             '--datadir=%s' % self._datadir,
             '--log-warnings=0',
@@ -416,6 +420,13 @@ class MySQLServer(MySQLServerBase):
             '--tmpdir=%s' % self._tmpdir,
             '--innodb_log_file_size=1Gb',
         ]
+
+        if self._version[0:2] >= (8, 0):
+            cmd.append("--initialize-insecure")
+            cmd.append("--init-file={0}".format(self._init_sql))
+        else:
+            cmd.append("--bootstrap")
+
         if self._version[0:2] < (5, 5):
             cmd.append('--language={0}/english'.format(self._lc_messages_dir))
         else:
@@ -452,63 +463,61 @@ class MySQLServer(MySQLServerBase):
         extra_sql = [
             "CREATE DATABASE myconnpy;"
         ]
-        insert = (
-            "INSERT INTO mysql.user VALUES ('localhost','root'{0},"
-            "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-            "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-            "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
-            "@@default_authentication_plugin,'','N',"
-            "CURRENT_TIMESTAMP,NULL{1});"
-        )
-        # MySQL 5.7.5+ creates no user while bootstrapping
-        if self._version[0:3] >= (5, 7, 6):
-            # MySQL 5.7.6+ have extra account_locked col and no password col
-            extra_sql.append(insert.format("", ",'N'"))
-        elif self._version[0:3] >= (5, 7, 5):
-            extra_sql.append(insert.format(",''", ""))
+        defaults = ("'root'{0}, "
+                    "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                    "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                    "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
+                    "@@default_authentication_plugin,'','N',"
+                    "CURRENT_TIMESTAMP,NULL{1}")
 
-        insert_localhost = (
-            "INSERT INTO mysql.user SELECT '127.0.0.1', `User`{0},"
-            " `Select_priv`, `Insert_priv`, `Update_priv`, `Delete_priv`,"
-            " `Create_priv`, `Drop_priv`, `Reload_priv`, `Shutdown_priv`,"
-            " `Process_priv`, `File_priv`, `Grant_priv`, `References_priv`,"
-            " `Index_priv`, `Alter_priv`, `Show_db_priv`, `Super_priv`,"
-            " `Create_tmp_table_priv`, `Lock_tables_priv`, `Execute_priv`,"
-            " `Repl_slave_priv`, `Repl_client_priv`, `Create_view_priv`,"
-            " `Show_view_priv`, `Create_routine_priv`, "
-            "`Alter_routine_priv`,"
-            " `Create_user_priv`, `Event_priv`, `Trigger_priv`, "
-            "`Create_tablespace_priv`, `ssl_type`, `ssl_cipher`,"
-            "`x509_issuer`, `x509_subject`, `max_questions`, `max_updates`,"
-            "`max_connections`, `max_user_connections`, `plugin`,"
-            "`authentication_string`, `password_expired`,"
-            "`password_last_changed`, `password_lifetime`{1} FROM mysql.user "
-            "WHERE `user` = 'root' and `host` = 'localhost';"
-        )
-        # MySQL 5.7.4+ only creates root@localhost
-        if self._version[0:3] >= (5, 7, 6):
-            extra_sql.append(insert_localhost.format("", ",`account_locked`"))
+        hosts = ["::1", "127.0.0.1"]
+        if self._version[0:3] < (8, 0, 1):
+            # because we use --initialize-insecure for 8.0 above
+            # which already creates root @ localhost
+            hosts.append("localhost")
+
+        insert = "INSERT INTO mysql.user VALUES {0};".format(
+            ", ".join("('{0}', {{0}})".format(host) for host in hosts))
+
+        if self._version[0:3] >= (8, 0, 1):
+            # No password column, has account_locked, Create_role_priv and
+            # Drop_role_priv columns
+            extra_sql.append(insert.format(defaults.format("", ", 'N', 'Y', 'Y'")))
+        elif self._version[0:3] >= (5, 7, 6):
+            # No password column, has account_locked column
+            extra_sql.append(insert.format(defaults.format("", ", 'N'")))
         elif self._version[0:3] >= (5, 7, 4):
-            extra_sql.append(insert_localhost.format(",`Password`", ""))
+            # The password column
+            extra_sql.append(insert.format(defaults.format(", ''", "")))
 
         bootstrap_log = os.path.join(self._topdir, 'bootstrap.log')
         try:
             self._create_directories()
             cmd = self._get_bootstrap_cmd()
             sql = ["USE mysql;"]
-            for filename in script_files:
-                full_path = os.path.join(self._scriptdir, filename)
-                LOGGER.debug("Reading SQL from '%s'", full_path)
-                with open(full_path, 'r') as fp:
-                    sql.extend([line.strip() for line in fp.readlines()])
-            sql.extend(extra_sql)
-            fp_log = open(bootstrap_log, 'w')
-            prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT, stdout=fp_log)
-            if sys.version_info[0] == 2:
-                prc.communicate('\n'.join(sql))
+
+            if self._version[0:2] >= (8, 0):
+                test_sql = open(self._init_sql, "w")
+                test_sql.write("\n".join(extra_sql))
+                test_sql.close()
             else:
-                prc.communicate(bytearray('\n'.join(sql), 'utf8'))
+                for filename in script_files:
+                    full_path = os.path.join(self._scriptdir, filename)
+                    LOGGER.debug("Reading SQL from '%s'", full_path)
+                    with open(full_path, 'r') as fp:
+                        sql.extend([line.strip() for line in fp.readlines()])
+
+            fp_log = open(bootstrap_log, 'w')
+            if self._version[0:2] < (8, 0):
+                sql.extend(extra_sql)
+                prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT,
+                                       stdout=fp_log)
+                prc.communicate('\n'.join(sql) if sys.version_info[0] == 2
+                                else bytearray('\n'.join(sql), 'utf8'))
+            else:
+                prc = subprocess.call(cmd, stderr=subprocess.STDOUT,
+                                      stdout=fp_log)
             fp_log.close()
         except OSError as err:
             raise MySQLBootstrapError(
@@ -553,6 +562,7 @@ class MySQLServer(MySQLServerBase):
             'bind_address': self._bind_address,
             'port': self._port,
             'unix_socket': _convert_forward_slash(self._unix_socket),
+            'ssl_dir': _convert_forward_slash(self._ssldir),
             'ssl_ca': _convert_forward_slash(self._ssl_ca),
             'ssl_cert': _convert_forward_slash(self._ssl_cert),
             'ssl_key': _convert_forward_slash(self._ssl_key),
@@ -561,6 +571,13 @@ class MySQLServer(MySQLServerBase):
             'lc_messages_dir': _convert_forward_slash(
                 self._lc_messages_dir),
         }
+
+        for arg in self._extra_args:
+            if self._version < arg["version"]:
+                options.update(dict([(key, '') for key in
+                                     arg["options"].keys()]))
+            else:
+                options.update(arg["options"])
         options.update(**kwargs)
         try:
             fp = open(self._option_file, 'w')
