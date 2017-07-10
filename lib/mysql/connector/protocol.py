@@ -123,6 +123,10 @@ class MySQLProtocol(object):
             data += argument
         return data
 
+    def make_stmt_fetch(self, statement_id, rows=1):
+        """Make a MySQL packet with Fetch Statement command"""
+        return utils.int4store(statement_id) + utils.int4store(rows)
+
     def make_change_user(self, handshake, username=None, password=None,
                          database=None, charset=33, client_flags=0,
                          ssl_enabled=False, auth_plugin=None):
