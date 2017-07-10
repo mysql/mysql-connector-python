@@ -1318,20 +1318,20 @@ MySQL_escape_string(MySQL *self, PyObject *value)
         {
             return NULL;
         }
+        from_size= BytesSize(from);
+        from_str= PyBytesAsString(from);
     }
 #ifndef PY3
     // Python v2 str
     else if (PyString_Check(value))
-    {
-        from= value;
-    }
 #else
     // Python v3 bytes
     else if (PyBytes_Check(value))
-    {
-        from= value;
-    }
 #endif
+    {
+        from_size= BytesSize(value);
+        from_str= PyBytesAsString(value);
+    }
     else
     {
 #ifdef PY3
@@ -1342,10 +1342,8 @@ MySQL_escape_string(MySQL *self, PyObject *value)
         return NULL;
     }
 
-    from_size= BytesSize(from);
     to= BytesFromStringAndSize(NULL, from_size * 2 + 1);
     to_str= PyBytesAsString(to);
-    from_str= PyBytesAsString(from);
 
     Py_BEGIN_ALLOW_THREADS
     escaped_size= (Py_ssize_t)mysql_real_escape_string(&self->session, to_str,
@@ -1354,6 +1352,7 @@ MySQL_escape_string(MySQL *self, PyObject *value)
     Py_END_ALLOW_THREADS
 
     BytesResize(&to, escaped_size);
+    Py_XDECREF(from);
 
     if (!to)
     {
