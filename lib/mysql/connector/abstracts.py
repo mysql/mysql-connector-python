@@ -26,12 +26,15 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import re
 import time
+import weakref
 
 from .catch23 import make_abc, BYTE_TYPES
 from .conversion import MySQLConverterBase
 from .constants import ClientFlag, CharacterSet, DEFAULT_CONFIGURATION
 from .optionfiles import MySQLOptionsParser
 from . import errors
+
+NAMED_TUPLE_CACHE = weakref.WeakValueDictionary()
 
 @make_abc(ABCMeta)
 class MySQLConnectionAbstract(object):

@@ -29,7 +29,7 @@ import re
 import weakref
 
 from . import errors
-from .abstracts import MySQLCursorAbstract
+from .abstracts import MySQLCursorAbstract, NAMED_TUPLE_CACHE
 from .catch23 import PY2
 
 SQL_COMMENT = r"\/\*.*?\*\/"
@@ -1293,9 +1293,14 @@ class MySQLCursorNamedTuple(MySQLCursor):
 
         if row:
             # pylint: disable=W0201
-            self.named_tuple = namedtuple('Row', self.column_names)
+            columns = tuple(self.column_names)
+            try:
+                named_tuple = NAMED_TUPLE_CACHE[columns]
+            except KeyError:
+                named_tuple = namedtuple('Row', columns)
+                NAMED_TUPLE_CACHE[columns] = named_tuple
             # pylint: enable=W0201
-            return self.named_tuple(*row)
+            return named_tuple(*row)
 
     def fetchone(self):
         """Returns next row of a query result set
