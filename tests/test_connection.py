@@ -814,7 +814,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 charset=kwargs['charset'],
                 client_flags=kwargs['client_flags']),
         ]
-        self.cnx._socket.switch_to_ssl = lambda ca, cert, key: None
+        self.cnx._socket.switch_to_ssl = \
+            lambda ca, cert, key, verify_cert, cipher: None
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
             bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00'),

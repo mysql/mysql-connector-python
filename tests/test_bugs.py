@@ -2407,6 +2407,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
     def test_sha256_nonssl(self):
         config = tests.get_mysql_config()
         config['unix_socket'] = None
+        config['ssl_disabled'] = True
         config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
 
         user = self.users['sha256user']
@@ -4242,71 +4243,111 @@ class BugOra25397650(tests.MySQLConnectorTests):
     """BUG#25397650: CERTIFICATE VALIDITY NOT VERIFIED 
     """
     def setUp(self):
-        self.config = tests.get_mysql_config()
-        self.config = tests.get_mysql_config()
-        self.config.update({
-            'ssl_ca': os.path.abspath(
-                os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem')),
-            'ssl_cert': os.path.abspath(
-                os.path.join(tests.SSL_DIR, 'tests_client_cert.pem')),
-            'ssl_key': os.path.abspath(
-                os.path.join(tests.SSL_DIR, 'tests_client_key.pem')),
-        })
-        self.mysql_server = tests.MYSQL_SERVERS[0]
-        self._use_expired_cert()
+        self.config = tests.get_mysql_config().copy()
+        self.config.pop('unix_socket')
+        self.config['host'] = 'localhost'
+        self.ca = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'))
+        self.ca_1 = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_CA_cert_1.pem'))
 
-    def tearDown(self):
-        self._use_original_cert()
-        self._ensure_up()
+    def _verify_cert(self, config):
+        # Test with a bad CA
+        config['ssl_ca'] = self.ca_1
+        config['ssl_verify_cert'] = True
+        self.assertRaises(errors.InterfaceError,
+            mysql.connector.connect, **config)
+        config['ssl_verify_cert'] = False
+        mysql.connector.connect(**config)
 
-    def _ensure_up(self):
-        # Start the MySQL server again
-        if not self.mysql_server.check_running():
-            self.mysql_server.start()
-
-            if not self.mysql_server.wait_up():
-                self.fail("Failed restarting MySQL server after test")
-
-    def _use_original_cert(self):
-        self.mysql_server.stop()
-        self.mysql_server.wait_down()
-
-        self.mysql_server.start()
-        self.mysql_server.wait_up()
-        time.sleep(2)
-
-    def _use_expired_cert(self):
-        self.mysql_server.stop()
-        self.mysql_server.wait_down()
-
-        cert = os.path.abspath(
-            os.path.join(tests.SSL_DIR, 'tests_expired_server_cert.pem'))
-        key = os.path.abspath(
-            os.path.join(tests.SSL_DIR, 'tests_expired_server_key.pem'))
-        if os.name == 'nt':
-            cert = os.path.normpath(cert)
-            cert = cert.replace('\\', '\\\\')
-            key = os.path.normpath(key)
-            key = key.replace('\\', '\\\\')
-        self.mysql_server.start(ssl_cert=cert, ssl_key=key)
-        self.mysql_server.wait_up()
-        time.sleep(2)
+        # Test with the correct CA
+        config['ssl_ca'] = self.ca
+        config['ssl_verify_cert'] = True
+        mysql.connector.connect(**config)
+        config['ssl_verify_cert'] = False
+        mysql.connector.connect(**config)
 
     def test_pure_verify_server_certifcate(self):
-        self.config["use_pure"] = True
-        self.config['ssl_verify_cert'] = True
-        self.assertRaises(errors.InterfaceError,
-            mysql.connector.connect, **self.config)
-        self.config['ssl_verify_cert'] = False
-        mysql.connector.connect(**self.config)
+        config = self.config.copy()
+        config['use_pure'] = True
+
+        self._verify_cert(config)
 
     def test_cext_verify_server_certifcate(self):
-        self.config["use_pure"] = False
-        self.config['ssl_verify_cert'] = True
-        self.assertRaises(errors.InterfaceError,
-            mysql.connector.connect, **self.config)
-        self.config['ssl_verify_cert'] = False
-        mysql.connector.connect(**self.config)
+        config = self.config.copy()
+        config['use_pure'] = False
+
+        self._verify_cert(config)
+
+
+class BugOra21947091(tests.MySQLConnectorTests):
+    """BUG#21947091: """
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config.pop('unix_socket')
+        self.server = tests.MYSQL_SERVERS[0]
+
+    def _disable_ssl(self):
+        self.server.stop()
+        self.server.wait_down()
+
+        self.server.start(ssl_ca='', ssl_cert='', ssl_key='')
+        self.server.wait_up()
+        time.sleep(1)
+
+    def _enable_ssl(self):
+        self.server.stop()
+        self.server.wait_down()
+
+        self.server.start()
+        self.server.wait_up()
+        time.sleep(1)
+
+    def _verify_ssl(self, cnx, available=True):
+        cur = cnx.cursor()
+        cur.execute("SHOW STATUS LIKE 'Ssl_version'")
+        result = cur.fetchall()[0]
+        if available:
+            self.assertNotEqual(result[1], '')
+        else:
+            self.assertEqual(result[1], '')
+
+    def test_ssl_disabled_pure(self):
+        self.config['use_pure'] = True
+        self._test_ssl_modes()
+
+    def test_ssl_disabled_cext(self):
+        self.config['use_pure'] = False
+        self._test_ssl_modes()
+
+    def _test_ssl_modes(self):
+        config = self.config.copy()
+        # With SSL on server
+        # default
+        cnx = mysql.connector.connect(**config)
+        self._verify_ssl(cnx)
+
+        # disabled
+        config['ssl_disabled'] = True
+        cnx = mysql.connector.connect(**config)
+        self._verify_ssl(cnx, False)
+
+        self._disable_ssl()
+        config = self.config.copy()
+        config['ssl_ca'] = tests.SSL_CA
+        # Without SSL on server
+        try:
+            # default
+            cnx = mysql.connector.connect(**config)
+            self._verify_ssl(cnx, False)
+
+            # disabled
+            config['ssl_disabled'] = True
+            cnx = mysql.connector.connect(**config)
+            self._verify_ssl(cnx, False)
+
+        finally:
+            self._enable_ssl()
 
 
 class BugOra25589496(tests.MySQLConnectorTests):

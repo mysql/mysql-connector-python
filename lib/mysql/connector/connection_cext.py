@@ -158,12 +158,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
             'compress': self.isset_client_flag(ClientFlag.COMPRESS)
         }
 
-        if self.isset_client_flag(ClientFlag.SSL):
+        if not self._ssl_disabled:
             cnx_kwargs.update({
-                'ssl_ca': self._ssl['ca'],
-                'ssl_cert': self._ssl['cert'],
-                'ssl_key': self._ssl['key'],
-                'ssl_verify_cert': self._ssl['verify_cert']
+                'ssl_ca': self._ssl.get('ca'),
+                'ssl_cert': self._ssl.get('cert'),
+                'ssl_key': self._ssl.get('key'),
+                'ssl_verify_cert': self._ssl.get('verify_cert') or False,
+                'ssl_disabled': self._ssl_disabled
             })
 
         try:
