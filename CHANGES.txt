@@ -11,14 +11,14 @@ Full release notes:
 v2.1.7
 ======
 
-- BUG26376334: Fix prepared statements in MySQL 8.0
-- BUG25965922: Add support for Django 1.11
-- BUG24659561: Fix MySQLCursor.executemany() when using utf8mb4 charset
-- BUG24342757: Fix unclosed socket on connection failure
-- BUG22880163: Fix memory leak on using Named Tuple Cursors
-- BUG22825962: Fix memory leak on escape_string()
-- BUG22564149: Fix cmd_query_iter() when using bytestrings with Python 2
-- BUG21947091: Add ssl_disabled option
+- BUG#26376334: Fix prepared statements in MySQL 8.0
+- BUG#25965922: Add support for Django 1.11
+- BUG#24659561: Fix MySQLCursor.executemany() when using utf8mb4 charset
+- BUG#24342757: Fix unclosed socket on connection failure
+- BUG#22880163: Fix memory leak on using Named Tuple Cursors
+- BUG#22825962: Fix memory leak on escape_string()
+- BUG#22564149: Fix cmd_query_iter() when using bytestrings with Python 2
+- BUG#21947091: Add ssl_disabled option
 
 v2.1.6
 ======
