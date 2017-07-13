@@ -8,6 +8,18 @@ Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v2.1.7
+======
+
+- BUG26376334: Fix prepared statements in MySQL 8.0
+- BUG25965922: Add support for Django 1.11
+- BUG24659561: Fix MySQLCursor.executemany() when using utf8mb4 charset
+- BUG24342757: Fix unclosed socket on connection failure
+- BUG22880163: Fix memory leak on using Named Tuple Cursors
+- BUG22825962: Fix memory leak on escape_string()
+- BUG22564149: Fix cmd_query_iter() when using bytestrings with Python 2
+- BUG21947091: Add ssl_disabled option
+
 v2.1.6
 ======
 
