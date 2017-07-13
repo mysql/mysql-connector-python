@@ -52,6 +52,7 @@ class Bug21879914(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         config['ssl_ca'] = TEST_SSL['ca']
         config['use_pure'] = False
+        config.pop('unix_socket')
 
         cnx = mysql.connector.connect(**config)
         cnx.cmd_query("SHOW STATUS LIKE 'Ssl_cipher'")

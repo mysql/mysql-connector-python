@@ -60,6 +60,7 @@ class MySQLConnectionAbstract(object):
         self._client_host = ''
         self._client_port = 0
         self._ssl = {}
+        self._ssl_disabled = DEFAULT_CONFIGURATION["ssl_disabled"]
         self._force_ipv6 = False
 
         self._use_unicode = True
@@ -304,6 +305,9 @@ class MySQLConnectionAbstract(object):
             raise errors.InterfaceError(
                 "TCP/IP port number should be an integer")
 
+        if "ssl_disabled" in config:
+            self._ssl_disabled = config.pop("ssl_disabled")
+
         # Other configuration
         set_ssl_flag = False
         for key, value in config.items():
@@ -344,7 +348,6 @@ class MySQLConnectionAbstract(object):
                     "ssl_key and ssl_cert need to be both "
                     "set, or neither."
                 )
-            self.set_client_flags([ClientFlag.SSL])
 
     def _check_server_version(self, server_version):
         """Check the MySQL version

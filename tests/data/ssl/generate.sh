@@ -125,25 +125,24 @@ if [ $? -ne 0 ]; then
     exit 3
 fi
 
-# MySQL Expired Server Certificate: generate, remove passphrase, sign
+# MySQL Root Certificate: generate, remove passphrase, sign
 echo
-echo "Generating Expired Server Certificate"
+echo "Generating Another Root Certificate"
 echo
-SUBJ="/OU=$OU Expired Server Cert/CN=localhost"
-$OPENSSL genrsa -out $DESTDIR/tests_expired_server_key.pem 2048
+$OPENSSL genrsa -out $DESTDIR/tests_CA_key_1.pem 2048
 if [ $? -ne 0 ]; then
     exit 3
 fi
-$OPENSSL req -new -key $DESTDIR/tests_expired_server_key.pem \
-    -out $DESTDIR/tests_expired_server_req.csr -subj "$SUBJ"
+SUBJ="/OU=$OU Root CA/CN=MyConnPy Root CA"
+$OPENSSL req -new -key $DESTDIR/tests_CA_key_1.pem \
+    -out $DESTDIR/tests_CA_req_1.csr -subj "$SUBJ"
 if [ $? -ne 0 ]; then
     exit 3
 fi
-$OPENSSL ca -config $DESTDIR/ca.conf -in $DESTDIR/tests_expired_server_req.csr \
-    -cert $DESTDIR/tests_CA_cert.pem \
-    -keyfile $DESTDIR/tests_CA_key.pem \
-    -out $DESTDIR/tests_expired_server_cert.pem -batch \
-    -startdate 120815080000Z -enddate 120815090000Z
+$OPENSSL x509 -req -days $DAYS \
+    -in $DESTDIR/tests_CA_req_1.csr \
+    -out $DESTDIR/tests_CA_cert_1.pem \
+    -signkey $DESTDIR/tests_CA_key_1.pem
 if [ $? -ne 0 ]; then
     exit 3
 fi
@@ -176,5 +175,5 @@ echo "Cleaning up"
 echo
 (cd $DESTDIR; rm -rf tests_server_req.pem tests_client_req.pem \
     ca.db.certs ca.db.index* ca.db.serial* ca.conf tests_CA_req.csr \
-    tests_server_req.csr tests_expired_server_req.csr tests_client_req.csr)
+    tests_server_req.csr tests_CA_req_1.csr tests_client_req.csr)
 

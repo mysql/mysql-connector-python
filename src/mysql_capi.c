@@ -1034,7 +1034,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
 	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
-	PyObject *charset_name, *compress, *ssl_verify_cert, *password;
+	PyObject *charset_name, *compress, *ssl_verify_cert, *password, *ssl_disabled;
 	const char* auth_plugin;
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
@@ -1055,21 +1055,22 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	{
 	    "host", "user", "password", "database",
 		"port", "unix_socket", "client_flags",
-		"ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert",
+		"ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert", "ssl_disabled",
 		"compress",
 		NULL
     };
 
 #ifdef PY3
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!O!", kwlist,
 #else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!O!", kwlist,
 #endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
                                      &ssl_ca, &ssl_cert, &ssl_key,
                                      &PyBool_Type, &ssl_verify_cert,
+                                     &PyBool_Type, &ssl_disabled,
                                      &PyBool_Type, &compress))
     {
         return NULL;
@@ -1124,39 +1125,26 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     mysql_options(&self->session, MYSQL_OPT_READ_TIMEOUT, (char*)&tmp_uint);
     mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, (char*)&tmp_uint);
 
-    if (ssl_ca || ssl_cert || ssl_key) {
+    if (ssl_disabled && ssl_disabled == Py_False) {
         ssl_enabled= 1;
-#if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711
-        {
-            abool= 1;
-            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
-        }
-#endif
-#if MYSQL_VERSION_ID >= 50711
-        {
-            ssl_mode= SSL_MODE_REQUIRED;
-            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
-        }
-#endif
-
+        client_flags |= CLIENT_SSL;
         if (ssl_verify_cert && ssl_verify_cert == Py_True)
         {
 #if MYSQL_VERSION_ID >= 50711
-            {
-                ssl_mode= SSL_MODE_VERIFY_IDENTITY;
-                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
-            }
+            ssl_mode= SSL_MODE_VERIFY_IDENTITY;
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
 #else
-            {
-                abool= 1;
-                mysql_options(&self->session,
-                              MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
-            }
+            abool= 1;
+#if MYSQL_VERSION_ID > 50703
+            mysql_options(&self->session, MYSQL_OPT_SSL_ENFORCE, (char*)&abool);
 #endif
-          mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
+            mysql_options(&self->session,
+                          MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
+#endif
         } else {
-          mysql_ssl_set(&self->session, ssl_key, ssl_cert, NULL, NULL, NULL); 
+          ssl_ca= NULL;
         }
+        mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
     } else {
         // Make sure to not enforce SSL
 #if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711

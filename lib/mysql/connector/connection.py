@@ -114,6 +114,14 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._server_version = self._check_server_version(
             handshake['server_version_original'])
 
+        if not handshake['capabilities'] & ClientFlag.SSL:
+            self._client_flags &= ~ClientFlag.SSL
+            if self._ssl.get('verify_cert'):
+                raise errors.InterfaceError("SSL is required but the server "
+                                            "doesn't support it", errno=2026)
+        elif not self._ssl_disabled:
+            self._client_flags |= ClientFlag.SSL
+
         if handshake['capabilities'] & ClientFlag.PLUGIN_AUTH:
             self.set_client_flags([ClientFlag.PLUGIN_AUTH])
 
@@ -131,11 +139,15 @@ class MySQLConnection(MySQLConnectionAbstract):
         reply back. Raises any error coming from MySQL.
         """
         self._ssl_active = False
-        if client_flags & ClientFlag.SSL and ssl_options:
+        if client_flags & ClientFlag.SSL:
             packet = self._protocol.make_auth_ssl(charset=charset,
                                                   client_flags=client_flags)
             self._socket.send(packet)
-            self._socket.switch_to_ssl(**ssl_options)
+            self._socket.switch_to_ssl(ssl_options.get('ca'),
+                                       ssl_options.get('cert'),
+                                       ssl_options.get('key'),
+                                       ssl_options.get('verify_cert') or False,
+                                       ssl_options.get('cipher'))
             self._ssl_active = True
 
         packet = self._protocol.make_auth(
