@@ -431,16 +431,14 @@ class CMySQLCursor(MySQLCursorAbstract):
                                          raw_as_string=self._raw_as_string)
 
             results = []
+            tmp_cursor_type = self.__get_buffered_cursor_type()
             while self._cnx.result_set_available:
                 result = self._cnx.fetch_eof_columns()
-                # pylint: disable=W0212,R0204
-                if self._raw:
-                    cur = CMySQLCursorBufferedRaw(self._cnx._get_self())
-                else:
-                    cur = CMySQLCursorBuffered(self._cnx._get_self())
+                # pylint: disable=W0212
+                cur = tmp_cursor_type(self._cnx._get_self())
                 cur._executed = "(a result of {0})".format(call)
                 cur._handle_result(result)
-                # pylint: enable=W0212,R0204
+                # pylint: enable=W0212
                 results.append(cur)
                 self._cnx.next_result()
             self._stored_results = results
@@ -450,8 +448,13 @@ class CMySQLCursor(MySQLCursorAbstract):
                 self.reset()
                 select = "SELECT {0}".format(','.join(argtypes))
                 self.execute(select)
-
-                return self.fetchone()
+                retargs = self.fetchone()
+                # Always return arguments as simple sequence
+                if isinstance(retargs, dict):
+                    # Returned dictinary keys bytes, not str
+                    retargs = tuple(retargs[argname.encode('utf-8')] for argname in argnames)
+                # Also catches namedtuple instances (otherwise will be noop)
+                return tuple(retargs)
             else:
                 return tuple()
 
@@ -460,6 +463,22 @@ class CMySQLCursor(MySQLCursorAbstract):
         except Exception as err:
             raise errors.InterfaceError(
                 "Failed calling stored routine; {0}".format(err))
+
+    def __get_buffered_cursor_type(self):
+        """Returns cursor type for this cursor or buffered equivalent if unbuffered.
+        """
+        # pylint: disable=R0204
+        if isinstance(self, CMySQLCursorBuffered):
+            cursor = type(self)
+        elif isinstance(self, CMySQLCursorRaw):
+            cursor = CMySQLCursorBufferedRaw
+        elif isinstance(self, CMySQLCursorDict):
+            cursor = CMySQLCursorBufferedDict
+        elif isinstance(self, CMySQLCursorNamedTuple):
+            cursor = CMySQLCursorBufferedNamedTuple
+        else:
+            cursor = CMySQLCursorBuffered
+        return cursor
 
     def nextset(self):
         """Skip to the next available result set"""

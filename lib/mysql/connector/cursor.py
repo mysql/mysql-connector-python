@@ -754,14 +754,10 @@ class MySQLCursor(CursorBase):
             # We disable consuming results temporary to make sure we
             # getting all results
             can_consume_results = self._connection._consume_results
+            tmp_cursor_type = self.__get_buffered_cursor_type()
             for result in self._connection.cmd_query_iter(call):
                 self._connection._consume_results = False
-                # pylint: disable=R0204
-                if self._raw:
-                    tmp = MySQLCursorBufferedRaw(self._connection._get_self())
-                else:
-                    tmp = MySQLCursorBuffered(self._connection._get_self())
-                # pylint: enable=R0204
+                tmp = tmp_cursor_type(self._connection._get_self())
                 tmp._executed = "(a result of {0})".format(call)
                 tmp._handle_result(result)
                 if tmp._warnings is not None:
@@ -775,7 +771,12 @@ class MySQLCursor(CursorBase):
                 select = "SELECT {0}".format(','.join(argtypes))
                 self.execute(select)
                 self._stored_results = results
-                return self.fetchone()
+                retargs = self.fetchone()
+                # Always return arguments as simple sequence
+                if isinstance(retargs, dict):
+                    retargs = tuple(retargs[argname] for argname in argnames)
+                # Also catches namedtuple instances (otherwise will be noop)
+                return tuple(retargs)
             else:
                 self._stored_results = results
                 return ()
@@ -785,6 +786,22 @@ class MySQLCursor(CursorBase):
         except Exception as err:
             raise errors.InterfaceError(
                 "Failed calling stored routine; {0}".format(err))
+
+    def __get_buffered_cursor_type(self):
+        """Returns cursor type for this cursor or buffered equivalent if unbuffered.
+        """
+        # pylint: disable=R0204
+        if isinstance(self, MySQLCursorBuffered):
+            cursor = type(self)
+        elif isinstance(self, MySQLCursorRaw):
+            cursor = MySQLCursorBufferedRaw
+        elif isinstance(self, MySQLCursorDict):
+            cursor = MySQLCursorBufferedDict
+        elif isinstance(self, MySQLCursorNamedTuple):
+            cursor = MySQLCursorBufferedNamedTuple
+        else:
+            cursor = MySQLCursorBuffered
+        return cursor
 
     def getlastrowid(self):
         """Returns the value generated for an AUTO_INCREMENT column
