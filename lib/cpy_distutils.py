@@ -24,9 +24,10 @@
 """Implements the DistUtils command 'build_ext'
 """
 
-from distutils.command.build_ext import build_ext
-from distutils.command.install import install
-from distutils.command.install_lib import install_lib
+from setuptools.command.build_ext import build_ext
+from setuptools.command.install import install
+from setuptools.command.install_lib import install_lib
+from wheel.bdist_wheel import bdist_wheel
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.dir_util import copy_tree
@@ -820,3 +821,29 @@ class Install(install):
         else:
             log.info("Installing MySQL C Extension")
         install.run(self)
+
+
+class BDistWheel(bdist_wheel):
+
+    description = "Build Binary Wheel"
+
+    user_options = bdist_wheel.user_options + CEXT_OPTIONS
+
+    def initialize_options(self):
+        bdist_wheel.initialize_options(self)
+        self.with_mysql_capi = None
+
+    def finalize_options(self):
+
+        if self.with_mysql_capi:
+            build_ext = self.distribution.get_command_obj('build_ext')
+            build_ext.with_mysql_capi = self.with_mysql_capi
+            build = self.distribution.get_command_obj('build')
+            build.with_mysql_capi = self.with_mysql_capi
+            install = self.distribution.get_command_obj('install')
+            install.with_mysql_capi = self.with_mysql_capi
+
+        bdist_wheel.finalize_options(self)
+
+    def run(self):
+        bdist_wheel.run(self)

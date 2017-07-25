@@ -21,12 +21,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from distutils.core import Extension
+from setuptools import Extension
 import os
 import sys
 
 from lib.cpy_distutils import (
-    Install, InstallLib, BuildExtDynamic, BuildExtStatic
+    Install, InstallLib, BuildExtDynamic, BuildExtStatic,
+    BDistWheel,
 )
 
 # Development Status Trove Classifiers significant for Connector/Python
@@ -54,6 +55,7 @@ command_classes = {
     'build_ext_static': BuildExtStatic,
     'install_lib': InstallLib,
     'install': Install,
+    'bdist_wheel': BDistWheel,
 }
 
 package_dir = {'': 'lib'}
