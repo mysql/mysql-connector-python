@@ -264,7 +264,7 @@ def get_mysql_config_info(mysql_config):
     return info
 
 
-def remove_cext(distribution):
+def remove_cext(distribution, ext):
     """Remove the C Extension from the distribution
 
     This function can be useful in Distutils commands for creating
@@ -272,7 +272,7 @@ def remove_cext(distribution):
     """
     to_remove = []
     for ext_mod in distribution.ext_modules:
-        if ext_mod.name == '_mysql_connector':
+        if ext_mod.name == ext:
             to_remove.append(ext_mod)
     for ext_mod in to_remove:
         distribution.ext_modules.remove(ext_mod)
@@ -295,6 +295,7 @@ class BuildExtDynamic(build_ext):
         self.extra_compile_args = None
         self.extra_link_args = None
         self.with_mysql_capi = None
+        self.with_mysqlxpb_cext = False
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
         self.with_protoc = None
@@ -445,6 +446,10 @@ class BuildExtDynamic(build_ext):
         if not self.with_protoc:
             self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
 
+        self.with_mysqlxpb_cext = any((self.with_protobuf_include_dir,
+                                       self.with_protobuf_lib_dir,
+                                       self.with_protoc))
+
     def run_protoc(self):
         if self.with_protobuf_include_dir:
             print("# Protobuf include directory: {0}"
@@ -516,7 +521,7 @@ class BuildExtDynamic(build_ext):
         sysheaders = [ '-isystem' + dir for dir in cc.include_dirs]
         for ext in self.extensions:
             # Add Protobuf include and library dirs
-            if ext.name == "_mysqlxpb":
+            if ext.name == "_mysqlxpb" and self.with_mysqlxpb_cext:
                 ext.include_dirs.append(self.with_protobuf_include_dir)
                 ext.library_dirs.append(self.with_protobuf_lib_dir)
                 if os.name == 'nt':
@@ -540,10 +545,12 @@ class BuildExtDynamic(build_ext):
 
     def run(self):
         """Run the command"""
+        if not self.with_mysql_capi and not self.with_mysqlxpb_cext:
+            return
         if os.name == 'nt':
             for ext in self.extensions:
                 # Add Protobuf include and library dirs
-                if ext.name == "_mysqlxpb":
+                if ext.name == "_mysqlxpb" and self.with_mysqlxpb_cext:
                     ext.include_dirs.append(self.with_protobuf_include_dir)
                     ext.library_dirs.append(self.with_protobuf_lib_dir)
                     ext.libraries.append("libprotobuf")
@@ -555,14 +562,16 @@ class BuildExtDynamic(build_ext):
                 # Add extra link args
                 if self.extra_link_args:
                     ext.extra_link_args.extend(self.extra_link_args.split())
-            self.run_protoc()
+            if self.with_mysqlxpb_cext:
+                self.run_protoc()
             build_ext.run(self)
         else:
             self.real_build_extensions = self.build_extensions
             self.build_extensions = lambda: None
             build_ext.run(self)
             self.fix_compiler()
-            self.run_protoc()
+            if self.with_mysqlxpb_cext:
+                self.run_protoc()
             self.real_build_extensions()
 
 
@@ -610,41 +619,14 @@ class BuildExtStatic(BuildExtDynamic):
         self.protobuf_lib = os.path.join(self.build_temp, 'protobuf', 'lib')
         self.protobuf_include = os.path.join(self.build_temp, 'protobuf', 'include')
 
+        self.with_mysqlxpb_cext = any((self.with_protobuf_include_dir,
+                                       self.with_protobuf_lib_dir,
+                                       self.with_protoc))
         if self.with_mysql_capi:
             self._finalize_connector_c(self.with_mysql_capi)
 
-        if not self.with_protobuf_include_dir:
-            self.with_protobuf_include_dir = \
-                os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR")
-
-        if not self.with_protobuf_lib_dir:
-            self.with_protobuf_lib_dir = \
-                os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
-
-        if not self.with_protoc:
-            self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
-
-        if self.with_protobuf_include_dir:
-            print("# Protobuf include directory: {0}"
-                  "".format(self.with_protobuf_include_dir))
-        else:
-            log.error("Unable to find Protobuf include directory.")
-            sys.exit(1)
-
-        if self.with_protobuf_lib_dir:
-            print("# Protobuf library directory: {0}"
-                  "".format(self.with_protobuf_lib_dir))
-        else:
-            log.error("Unable to find Protobuf library directory.")
-            sys.exit(1)
-
-        if self.with_protoc:
-            print("# Protobuf protoc binary: {0}".format(self.with_protoc))
-        else:
-            log.error("Unable to find Protobuf protoc binary.")
-            sys.exit(1)
-
-        self._finalize_protobuf()
+        if self.with_mysqlxpb_cext:
+            self._finalize_protobuf()
 
     def _finalize_connector_c(self, connc_loc):
         if not os.path.isdir(connc_loc):
@@ -665,12 +647,44 @@ class BuildExtStatic(BuildExtDynamic):
                     os.unlink(os.path.join(self.connc_lib, lib_file))
 
     def _finalize_protobuf(self):
-        if not os.path.isdir(self.with_protobuf_lib_dir):
-            log.error("Protobuf library dir should be a directory")
+        if not self.with_protobuf_include_dir:
+            self.with_protobuf_include_dir = \
+                os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR")
+
+        if not self.with_protobuf_lib_dir:
+            self.with_protobuf_lib_dir = \
+                os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
+
+        if not self.with_protoc:
+            self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
+
+        if self.with_protobuf_include_dir:
+            print("# Protobuf include directory: {0}"
+                  "".format(self.with_protobuf_include_dir))
+            if not os.path.isdir(self.with_protobuf_include_dir):
+                log.error("Protobuf include dir should be a directory")
+                sys.exit(1)
+        else:
+            log.error("Unable to find Protobuf include directory.")
             sys.exit(1)
 
-        if not os.path.isdir(self.with_protobuf_include_dir):
-            log.error("Protobuf include dir should be a directory")
+        if self.with_protobuf_lib_dir:
+            print("# Protobuf library directory: {0}"
+                  "".format(self.with_protobuf_lib_dir))
+            if not os.path.isdir(self.with_protobuf_lib_dir):
+                log.error("Protobuf library dir should be a directory")
+                sys.exit(1)
+        else:
+            log.error("Unable to find Protobuf library directory.")
+            sys.exit(1)
+
+        if self.with_protoc:
+            print("# Protobuf protoc binary: {0}".format(self.with_protoc))
+            if not os.path.isfile(self.with_protoc):
+                log.error("Protobuf protoc binary is not valid.")
+                sys.exit(1)
+        else:
+            log.error("Unable to find Protobuf protoc binary.")
             sys.exit(1)
 
         if not os.path.exists(self.protobuf_lib):
@@ -783,6 +797,7 @@ class Install(install):
         self.extra_compile_args = None
         self.extra_link_args = None
         self.with_mysql_capi = None
+        self.with_mysqlxpb_cext = False
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
         self.with_protoc = None
@@ -810,7 +825,14 @@ class Install(install):
             self.need_ext = True
 
         if not self.need_ext:
-            remove_cext(self.distribution)
+            remove_cext(self.distribution, "_mysql_connector")
+
+        self.with_mysqlxpb_cext = all((self.with_protobuf_include_dir,
+                                       self.with_protobuf_lib_dir,
+                                       self.with_protoc))
+
+        if not self.with_mysqlxpb_cext:
+            remove_cext(self.distribution, "_mysqlxpb")
 
         install.finalize_options(self)
 

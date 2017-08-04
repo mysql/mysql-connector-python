@@ -40,6 +40,7 @@ from .errors import InterfaceError, OperationalError, ProgrammingError
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES
 from .crud import Schema
 from .constants import SSLMode
+from .helpers import get_item_or_attr
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
 from .statement import SqlStatement, AddStatement
@@ -242,7 +243,8 @@ class Connection(object):
             return
 
         data = self.protocol.get_capabilites().capabilities
-        if not (data[0]["name"].lower() == "tls" if data else False):
+        if not (get_item_or_attr(data[0], "name").lower() == "tls"
+                if data else False):
             self.close_connection()
             raise OperationalError("SSL not enabled at server.")
 

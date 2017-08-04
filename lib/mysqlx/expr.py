@@ -22,6 +22,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 from .compat import STRING_TYPES, PY3
+from .helpers import get_item_or_attr
 from .protobuf import Message, mysqlxpb_enum
 
 
@@ -662,7 +663,7 @@ class ExprParser:
             else:
                 break
         items = len(doc_path)
-        if items > 0 and doc_path[items - 1]["type"] == \
+        if items > 0 and get_item_or_attr(doc_path[items - 1], "type") == \
            mysqlxpb_enum("Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK"):
             raise ValueError("JSON path may not end in '**' at {0}"
                              "".format(self.pos))
@@ -755,11 +756,12 @@ class ExprParser:
         """
         operator = Message("Mysqlx.Expr.Operator", name="cast")
         self.consume_token(TokenType.LPAREN)
-        operator["param"].append(self.expr().get_message())
+        operator["param"].extend([self.expr().get_message()])
         self.consume_token(TokenType.AS)
 
         type_scalar = build_bytes_scalar(str.encode(self.cast_data_type()))
-        operator["param"].append(build_literal_expr(type_scalar).get_message())
+        operator["param"].extend(
+            [build_literal_expr(type_scalar).get_message()])
         self.consume_token(TokenType.RPAREN)
         msg = Message("Mysqlx.Expr.Expr", operator=operator.get_message())
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
@@ -901,7 +903,7 @@ class ExprParser:
             operator["name"] = operators[self.tokens[self.pos].val]
             operator["param"] = [lhs.get_message()]
             self.pos += 1
-            operator["param"].append(inner_parser().get_message())
+            operator["param"].extend([inner_parser().get_message()])
             msg["operator"] = operator
             lhs = msg
         return lhs
@@ -914,20 +916,20 @@ class ExprParser:
             token = self.next_token()
 
             op = Message("Mysqlx.Expr.Operator")
-            op["param"].append(lhs.get_message())
+            op["param"].extend([lhs.get_message()])
             op["name"] = "date_add" if token.type is TokenType.PLUS \
                                     else "date_sub"
 
             self.consume_token(TokenType.INTERVAL)
-            op["param"].append(self.bit_expr().get_message())
+            op["param"].extend([self.bit_expr().get_message()])
 
             if not self.cur_token_type_in(*interval_units):
                 raise ValueError("Expected interval type at position {0}"
                                  "".format(self.pos))
 
             token = str.encode(self.consume_any_token().upper())
-            op["param"].append(build_literal_expr(
-                build_bytes_scalar(token)).get_message())
+            op["param"].extend([build_literal_expr(
+                build_bytes_scalar(token)).get_message()])
 
             lhs = Message("Mysqlx.Expr.Expr", operator=op)
             lhs["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
@@ -1052,7 +1054,7 @@ class ExprParser:
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection["alias"] = self.consume_token(TokenType.IDENT)
-            elif projection["source"]["type"] is \
+            elif get_item_or_attr(projection["source"], "type") is \
                 mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT"):
                 self.pos -= 1
                 projection["alias"] = self.consume_token(TokenType.IDENT)

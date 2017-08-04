@@ -30,12 +30,9 @@ from .dbdoc import DbDoc
 from .errors import InterfaceError, OperationalError, ProgrammingError
 from .expr import (ExprParser, build_null_scalar, build_string_scalar,
                    build_bool_scalar, build_double_scalar, build_int_scalar)
+from .helpers import encode_to_bytes, get_item_or_attr
 from .result import ColumnMetaData
 from .protobuf import SERVER_MESSAGES, Message, mysqlxpb_enum
-
-
-def encode_to_bytes(value, encoding="utf-8"):
-    return value if isinstance(value, bytes) else value.encode(encoding)
 
 
 class MessageReaderWriter(object):
@@ -50,9 +47,9 @@ class MessageReaderWriter(object):
 
     def read_message(self):
         if self._msg is not None:
-            m = self._msg
+            msg = self._msg
             self._msg = None
-            return m
+            return msg
         return self._read_message()
 
     def _read_message(self):
@@ -93,7 +90,7 @@ class Protocol(object):
             capability = Message("Mysqlx.Connection.Capability")
             capability["name"] = key
             capability["value"] = self._create_any(value)
-            capabilities["capabilities"].append(capability.get_message())
+            capabilities["capabilities"].extend([capability.get_message()])
         msg = Message("Mysqlx.Connection.CapabilitiesSet")
         msg["capabilities"] = capabilities
         self._writer.write_message(
@@ -288,11 +285,13 @@ class Protocol(object):
             if sess_state_msg["param"] == mysqlxpb_enum(
                     "Mysqlx.Notice.SessionStateChanged.Parameter."
                     "ROWS_AFFECTED"):
-                rs._rows_affected = sess_state_msg["value"]["v_unsigned_int"]
+                rs._rows_affected = get_item_or_attr(
+                     sess_state_msg["value"], "v_unsigned_int")
             elif sess_state_msg["param"] == mysqlxpb_enum(
                     "Mysqlx.Notice.SessionStateChanged.Parameter."
                     "GENERATED_INSERT_ID"):
-                rs._generated_id = sess_state_msg["value"]["v_unsigned_int"]
+                rs._generated_id =  get_item_or_attr(
+                    sess_state_msg["value"], "v_unsigned_int")
 
     def _read_message(self, rs):
         while True:

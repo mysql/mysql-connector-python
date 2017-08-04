@@ -825,11 +825,15 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
         'install',
         '--root', install_dir,
         '--install-lib', '.',
-        '--with-protobuf-include-dir', protobuf_include_dir,
-        '--with-protobuf-lib-dir', protobuf_lib_dir,
-        '--with-protoc', protoc,
         '--static',
     ])
+
+    if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
+        cmd.extend([
+            '--with-protobuf-include-dir', protobuf_include_dir,
+            '--with-protobuf-lib-dir', protobuf_lib_dir,
+            '--with-protoc', protoc,
+        ])
 
     if connc_location:
         cmd.extend(['--with-mysql-capi', connc_location])

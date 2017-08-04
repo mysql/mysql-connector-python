@@ -7,6 +7,7 @@ commit.txt
 *.diff
 dist/
 build/
+venv/
 MANIFEST
 cpy_server*/
 *_output.txt

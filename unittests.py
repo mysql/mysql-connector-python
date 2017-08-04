@@ -821,15 +821,16 @@ def main():
         protobuf_lib_dir = options.protobuf_lib_dir or \
             os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
         protoc = options.protoc or os.environ.get("MYSQLXPB_PROTOC")
-        if not protobuf_include_dir:
-            LOGGER.error("Unable to find Protobuf include directory.")
-            sys.exit(1)
-        if not protobuf_lib_dir:
-            LOGGER.error("Unable to find Protobuf library directory.")
-            sys.exit(1)
-        if not protoc:
-            LOGGER.error("Unable to find Protobuf protoc binary.")
-            sys.exit(1)
+        if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
+            if not protobuf_include_dir:
+                LOGGER.error("Unable to find Protobuf include directory.")
+                sys.exit(1)
+            if not protobuf_lib_dir:
+                LOGGER.error("Unable to find Protobuf library directory.")
+                sys.exit(1)
+            if not protoc:
+                LOGGER.error("Unable to find Protobuf protoc binary.")
+                sys.exit(1)
         tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
                                 protobuf_include_dir,
                                 protobuf_lib_dir,

@@ -97,6 +97,7 @@ packages = [
     'mysqlx',
     'mysqlx.locales',
     'mysqlx.locales.eng',
+    'mysqlx.protobuf',
 ]
 description = "MySQL driver written in Python"
 long_description = """
