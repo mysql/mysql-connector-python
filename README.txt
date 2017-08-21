@@ -11,7 +11,7 @@ License information can be found in the LICENSE.txt file.
 Requirements
 ============
 
-Protobuf C++ (version >= 2.6.0)
+Protobuf C++ (version >= 2.6.0) and Python Protobuf (version >= 3.0.0)
 https://developers.google.com/protocol-buffers/docs/downloads
 
 
