@@ -26,6 +26,7 @@
 """
 
 import logging
+import os
 import unittest
 import sys
 import tests
@@ -248,6 +249,32 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Invalid option with kwargs
         self.assertRaises(ProgrammingError, mysqlx.get_session, **config)
+
+        usr_file = os.path.join(os.getcwd(), "mysqlx_usr_sessions.json")
+        sys_file = os.path.join(os.getcwd(), "mysqlx_sys_sessions.json")
+        temp = mysqlx.sessions
+        try:
+            configs = mysqlx.config.SessionConfigManager()
+            configs.set_persistence_handler(
+                mysqlx.config.PersistenceHandler(sys_file, usr_file))
+
+            mysqlx.sessions = configs
+            config = configs.save("myserver1", "{0}:{1}@{2}:{3}".format(
+                self.connect_kwargs["user"], self.connect_kwargs["password"],
+                self.connect_kwargs["host"], self.connect_kwargs["port"]),
+                {'foo': 'baz'})
+
+            mysqlx.get_session(config, self.connect_kwargs["password"])
+            mysqlx.get_session({"session_name": "myserver1"},
+                               self.connect_kwargs["password"])
+        except:
+            self.fail("Failed to create XSession with saved configuration.")
+        finally:
+            mysqlx.sessions = temp
+            if os.path.exists(usr_file):
+                os.remove(usr_file)
+            if os.path.exists(sys_file):
+                os.remove(sys_file)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
     def test_mysqlx_socket(self):
@@ -507,4 +534,127 @@ class MySQLxSessionTests(tests.MySQLxTests):
         settings = self.connect_kwargs.copy()
         settings["port"] = res[0][1]  # Lets use the MySQL classic port
         session.close()
-        self.assertRaises(ProgrammingError, mysqlx.get_session, settings)
+        self.assertRaises(mysqlx.errors.ProgrammingError, mysqlx.get_session,
+                          settings)
+
+
+class SessionConfigTests(tests.MySQLxTests):
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.configs = mysqlx.config.SessionConfigManager()
+        self.usr_file = os.path.join(os.getcwd(), "mysqlx_usr_sessions.json")
+        self.sys_file = os.path.join(os.getcwd(), "mysqlx_sys_sessions.json")
+        self.configs.set_persistence_handler(
+            mysqlx.config.PersistenceHandler(self.sys_file, self.usr_file))
+
+    def tearDown(self):
+        if os.path.exists(self.usr_file):
+            os.remove(self.usr_file)
+        if os.path.exists(self.sys_file):
+            os.remove(self.sys_file)
+
+    def test_set_appdata(self):
+        config = self.configs.save("new", "mysqlx://root:pass@localhost")
+        config.set_appdata("alias", "test")
+        self.assertEqual("test", config.get_appdata("alias"))
+
+    def test_delete_appdata(self):
+        sess_config = self.configs.save("new", {"host": "10.20.0.1",
+                                                "port": 33060,
+                                                "user": "mike",
+                                                "password": "1234isverysafe",
+                                                "appdata": {"alias": "new"}})
+        self.assertEqual("new", sess_config.get_appdata("alias"))
+        sess_config.delete_appdata("alias")
+        sess_config.save()
+        self.assertRaises(KeyError, sess_config.get_appdata, "alias")
+
+    def test_save(self):
+        config = {"host": "10.20.0.1",
+                  "port": 33060,
+                  "user": "mike",
+                  "password": "1234isverysafe",
+                  "appdata": {"alias": "new"}}
+
+        self.assertRaises(InterfaceError, self.configs.save, " ", config)
+        self.assertRaises(InterfaceError, self.configs.save, ":&", config)
+        self.assertRaises(InterfaceError, self.configs.save,
+                          "quinquagintaquadringentillionths", config)
+        sess_config = self.configs.save("new", config)
+        self.assertEqual(1, len(self.configs.list()))
+        self.assertEqual("new", self.configs.list()[0].name)
+
+        self.assertEqual("new", sess_config.get_appdata("alias"))
+        sess_config.set_appdata("alias", "update")
+        sess_config.save()
+        self.assertEqual("update", sess_config.get_appdata("alias"))
+
+    def test_set_uri(self):
+        config = self.configs.save("new", "mysqlx://root:pass@localhost")
+        self.assertEqual("mysqlx://root:@localhost", config.get_uri())
+
+
+class SessionConfigManagerTests(tests.MySQLxTests):
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.configs = mysqlx.config.SessionConfigManager()
+        self.usr_file = os.path.join(os.getcwd(), "mysqlx_usr_sessions.json")
+        self.sys_file = os.path.join(os.getcwd(), "mysqlx_sys_sessions.json")
+        self.configs.set_persistence_handler(
+            mysqlx.config.PersistenceHandler(self.sys_file, self.usr_file))
+
+    def tearDown(self):
+        if os.path.exists(self.usr_file):
+            os.remove(self.usr_file)
+        if os.path.exists(self.sys_file):
+            os.remove(self.sys_file)
+
+    def test_delete(self):
+        self.configs.save("myserver1", "{0}:{1}@{2}:{3}".format(
+            self.connect_kwargs["user"], self.connect_kwargs["password"],
+            self.connect_kwargs["host"], self.connect_kwargs["port"]))
+        self.assertEqual(1, len(self.configs.list()))
+        self.configs.delete("myserver1")
+        self.assertEqual(0, len(self.configs.list()))
+
+    def test_save(self):
+        self.configs.save("myserver1", "{0}:{1}@{2}:{3}".format(
+            self.connect_kwargs["user"], self.connect_kwargs["password"],
+            self.connect_kwargs["host"], self.connect_kwargs["port"]))
+        self.assertEqual(1, len(self.configs.list()))
+        self.configs.delete("myserver1")
+
+        # BUG#25829054 overwrite existing session completely
+        data = {"test": "data"}
+        self.configs.save("testupdate", "test:update@host:99", data)
+        self.assertEqual(1, len(self.configs.list()))
+        config = self.configs.get("testupdate")
+        self.assertEqual("data", config.get_appdata("test"))
+
+        data = {"replaced": "app"}
+        self.configs.save("testupdate", "new:replaced@host:99", data)
+        self.assertEqual(1, len(self.configs.list()))
+        config = self.configs.get("testupdate")
+        self.assertRaises(KeyError, config.get_appdata, "test")
+        self.assertEqual("app", config.get_appdata("replaced"))
+
+        # BUG#25860579 save() acts as update()
+        config.set_appdata("new", "key")
+        self.configs.save(config)
+        self.assertEqual(1, len(self.configs.list()))
+        self.assertEqual("key", config.get_appdata("new"))
+        self.assertEqual("app", config.get_appdata("replaced"))
+
+        self.configs.delete("testupdate")
+
+    def test_get(self):
+        self.configs.save("new", "luke:cage@10.55.120.48:33060")
+        config = self.configs.get("new")
+        self.assertEqual("new", config.name)
+        self.assertEqual("luke:@10.55.120.48:33060", config.get_uri())
+
+    def test_list(self):
+        self.configs.save("new", "luke:cage@10.55.120.48:33060")
+        configs = self.configs.list()
+        self.assertEqual(1, len(configs))
+        self.assertEqual("new", configs[0].name)

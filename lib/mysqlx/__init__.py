@@ -26,6 +26,8 @@
 import re
 from . import constants
 
+from .config import (PersistenceHandler, SessionConfigManager, SessionConfig,
+                     PasswordHandler)
 from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
 from .connection import Session
 from .constants import SSLMode
@@ -208,11 +210,24 @@ def _get_connection_settings(*args, **kwargs):
             settings = _parse_connection_uri(args[0])
         elif isinstance(args[0], dict):
             settings.update(args[0])
+        elif isinstance(args[0], SessionConfig):
+            settings.update(args[0].to_dict())
+            settings.pop("appdata", None)
+
+        if len(args) is 2:
+            settings["password"] = args[1]
     elif kwargs:
         settings.update(kwargs)
         for key, val in settings.items():
             if "_" in key:
                 settings[key.replace("_", "-")] = settings.pop(key)
+
+    if "session_name" in settings:
+        sess_config = sessions.get(settings.pop("session_name")).to_dict()
+        settings = dict(sess_config, **settings)
+        settings.pop("appdata", None)
+    if "uri" in settings:
+        settings = dict(_parse_connection_uri(settings.pop("uri")), **settings)
 
     if not settings:
         raise InterfaceError("Settings not provided")
@@ -237,9 +252,15 @@ def get_session(*args, **kwargs):
     return Session(settings)
 
 
+sessions = SessionConfigManager()
+sessions.set_persistence_handler(PersistenceHandler())
+
 __all__ = [
     # mysqlx.connection
     "Session", "get_session",
+
+    # mysqlx.sessions
+    "sessions",
 
     # mysqlx.constants
     "constants",
