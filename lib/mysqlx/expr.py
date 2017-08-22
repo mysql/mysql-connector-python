@@ -227,7 +227,9 @@ operators = {
     "*": "*",
     "/": "/",
     "~": "~",
-    "%": "%"
+    "%": "%",
+    "cast": "cast",
+    "cont_in": "cont_in"
 }
 
 unary_operators = {
@@ -243,7 +245,8 @@ negation = {
     "between": "not_between",
     "regexp": "not_regexp",
     "like": "not_like",
-    "in": "not_in"
+    "in": "not_in",
+    "cont_in": "not_cont_in"
 }
 
 
@@ -602,6 +605,7 @@ class ExprParser:
     def docpath_array_loc(self):
         self.consume_token(TokenType.LSQBRACKET)
         if self.cur_token_type_is(TokenType.MUL):
+            self.consume_token(TokenType.MUL)
             self.consume_token(TokenType.RSQBRACKET)
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
@@ -688,15 +692,30 @@ class ExprParser:
                 col_id["table_name"] = parts[1]
             elif i == 2:
                 col_id["schema_name"] = parts[2]
+
+        is_doc = False
         if self.cur_token_type_is(TokenType.DOLLAR):
+            is_doc = True
             self.consume_token(TokenType.DOLLAR)
             col_id["document_path"] = self.document_path()
         elif self.cur_token_type_is(TokenType.ARROW):
+            is_doc = True
             self.consume_token(TokenType.ARROW)
-            self.consume_token(TokenType.QUOTE)
+            is_quoted = False
+            if self.cur_token_type_is(TokenType.QUOTE):
+                is_quoted = True
+                self.consume_token(TokenType.QUOTE)
             self.consume_token(TokenType.DOLLAR)
             col_id["document_path"] = self.document_path()
-            self.consume_token(TokenType.QUOTE)
+            if is_quoted:
+                self.consume_token(TokenType.QUOTE)
+
+        if is_doc and len(col_id["document_path"]) == 0:
+            doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
+            doc_path_item["type"] = mysqlxpb_enum(
+                "Mysqlx.Expr.DocumentPathItem.Type.MEMBER")
+            doc_path_item["value"] = ""
+            col_id["document_path"].extend([doc_path_item.get_message()])
 
         msg_expr = Message("Mysqlx.Expr.Expr")
         msg_expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT")
@@ -723,8 +742,46 @@ class ExprParser:
         self.pos += 1
         return value
 
+    def parse_json_array(self):
+        """
+        jsonArray            ::=  "[" [ expr ("," expr)* ] "]"
+        """
+        msg = Message("Mysqlx.Expr.Array")
+        while self.pos < len(self.tokens) and \
+            not self.cur_token_type_is(TokenType.RSQBRACKET):
+            msg["value"].extend([self.expr().get_message()])
+            if not self.cur_token_type_is(TokenType.COMMA):
+                break
+            self.consume_token(TokenType.COMMA)
+        self.consume_token(TokenType.RSQBRACKET)
+
+        expr = Message("Mysqlx.Expr.Expr")
+        expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.ARRAY")
+        expr["array"] = msg.get_message()
+        return expr
+
     def parse_json_doc(self):
-        o = Object()
+        """
+        jsonDoc              ::=  "{" [jsonKeyValue ("," jsonKeyValue)*] "}"
+        jsonKeyValue         ::=  STRING_DQ ":" expr
+        """
+        msg = Message("Mysqlx.Expr.Object")
+        while self.pos < len(self.tokens) and \
+            not self.cur_token_type_is(TokenType.RCURLY):
+            item = Message("Mysqlx.Expr.Object.ObjectField")
+            item["key"] = self.consume_token(TokenType.LSTRING)
+            self.consume_token(TokenType.COLON)
+            item["value"] = self.expr().get_message()
+            msg["fld"].extend([item.get_message()])
+            if not self.cur_token_type_is(TokenType.COMMA):
+                break
+            self.consume_token(TokenType.COMMA)
+        self.consume_token(TokenType.RCURLY)
+
+        expr = Message("Mysqlx.Expr.Expr")
+        expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OBJECT")
+        expr["object"] = msg.get_message()
+        return expr
 
     def parse_place_holder(self, token):
         place_holder_name = ""
@@ -829,6 +886,8 @@ class ExprParser:
             return self.parse_place_holder(token)
         elif token.type == TokenType.LCURLY:
             return self.parse_json_doc()
+        elif token.type == TokenType.LSQBRACKET:
+            return self.parse_json_array()
         elif token.type == TokenType.CAST:
             return self.cast()
         elif token.type == TokenType.LPAREN:
@@ -978,7 +1037,11 @@ class ExprParser:
                 params.append(self.comp_expr().get_message())
             elif self.cur_token_type_is(TokenType.IN):
                 self.consume_token(TokenType.IN)
-                params.extend(self.paren_expr_list())
+                if self.cur_token_type_is(TokenType.LPAREN):
+                    params.extend(self.paren_expr_list())
+                else:
+                    op_name = "cont_in"
+                    params.append(self.comp_expr().get_message())
             elif self.cur_token_type_is(TokenType.LIKE):
                 self.consume_token(TokenType.LIKE)
                 params.append(self.comp_expr().get_message())
@@ -1037,8 +1100,10 @@ class ExprParser:
         temp.reverse()
         while temp:
             field = temp.pop()
-            while field.count("(") != field.count(")"):
-                field = "{0}{1}".format(temp.pop(), field)
+            while field.count("(") != field.count(")") or \
+                field.count("[") != field.count("]") or \
+                field.count("{") != field.count("}"):
+                field = "{1},{0}".format(temp.pop(), field)
             fields.append(field.strip())
         return fields
 
