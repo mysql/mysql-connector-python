@@ -167,6 +167,14 @@ class Protocol(object):
         if stmt._has_projection:
             msg["projection"] = stmt._projection_expr
         self._apply_filter(msg, stmt)
+
+        if stmt._lock_exclusive:
+            msg["locking"] = \
+                mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.EXCLUSIVE_LOCK")
+        elif stmt._lock_shared:
+            msg["locking"] = \
+                mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.SHARED_LOCK")
+
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_FIND"), msg)
 

@@ -27,6 +27,8 @@
 
 import logging
 import unittest
+import threading
+import time
 
 import tests
 import mysqlx
@@ -442,6 +444,171 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection = self.schema.create_collection(collection_name)
         self.assertTrue(collection.exists_in_database())
         self.schema.drop_collection(collection_name)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 3), "Row locks unavailable.")
+    def test_lock_shared(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add({"name": "Fred", "age": 21}).execute()
+
+        pause = threading.Event()
+        locking = threading.Event()
+        waiting = threading.Event()
+
+        errors = []
+
+        def client_a(pause, locking, waiting):
+            sess1 = mysqlx.get_session(self.connect_kwargs)
+            schema = sess1.get_schema(self.schema_name)
+            collection = schema.get_collection(collection_name)
+
+            sess1.start_transaction()
+            result = collection.find("name = 'Fred'").lock_shared().execute()
+            locking.set()
+            time.sleep(2)
+            locking.clear()
+            if waiting.is_set():
+                errors.append("S-S lock test failure.")
+                sess1.commit()
+                return
+            sess1.commit()
+
+            pause.set()
+
+            sess1.start_transaction()
+            result = collection.find("name = 'Fred'").lock_shared().execute()
+            locking.set()
+            time.sleep(2)
+            locking.clear()
+            if not waiting.is_set():
+                errors.append("S-X lock test failure.")
+                sess1.commit()
+                return
+            sess1.commit()
+
+        def client_b(pause, locking, waiting):
+            sess1 = mysqlx.get_session(self.connect_kwargs)
+            schema = sess1.get_schema(self.schema_name)
+            collection = schema.get_collection(collection_name)
+
+            if not locking.wait(2):
+                return
+            sess1.start_transaction()
+
+            waiting.set()
+            result = collection.find("name = 'Fred'").lock_shared().execute()
+            waiting.clear()
+
+            sess1.commit()
+
+            if not pause.wait(2):
+                return
+
+            if not locking.wait(2):
+                return
+            sess1.start_transaction()
+            waiting.set()
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
+            waiting.clear()
+            sess1.commit()
+
+        client1 = threading.Thread(target=client_a,
+                                   args=(pause, locking, waiting,))
+        client2 = threading.Thread(target=client_b,
+                                   args=(pause, locking, waiting,))
+
+        client1.start()
+        client2.start()
+
+        client1.join()
+        client2.join()
+
+        self.schema.drop_collection(collection_name)
+        if errors:
+            self.fail(errors[0])
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 3), "Row locks unavailable.")
+    def test_lock_exclusive(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add({"name": "Fred", "age": 21}).execute()
+        event = threading.Event()
+
+        pause = threading.Event()
+        locking = threading.Event()
+        waiting = threading.Event()
+
+        errors = []
+
+        def client_a(pause, locking, waiting):
+            sess1 = mysqlx.get_session(self.connect_kwargs)
+            schema = sess1.get_schema(self.schema_name)
+            collection = schema.get_collection(collection_name)
+
+            sess1.start_transaction()
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
+            locking.set()
+            time.sleep(2)
+            locking.clear()
+            if not waiting.is_set():
+                sess1.commit()
+                errors.append("X-X lock test failure.")
+                return
+            sess1.commit()
+
+            pause.set()
+
+            sess1.start_transaction()
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
+            locking.set()
+            time.sleep(2)
+            locking.clear()
+            if not waiting.is_set():
+                errors.append("X-S lock test failure.")
+                sess1.commit()
+                return
+            sess1.commit()
+
+        def client_b(pause, locking, waiting):
+            sess1 = mysqlx.get_session(self.connect_kwargs)
+            schema = sess1.get_schema(self.schema_name)
+            collection = schema.get_collection(collection_name)
+
+            if not locking.wait(2):
+                return
+            sess1.start_transaction()
+
+            waiting.set()
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
+            waiting.clear()
+
+            sess1.commit()
+
+            if not pause.wait(2):
+                return
+
+            if not locking.wait(2):
+                return
+            sess1.start_transaction()
+            waiting.set()
+            result = collection.find("name = 'Fred'").lock_shared().execute()
+            waiting.clear()
+            sess1.commit()
+
+        client1 = threading.Thread(target=client_a,
+                                   args=(pause, locking, waiting,))
+        client2 = threading.Thread(target=client_b,
+                                   args=(pause, locking, waiting,))
+
+        client1.start()
+        client2.start()
+
+        client1.join()
+        client2.join()
+
+        self.schema.drop_collection(collection_name)
+        if errors:
+            self.fail(errors[0])
 
     def test_add(self):
         collection_name = "collection_test"

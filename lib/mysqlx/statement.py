@@ -477,7 +477,74 @@ class ModifyStatement(FilterableStatement):
         return self._connection.update(self)
 
 
-class FindStatement(FilterableStatement):
+class ReadStatement(FilterableStatement):
+    """Provide base functionality for Read operations
+
+    Args:
+        target (object): The target database object, it can be
+                         :class:`mysqlx.Collection` or :class:`mysqlx.Table`.
+        doc_based (Optional[bool]): `True` if it is document based
+                                    (default: `True`).
+        condition (Optional[str]): Sets the search condition to filter
+                                   documents or records.
+    """
+    def __init__(self, target, doc_based=True, condition=None):
+        super(ReadStatement, self).__init__(target, doc_based, condition)
+        self._lock_exclusive = False
+        self._lock_shared = False
+
+    def lock_shared(self):
+        """Execute a read operation with SHARED LOCK. Only one lock can be
+           active at a time.
+        """
+        self._lock_exclusive = False
+        self._lock_shared = True
+        return self
+
+    def lock_exclusive(self):
+        """Execute a read operation with EXCLUSIVE LOCK. Only one lock can be
+           active at a time.
+        """
+        self._lock_exclusive = True
+        self._lock_shared = False
+        return self
+
+    def group_by(self, *fields):
+        """Sets a grouping criteria for the resultset.
+
+        Args:
+            *fields: The string expressions identifying the grouping criteria.
+
+        Returns:
+            mysqlx.ReadStatement: ReadStatement object.
+        """
+        self._group_by(*fields)
+        return self
+
+    def having(self, condition):
+        """Sets a condition for records to be considered in agregate function
+        operations.
+
+        Args:
+            condition (string): A condition on the agregate functions used on
+                                the grouping criteria.
+
+        Returns:
+            mysqlx.ReadStatement: ReadStatement object.
+        """
+        self._having(condition)
+        return self
+
+    def execute(self):
+        """Execute the statement.
+
+        Returns:
+            mysqlx.Result: Result object.
+        """
+        return self._connection.find(self)
+
+
+class FindStatement(ReadStatement):
     """A statement document selection on a Collection.
 
     Args:
@@ -502,42 +569,8 @@ class FindStatement(FilterableStatement):
         """
         return self._projection(*fields)
 
-    def group_by(self, *fields):
-        """Sets a grouping criteria for the resultset.
 
-        Args:
-            *fields: The string expressions identifying the grouping criteria.
-
-        Returns:
-            mysqlx.FindStatement: FindStatement object.
-        """
-        self._group_by(*fields)
-        return self
-
-    def having(self, condition):
-        """Sets a condition for records to be considered in agregate function
-        operations.
-
-        Args:
-            condition (string): A condition on the agregate functions used on
-                                the grouping criteria.
-
-        Returns:
-            mysqlx.FindStatement: FindStatement object.
-        """
-        self._having(condition)
-        return self
-
-    def execute(self):
-        """Execute the statement.
-
-        Returns:
-            mysqlx.DocResult: DocResult object.
-        """
-        return self._connection.find(self)
-
-
-class SelectStatement(FilterableStatement):
+class SelectStatement(ReadStatement):
     """A statement for record retrieval operations on a Table.
 
     Args:
@@ -560,40 +593,6 @@ class SelectStatement(FilterableStatement):
         self.sort(*clauses)
         return self
 
-    def group_by(self, *fields):
-        """Sets a grouping criteria for the resultset.
-
-        Args:
-            *fields: The fields identifying the grouping criteria.
-
-        Returns:
-            mysqlx.SelectStatement: SelectStatement object.
-        """
-        self._group_by(*fields)
-        return self
-
-    def having(self, condition):
-        """Sets a condition for records to be considered in agregate function
-        operations.
-
-        Args:
-            condition (str): A condition on the agregate functions used on the
-                             grouping criteria.
-
-        Returns:
-            mysqlx.SelectStatement: SelectStatement object.
-        """
-        self._having(condition)
-        return self
-
-    def execute(self):
-        """Execute the statement.
-
-        Returns:
-            mysqlx.RowResult: RowResult object.
-        """
-        return self._connection.find(self)
-
     def get_sql(self):
         where = " WHERE {0}".format(self._where) if self._has_where else ""
         group_by = " GROUP BY {0}".format(self._grouping_str) if \
@@ -610,6 +609,7 @@ class SelectStatement(FilterableStatement):
                 where=where, group=group_by, having=having, order=order_by))
 
         return stmt
+
 
 class InsertStatement(Statement):
     """A statement for insert operations on Table.
