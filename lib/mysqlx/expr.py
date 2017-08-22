@@ -21,8 +21,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .compat import STRING_TYPES, PY3
+from .compat import STRING_TYPES, BYTE_TYPES, UNICODE_TYPES, PY3
 from .helpers import get_item_or_attr
+from .dbdoc import DbDoc
 from .protobuf import Message, mysqlxpb_enum
 
 
@@ -268,6 +269,51 @@ class Token:
 
 
 # static protobuf helper functions
+
+def build_expr(value):
+    msg = Message("Mysqlx.Expr.Expr")
+    if isinstance(value, (dict, DbDoc)):
+        msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OBJECT")
+        msg["object"] = build_object(value).get_message()
+    elif isinstance(value, (list, tuple)):
+        msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.ARRAY")
+        msg["array"] = build_array(value).get_message()
+    else:
+        msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.LITERAL")
+        msg["literal"] = build_scalar(value).get_message()
+    return msg
+
+def build_scalar(value):
+    if isinstance(value, STRING_TYPES):
+        return build_string_scalar(value)
+    elif isinstance(value, BYTE_TYPES):
+        return build_bytes_scalar(value)
+    elif isinstance(value, bool):
+        return build_bool_scalar(value)
+    elif isinstance(value, int):
+        return build_int_scalar(value)
+    elif isinstance(value, float):
+        return build_double_scalar(value)
+    elif value is None:
+        return build_null_scalar()
+    raise ValueError("Unsupported data type: {0}.".format(type(value)))
+
+def build_object(obj):
+    if isinstance(obj, DbDoc):
+        return build_object(obj.__dict__)
+
+    msg = Message("Mysqlx.Expr.Object")
+    for key, value in obj.items():
+        pair = Message("Mysqlx.Expr.Object.ObjectField")
+        pair["key"] = key.encode() if isinstance(key, UNICODE_TYPES) else key
+        pair["value"] = build_expr(value).get_message()
+        msg["fld"].extend([pair.get_message()])
+    return msg
+
+def build_array(array):
+    msg = Message("Mysqlx.Expr.Array")
+    msg["value"].extend([build_expr(value).get_message() for value in array])
+    return msg
 
 def build_null_scalar():
     msg = Message("Mysqlx.Datatypes.Scalar")

@@ -27,6 +27,7 @@ import json
 import uuid
 
 from .compat import STRING_TYPES
+from .errors import ProgrammingError
 
 
 class DbDoc(object):
@@ -47,14 +48,21 @@ class DbDoc(object):
         else:
             raise ValueError("Unable to handle type: {0}".format(type(value)))
 
+    def __setitem__(self, index, value):
+        if index == "_id":
+            raise ProgrammingError("Cannot modify _id")
+        self.__dict__[index] = value
+
     def __getitem__(self, index):
         return self.__dict__[index]
 
     def keys(self):
         return self.__dict__.keys()
 
-    def ensure_id(self):
-        if "_id" not in self.__dict__:
+    def ensure_id(self, doc_id=None):
+        if doc_id:
+            self.__dict__["_id"] = doc_id
+        elif "_id" not in self.__dict__:
             uuid1 = str(uuid.uuid1()).upper().split("-")
             uuid1.reverse()
             self.__dict__["_id"] = "".join(uuid1)

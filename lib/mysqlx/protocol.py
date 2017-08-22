@@ -28,8 +28,7 @@ import struct
 from .compat import STRING_TYPES, INT_TYPES
 from .dbdoc import DbDoc
 from .errors import InterfaceError, OperationalError, ProgrammingError
-from .expr import (ExprParser, build_null_scalar, build_string_scalar,
-                   build_bool_scalar, build_double_scalar, build_int_scalar)
+from .expr import ExprParser, build_expr, build_scalar, build_bool_scalar
 from .helpers import encode_to_bytes, get_item_or_attr
 from .result import ColumnMetaData
 from .protobuf import SERVER_MESSAGES, Message, mysqlxpb_enum
@@ -135,8 +134,7 @@ class Protocol(object):
                 raise ProgrammingError("Unable to find placeholder for "
                                        "parameter: {0}".format(name))
             pos = statement._binding_map[name]
-            scalars[pos] = self.arg_object_to_scalar(binding["value"],
-                                                     not statement._doc_based)
+            scalars[pos] = build_scalar(binding["value"]).get_message()
         return scalars
 
     def _apply_filter(self, message, statement):
@@ -193,8 +191,7 @@ class Protocol(object):
             operation["operation"] = update_op.update_type
             operation["source"] = update_op.source
             if update_op.value is not None:
-                operation["value"] = self.arg_object_to_expr(
-                    update_op.value, not stmt._doc_based)
+                operation["value"] = build_expr(update_op.value)
             msg["operation"].extend([operation.get_message()])
 
         self._writer.write_message(
@@ -241,13 +238,12 @@ class Protocol(object):
             row = Message("Mysqlx.Crud.Insert.TypedRow")
             if isinstance(value, list):
                 for val in value:
-                    obj = self.arg_object_to_expr(val, not stmt._doc_based)
-                    row["field"].extend([obj.get_message()])
+                    row["field"].extend([build_expr(val).get_message()])
             else:
-                obj = self.arg_object_to_expr(value, not stmt._doc_based)
-                row["field"].extend([obj.get_message()])
+                row["field"].extend([build_expr(value).get_message()])
             msg["row"].extend([row.get_message()])
 
+        msg["upsert"] = stmt._upsert
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_INSERT"), msg)
 
@@ -337,39 +333,6 @@ class Protocol(object):
                                  msg.get("content_type"))
             columns.append(col)
         return columns
-
-    def arg_object_to_expr(self, value, allow_relational):
-        literal = None
-        if value is None:
-            literal = build_null_scalar()
-        if isinstance(value, bool):
-            literal = build_bool_scalar(value)
-        elif isinstance(value, INT_TYPES):
-            literal = build_int_scalar(value)
-        elif isinstance(value, (float)):
-            literal = build_double_scalar(value)
-        elif isinstance(value, STRING_TYPES):
-            try:
-                expression = ExprParser(value, allow_relational).expr()
-                if expression.has_identifier():
-                    msg = Message("Mysqlx.Expr.Expr",
-                                  literal=build_string_scalar(value))
-                    return msg
-                return expression.serialize_to_string()
-            except:
-                literal = build_string_scalar(value)
-        elif isinstance(value, DbDoc):
-            literal = build_string_scalar(str(value))
-        if literal is None:
-            raise InterfaceError("Unsupported type: {0}".format(type(value)))
-
-        msg = Message("Mysqlx.Expr.Expr")
-        msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.LITERAL")
-        msg["literal"] = literal
-        return msg
-
-    def arg_object_to_scalar(self, value, allow_relational):
-        return self.arg_object_to_expr(value, allow_relational).literal
 
     def read_ok(self):
         msg = self._reader.read_message()

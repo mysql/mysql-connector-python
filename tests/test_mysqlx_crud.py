@@ -1203,6 +1203,89 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 3),
+                     "Root level updates not supported")
+    def test_replace_one(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        result = collection.find("age = 21").execute().fetch_one()
+        self.assertEqual("Fred", result["name"])
+        result['name'] = "George"
+        collection.replace_one(result["_id"], result)
+
+        result = collection.find("age = 21").execute().fetch_one()
+        self.assertEqual("George", result["name"])
+
+        self.schema.drop_collection(collection_name)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 2), "Upsert not supported")
+    def test_add_or_replace_one(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        result = collection.find("age = 21").execute().fetch_one()
+        self.assertEqual("Fred", result["name"])
+        result['name'] = "George"
+        collection.add_or_replace_one(result["_id"], result)
+
+        result = collection.find("age = 21").execute().fetch_one()
+        self.assertEqual("George", result["name"])
+
+        result = collection.find("_id = 'new_id'").execute().fetch_all()
+        self.assertEqual(0, len(result))
+        upsert = {'name': 'Melissandre', "age": 99999}
+        collection.add_or_replace_one("new_id", upsert)
+        result = collection.find("_id = 'new_id'").execute().fetch_one()
+        self.assertEqual("Melissandre", result["name"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_get_one(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        result = collection.find("name = 'Fred'").execute().fetch_one()
+        result = collection.get_one(result["_id"])
+        self.assertEqual("Fred", result["name"])
+
+        self.schema.drop_collection(collection_name)
+
+    def test_remove_one(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+            {"name": "Betty", "age": 67},
+        ).execute()
+
+        result = collection.find("name = 'Fred'").execute().fetch_one()
+        result = collection.remove_one(result["_id"])
+        result = collection.find("name = 'Fred'").execute().fetch_all()
+        self.assertEqual(0, len(result))
+
+        self.schema.drop_collection(collection_name)
+
     def test_results(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)

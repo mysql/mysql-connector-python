@@ -306,15 +306,34 @@ class SqlStatement(Statement):
         return SqlResult(self._connection)
 
 
-class AddStatement(Statement):
+class WriteStatement(Statement):
+    """Provide common write operation attributes
+    """
+    def __init__(self, target, doc_based):
+        super(WriteStatement, self).__init__(target, doc_based)
+        self._values = []
+        self._upsert = False
+
+    def upsert(self, val=True):
+        """Sets the upset flag to the boolean of the value provided.
+        Setting of this flag allows updating of the matched rows/documents
+        with the provided value.
+
+        Args:
+            val (optional[bool]): Set or unset the upsert flag.
+        """
+        self._upsert = val
+        return self
+
+
+class AddStatement(WriteStatement):
     """A statement for document addition on a collection.
 
     Args:
         collection (mysqlx.Collection): The Collection object.
     """
     def __init__(self, collection):
-        super(AddStatement, self).__init__(target=collection)
-        self._values = []
+        super(AddStatement, self).__init__(collection, True)
         self._ids = []
 
     def add(self, *values):
@@ -610,8 +629,7 @@ class SelectStatement(ReadStatement):
 
         return stmt
 
-
-class InsertStatement(Statement):
+class InsertStatement(WriteStatement):
     """A statement for insert operations on Table.
 
     Args:
@@ -619,9 +637,8 @@ class InsertStatement(Statement):
         *fields: The fields to be inserted.
     """
     def __init__(self, table, *fields):
-        super(InsertStatement, self).__init__(target=table, doc_based=False)
+        super(InsertStatement, self).__init__(table, False)
         self._fields = flexible_params(*fields)
-        self._values = []
 
     def values(self, *values):
         """Set the values to be inserted.

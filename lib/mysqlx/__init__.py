@@ -45,7 +45,7 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         CreateCollectionIndexStatement, CreateTableStatement,
                         CreateViewStatement, AlterViewStatement, ColumnDef,
                         GeneratedColumnDef, ForeignKeyDef, Expr,
-                        ReadStatement)
+                        ReadStatement, WriteStatement)
 
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)

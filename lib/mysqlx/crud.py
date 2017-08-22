@@ -23,6 +23,7 @@
 
 """Implementation of the CRUD database objects."""
 
+from .dbdoc import DbDoc
 from .errors import ProgrammingError
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
@@ -408,6 +409,46 @@ class Collection(DatabaseObject):
         """
         self._connection.execute_nonquery("xplugin", "drop_collection_index",
             False, self._schema.name, self._name, index_name)
+
+    def replace_one(self, doc_id, doc):
+        """Replaces the Document matching the document ID with a
+           new document provided.
+
+        Args:
+            doc_id (str): Document ID
+            doc (DbDoc/dict): New Document
+        """
+        return self.modify("_id = :id").set("$", doc) \
+                   .bind("id", doc_id).execute()
+
+    def add_or_replace_one(self, doc_id, doc):
+        """Upserts the Document matching the document ID with a
+           new document provided.
+
+        Args:
+            doc_id (str): Document ID
+            doc (DbDoc/dict): New Document
+        """
+        if not isinstance(doc, DbDoc):
+            doc = DbDoc(doc)
+        doc.ensure_id(doc_id)
+        return self.add(doc).upsert(True).execute()
+
+    def get_one(self, doc_id):
+        """Returns a Document matching the Document ID.
+
+        Args:
+            doc_id (str): Document ID
+        """
+        return self.find("_id = :id").bind("id", doc_id).execute().fetch_one()
+
+    def remove_one(self, doc_id):
+        """Removes a Document matching the Document ID.
+
+        Args:
+            doc_id (str): Document ID
+        """
+        return self.remove("_id = :id").bind("id", doc_id).execute()
 
 
 class Table(DatabaseObject):
