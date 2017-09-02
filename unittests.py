@@ -148,7 +148,6 @@ local_infile = 1
 innodb_flush_log_at_trx_commit = 2
 innodb_log_file_size = 1Gb
 general_log_file = general_{name}.log
-ssl
 """
 
 # Platform specifics
@@ -168,6 +167,8 @@ else:
         "innodb_flush_method = O_DIRECT",
     ))
     MYSQL_DEFAULT_BASE = os.path.join('/', 'usr', 'local', 'mysql')
+
+MY_CNF += "\nssl={ssl}"
 
 MYSQL_DEFAULT_TOPDIR = _TOPDIR
 

@@ -417,7 +417,6 @@ class MySQLServer(MySQLServerBase):
             '--no-defaults',
             '--basedir=%s' % self._basedir,
             '--datadir=%s' % self._datadir,
-            '--log-warnings=0',
             '--max_allowed_packet=8M',
             '--default-storage-engine=myisam',
             '--net_buffer_length=16K',
@@ -430,6 +429,9 @@ class MySQLServer(MySQLServerBase):
             cmd.append("--init-file={0}".format(self._init_sql))
         else:
             cmd.append("--bootstrap")
+
+        if self._version < (8, 0, 3):
+            cmd.append('--log-warnings=0')
 
         if self._version[0:2] < (5, 5):
             cmd.append('--language={0}/english'.format(self._lc_messages_dir))
@@ -467,34 +469,36 @@ class MySQLServer(MySQLServerBase):
         extra_sql = [
             "CREATE DATABASE myconnpy;"
         ]
-        defaults = ("'root'{0}, "
-                    "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-                    "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-                    "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
-                    "@@default_authentication_plugin,'','N',"
-                    "CURRENT_TIMESTAMP,NULL{1}")
 
-        hosts = ["::1", "127.0.0.1"]
-        if self._version[0:3] < (8, 0, 1):
-            # because we use --initialize-insecure for 8.0 above
-            # which already creates root @ localhost
-            hosts.append("localhost")
+        if self._version < (8, 0, 1):
+            defaults = ("'root'{0}, "
+                        "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                        "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                        "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
+                        "@@default_authentication_plugin,'','N',"
+                        "CURRENT_TIMESTAMP,NULL{1}")
 
-        insert = "INSERT INTO mysql.user VALUES {0};".format(
-            ", ".join("('{0}', {{0}})".format(host) for host in hosts))
+            hosts = ["::1", "127.0.0.1", "localhost"]
 
-        if self._version[0:3] >= (8, 0, 1):
-            # No password column, has account_locked, Create_role_priv and
-            # Drop_role_priv columns
-            defaults = defaults.format("", ", 'N', 'Y', 'Y'")
-        elif self._version[0:3] >= (5, 7, 6):
-            # No password column, has account_locked column
-            defaults = defaults.format("", ", 'N'")
-        elif self._version[0:3] >= (5, 7, 5):
-            # The password column
-            defaults = defaults.format(", ''", "")
+            insert = "INSERT INTO mysql.user VALUES {0};".format(
+                ", ".join("('{0}', {{0}})".format(host) for host in hosts))
 
-        extra_sql.append(insert.format(defaults))
+            if self._version[0:3] >= (5, 7, 6):
+                # No password column, has account_locked column
+                defaults = defaults.format("", ", 'N'")
+            elif self._version[0:3] >= (5, 7, 5):
+                # The password column
+                defaults = defaults.format(", ''", "")
+
+            extra_sql.append(insert.format(defaults))
+        else:
+            extra_sql.extend([
+                "CREATE USER 'root'@'127.0.01';",
+                "GRANT ALL ON *.* TO 'root'@'127.0.0.1';",
+                "CREATE USER 'root'@'::1';",
+                "GRANT ALL ON *.* TO 'root'@'::1';"
+            ])
+
         bootstrap_log = os.path.join(self._topdir, 'bootstrap.log')
         try:
             self._create_directories()
@@ -583,6 +587,7 @@ class MySQLServer(MySQLServerBase):
             'serverid': self._serverid,
             'lc_messages_dir': _convert_forward_slash(
                 self._lc_messages_dir),
+            'ssl': 1,
         }
 
         for arg in self._extra_args:

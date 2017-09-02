@@ -742,6 +742,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     def test__do_auth(self):
         """Authenticate with the MySQL server"""
         self.cnx._socket.sock = tests.DummySocket()
+        self.cnx._handshake["auth_plugin"] = "mysql_native_password"
         flags = constants.ClientFlag.get_default()
         kwargs = {
             'username': 'ham',
@@ -782,6 +783,94 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                           self.cnx._do_auth, **kwargs)
 
     @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 3),
+                     "caching_sha2_password plugin not supported by server.")
+    def test_caching_sha2_password(self):
+        """Authenticate with the MySQL server using caching_sha2_password"""
+        self.cnx._socket.sock = tests.DummySocket()
+        flags = constants.ClientFlag.get_default()
+        flags |= constants.ClientFlag.SSL
+        kwargs = {
+            'username': 'ham',
+            'password': 'spam',
+            'database': 'test',
+            'charset': 33,
+            'client_flags': flags,
+            'ssl_options': {
+                'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
+                'cert': os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'),
+                'key': os.path.join(tests.SSL_DIR, 'tests_client_key.pem'),
+            },
+        }
+
+        self.cnx._handshake['auth_plugin'] = 'caching_sha2_password'
+        self.cnx._handshake['auth_data'] = b'h4i6oP!OLng9&PD@WrYH'
+        self.cnx._socket.switch_to_ssl = \
+            lambda ca, cert, key, verify_cert, cipher: None
+
+        # Test perform_full_authentication
+        # Exchange:
+        # Client              Server
+        # ------              ------
+        # make_ssl_auth
+        # first_auth
+        #                     full_auth
+        # second_auth
+        #                     OK
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            bytearray(b'\x02\x00\x00\x03\x01\x04'), # full_auth request
+            bytearray(b'\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00') # OK
+        ])
+        self.cnx._do_auth(**kwargs)
+        packets = self.cnx._socket.sock._client_sends
+        self.assertEqual(3, len(packets))
+        ssl_pkt = self.cnx._protocol.make_auth_ssl(
+                charset=kwargs['charset'], client_flags=kwargs['client_flags'])
+        # Check the SSL request packet
+        self.assertEqual(packets[0][4:], ssl_pkt)
+        auth_pkt = self.cnx._protocol.make_auth(
+            self.cnx._handshake, kwargs['username'],
+            kwargs['password'], kwargs['database'],
+            charset=kwargs['charset'],
+            client_flags=kwargs['client_flags'],
+            ssl_enabled=True)
+        # Check the first_auth packet
+        self.assertEqual(packets[1][4:], auth_pkt)
+        # Check the second_auth packet
+        self.assertEqual(packets[2][4:],
+                bytearray(kwargs["password"].encode('utf-8') + b"\x00"))
+
+        # Test fast_auth_success
+        # Exchange:
+        # Client              Server
+        # ------              ------
+        # make_ssl_auth
+        # first_auth
+        #                     fast_auth
+        #                     OK
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            bytearray(b'\x02\x00\x00\x03\x01\x03'), # fast_auth success
+            bytearray(b'\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00') # OK
+        ])
+        self.cnx._do_auth(**kwargs)
+        packets = self.cnx._socket.sock._client_sends
+        self.assertEqual(2, len(packets))
+        ssl_pkt = self.cnx._protocol.make_auth_ssl(
+                charset=kwargs['charset'], client_flags=kwargs['client_flags'])
+        # Check the SSL request packet
+        self.assertEqual(packets[0][4:], ssl_pkt)
+        auth_pkt = self.cnx._protocol.make_auth(
+            self.cnx._handshake, kwargs['username'],
+            kwargs['password'], kwargs['database'],
+            charset=kwargs['charset'],
+            client_flags=kwargs['client_flags'],
+            ssl_enabled=True)
+        # Check the first auth packet
+        self.assertEqual(packets[1][4:], auth_pkt)
+
+    @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
     def test__do_auth_ssl(self):
         """Authenticate with the MySQL server using SSL"""
         self.cnx._socket.sock = tests.DummySocket()
@@ -812,7 +901,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 self.cnx._handshake, kwargs['username'],
                 kwargs['password'], kwargs['database'],
                 charset=kwargs['charset'],
-                client_flags=kwargs['client_flags']),
+                client_flags=kwargs['client_flags'],
+                ssl_enabled=True),
         ]
         self.cnx._socket.switch_to_ssl = \
             lambda ca, cert, key, verify_cert, cipher: None

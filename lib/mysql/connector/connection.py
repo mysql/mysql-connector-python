@@ -170,6 +170,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         Raises NotSupportedError when we get the old, insecure password
         reply back. Raises any error coming from MySQL.
         """
+        auth = None
+        new_auth_plugin = self._auth_plugin or self._handshake["auth_plugin"]
         packet = self._socket.recv()
         if packet[4] == 254 and len(packet) == 5:
             raise errors.NotSupportedError(
@@ -185,10 +187,19 @@ class MySQLConnection(MySQLConnectionAbstract):
             response = auth.auth_response()
             self._socket.send(response)
             packet = self._socket.recv()
-            if packet[4] != 1:
-                return self._handle_ok(packet)
-            else:
-                auth_data = self._protocol.parse_auth_more_data(packet)
+
+        if packet[4] == 1:
+            auth_data = self._protocol.parse_auth_more_data(packet)
+            auth = get_auth_plugin(new_auth_plugin)(
+                auth_data, password=password, ssl_enabled=self._ssl_active)
+            if new_auth_plugin == "caching_sha2_password":
+                response = auth.auth_response()
+                if response:
+                    self._socket.send(response)
+                packet = self._socket.recv()
+
+        if packet[4] == 0:
+            return self._handle_ok(packet)
         elif packet[4] == 255:
             raise errors.get_exception(packet)
 

@@ -458,6 +458,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
     def test_change_user(self):
         connect_kwargs = self.connect_kwargs.copy()
         connect_kwargs['unix_socket'] = None
+        connect_kwargs['ssl_disabled'] = False
         cmy1 = MySQL(buffered=True)
         cmy1.connect(**connect_kwargs)
         cmy2 = MySQL(buffered=True)
@@ -477,7 +478,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             pass
 
         stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED WITH "
-                "mysql_native_password").format(**new_user)
+                "caching_sha2_password").format(**new_user)
         cmy1.query(stmt)
         cmy1.query("SET old_passwords = 0")
         res = cmy1.query("SET PASSWORD FOR '{user}'@'{host}' = "
