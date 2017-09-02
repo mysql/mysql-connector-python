@@ -30,7 +30,7 @@ from .config import (PersistenceHandler, SessionConfigManager, SessionConfig,
                      PasswordHandler)
 from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
 from .connection import Session
-from .constants import SSLMode
+from .constants import SSLMode, Auth
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
@@ -51,7 +51,7 @@ _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 ssl_opts = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 sess_opts = ssl_opts + ["user", "password", "schema", "host", "port",
-                        "routers", "socket", "ssl-mode"]
+                        "routers", "socket", "ssl-mode", "auth"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -173,6 +173,13 @@ def _validate_settings(settings):
     if "ssl-ca" in settings and settings.get("ssl-mode") \
         not in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
         raise InterfaceError("Must verify Server if CA is provided.")
+
+    if "auth" in settings:
+        try:
+            settings["auth"] = settings["auth"].lower()
+            Auth.index(settings["auth"])
+        except (AttributeError, ValueError):
+            raise InterfaceError("Invalid Auth '{0}'".format(settings["auth"]))
 
 
 def _validate_hosts(settings):

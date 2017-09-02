@@ -97,9 +97,13 @@ class Protocol(object):
             msg)
         return self.read_ok()
 
-    def send_auth_start(self, method):
+    def send_auth_start(self, method, auth_data=None, initial_response=None):
         msg = Message("Mysqlx.Session.AuthenticateStart")
         msg["mech_name"] = method
+        if auth_data is not None:
+            msg["auth_data"] = auth_data
+        if initial_response is not None:
+            msg["initial_response"] = initial_response
         self._writer.write_message(mysqlxpb_enum(
             "Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_START"), msg)
 

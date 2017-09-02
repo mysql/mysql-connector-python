@@ -179,7 +179,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             "username": "root",
             "password": ""
         }
-        self.assertRaises(TypeError, mysqlx.Session, bad_config)
+        self.assertRaises(InterfaceError, mysqlx.Session, bad_config)
 
         host = self.connect_kwargs["host"]
         port = self.connect_kwargs["port"]
@@ -275,6 +275,42 @@ class MySQLxSessionTests(tests.MySQLxTests):
                 os.remove(usr_file)
             if os.path.exists(sys_file):
                 os.remove(sys_file)
+
+        # SocketSteam.is_socket
+        session = mysqlx.get_session(user=user, password=password,
+                                     host=host, port=port)
+        self.assertFalse(session._connection.stream.is_socket)
+
+    def test_auth(self):
+        sess = mysqlx.get_session(self.connect_kwargs)
+        sess.sql("CREATE USER 'native'@'%' IDENTIFIED WITH "
+                 "mysql_native_password BY 'test'").execute()
+        sess.sql("CREATE USER 'sha256'@'%' IDENTIFIED WITH "
+                 "sha256_password BY 'sha256'").execute()
+
+        config = {'host': self.connect_kwargs['host'],
+                  'port': self.connect_kwargs['port']}
+
+        config['user'] = 'native'
+        config['password'] = 'test'
+        config['auth'] = 'plain'
+        mysqlx.get_session(config)
+
+        config['auth'] = 'mysql41'
+        mysqlx.get_session(config)
+
+        config['user'] = 'sha256'
+        config['password'] = 'sha256'
+        if tests.MYSQL_VERSION >= (8, 0, 1):
+            config['auth'] = 'plain'
+            mysqlx.get_session(config)
+
+        config['auth'] = 'mysql41'
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        sess.sql("DROP USER 'native'@'%'").execute()
+        sess.sql("DROP USER 'sha256'@'%'").execute()
+        sess.close()
 
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
     def test_mysqlx_socket(self):

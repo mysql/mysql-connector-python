@@ -35,11 +35,12 @@ import logging
 
 from functools import wraps
 
-from .authentication import MySQL41AuthPlugin
+from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
+                             ExternalAuthPlugin)
 from .errors import InterfaceError, OperationalError, ProgrammingError
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES
 from .crud import Schema
-from .constants import SSLMode
+from .constants import SSLMode, Auth
 from .helpers import get_item_or_attr
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
@@ -54,16 +55,20 @@ class SocketStream(object):
     def __init__(self):
         self._socket = None
         self._is_ssl = False
+        self._is_socket = False
         self._host = None
 
     def connect(self, params):
-        if isinstance(params, tuple):
+        try:
+            self._socket = socket.create_connection(params)
             self._host = params[0]
-            s_type = socket.AF_INET6 if ":" in params[0] else socket.AF_INET
-        else:
-            s_type = socket.AF_UNIX
-        self._socket = socket.socket(s_type, socket.SOCK_STREAM)
-        self._socket.connect(params)
+        except ValueError:
+            try:
+                self._socket = socket.socket(socket.AF_UNIX)
+                self._is_socket = True
+                self._socket.connect(params)
+            except AttributeError:
+                raise InterfaceError("Unix socket unsupported.")
 
     def read(self, count):
         if self._socket is None:
@@ -130,6 +135,17 @@ class SocketStream(object):
                 raise InterfaceError("Unable to verify server identity: {}"
                                      "".format(err))
         self._is_ssl = True
+
+    @property
+    def is_ssl(self):
+        return self._is_ssl
+
+    @property
+    def is_socket(self):
+        return self._is_socket
+
+    def is_secure(self):
+        return self._is_ssl or self.is_socket
 
 
 def catch_network_exception(func):
@@ -237,7 +253,7 @@ class Connection(object):
     def _handle_capabilities(self):
         if self.settings.get("ssl-mode") == SSLMode.DISABLED:
             return
-        if "socket" in self.settings:
+        if self.stream.is_socket:
             if self.settings.get("ssl-mode"):
                 _LOGGER.warning("SSL not required when using Unix socket.")
             return
@@ -261,11 +277,32 @@ class Connection(object):
                             self.settings.get("ssl-key"))
 
     def _authenticate(self):
+        auth = self.settings.get("auth")
+        if (not auth and self.stream.is_secure()) or auth == Auth.PLAIN:
+            self._authenticate_plain()
+        elif auth == Auth.EXTERNAL:
+            self._authenticate_external()
+        else:
+            self._authenticate_mysql41()
+
+    def _authenticate_mysql41(self):
         plugin = MySQL41AuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name())
         extra_data = self.protocol.read_auth_continue()
         self.protocol.send_auth_continue(
             plugin.build_authentication_response(extra_data))
+        self.protocol.read_auth_ok()
+
+    def _authenticate_plain(self):
+        plugin = PlainAuthPlugin(self._user, self._password)
+        self.protocol.send_auth_start(plugin.auth_name(),
+            auth_data=plugin.auth_data())
+        self.protocol.read_auth_ok()
+
+    def _authenticate_external(self):
+        plugin = ExternalAuthPlugin()
+        self.protocol.send_auth_start(plugin.auth_name(),
+            initial_response=plugin.initial_response())
         self.protocol.read_auth_ok()
 
     @catch_network_exception
