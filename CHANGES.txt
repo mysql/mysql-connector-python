@@ -10,7 +10,13 @@ Full release notes:
 
 v8.0.5
 ======
+- WL#11073: Add caching_sha2_password authentication plugin
+- WL#10975: Add Single document operations
+- WL#10974: Add Row locking methods to find and select operations
+- WL#10973: Allow JSON types as operands for IN operator
 - WL#10899: Add support for pure Python implementation of Protobuf
+- WL#10771: Add SHA256 authentication
+- WL#10053: Configuration handling interface
 
 v8.0.4
 ======
