@@ -134,7 +134,7 @@ class Schema(DatabaseObject):
         """Returns a list of collections for this schema.
 
         Returns:
-            list: List of Collection objects.
+            `list`: List of Collection objects.
         """
         rows = self._connection.get_row_result("list_objects", self._name)
         rows.fetch_all()
@@ -162,7 +162,7 @@ class Schema(DatabaseObject):
         """Returns a list of tables for this schema.
 
         Returns:
-            list: List of Table objects.
+            `list`: List of Table objects.
         """
         rows = self._connection.get_row_result("list_objects", self._name)
         rows.fetch_all()

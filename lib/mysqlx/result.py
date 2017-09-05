@@ -591,7 +591,7 @@ class Row(object):
 
     Args:
         rs (mysqlx.Result): The Result set.
-        fields (list): The list of fields.
+        fields (`list`): The list of fields.
     """
     def __init__(self, rs, fields):
         self._fields = fields
@@ -641,7 +641,7 @@ class BaseResult(object):
         """Returns the warnings.
 
         Returns:
-            list: The list of warnings.
+            `list`: The list of warnings.
         """
         return self._warnings
 
@@ -660,7 +660,7 @@ class Result(BaseResult):
 
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
-        ids (list): A list of IDs.
+        ids (`list`): A list of IDs.
     """
     def __init__(self, connection=None, ids=None):
         super(Result, self).__init__(connection)
@@ -774,7 +774,7 @@ class BufferingResult(BaseResult):
         """Fetch all items.
 
         Returns:
-            list: The list of items.
+            `list`: The list of items.
         """
         while True:
             if not self._page_in_items():
@@ -793,7 +793,7 @@ class RowResult(BufferingResult):
 
     @property
     def columns(self):
-        """list: The list of columns.
+        """`list`: The list of columns.
         """
         return self._columns
 

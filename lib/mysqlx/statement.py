@@ -824,7 +824,7 @@ class CreateViewStatement(Statement):
         """Sets the column names.
 
         Args:
-            columns (list): The list of column names.
+            columns (`list`): The list of column names.
 
         Returns:
             mysqlx.CreateViewStatement: CreateViewStatement object.

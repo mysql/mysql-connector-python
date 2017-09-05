@@ -270,7 +270,7 @@ class SessionConfigManager(object):
         """A list of all Session configuration stored on the system.
 
         Returns:
-            list: List of :class`mysqlx.SessionConfig` objects.
+            `list`: List of :class`mysqlx.SessionConfig` objects.
         """
         if not self.persistence_handler:
             raise OperationalError("Persistence Handler not defined.")
@@ -337,7 +337,7 @@ class PersistenceHandler(object):
         data.
 
         Returns:
-            list: List of tuples of session name and session
+            `list`: List of tuples of session name and session
             configuration data.
         """
         return self._configs.items()
@@ -390,7 +390,7 @@ class PersistenceHandler(object):
         """Returns a list of all existing session configuration data.
 
         Returns:
-            list: List of dicts containing all session configuration data.
+            `list`: List of dicts containing all session configuration data.
         """
         return self._configs.values()
 
