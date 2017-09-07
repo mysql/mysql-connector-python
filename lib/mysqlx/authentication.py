@@ -69,7 +69,7 @@ class PlainAuthPlugin(object):
     def __init__(self, username, password):
         self._username = username
         self._password = password.encode("utf-8") \
-            if isinstance(password, UNICODE_TYPES) else password
+            if isinstance(password, UNICODE_TYPES) and not PY3 else password
 
     def name(self):
         return "Plain Authentication Plugin"
