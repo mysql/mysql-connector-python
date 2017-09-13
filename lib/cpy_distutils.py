@@ -338,9 +338,10 @@ class BuildExtDynamic(build_ext):
                 else:
                     with open(myversionh, 'rb') as fp:
                         for line in fp.readlines():
-                            if '#define LIBMYSQL_VERSION' in line:
+                            if b'#define LIBMYSQL_VERSION' in line:
                                 version = LooseVersion(
-                                    line.split()[2].replace('"', '')).version
+                                    line.split()[2].replace(b'"', b'').decode()
+                                ).version
                                 if version < min_version:
                                     log.error(err_version);
                                     sys.exit(1)
