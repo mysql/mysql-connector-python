@@ -342,7 +342,7 @@ class BuildExtDynamic(build_ext):
                                 version = LooseVersion(
                                     line.split()[2].replace(b'"', b'').decode()
                                 ).version
-                                if version < min_version:
+                                if tuple(version) < min_version:
                                     log.error(err_version);
                                     sys.exit(1)
                                 break
