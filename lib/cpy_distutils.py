@@ -29,6 +29,7 @@ from distutils.command.install import install
 from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
+from distutils.version import LooseVersion
 from distutils.dir_util import copy_tree
 from distutils import log
 from glob import glob
@@ -327,21 +328,19 @@ class BuildExtDynamic(build_ext):
                 log.debug("# connc_loc: {0}".format(connc_loc))
             else:
                 # Probably using MS Windows
-                myconfigh = os.path.join(connc_loc, 'include', 'my_config.h')
+                myversionh = os.path.join(connc_loc, 'include',
+                                          'mysql_version.h')
 
-                if not os.path.exists(myconfigh):
+                if not os.path.exists(myversionh):
                     log.error("MySQL C API installation invalid "
-                              "(my_config.h not found)")
+                              "(mysql_version.h not found)")
                     sys.exit(1)
                 else:
-                    with open(myconfigh, 'rb') as fp:
+                    with open(myversionh, 'rb') as fp:
                         for line in fp.readlines():
-                            if b'#define VERSION' in line:
-                                version = tuple([
-                                    int(v) for v in
-                                    line.split()[2].replace(
-                                        b'"', b'').split(b'.')
-                                ])
+                            if '#define LIBMYSQL_VERSION' in line:
+                                version = LooseVersion(
+                                    line.split()[2].replace('"', '')).version
                                 if version < min_version:
                                     log.error(err_version);
                                     sys.exit(1)
