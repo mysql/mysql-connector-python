@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_crud.proto',
   package='Mysqlx.Crud',
   syntax='proto2',
-  serialized_pb=_b('\n\x11mysqlx_crud.proto\x12\x0bMysqlx.Crud\x1a\x11mysqlx_expr.proto\x1a\x16mysqlx_datatypes.proto\"[\n\x06\x43olumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05\x61lias\x18\x02 \x01(\t\x12\x34\n\rdocument_path\x18\x03 \x03(\x0b\x32\x1d.Mysqlx.Expr.DocumentPathItem\">\n\nProjection\x12!\n\x06source\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12\r\n\x05\x61lias\x18\x02 \x01(\t\"*\n\nCollection\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0e\n\x06schema\x18\x02 \x01(\t\"*\n\x05Limit\x12\x11\n\trow_count\x18\x01 \x02(\x04\x12\x0e\n\x06offset\x18\x02 \x01(\x04\"~\n\x05Order\x12\x1f\n\x04\x65xpr\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12\x34\n\tdirection\x18\x02 \x01(\x0e\x32\x1c.Mysqlx.Crud.Order.Direction:\x03\x41SC\"\x1e\n\tDirection\x12\x07\n\x03\x41SC\x10\x01\x12\x08\n\x04\x44\x45SC\x10\x02\"\x9a\x02\n\x0fUpdateOperation\x12-\n\x06source\x18\x01 \x02(\x0b\x32\x1d.Mysqlx.Expr.ColumnIdentifier\x12:\n\toperation\x18\x02 \x02(\x0e\x32\'.Mysqlx.Crud.UpdateOperation.UpdateType\x12 \n\x05value\x18\x03 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\"z\n\nUpdateType\x12\x07\n\x03SET\x10\x01\x12\x0f\n\x0bITEM_REMOVE\x10\x02\x12\x0c\n\x08ITEM_SET\x10\x03\x12\x10\n\x0cITEM_REPLACE\x10\x04\x12\x0e\n\nITEM_MERGE\x10\x05\x12\x10\n\x0c\x41RRAY_INSERT\x10\x06\x12\x10\n\x0c\x41RRAY_APPEND\x10\x07\"\xf2\x02\n\x04\x46ind\x12+\n\ncollection\x18\x02 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x03 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12+\n\nprojection\x18\x04 \x03(\x0b\x32\x17.Mysqlx.Crud.Projection\x12#\n\x08\x63riteria\x18\x05 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x0b \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05limit\x18\x06 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12!\n\x05order\x18\x07 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12#\n\x08grouping\x18\x08 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\x12,\n\x11grouping_criteria\x18\t \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\"\x8b\x02\n\x06Insert\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x02 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12\'\n\nprojection\x18\x03 \x03(\x0b\x32\x13.Mysqlx.Crud.Column\x12)\n\x03row\x18\x04 \x03(\x0b\x32\x1c.Mysqlx.Crud.Insert.TypedRow\x12&\n\x04\x61rgs\x18\x05 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x1a,\n\x08TypedRow\x12 \n\x05\x66ield\x18\x01 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\"\xa5\x02\n\x06Update\x12+\n\ncollection\x18\x02 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x03 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12#\n\x08\x63riteria\x18\x04 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x08 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05limit\x18\x05 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12!\n\x05order\x18\x06 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12/\n\toperation\x18\x07 \x03(\x0b\x32\x1c.Mysqlx.Crud.UpdateOperation\"\xf4\x01\n\x06\x44\x65lete\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x02 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12#\n\x08\x63riteria\x18\x03 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x06 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05limit\x18\x04 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12!\n\x05order\x18\x05 \x03(\x0b\x32\x12.Mysqlx.Crud.Order*$\n\tDataModel\x12\x0c\n\x08\x44OCUMENT\x10\x01\x12\t\n\x05TABLE\x10\x02\x42\x1e\n\x1c\x63om.mysql.cj.mysqlx.protobuf')
+  serialized_pb=_b('\n\x11mysqlx_crud.proto\x12\x0bMysqlx.Crud\x1a\x11mysqlx_expr.proto\x1a\x16mysqlx_datatypes.proto\"[\n\x06\x43olumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05\x61lias\x18\x02 \x01(\t\x12\x34\n\rdocument_path\x18\x03 \x03(\x0b\x32\x1d.Mysqlx.Expr.DocumentPathItem\">\n\nProjection\x12!\n\x06source\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12\r\n\x05\x61lias\x18\x02 \x01(\t\"*\n\nCollection\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0e\n\x06schema\x18\x02 \x01(\t\"*\n\x05Limit\x12\x11\n\trow_count\x18\x01 \x02(\x04\x12\x0e\n\x06offset\x18\x02 \x01(\x04\"~\n\x05Order\x12\x1f\n\x04\x65xpr\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12\x34\n\tdirection\x18\x02 \x01(\x0e\x32\x1c.Mysqlx.Crud.Order.Direction:\x03\x41SC\"\x1e\n\tDirection\x12\x07\n\x03\x41SC\x10\x01\x12\x08\n\x04\x44\x45SC\x10\x02\"\x9a\x02\n\x0fUpdateOperation\x12-\n\x06source\x18\x01 \x02(\x0b\x32\x1d.Mysqlx.Expr.ColumnIdentifier\x12:\n\toperation\x18\x02 \x02(\x0e\x32\'.Mysqlx.Crud.UpdateOperation.UpdateType\x12 \n\x05value\x18\x03 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\"z\n\nUpdateType\x12\x07\n\x03SET\x10\x01\x12\x0f\n\x0bITEM_REMOVE\x10\x02\x12\x0c\n\x08ITEM_SET\x10\x03\x12\x10\n\x0cITEM_REPLACE\x10\x04\x12\x0e\n\nITEM_MERGE\x10\x05\x12\x10\n\x0c\x41RRAY_INSERT\x10\x06\x12\x10\n\x0c\x41RRAY_APPEND\x10\x07\"\xce\x03\n\x04\x46ind\x12+\n\ncollection\x18\x02 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x03 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12+\n\nprojection\x18\x04 \x03(\x0b\x32\x17.Mysqlx.Crud.Projection\x12#\n\x08\x63riteria\x18\x05 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x0b \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05limit\x18\x06 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12!\n\x05order\x18\x07 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12#\n\x08grouping\x18\x08 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\x12,\n\x11grouping_criteria\x18\t \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12*\n\x07locking\x18\x0c \x01(\x0e\x32\x19.Mysqlx.Crud.Find.RowLock\".\n\x07RowLock\x12\x0f\n\x0bSHARED_LOCK\x10\x01\x12\x12\n\x0e\x45XCLUSIVE_LOCK\x10\x02\"\xa2\x02\n\x06Insert\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x02 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12\'\n\nprojection\x18\x03 \x03(\x0b\x32\x13.Mysqlx.Crud.Column\x12)\n\x03row\x18\x04 \x03(\x0b\x32\x1c.Mysqlx.Crud.Insert.TypedRow\x12&\n\x04\x61rgs\x18\x05 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12\x15\n\x06upsert\x18\x06 \x01(\x08:\x05\x66\x61lse\x1a,\n\x08TypedRow\x12 \n\x05\x66ield\x18\x01 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\"\xa5\x02\n\x06Update\x12+\n\ncollection\x18\x02 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x03 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12#\n\x08\x63riteria\x18\x04 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x08 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05limit\x18\x05 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12!\n\x05order\x18\x06 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12/\n\toperation\x18\x07 \x03(\x0b\x32\x1c.Mysqlx.Crud.UpdateOperation\"\xf4\x01\n\x06\x44\x65lete\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x02 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12#\n\x08\x63riteria\x18\x03 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x06 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05limit\x18\x04 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12!\n\x05order\x18\x05 \x03(\x0b\x32\x12.Mysqlx.Crud.Order*$\n\tDataModel\x12\x0c\n\x08\x44OCUMENT\x10\x01\x12\t\n\x05TABLE\x10\x02\x42\x1e\n\x1c\x63om.mysql.cj.mysqlx.protobuf')
   ,
   dependencies=[mysqlx__expr__pb2.DESCRIPTOR,mysqlx__datatypes__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -44,8 +44,8 @@ _DATAMODEL = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1921,
-  serialized_end=1957,
+  serialized_start=2036,
+  serialized_end=2072,
 )
 _sym_db.RegisterEnumDescriptor(_DATAMODEL)
 
@@ -117,6 +117,28 @@ _UPDATEOPERATION_UPDATETYPE = _descriptor.EnumDescriptor(
   serialized_end=733,
 )
 _sym_db.RegisterEnumDescriptor(_UPDATEOPERATION_UPDATETYPE)
+
+_FIND_ROWLOCK = _descriptor.EnumDescriptor(
+  name='RowLock',
+  full_name='Mysqlx.Crud.Find.RowLock',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='SHARED_LOCK', index=0, number=1,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='EXCLUSIVE_LOCK', index=1, number=2,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=1152,
+  serialized_end=1198,
+)
+_sym_db.RegisterEnumDescriptor(_FIND_ROWLOCK)
 
 
 _COLUMN = _descriptor.Descriptor(
@@ -433,11 +455,19 @@ _FIND = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='locking', full_name='Mysqlx.Crud.Find.locking', index=9,
+      number=12, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=1,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
+    _FIND_ROWLOCK,
   ],
   options=None,
   is_extendable=False,
@@ -446,7 +476,7 @@ _FIND = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=736,
-  serialized_end=1106,
+  serialized_end=1198,
 )
 
 
@@ -476,8 +506,8 @@ _INSERT_TYPEDROW = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1332,
-  serialized_end=1376,
+  serialized_start=1447,
+  serialized_end=1491,
 )
 
 _INSERT = _descriptor.Descriptor(
@@ -522,6 +552,13 @@ _INSERT = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='upsert', full_name='Mysqlx.Crud.Insert.upsert', index=5,
+      number=6, type=8, cpp_type=7, label=1,
+      has_default_value=True, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -534,8 +571,8 @@ _INSERT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1109,
-  serialized_end=1376,
+  serialized_start=1201,
+  serialized_end=1491,
 )
 
 
@@ -607,8 +644,8 @@ _UPDATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1379,
-  serialized_end=1672,
+  serialized_start=1494,
+  serialized_end=1787,
 )
 
 
@@ -673,8 +710,8 @@ _DELETE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1675,
-  serialized_end=1919,
+  serialized_start=1790,
+  serialized_end=2034,
 )
 
 _COLUMN.fields_by_name['document_path'].message_type = mysqlx__expr__pb2._DOCUMENTPATHITEM
@@ -695,6 +732,8 @@ _FIND.fields_by_name['limit'].message_type = _LIMIT
 _FIND.fields_by_name['order'].message_type = _ORDER
 _FIND.fields_by_name['grouping'].message_type = mysqlx__expr__pb2._EXPR
 _FIND.fields_by_name['grouping_criteria'].message_type = mysqlx__expr__pb2._EXPR
+_FIND.fields_by_name['locking'].enum_type = _FIND_ROWLOCK
+_FIND_ROWLOCK.containing_type = _FIND
 _INSERT_TYPEDROW.fields_by_name['field'].message_type = mysqlx__expr__pb2._EXPR
 _INSERT_TYPEDROW.containing_type = _INSERT
 _INSERT.fields_by_name['collection'].message_type = _COLLECTION
