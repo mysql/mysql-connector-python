@@ -35,7 +35,8 @@ from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, Warning, InterfaceError, DatabaseError,
                      NotSupportedError, DataError, IntegrityError,
-                     ProgrammingError, OperationalError, InternalError)
+                     ProgrammingError, OperationalError, InternalError,
+                     PoolError)
 from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
                      SqlResult, ColumnType)
 from .statement import (Statement, FilterableStatement, SqlStatement,
@@ -278,7 +279,7 @@ __all__ = [
     # mysqlx.errors
     "Error", "Warning", "InterfaceError", "DatabaseError", "NotSupportedError",
     "DataError", "IntegrityError", "ProgrammingError", "OperationalError",
-    "InternalError",
+    "InternalError", "PoolError",
 
     # mysqlx.result
     "ColumnMetaData", "Row", "Result", "BufferingResult", "RowResult",
