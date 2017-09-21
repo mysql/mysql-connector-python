@@ -93,6 +93,8 @@ except ImportError:
     # Mysqlx.Crud
     for key, val in mysqlx_crud_pb2.DataModel.items():
         _MESSAGES["Mysqlx.Crud.DataModel.{0}".format(key)] = val
+    for key, val in mysqlx_crud_pb2.Find.RowLock.items():
+        _MESSAGES["Mysqlx.Crud.Find.RowLock.{0}".format(key)] = val
     for key, val in mysqlx_crud_pb2.Order.Direction.items():
         _MESSAGES["Mysqlx.Crud.Order.Direction.{0}".format(key)] = val
     for key, val in mysqlx_crud_pb2.UpdateOperation.UpdateType.items():
