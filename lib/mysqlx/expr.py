@@ -1165,10 +1165,6 @@ class ExprParser:
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection["alias"] = self.consume_token(TokenType.IDENT)
-            elif get_item_or_attr(projection["source"], "type") is \
-                mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT"):
-                self.pos -= 1
-                projection["alias"] = self.consume_token(TokenType.IDENT)
             else:
                 projection["alias"] = fields[len(project_expr)]
             project_expr.append(projection.get_message())
