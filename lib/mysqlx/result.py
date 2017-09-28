@@ -605,10 +605,10 @@ class Row(object):
         return self._fields[index]
 
     def get_string(self, str_index):
-        """Returns the value if the index by string.
+        """Returns the value using the column name.
 
         Args:
-            str_index (str): The string index.
+            str_index (str): The column name.
         """
         int_index = self._resultset.index_of(str_index)
         if int_index >= len(self._fields):

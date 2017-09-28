@@ -24,7 +24,8 @@
 """This module contains the implementation of a helper class for MySQL X
 Protobuf messages."""
 
-from mysqlx.compat import NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES
+from mysqlx.compat import PY3, NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES
+from mysqlx.helpers import encode_to_bytes
 
 
 _SERVER_MESSAGES_TUPLES = (
@@ -93,6 +94,8 @@ except ImportError:
     # Mysqlx.Crud
     for key, val in mysqlx_crud_pb2.DataModel.items():
         _MESSAGES["Mysqlx.Crud.DataModel.{0}".format(key)] = val
+    for key, val in mysqlx_crud_pb2.Find.RowLock.items():
+        _MESSAGES["Mysqlx.Crud.Find.RowLock.{0}".format(key)] = val
     for key, val in mysqlx_crud_pb2.Order.Direction.items():
         _MESSAGES["Mysqlx.Crud.Order.Direction.{0}".format(key)] = val
     for key, val in mysqlx_crud_pb2.UpdateOperation.UpdateType.items():
@@ -230,8 +233,12 @@ class Message(object):
             self._msg[name] = value.get_message() \
                 if isinstance(value, Message) else value
         else:
-            if isinstance(value, (NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES)):
+            if PY3 and isinstance(value, STRING_TYPES):
+                setattr(self._msg, name, encode_to_bytes(value))
+            elif isinstance(value, (NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES)):
                 setattr(self._msg, name, value)
+            elif isinstance(value, list):
+                getattr(self._msg, name).extend(value)
             elif isinstance(value, Message):
                 getattr(self._msg, name).MergeFrom(value.get_message())
             else:

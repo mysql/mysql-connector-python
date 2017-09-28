@@ -1163,6 +1163,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs = result.fetch_all()
         self.assertTrue("$.age + 100" in docs[0].keys())
 
+        # tests comma seperated fields
+        result = collection.find("$.age = 21").fields("$.age, $.name").execute()
+        docs = result.fetch_all()
+        self.assertEqual("Fred", docs[0]['$.name'])
+
         self.schema.drop_collection(collection_name)
 
     def test_modify(self):

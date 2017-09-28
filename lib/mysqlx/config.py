@@ -24,8 +24,8 @@
 """Implementation of Session Configuration"""
 
 import os
+import sys
 import json
-import platform
 
 from .compat import STRING_TYPES
 from .errors import OperationalError, InterfaceError
@@ -343,12 +343,14 @@ class PersistenceHandler(object):
         return self._configs.items()
 
     def _load_default_paths(self):
-        if platform.system() == "Windows":
+        if sys.platform.startswith("win"):
             self._usr_file = os.path.join(
                 os.getenv("APPDATA"), "MySQLsessions.json")
             self._sys_file = os.path.join(
                 os.getenv("PROGRAMDATA"), "MySQLsessions.json")
-        elif platform.system() == "Linux":
+        elif sys.platform.startswith("linux") or \
+             sys.platform.startswith("darwin") or \
+             sys.platform.startswith("sunos"):
             self._usr_file = os.path.join(
                 os.getenv("HOME"), ".mysql", "sessions.json")
             self._sys_file = os.path.join(
