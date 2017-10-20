@@ -972,6 +972,211 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    def test_modify_patch(self):
+        collection_name = "collection_GOT"
+        collection = self.schema.create_collection(collection_name)
+        result = collection.add(
+            {"name": "Bran", "family_name": "Stark", "age": 18,
+             "actors_bio": {"bd": "1999 April 9", "rn": "Isaac Hempstead"},
+             "parents": ["Eddard Stark", "Catelyn Stark"]},
+            {"name": "Sansa", "family_name": "Stark", "age": 21,
+             "actors_bio": {"bd": "1996 February 21", "rn": "Sophie Turner"},
+             "parents": ["Eddard Stark", "Catelyn Stark"]},
+            {"name": "Arya", "family_name": "Stark", "age": 20,
+             "actors_bio": {"bd": "1997 April 15", "rn": "Maisie Williams"},
+             "parents": ["Eddard Stark", "Catelyn Stark"]},
+            {"name": "Jon", "family_name": "Snow", "age": 30,
+             "actors_bio": {"bd": "1986 December 26", "rn": "Kit Harington"}, },
+            {"name": "Daenerys", "family_name": "Targaryen", "age": 30,
+             "actors_bio": {"bd": "1986 October 23", "rn": "Emilia Clarke"}, },
+            {"name": "Margaery", "family_name": "Tyrell", "age": 35,
+             "actors_bio": {"bd": "1982 February 11", "rn": "Natalie Dormer"}, },
+            {"name": "Cersei", "family_name": "Lannister", "age": 44,
+             "actors_bio": {"bd": "1973 October 3", "rn": "Lena Headey"},
+             "parents": ["Tywin Lannister, Joanna Lannister"]},
+            {"name": "Tyrion", "family_name": "Lannister", "age": 48,
+             "actors_bio": {"bd": "1969 June 11", "rn": "Peter Dinklage"},
+             "parents": ["Tywin Lannister, Joanna Lannister"]},
+        ).execute()
+
+        # test with empty document
+        result = collection.modify("TRUE").patch('{}').execute()
+        self.assertEqual(0, result.get_affected_items_count())
+
+        # Test addition of new attribute
+        result = collection.modify("age <= 21").patch(
+            '{"status": "young"}').execute()
+        self.assertEqual(3, result.get_affected_items_count())
+        doc = collection.find("name = 'Bran'").execute().fetch_all()[0]
+        self.assertEqual("young", doc.status)
+        doc = collection.find("name = 'Sansa'").execute().fetch_all()[0]
+        self.assertEqual("young", doc.status)
+        doc = collection.find("name = 'Arya'").execute().fetch_all()[0]
+        self.assertEqual("young", doc.status)
+
+        result = collection.modify("age > 21").patch(
+            '{"status": "older"}').execute()
+        self.assertEqual(5, result.get_affected_items_count())
+        doc = collection.find("name = 'Jon'").execute().fetch_all()[0]
+        self.assertEqual("older", doc.status)
+        doc = collection.find("name = 'Cersei'").execute().fetch_all()[0]
+        self.assertEqual("older", doc.status)
+        doc = collection.find("name = 'Tyrion'").execute().fetch_all()[0]
+        self.assertEqual("older", doc.status)
+        doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
+        self.assertEqual("older", doc.status)
+        doc = collection.find("name = 'Margaery'").execute().fetch_all()[0]
+        self.assertEqual("older", doc.status)
+
+        # Test addition of new attribute with array value
+        result = collection.modify('family_name == "Tyrell"').patch(
+            {"parents": ["Mace Tyrell", "Alerie Tyrell"]}).execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Margaery'").execute().fetch_all()[0]
+        self.assertEqual(
+            ["Mace Tyrell", "Alerie Tyrell"],
+            doc.parents)
+
+        result = collection.modify('name == "Jon"').patch(
+            '{"parents": ["Lyanna Stark and Rhaegar Targaryen"], '
+            '"bastard":null}').execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Jon'").execute().fetch_all()[0]
+        self.assertEqual(
+            ["Lyanna Stark and Rhaegar Targaryen"],
+            doc.parents)
+
+        # Test update of attribute with array value
+        result = collection.modify('name == "Jon"').patch(
+            '{"parents": ["Lyanna Stark", "Rhaegar Targaryen"], '
+            '"bastard":null}').execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Jon'").execute().fetch_all()[0]
+        self.assertEqual(
+            ["Lyanna Stark", "Rhaegar Targaryen"],
+            doc.parents)
+
+        # Test add and update of a nested attribute with doc value
+        result = collection.modify('name == "Daenerys"').patch('''
+        {"dragons":{"drogon": "black with red markings",
+                    "Rhaegal": "green with bronze markings",
+                    "Viserion": "creamy white, with gold markings"}}
+                    ''').execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
+        self.assertEqual(
+            {"drogon": "black with red markings",
+             "Rhaegal": "green with bronze markings",
+             "Viserion": "creamy white, with gold markings"},
+            doc.dragons)
+
+        # test remove attribute by seting it with null value.
+        result = collection.modify("TRUE").patch('{"status": null}').execute()
+        self.assertEqual(8, result.get_affected_items_count())
+
+        # Test remove a nested attribute with doc value
+        result = collection.modify('name == "Daenerys"').patch(
+            {"dragons": {"drogon": "black with red markings",
+                         "Rhaegal": "green with bronze markings",
+                         "Viserion": None}}
+        ).execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
+        self.assertEqual(
+            {"drogon": "black with red markings",
+             "Rhaegal": "green with bronze markings"},
+            doc.dragons)
+
+        # Test add new attribute using expresion (function call)
+        result = collection.modify('name == "Daenerys"').patch(
+            'JSON_OBJECT("dragons", JSON_OBJECT("count", 3))'
+        ).execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
+        self.assertEqual(
+            {"drogon": "black with red markings",
+             "Rhaegal": "green with bronze markings",
+             "count": 3},
+            doc.dragons)
+
+        # Test update attribute value using expresion (function call)
+        result = collection.modify('name == "Daenerys"').patch(
+            'JSON_OBJECT("dragons",'
+            '    JSON_OBJECT("count", $.dragons.count - 1))'
+        ).execute()
+        self.assertEqual(1, result.get_affected_items_count())
+        doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
+        self.assertEqual(
+            {"drogon": "black with red markings",
+             "Rhaegal": "green with bronze markings",
+             "count": 2},
+            doc.dragons)
+
+        # Test update attribute value using expresion without JSON functions
+        result = collection.modify('TRUE').patch(
+            '{"actors_bio": {"current": {"day_of_birth": CAST(SUBSTRING_INDEX('
+            '    $.actors_bio.bd, " ", - 1) AS DECIMAL)}}}').execute()
+        self.assertEqual(8, result.get_affected_items_count())
+
+        # Test update attribute value using mysqlx.expr
+        result = collection.modify('TRUE').patch(
+            {"actors_bio": {"current": {
+                "birth_age": mysqlx.expr(
+                    'CAST(SUBSTRING_INDEX($.actors_bio.bd, " ", 1)'
+                    ' AS DECIMAL)')}}
+            }).execute()
+        self.assertEqual(8, result.get_affected_items_count())
+        doc = collection.find(
+            "actors_bio.rn = 'Maisie Williams'").execute().fetch_all()[0]
+        self.assertEqual(
+            {"bd": "1997 April 15",
+             "current": {'day_of_birth': 15, 'birth_age': 1997},
+             "rn": "Maisie Williams"},
+            doc.actors_bio)
+
+        # Test update attribute value using mysqlx.expr extended without '()'
+        result = collection.modify('TRUE').patch(
+            {"actors_bio": {"current": {
+                "age": mysqlx.expr(
+                    'CAST(SUBSTRING_INDEX($.actors_bio.bd, " ", 1)'
+                    ' AS DECIMAL) - Year(CURDATE())')}}
+            }).execute()
+        self.assertEqual(8, result.get_affected_items_count())
+        res = self.session.sql("select 1997 - Year(CURDATE())").execute()
+        age = res.fetch_all()[0]["1997 - Year(CURDATE())"]
+        doc = collection.find(
+            "actors_bio.rn = 'Maisie Williams'").execute().fetch_all()[0]
+        self.assertEqual(
+            {"bd": "1997 April 15",
+             "current": {'age': age, 'day_of_birth': 15, 'birth_age': 1997},
+             "rn": "Maisie Williams"},
+            doc.actors_bio)
+
+        # test use of year funtion.
+        result = collection.modify('TRUE').patch(
+            '{"actors_bio": {"current": {"last_update": Year(CURDATE())}}}'
+            ).execute()
+        self.assertEqual(8, result.get_affected_items_count())
+
+        # Collection.modify() is not allowed without a condition
+        result = collection.modify().patch('{"status":"alive"}')
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
+        result = collection.modify("").patch('{"status":"alive"}')
+        self.assertRaises(mysqlx.ProgrammingError, result.execute)
+
+        # Collection.modify().patch() is not allowed without a document
+        result = collection.modify("TRUE").patch('')
+        self.assertRaises(mysqlx.OperationalError, result.execute)
+        result = collection.modify("TRUE").patch(None)
+        self.assertRaises(mysqlx.OperationalError, result.execute)
+
+        # Collection.modify().patch() must fail is parameter is other
+        # than DBdoc, dict or str.
+        self.assertRaises(mysqlx.ProgrammingError,
+                          collection.modify("TRUE").patch, {"a_set"})
+
+        self.schema.drop_collection(collection_name)
+
     @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 3),
                      "Root level updates not supported")
     def test_replace_one(self):

@@ -473,6 +473,8 @@ class BuildExtDynamic(build_ext):
 
         base_path = os.path.join(os.getcwd(), "src", "mysqlxpb", "mysqlx")
         command = [self.with_protoc, "-I"]
+        if "protobuf-2.6" in self.with_protobuf_include_dir:
+            command.extend([self.with_protobuf_include_dir, "-I"])
         command.append(os.path.join(base_path, "protocol"))
         command.extend(glob(os.path.join(base_path, "protocol", "*.proto")))
         command.append("--cpp_out={0}".format(base_path))

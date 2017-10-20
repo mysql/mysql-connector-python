@@ -43,6 +43,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         CreateCollectionIndexStatement, Expr, ReadStatement,
                         WriteStatement)
 
+from .expr import ExprParser as expr
+
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]

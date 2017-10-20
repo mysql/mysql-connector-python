@@ -654,6 +654,30 @@ class ModifyStatement(FilterableStatement):
                        doc_path, value))
         return self
 
+    def patch(self, doc):
+        """Inserts a value into a specific position in an array attribute in
+        documents of a collection.
+
+        Args:
+            doc (object): A generic document (DbDoc), string in JSON format or
+                          dict, with the changes to apply to the matching
+                          documents.
+
+        Returns:
+            mysqlx.ModifyStatement: ModifyStatement object.
+        """
+        if doc is None:
+            doc = ''
+        if not isinstance(doc, (dict, DbDoc, str)):
+            raise ProgrammingError(
+                "Invalid data for update operation on document collection "
+                "table")
+        self._update_ops.append(
+            UpdateSpec(mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
+                       '', doc))
+        return self
+
     def execute(self):
         """Execute the statement.
 

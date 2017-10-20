@@ -198,6 +198,17 @@ _RESERVED_WORDS = {
     "year_month": TokenType.YEAR_MONTH
 }
 
+_SQL_FUNTION_RESERVED_WORDS_COLLISION = {
+    "binary": TokenType.BINARY,
+    "cast": TokenType.CAST,
+    "char": TokenType.CHAR,
+    "date": TokenType.DATE,
+    "decimal": TokenType.DECIMAL,
+    "signed": TokenType.SIGNED,
+    "time": TokenType.TIME,
+    "unsigned": TokenType.UNSIGNED,
+}
+
 _OPERATORS = {
     "=": "==",
     "==": "==",
@@ -271,12 +282,21 @@ class Token(object):
 
 def build_expr(value):
     msg = Message("Mysqlx.Expr.Expr")
-    if isinstance(value, (dict, DbDoc)):
+    if isinstance(value, (Message)):
+        return value
+    elif isinstance(value, (ExprParser)):
+        return value.expr()
+    elif isinstance(value, (dict, DbDoc)):
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OBJECT")
         msg["object"] = build_object(value).get_message()
     elif isinstance(value, (list, tuple)):
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.ARRAY")
         msg["array"] = build_array(value).get_message()
+    # look for MySQL expressions
+    elif isinstance(value, STRING_TYPES) and \
+        (("(" in value and ")" in value) or ("{" in value and "}" in value)):
+        expr_parser = ExprParser(value, False)
+        return expr_parser.expr()
     else:
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.LITERAL")
         msg["literal"] = build_scalar(value).get_message()
@@ -383,14 +403,29 @@ def escape_literal(string):
 
 
 class ExprParser(object):
-    def __init__(self, string, allow_relational):
+    def __init__(self, string, allow_relational=False):
         self.string = string
         self.tokens = []
         self.pos = 0
         self._allow_relational_columns = allow_relational
         self.placeholder_name_to_position = {}
         self.positional_placeholder_count = 0
+        self.clean_expression()
         self.lex()
+
+    def clean_expression(self):
+        """Removes the keywords that does not form part of the expression.
+
+        Removes the keywords "SELECT" and "WHERE" that does not form part of
+        the expression itself.
+        """
+        self.string = self.string.strip(" ")
+        if len(self.string) > 1 and self.string[-1] == ';':
+            self.string = self.string[:-1]
+        if "SELECT" in self.string[:6].upper():
+            self.string = self.string[6:]
+        if "WHERE" in self.string[:5].upper():
+            self.string = self.string[5:]
 
     # convencience checker for lexer
     def next_char_is(self, key, char):
@@ -421,7 +456,11 @@ class ExprParser(object):
 
         val = self.string[start:i]
         try:
-            token = Token(_RESERVED_WORDS[val.lower()], val.lower(), len(val))
+            if i < len(self.string) and self.string[i] == '(' and \
+               val.lower() not in _SQL_FUNTION_RESERVED_WORDS_COLLISION:
+                token = Token(TokenType.IDENT, val, len(val))
+            else:
+                token = Token(_RESERVED_WORDS[val.lower()], val.lower(), len(val))
         except KeyError:
             token = Token(TokenType.IDENT, val, len(val))
         return token

@@ -3,6 +3,7 @@
 
 import sys
 _b=sys.version_info[0]<3 and (lambda x:x) or (lambda x:x.encode('latin1'))
+from google.protobuf.internal import enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
@@ -19,10 +20,65 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_resultset.proto',
   package='Mysqlx.Resultset',
   syntax='proto2',
-  serialized_pb=_b('\n\x16mysqlx_resultset.proto\x12\x10Mysqlx.Resultset\"\x18\n\x16\x46\x65tchDoneMoreOutParams\"\x19\n\x17\x46\x65tchDoneMoreResultsets\"\x0b\n\tFetchDone\"\x9f\x03\n\x0e\x43olumnMetaData\x12\x38\n\x04type\x18\x01 \x02(\x0e\x32*.Mysqlx.Resultset.ColumnMetaData.FieldType\x12\x0c\n\x04name\x18\x02 \x01(\x0c\x12\x15\n\roriginal_name\x18\x03 \x01(\x0c\x12\r\n\x05table\x18\x04 \x01(\x0c\x12\x16\n\x0eoriginal_table\x18\x05 \x01(\x0c\x12\x0e\n\x06schema\x18\x06 \x01(\x0c\x12\x0f\n\x07\x63\x61talog\x18\x07 \x01(\x0c\x12\x11\n\tcollation\x18\x08 \x01(\x04\x12\x19\n\x11\x66ractional_digits\x18\t \x01(\r\x12\x0e\n\x06length\x18\n \x01(\r\x12\r\n\x05\x66lags\x18\x0b \x01(\r\x12\x14\n\x0c\x63ontent_type\x18\x0c \x01(\r\"\x82\x01\n\tFieldType\x12\x08\n\x04SINT\x10\x01\x12\x08\n\x04UINT\x10\x02\x12\n\n\x06\x44OUBLE\x10\x05\x12\t\n\x05\x46LOAT\x10\x06\x12\t\n\x05\x42YTES\x10\x07\x12\x08\n\x04TIME\x10\n\x12\x0c\n\x08\x44\x41TETIME\x10\x0c\x12\x07\n\x03SET\x10\x0f\x12\x08\n\x04\x45NUM\x10\x10\x12\x07\n\x03\x42IT\x10\x11\x12\x0b\n\x07\x44\x45\x43IMAL\x10\x12\"\x14\n\x03Row\x12\r\n\x05\x66ield\x18\x01 \x03(\x0c\x42\x1e\n\x1c\x63om.mysql.cj.mysqlx.protobuf')
+  serialized_pb=_b('\n\x16mysqlx_resultset.proto\x12\x10Mysqlx.Resultset\"\x18\n\x16\x46\x65tchDoneMoreOutParams\"\x19\n\x17\x46\x65tchDoneMoreResultsets\"\x0b\n\tFetchDone\"\x9f\x03\n\x0e\x43olumnMetaData\x12\x38\n\x04type\x18\x01 \x02(\x0e\x32*.Mysqlx.Resultset.ColumnMetaData.FieldType\x12\x0c\n\x04name\x18\x02 \x01(\x0c\x12\x15\n\roriginal_name\x18\x03 \x01(\x0c\x12\r\n\x05table\x18\x04 \x01(\x0c\x12\x16\n\x0eoriginal_table\x18\x05 \x01(\x0c\x12\x0e\n\x06schema\x18\x06 \x01(\x0c\x12\x0f\n\x07\x63\x61talog\x18\x07 \x01(\x0c\x12\x11\n\tcollation\x18\x08 \x01(\x04\x12\x19\n\x11\x66ractional_digits\x18\t \x01(\r\x12\x0e\n\x06length\x18\n \x01(\r\x12\r\n\x05\x66lags\x18\x0b \x01(\r\x12\x14\n\x0c\x63ontent_type\x18\x0c \x01(\r\"\x82\x01\n\tFieldType\x12\x08\n\x04SINT\x10\x01\x12\x08\n\x04UINT\x10\x02\x12\n\n\x06\x44OUBLE\x10\x05\x12\t\n\x05\x46LOAT\x10\x06\x12\t\n\x05\x42YTES\x10\x07\x12\x08\n\x04TIME\x10\n\x12\x0c\n\x08\x44\x41TETIME\x10\x0c\x12\x07\n\x03SET\x10\x0f\x12\x08\n\x04\x45NUM\x10\x10\x12\x07\n\x03\x42IT\x10\x11\x12\x0b\n\x07\x44\x45\x43IMAL\x10\x12\"\x14\n\x03Row\x12\r\n\x05\x66ield\x18\x01 \x03(\x0c*4\n\x11\x43ontentType_BYTES\x12\x0c\n\x08GEOMETRY\x10\x01\x12\x08\n\x04JSON\x10\x02\x12\x07\n\x03XML\x10\x03*.\n\x14\x43ontentType_DATETIME\x12\x08\n\x04\x44\x41TE\x10\x01\x12\x0c\n\x08\x44\x41TETIME\x10\x02\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
+_CONTENTTYPE_BYTES = _descriptor.EnumDescriptor(
+  name='ContentType_BYTES',
+  full_name='Mysqlx.Resultset.ContentType_BYTES',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='GEOMETRY', index=0, number=1,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='JSON', index=1, number=2,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='XML', index=2, number=3,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=550,
+  serialized_end=602,
+)
+_sym_db.RegisterEnumDescriptor(_CONTENTTYPE_BYTES)
+
+ContentType_BYTES = enum_type_wrapper.EnumTypeWrapper(_CONTENTTYPE_BYTES)
+_CONTENTTYPE_DATETIME = _descriptor.EnumDescriptor(
+  name='ContentType_DATETIME',
+  full_name='Mysqlx.Resultset.ContentType_DATETIME',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='DATE', index=0, number=1,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='DATETIME', index=1, number=2,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=604,
+  serialized_end=650,
+)
+_sym_db.RegisterEnumDescriptor(_CONTENTTYPE_DATETIME)
+
+ContentType_DATETIME = enum_type_wrapper.EnumTypeWrapper(_CONTENTTYPE_DATETIME)
+GEOMETRY = 1
+JSON = 2
+XML = 3
+DATE = 1
+DATETIME = 2
 
 
 _COLUMNMETADATA_FIELDTYPE = _descriptor.EnumDescriptor(
@@ -302,6 +358,8 @@ DESCRIPTOR.message_types_by_name['FetchDoneMoreResultsets'] = _FETCHDONEMORERESU
 DESCRIPTOR.message_types_by_name['FetchDone'] = _FETCHDONE
 DESCRIPTOR.message_types_by_name['ColumnMetaData'] = _COLUMNMETADATA
 DESCRIPTOR.message_types_by_name['Row'] = _ROW
+DESCRIPTOR.enum_types_by_name['ContentType_BYTES'] = _CONTENTTYPE_BYTES
+DESCRIPTOR.enum_types_by_name['ContentType_DATETIME'] = _CONTENTTYPE_DATETIME
 
 FetchDoneMoreOutParams = _reflection.GeneratedProtocolMessageType('FetchDoneMoreOutParams', (_message.Message,), dict(
   DESCRIPTOR = _FETCHDONEMOREOUTPARAMS,
@@ -340,5 +398,5 @@ _sym_db.RegisterMessage(Row)
 
 
 DESCRIPTOR.has_options = True
-DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\034com.mysql.cj.mysqlx.protobuf'))
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

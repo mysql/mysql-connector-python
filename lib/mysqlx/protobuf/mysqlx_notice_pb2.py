@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_notice.proto',
   package='Mysqlx.Notice',
   syntax='proto2',
-  serialized_pb=_b('\n\x13mysqlx_notice.proto\x12\rMysqlx.Notice\x1a\x16mysqlx_datatypes.proto\"y\n\x05\x46rame\x12\x0c\n\x04type\x18\x01 \x02(\r\x12\x31\n\x05scope\x18\x02 \x01(\x0e\x32\x1a.Mysqlx.Notice.Frame.Scope:\x06GLOBAL\x12\x0f\n\x07payload\x18\x03 \x01(\x0c\"\x1e\n\x05Scope\x12\n\n\x06GLOBAL\x10\x01\x12\t\n\x05LOCAL\x10\x02\"\x85\x01\n\x07Warning\x12\x34\n\x05level\x18\x01 \x01(\x0e\x32\x1c.Mysqlx.Notice.Warning.Level:\x07WARNING\x12\x0c\n\x04\x63ode\x18\x02 \x02(\r\x12\x0b\n\x03msg\x18\x03 \x02(\t\")\n\x05Level\x12\x08\n\x04NOTE\x10\x01\x12\x0b\n\x07WARNING\x10\x02\x12\t\n\x05\x45RROR\x10\x03\"P\n\x16SessionVariableChanged\x12\r\n\x05param\x18\x01 \x02(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\"\xd5\x02\n\x13SessionStateChanged\x12;\n\x05param\x18\x01 \x02(\x0e\x32,.Mysqlx.Notice.SessionStateChanged.Parameter\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\"\xd7\x01\n\tParameter\x12\x12\n\x0e\x43URRENT_SCHEMA\x10\x01\x12\x13\n\x0f\x41\x43\x43OUNT_EXPIRED\x10\x02\x12\x17\n\x13GENERATED_INSERT_ID\x10\x03\x12\x11\n\rROWS_AFFECTED\x10\x04\x12\x0e\n\nROWS_FOUND\x10\x05\x12\x10\n\x0cROWS_MATCHED\x10\x06\x12\x11\n\rTRX_COMMITTED\x10\x07\x12\x12\n\x0eTRX_ROLLEDBACK\x10\t\x12\x14\n\x10PRODUCED_MESSAGE\x10\n\x12\x16\n\x12\x43LIENT_ID_ASSIGNED\x10\x0b\x42\x1e\n\x1c\x63om.mysql.cj.mysqlx.protobuf')
+  serialized_pb=_b('\n\x13mysqlx_notice.proto\x12\rMysqlx.Notice\x1a\x16mysqlx_datatypes.proto\"\xc7\x01\n\x05\x46rame\x12\x0c\n\x04type\x18\x01 \x02(\r\x12\x31\n\x05scope\x18\x02 \x01(\x0e\x32\x1a.Mysqlx.Notice.Frame.Scope:\x06GLOBAL\x12\x0f\n\x07payload\x18\x03 \x01(\x0c\"\x1e\n\x05Scope\x12\n\n\x06GLOBAL\x10\x01\x12\t\n\x05LOCAL\x10\x02\"L\n\x04Type\x12\x0b\n\x07WARNING\x10\x01\x12\x1c\n\x18SESSION_VARIABLE_CHANGED\x10\x02\x12\x19\n\x15SESSION_STATE_CHANGED\x10\x03\"\x85\x01\n\x07Warning\x12\x34\n\x05level\x18\x01 \x01(\x0e\x32\x1c.Mysqlx.Notice.Warning.Level:\x07WARNING\x12\x0c\n\x04\x63ode\x18\x02 \x02(\r\x12\x0b\n\x03msg\x18\x03 \x02(\t\")\n\x05Level\x12\x08\n\x04NOTE\x10\x01\x12\x0b\n\x07WARNING\x10\x02\x12\t\n\x05\x45RROR\x10\x03\"P\n\x16SessionVariableChanged\x12\r\n\x05param\x18\x01 \x02(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\"\xd5\x02\n\x13SessionStateChanged\x12;\n\x05param\x18\x01 \x02(\x0e\x32,.Mysqlx.Notice.SessionStateChanged.Parameter\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\"\xd7\x01\n\tParameter\x12\x12\n\x0e\x43URRENT_SCHEMA\x10\x01\x12\x13\n\x0f\x41\x43\x43OUNT_EXPIRED\x10\x02\x12\x17\n\x13GENERATED_INSERT_ID\x10\x03\x12\x11\n\rROWS_AFFECTED\x10\x04\x12\x0e\n\nROWS_FOUND\x10\x05\x12\x10\n\x0cROWS_MATCHED\x10\x06\x12\x11\n\rTRX_COMMITTED\x10\x07\x12\x12\n\x0eTRX_ROLLEDBACK\x10\t\x12\x14\n\x10PRODUCED_MESSAGE\x10\n\x12\x16\n\x12\x43LIENT_ID_ASSIGNED\x10\x0b\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
   dependencies=[mysqlx__datatypes__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -44,10 +44,36 @@ _FRAME_SCOPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=153,
-  serialized_end=183,
+  serialized_start=154,
+  serialized_end=184,
 )
 _sym_db.RegisterEnumDescriptor(_FRAME_SCOPE)
+
+_FRAME_TYPE = _descriptor.EnumDescriptor(
+  name='Type',
+  full_name='Mysqlx.Notice.Frame.Type',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='WARNING', index=0, number=1,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='SESSION_VARIABLE_CHANGED', index=1, number=2,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='SESSION_STATE_CHANGED', index=2, number=3,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=186,
+  serialized_end=262,
+)
+_sym_db.RegisterEnumDescriptor(_FRAME_TYPE)
 
 _WARNING_LEVEL = _descriptor.EnumDescriptor(
   name='Level',
@@ -70,8 +96,8 @@ _WARNING_LEVEL = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=278,
-  serialized_end=319,
+  serialized_start=357,
+  serialized_end=398,
 )
 _sym_db.RegisterEnumDescriptor(_WARNING_LEVEL)
 
@@ -124,8 +150,8 @@ _SESSIONSTATECHANGED_PARAMETER = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=530,
-  serialized_end=745,
+  serialized_start=609,
+  serialized_end=824,
 )
 _sym_db.RegisterEnumDescriptor(_SESSIONSTATECHANGED_PARAMETER)
 
@@ -164,6 +190,7 @@ _FRAME = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
     _FRAME_SCOPE,
+    _FRAME_TYPE,
   ],
   options=None,
   is_extendable=False,
@@ -171,8 +198,8 @@ _FRAME = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=62,
-  serialized_end=183,
+  serialized_start=63,
+  serialized_end=262,
 )
 
 
@@ -217,8 +244,8 @@ _WARNING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=186,
-  serialized_end=319,
+  serialized_start=265,
+  serialized_end=398,
 )
 
 
@@ -255,8 +282,8 @@ _SESSIONVARIABLECHANGED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=321,
-  serialized_end=401,
+  serialized_start=400,
+  serialized_end=480,
 )
 
 
@@ -294,12 +321,13 @@ _SESSIONSTATECHANGED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=404,
-  serialized_end=745,
+  serialized_start=483,
+  serialized_end=824,
 )
 
 _FRAME.fields_by_name['scope'].enum_type = _FRAME_SCOPE
 _FRAME_SCOPE.containing_type = _FRAME
+_FRAME_TYPE.containing_type = _FRAME
 _WARNING.fields_by_name['level'].enum_type = _WARNING_LEVEL
 _WARNING_LEVEL.containing_type = _WARNING
 _SESSIONVARIABLECHANGED.fields_by_name['value'].message_type = mysqlx__datatypes__pb2._SCALAR
@@ -341,5 +369,5 @@ _sym_db.RegisterMessage(SessionStateChanged)
 
 
 DESCRIPTOR.has_options = True
-DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\034com.mysql.cj.mysqlx.protobuf'))
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

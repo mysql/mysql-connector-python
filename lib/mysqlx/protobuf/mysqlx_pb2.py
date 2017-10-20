@@ -13,22 +13,14 @@ from google.protobuf import descriptor_pb2
 _sym_db = _symbol_database.Default()
 
 
-from mysqlx.protobuf import mysqlx_sql_pb2 as mysqlx__sql__pb2
-from mysqlx.protobuf import mysqlx_resultset_pb2 as mysqlx__resultset__pb2
-from mysqlx.protobuf import mysqlx_crud_pb2 as mysqlx__crud__pb2
-from mysqlx.protobuf import mysqlx_session_pb2 as mysqlx__session__pb2
-from mysqlx.protobuf import mysqlx_connection_pb2 as mysqlx__connection__pb2
-from mysqlx.protobuf import mysqlx_expect_pb2 as mysqlx__expect__pb2
-from mysqlx.protobuf import mysqlx_notice_pb2 as mysqlx__notice__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx.proto',
   package='Mysqlx',
   syntax='proto2',
-  serialized_pb=_b('\n\x0cmysqlx.proto\x12\x06Mysqlx\x1a\x10mysqlx_sql.proto\x1a\x16mysqlx_resultset.proto\x1a\x11mysqlx_crud.proto\x1a\x14mysqlx_session.proto\x1a\x17mysqlx_connection.proto\x1a\x13mysqlx_expect.proto\x1a\x13mysqlx_notice.proto\"\xb4\x02\n\x0e\x43lientMessages\"\xa1\x02\n\x04Type\x12\x18\n\x14\x43ON_CAPABILITIES_GET\x10\x01\x12\x18\n\x14\x43ON_CAPABILITIES_SET\x10\x02\x12\r\n\tCON_CLOSE\x10\x03\x12\x1b\n\x17SESS_AUTHENTICATE_START\x10\x04\x12\x1e\n\x1aSESS_AUTHENTICATE_CONTINUE\x10\x05\x12\x0e\n\nSESS_RESET\x10\x06\x12\x0e\n\nSESS_CLOSE\x10\x07\x12\x14\n\x10SQL_STMT_EXECUTE\x10\x0c\x12\r\n\tCRUD_FIND\x10\x11\x12\x0f\n\x0b\x43RUD_INSERT\x10\x12\x12\x0f\n\x0b\x43RUD_UPDATE\x10\x13\x12\x0f\n\x0b\x43RUD_DELETE\x10\x14\x12\x0f\n\x0b\x45XPECT_OPEN\x10\x18\x12\x10\n\x0c\x45XPECT_CLOSE\x10\x19\"\xe2\x02\n\x0eServerMessages\"\xcf\x02\n\x04Type\x12\x06\n\x02OK\x10\x00\x12\t\n\x05\x45RROR\x10\x01\x12\x15\n\x11\x43ONN_CAPABILITIES\x10\x02\x12\x1e\n\x1aSESS_AUTHENTICATE_CONTINUE\x10\x03\x12\x18\n\x14SESS_AUTHENTICATE_OK\x10\x04\x12\n\n\x06NOTICE\x10\x0b\x12\x1e\n\x1aRESULTSET_COLUMN_META_DATA\x10\x0c\x12\x11\n\rRESULTSET_ROW\x10\r\x12\x18\n\x14RESULTSET_FETCH_DONE\x10\x0e\x12\x1d\n\x19RESULTSET_FETCH_SUSPENDED\x10\x0f\x12(\n$RESULTSET_FETCH_DONE_MORE_RESULTSETS\x10\x10\x12\x17\n\x13SQL_STMT_EXECUTE_OK\x10\x11\x12(\n$RESULTSET_FETCH_DONE_MORE_OUT_PARAMS\x10\x12\"\x11\n\x02Ok\x12\x0b\n\x03msg\x18\x01 \x01(\t\"\x88\x01\n\x05\x45rror\x12/\n\x08severity\x18\x01 \x01(\x0e\x32\x16.Mysqlx.Error.Severity:\x05\x45RROR\x12\x0c\n\x04\x63ode\x18\x02 \x02(\r\x12\x11\n\tsql_state\x18\x04 \x02(\t\x12\x0b\n\x03msg\x18\x03 \x02(\t\" \n\x08Severity\x12\t\n\x05\x45RROR\x10\x00\x12\t\n\x05\x46\x41TAL\x10\x01\x42\x1e\n\x1c\x63om.mysql.cj.mysqlx.protobuf')
-  ,
-  dependencies=[mysqlx__sql__pb2.DESCRIPTOR,mysqlx__resultset__pb2.DESCRIPTOR,mysqlx__crud__pb2.DESCRIPTOR,mysqlx__session__pb2.DESCRIPTOR,mysqlx__connection__pb2.DESCRIPTOR,mysqlx__expect__pb2.DESCRIPTOR,mysqlx__notice__pb2.DESCRIPTOR,])
+  serialized_pb=_b('\n\x0cmysqlx.proto\x12\x06Mysqlx\"\xf4\x02\n\x0e\x43lientMessages\"\xe1\x02\n\x04Type\x12\x18\n\x14\x43ON_CAPABILITIES_GET\x10\x01\x12\x18\n\x14\x43ON_CAPABILITIES_SET\x10\x02\x12\r\n\tCON_CLOSE\x10\x03\x12\x1b\n\x17SESS_AUTHENTICATE_START\x10\x04\x12\x1e\n\x1aSESS_AUTHENTICATE_CONTINUE\x10\x05\x12\x0e\n\nSESS_RESET\x10\x06\x12\x0e\n\nSESS_CLOSE\x10\x07\x12\x14\n\x10SQL_STMT_EXECUTE\x10\x0c\x12\r\n\tCRUD_FIND\x10\x11\x12\x0f\n\x0b\x43RUD_INSERT\x10\x12\x12\x0f\n\x0b\x43RUD_UPDATE\x10\x13\x12\x0f\n\x0b\x43RUD_DELETE\x10\x14\x12\x0f\n\x0b\x45XPECT_OPEN\x10\x18\x12\x10\n\x0c\x45XPECT_CLOSE\x10\x19\x12\x14\n\x10\x43RUD_CREATE_VIEW\x10\x1e\x12\x14\n\x10\x43RUD_MODIFY_VIEW\x10\x1f\x12\x12\n\x0e\x43RUD_DROP_VIEW\x10 \"\xe2\x02\n\x0eServerMessages\"\xcf\x02\n\x04Type\x12\x06\n\x02OK\x10\x00\x12\t\n\x05\x45RROR\x10\x01\x12\x15\n\x11\x43ONN_CAPABILITIES\x10\x02\x12\x1e\n\x1aSESS_AUTHENTICATE_CONTINUE\x10\x03\x12\x18\n\x14SESS_AUTHENTICATE_OK\x10\x04\x12\n\n\x06NOTICE\x10\x0b\x12\x1e\n\x1aRESULTSET_COLUMN_META_DATA\x10\x0c\x12\x11\n\rRESULTSET_ROW\x10\r\x12\x18\n\x14RESULTSET_FETCH_DONE\x10\x0e\x12\x1d\n\x19RESULTSET_FETCH_SUSPENDED\x10\x0f\x12(\n$RESULTSET_FETCH_DONE_MORE_RESULTSETS\x10\x10\x12\x17\n\x13SQL_STMT_EXECUTE_OK\x10\x11\x12(\n$RESULTSET_FETCH_DONE_MORE_OUT_PARAMS\x10\x12\"\x11\n\x02Ok\x12\x0b\n\x03msg\x18\x01 \x01(\t\"\x88\x01\n\x05\x45rror\x12/\n\x08severity\x18\x01 \x01(\x0e\x32\x16.Mysqlx.Error.Severity:\x05\x45RROR\x12\x0c\n\x04\x63ode\x18\x02 \x02(\r\x12\x11\n\tsql_state\x18\x04 \x02(\t\x12\x0b\n\x03msg\x18\x03 \x02(\t\" \n\x08Severity\x12\t\n\x05\x45RROR\x10\x00\x12\t\n\x05\x46\x41TAL\x10\x01\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
+)
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
@@ -95,11 +87,23 @@ _CLIENTMESSAGES_TYPE = _descriptor.EnumDescriptor(
       name='EXPECT_CLOSE', index=13, number=25,
       options=None,
       type=None),
+    _descriptor.EnumValueDescriptor(
+      name='CRUD_CREATE_VIEW', index=14, number=30,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='CRUD_MODIFY_VIEW', index=15, number=31,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='CRUD_DROP_VIEW', index=16, number=32,
+      options=None,
+      type=None),
   ],
   containing_type=None,
   options=None,
-  serialized_start=194,
-  serialized_end=483,
+  serialized_start=44,
+  serialized_end=397,
 )
 _sym_db.RegisterEnumDescriptor(_CLIENTMESSAGES_TYPE)
 
@@ -164,8 +168,8 @@ _SERVERMESSAGES_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=505,
-  serialized_end=840,
+  serialized_start=419,
+  serialized_end=754,
 )
 _sym_db.RegisterEnumDescriptor(_SERVERMESSAGES_TYPE)
 
@@ -186,8 +190,8 @@ _ERROR_SEVERITY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=966,
-  serialized_end=998,
+  serialized_start=880,
+  serialized_end=912,
 )
 _sym_db.RegisterEnumDescriptor(_ERROR_SEVERITY)
 
@@ -212,8 +216,8 @@ _CLIENTMESSAGES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=175,
-  serialized_end=483,
+  serialized_start=25,
+  serialized_end=397,
 )
 
 
@@ -237,8 +241,8 @@ _SERVERMESSAGES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=486,
-  serialized_end=840,
+  serialized_start=400,
+  serialized_end=754,
 )
 
 
@@ -268,8 +272,8 @@ _OK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=842,
-  serialized_end=859,
+  serialized_start=756,
+  serialized_end=773,
 )
 
 
@@ -321,8 +325,8 @@ _ERROR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=862,
-  serialized_end=998,
+  serialized_start=776,
+  serialized_end=912,
 )
 
 _CLIENTMESSAGES_TYPE.containing_type = _CLIENTMESSAGES
@@ -364,5 +368,5 @@ _sym_db.RegisterMessage(Error)
 
 
 DESCRIPTOR.has_options = True
-DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\034com.mysql.cj.mysqlx.protobuf'))
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

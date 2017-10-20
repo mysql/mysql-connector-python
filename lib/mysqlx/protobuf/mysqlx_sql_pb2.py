@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_sql.proto',
   package='Mysqlx.Sql',
   syntax='proto2',
-  serialized_pb=_b('\n\x10mysqlx_sql.proto\x12\nMysqlx.Sql\x1a\x16mysqlx_datatypes.proto\"y\n\x0bStmtExecute\x12\x16\n\tnamespace\x18\x03 \x01(\t:\x03sql\x12\x0c\n\x04stmt\x18\x01 \x02(\x0c\x12#\n\x04\x61rgs\x18\x02 \x03(\x0b\x32\x15.Mysqlx.Datatypes.Any\x12\x1f\n\x10\x63ompact_metadata\x18\x04 \x01(\x08:\x05\x66\x61lse\"\x0f\n\rStmtExecuteOkB\x1e\n\x1c\x63om.mysql.cj.mysqlx.protobuf')
+  serialized_pb=_b('\n\x10mysqlx_sql.proto\x12\nMysqlx.Sql\x1a\x16mysqlx_datatypes.proto\"y\n\x0bStmtExecute\x12\x16\n\tnamespace\x18\x03 \x01(\t:\x03sql\x12\x0c\n\x04stmt\x18\x01 \x02(\x0c\x12#\n\x04\x61rgs\x18\x02 \x03(\x0b\x32\x15.Mysqlx.Datatypes.Any\x12\x1f\n\x10\x63ompact_metadata\x18\x04 \x01(\x08:\x05\x66\x61lse\"\x0f\n\rStmtExecuteOkB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
   dependencies=[mysqlx__datatypes__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -123,5 +123,5 @@ _sym_db.RegisterMessage(StmtExecuteOk)
 
 
 DESCRIPTOR.has_options = True
-DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\034com.mysql.cj.mysqlx.protobuf'))
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

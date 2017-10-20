@@ -1,35 +1,30 @@
 /*
- * MySQL Connector/Python - MySQL driver written in Python.
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
  *
- * MySQL Connector/Python is licensed under the terms of the GPLv2
- * <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
- * MySQL Connectors. There are special exceptions to the terms and
- * conditions of the GPLv2 as it is applied to this software, see the
- * FOSS License Exception
- * <http://www.mysql.com/about/legal/licensing/foss-exception.html>.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; version 2 of the
+ * License.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301  USA
  */
 syntax = "proto2";
 
 // ifdef PROTOBUF_LITE: option optimize_for = LITE_RUNTIME;
 
 import "mysqlx_datatypes.proto";
+import "mysqlx.proto"; // comment_out_if PROTOBUF_LITE
 
 package Mysqlx.Connection;
-option java_package = "com.mysql.cj.mysqlx.protobuf";
+option java_package = "com.mysql.cj.x.protobuf";
 
 // a Capability
 //
@@ -42,6 +37,8 @@ message Capability {
 // Capabilities
 message Capabilities {
   repeated Capability capabilities = 1;
+
+  option (server_message_id) = CONN_CAPABILITIES; // comment_out_if PROTOBUF_LITE
 }
 
 // get supported connection capabilities and their current state
@@ -49,6 +46,7 @@ message Capabilities {
 //   :returns: :protobuf:msg:`Mysqlx.Connection::Capabilities` or :protobuf:msg:`Mysqlx::Error`
 //
 message CapabilitiesGet {
+  option (client_message_id) = CON_CAPABILITIES_GET; // comment_out_if PROTOBUF_LITE
 };
 
 // sets connection capabilities atomically
@@ -60,6 +58,8 @@ message CapabilitiesGet {
 // :returns: :protobuf:msg:`Mysqlx::Ok` or :protobuf:msg:`Mysqlx::Error`
 message CapabilitiesSet {
   required Capabilities capabilities = 1;
+
+  option (client_message_id) = CON_CAPABILITIES_SET; // comment_out_if PROTOBUF_LITE
 };
 
 // announce to the server that the client wants to close the connection
@@ -68,5 +68,6 @@ message CapabilitiesSet {
 //
 // :Returns: :protobuf:msg:`Mysqlx::Ok`
 message Close {
+  option (client_message_id) = CON_CLOSE; // comment_out_if PROTOBUF_LITE
 };
 
