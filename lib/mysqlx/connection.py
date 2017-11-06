@@ -52,6 +52,7 @@ _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
 _LOGGER = logging.getLogger("mysqlx")
 
 class SocketStream(object):
+    """Implements a socket stream."""
     def __init__(self):
         self._socket = None
         self._is_ssl = False
@@ -59,6 +60,14 @@ class SocketStream(object):
         self._host = None
 
     def connect(self, params):
+        """Connects to a TCP service.
+
+        Args:
+            params (tuple): The connection parameters.
+
+        Raises:
+            :class:`mysqlx.InterfaceError`: If Unix socket is not supported.
+        """
         try:
             self._socket = socket.create_connection(params)
             self._host = params[0]
@@ -71,6 +80,14 @@ class SocketStream(object):
                 raise InterfaceError("Unix socket unsupported.")
 
     def read(self, count):
+        """Receive data from the socket.
+
+        Args:
+            count (int): Buffer size.
+
+        Returns:
+            bytes: The data received.
+        """
         if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
         buf = []
@@ -83,11 +100,17 @@ class SocketStream(object):
         return b"".join(buf)
 
     def sendall(self, data):
+        """Send data to the socket.
+
+        Args:
+            data (bytes): The data to be sent.
+        """
         if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
         self._socket.sendall(data)
 
     def close(self):
+        """Close the socket."""
         if not self._socket:
             return
 
@@ -95,6 +118,20 @@ class SocketStream(object):
         self._socket = None
 
     def set_ssl(self, ssl_mode, ssl_ca, ssl_crl, ssl_cert, ssl_key):
+        """Set SSL parameters.
+
+        Args:
+            ssl_mode (str): SSL mode.
+            ssl_ca (str): The certification authority certificate.
+            ssl_crl (str): The certification revocation lists.
+            ssl_cert (str): The certificate.
+            ssl_key (str): The certificate key.
+
+        Raises:
+            :class:`mysqlx.RuntimeError`: If Python installation has no SSL
+                                          support.
+            :class:`mysqlx.InterfaceError`: If the parameters are invalid.
+        """
         if not SSL_AVAILABLE:
             self.close()
             raise RuntimeError("Python installation has no SSL support.")
@@ -136,21 +173,49 @@ class SocketStream(object):
                                      "".format(err))
         self._is_ssl = True
 
-    @property
     def is_ssl(self):
+        """Verifies if SSL is being used.
+
+        Returns:
+            bool: Returns `True` if SSL is being used.
+        """
         return self._is_ssl
 
-    @property
     def is_socket(self):
+        """Verifies if socket connection is being used.
+
+        Returns:
+            bool: Returns `True` if socket connection is being used.
+        """
         return self._is_socket
 
     def is_secure(self):
-        return self._is_ssl or self.is_socket
+        """Verifies if connection is secure.
+
+        Returns:
+            bool: Returns `True` if connection is secure.
+        """
+        return self._is_ssl or self._is_socket
+
+    def is_open(self):
+        """Verifies if connection is open.
+
+        Returns:
+            bool: Returns `True` if connection is open.
+        """
+        return self._socket is not None
 
 
 def catch_network_exception(func):
+    """Decorator used to catch socket.error or RuntimeError.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: If `socket.Error` or `RuntimeError`
+                                        is raised.
+    """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
+        """Wrapper function."""
         try:
             return func(self, *args, **kwargs)
         except (socket.error, RuntimeError):
@@ -160,6 +225,11 @@ def catch_network_exception(func):
 
 
 class Connection(object):
+    """Connection to a MySQL Server.
+
+    Args:
+        settings (dict): Dictionary with connection settings.
+    """
     def __init__(self, settings):
         self.settings = settings
         self.stream = SocketStream()
@@ -183,11 +253,28 @@ class Connection(object):
         self._routers.sort(key=lambda x: x['priority'], reverse=True)
 
     def fetch_active_result(self):
+        """Fetch active result."""
         if self._active_result is not None:
             self._active_result.fetch_all()
             self._active_result = None
 
+    def set_active_result(self, result):
+        """Set active result.
+
+        Args:
+            `Result`: It can be :class:`mysqlx.Result`,
+                      :class:`mysqlx.BufferingResult`,
+                      :class:`mysqlx.RowResult`, :class:`mysqlx.SqlResult` or
+                      :class:`mysqlx.DocResult`.
+        """
+        self._active_result = result
+
     def _ensure_priorities(self):
+        """Ensure priorities.
+
+        Raises:
+            :class:`mysqlx.ProgrammingError`: If priorities are invalid.
+        """
         priority_count = 0
         priority = 100
 
@@ -198,14 +285,20 @@ class Connection(object):
                 router["priority"] = priority
             elif pri > 100:
                 raise ProgrammingError("The priorities must be between 0 and "
-                    "100", 4007)
+                                       "100", 4007)
             priority -= 1
 
         if 0 < priority_count < len(self._routers):
             raise ProgrammingError("You must either assign no priority to any "
-                "of the routers or give a priority for every router", 4000)
+                                   "of the routers or give a priority for "
+                                   "every router", 4000)
 
-    def _connection_params(self):
+    def _get_connection_params(self):
+        """Returns the connection parameters.
+
+        Returns:
+            tuple: The connection parameters.
+        """
         if not self._routers:
             self._can_failover = False
             if "host" in self.settings:
@@ -215,7 +308,7 @@ class Connection(object):
             return ("localhost", 33060,)
 
         # Reset routers status once all are tried
-        if not self._can_failover or self._cur_router is -1:
+        if not self._can_failover or self._cur_router == -1:
             self._cur_router = -1
             self._can_failover = True
             for router in self._routers:
@@ -233,11 +326,17 @@ class Connection(object):
         return (host, port,)
 
     def connect(self):
+        """Attempt to connect to the MySQL server.
+
+        Raises:
+            :class:`mysqlx.InterfaceError`: If fails to connect to the MySQL
+                                            server.
+        """
         # Loop and check
         error = None
         while self._can_failover:
             try:
-                self.stream.connect(self._connection_params())
+                self.stream.connect(self._get_connection_params())
                 self.reader_writer = MessageReaderWriter(self.stream)
                 self.protocol = Protocol(self.reader_writer)
                 self._handle_capabilities()
@@ -251,9 +350,17 @@ class Connection(object):
         raise InterfaceError("Failed to connect to any of the routers.", 4001)
 
     def _handle_capabilities(self):
+        """Handle capabilities.
+
+        Raises:
+            :class:`mysqlx.OperationalError`: If SSL is not enabled at the
+                                             server.
+            :class:`mysqlx.RuntimeError`: If support for SSL is not available
+                                          in Python.
+        """
         if self.settings.get("ssl-mode") == SSLMode.DISABLED:
             return
-        if self.stream.is_socket:
+        if self.stream.is_socket():
             if self.settings.get("ssl-mode"):
                 _LOGGER.warning("SSL not required when using Unix socket.")
             return
@@ -267,7 +374,7 @@ class Connection(object):
         if sys.version_info < (2, 7, 9):
             self.close_connection()
             raise RuntimeError("The support for SSL is not available for "
-                "this Python version.")
+                               "this Python version.")
 
         self.protocol.set_capabilities(tls=True)
         self.stream.set_ssl(self.settings.get("ssl-mode", SSLMode.REQUIRED),
@@ -277,6 +384,7 @@ class Connection(object):
                             self.settings.get("ssl-key"))
 
     def _authenticate(self):
+        """Authenticate with the MySQL server."""
         auth = self.settings.get("auth")
         if (not auth and self.stream.is_secure()) or auth == Auth.PLAIN:
             self._authenticate_plain()
@@ -286,6 +394,7 @@ class Connection(object):
             self._authenticate_mysql41()
 
     def _authenticate_mysql41(self):
+        """Authenticate with the MySQL server using `MySQL41AuthPlugin`."""
         plugin = MySQL41AuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name())
         extra_data = self.protocol.read_auth_continue()
@@ -294,19 +403,31 @@ class Connection(object):
         self.protocol.read_auth_ok()
 
     def _authenticate_plain(self):
+        """Authenticate with the MySQL server using `PlainAuthPlugin`."""
         plugin = PlainAuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name(),
-            auth_data=plugin.auth_data())
+                                      auth_data=plugin.auth_data())
         self.protocol.read_auth_ok()
 
     def _authenticate_external(self):
+        """Authenticate with the MySQL server using `ExternalAuthPlugin`."""
         plugin = ExternalAuthPlugin()
-        self.protocol.send_auth_start(plugin.auth_name(),
-            initial_response=plugin.initial_response())
+        self.protocol.send_auth_start(
+            plugin.auth_name(), initial_response=plugin.initial_response())
         self.protocol.read_auth_ok()
 
     @catch_network_exception
     def send_sql(self, sql, *args):
+        """Execute a SQL statement.
+
+        Args:
+            sql (str): The SQL statement.
+            *args: Arbitrary arguments.
+
+        Raises:
+            :class:`mysqlx.ProgrammingError`: If the SQL statement is not a
+                                              valid string.
+        """
         if not isinstance(sql, STRING_TYPES):
             raise ProgrammingError("The SQL statement is not a valid string")
         elif not PY3 and isinstance(sql, UNICODE_TYPES):
@@ -317,29 +438,80 @@ class Connection(object):
 
     @catch_network_exception
     def send_insert(self, statement):
+        """Send an insert statement.
+
+        Args:
+            statement (`Statement`): It can be :class:`mysqlx.InsertStatement`
+                                     or :class:`mysqlx.AddStatement`.
+
+        Returns:
+            :class:`mysqlx.Result`: A result object.
+        """
         self.protocol.send_insert(statement)
         ids = None
         if isinstance(statement, AddStatement):
-            ids = statement._ids
+            ids = statement.ids
         return Result(self, ids)
 
     @catch_network_exception
     def find(self, statement):
+        """Send an find statement.
+
+        Args:
+            statement (`Statement`): It can be :class:`mysqlx.ReadStatement`
+                                     or :class:`mysqlx.FindStatement`.
+
+        Returns:
+            `Result`: It can be class:`mysqlx.DocResult` or
+                      :class:`mysqlx.RowResult`.
+        """
         self.protocol.send_find(statement)
-        return DocResult(self) if statement._doc_based else RowResult(self)
+        return DocResult(self) if statement.is_doc_based() else RowResult(self)
 
     @catch_network_exception
     def delete(self, statement):
+        """Send an delete statement.
+
+        Args:
+            statement (`Statement`): It can be :class:`mysqlx.RemoveStatement`
+                                     or :class:`mysqlx.DeleteStatement`.
+
+        Returns:
+            :class:`mysqlx.Result`: The result object.
+        """
         self.protocol.send_delete(statement)
         return Result(self)
 
     @catch_network_exception
     def update(self, statement):
+        """Send an delete statement.
+
+        Args:
+            statement (`Statement`): It can be :class:`mysqlx.ModifyStatement`
+                                     or :class:`mysqlx.UpdateStatement`.
+
+        Returns:
+            :class:`mysqlx.Result`: The result object.
+        """
         self.protocol.send_update(statement)
         return Result(self)
 
     @catch_network_exception
     def execute_nonquery(self, namespace, cmd, raise_on_fail=False, *args):
+        """Execute a non query command.
+
+        Args:
+            namespace (str): The namespace.
+            cmd (str): The command.
+            raise_on_fail (bool): `True` to raise on fail.
+            *args: Arbitrary arguments.
+
+        Raises:
+            :class:`mysqlx.OperationalError`: On errors.
+
+        Returns:
+            :class:`mysqlx.Result`: The result object.
+        """
         try:
             self.protocol.send_execute_statement(namespace, cmd, args)
             return Result(self)
@@ -349,6 +521,18 @@ class Connection(object):
 
     @catch_network_exception
     def execute_sql_scalar(self, sql, *args):
+        """Execute a SQL scalar.
+
+        Args:
+            sql (str): The SQL statement.
+            *args: Arbitrary arguments.
+
+        Raises:
+            :class:`mysqlx.InterfaceError`: If no data found.
+
+        Returns:
+            :class:`mysqlx.Result`: The result.
+        """
         self.protocol.send_execute_statement("sql", sql, args)
         result = RowResult(self)
         result.fetch_all()
@@ -358,32 +542,61 @@ class Connection(object):
 
     @catch_network_exception
     def get_row_result(self, cmd, *args):
+        """Returns the row result.
+
+        Args:
+            cmd (str): The command.
+            *args: Arbitrary arguments.
+
+        Returns:
+            :class:`mysqlx.RowResult`: The result object.
+        """
         self.protocol.send_execute_statement("xplugin", cmd, args)
         return RowResult(self)
 
     @catch_network_exception
     def read_row(self, result):
+        """Read row.
+
+        Args:
+            result (:class:`mysqlx.RowResult`): The result object.
+        """
         return self.protocol.read_row(result)
 
     @catch_network_exception
     def close_result(self, result):
+        """Close result.
+
+        Args:
+            result (:class:`mysqlx.Result`): The result object.
+        """
         self.protocol.close_result(result)
 
     @catch_network_exception
     def get_column_metadata(self, result):
+        """Get column metadata.
+
+        Args:
+            result (:class:`mysqlx.Result`): The result object.
+        """
         return self.protocol.get_column_metadata(result)
 
     def is_open(self):
-        return self.stream._socket is not None
+        """Check if connection is open.
+
+        Returns:
+            bool: `True` if connection is open.
+        """
+        return self.stream.is_open()
 
     def disconnect(self):
+        """Disconnect from server."""
         if not self.is_open():
             return
         self.stream.close()
 
     def close_session(self):
-        """Close a sucessfully authenticated session.
-        """
+        """Close a sucessfully authenticated session."""
         if not self.is_open():
             return
         if self._active_result is not None:
@@ -424,13 +637,26 @@ class Session(object):
         self._connection.connect()
 
     def is_open(self):
-        return self._connection.stream._socket is not None
+        """Returns `True` if the session is open.
+
+        Returns:
+            bool: Returns `True` if the session is open.
+        """
+        return self._connection.stream.is_open()
 
     def sql(self, sql):
         """Creates a :class:`mysqlx.SqlStatement` object to allow running the
         SQL statement on the target MySQL Server.
         """
         return SqlStatement(self._connection, sql)
+
+    def get_connection(self):
+        """Returns the underlying connection.
+
+        Returns:
+            mysqlx.connection.Connection: The connection object.
+        """
+        return self._connection
 
     def get_schema(self, name):
         """Retrieves a Schema object from the current session by it's name.
@@ -452,7 +678,7 @@ class Session(object):
                            time.
 
         Raises:
-            ProgrammingError: If default schema not provided.
+            :class:`mysqlx.ProgrammingError`: If default schema not provided.
         """
         if self._connection.settings.get("schema"):
             return Schema(self, self._connection.settings["schema"])
@@ -479,8 +705,7 @@ class Session(object):
         return Schema(self, name)
 
     def start_transaction(self):
-        """Starts a transaction context on the server.
-        """
+        """Starts a transaction context on the server."""
         self._connection.execute_nonquery("sql", "START TRANSACTION", True)
 
     def commit(self):
@@ -496,4 +721,5 @@ class Session(object):
         self._connection.execute_nonquery("sql", "ROLLBACK", True)
 
     def close(self):
+        """Closes the session."""
         self._connection.close_session()

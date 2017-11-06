@@ -53,7 +53,7 @@ class DatabaseObject(object):
     def __init__(self, schema, name):
         self._schema = schema
         self._name = name
-        self._connection = self._schema.get_session()._connection
+        self._connection = self._schema.get_session().get_connection()
 
     @property
     def schema(self):
@@ -66,6 +66,14 @@ class DatabaseObject(object):
         """str: The name of this database object.
         """
         return self._name
+
+    def get_connection(self):
+        """Returns the underlying connection.
+
+        Returns:
+            mysqlx.connection.Connection: The connection object.
+        """
+        return self._connection
 
     def get_schema(self):
         """Returns the Schema object of this database object.
@@ -95,9 +103,22 @@ class DatabaseObject(object):
         raise NotImplementedError
 
     def am_i_real(self):
+        """Verifies if this object exists in the database.
+
+        Returns:
+            bool: `True` if object exists in database.
+
+        Raises:
+           NotImplementedError: This method must be implemented.
+        """
         return self.exists_in_database()
 
     def who_am_i(self):
+        """Returns the name of this database object.
+
+        Returns:
+            str: The name of this database object.
+        """
         return self.get_name()
 
 
@@ -256,7 +277,8 @@ class Schema(DatabaseObject):
             mysqlx.Collection: Collection object.
 
         Raises:
-            ProgrammingError: If ``reuse`` is False and collection exists.
+            :class:`mysqlx.ProgrammingError`: If ``reuse`` is False and
+                                              collection exists.
         """
         if not name:
             raise ProgrammingError("Collection name is invalid")
@@ -296,6 +318,16 @@ class Schema(DatabaseObject):
         return view.get_alter_statement()
 
     def create_table(self, name, reuse=False):
+        """Creates in the current schema a table with the specified name and
+        retrieves an object representing the new table created.
+
+        Args:
+            name (string): The name of the name.
+            reuse (Optional[bool]): `True` to reuse.
+
+        Returns:
+            mysqlx.Table: Table object.
+        """
         if not name:
             raise ProgrammingError("Table name is invalid")
         table = Table(self, name)
@@ -313,8 +345,6 @@ class Collection(DatabaseObject):
         schema (mysqlx.Schema): The Schema object.
         name (str): The collection name.
     """
-    def __init__(self, schema, name):
-        super(Collection, self).__init__(schema, name)
 
     def exists_in_database(self):
         """Verifies if this object exists in the database.
@@ -345,16 +375,6 @@ class Collection(DatabaseObject):
         """
         return AddStatement(self).add(*values)
 
-    def remove_one(self, id):
-        """Removes document by ID.
-
-        Args:
-            id (str): The document ID.
-
-        Returns:
-            mysqlx.RemoveStatement: RemoveStatement object.
-        """
-        return self.remove("_id = '{0}'".format(id))
 
     def remove(self, condition=None):
         """Removes documents based on the ``condition``.
@@ -366,10 +386,10 @@ class Collection(DatabaseObject):
         Returns:
             mysqlx.RemoveStatement: RemoveStatement object.
         """
-        rs = RemoveStatement(self)
+        stmt = RemoveStatement(self)
         if condition:
-            rs.where(condition)
-        return rs
+            stmt.where(condition)
+        return stmt
 
     def modify(self, condition=None):
         """Modifies documents based on the ``condition``.
@@ -408,7 +428,8 @@ class Collection(DatabaseObject):
             index_name (str): Index name.
         """
         self._connection.execute_nonquery("xplugin", "drop_collection_index",
-            False, self._schema.name, self._name, index_name)
+                                          False, self._schema.name, self._name,
+                                          index_name)
 
     def replace_one(self, doc_id, doc):
         """Replaces the Document matching the document ID with a
@@ -447,6 +468,9 @@ class Collection(DatabaseObject):
 
         Args:
             doc_id (str): Document ID
+
+        Returns:
+            mysqlx.Result: Result object.
         """
         return self.remove("_id = :id").bind("id", doc_id).execute()
 
@@ -461,8 +485,6 @@ class Table(DatabaseObject):
         schema (mysqlx.Schema): The Schema object.
         name (str): The table name.
     """
-    def __init__(self, schema, name):
-        super(Table, self).__init__(schema, name)
 
     def exists_in_database(self):
         """Verifies if this object exists in the database.
@@ -546,9 +568,6 @@ class View(Table):
         schema (mysqlx.Schema): The Schema object.
         name (str): The table name.
     """
-
-    def __init__(self, schema, name):
-        super(View, self).__init__(schema, name)
 
     def exists_in_database(self):
         """Verifies if this object exists in the database.

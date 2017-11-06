@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -139,12 +139,6 @@ class ErrorTest(tests.MySQLxTests):
         self.assertEqual("1: Spam", str(errors.Error(msg, 1)))
         self.assertEqual("1 (XYZ): Spam",
                          str(errors.Error(msg, 1, sqlstate="XYZ")))
-
-
-class WarningTests(tests.MySQLxTests):
-
-    def test___init__(self):
-        self.assertTrue(issubclass(errors.Warning, Exception))
 
 
 class InterfaceErrorTests(tests.MySQLxTests):

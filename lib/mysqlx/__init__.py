@@ -33,12 +33,11 @@ from .connection import Session
 from .constants import SSLMode, Auth
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
-from .errors import (Error, Warning, InterfaceError, DatabaseError,
-                     NotSupportedError, DataError, IntegrityError,
-                     ProgrammingError, OperationalError, InternalError,
-                     PoolError)
+from .errors import (Error, InterfaceError, DatabaseError, NotSupportedError,
+                     DataError, IntegrityError, ProgrammingError,
+                     OperationalError, InternalError, PoolError)
 from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
-                     SqlResult, ColumnType)
+                     SqlResult, DocResult, ColumnType)
 from .statement import (Statement, FilterableStatement, SqlStatement,
                         FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
@@ -50,9 +49,9 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
 
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
-ssl_opts = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
-sess_opts = ssl_opts + ["user", "password", "schema", "host", "port",
-                        "routers", "socket", "ssl-mode", "auth"]
+_SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
+_SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
+                          "routers", "socket", "ssl-mode", "auth"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -65,9 +64,9 @@ def _parse_address_list(path):
         specified.
     """
     path = path.replace(" ", "")
-    array  = not("," not in path and path.count(":") > 1
-                 and path.count("[") == 1) and \
-             path.startswith("[") and path.endswith("]")
+    array = not("," not in path and path.count(":") > 1
+                and path.count("[") == 1) and path.startswith("[") \
+                and path.endswith("]")
 
     routers = []
     address_list = _SPLIT.split(path[1:-1] if array else path)
@@ -102,12 +101,12 @@ def _parse_connection_uri(uri):
     settings = {"schema": ""}
     uri = "{0}{1}".format("" if uri.startswith("mysqlx://")
                           else "mysqlx://", uri)
-    scheme, temp = uri.split("://", 1)
+    _, temp = uri.split("://", 1)
     userinfo, temp = temp.partition("@")[::2]
     host, query_str = temp.partition("?")[::2]
 
     pos = host.rfind("/")
-    if host[pos:].find(")") is -1 and pos > 0:
+    if host[pos:].find(")") == -1 and pos > 0:
         host, settings["schema"] = host.rsplit("/", 1)
     host = host.strip("()")
 
@@ -126,7 +125,7 @@ def _parse_connection_uri(uri):
         opt = key.lower()
         if opt in settings:
             raise InterfaceError("Duplicate option '{0}'.".format(key))
-        if opt in ssl_opts:
+        if opt in _SSL_OPTS:
             settings[opt] = unquote(val.strip("()"))
         else:
             settings[opt] = val.lower()
@@ -141,7 +140,7 @@ def _validate_settings(settings):
     Args:
         settings: dict containing connection settings.
     """
-    invalid_opts = set(settings.keys()).difference(sess_opts)
+    invalid_opts = set(settings.keys()).difference(_SESS_OPTS)
     if invalid_opts:
         raise ProgrammingError("Invalid options: {0}."
                                "".format(", ".join(invalid_opts)))
@@ -160,7 +159,7 @@ def _validate_settings(settings):
             raise InterfaceError("Invalid SSL Mode '{0}'."
                                  "".format(settings["ssl-mode"]))
         if settings["ssl-mode"] == SSLMode.DISABLED and \
-            any(key in settings for key in ssl_opts):
+            any(key in settings for key in _SSL_OPTS):
             raise InterfaceError("SSL options used with ssl-mode 'disabled'.")
 
     if "ssl-crl" in settings and not "ssl-ca" in settings:
@@ -184,6 +183,14 @@ def _validate_settings(settings):
 
 
 def _validate_hosts(settings):
+    """Validate hosts.
+
+    Args:
+        settings (dict): Settings dictionary.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: If priority or port are invalid.
+    """
     if "priority" in settings and settings["priority"]:
         try:
             settings["priority"] = int(settings["priority"])
@@ -222,11 +229,11 @@ def _get_connection_settings(*args, **kwargs):
             settings.update(args[0].to_dict())
             settings.pop("appdata", None)
 
-        if len(args) is 2:
+        if len(args) == 2:
             settings["password"] = args[1]
     elif kwargs:
         settings.update(kwargs)
-        for key, val in settings.items():
+        for key in settings:
             if "_" in key:
                 settings[key.replace("_", "-")] = settings.pop(key)
 
@@ -260,7 +267,7 @@ def get_session(*args, **kwargs):
     return Session(settings)
 
 
-sessions = SessionConfigManager()
+sessions = SessionConfigManager()  # pylint: disable=C0103
 sessions.set_persistence_handler(PersistenceHandler())
 
 __all__ = [
@@ -277,19 +284,19 @@ __all__ = [
     "Schema", "Collection", "Table", "View",
 
     # mysqlx.errors
-    "Error", "Warning", "InterfaceError", "DatabaseError", "NotSupportedError",
+    "Error", "InterfaceError", "DatabaseError", "NotSupportedError",
     "DataError", "IntegrityError", "ProgrammingError", "OperationalError",
     "InternalError", "PoolError",
 
     # mysqlx.result
     "ColumnMetaData", "Row", "Result", "BufferingResult", "RowResult",
-    "SqlResult", "ColumnType",
+    "SqlResult", "DocResult", "ColumnType",
 
     # mysqlx.statement
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
     "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
     "CreateCollectionIndexStatement", "CreateTableStatement",
-    "CreateViewStatement", "AlterViewStatement","ColumnDef",
+    "CreateViewStatement", "AlterViewStatement", "ColumnDef",
     "GeneratedColumnDef", "ForeignKeyDef", "Expr",
 ]

@@ -37,11 +37,13 @@ from .protobuf import mysqlxpb_enum
 
 
 class Expr(object):
+    """Expression wrapper."""
     def __init__(self, expr):
         self.expr = expr
 
 
 def flexible_params(*values):
+    """Parse flexible parameters."""
     if len(values) == 1 and isinstance(values[0], (list, tuple,)):
         return values[0]
     return values
@@ -60,8 +62,7 @@ def is_quoted_identifier(identifier, sql_mode=""):
     if "ANSI_QUOTES" in sql_mode:
         return ((identifier[0] == "`" and identifier[-1] == "`") or
                 (identifier[0] == '"' and identifier[-1] == '"'))
-    else:
-        return identifier[0] == "`" and identifier[-1] == "`"
+    return identifier[0] == "`" and identifier[-1] == "`"
 
 
 def quote_identifier(identifier, sql_mode=""):
@@ -80,8 +81,7 @@ def quote_identifier(identifier, sql_mode=""):
         return identifier
     if "ANSI_QUOTES" in sql_mode:
         return '"{0}"'.format(identifier.replace('"', '""'))
-    else:
-        return "`{0}`".format(identifier.replace("`", "``"))
+    return "`{0}`".format(identifier.replace("`", "``"))
 
 
 def quote_multipart_identifier(identifiers, sql_mode=""):
@@ -99,6 +99,16 @@ def quote_multipart_identifier(identifiers, sql_mode=""):
 
 
 def parse_table_name(default_schema, table_name, sql_mode=""):
+    """Parse table name.
+
+    Args:
+        default_schema (str): The default schema.
+        table_name (str): The table name.
+        sql_mode(Optional[str]): The SQL mode.
+
+    Returns:
+        str: The parsed table name.
+    """
     quote = '"' if "ANSI_QUOTES" in sql_mode else "`"
     delimiter = ".{0}".format(quote) if quote in table_name else "."
     temp = table_name.split(delimiter, 1)
@@ -117,19 +127,25 @@ class Statement(object):
     def __init__(self, target, doc_based=True):
         self._target = target
         self._doc_based = doc_based
-        self._connection = target._connection if target else None
+        self._connection = target.get_connection() if target else None
 
     @property
     def target(self):
-        """object: The database object target.
-        """
+        """object: The database object target."""
         return self._target
 
     @property
     def schema(self):
-        """:class:`mysqlx.Schema`: The Schema object.
-        """
+        """:class:`mysqlx.Schema`: The Schema object."""
         return self._target.schema
+
+    def is_doc_based(self):
+        """Check if it is document based.
+
+        Returns:
+            bool: `True` if it is document based.
+        """
+        return self._doc_based
 
     def execute(self):
         """Execute the statement.
@@ -154,17 +170,160 @@ class FilterableStatement(Statement):
     def __init__(self, target, doc_based=True, condition=None):
         super(FilterableStatement, self).__init__(target=target,
                                                   doc_based=doc_based)
-        self._has_projection = False
-        self._has_where = False
-        self._has_limit = False
-        self._has_sort = False
-        self._has_group_by = False
-        self._has_having = False
-        self._has_bindings = False
         self._binding_map = {}
         self._bindings = []
+        self._having = None
+        self._grouping_str = ""
+        self._grouping = None
+        self._limit_offset = 0
+        self._limit_row_count = 0
+        self._projection_str = ""
+        self._projection_expr = None
+        self._sort_str = ""
+        self._sort_expr = None
+        self.has_bindings = False
+        self.has_limit = False
+        self.has_group_by = False
+        self.has_having = False
+        self.has_projection = False
+        self.has_sort = False
+        self.has_where = False
         if condition:
             self.where(condition)
+
+    def _bind_single(self, obj):
+        """Bind single object.
+
+        Args:
+            obj(:class:`mysqlx.DbDoc` or str): DbDoc or JSON string object.
+
+        Raises:
+            :class:`mysqlx.ProgrammingError`: If invalid JSON string to bind.
+            ValueError: If JSON loaded is not a dictionary.
+        """
+        if isinstance(obj, DbDoc):
+            self.bind(str(obj))
+        elif isinstance(obj, STRING_TYPES):
+            try:
+                res = json.loads(obj)
+                if not isinstance(res, dict):
+                    raise ValueError
+            except ValueError:
+                raise ProgrammingError("Invalid JSON string to bind")
+            for key in res.keys():
+                self.bind(key, res[key])
+        else:
+            raise ProgrammingError("Invalid JSON string or object to bind")
+
+    def _set_group_by(self, *fields):
+        """Set group by.
+
+        Args:
+            *fields: List of fields.
+        """
+        fields = flexible_params(*fields)
+        self.has_group_by = True
+        self._grouping_str = ",".join(fields)
+        self._grouping = ExprParser(self._grouping_str,
+                                    not self._doc_based).parse_expr_list()
+
+    def _set_having(self, condition):
+        """Set having.
+
+        Args:
+            condition (str): The condition.
+        """
+        self.has_having = True
+        self._having = ExprParser(condition, not self._doc_based).expr()
+
+    def _set_projection(self, *fields):
+        """Set the projection.
+
+        Args:
+            *fields: List of fields.
+
+        Returns:
+            :class:`mysqlx.FilterableStatement`: Returns self.
+        """
+        fields = flexible_params(*fields)
+        self.has_projection = True
+        self._projection_str = ",".join(fields)
+        self._projection_expr = ExprParser(
+            self._projection_str,
+            not self._doc_based).parse_table_select_projection()
+        return self
+
+    def get_binding_map(self):
+        """Returns the binding map dictionary.
+
+        Returns:
+            dict: The binding map dictionary.
+        """
+        return self._binding_map
+
+    def get_bindings(self):
+        """Returns the bindings list.
+
+        Returns:
+            `list`: The bindings list.
+        """
+        return self._bindings
+
+    def get_grouping(self):
+        """Returns the grouping expression list.
+
+        Returns:
+            `list`: The grouping expression list.
+        """
+        return self._grouping
+
+    def get_having(self):
+        """Returns the having expression.
+
+        Returns:
+            object: The having expression.
+        """
+        return self._having
+
+    def get_limit_row_count(self):
+        """Returns the limit row count.
+
+        Returns:
+            int: The limit row count.
+        """
+        return self._limit_row_count
+
+    def get_limit_offset(self):
+        """Returns the limit offset.
+
+        Returns:
+            int: The limit offset.
+        """
+        return self._limit_offset
+
+    def get_where_expr(self):
+        """Returns the where expression.
+
+        Returns:
+            object: The where expression.
+        """
+        return self._where_expr
+
+    def get_projection_expr(self):
+        """Returns the projection expression.
+
+        Returns:
+            object: The projection expression.
+        """
+        return self._projection_expr
+
+    def get_sort_expr(self):
+        """Returns the sort expression.
+
+        Returns:
+            object: The sort expression.
+        """
+        return self._sort_expr
 
     def where(self, condition):
         """Sets the search condition to filter.
@@ -176,7 +335,7 @@ class FilterableStatement(Statement):
         Returns:
             mysqlx.FilterableStatement: FilterableStatement object.
         """
-        self._has_where = True
+        self.has_where = True
         self._where = condition
         try:
             expr = ExprParser(condition, not self._doc_based)
@@ -184,14 +343,6 @@ class FilterableStatement(Statement):
         except ValueError:
             raise ProgrammingError("Invalid condition")
         self._binding_map = expr.placeholder_name_to_position
-        return self
-
-    def _projection(self, *fields):
-        fields = flexible_params(*fields)
-        self._has_projection = True
-        self._projection_str = ",".join(fields)
-        self._projection_expr = ExprParser(self._projection_str,
-            not self._doc_based).parse_table_select_projection()
         return self
 
     def limit(self, row_count, offset=0):
@@ -204,9 +355,9 @@ class FilterableStatement(Statement):
         Returns:
             mysqlx.FilterableStatement: FilterableStatement object.
         """
-        self._has_limit = True
-        self._limit_offset = offset
+        self.has_limit = True
         self._limit_row_count = row_count
+        self._limit_offset = offset
         return self
 
     def sort(self, *sort_clauses):
@@ -219,22 +370,11 @@ class FilterableStatement(Statement):
             mysqlx.FilterableStatement: FilterableStatement object.
         """
         sort_clauses = flexible_params(*sort_clauses)
-        self._has_sort = True
+        self.has_sort = True
         self._sort_str = ",".join(sort_clauses)
         self._sort_expr = ExprParser(self._sort_str,
                                      not self._doc_based).parse_order_spec()
         return self
-
-    def _group_by(self, *fields):
-        fields = flexible_params(*fields)
-        self._has_group_by = True
-        self._grouping_str = ",".join(fields)
-        self._grouping = ExprParser(self._grouping_str,
-                                    not self._doc_based).parse_expr_list()
-
-    def _having(self, condition):
-        self._has_having = True
-        self._having = ExprParser(condition, not self._doc_based).expr()
 
     def bind(self, *args):
         """Binds a value to a specific placeholder.
@@ -250,7 +390,7 @@ class FilterableStatement(Statement):
         Raises:
             ProgrammingError: If the number of arguments is invalid.
         """
-        self._has_bindings = True
+        self.has_bindings = True
         count = len(args)
         if count == 1:
             self._bind_single(args[0])
@@ -259,21 +399,6 @@ class FilterableStatement(Statement):
         else:
             self._bindings.append({"name": args[0], "value": args[1]})
         return self
-
-    def _bind_single(self, obj):
-        if isinstance(obj, DbDoc):
-            self.bind(str(obj))
-        elif isinstance(obj, STRING_TYPES):
-            try:
-                res = json.loads(obj)
-                if not isinstance(res, dict):
-                    raise ValueError
-            except ValueError:
-                raise ProgrammingError("Invalid JSON string to bind")
-            for key in res.keys():
-                self.bind(key, res[key])
-        else:
-            raise ProgrammingError("Invalid JSON string or object to bind")
 
     def execute(self):
         """Execute the statement.
@@ -307,12 +432,28 @@ class SqlStatement(Statement):
 
 
 class WriteStatement(Statement):
-    """Provide common write operation attributes
+    """Provide common write operation attributes.
     """
     def __init__(self, target, doc_based):
         super(WriteStatement, self).__init__(target, doc_based)
         self._values = []
         self._upsert = False
+
+    def get_values(self):
+        """Returns the list of values.
+
+        Returns:
+            `list`: The list of values.
+        """
+        return self._values
+
+    def is_upsert(self):
+        """Returns `True` if it's an upsert.
+
+        Returns:
+            bool: `True` if it's an upsert.
+        """
+        return self._upsert
 
     def upsert(self, val=True):
         """Sets the upset flag to the boolean of the value provided.
@@ -325,6 +466,14 @@ class WriteStatement(Statement):
         self._upsert = val
         return self
 
+    def execute(self):
+        """Execute the statement.
+
+        Raises:
+           NotImplementedError: This method must be implemented.
+        """
+        raise NotImplementedError
+
 
 class AddStatement(WriteStatement):
     """A statement for document addition on a collection.
@@ -334,7 +483,7 @@ class AddStatement(WriteStatement):
     """
     def __init__(self, collection):
         super(AddStatement, self).__init__(collection, True)
-        self._ids = []
+        self.ids = []
 
     def add(self, *values):
         """Adds a list of documents into a collection.
@@ -362,12 +511,19 @@ class AddStatement(WriteStatement):
             return Result()
 
         for doc in self._values:
-            self._ids.append(doc.ensure_id())
+            self.ids.append(doc.ensure_id())
 
         return self._connection.send_insert(self)
 
 
 class UpdateSpec(object):
+    """Update specification class implementation.
+
+    Args:
+        update_type (int): The update type.
+        source (str): The source.
+        value (Optional[str]): The value.
+    """
     def __init__(self, update_type, source, value=None):
         if update_type == mysqlxpb_enum(
                 "Mysqlx.Crud.UpdateOperation.UpdateType.SET"):
@@ -382,6 +538,12 @@ class UpdateSpec(object):
             self.value = value
 
     def _table_set(self, source, value):
+        """Table set.
+
+        Args:
+            source (str): The source.
+            value (str): The value.
+        """
         self.update_type = mysqlxpb_enum(
             "Mysqlx.Crud.UpdateOperation.UpdateType.SET")
         self.source = ExprParser(source, True).parse_table_update_field()
@@ -401,6 +563,14 @@ class ModifyStatement(FilterableStatement):
                                               condition=condition)
         self._update_ops = []
 
+    def get_update_ops(self):
+        """Returns the list of update operations.
+
+        Returns:
+            `list`: The list of update operations.
+        """
+        return self._update_ops
+
     def set(self, doc_path, value):
         """Sets or updates attributes on documents in a collection.
 
@@ -413,7 +583,7 @@ class ModifyStatement(FilterableStatement):
         """
         self._update_ops.append(UpdateSpec(mysqlxpb_enum(
             "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_SET"),
-            doc_path, value))
+                                           doc_path, value))
         return self
 
     def change(self, doc_path, value):
@@ -429,7 +599,7 @@ class ModifyStatement(FilterableStatement):
         """
         self._update_ops.append(UpdateSpec(mysqlxpb_enum(
             "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"),
-            doc_path, value))
+                                           doc_path, value))
         return self
 
     def unset(self, *doc_paths):
@@ -463,7 +633,7 @@ class ModifyStatement(FilterableStatement):
         self._update_ops.append(
             UpdateSpec(mysqlxpb_enum(
                 "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"),
-                field, value))
+                       field, value))
         return self
 
     def array_append(self, doc_path, value):
@@ -482,7 +652,7 @@ class ModifyStatement(FilterableStatement):
         self._update_ops.append(
             UpdateSpec(mysqlxpb_enum(
                 "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"),
-                doc_path, value))
+                       doc_path, value))
         return self
 
     def execute(self):
@@ -491,7 +661,7 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
-        if not self._has_where:
+        if not self.has_where:
             raise ProgrammingError("No condition was found for modify")
         return self._connection.update(self)
 
@@ -511,6 +681,22 @@ class ReadStatement(FilterableStatement):
         super(ReadStatement, self).__init__(target, doc_based, condition)
         self._lock_exclusive = False
         self._lock_shared = False
+
+    def is_lock_exclusive(self):
+        """Returns `True` if is `EXCLUSIVE LOCK`.
+
+        Returns:
+            bool: `True` if is `EXCLUSIVE LOCK`.
+        """
+        return self._lock_exclusive
+
+    def is_lock_shared(self):
+        """Returns `True` if is `SHARED LOCK`.
+
+        Returns:
+            bool: `True` if is `SHARED LOCK`.
+        """
+        return self._lock_shared
 
     def lock_shared(self):
         """Execute a read operation with SHARED LOCK. Only one lock can be
@@ -537,7 +723,7 @@ class ReadStatement(FilterableStatement):
         Returns:
             mysqlx.ReadStatement: ReadStatement object.
         """
-        self._group_by(*fields)
+        self._set_group_by(*fields)
         return self
 
     def having(self, condition):
@@ -551,7 +737,7 @@ class ReadStatement(FilterableStatement):
         Returns:
             mysqlx.ReadStatement: ReadStatement object.
         """
-        self._having(condition)
+        self._set_having(condition)
         return self
 
     def execute(self):
@@ -586,7 +772,7 @@ class FindStatement(ReadStatement):
         Returns:
             mysqlx.FindStatement: FindStatement object.
         """
-        return self._projection(*fields)
+        return self._set_projection(*fields)
 
 
 class SelectStatement(ReadStatement):
@@ -598,7 +784,7 @@ class SelectStatement(ReadStatement):
     """
     def __init__(self, table, *fields):
         super(SelectStatement, self).__init__(table, False)
-        self._projection(*fields)
+        self._set_projection(*fields)
 
     def order_by(self, *clauses):
         """Sets the order by criteria.
@@ -613,20 +799,26 @@ class SelectStatement(ReadStatement):
         return self
 
     def get_sql(self):
-        where = " WHERE {0}".format(self._where) if self._has_where else ""
+        """Returns the generated SQL.
+
+        Returns:
+            str: The generated SQL.
+        """
+        where = " WHERE {0}".format(self._where) if self.has_where else ""
         group_by = " GROUP BY {0}".format(self._grouping_str) if \
-            self._has_group_by else ""
-        having = " HAVING {0}".format(self._having) if self._has_having else ""
-        order_by = " ORDER BY {0}".format(self._sort_str) if self._has_sort \
+            self.has_group_by else ""
+        having = " HAVING {0}".format(self._having) if self.has_having else ""
+        order_by = " ORDER BY {0}".format(self._sort_str) if self.has_sort \
             else ""
         limit = " LIMIT {0} OFFSET {1}".format(self._limit_row_count,
-            self._limit_offset) if self._has_limit else ""
-
+                                               self._limit_offset) \
+                                               if self.has_limit else ""
         stmt = ("SELECT {select} FROM {schema}.{table}{where}{group}{having}"
                 "{order}{limit}".format(select=self._projection_str or "*",
-                schema=self.schema.name, table=self.target.name, limit=limit,
-                where=where, group=group_by, having=having, order=order_by))
-
+                                        schema=self.schema.name,
+                                        table=self.target.name, limit=limit,
+                                        where=where, group=group_by,
+                                        having=having, order=order_by))
         return stmt
 
 class InsertStatement(WriteStatement):
@@ -672,6 +864,14 @@ class UpdateStatement(FilterableStatement):
         super(UpdateStatement, self).__init__(target=table, doc_based=False)
         self._update_ops = []
 
+    def get_update_ops(self):
+        """Returns the list of update operations.
+
+        Returns:
+            `list`: The list of update operations.
+        """
+        return self._update_ops
+
     def set(self, field, value):
         """Updates the column value on records in a table.
 
@@ -693,7 +893,7 @@ class UpdateStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object
         """
-        if not self._has_where:
+        if not self.has_where:
             raise ProgrammingError("No condition was found for update")
         return self._connection.update(self)
 
@@ -713,7 +913,7 @@ class RemoveStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
-        if not self._has_where:
+        if not self.has_where:
             raise ProgrammingError("No condition was found for remove")
         return self._connection.delete(self)
 
@@ -737,7 +937,7 @@ class DeleteStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
-        if not self._has_where:
+        if not self.has_where:
             raise ProgrammingError("No condition was found for delete")
         return self._connection.delete(self)
 
@@ -785,14 +985,27 @@ class CreateCollectionIndexStatement(Statement):
 
 
 class TableIndex(object):
+    """Table index implementation.
+
+    Args:
+        name (str): The table name.
+        index_type (int): The index type.
+        columns (list): The list of columns.
+    """
     UNIQUE_INDEX = 1
     INDEX = 2
+
     def __init__(self, name, index_type, columns):
         self._name = name
         self._index_type = index_type
         self._columns = columns
 
     def get_sql(self):
+        """Returns the generated SQL.
+
+        Returns:
+            str: The generated SQL.
+        """
         stmt = ""
         if self._index_type is TableIndex.UNIQUE_INDEX:
             stmt += "UNIQUE "
@@ -989,12 +1202,16 @@ class CreateTableStatement(Statement):
 
     @property
     def table_name(self):
-        """string: The fully qualified name of the Table.
-        """
+        """string: The fully qualified name of the Table."""
         return quote_multipart_identifier(parse_table_name(
             self.schema.name, self._name))
 
     def _get_table_opts(self):
+        """Returns the table options.
+
+        Returns:
+            str: The table options.
+        """
         options = []
         options.append("AUTO_INCREMENT = {inc}")
         if self._charset:
@@ -1006,9 +1223,15 @@ class CreateTableStatement(Statement):
 
         table_opts = ",".join(options)
         return table_opts.format(inc=self._auto_inc, charset=self._charset,
-            collation=self._collation, comment=self._comment)
+                                 collation=self._collation,
+                                 comment=self._comment)
 
     def _get_create_def(self):
+        """Returns the create table definition.
+
+        Returns:
+            str: The create table definition.
+        """
         defs = []
         if self._p_keys:
             defs.append("PRIMARY KEY ({0})".format(",".join(self._p_keys)))
@@ -1089,7 +1312,7 @@ class CreateTableStatement(Statement):
             mysqlx.CreateTableStatement: CreateTableStatement object.
         """
         self._indices.append(TableIndex(index_name, TableIndex.INDEX,
-            flexible_params(*cols)))
+                                        flexible_params(*cols)))
         return self
 
     def add_unique_index(self, index_name, *cols):
@@ -1103,7 +1326,7 @@ class CreateTableStatement(Statement):
             mysqlx.CreateTableStatement: CreateTableStatement object.
         """
         self._u_indices.append(TableIndex(index_name, TableIndex.UNIQUE_INDEX,
-            flexible_params(*cols)))
+                                          flexible_params(*cols)))
         return self
 
     def add_foreign_key(self, name, key):
@@ -1183,7 +1406,8 @@ class CreateTableStatement(Statement):
         Returns:
             mysqlx.Table: Table object.
         """
-        create = "CREATE {table_type} {name}".format(name=self.table_name,
+        create = "CREATE {table_type} {name}".format(
+            name=self.table_name,
             table_type="TEMPORARY TABLE" if self._temp else "TABLE")
         if self._like:
             stmt = "{create} LIKE {query}"
@@ -1205,10 +1429,10 @@ class ColumnDefBase(object):
 
     Args:
         name (string): Name of the column.
-        type (MySQLx.ColumnType): Type of the column.
+        col_type (MySQLx.ColumnType): Type of the column.
         size (int): Size of the column.
     """
-    def __init__(self, name, type, size):
+    def __init__(self, name, col_type, size):
         self._default_schema = None
         self._not_null = False
         self._p_key = False
@@ -1216,7 +1440,7 @@ class ColumnDefBase(object):
         self._name = name
         self._size = size
         self._comment = ""
-        self._type = type
+        self._type = col_type
 
     def not_null(self):
         """Disable NULL values for this column.
@@ -1258,6 +1482,11 @@ class ColumnDefBase(object):
         return self
 
     def set_schema(self, schema):
+        """Set the schema name.
+
+        Args:
+            schema (std): The schema name.
+        """
         self._default_schema = schema
 
 
@@ -1266,27 +1495,29 @@ class ColumnDef(ColumnDefBase):
 
     Args:
         name (string): Name of the column.
-        type (MySQL.ColumnType): Type of the column.
+        col_type (MySQL.ColumnType): Type of the column.
         size (int): Size of the column.
     """
-    def __init__(self, name, type, size=None):
-        super(ColumnDef, self).__init__(name, type, size)
+    def __init__(self, name, col_type, size=None):
+        super(ColumnDef, self).__init__(name, col_type, size)
         self._ref = None
         self._default = None
         self._decimals = None
         self._ref_table = None
-
         self._binary = False
         self._auto_inc = False
         self._unsigned = False
-
         self._values = []
         self._ref_fields = []
-
         self._charset = None
         self._collation = None
 
     def _data_type(self):
+        """Returns the date type.
+
+        Returns:
+            str: The data type.
+        """
         type_def = ""
         if self._size and (ColumnType.is_numeric(self._type) or \
             ColumnType.is_char(self._type) or ColumnType.is_binary(self._type)):
@@ -1308,13 +1539,18 @@ class ColumnDef(ColumnDefBase):
         return "{0} {1}".format(ColumnType.to_string(self._type), type_def)
 
     def _col_definition(self):
+        """Returns the column definition.
+
+        Returns:
+            str: The column definition.
+        """
         null = " NOT NULL" if self._not_null else " NULL"
         auto_inc = " AUTO_INCREMENT" if self._auto_inc else ""
         default = " DEFAULT {default}" if self._default else ""
         comment = " COMMENT '{comment}'" if self._comment else ""
 
         defn = "{0}{1}{2}{3}{4}".format(self._data_type(), null, default,
-            auto_inc, comment)
+                                        auto_inc, comment)
 
         if self._p_key:
             defn = "{0} PRIMARY KEY".format(defn)
@@ -1323,8 +1559,8 @@ class ColumnDef(ColumnDefBase):
         if self._ref_table and self._ref_fields:
             ref_table = quote_multipart_identifier(parse_table_name(
                 self._default_schema, self._ref_table))
-            defn = "{0} REFERENCES {1} ({2})".format(defn, ref_table,
-                ",".join(self._ref_fields))
+            defn = "{0} REFERENCES {1} ({2})".format(
+                defn, ref_table, ",".join(self._ref_fields))
 
         return defn.format(default=self._default, comment=self._comment)
 
@@ -1333,7 +1569,7 @@ class ColumnDef(ColumnDefBase):
 
         Args:
             default_val (object): The default value of the Column. Can be a
-            string, number or :class`MySQLx.Expr`.
+                                  string, number or `Expr`.
 
         Returns:
             mysqlx.ColumnDef: ColumnDef object.
@@ -1437,6 +1673,11 @@ class ColumnDef(ColumnDefBase):
         return self
 
     def get_sql(self):
+        """Returns the generated SQL.
+
+        Returns:
+            str: The generated SQL.
+        """
         return "{0} {1}".format(self._name, self._col_definition())
 
 
@@ -1464,6 +1705,11 @@ class GeneratedColumnDef(ColumnDef):
         return self
 
     def get_sql(self):
+        """Returns the generated SQL.
+
+        Returns:
+            str: The generated SQL.
+        """
         return "{0} GENERATED ALWAYS AS ({1}){2}".format(
             super(GeneratedColumnDef, self).get_sql(),
             self._expr, " STORED" if self._stored else "")
@@ -1486,6 +1732,11 @@ class ForeignKeyDef(object):
         self._delete_action = self._action(ForeignKeyDef.NO_ACTION)
 
     def _action(self, action):
+        """Returns the action.
+
+        Returns:
+            str: The action.
+        """
         if action is ForeignKeyDef.RESTRICT:
             return "RESTRICT"
         elif action is ForeignKeyDef.CASCADE:
@@ -1495,9 +1746,19 @@ class ForeignKeyDef(object):
         return "NO ACTION"
 
     def set_name(self, name):
+        """Set the name.
+
+        Args:
+            name (str): The name.
+        """
         self._name = name
 
     def set_schema(self, schema):
+        """Set the schema name.
+
+        Args:
+            schema (std): The schema name.
+        """
         self._default_schema = schema
 
     def fields(self, *fields):
@@ -1562,10 +1823,15 @@ class ForeignKeyDef(object):
         return self
 
     def get_sql(self):
+        """Returns the generated SQL.
+
+        Returns:
+            str: The generated SQL.
+        """
         update = "ON UPDATE {0}".format(self._update_action)
         delete = "ON DELETE {0}".format(self._delete_action)
         key = "FOREIGN KEY {0}({1}) REFERENCES {2} ({3})".format(
             self._name, ",".join(self._fields), quote_multipart_identifier(
-            parse_table_name(self._default_schema, self._f_table)),
+                parse_table_name(self._default_schema, self._f_table)),
             ",".join(self._f_fields))
         return "{0} {1} {2}".format(key, update, delete)

@@ -2,6 +2,7 @@
 .DS_Store
 *__pycache__*
 .idea/
+.vscode/
 commit.txt
 *.patch
 *.diff
@@ -14,4 +15,3 @@ cpy_server*/
 tests_*.log
 dev*.py
 src/mysqlxpb/mysqlx/mysqlx*
-

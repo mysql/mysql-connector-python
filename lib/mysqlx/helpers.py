@@ -24,7 +24,38 @@
 """This module contains helper functions."""
 
 def encode_to_bytes(value, encoding="utf-8"):
+    """Returns an encoded version of the string as a bytes object.
+
+    Args:
+        encoding (str): The encoding.
+
+    Resturns:
+        bytes: The encoded version of the string as a bytes object.
+    """
     return value if isinstance(value, bytes) else value.encode(encoding)
 
+
+def decode_from_bytes(value, encoding="utf-8"):
+    """Returns a string decoded from the given bytes.
+
+    Args:
+        value (bytes): The value to be decoded.
+        encoding (str): The encoding.
+
+    Returns:
+        str: The value decoded from bytes.
+    """
+    return value.decode(encoding) if isinstance(value, bytes) else value
+
+
 def get_item_or_attr(obj, key):
+    """Get item from dictionary or attribute from object.
+
+    Args:
+        obj (object): Dictionary or object.
+        key (str): Key.
+
+    Returns:
+        object: The object for the provided key.
+    """
     return obj[key] if isinstance(obj, dict) else getattr(obj, key)

@@ -100,7 +100,6 @@ else:
 MY_CNF = """
 # MySQL option file for MySQL Connector/Python tests
 [mysqld-8.0]
-information-schema-stats=LATEST
 plugin-load={mysqlx_plugin}
 loose_mysqlx_port={mysqlx_port}
 {mysqlx_bind_address}

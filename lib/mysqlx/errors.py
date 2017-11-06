@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -31,12 +31,14 @@ from .locales import get_client_error
 PY2 = sys.version_info[0] == 2
 
 if PY2:
+    # pylint: disable=E0602
     def struct_unpack(fmt, buf):
         """Wrapper around struct.unpack handling buffer as bytes and strings.
         """
         if isinstance(buf, (bytearray, bytes)):
             return struct.unpack_from(fmt, buffer(buf))
         return struct.unpack_from(fmt, buf)
+    # pylint: enable=E0602
 else:
     from struct import unpack as struct_unpack
 
@@ -76,11 +78,6 @@ class Error(Exception):
 
     def __str__(self):
         return self._full_msg
-
-
-class Warning(Exception):  # pylint: disable=W0622
-    """Exception for important warnings."""
-    pass
 
 
 class InterfaceError(Error):
@@ -139,9 +136,8 @@ def intread(buf):
         elif length <= 4:
             tmp = buf + b"\x00" * (4 - length)
             return struct_unpack("<I", tmp)[0]
-        else:
-            tmp = buf + b"\x00" * (8 - length)
-            return struct_unpack("<Q", tmp)[0]
+        tmp = buf + b"\x00" * (8 - length)
+        return struct_unpack("<Q", tmp)[0]
     except:
         raise
 

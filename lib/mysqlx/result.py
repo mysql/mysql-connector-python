@@ -21,7 +21,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-"""Implementation of the Result Set classes."""
+"""Implementation of the Result classes."""
 
 import decimal
 import struct
@@ -32,12 +32,10 @@ from datetime import datetime, timedelta
 from .dbdoc import DbDoc
 from .charsets import MYSQL_CHARACTER_SETS
 from .compat import STRING_TYPES
+from .helpers import decode_from_bytes
 
 
-def decode_from_bytes(value, encoding="utf-8"):
-    return value.decode(encoding) if isinstance(value, bytes) else value
-
-
+# pylint: disable=C0111
 def from_protobuf(col_type, payload):
     if len(payload) == 0:
         return None
@@ -56,8 +54,8 @@ def from_protobuf(col_type, payload):
             ColumnProtoType.ENUM: bytes_from_protobuf,
             ColumnProtoType.DECIMAL: decimal_from_protobuf,
         }[col_type](payload)
-    except KeyError as e:
-        sys.stderr.write("{0}".format(e))
+    except KeyError as err:
+        sys.stderr.write("{0}".format(err))
         sys.stderr.write("{0}".format(payload.encode("hex")))
         return None
 
@@ -85,10 +83,10 @@ def varint_from_protobuf_stream(payload):
     i = 0
     shift = 0
 
-    for c in payload:
-        ch = c if isinstance(c, int) else ord(c)
-        eos = (ch & 0x80) == 0
-        cur_bits = (ch & 0x7f)
+    for item in payload:
+        char = item if isinstance(item, int) else ord(item)
+        eos = (char & 0x80) == 0
+        cur_bits = (char & 0x7f)
         cur_bits <<= shift
         i |= cur_bits
         if eos:
@@ -124,24 +122,24 @@ def varsint_from_protobuf(payload):
 
 
 def set_from_protobuf(payload):
-    s = []
+    set_pb = []
     while True:
         try:
             field_len, payload = varint_from_protobuf_stream(payload)
             if len(payload) < field_len:
-                if len(payload) == 0 and field_len == 1 and len(s) == 0:
+                if len(payload) == 0 and field_len == 1 and len(set_pb) == 0:
                     # Special case for empty set
                     return []
                 raise ValueError("Invalid Set encoding")
 
-            s.append(payload[:field_len])
+            set_pb.append(payload[:field_len])
             payload = payload[field_len:]
             if len(payload) == 0:
                 # Done
                 break
         except ValueError:
             break
-    return s
+    return set_pb
 
 
 def decimal_from_protobuf(payload):
@@ -150,10 +148,10 @@ def decimal_from_protobuf(payload):
     scale = payload[0] if isinstance(payload[0], int) else ord(payload[0])
     payload = payload[1:]
 
-    for c in payload:
-        ch = c if isinstance(c, int) else ord(c)
-        high_bcd = (ch & 0xf0) >> 4
-        low_bcd = ch & 0x0f
+    for item in payload:
+        char = item if isinstance(item, int) else ord(item)
+        high_bcd = (char & 0xf0) >> 4
+        low_bcd = char & 0x0f
         if high_bcd < 0x0a:
             digits.append(high_bcd)
             if low_bcd < 0x0a:
@@ -295,17 +293,17 @@ class ColumnType(object):
     @classmethod
     def is_text(cls, col_type):
         return col_type in (cls.TEXT, cls.TINYTEXT, cls.MEDIUMTEXT,
-            cls.LONGTEXT,)
+                            cls.LONGTEXT,)
 
     @classmethod
     def is_decimals(cls, col_type):
         return col_type in (cls.REAL, cls.DOUBLE, cls.FLOAT, cls.DECIMAL,
-            cls.NUMERIC,)
+                            cls.NUMERIC,)
 
     @classmethod
     def is_numeric(cls, col_type):
         return col_type in (cls.BIT, cls.TINYINT, cls.SMALLINT, cls.MEDIUMINT,
-            cls.INT, cls.BIGINT,)
+                            cls.INT, cls.BIGINT,)
 
     @classmethod
     def is_finite_set(cls, col_type):
@@ -330,18 +328,18 @@ class Flags(object):
     def __init__(self, value):
         self._allowed_flags = {}
         self._flag_names = {}
-        for k, v in self.__class__.__dict__.items():
-            if k.startswith("__"):
+        for key, val in self.__class__.__dict__.items():
+            if key.startswith("__"):
                 continue
-            if type(v) in (int, ):
-                self._allowed_flags[k] = v
-                self._flag_names[v] = k
-        self.value = value
+            if isinstance(val, int):
+                self._allowed_flags[key] = val
+                self._flag_names[val] = key
+        self._value = value
 
     def __str__(self):
         mask = 1
         flag_names = []
-        value = self.value
+        value = self._value
 
         for _ in range(0, 63):
             mask <<= 1
@@ -361,8 +359,8 @@ class Flags(object):
         return self._value
 
     @value.setter
-    def value(self, v):
-        self._value = v
+    def value(self, val):
+        self._value = val
 
 
 class ColumnFlags(Flags):
@@ -423,6 +421,7 @@ class ColumnMetaData(object):
         self._is_bytes = False
         self._collation_name = None
         self._character_set_name = None
+        self._zero_fill = None
 
         if self._collation > 0:
             if self._collation >= len(MYSQL_CHARACTER_SETS):
@@ -446,44 +445,28 @@ class ColumnMetaData(object):
             "flags": str(self._flags),
         })
 
-    def get_schema_name(self):
-        return self._schema
+    def _map_bytes(self):
+        if self._content_type == BytesContentType.GEOMETRY:
+            self._col_type = ColumnType.GEOMETRY
+        elif self._content_type == BytesContentType.JSON:
+            self._col_type = ColumnType.JSON
+        elif self._content_type == BytesContentType.XML:
+            self._col_type = ColumnType.XML
+        elif self._is_binary:
+            self._col_type = ColumnType.BYTES
+        else:
+            self._col_type = ColumnType.STRING
+        self._is_padded = self._flags & 1
 
-    def get_table_name(self):
-        return self._original_table or self._table
-
-    def get_table_label(self):
-        return self._table or self._original_table
-
-    def get_column_name(self):
-        return self._original_name or self._name
-
-    def get_column_label(self):
-        return self._name or self._original_name
-
-    def get_type(self):
-        return self._col_type
-
-    def get_length(self):
-        return self._length
-
-    def get_fractional_digits(self):
-        return self._fractional_digits
-
-    def get_collation_name(self):
-        return self._collation_name
-
-    def get_character_set_name(self):
-        return self._character_set_name
-
-    def is_number_signed(self):
-        return self._number_signed
-
-    def is_padded(self):
-        return self._is_padded
-
-    def is_bytes(self):
-        return self._is_bytes
+    def _map_datetime(self):
+        if self._length == 10:
+            self._col_type = ColumnType.DATE
+        elif self._length == 19:
+            self._col_type = ColumnType.DATETIME
+        elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0:
+            self._col_type = ColumnType.TIMESTAMP
+        else:
+            raise ValueError("Datetime mapping scenario unhandled")
 
     def _map_int_type(self):
         if self._length <= 4:
@@ -510,29 +493,6 @@ class ColumnMetaData(object):
         else:
             self._col_type = ColumnType.BIGINT
         self._zero_fill = self._flags & 1
-
-    def _map_bytes(self):
-        if self._content_type == BytesContentType.GEOMETRY:
-            self._col_type = ColumnType.GEOMETRY
-        elif self._content_type == BytesContentType.JSON:
-            self._col_type = ColumnType.JSON
-        elif self._content_type == BytesContentType.XML:
-            self._col_type = ColumnType.XML
-        elif self._is_binary:
-            self._col_type = ColumnType.BYTES
-        else:
-            self._col_type = ColumnType.STRING
-        self._is_padded = self._flags & 1
-
-    def _map_datetime(self):
-        if self._length == 10:
-            self._col_type = ColumnType.DATE
-        elif self._length == 19:
-            self._col_type = ColumnType.DATETIME
-        elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0:
-            self._col_type = ColumnType.TIMESTAMP
-        else:
-            raise ValueError("Datetime mapping scenario unhandled")
 
     def _map_type(self):
         if self._proto_type == ColumnProtoType.SINT:
@@ -566,25 +526,48 @@ class ColumnMetaData(object):
         else:
             raise ValueError("Unknown column type {0}".format(self._proto_type))
 
+    def get_schema_name(self):
+        return self._schema
 
-class Warning(object):
-    def __init__(self, level, code, msg):
-        self._level = level
-        self._code = code
-        self._message = msg
+    def get_table_name(self):
+        return self._original_table or self._table
 
-    @property
-    def Level(self):
-        return self._level
+    def get_table_label(self):
+        return self._table or self._original_table
 
-    @property
-    def Code(self):
-        return self._code
+    def get_column_name(self):
+        return self._original_name or self._name
 
-    @property
-    def Message(self):
-        return self._message
+    def get_column_label(self):
+        return self._name or self._original_name
 
+    def get_proto_type(self):
+        return self._proto_type
+
+    def get_type(self):
+        return self._col_type
+
+    def get_length(self):
+        return self._length
+
+    def get_fractional_digits(self):
+        return self._fractional_digits
+
+    def get_collation_name(self):
+        return self._collation_name
+
+    def get_character_set_name(self):
+        return self._character_set_name
+
+    def is_number_signed(self):
+        return self._number_signed
+
+    def is_padded(self):
+        return self._is_padded
+
+    def is_bytes(self):
+        return self._is_bytes
+# pylint: enable=C0111
 
 class Row(object):
     """Represents a row element returned from a SELECT query.
@@ -653,6 +636,31 @@ class BaseResult(object):
         """
         return len(self._warnings)
 
+    def set_closed(self, flag):
+        """Sets if resultset fetch is done.
+        """
+        self._closed = flag
+
+    def append_warning(self, level, code, msg):
+        """Append a warning.
+
+        Args:
+            level (int): The warning level.
+            code (int): The warning code.
+            msg (str): The warning message.
+        """
+        self._warnings.append((level, code, msg,))
+
+    def set_generated_id(self, generated_id):
+        """Sets the generated ID.
+        """
+        self._generated_id = generated_id
+
+    def set_rows_affected(self, total):
+        """Sets the number of rows affected.
+        """
+        self._rows_affected = total
+
 
 class Result(BaseResult):
     """Allows retrieving information about non query operations performed on
@@ -660,7 +668,7 @@ class Result(BaseResult):
 
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
-        ids (`list`): A list of IDs.
+                                                   ids (`list`): A list of IDs.
     """
     def __init__(self, connection=None, ids=None):
         super(Result, self).__init__(connection)
@@ -688,9 +696,7 @@ class Result(BaseResult):
     def get_document_id(self):
         """Returns ID of the last document inserted into a collection.
         """
-        if self._ids is None:
-            return None
-        if len(self._ids) == 0:
+        if self._ids is None or len(self._ids) == 0:
             return None
         return self._ids[0]
 
@@ -701,26 +707,76 @@ class Result(BaseResult):
 
 
 class BufferingResult(BaseResult):
+    """Provides base functionality for buffering result objects.
+
+    Args:
+        connection (mysqlx.connection.Connection): The Connection object.
+                                                   ids (`list`): A list of IDs.
+    """
     def __init__(self, connection):
         super(BufferingResult, self).__init__(connection)
+        self._columns = []
+        self._has_more_results = False
+        self._items = []
+        self._page_size = 0
+        self._position = -1
         self._init_result()
 
+    def __getitem__(self, index):
+        return self._items[index]
+
+    @property
+    def count(self):
+        """int: The total of items."""
+        return len(self._items)
+
     def _init_result(self):
+        """Initialize the result."""
         self._columns = self._connection.get_column_metadata(self)
         self._has_more_data = True if len(self._columns) > 0 else False
         self._items = []
         self._page_size = 20
         self._position = -1
-        self._connection._active_result = self if self._has_more_data else None
+        self._connection.set_active_result(self if self._has_more_data
+                                           else None)
 
-    @property
-    def count(self):
-        """int: The total of items.
+    def _read_item(self, dumping):
+        """Read item.
+
+        Args:
+            dumping (bool): `True` for dumping.
+
+        Returns:
+            :class:`mysqlx.Row`: A `Row` object.
         """
-        return len(self._items)
+        row = self._connection.read_row(self)
+        if row is None:
+            return None
+        item = [None] * len(row["field"])
+        if not dumping:
+            for key in range(len(row["field"])):
+                col = self._columns[key]
+                item[key] = from_protobuf(col.get_proto_type(),
+                                          row["field"][key])
+        return Row(self, item)
 
-    def __getitem__(self, index):
-        return self._items[index]
+    def _page_in_items(self):
+        """Reads the page items.
+
+        Returns:
+            int: Total items read.
+        """
+        if self._closed:
+            return False
+
+        count = 0
+        for _ in range(self._page_size):
+            item = self._read_item(False)
+            if item is None:
+                break
+            self._items.append(item)
+            count += 1
+        return count
 
     def index_of(self, col_name):
         """Returns the index of the column.
@@ -735,35 +791,11 @@ class BufferingResult(BaseResult):
             index = index + 1
         return -1
 
-    def _read_item(self, dumping):
-        row = self._connection.read_row(self)
-        if row is None:
-            return None
-        item = [None] * len(row["field"])
-        if not dumping:
-            for x in range(len(row["field"])):
-                col = self._columns[x]
-                item[x] = from_protobuf(col._proto_type, row["field"][x])
-        return Row(self, item)
-
-    def _page_in_items(self):
-        if self._closed:
-            return False
-
-        count = 0
-        for i in range(self._page_size):
-            item = self._read_item(False)
-            if item is None:
-                break
-            self._items.append(item)
-            count += 1
-        return count
-
     def fetch_one(self):
         """ Fetch one item.
 
         Returns:
-            Row/DbDoc: one result item.
+            :class:`mysqlx.Row` or :class:`mysqlx.DbDoc`: one result item.
         """
         if self._closed:
             return None
@@ -774,12 +806,17 @@ class BufferingResult(BaseResult):
         """Fetch all items.
 
         Returns:
-            `list`: The list of items.
+            `list`: The list of items of :class:`mysqlx.DbDoc` or
+                    :class:`mysqlx.Row`.
         """
         while True:
             if not self._page_in_items():
                 break
         return self._items
+
+    def set_has_more_results(self, flag):
+        """Sets if has more resultsets."""
+        self._has_more_results = flag
 
 
 class RowResult(BufferingResult):
@@ -793,8 +830,7 @@ class RowResult(BufferingResult):
 
     @property
     def columns(self):
-        """`list`: The list of columns.
-        """
+        """`list`: The list of columns."""
         return self._columns
 
 
@@ -806,14 +842,21 @@ class SqlResult(RowResult):
     """
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
-        self._has_more_results = False
 
     def get_autoincrement_value(self):
         """Returns the identifier for the last record inserted.
+
+        Returns:
+            str: The identifier of the last record inserted.
         """
         return self._generated_id
 
     def next_result(self):
+        """Process the next result.
+
+        Returns:
+            bool: Return `True` if the fetch is done.
+        """
         if self._closed:
             return False
         self._has_more_results = False
@@ -832,6 +875,14 @@ class DocResult(BufferingResult):
         super(DocResult, self).__init__(connection)
 
     def _read_item(self, dumping):
+        """Read item.
+
+        Args:
+            dumping (bool): `True` for dumping.
+
+        Returns:
+            :class:`mysqlx.DbDoc`: A `DbDoc` object.
+        """
         row = super(DocResult, self)._read_item(dumping)
         if row is None:
             return None

@@ -276,10 +276,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
             if os.path.exists(sys_file):
                 os.remove(sys_file)
 
-        # SocketSteam.is_socket
+        # SocketSteam.is_socket()
         session = mysqlx.get_session(user=user, password=password,
                                      host=host, port=port)
-        self.assertFalse(session._connection.stream.is_socket)
+        self.assertFalse(session._connection.stream.is_socket())
 
     def test_auth(self):
         sess = mysqlx.get_session(self.connect_kwargs)

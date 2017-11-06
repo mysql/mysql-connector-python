@@ -37,17 +37,19 @@ class SessionConfig(object):
     def __init__(self, manager, name, data=None):
         if not (name.isalnum() and 0 < len(name) < 31):
             raise InterfaceError("Invalid session name '{0}'".format(name))
-
         self._name = name
         self._manager = manager
         self._uri = None
         self._connection_data = {}
         self._appdata = {}
+        self.user = None
+        self.password = None
+        self.host = None
         self.set_connection_data(data)
 
     @property
     def name(self):
-        """string: Name of the session.
+        """str: Name of the session.
         """
         return self._name
 
@@ -57,8 +59,9 @@ class SessionConfig(object):
         automatically removed.
 
         Args:
-            data (object): Can be a string or a dict containing the information
-            to connect and application specific data which is optional.
+            data (object): Can be a string or a dict containing the
+                           information to connect and application specific
+                           data which is optional.
         """
         if isinstance(data, STRING_TYPES):
             self.set_uri(data)
@@ -85,15 +88,14 @@ class SessionConfig(object):
                     self.host = ",".join(hosts)
 
     def save(self):
-        """Persists the session information on the disk.
-        """
+        """Persists the session information on the disk."""
         self._manager.save(self)
 
     def get_name(self):
         """Returns the name of the session provided by the user.
 
         Returns:
-            string: The name of the session.
+            str: The name of the session.
         """
         return self._name
 
@@ -101,7 +103,7 @@ class SessionConfig(object):
         """Sets the name for the session.
 
         Args:
-            name (string): Name of the session.
+            name (str): Name of the session.
         """
         self._name = name
 
@@ -110,23 +112,23 @@ class SessionConfig(object):
         the URI string.
 
         Args:
-            uri (string): A URI.
+            uri (str): A URI.
         """
         if uri is None:
             return
 
         start = uri.find("://")
-        start = 0 if start is -1 else start + 3
+        start = 0 if start == -1 else start + 3
         end = uri.find("@")
         self.user, self.password = uri[start:end].split(":", 1)
         uri = "".join([uri[:start + uri[start:].find(":") + 1], uri[end:]])
         start = uri.find("@") + 1
         end = uri.rfind("/")
-        if uri[end:].find(")") is -1 and end > 0:
+        if uri[end:].find(")") == -1 and end > 0:
             self.host = uri[start:end]
         else:
             end = uri.find("?")
-            self.host = uri[start:] if end is -1 else uri[start:end]
+            self.host = uri[start:] if end == -1 else uri[start:end]
         self._uri = uri
 
     def get_uri(self):
@@ -144,7 +146,7 @@ class SessionConfig(object):
             *args: A key and a value.
             **kwargs: Set multiple application data values at once.
         """
-        if args and len(args) is 2:
+        if args and len(args) == 2:
             self._appdata[args[0]] = args[1]
         elif kwargs:
             self._appdata.update(kwargs)
@@ -153,7 +155,7 @@ class SessionConfig(object):
         """Returns application data associated with a specific key.
 
         Args:
-            key (string): Key associated with application data.
+            key (str): Key associated with application data.
         """
         return self._appdata[key]
 
@@ -161,7 +163,7 @@ class SessionConfig(object):
         """Deletes application data associated with a specific key.
 
         Args:
-            key (string): Key associated with application data.
+            key (str): Key associated with application data.
         """
         del self._appdata[key]
 
@@ -192,9 +194,15 @@ class SessionConfigManager(object):
         self.persistence_handler = None
         self.password_handler = None
 
-    def _save_config(self, config, json=None):
-        if json:
-            config = SessionConfig(self, config, json)
+    def _save_config(self, config, json_data=None):
+        """Save the configuration.
+
+        Args:
+            config (:class: `mysqlx.SessionConfig`): Session Configuration.
+            json_data (Optional[dict]): JSON data.
+        """
+        if json_data:
+            config = SessionConfig(self, config, json_data)
         self.persistence_handler.save(config.name, config.to_dict())
         if self.password_handler:
             self.password_handler.save(config.user, config.host,
@@ -202,6 +210,13 @@ class SessionConfigManager(object):
         return config
 
     def _load_config(self, name, config=None):
+        """Load the configuration.
+
+        Args:
+            name (str): Configuration name.
+            config (Optional[:class:`mysqlx.SessionConfig`]): SessionConfig
+                                                              object.
+        """
         if config:
             config = SessionConfig(self, name, config)
         else:
@@ -217,12 +232,17 @@ class SessionConfigManager(object):
 
         Args:
             config (object): Can be a :class`mysqlx.SessionConfig` or
-            a string (name of the session).
-            settings (object): Can be a string (URI) or dict (connection
-            settings).
+                             a string (name of the session).
+            settings (Optional[object]): Can be a string (URI) or dict
+                                         (connection settings).
+            appdata (Optional[dict]): App data dictionary.
+
+        Raises:
+            :class:`mysqlx.OperationalError`: If persistence handler is not
+                                              defined.
 
         Returns:
-            mysqlx.SessionConfig: SessionConfig object.
+            :class:`mysqlx.SessionConfig`: SessionConfig object.
         """
         if not self.persistence_handler:
             raise OperationalError("Persistence Handler not defined.")
@@ -241,10 +261,13 @@ class SessionConfigManager(object):
         """Retrieves a SessionConfig by name.
 
         Args:
-            session_name (string): Name of the session.
+            session_name (str): Name of the session.
 
+        Raises:
+            :class:`mysqlx.OperationalError`: If persistence handler is not
+                                              defined.
         Returns:
-            mysqlx.SessionConfig: SessionConfig object.
+            :class:`mysqlx.SessionConfig`: SessionConfig object.
         """
         if not self.persistence_handler:
             raise OperationalError("Persistence Handler not defined.")
@@ -255,10 +278,13 @@ class SessionConfigManager(object):
         """Deletes a SessionConfig by name.
 
         Args:
-            session_name (string): Name of the session.
+            session_name (str): Name of the session.
 
+        Raises:
+            :class:`mysqlx.OperationalError`: If persistence handler is not
+                                              defined.
         Returns:
-            mysqlx.SessionConfig: SessionConfig object.
+            :class:`mysqlx.SessionConfig`: SessionConfig object.
         """
         if not self.persistence_handler:
             raise OperationalError("Persistence Handler not defined.")
@@ -268,6 +294,10 @@ class SessionConfigManager(object):
 
     def list(self):
         """A list of all Session configuration stored on the system.
+
+        Raises:
+            :class:`mysqlx.OperationalError`: If persistence handler is not
+                                              defined.
 
         Returns:
             `list`: List of :class`mysqlx.SessionConfig` objects.
@@ -282,7 +312,7 @@ class SessionConfigManager(object):
         """Sets the Persistence Handler to persist the session data.
 
         Args:
-            handler (mysqlx.PersistenceHandler): Required to store
+            handler (:class:`mysqlx.PersistenceHandler`): Required to store \
             and load configuration details from the disk in JSON format.
         """
         self.persistence_handler = handler
@@ -291,8 +321,8 @@ class SessionConfigManager(object):
         """Sets the Password Handler to store passwords for the session data.
 
         Args:
-            handler (mysqlx.PasswordHandler): Required to securely store
-            and load the password for a session.
+            handler (:class:`mysqlx.PasswordHandler`): Required to securely \
+            store and load the password for a session.
         """
         self.password_handler = handler
 
@@ -337,12 +367,17 @@ class PersistenceHandler(object):
         data.
 
         Returns:
-            `list`: List of tuples of session name and session
-            configuration data.
+            `list`: List of tuples of session name and session configuration
+                    data.
         """
         return self._configs.items()
 
     def _load_default_paths(self):
+        """Load the default paths.
+
+        Raises:
+            :class:`mysqlx.OperationalError`: If unable to load configuration.
+        """
         if sys.platform.startswith("win"):
             self._usr_file = os.path.join(
                 os.getenv("APPDATA"), "MySQLsessions.json")
@@ -362,7 +397,7 @@ class PersistenceHandler(object):
         """Persists the session configuration data onto the disk.
 
         Args:
-            name (string): Session name.
+            name (str): Session name.
             config (dict): Session data.
         """
         self._configs[name] = config
@@ -372,7 +407,7 @@ class PersistenceHandler(object):
         """Loads session data given a name.
 
         Args:
-            name (string): Session name.
+            name (str): Session name.
         """
         return self._configs[name]
 
@@ -380,7 +415,7 @@ class PersistenceHandler(object):
         """Deletes session data given a name.
 
         Args:
-            name (string): Session name.
+            name (str): Session name.
         """
         try:
             del self._configs[name]
@@ -400,20 +435,30 @@ class PersistenceHandler(object):
         """Checks for the existence of a session.
 
         Args:
-            name (string): Session name.
+            name (str): Session name.
 
         Returns:
-            boolean: If the Session exists or not.
+            bool: If the Session exists or not.
         """
         return name in self._configs
 
     def _read_config(self, file_path):
+        """Read configuration.
+
+        Args:
+            file_path (str): The file path.
+        """
         if not os.path.exists(file_path) or os.path.getsize(file_path) is 0:
             return
         with open(file_path, "r") as config_file:
             self._configs.update(json.load(config_file))
 
     def _write_config(self, file_path):
+        """Write configuration.
+
+        Args:
+            file_path (str): The file path.
+        """
         path = os.path.split(file_path)[0]
         if not os.path.exists(path):
             os.makedirs(path)
@@ -422,13 +467,14 @@ class PersistenceHandler(object):
 
 
 class PasswordHandler(object):
+    """Password Handler."""
     def save(self, key, service, password):
         """Securely stores the password for a session.
 
         Args:
-            key (string): Username.
-            service (string): Hostname.
-            password (string): Password.
+            key (str): Username.
+            service (str): Hostname.
+            password (str): Password.
         """
         raise NotImplementedError
 
@@ -436,7 +482,7 @@ class PasswordHandler(object):
         """Loads the password for a session.
 
         Args:
-            key (string): Username.
-            service (string): Hostname.
+            key (str): Username.
+            service (str): Hostname.
         """
         raise NotImplementedError

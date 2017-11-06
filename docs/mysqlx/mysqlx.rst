@@ -91,4 +91,3 @@ Errors
    mysqlx.OperationalError
    mysqlx.PoolError
    mysqlx.ProgrammingError
-   mysqlx.Warning

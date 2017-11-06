@@ -40,13 +40,15 @@ class DbDoc(object):
         ValueError: If ``value`` type is not a basestring or dict.
     """
     def __init__(self, value):
-        # TODO: Handle exceptions. What happens if it doesn't load properly?
         if isinstance(value, dict):
             self.__dict__ = value
         elif isinstance(value, STRING_TYPES):
             self.__dict__ = json.loads(value)
         else:
             raise ValueError("Unable to handle type: {0}".format(type(value)))
+
+    def __str__(self):
+        return json.dumps(self.__dict__)
 
     def __setitem__(self, index, value):
         if index == "_id":
@@ -57,9 +59,19 @@ class DbDoc(object):
         return self.__dict__[index]
 
     def keys(self):
+        """Returns the keys.
+
+        Returns:
+            list: The keys.
+        """
         return self.__dict__.keys()
 
     def ensure_id(self, doc_id=None):
+        """Ensure ID.
+
+        Args:
+            doc_id (str): Document ID.
+        """
         if doc_id:
             self.__dict__["_id"] = doc_id
         elif "_id" not in self.__dict__:
@@ -67,6 +79,3 @@ class DbDoc(object):
             uuid1.reverse()
             self.__dict__["_id"] = "".join(uuid1)
         return self.__dict__["_id"]
-
-    def __str__(self):
-        return json.dumps(self.__dict__)

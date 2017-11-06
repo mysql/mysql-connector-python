@@ -21,17 +21,16 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .compat import STRING_TYPES, BYTE_TYPES, UNICODE_TYPES, PY3
+"""Expression Parser."""
+
+from .compat import STRING_TYPES, BYTE_TYPES, UNICODE_TYPES
 from .helpers import get_item_or_attr
 from .dbdoc import DbDoc
 from .protobuf import Message, mysqlxpb_enum
 
 
-if PY3:
-    xrange = range
-
-
-class TokenType:
+# pylint: disable=C0103,C0111
+class TokenType(object):
     NOT = 1
     AND = 2
     OR = 3
@@ -120,8 +119,9 @@ class TokenType:
     DAY_MINUTE = 86
     DAY_HOUR = 87
     YEAR_MONTH = 88
+# pylint: enable=C0103
 
-interval_units = set([
+_INTERVAL_UNITS = set([
     TokenType.MICROSECOND,
     TokenType.SECOND,
     TokenType.MINUTE,
@@ -144,7 +144,7 @@ interval_units = set([
     TokenType.YEAR_MONTH])
 
 # map of reserved word to token type
-reservedWords = {
+_RESERVED_WORDS = {
     "and":      TokenType.AND,
     "or":       TokenType.OR,
     "xor":      TokenType.XOR,
@@ -198,8 +198,7 @@ reservedWords = {
     "year_month": TokenType.YEAR_MONTH
 }
 
-
-operators = {
+_OPERATORS = {
     "=": "==",
     "==": "==",
     "and": "&&",
@@ -233,7 +232,7 @@ operators = {
     "cont_in": "cont_in"
 }
 
-unary_operators = {
+_UNARY_OPERATORS = {
     "+": "sign_plus",
     "-": "sign_minus",
     "~": "~",
@@ -241,7 +240,7 @@ unary_operators = {
     "!": "!"
 }
 
-negation = {
+_NEGATION = {
     "is": "is_not",
     "between": "not_between",
     "regexp": "not_regexp",
@@ -251,21 +250,21 @@ negation = {
 }
 
 
-class Token:
-    def __init__(self, type, val, len=1):
-        self.type = type
-        self.val = val
-        self.len = len
+class Token(object):
+    def __init__(self, token_type, value, length=1):
+        self.token_type = token_type
+        self.value = value
+        self.length = length
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self):
-        if self.type == TokenType.IDENT or self.type == TokenType.LNUM or \
-           self.type == TokenType.LSTRING:
-            return str(self.type) + "(" + self.val + ")"
-        else:
-            return str(self.type)
+        if self.token_type == TokenType.IDENT or \
+           self.token_type == TokenType.LNUM or \
+           self.token_type == TokenType.LSTRING:
+            return "{0}({1})".format(self.token_type, self.value)
+        return "{0}".format(self.token_type)
 
 
 # static protobuf helper functions
@@ -283,6 +282,7 @@ def build_expr(value):
         msg["literal"] = build_scalar(value).get_message()
     return msg
 
+
 def build_scalar(value):
     if isinstance(value, STRING_TYPES):
         return build_string_scalar(value)
@@ -298,6 +298,7 @@ def build_scalar(value):
         return build_null_scalar()
     raise ValueError("Unsupported data type: {0}.".format(type(value)))
 
+
 def build_object(obj):
     if isinstance(obj, DbDoc):
         return build_object(obj.__dict__)
@@ -310,10 +311,12 @@ def build_object(obj):
         msg["fld"].extend([pair.get_message()])
     return msg
 
+
 def build_array(array):
     msg = Message("Mysqlx.Expr.Array")
     msg["value"].extend([build_expr(value).get_message() for value in array])
     return msg
+
 
 def build_null_scalar():
     msg = Message("Mysqlx.Datatypes.Scalar")
@@ -321,51 +324,53 @@ def build_null_scalar():
     return msg
 
 
-def build_double_scalar(d):
+def build_double_scalar(value):
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_DOUBLE")
-    msg["v_double"] = d
+    msg["v_double"] = value
     return msg
 
 
-def build_int_scalar(i):
+def build_int_scalar(value):
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_SINT")
-    msg["v_signed_int"] = i
+    msg["v_signed_int"] = value
     return msg
 
 
-def build_string_scalar(s):
-    if isinstance(s, STRING_TYPES):
-        s = bytes(bytearray(s, "utf-8"))
+def build_string_scalar(value):
+    if isinstance(value, STRING_TYPES):
+        value = bytes(bytearray(value, "utf-8"))
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_STRING")
-    msg["v_string"] = Message("Mysqlx.Datatypes.Scalar.String", value=s)
+    msg["v_string"] = Message("Mysqlx.Datatypes.Scalar.String", value=value)
     return msg
 
 
-def build_bool_scalar(b):
+def build_bool_scalar(value):
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_BOOL")
-    msg["v_bool"] = b
+    msg["v_bool"] = value
     return msg
 
-def build_bytes_scalar(b):
+
+def build_bytes_scalar(value):
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_OCTETS")
-    msg["v_octets"] = Message("Mysqlx.Datatypes.Scalar.Octets", value=b)
+    msg["v_octets"] = Message("Mysqlx.Datatypes.Scalar.Octets", value=value)
     return msg
 
-def build_literal_expr(anyval):
+
+def build_literal_expr(value):
     msg = Message("Mysqlx.Expr.Expr")
     msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.LITERAL")
-    msg["literal"] = anyval
+    msg["literal"] = value
     return msg
 
 
 def build_unary_op(name, param):
     operator = Message("Mysqlx.Expr.Operator")
-    operator["name"] = unary_operators[name]
+    operator["name"] = _UNARY_OPERATORS[name]
     operator["param"] = [param.get_message()]
     msg = Message("Mysqlx.Expr.Expr")
     msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
@@ -377,19 +382,19 @@ def escape_literal(string):
     return string.replace('"', '""')
 
 
-class ExprParser:
-    def __init__(self, string, allowRelational):
+class ExprParser(object):
+    def __init__(self, string, allow_relational):
         self.string = string
         self.tokens = []
         self.pos = 0
-        self._allowRelationalColumns = allowRelational
+        self._allow_relational_columns = allow_relational
         self.placeholder_name_to_position = {}
         self.positional_placeholder_count = 0
         self.lex()
 
     # convencience checker for lexer
-    def next_char_is(self, i, c):
-        return i + 1 < len(self.string) and self.string[i + 1] == c
+    def next_char_is(self, key, char):
+        return key + 1 < len(self.string) and self.string[key + 1] == char
 
     def lex_number(self, pos):
         # numeric literal
@@ -403,128 +408,126 @@ class ExprParser:
                 found_dot = True
             # technically we allow more than one "." and let float()'s parsing
             # complain later
-            pos = pos + 1
+            pos += 1
         val = self.string[start:pos]
-        t = Token(TokenType.LNUM, val, len(val))
-        return t
+        return Token(TokenType.LNUM, val, len(val))
 
     def lex_alpha(self, i, allow_space=False):
         start = i
         while i < len(self.string) and \
-             (self.string[i].isalnum() or self.string[i] == "_" or
-             (self.string[i].isspace() and allow_space)):
-            i = i + 1
+              (self.string[i].isalnum() or self.string[i] == "_" or
+               (self.string[i].isspace() and allow_space)):
+            i += 1
 
         val = self.string[start:i]
         try:
-            token = Token(reservedWords[val.lower()], val.lower(), len(val))
+            token = Token(_RESERVED_WORDS[val.lower()], val.lower(), len(val))
         except KeyError:
             token = Token(TokenType.IDENT, val, len(val))
         return token
 
-    def lex_quoted_token(self, i):
-        quote_char = self.string[i]
+    def lex_quoted_token(self, key):
+        quote_char = self.string[key]
         val = ""
-        i += 1
-        start = i
-        while i < len(self.string):
-            c = self.string[i]
-            if c == quote_char and i + 1 < len(self.string) and \
-               self.string[i + 1] != quote_char:
+        key += 1
+        start = key
+        while key < len(self.string):
+            char = self.string[key]
+            if char == quote_char and key + 1 < len(self.string) and \
+               self.string[key + 1] != quote_char:
                 # break if we have a quote char that's not double
                 break
-            elif c == quote_char or c == "\\":
+            elif char == quote_char or char == "\\":
                 # this quote char has to be doubled
-                if i + 1 >= len(self.string):
+                if key + 1 >= len(self.string):
                     break
-                i += 1
-                val += self.string[i]
+                key += 1
+                val += self.string[key]
             else:
-                val += c
-            i += 1
-        if i >= len(self.string) or self.string[i] != quote_char:
+                val += char
+            key += 1
+        if key >= len(self.string) or self.string[key] != quote_char:
             raise ValueError("Unterminated quoted string starting at {0}"
                              "".format(start))
         if quote_char == "`":
             return Token(TokenType.IDENT, val, len(val) + 2)
-        else:
-            return Token(TokenType.LSTRING, val, len(val) + 2)
+        return Token(TokenType.LSTRING, val, len(val) + 2)
 
     def lex(self):
         i = 0
         arrow_last = False
         inside_arrow = False
         while i < len(self.string):
-            c = self.string[i]
-            if c.isspace():
+            char = self.string[i]
+            if char.isspace():
                 i += 1
                 continue
-            elif c.isdigit():
+            elif char.isdigit():
                 token = self.lex_number(i)
-            elif c.isalpha() or c == "_":
+            elif char.isalpha() or char == "_":
                 token = self.lex_alpha(i, inside_arrow)
-            elif c == "?":
-                token = Token(TokenType.EROTEME, c)
-            elif c == ":":
-                token = Token(TokenType.COLON, c)
-            elif c == "{":
-                token = Token(TokenType.LCURLY, c)
-            elif c == "}":
-                token = Token(TokenType.RCURLY, c)
-            elif c == "+":
-                token = Token(TokenType.PLUS, c)
-            elif c == "-":
+            elif char == "?":
+                token = Token(TokenType.EROTEME, char)
+            elif char == ":":
+                token = Token(TokenType.COLON, char)
+            elif char == "{":
+                token = Token(TokenType.LCURLY, char)
+            elif char == "}":
+                token = Token(TokenType.RCURLY, char)
+            elif char == "+":
+                token = Token(TokenType.PLUS, char)
+            elif char == "-":
                 if self.next_char_is(i, ">") and not arrow_last:
                     token = Token(TokenType.ARROW, "->", 2)
                     arrow_last = True
                 else:
-                    token = Token(TokenType.MINUS, c)
-            elif c == "*":
+                    token = Token(TokenType.MINUS, char)
+            elif char == "*":
                 if self.next_char_is(i, "*"):
                     token = Token(TokenType.DOUBLESTAR, "**", 2)
                 else:
-                    token = Token(TokenType.MUL, c)
-            elif c == "/":
-                token = Token(TokenType.DIV, c)
-            elif c == "$":
-                token = Token(TokenType.DOLLAR, c)
-            elif c == "%":
-                token = Token(TokenType.MOD, c)
-            elif c == "=":
+                    token = Token(TokenType.MUL, char)
+            elif char == "/":
+                token = Token(TokenType.DIV, char)
+            elif char == "$":
+                token = Token(TokenType.DOLLAR, char)
+            elif char == "%":
+                token = Token(TokenType.MOD, char)
+            elif char == "=":
                 if self.next_char_is(i, "="):
                     token = Token(TokenType.EQ, "==", 2)
                 else:
                     token = Token(TokenType.EQ, "==", 1)
-            elif c == "&":
+            elif char == "&":
                 if self.next_char_is(i, "&"):
-                    token = Token(TokenType.ANDAND, c, 2)
+                    token = Token(TokenType.ANDAND, char, 2)
                 else:
-                    token = Token(TokenType.BITAND, c)
-            elif c == "^":
-                token = Token(TokenType.BITXOR, c)
-            elif c == "|":
+                    token = Token(TokenType.BITAND, char)
+            elif char == "^":
+                token = Token(TokenType.BITXOR, char)
+            elif char == "|":
                 if self.next_char_is(i, "|"):
                     token = Token(TokenType.OROR, "||", 2)
                 else:
-                    token = Token(TokenType.BITOR, c)
-            elif c == "(":
-                token = Token(TokenType.LPAREN, c)
-            elif c == ")":
-                token = Token(TokenType.RPAREN, c)
-            elif c == "[":
-                token = Token(TokenType.LSQBRACKET, c)
-            elif c == "]":
-                token = Token(TokenType.RSQBRACKET, c)
-            elif c == "~":
-                token = Token(TokenType.NEG, c)
-            elif c == ",":
-                token = Token(TokenType.COMMA, c)
-            elif c == "!":
+                    token = Token(TokenType.BITOR, char)
+            elif char == "(":
+                token = Token(TokenType.LPAREN, char)
+            elif char == ")":
+                token = Token(TokenType.RPAREN, char)
+            elif char == "[":
+                token = Token(TokenType.LSQBRACKET, char)
+            elif char == "]":
+                token = Token(TokenType.RSQBRACKET, char)
+            elif char == "~":
+                token = Token(TokenType.NEG, char)
+            elif char == ",":
+                token = Token(TokenType.COMMA, char)
+            elif char == "!":
                 if self.next_char_is(i, "="):
                     token = Token(TokenType.NE, "!=", 2)
                 else:
-                    token = Token(TokenType.BANG, c)
-            elif c == "<":
+                    token = Token(TokenType.BANG, char)
+            elif char == "<":
                 if self.next_char_is(i, ">"):
                     token = Token(TokenType.NE, "<>", 2)
                 elif self.next_char_is(i, "<"):
@@ -532,66 +535,67 @@ class ExprParser:
                 elif self.next_char_is(i, "="):
                     token = Token(TokenType.LE, "<=", 2)
                 else:
-                    token = Token(TokenType.LT, c)
-            elif c == ">":
+                    token = Token(TokenType.LT, char)
+            elif char == ">":
                 if self.next_char_is(i, ">"):
                     token = Token(TokenType.RSHIFT, ">>", 2)
                 elif self.next_char_is(i, "="):
                     token = Token(TokenType.GE, ">=", 2)
                 else:
-                    token = Token(TokenType.GT, c)
-            elif c == ".":
+                    token = Token(TokenType.GT, char)
+            elif char == ".":
                 if self.next_char_is(i, "*"):
                     token = Token(TokenType.DOTSTAR, ".*", 2)
                 elif i + 1 < len(self.string) and self.string[i + 1].isdigit():
                     token = self.lex_number(i)
                 else:
-                    token = Token(TokenType.DOT, c)
-            elif (c == "'" or c == '"') and arrow_last:
-                token = Token(TokenType.QUOTE, c)
+                    token = Token(TokenType.DOT, char)
+            elif (char == "'" or char == '"') and arrow_last:
+                token = Token(TokenType.QUOTE, char)
                 if not inside_arrow:
                     inside_arrow = True
                 else:
                     arrow_last = False
                     inside_arrow = False
-            elif c == '"' or c == "'" or c == "`":
+            elif char == '"' or char == "'" or char == "`":
                 token = self.lex_quoted_token(i)
             else:
                 raise ValueError("Unknown character at {0}".format(i))
             self.tokens.append(token)
-            i += token.len
+            i += token.length
 
-    def assert_cur_token(self, type):
+    def assert_cur_token(self, token_type):
         if self.pos >= len(self.tokens):
             raise ValueError("Expected token type {0} at pos {1} but no "
-                             "tokens left".format(type, self.pos))
-        if self.tokens[self.pos].type != type:
+                             "tokens left".format(token_type, self.pos))
+        if self.tokens[self.pos].token_type != token_type:
             raise ValueError("Expected token type {0} at pos {1} but found "
-                             "type {2}".format(type, self.pos,
+                             "type {2}".format(token_type, self.pos,
                                                self.tokens[self.pos]))
 
-    def cur_token_type_is(self, type):
-        return self.pos_token_type_is(self.pos, type)
+    def cur_token_type_is(self, token_type):
+        return self.pos_token_type_is(self.pos, token_type)
 
     def cur_token_type_in(self, *types):
         return self.pos < len(self.tokens) and \
-               self.tokens[self.pos].type in types
+               self.tokens[self.pos].token_type in types
 
-    def next_token_type_is(self, type):
-        return self.pos_token_type_is(self.pos + 1, type)
+    def next_token_type_is(self, token_type):
+        return self.pos_token_type_is(self.pos + 1, token_type)
 
     def next_token_type_in(self, *types):
         return self.pos < len(self.tokens) and \
-               self.tokens[self.pos + 1].type in types
+               self.tokens[self.pos + 1].token_type in types
 
-    def pos_token_type_is(self, pos, type):
-        return pos < len(self.tokens) and self.tokens[pos].type == type
+    def pos_token_type_is(self, pos, token_type):
+        return pos < len(self.tokens) and \
+            self.tokens[pos].token_type == token_type
 
-    def consume_token(self, type):
-        self.assert_cur_token(type)
-        v = self.tokens[self.pos].val
-        self.pos = self.pos + 1
-        return v
+    def consume_token(self, token_type):
+        self.assert_cur_token(token_type)
+        value = self.tokens[self.pos].value
+        self.pos += 1
+        return value
 
     def paren_expr_list(self):
         """Parse a paren-bounded expression list for function arguments or IN
@@ -602,7 +606,7 @@ class ExprParser:
         if not self.cur_token_type_is(TokenType.RPAREN):
             exprs.append(self.expr().get_message())
             while self.cur_token_type_is(TokenType.COMMA):
-                self.pos = self.pos + 1
+                self.pos += 1
                 exprs.append(self.expr().get_message())
         self.consume_token(TokenType.RPAREN)
         return exprs
@@ -613,7 +617,7 @@ class ExprParser:
         if self.next_token_type_is(TokenType.DOT):
             ident["schema_name"] = self.consume_token(TokenType.IDENT)
             self.consume_token(TokenType.DOT)
-        ident["name"] = self.tokens[self.pos].val
+        ident["name"] = self.tokens[self.pos].value
         self.pos += 1
         return ident
 
@@ -630,15 +634,15 @@ class ExprParser:
         self.consume_token(TokenType.DOT)
         token = self.tokens[self.pos]
 
-        if token.type == TokenType.IDENT:
-            if token.val.startswith('`') and token.val.endswith('`'):
+        if token.token_type == TokenType.IDENT:
+            if token.value.startswith('`') and token.value.endswith('`'):
                 raise ValueError("{0} is not a valid JSON/ECMAScript "
                                  "identifier".format(token.value))
             self.consume_token(TokenType.IDENT)
-            member_name = token.val
-        elif token.type == TokenType.LSTRING:
+            member_name = token.value
+        elif token.token_type == TokenType.LSTRING:
             self.consume_token(TokenType.LSTRING)
-            member_name = token.val
+            member_name = token.value
         else:
             raise ValueError("Expected token type IDENT or LSTRING in JSON "
                              "path at token pos {0}".format(self.pos))
@@ -658,15 +662,15 @@ class ExprParser:
                 "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX_ASTERISK")
             return doc_path_item
         elif self.cur_token_type_is(TokenType.LNUM):
-            v = int(self.consume_token(TokenType.LNUM))
-            if v < 0:
+            value = int(self.consume_token(TokenType.LNUM))
+            if value < 0:
                 raise IndexError("Array index cannot be negative at {0}"
                                  "".format(self.pos))
             self.consume_token(TokenType.RSQBRACKET)
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
                 "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX")
-            doc_path_item["index"] = v
+            doc_path_item["index"] = value
             return doc_path_item
         else:
             raise ValueError("Exception token type MUL or LNUM in JSON "
@@ -731,7 +735,7 @@ class ExprParser:
         parts.reverse()
         col_id = Message("Mysqlx.Expr.ColumnIdentifier")
         # clever way to apply them to the struct
-        for i in xrange(0, len(parts)):
+        for i in range(0, len(parts)):
             if i == 0:
                 col_id["name"] = parts[0]
             elif i == 1:
@@ -769,22 +773,22 @@ class ExprParser:
         return msg_expr
 
     def next_token(self):
-        if (self.pos >= len(self.tokens)):
+        if self.pos >= len(self.tokens):
             raise ValueError("Unexpected end of token stream")
-        t = self.tokens[self.pos]
+        token = self.tokens[self.pos]
         self.pos += 1
-        return t
+        return token
 
     def expect_token(self, token_type):
-        t = self.next_token()
-        if t.type != token_type:
+        token = self.next_token()
+        if token.token_type != token_type:
             raise ValueError("Expected token type {0}".format(token_type))
 
     def peek_token(self):
         return self.tokens[self.pos]
 
     def consume_any_token(self):
-        value = self.tokens[self.pos].val
+        value = self.tokens[self.pos].value
         self.pos += 1
         return value
 
@@ -832,10 +836,10 @@ class ExprParser:
     def parse_place_holder(self, token):
         place_holder_name = ""
         if self.cur_token_type_is(TokenType.LNUM):
-            place_holder_name = self.consume_token(TokenType.LNUM_INT)
+            place_holder_name = self.consume_token(TokenType.LNUM)
         elif self.cur_token_type_is(TokenType.IDENT):
             place_holder_name = self.consume_token(TokenType.IDENT)
-        elif token.type == TokenType.EROTEME:
+        elif token.token_type == TokenType.EROTEME:
             place_holder_name = str(self.positional_placeholder_count)
         else:
             raise ValueError("Invalid placeholder name at token pos {0}"
@@ -882,24 +886,25 @@ class ExprParser:
                                JSON
         """
         token = self.next_token()
-        if token.type in (TokenType.BINARY, TokenType.CHAR, TokenType.DATETIME,
-                          TokenType.TIME,):
+        if token.token_type in (TokenType.BINARY, TokenType.CHAR,
+                                TokenType.DATETIME, TokenType.TIME,):
             dimension = self.cast_data_type_dimension()
-            return "{0}{1}".format(token.val, dimension) \
-                    if dimension else token.val
-        elif token.type is TokenType.DECIMAL:
+            return "{0}{1}".format(token.value, dimension) \
+                    if dimension else token.value
+        elif token.token_type is TokenType.DECIMAL:
             dimension = self.cast_data_type_dimension(True)
-            return "{0}{1}".format(token.val, dimension) \
-                    if dimension else token.val
-        elif token.type in (TokenType.SIGNED, TokenType.UNSIGNED,):
+            return "{0}{1}".format(token.value, dimension) \
+                    if dimension else token.value
+        elif token.token_type in (TokenType.SIGNED, TokenType.UNSIGNED,):
             if self.cur_token_type_is(TokenType.INTEGER):
                 self.consume_token(TokenType.INTEGER)
-            return token.val
-        elif token.type in (TokenType.INTEGER, TokenType.JSON, TokenType.DATE,):
-            return token.val
+            return token.value
+        elif token.token_type in (TokenType.INTEGER, TokenType.JSON,
+                                  TokenType.DATE,):
+            return token.value
 
         raise ValueError("Unknown token type {0} at position {1} ({2})"
-                         "".format(token.type, self.pos, token.val))
+                         "".format(token.token_type, self.pos, token.value))
 
     def cast_data_type_dimension(self, decimal=False):
         """ dimension ::= LPAREN LNUM (, LNUM)? RPAREN
@@ -918,7 +923,7 @@ class ExprParser:
         return "({0})".format(dimension[0]) if len(dimension) is 1 else \
                "({0},{1})".format(*dimension)
 
-    def starOperator(self):
+    def star_operator(self):
         msg = Message("Mysqlx.Expr.Expr")
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
         msg["operator"] = Message("Mysqlx.Expr.Operator", name="*")
@@ -928,84 +933,68 @@ class ExprParser:
         """Parse an atomic expression and return a protobuf Expr object"""
         token = self.next_token()
 
-        if token.type in [TokenType.EROTEME, TokenType.COLON]:
+        if token.token_type in [TokenType.EROTEME, TokenType.COLON]:
             return self.parse_place_holder(token)
-        elif token.type == TokenType.LCURLY:
+        elif token.token_type == TokenType.LCURLY:
             return self.parse_json_doc()
-        elif token.type == TokenType.LSQBRACKET:
+        elif token.token_type == TokenType.LSQBRACKET:
             return self.parse_json_array()
-        elif token.type == TokenType.CAST:
+        elif token.token_type == TokenType.CAST:
             return self.cast()
-        elif token.type == TokenType.LPAREN:
-            e = self.expr()
+        elif token.token_type == TokenType.LPAREN:
+            expr = self.expr()
             self.expect_token(TokenType.RPAREN)
-            return e
-        elif token.type in [TokenType.PLUS, TokenType.MINUS]:
+            return expr
+        elif token.token_type in [TokenType.PLUS, TokenType.MINUS]:
             peek = self.peek_token()
-            if peek.type == TokenType.LNUM:
-                self.tokens[self.pos].val = token.val + peek.val
+            if peek.token_type == TokenType.LNUM:
+                self.tokens[self.pos].value = token.value + peek.value
                 return self.atomic_expr()
-            return build_unary_op(token.val, self.atomic_expr())
-        elif token.type in [TokenType.NOT, TokenType.NEG, TokenType.BANG]:
-            return build_unary_op(token.val, self.atomic_expr())
-        elif token.type == TokenType.LSTRING:
-            return build_literal_expr(build_string_scalar(token.val))
-        elif token.type == TokenType.NULL:
+            return build_unary_op(token.value, self.atomic_expr())
+        elif token.token_type in [TokenType.NOT, TokenType.NEG, TokenType.BANG]:
+            return build_unary_op(token.value, self.atomic_expr())
+        elif token.token_type == TokenType.LSTRING:
+            return build_literal_expr(build_string_scalar(token.value))
+        elif token.token_type == TokenType.NULL:
             return build_literal_expr(build_null_scalar())
-        elif token.type == TokenType.LNUM:
-            if "." in token.val:
+        elif token.token_type == TokenType.LNUM:
+            if "." in token.value:
                 return build_literal_expr(
-                    build_double_scalar(float(token.val)))
-            else:
-                return build_literal_expr(build_int_scalar(int(token.val)))
-        elif token.type in [TokenType.TRUE, TokenType.FALSE]:
+                    build_double_scalar(float(token.value)))
+            return build_literal_expr(build_int_scalar(int(token.value)))
+        elif token.token_type in [TokenType.TRUE, TokenType.FALSE]:
             return build_literal_expr(
-                build_bool_scalar(token.type == TokenType.TRUE))
-        elif token.type == TokenType.DOLLAR:
+                build_bool_scalar(token.token_type == TokenType.TRUE))
+        elif token.token_type == TokenType.DOLLAR:
             return self.document_field()
-        elif token.type == TokenType.MUL:
-            return self.starOperator()
-        elif token.type == TokenType.IDENT:
+        elif token.token_type == TokenType.MUL:
+            return self.star_operator()
+        elif token.token_type == TokenType.IDENT:
             self.pos = self.pos - 1  # stay on the identifier
             if self.next_token_type_is(TokenType.LPAREN) or \
                (self.next_token_type_is(TokenType.DOT) and
-               self.pos_token_type_is(self.pos + 2, TokenType.IDENT) and
-               self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)):
+                self.pos_token_type_is(self.pos + 2, TokenType.IDENT) and
+                self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)):
                 # Function call
                 return self.function_call()
-            else:
-                return (self.document_field()
-                        if not self._allowRelationalColumns
-                        else self.column_identifier())
+            return (self.document_field()
+                    if not self._allow_relational_columns
+                    else self.column_identifier())
 
-#        if t.type == TokenType.EROTEME:
-#            return build_literal_expr(build_string_scalar("?"))
-#        elif t.type == TokenType.INTERVAL:
-#            e = Expr()
-#            e.type = Expr.OPERATOR
-#            e.operator.name = "INTERVAL"
-#            e.operator.param.add().CopyFrom(self.expr())
-#            # validate the interval units
-#            if self.pos < len(self.tokens) and self.tokens[self.pos].type in interval_units:
-#                pass
-#            else:
-#                raise StandardError("Expected interval units at " + str(self.pos))
-#            e.operator.param.add().CopyFrom(build_literal_expr(build_string_scalar(self.tokens[self.pos].val)))
-#            self.pos = self.pos + 1
-#            return e
         raise ValueError("Unknown token type = {0}  when expecting atomic "
-                         "expression at {1}".format(token.type, self.pos))
+                         "expression at {1}"
+                         "".format(token.token_type, self.pos))
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
         """Given a `set' of types and an Expr-returning inner parser function,
         parse a left associate binary operator expression"""
         lhs = inner_parser()
         while (self.pos < len(self.tokens) and
-               self.tokens[self.pos].type in types):
+               self.tokens[self.pos].token_type in types):
             msg = Message("Mysqlx.Expr.Expr")
             msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
             operator = Message("Mysqlx.Expr.Operator")
-            operator["name"] = operators[self.tokens[self.pos].val]
+            operator["name"] = _OPERATORS[self.tokens[self.pos].value]
             operator["param"] = [lhs.get_message()]
             self.pos += 1
             operator["param"].extend([inner_parser().get_message()])
@@ -1020,23 +1009,23 @@ class ExprParser:
            self.next_token_type_is(TokenType.INTERVAL):
             token = self.next_token()
 
-            op = Message("Mysqlx.Expr.Operator")
-            op["param"].extend([lhs.get_message()])
-            op["name"] = "date_add" if token.type is TokenType.PLUS \
-                                    else "date_sub"
+            operator = Message("Mysqlx.Expr.Operator")
+            operator["param"].extend([lhs.get_message()])
+            operator["name"] = "date_add" if token.token_type is TokenType.PLUS \
+                               else "date_sub"
 
             self.consume_token(TokenType.INTERVAL)
-            op["param"].extend([self.bit_expr().get_message()])
+            operator["param"].extend([self.bit_expr().get_message()])
 
-            if not self.cur_token_type_in(*interval_units):
+            if not self.cur_token_type_in(*_INTERVAL_UNITS):
                 raise ValueError("Expected interval type at position {0}"
                                  "".format(self.pos))
 
             token = str.encode(self.consume_any_token().upper())
-            op["param"].extend([build_literal_expr(
+            operator["param"].extend([build_literal_expr(
                 build_bytes_scalar(token)).get_message()])
 
-            lhs = Message("Mysqlx.Expr.Expr", operator=op)
+            lhs = Message("Mysqlx.Expr.Expr", operator=operator)
             lhs["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
 
         return lhs
@@ -1073,7 +1062,7 @@ class ExprParser:
             self.consume_token(TokenType.NOT)
         if self.pos < len(self.tokens):
             params.append(lhs.get_message())
-            op_name = self.tokens[self.pos].val
+            op_name = self.tokens[self.pos].value
             if self.cur_token_type_is(TokenType.IS):
                 self.consume_token(TokenType.IS)
                 # for IS, NOT comes AFTER
@@ -1109,7 +1098,7 @@ class ExprParser:
                 op_name = None  # not an operator we're interested in
             if op_name:
                 operator = Message("Mysqlx.Expr.Operator")
-                operator["name"] = negation[op_name] if is_not else op_name
+                operator["name"] = _NEGATION[op_name] if is_not else op_name
                 operator["param"] = params
                 msg_expr = Message("Mysqlx.Expr.Expr")
                 msg_expr["type"] = mysqlxpb_enum(
@@ -1199,62 +1188,3 @@ class ExprParser:
             first = False
             expr_list.append(self.expr().get_message())
         return expr_list
-
-
-def parseAndPrintExpr(expr_string, allowRelational=True):
-    print(">>>>>>> parsing:  {0}".format(expr_string))
-    p = ExprParser(expr_string, allowRelational)
-    print(p.tokens)
-    e = p.expr()
-    print(e)
-
-
-def x_test():
-    parseAndPrintExpr("name like :name")
-    return
-    parseAndPrintExpr("10+1")
-    parseAndPrintExpr("(abc == 1)")
-    parseAndPrintExpr("(func(abc)=1)")
-    parseAndPrintExpr("(abc = \"jess\")")
-    parseAndPrintExpr("(abc = \"with \\\"\")")
-    parseAndPrintExpr("(abc != .10)")
-    parseAndPrintExpr("(abc != \"xyz\")")
-    parseAndPrintExpr("a + b * c + d")
-    parseAndPrintExpr("(a + b) * c + d")
-    parseAndPrintExpr("(field not in ('a',func('b', 2.0),'c'))")
-    parseAndPrintExpr("jess.age between 30 and death")
-    parseAndPrintExpr("a + b * c + d")
-    parseAndPrintExpr("x > 10 and Y >= -20")
-    parseAndPrintExpr("a is true and b is null and C + 1 > 40 and "
-                      "(time = now() or hungry())")
-    parseAndPrintExpr("a + b + -c > 2")
-    parseAndPrintExpr("now () + b + c > 2")
-    parseAndPrintExpr("now () + @b + c > 2")
-    parseAndPrintExpr("now () - interval +2 day > some_other_time() or "
-                      "something_else IS NOT NULL")
-    parseAndPrintExpr("\"two quotes to one\"\"\"")
-    parseAndPrintExpr("'two quotes to one'''")
-    parseAndPrintExpr("'different quote \"'")
-    parseAndPrintExpr("\"different quote '\"")
-    parseAndPrintExpr("`ident`")
-    parseAndPrintExpr("`ident```")
-    parseAndPrintExpr("`ident\"'`")
-    parseAndPrintExpr("now () - interval -2 day")
-    parseAndPrintExpr("? > x and func(?, ?, ?)")
-    parseAndPrintExpr("a > now() + interval (2 + x) MiNuTe")
-    parseAndPrintExpr("a between 1 and 2")
-    parseAndPrintExpr("a not between 1 and 2")
-    parseAndPrintExpr("a in (1,2,a.b(3),4,5,x)")
-    parseAndPrintExpr("a not in (1,2,3,4,5,@x)")
-    parseAndPrintExpr("a like b escape c")
-    parseAndPrintExpr("a not like b escape c")
-    parseAndPrintExpr("(1 + 3) in (3, 4, 5)")
-    parseAndPrintExpr("`a crazy \"function\"``'name'`(1 + 3) in (3, 4, 5)")
-    parseAndPrintExpr("`a crazy \"function\"``'name'`(1 + 3) in (3, 4, 5)")
-    parseAndPrintExpr("a@.b", False)
-    parseAndPrintExpr("a@.b[0][0].c**.d.\"a weird\\\"key name\"", False)
-    parseAndPrintExpr("a@.*", False)
-    parseAndPrintExpr("a@[0].*", False)
-    parseAndPrintExpr("a@**[0].*", False)
-
-# x_test()

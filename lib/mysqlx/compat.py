@@ -31,10 +31,19 @@ import binascii
 PY3 = sys.version_info[0] == 3
 
 
+# pylint: disable=E0401,E0602,E0611,W0611,
 if PY3:
     from urllib.parse import urlparse, unquote, parse_qsl
 
     def hexlify(data):
+        """Return the hexadecimal representation of the binary data.
+
+        Args:
+            data (str): The binary data.
+
+        Returns:
+            bytes: The hexadecimal representation of data.
+        """
         return binascii.hexlify(data).decode("utf-8")
 
     NUMERIC_TYPES = (int, float, decimal.Decimal,)
@@ -48,6 +57,14 @@ else:
     from urlparse import urlparse, unquote, parse_qsl
 
     def hexlify(data):
+        """Return the hexadecimal representation of the binary data.
+
+        Args:
+            data (str): The binary data.
+
+        Returns:
+            bytes: The hexadecimal representation of data.
+        """
         return data.encode("hex")
 
     NUMERIC_TYPES = (int, float, decimal.Decimal, long,)
