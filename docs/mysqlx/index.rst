@@ -17,9 +17,10 @@ Contents:
 .. toctree::
    :maxdepth: 4
 
-   requirements
-   tutorial
    license
+   requirements
+   installation
+   tutorials
    mysqlx
 
 

@@ -62,7 +62,7 @@ class DbDoc(object):
         """Returns the keys.
 
         Returns:
-            list: The keys.
+            `list`: The keys.
         """
         return self.__dict__.keys()
 
