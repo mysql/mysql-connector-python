@@ -451,71 +451,69 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection = self.schema.create_collection(collection_name)
         result = collection.add({"name": "Fred", "age": 21}).execute()
 
-        pause = threading.Event()
-        locking = threading.Event()
         waiting = threading.Event()
+
+        lock_a = threading.Lock()
+        lock_b = threading.Lock()
 
         errors = []
 
-        def client_a(pause, locking, waiting):
+        def client_a(lock_a, lock_b, waiting):
             sess1 = mysqlx.get_session(self.connect_kwargs)
             schema = sess1.get_schema(self.schema_name)
             collection = schema.get_collection(collection_name)
 
             sess1.start_transaction()
             result = collection.find("name = 'Fred'").lock_shared().execute()
-            locking.set()
+            lock_a.release()
+            lock_b.acquire()
             time.sleep(2)
-            locking.clear()
             if waiting.is_set():
                 errors.append("S-S lock test failure.")
                 sess1.commit()
                 return
             sess1.commit()
 
-            pause.set()
-
             sess1.start_transaction()
             result = collection.find("name = 'Fred'").lock_shared().execute()
-            locking.set()
+            lock_b.release()
+            lock_a.acquire()
             time.sleep(2)
-            locking.clear()
             if not waiting.is_set():
                 errors.append("S-X lock test failure.")
                 sess1.commit()
                 return
             sess1.commit()
 
-        def client_b(pause, locking, waiting):
+        def client_b(lock_a, lock_b, waiting):
             sess1 = mysqlx.get_session(self.connect_kwargs)
             schema = sess1.get_schema(self.schema_name)
             collection = schema.get_collection(collection_name)
 
-            if not locking.wait(2):
-                return
+            lock_a.acquire()
             sess1.start_transaction()
-
             waiting.set()
+            lock_b.release()
             result = collection.find("name = 'Fred'").lock_shared().execute()
             waiting.clear()
 
             sess1.commit()
 
-            if not pause.wait(2):
-                return
-
-            if not locking.wait(2):
-                return
+            lock_b.acquire()
             sess1.start_transaction()
             waiting.set()
+            lock_a.release()
             result = collection.find("name = 'Fred'").lock_exclusive().execute()
             waiting.clear()
             sess1.commit()
 
         client1 = threading.Thread(target=client_a,
-                                   args=(pause, locking, waiting,))
+                                   args=(lock_a, lock_b, waiting,))
         client2 = threading.Thread(target=client_b,
-                                   args=(pause, locking, waiting,))
+                                   args=(lock_a, lock_b, waiting,))
+
+        lock_a.acquire()
+        lock_b.acquire()
 
         client1.start()
         client2.start()
