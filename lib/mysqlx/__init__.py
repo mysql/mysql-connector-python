@@ -42,10 +42,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
-                        CreateCollectionIndexStatement, CreateTableStatement,
-                        CreateViewStatement, AlterViewStatement, ColumnDef,
-                        GeneratedColumnDef, ForeignKeyDef, Expr,
-                        ReadStatement, WriteStatement)
+                        CreateCollectionIndexStatement, Expr, ReadStatement,
+                        WriteStatement)
 
 _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
@@ -296,7 +294,5 @@ __all__ = [
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
     "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
-    "CreateCollectionIndexStatement", "CreateTableStatement",
-    "CreateViewStatement", "AlterViewStatement", "ColumnDef",
-    "GeneratedColumnDef", "ForeignKeyDef", "Expr",
+    "CreateCollectionIndexStatement", "Expr",
 ]

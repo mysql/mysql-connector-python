@@ -53,12 +53,6 @@ Statement
    mysqlx.DeleteStatement
    mysqlx.UpdateStatement
    mysqlx.CreateCollectionIndexStatement
-   mysqlx.CreateTableStatement
-   mysqlx.ColumnDef
-   mysqlx.GeneratedColumnDef
-   mysqlx.ForeignKeyDef
-   mysqlx.CreateViewStatement
-   mysqlx.AlterViewStatement
    mysqlx.ReadStatement
    mysqlx.WriteStatement
 

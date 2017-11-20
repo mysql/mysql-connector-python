@@ -28,8 +28,7 @@ from .errors import ProgrammingError
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
-                        CreateCollectionIndexStatement, CreateViewStatement,
-                        AlterViewStatement, CreateTableStatement)
+                        CreateCollectionIndexStatement)
 
 
 _COUNT_VIEWS_QUERY = ("SELECT COUNT(*) FROM information_schema.views "
@@ -40,7 +39,6 @@ _COUNT_SCHEMAS_QUERY = ("SELECT COUNT(*) FROM information_schema.schemata "
                         "WHERE schema_name like '{0}'")
 _COUNT_QUERY = "SELECT COUNT(*) FROM `{0}`.`{1}`"
 _DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
-_DROP_VIEW_QUERY = "DROP VIEW IF EXISTS `{0}`.`{1}`"
 
 
 class DatabaseObject(object):
@@ -243,28 +241,6 @@ class Schema(DatabaseObject):
         self._connection.execute_nonquery(
             "sql", _DROP_TABLE_QUERY.format(self._name, name), False)
 
-    def drop_table(self, name):
-        """Drops a table.
-
-        Args:
-            name (str): The name of the table to be dropped.
-        """
-        table = Table(self, name)
-        if table.is_view():
-            self.drop_view(name)
-        else:
-            self._connection.execute_nonquery(
-                "sql", _DROP_TABLE_QUERY.format(self._name, name), False)
-
-    def drop_view(self, name):
-        """Drops a view.
-
-        Args:
-            name (str): The name of the view to be dropped.
-        """
-        self._connection.execute_nonquery(
-            "sql", _DROP_VIEW_QUERY.format(self._name, name), False)
-
     def create_collection(self, name, reuse=False):
         """Creates in the current schema a new collection with the specified
         name and retrieves an object representing the new collection created.
@@ -289,53 +265,6 @@ class Schema(DatabaseObject):
         elif not reuse:
             raise ProgrammingError("Collection already exists")
         return collection
-
-    def create_view(self, name, replace=False):
-        """Creates in the current schema a new view with the specified name
-        and retrieves an object representing the new view created.
-
-        Args:
-            name (string): The name of the view.
-            replace (Optional[bool]): `True` to add replace.
-
-        Returns:
-            mysqlx.View: View object.
-        """
-        view = View(self, name)
-        return view.get_create_statement(replace)
-
-    def alter_view(self, name):
-        """Alters a view in the current schema with the specified name and
-        retrieves an object representing the view.
-
-        Args:
-            name (string): The name of the view.
-
-        Returns:
-            mysqlx.View: View object.
-        """
-        view = View(self, name)
-        return view.get_alter_statement()
-
-    def create_table(self, name, reuse=False):
-        """Creates in the current schema a table with the specified name and
-        retrieves an object representing the new table created.
-
-        Args:
-            name (string): The name of the name.
-            reuse (Optional[bool]): `True` to reuse.
-
-        Returns:
-            mysqlx.Table: Table object.
-        """
-        if not name:
-            raise ProgrammingError("Table name is invalid")
-        table = Table(self, name)
-        if not table.exists_in_database():
-            return CreateTableStatement(self, name)
-        elif not reuse:
-            raise ProgrammingError("Table already exists")
-        return table
 
 
 class Collection(DatabaseObject):
@@ -577,22 +506,3 @@ class View(Table):
         """
         sql = _COUNT_VIEWS_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql) == 1
-
-    def get_create_statement(self, replace=False):
-        """Creates a new :class:`mysqlx.CreateViewStatement` object.
-
-        Args:
-            replace (Optional[bool]): `True` to add replace.
-
-        Returns:
-            mysqlx.CreateViewStatement: CreateViewStatement object.
-        """
-        return CreateViewStatement(self, replace)
-
-    def get_alter_statement(self):
-        """Creates a new :class:`mysqlx.AlterViewStatement` object.
-
-        Returns:
-            mysqlx.AlterViewStatement: AlterViewStatement object.
-        """
-        return AlterViewStatement(self)

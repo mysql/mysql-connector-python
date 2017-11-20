@@ -44,9 +44,6 @@ def create_enum(name, fields, values=None):
     return Enum(*values)
 
 
-Algorithms = create_enum("Algorithms", ("MERGE", "TMPTABLE", "UNDEFINED"))
-Securities = create_enum("Securities", ("DEFINER", "INVOKER"))
-CheckOptions = create_enum("CheckOptions", ("CASCADED", "LOCAL"))
 SSLMode = create_enum("SSLMode",
                       ("REQUIRED", "DISABLED", "VERIFY_CA", "VERIFY_IDENTITY"),
                       ("required", "disabled", "verify_ca", "verify_identity"))
@@ -54,4 +51,4 @@ Auth = create_enum("Auth",
                    ("PLAIN", "EXTERNAL", "MYSQL41"),
                    ("plain", "external", "mysql41"))
 
-__all__ = ["Algorithms", "Securities", "CheckOptions", "SSLMode", "Auth"]
+__all__ = ["SSLMode", "Auth"]

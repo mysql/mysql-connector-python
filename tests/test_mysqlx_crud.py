@@ -41,6 +41,25 @@ _CREATE_TEST_VIEW_QUERY = ("CREATE VIEW `{0}`.`{1}` AS SELECT * "
                            "FROM `{2}`.`{3}`;")
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
                        "WHERE table_schema = '{0}' AND table_name = '{1}'")
+_CREATE_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS {2}"
+_DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
+_DROP_VIEW_QUERY = "DROP VIEW IF EXISTS `{0}`.`{1}`"
+
+
+def create_view(schema, view_name, defined_as):
+    query = _CREATE_VIEW_QUERY.format(schema.name, view_name, defined_as)
+    schema.get_session().sql(query).execute()
+    return schema.get_view(view_name, True)
+
+
+def drop_table(schema, table_name):
+    query = _DROP_TABLE_QUERY.format(schema.name, table_name)
+    schema.get_session().sql(query).execute()
+
+
+def drop_view(schema, view_name):
+    query = _DROP_VIEW_QUERY.format(schema.name, view_name)
+    schema.get_session().sql(query).execute()
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -89,126 +108,6 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
-    def test_create_view(self):
-        table_name = "table_test"
-        view_name = "view_test"
-        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
-            self.schema_name, table_name)).execute()
-        self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
-            self.schema_name, table_name, "1")).execute()
-
-        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
-                                                     table_name)
-        view = self.schema.create_view(view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
-        self.assertEqual(view.get_name(), view_name)
-        self.assertTrue(view.exists_in_database())
-        self.assertTrue(view.is_view())
-
-        # should get exception if reuse is false and it already exists
-        self.assertRaises(mysqlx.ProgrammingError,
-                          self.schema.create_collection, view_name,
-                          False)
-
-        # using replacing the existing view should work
-        view = self.schema.create_view(view_name, True) \
-                          .defined_as(defined_as) \
-                          .execute()
-
-        self.schema.drop_view(view_name)
-
-        # using a non-updatable view
-        defined_as = ("SELECT COLUMN_TYPE, COLUMN_COMMENT FROM "
-                      "INFORMATION_SCHEMA.columns WHERE TABLE_NAME='{0}' "
-                      "AND COLUMN_NAME='id'".format(table_name))
-        view = self.schema.create_view(view_name, True) \
-                          .defined_as(defined_as) \
-                          .execute()
-
-        self.schema.drop_view(view_name)
-
-        # create view from Table.select()
-        table = self.schema.get_table(table_name)
-        table.insert("id").values(2).values(3).execute()
-        select = table.select()
-        view = self.schema.create_view(view_name).defined_as(select).execute()
-        self.assertEqual(3, view.count())
-
-        self.schema.drop_view(view_name)
-
-        # ensure that the object passed to defined_as() does not affect the
-        # view if changed later
-        select = table.select()
-        view = self.schema.create_view(view_name).defined_as(select)
-        select = select.where("id > 1")
-        self.assertEqual(3, view.execute().count())
-
-        # defined_as() should only accepts SelectStatement and strings
-        view = self.schema.create_view(view_name)
-        self.assertRaises(mysqlx.ProgrammingError, view.defined_as, 123)
-
-        self.schema.drop_view(view_name)
-        self.schema.drop_table(table_name)
-
-    def test_alter_view(self):
-        table_name = "table_test"
-        view_name = "view_test"
-
-        self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
-            self.schema_name, table_name)).execute()
-        for i in range(10):
-            self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
-                self.schema_name, table_name, "{0}".format(i + 1))
-            ).execute()
-
-        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
-                                                     table_name)
-        view = self.schema.create_view(view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
-        self.assertEqual(10, view.count())
-
-        defined_as = ("SELECT id FROM {0}.{1} WHERE id > 5"
-                      "".format(self.schema_name, table_name))
-        view = self.schema.alter_view(view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
-        self.assertEqual(5, view.count())
-
-        # using a non-updatable view
-        defined_as = ("SELECT COLUMN_TYPE, COLUMN_COMMENT FROM "
-                      "INFORMATION_SCHEMA.columns WHERE TABLE_NAME='{0}' "
-                      "AND COLUMN_NAME='id'".format(table_name))
-        view = self.schema.alter_view(view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
-
-        self.schema.drop_view(view_name)
-
-        # create view from Table.select()
-        table = self.schema.get_table(table_name)
-        table.insert("id").values(2).values(3).execute()
-        select = table.select()
-        view = self.schema.create_view(view_name).defined_as(select).execute()
-        self.assertEqual(12, view.count())
-
-        self.schema.drop_view(view_name)
-
-        # ensure that the object passed to defined_as() does not affect the
-        # view if changed later
-        select = table.select()
-        view = self.schema.create_view(view_name).defined_as(select)
-        select = select.where("id > 1")
-        self.assertEqual(12, view.execute().count())
-
-        # defined_as() should only accepts SelectStatement and strings
-        view = self.schema.create_view(view_name)
-        self.assertRaises(mysqlx.ProgrammingError, view.defined_as, 123)
-
-        self.schema.drop_view(view_name)
-        self.schema.drop_table(table_name)
-
     def test_get_collection(self):
         collection_name = "collection_test"
         coll = self.schema.get_collection(collection_name)
@@ -229,9 +128,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
                                                      table_name)
-        view = self.schema.create_view(view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, view_name, defined_as)
         self.assertTrue(view.exists_in_database())
 
         # raise a ProgrammingError if the view does not exists
@@ -239,8 +136,8 @@ class MySQLxSchemaTests(tests.MySQLxTests):
                           self.schema.get_view, "nonexistent",
                           check_existence=True)
 
-        self.schema.drop_table(table_name)
-        self.schema.drop_view(view_name)
+        drop_table(self.schema, table_name)
+        drop_view(self.schema, view_name)
 
     def test_get_collections(self):
         coll = self.schema.get_collections()
@@ -278,10 +175,10 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.assertEqual("table3", tables[2].get_name())
         self.assertEqual("view1", tables[3].get_name())
 
-        self.schema.drop_table("table1")
-        self.schema.drop_table("table2")
-        self.schema.drop_table("table3")
-        self.schema.drop_table("view1")
+        drop_table(self.schema, "table1")
+        drop_table(self.schema, "table2")
+        drop_table(self.schema, "table3")
+        drop_view(self.schema, "view1")
 
     def test_drop_collection(self):
         collection_name = "collection_test"
@@ -291,137 +188,6 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         # dropping an non-existing collection should succeed silently
         self.schema.drop_collection(collection_name)
-
-    def test_drop_table(self):
-        table_name = "table_test"
-        try:
-            self.session.sql(
-                _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
-            ).execute()
-        except mysqlx.Error as err:
-            LOGGER.info("{0}".format(err))
-        table = self.schema.get_table(table_name)
-        self.schema.drop_table(table_name)
-        self.assertFalse(table.exists_in_database())
-
-        # dropping an non-existing table should succeed silently
-        self.schema.drop_table(table_name)
-
-    def test_create_table(self):
-        table_a = 'test_language'
-        table_b = 'test_film'
-        table_c = 'test_lang'
-        table_d = 'test_lang_a'
-        table_e = 'test_lang_b'
-
-        # Simple create table
-        language = self.schema.create_table(table_a) \
-            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
-                .primary().auto_increment().unsigned().not_null()) \
-            .set_initial_auto_increment(12) \
-            .set_comment("Table Comment test").execute()
-
-        self.assertTrue(language.exists_in_database())
-        self.assertEqual(12,
-            self.session.sql(
-                'SELECT AUTO_INCREMENT '
-                'FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "{0}" AND '
-                'TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
-            .execute().fetch_all()[0][0])
-        self.assertEqual("Table Comment test",
-            self.session.sql(
-                'SELECT TABLE_COMMENT FROM INFORMATION_SCHEMA.TABLES '
-                'WHERE TABLE_SCHEMA = "{0}" '
-                'AND TABLE_NAME = "{1}"'.format(self.schema.name, table_a)) \
-            .execute().fetch_all()[0][0])
-
-        # Create table with index and foreign keys
-        film = self.schema.create_table(table_b) \
-            .add_column(mysqlx.ColumnDef('film_id', mysqlx.ColumnType.INT) \
-                .primary().auto_increment().unsigned().not_null()) \
-            .add_column(mysqlx.ColumnDef('title', mysqlx.ColumnType.TEXT, 255) \
-                .not_null()) \
-            .add_column(mysqlx.ColumnDef('native_title',
-                mysqlx.ColumnType.VARCHAR, 255).charset("utf8mb4")
-                .collation("utf8mb4_general_ci")) \
-            .add_column(mysqlx.ColumnDef('description',
-                mysqlx.ColumnType.TEXT).binary()) \
-            .add_column(mysqlx.ColumnDef('release_year',
-                mysqlx.ColumnType.YEAR, 4)) \
-            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
-                .unsigned().not_null().foreign_key(table_a, 'language_id')) \
-            .add_column(mysqlx.ColumnDef('original_language_id',
-                mysqlx.ColumnType.INT).unsigned())\
-            .add_column(mysqlx.ColumnDef('rental_duration',
-                mysqlx.ColumnType.INT).unsigned().not_null().set_default(3)) \
-            .add_column(mysqlx.ColumnDef('rental_rate',
-                mysqlx.ColumnType.DECIMAL, 4).decimals(2).not_null() \
-                .set_default(4.99).unique_index()) \
-            .add_column(mysqlx.ColumnDef('length', mysqlx.ColumnType.INT) \
-                .unsigned()) \
-            .add_column(mysqlx.ColumnDef('replacement_cost',
-                mysqlx.ColumnType.DECIMAL, 5).decimals(2).not_null(). \
-                set_default(19.99)) \
-            .add_column(mysqlx.ColumnDef('rating', mysqlx.ColumnType.ENUM) \
-                .values(['G', 'PG', 'PG-13', 'R', 'NC-17']).set_default('G')) \
-            .add_column(mysqlx.ColumnDef('special_features',
-                mysqlx.ColumnType.SET).values(['Trailers', 'Commentaries',
-                'Deleted Scenes', 'Behind the Scenes'])) \
-            .add_column(mysqlx.ColumnDef('last_update',
-                mysqlx.ColumnType.TIMESTAMP)) \
-            .add_index('idx_title', ['title(255)']) \
-            .add_foreign_key('fk_film_language', mysqlx.ForeignKeyDef() \
-                .fields(['language_id']).refers_to(table_a,
-                ['language_id'])) \
-            .add_foreign_key('fk_film_language_original',
-                mysqlx.ForeignKeyDef().fields(['original_language_id']) \
-                .refers_to(table_a,['language_id']).on_update('Cascade')) \
-            .set_default_charset('latin2') \
-            .set_default_collation('latin2_general_ci') \
-            .execute()
-
-        self.assertTrue(film.exists_in_database())
-        self.assertEqual(1, len(self.session.sql('SHOW INDEXES FROM '
-            '{0}.{1} WHERE COLUMN_NAME = "{2}" AND NOT NON_UNIQUE'.format(
-            self.schema.name, table_b, 'rental_rate')).execute().fetch_all()))
-
-        res = self.session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
-                'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "{0}" '
-                'AND COLUMN_NAME = "{1}"'.format(table_b, 'native_title')) \
-            .execute().fetch_all()
-        self.assertEqual("utf8mb4", res[0]['CHARACTER_SET_NAME'])
-        self.assertEqual("utf8mb4_general_ci", res[0]['COLLATION_NAME'])
-
-        res = self.session.sql('SELECT CHARACTER_SET_NAME, COLLATION_NAME '
-                'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "{0}" '
-                'AND COLUMN_NAME = "{1}"'.format(table_b, 'title')) \
-            .execute().fetch_all()
-        self.assertEqual("latin2", res[0]['CHARACTER_SET_NAME'])
-        self.assertEqual("latin2_general_ci", res[0]['COLLATION_NAME'])
-
-        # Create table like another table
-        lang = self.schema.create_table(table_c).like(table_a).execute()
-        self.assertTrue(lang.exists_in_database())
-
-        # Create table as Select Statement
-        lang_a = self.schema.create_table(table_d) \
-            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
-                .not_null().primary().auto_increment().unsigned()) \
-            .as_select("SELECT language_id from {0}".format(table_a)).execute()
-        self.assertTrue(lang_a.exists_in_database())
-
-        select = language.select('language_id').where('language_id > 100')
-        lang_b = self.schema.create_table(table_e) \
-            .add_column(mysqlx.ColumnDef('language_id', mysqlx.ColumnType.INT) \
-                .not_null().primary().auto_increment().unsigned()) \
-            .as_select(select).execute()
-        self.assertTrue(lang_b.exists_in_database())
-
-        self.schema.drop_table(table_b)
-        self.schema.drop_table(table_a)
-        self.schema.drop_table(table_c)
-        self.schema.drop_table(table_d)
-        self.schema.drop_table(table_e)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -1466,7 +1232,7 @@ class MySQLxTableTests(tests.MySQLxTests):
             LOGGER.info("{0}".format(err))
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
-        self.schema.drop_table(table_name)
+        drop_table(self.schema, table_name)
 
     def test_select(self):
         table_name = "{0}.test".format(self.schema_name)
@@ -1551,7 +1317,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.select("cast('12:00:00' as time) as test").execute()
         self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.TIME)
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
         coll = self.schema.create_collection("test")
         coll.add({"a": 21}, {"a": 22}, {"a": 23}, {"a": 24}).execute()
@@ -1599,7 +1365,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(42, rows[0]["age"])
         self.assertEqual(21, rows[1]["age"])
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_insert(self):
         self.session.sql("CREATE TABLE {0}.test(age INT, name "
@@ -1626,7 +1392,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(6, len(rows))
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_update(self):
         self.session.sql("CREATE TABLE {0}.test(age INT, name "
@@ -1647,7 +1413,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.update().set("age", 25)
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_delete(self):
         table_name = "table_test"
@@ -1672,7 +1438,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         self.assertRaises(mysqlx.ProgrammingError, table.delete, " ")
 
-        self.schema.drop_table(table_name)
+        drop_table(self.schema, table_name)
 
     def test_count(self):
         table_name = "table_test"
@@ -1683,7 +1449,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
-        self.schema.drop_table(table_name)
+        drop_table(self.schema, table_name)
 
     def test_results(self):
         table_name = "{0}.test".format(self.schema_name)
@@ -1702,7 +1468,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("Barney", result.fetch_one()["name"])
         self.assertEqual(None, result.fetch_one())
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_multiple_resultsets(self):
         self.session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "
@@ -1740,7 +1506,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         result2 = table.insert("id", "name").values(None, "Boo").execute()
         self.assertEqual(2, result2.get_autoincrement_value())
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_column_metadata(self):
         table_name = "{0}.test".format(self.schema_name)
@@ -1795,7 +1561,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())
 
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_is_view(self):
         table_name = "table_test"
@@ -1813,8 +1579,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         view = self.schema.get_table(view_name)
         self.assertTrue(view.is_view())
 
-        self.schema.drop_table(table_name)
-        self.schema.drop_table(view_name)
+        drop_table(self.schema, table_name)
+        drop_view(self.schema, view_name)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -1832,8 +1598,8 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.schema = self.session.get_schema(self.schema_name)
 
     def tearDown(self):
-        self.schema.drop_table(self.table_name)
-        self.schema.drop_view(self.view_name)
+        drop_table(self.schema, self.table_name)
+        drop_view(self.schema, self.view_name)
         self.session.close()
 
     def test_exists_in_database(self):
@@ -1843,9 +1609,7 @@ class MySQLxViewTests(tests.MySQLxTests):
             self.schema_name, self.table_name)).execute()
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
                                                      self.table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         self.assertTrue(view.exists_in_database())
 
     def test_select(self):
@@ -1863,9 +1627,7 @@ class MySQLxViewTests(tests.MySQLxTests):
                          "".format(table_name)).execute()
 
         defined_as = "SELECT age, name FROM {0}".format(table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         result = view.select().order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
@@ -1896,9 +1658,7 @@ class MySQLxViewTests(tests.MySQLxTests):
                          "".format(table_name)).execute()
 
         defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         result = view.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
@@ -1925,9 +1685,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
                          "gender CHAR(1))".format(table_name)).execute()
         defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
 
         result = view.insert("age", "name").values(21, 'Fred') \
                                            .values(28, 'Barney') \
@@ -1950,9 +1708,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.session.sql("CREATE TABLE {0} (age INT, name VARCHAR(50), "
                          "gender CHAR(1))".format(table_name)).execute()
         defined_as = ("SELECT age, name, gender FROM {0}".format(table_name))
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
 
         result = view.insert("age", "name").values(21, 'Fred') \
                                            .values(28, 'Barney') \
@@ -1960,7 +1716,7 @@ class MySQLxViewTests(tests.MySQLxTests):
                                            .values(67, 'Betty').execute()
         result = view.update().set("age", 25).where("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
-        self.schema.drop_table("test")
+        drop_table(self.schema, "test")
 
     def test_delete(self):
         self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
@@ -1970,9 +1726,7 @@ class MySQLxViewTests(tests.MySQLxTests):
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
                                                      self.table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
         view.delete("id = 1").execute()
         self.assertEqual(view.count(), 0)
@@ -1985,9 +1739,7 @@ class MySQLxViewTests(tests.MySQLxTests):
 
         defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name,
                                                      self.table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
 
     def test_results(self):
@@ -2001,9 +1753,7 @@ class MySQLxViewTests(tests.MySQLxTests):
                          "".format(table_name)).execute()
 
         defined_as = "SELECT age, name FROM {0}".format(table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         result = view.select().execute()
 
         self.assertEqual("Fred", result.fetch_one()["name"])
@@ -2020,9 +1770,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertEqual(1, result.get_autoincrement_value())
 
         defined_as = "SELECT id, name FROM {0}".format(table_name)
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
         result2 = view.insert("id", "name").values(None, "Boo").execute()
         self.assertEqual(2, result2.get_autoincrement_value())
 
@@ -2048,9 +1796,7 @@ class MySQLxViewTests(tests.MySQLxTests):
 
         defined_as = ("SELECT age, name, pic, config, created, active FROM {0}"
                       "".format(table_name))
-        view = self.schema.create_view(self.view_name) \
-                          .defined_as(defined_as) \
-                          .execute()
+        view = create_view(self.schema, self.view_name, defined_as)
 
         result = view.select().execute()
         result.fetch_all()
