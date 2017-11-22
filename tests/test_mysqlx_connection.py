@@ -446,6 +446,79 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         drop_table(schema, table_name)
 
+    def test_savepoint(self):
+        collection_name = "collection_test"
+        schema = self.session.get_schema(self.schema_name)
+
+        # The savepoint name should be a valid string
+        self.assertRaises(mysqlx.errors.ProgrammingError,
+                          self.session.set_savepoint, 123)
+
+        # The savepoint name should not be an empty string
+        self.assertRaises(mysqlx.errors.ProgrammingError,
+                          self.session.set_savepoint, "")
+
+        # The savepoint name should not be a white space
+        self.assertRaises(mysqlx.errors.ProgrammingError,
+                          self.session.set_savepoint, " ")
+
+        # Invalid rollback savepoint without a started transaction
+        sp1 = self.session.set_savepoint("sp1")
+        self.assertRaises(mysqlx.errors.OperationalError,
+                          self.session.rollback_to, sp1)
+
+        collection = schema.create_collection(collection_name)
+
+        self.session.start_transaction()
+
+        collection.add({"name": "Fred", "age": 21}).execute()
+        self.assertEqual(1, collection.count())
+
+        # Create a savepoint named 'sp2'
+        sp2 = self.session.set_savepoint("sp2")
+        self.assertEqual(sp2, "sp2")
+
+        collection.add({"name": "Wilma", "age": 33}).execute()
+        self.assertEqual(2, collection.count())
+
+        # Create a savepoint named 'sp3'
+        sp3 = self.session.set_savepoint("sp3")
+
+        collection.add({"name": "Betty", "age": 67}).execute()
+        self.assertEqual(3, collection.count())
+
+        # Rollback to 'sp3' savepoint
+        self.session.rollback_to(sp3)
+        self.assertEqual(2, collection.count())
+
+        # Rollback to 'sp2' savepoint
+        self.session.rollback_to(sp2)
+        self.assertEqual(1, collection.count())
+
+        # The 'sp3' savepoint should not exist at this point
+        self.assertRaises(mysqlx.errors.OperationalError,
+                          self.session.rollback_to, sp3)
+
+        collection.add({"name": "Barney", "age": 42}).execute()
+        self.assertEqual(2, collection.count())
+
+        # Create an unnamed savepoint
+        sp4 = self.session.set_savepoint()
+
+        collection.add({"name": "Wilma", "age": 33}).execute()
+        self.assertEqual(3, collection.count())
+
+        # Release unnamed savepoint
+        self.session.release_savepoint(sp4)
+        self.assertEqual(3, collection.count())
+
+        # The 'sp4' savepoint should not exist at this point
+        self.assertRaises(mysqlx.errors.OperationalError,
+                          self.session.rollback_to, sp4)
+
+        self.session.commit()
+        schema.drop_collection(collection_name)
+
     def test_close(self):
         session = mysqlx.get_session(self.connect_kwargs)
         schema = session.get_schema(self.schema_name)

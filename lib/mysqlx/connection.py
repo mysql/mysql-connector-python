@@ -32,6 +32,7 @@ except:
 import sys
 import socket
 import logging
+import uuid
 
 from functools import wraps
 
@@ -44,7 +45,7 @@ from .constants import SSLMode, Auth
 from .helpers import get_item_or_attr
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
-from .statement import SqlStatement, AddStatement
+from .statement import SqlStatement, AddStatement, quote_identifier
 
 
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
@@ -719,6 +720,51 @@ class Session(object):
         startTransaction().
         """
         self._connection.execute_nonquery("sql", "ROLLBACK", True)
+
+    def set_savepoint(self, name=None):
+        """Creates a transaction savepoint.
+
+        If a name is not provided, one will be generated using the uuid.uuid1()
+        function.
+
+        Args:
+            name (Optional[string]): The savepoint name.
+
+        Returns:
+            string: The savepoint name.
+        """
+        if name is None:
+            name = "{0}".format(uuid.uuid1())
+        elif not isinstance(name, STRING_TYPES) or len(name.strip()) == 0:
+            raise ProgrammingError("Invalid SAVEPOINT name")
+        self._connection.execute_nonquery("sql", "SAVEPOINT {0}"
+                                          "".format(quote_identifier(name)),
+                                          True)
+        return name
+
+    def rollback_to(self, name):
+        """Rollback to a transaction savepoint with the given name.
+
+        Args:
+            name (string): The savepoint name.
+        """
+        if not isinstance(name, STRING_TYPES) or len(name.strip()) == 0:
+            raise ProgrammingError("Invalid SAVEPOINT name")
+        self._connection.execute_nonquery("sql", "ROLLBACK TO SAVEPOINT {0}"
+                                          "".format(quote_identifier(name)),
+                                          True)
+
+    def release_savepoint(self, name):
+        """Release a transaction savepoint with the given name.
+
+        Args:
+            name (string): The savepoint name.
+        """
+        if not isinstance(name, STRING_TYPES) or len(name.strip()) == 0:
+            raise ProgrammingError("Invalid SAVEPOINT name")
+        self._connection.execute_nonquery("sql", "RELEASE SAVEPOINT {0}"
+                                          "".format(quote_identifier(name)),
+                                          True)
 
     def close(self):
         """Closes the session."""
