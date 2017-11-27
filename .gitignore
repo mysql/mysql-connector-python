@@ -1,4 +1,5 @@
 *.pyc
+.coverage
 .DS_Store
 *__pycache__*
 .idea/

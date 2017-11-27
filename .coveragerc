@@ -1,0 +1,20 @@
+[run]
+branch = True
+omit =
+    # omit tests
+    *tests/*
+    # omit examples
+    *examples/*
+    # omit misc files
+    *setupinfo.py*
+    *unittests.py*
+    *cpy_distutils.py*
+    # omit everything in site-packages and dist-packages
+    */site-packages/*
+    */dist-packages/*
+
+[html]
+directory = build/coverage_html
+
+[xml]
+output = build/coverage.xml
