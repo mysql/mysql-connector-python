@@ -57,18 +57,6 @@ Statement
    mysqlx.WriteStatement
 
 
-Configuration Management
-------------------------
-
-.. toctree::
-   :maxdepth: 4
-
-   mysqlx.SessionConfig
-   mysqlx.SessionConfigManager
-   mysqlx.PersistenceHandler
-   mysqlx.PasswordHandler
-
-
 Errors
 ------
 
