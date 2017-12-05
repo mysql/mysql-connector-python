@@ -23,15 +23,13 @@
 
 """Implementation of Statements."""
 
-import copy
 import json
-import re
 
 from .errors import ProgrammingError
 from .expr import ExprParser
 from .compat import STRING_TYPES
 from .dbdoc import DbDoc
-from .result import SqlResult, Result, ColumnType
+from .result import SqlResult, Result
 from .protobuf import mysqlxpb_enum
 
 

@@ -38,6 +38,9 @@ if mysqlx.compat.PY3:
 else:
     from urllib import quote_plus
 
+from .test_mysqlx_crud import drop_table
+
+
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
 _URI_TEST_RESULTS = (  # (uri, result)
@@ -420,7 +423,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.session.rollback()
         self.assertEqual(table.count(), 0)
 
-        schema.drop_table(table_name)
+        drop_table(schema, table_name)
 
     def test_commit(self):
         table_name = "t2"
@@ -441,7 +444,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.session.commit()
         self.assertEqual(table.count(), 1)
 
-        schema.drop_table(table_name)
+        drop_table(schema, table_name)
 
     def test_close(self):
         session = mysqlx.get_session(self.connect_kwargs)
