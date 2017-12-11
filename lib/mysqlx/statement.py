@@ -23,14 +23,17 @@
 
 """Implementation of Statements."""
 
+import copy
 import json
 
-from .errors import ProgrammingError
+from .errors import ProgrammingError, NotSupportedError
 from .expr import ExprParser
 from .compat import STRING_TYPES
 from .dbdoc import DbDoc
 from .result import SqlResult, Result
 from .protobuf import mysqlxpb_enum
+
+ERR_INVALID_INDEX_NAME = 'The given index name "{}" is not valid'
 
 
 class Expr(object):
@@ -971,28 +974,27 @@ class CreateCollectionIndexStatement(Statement):
     Args:
         collection (mysqlx.Collection): Collection.
         index_name (string): Index name.
-        is_unique (bool): `True` if the index is unique.
+        index_desc (dict): A dictionary containing the fields members that
+                           constraints the index to be created. It must have
+                           the form as shown in the following::
+
+                               {"fields": [{"field": member_path,
+                                            "type": member_type,
+                                            "required": member_required,
+                                            "collation": collation,
+                                            "options": options,
+                                            "srid": srid},
+                                            # {... more members,
+                                            #      repeated as many times
+                                            #      as needed}
+                                            ],
+                                "type": type}
     """
-    def __init__(self, collection, index_name, is_unique):
+    def __init__(self, collection, index_name, index_desc):
         super(CreateCollectionIndexStatement, self).__init__(target=collection)
+        self._index_desc = copy.deepcopy(index_desc)
         self._index_name = index_name
-        self._is_unique = is_unique
-        self._fields = []
-
-    def field(self, document_path, column_type, is_required):
-        """Add the field specification to this index creation statement.
-
-        Args:
-            document_path (string): The document path.
-            column_type (string): The column type.
-            is_required (bool): `True` if the field is required.
-
-        Returns:
-            mysqlx.CreateCollectionIndexStatement: \
-                                   CreateCollectionIndexStatement object.
-        """
-        self._fields.append((document_path, column_type, is_required,))
-        return self
+        self._fields_desc = self._index_desc.pop("fields", [])
 
     def execute(self):
         """Execute the statement.
@@ -1000,8 +1002,105 @@ class CreateCollectionIndexStatement(Statement):
         Returns:
             mysqlx.Result: Result object.
         """
-        fields = [item for sublist in self._fields for item in sublist]
+        # Validate index name is a valid identifier
+        if self._index_name is None:
+            raise ProgrammingError(
+                        ERR_INVALID_INDEX_NAME.format(self._index_name))
+        try:
+            parsed_ident = ExprParser(self._index_name).expr().get_message()
+
+            # The message is type dict when the Protobuf cext is used
+            if isinstance(parsed_ident, dict):
+                if parsed_ident['type'] != mysqlxpb_enum(
+                    "Mysqlx.Expr.Expr.Type.IDENT"):
+                    raise ProgrammingError(
+                        ERR_INVALID_INDEX_NAME.format(self._index_name))
+            else:
+                if parsed_ident.type != mysqlxpb_enum(
+                    "Mysqlx.Expr.Expr.Type.IDENT"):
+                    raise ProgrammingError(
+                        ERR_INVALID_INDEX_NAME.format(self._index_name))
+
+        except (ValueError, AttributeError):
+            raise ProgrammingError(
+                ERR_INVALID_INDEX_NAME.format(self._index_name))
+
+        # Validate members that constraint the index
+        if not self._fields_desc:
+            raise ProgrammingError("Required member \"fields\" not found in "
+                                   "the given index description: {}"
+                                   "".format(self._index_desc))
+
+        if not isinstance(self._fields_desc, list) :
+            raise ProgrammingError("Required member \"fields\" must contain a "
+                                   "list.")
+
+        args = {}
+        args["name"] = self._index_name
+        args["collection"] = self._target.name
+        args["schema"] = self._target.schema.name
+        if "type" in self._index_desc:
+            args["type"] = self._index_desc.pop("type")
+        else:
+            args["type"] = "INDEX"
+        args["unique"] = self._index_desc.pop("unique", False)
+        # Currently unique indexes are not supported:
+        if args["unique"]:
+            raise NotSupportedError("Unique indexes are not supported.")
+        args["constraint"] = []
+
+        if self._index_desc:
+            raise ProgrammingError("Unidentified fields: {}"
+                                   "".format(self._index_desc))
+
+        try:
+            for field_desc in self._fields_desc:
+                constraint = {}
+                constraint["member"] = field_desc.pop("field")
+                constraint["type"] = field_desc.pop("type")
+                constraint["required"] = field_desc.pop("required", False)
+                if args["type"].upper() == "SPATIAL" and \
+                   not constraint["required"]:
+                    raise ProgrammingError('Field member "required" must be '
+                                           'set to "True" when index type is'
+                                           ' set to "SPATIAL"')
+                if args["type"].upper() == "INDEX" and \
+                   constraint["type"] == 'GEOJSON':
+                    raise ProgrammingError('Index "type" must be set to '
+                                           '"SPATIAL" when field type is set '
+                                           'to "GEOJSON"')
+                if "collation" in field_desc:
+                    if not constraint["type"].upper().startswith("TEXT"):
+                        raise ProgrammingError(
+                            "The \"collation\" member can only be used when "
+                            "field  type is set to \"GEOJSON\"")
+                    else:
+                        constraint["collation"] = field_desc.pop("collation")
+                # "options" and "srid" fields in IndexField can be
+                # present only if "type" is set to "GEOJSON"
+                if "options" in field_desc:
+                    if constraint["type"].upper() != 'GEOJSON':
+                        raise ProgrammingError(
+                            "The \"options\" member can only be used when "
+                            "index type is set to \"GEOJSON\"")
+                    else:
+                        constraint["options"] = field_desc.pop("options")
+                if "srid" in field_desc:
+                    if constraint["type"].upper() != 'GEOJSON':
+                        raise ProgrammingError(
+                            "The \"srid\" member can only be used when index"
+                            " type is set to \"GEOJSON\"")
+                    else:
+                        constraint["srid"] = field_desc.pop("srid")
+                args["constraint"].append(constraint)
+        except KeyError as err:
+            raise ProgrammingError("Required inner member {} not found in "
+                                   "constraint: {}".format(err, field_desc))
+
+        for field_desc in self._fields_desc:
+            if field_desc:
+                raise ProgrammingError("Unidentified inner fields:{}"
+                                       "".format(field_desc))
+
         return self._connection.execute_nonquery(
-            "xplugin", "create_collection_index", True,
-            self._target.schema.name, self._target.name, self._index_name,
-            self._is_unique, *fields)
+            "mysqlx", "create_collection_index", True, args)

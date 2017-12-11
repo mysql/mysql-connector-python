@@ -1291,9 +1291,20 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
 
+        # Create index with single field
         index_name = "age_idx"
-        collection.create_index(index_name, True) \
-            .field("$.age", "INT", False).execute()
+        result = collection.create_index(index_name,
+                                         {"fields": [{"field": "$.age",
+                                                      "type": "INT",
+                                                      "required": True}],
+                                          "unique": True})
+        # Unique indexes are not supported
+        self.assertRaises(mysqlx.NotSupportedError, result.execute)
+
+        collection.create_index(index_name,
+                                {"fields": [{"field": "$.age", "type": "INT",
+                                             "required": True}],
+                                 "unique": False}).execute()
 
         show_indexes_sql = (
             "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
@@ -1304,6 +1315,188 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 
+        # Create index with multiple fields
+        index_name = "streets_idx"
+        collection.create_index(index_name,
+                                {"fields": [{"field": "$.street",
+                                             "type": "TEXT(15)",
+                                             "required": True},
+                                            {"field": "$.cross_street",
+                                             "type": "TEXT(15)",
+                                             "required": True}],
+                                 "unique": False}).execute()
+
+        show_indexes_sql = (
+            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+            "".format(self.schema_name, collection_name, index_name)
+        )
+
+        result = self.session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(2, len(rows))
+
+        # Create index using a geojson datatype
+        index_name = "geo_idx"
+        collection.create_index(index_name,
+                                {"fields": [{"field": '$.myGeoJsonField',
+                                             "type": 'GEOJSON',
+                                             "required": True,
+                                             "options": 2,
+                                             "srid": 4326}],
+                                 "unique": False,
+                                 "type":'SPATIAL'}).execute()
+
+        show_indexes_sql = (
+            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
+            "".format(self.schema_name, collection_name, index_name)
+        )
+
+        result = self.session.sql(show_indexes_sql).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
+
+        # Error conditions
+        # Index name can not be None
+        index_name = None
+        index_desc = {"fields": [{"field": "$.myField", "type": "TEXT(10)"}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Index name can not be invalid identifier
+        index_name = "!invalid"
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        index_name = "invalid()"
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        index_name = "01invalid"
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # index descriptor wrong format
+        # Required "fields" is missing
+        index_name = "myIndex"
+        index_desc = {"fields1": [{"field": "$.myField", "type": "TEXT(10)"}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        index_desc = {"field": [{"field": "$.myField", "type": "TEXT(10)"}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # index type with invalid type
+        index_desc = {"field": [{"field": "$.myField", "type": "TEXT(10)"}],
+                      "unique": False, "type":"Invalid"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # index description contains aditional fields
+        index_desc = {"field": [{"field": "$.myField", "type": "TEXT(10)"}],
+                      "unique": False, "other":"value"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Inner "field" value is not a list
+        index_desc = {"fields": "$.myField",
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Required inner "field" is missing
+        index_desc = {"fields": [{}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Required inner "field" is misstyped
+        index_desc = {"fields": [{"field1": "$.myField", "type": "TEXT(10)"}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Required inner "field" is misstyped
+        index_desc = {"fields": [{"01field1": "$.myField",
+                                  "type": "TEXT(10)"}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Required inner "field.type" is missing
+        index_desc = {"fields": [{"field": "$.myField"}], "unique": False,
+                      "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # Required inner "field.type" is invalid
+        index_desc = {"fields": [{"field": "$.myField", "type": "invalid"}],
+                      "unique": False, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.OperationalError, create_index.execute)
+
+        # By current Server limitations, "unique" can ont be True
+        index_desc = {"fields": [{"field": "$.myField", "type": "TEXT(10)"}],
+                      "unique": True, "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.NotSupportedError, create_index.execute)
+
+        # index specifiying the 'collation' option for non TEXT data type
+        index_desc = {"fields": [{"field": "$.myField", "type": "int",
+                                  "collation": "utf8_general_ci"}],
+                      "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # member description contains aditional fields
+        index_desc = {"fields": [{"field": "$.myField", "type": "int",
+                                  "additional": "field"}],
+                      "type":"INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # index type SPATIAL requires inner required field to be True
+        index_name = "geotrap"
+        index_desc = {"fields": [{"field": "$.intField", "type": "INT",
+                                  "required": True},
+                                 {"field": "$.floatField", "type": "FLOAT",
+                                  "required": True},
+                                 {"field": "$.dateField", "type": "DATE"},
+                                 {"field": "$.geoField", "type": "GEOJSON",
+                                  "required": False, "options": 2,
+                                  "srid": 4326}], "type" : "SPATIAL"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # inner field type GEOJSON requires index type set to SPATIAL
+        index_desc = {"fields": [{"field": "$.intField", "type": "INT",
+                                  "required": True},
+                                 {"field": "$.floatField", "type": "FLOAT",
+                                  "required": True},
+                                 {"field": "$.dateField", "type": "DATE"},
+                                 {"field": "$.geoField", "type": "GEOJSON",
+                                  "required": False, "options": 2,
+                                  "srid": 4326}], "type" : "SPATIAL"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # "srid" fields  can be present only if "type" is set to "GEOJSON"
+        index_desc = {"fields": [{"field": "$.NogeoField", "type": "int",
+                                  "required": True, "srid": 4326}],
+                      "type" : "SPATIAL"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # "options" fields  can be present only if "type" is set to "GEOJSON"
+        index_desc = {"fields": [{"field": "$.NogeoField", "type": "int",
+                                  "required": True, "options": 2}],
+                      "type" : "SPATIAL"}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
         self.schema.drop_collection(collection_name)
 
     def test_drop_index(self):
@@ -1311,8 +1504,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection = self.schema.create_collection(collection_name)
 
         index_name = "age_idx"
-        collection.create_index(index_name, True) \
-            .field("$.age", "INT", False).execute()
+        collection.create_index(index_name,
+                                {"fields": [{"field": "$.age", "type": "INT",
+                                             "required": True}],
+                                 "unique": False}).execute()
 
         show_indexes_sql = (
             "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"

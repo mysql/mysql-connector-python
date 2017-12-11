@@ -28,7 +28,7 @@ import struct
 from .compat import STRING_TYPES, INT_TYPES
 from .errors import InterfaceError, OperationalError, ProgrammingError
 from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
-                   build_int_scalar)
+                   build_int_scalar, build_unsigned_int_scalar)
 from .helpers import encode_to_bytes, get_item_or_attr
 from .result import ColumnMetaData
 from .protobuf import SERVER_MESSAGES, Message, mysqlxpb_enum
@@ -156,8 +156,38 @@ class Protocol(object):
             return Message("Mysqlx.Datatypes.Any", type=1,
                            scalar=build_bool_scalar(arg))
         elif isinstance(arg, INT_TYPES):
+            if arg < 0:
+                return Message("Mysqlx.Datatypes.Any", type=1,
+                               scalar=build_int_scalar(arg))
             return Message("Mysqlx.Datatypes.Any", type=1,
-                           scalar=build_int_scalar(arg))
+                           scalar=build_unsigned_int_scalar(arg))
+
+        elif isinstance(arg, tuple) and len(arg) == 2:
+            arg_key, arg_value = arg
+            obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
+                              key=arg_key, value=self._create_any(arg_value))
+            obj = Message("Mysqlx.Datatypes.Object",
+                          fld=[obj_fld.get_message()])
+            return Message("Mysqlx.Datatypes.Any", type=2, obj=obj)
+
+        elif isinstance(arg, dict) or (isinstance(arg, (list, tuple)) and
+                                       isinstance(arg[0], dict)):
+            array_values = []
+            for items in arg:
+                obj_flds = []
+                for key, value in items.items():
+                    # Array can only handle Any types, Mysqlx.Datatypes.Any.obj
+                    obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
+                                      key=key, value=self._create_any(value))
+                    obj_flds.append(obj_fld.get_message())
+                msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
+                msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
+                array_values.append(msg_any.get_message())
+
+            msg = Message("Mysqlx.Datatypes.Array")
+            msg["value"] = array_values
+            return Message("Mysqlx.Datatypes.Any", type=3, array=msg)
+
         return None
 
     def _process_frame(self, msg, result):
@@ -407,9 +437,25 @@ class Protocol(object):
         """
         msg = Message("Mysqlx.Sql.StmtExecute", namespace=namespace, stmt=stmt,
                       compact_metadata=False)
-        for arg in args:
-            value = self._create_any(arg)
-            msg["args"].extend([value.get_message()])
+
+        if namespace == "mysqlx":
+            # mysqlx namespace behavior: one object with a list of arguments
+            items = args[0].items() if isinstance(args, (list, tuple)) else \
+                    args.items()
+            obj_flds = []
+            for key, value in items:
+                obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
+                                  key=key, value=self._create_any(value))
+                obj_flds.append(obj_fld.get_message())
+            msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
+            msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
+            msg["args"] = [msg_any.get_message()]
+        else:
+            # xplugin namespace behavior: list of arguments
+            for arg in args:
+                value = self._create_any(arg)
+                msg["args"].extend([value.get_message()])
+
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"), msg)
 
@@ -497,8 +543,10 @@ class Protocol(object):
             col = ColumnMetaData(msg["type"], msg["catalog"], msg["schema"],
                                  msg["table"], msg["original_table"],
                                  msg["name"], msg["original_name"],
-                                 msg["length"], msg["collation"],
-                                 msg["fractional_digits"], msg["flags"],
+                                 msg.get("length", 21),
+                                 msg.get("collation", 0),
+                                 msg.get("fractional_digits", 0),
+                                 msg.get("flags", 16),
                                  msg.get("content_type"))
             columns.append(col)
         return columns

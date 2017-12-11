@@ -341,14 +341,28 @@ class Collection(DatabaseObject):
         sql = _COUNT_QUERY.format(self._schema.name, self._name)
         return self._connection.execute_sql_scalar(sql)
 
-    def create_index(self, index_name, is_unique):
+    def create_index(self, index_name, fields_desc):
         """Creates a collection index.
 
         Args:
             index_name (str): Index name.
-            is_unique (bool): `True` if the index is unique.
+            fields_desc (dict): A dictionary containing the fields members that
+                                constraints the index to be created. It must
+                                have the form as shown in the following::
+
+                                   {"fields": [{"field": member_path,
+                                                "type": member_type,
+                                                "required": member_required,
+                                                "collation": collation,
+                                                "options": options,
+                                                "srid": srid},
+                                                # {... more members,
+                                                #      repeated as many times
+                                                #      as needed}
+                                                ],
+                                    "type": type}
         """
-        return CreateCollectionIndexStatement(self, index_name, is_unique)
+        return CreateCollectionIndexStatement(self, index_name, fields_desc)
 
     def drop_index(self, index_name):
         """Drops a collection index.

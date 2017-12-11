@@ -130,8 +130,8 @@ Parameter binding is also available as a chained method to each of the CRUD oper
    my_coll.remove('name = :data').bind('data', 'Sakila').execute()
 
 
-Using Collection patch (:func:`Collection.patch()`).
----------------------------------------------------
+Using Collection patch (:func:`mysqlx.ModifyStatement.patch()`)
+---------------------------------------------------------------
 
 First we need to get a session and a schema.
 

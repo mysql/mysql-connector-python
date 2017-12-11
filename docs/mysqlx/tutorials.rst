@@ -6,3 +6,4 @@ Tutorials
 
    tutorials/getting_started
    tutorials/transactions
+   tutorials/creating_indexes

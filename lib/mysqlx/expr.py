@@ -357,6 +357,11 @@ def build_int_scalar(value):
     msg["v_signed_int"] = value
     return msg
 
+def build_unsigned_int_scalar(value):
+    msg = Message("Mysqlx.Datatypes.Scalar")
+    msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_UINT")
+    msg["v_unsigned_int"] = value
+    return msg
 
 def build_string_scalar(value):
     if isinstance(value, STRING_TYPES):
@@ -419,6 +424,8 @@ class ExprParser(object):
         Removes the keywords "SELECT" and "WHERE" that does not form part of
         the expression itself.
         """
+        if not isinstance(self.string, STRING_TYPES):
+            self.string = repr(self.string)
         self.string = self.string.strip(" ")
         if len(self.string) > 1 and self.string[-1] == ';':
             self.string = self.string[:-1]
