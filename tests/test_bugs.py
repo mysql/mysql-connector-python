@@ -4527,3 +4527,25 @@ class BugOra24659561(tests.MySQLConnectorTests):
             "INSERT INTO {0} VALUES (%s, %s)".format(self.tbl),
             [(1, "Nuno"), (2, "Amitabh"), (3, "Rafael")]
         )
+
+
+class BugOra27277964(tests.MySQLConnectorTests):
+    """BUG#27277964: NEW UTF8MB4 COLLATIONS NOT SUPPORTED
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config["charset"] = "utf8mb4"
+        config["collation"] = "utf8mb4_0900_ai_ci"
+        self.tbl = "BugOra27277964"
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute("CREATE TABLE {0} (id INT, name VARCHAR(100))"
+                         "".format(self.tbl))
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+
+    def test_execute_utf8mb4_collation(self):
+        self.cur.execute("INSERT INTO {0} VALUES (1, 'Nuno')".format(self.tbl))

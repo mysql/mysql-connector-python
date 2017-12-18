@@ -24,8 +24,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA 
 
 # This file was auto-generated.
-_GENERATED_ON = '2017-04-27'
-_MYSQL_VERSION = (8, 0, 1)
+_GENERATED_ON = '2017-12-18'
+_MYSQL_VERSION = (8, 0, 4)
 
 """This module contains the MySQL Server Character Sets"""
 
@@ -335,5 +335,9 @@ MYSQL_CHARACTER_SETS = [
     None,
     None,
     ("utf8mb4", "utf8mb4_ja_0900_as_cs", False),  # 303
+    ("utf8mb4", "utf8mb4_ja_0900_as_cs_ks", False),  # 304
+    ("utf8mb4", "utf8mb4_0900_as_ci", False),  # 305
+    ("utf8mb4", "utf8mb4_ru_0900_ai_ci", False),  # 306
+    ("utf8mb4", "utf8mb4_ru_0900_as_cs", False),  # 307
 ]
 

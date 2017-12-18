@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -24,8 +24,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA 
 
 # This file was auto-generated.
-_GENERATED_ON = '2015-08-24'
-_MYSQL_VERSION = (5, 7, 8)
+_GENERATED_ON = '2017-12-18'
+_MYSQL_VERSION = (8, 0, 4)
 
 """This module contains the MySQL Server Character Sets"""
 
@@ -76,7 +76,7 @@ MYSQL_CHARACTER_SETS = [
     ("latin7", "latin7_general_cs", False),  # 42
     ("macce", "macce_bin", False),  # 43
     ("cp1250", "cp1250_croatian_ci", False),  # 44
-    ("utf8mb4", "utf8mb4_general_ci", True),  # 45
+    ("utf8mb4", "utf8mb4_general_ci", False),  # 45
     ("utf8mb4", "utf8mb4_bin", False),  # 46
     ("latin1", "latin1_bin", False),  # 47
     ("latin1", "latin1_general_ci", False),  # 48
@@ -107,7 +107,7 @@ MYSQL_CHARACTER_SETS = [
     ("keybcs2", "keybcs2_bin", False),  # 73
     ("koi8r", "koi8r_bin", False),  # 74
     ("koi8u", "koi8u_bin", False),  # 75
-    None,
+    ("utf8", "utf8_tolower_ci", False),  # 76
     ("latin2", "latin2_bin", False),  # 77
     ("latin5", "latin5_bin", False),  # 78
     ("latin7", "latin7_bin", False),  # 79
@@ -282,5 +282,62 @@ MYSQL_CHARACTER_SETS = [
     ("gb18030", "gb18030_chinese_ci", True),  # 248
     ("gb18030", "gb18030_bin", False),  # 249
     ("gb18030", "gb18030_unicode_520_ci", False),  # 250
+    None,
+    None,
+    None,
+    None,
+    ("utf8mb4", "utf8mb4_0900_ai_ci", True),  # 255
+    ("utf8mb4", "utf8mb4_de_pb_0900_ai_ci", False),  # 256
+    ("utf8mb4", "utf8mb4_is_0900_ai_ci", False),  # 257
+    ("utf8mb4", "utf8mb4_lv_0900_ai_ci", False),  # 258
+    ("utf8mb4", "utf8mb4_ro_0900_ai_ci", False),  # 259
+    ("utf8mb4", "utf8mb4_sl_0900_ai_ci", False),  # 260
+    ("utf8mb4", "utf8mb4_pl_0900_ai_ci", False),  # 261
+    ("utf8mb4", "utf8mb4_et_0900_ai_ci", False),  # 262
+    ("utf8mb4", "utf8mb4_es_0900_ai_ci", False),  # 263
+    ("utf8mb4", "utf8mb4_sv_0900_ai_ci", False),  # 264
+    ("utf8mb4", "utf8mb4_tr_0900_ai_ci", False),  # 265
+    ("utf8mb4", "utf8mb4_cs_0900_ai_ci", False),  # 266
+    ("utf8mb4", "utf8mb4_da_0900_ai_ci", False),  # 267
+    ("utf8mb4", "utf8mb4_lt_0900_ai_ci", False),  # 268
+    ("utf8mb4", "utf8mb4_sk_0900_ai_ci", False),  # 269
+    ("utf8mb4", "utf8mb4_es_trad_0900_ai_ci", False),  # 270
+    ("utf8mb4", "utf8mb4_la_0900_ai_ci", False),  # 271
+    None,
+    ("utf8mb4", "utf8mb4_eo_0900_ai_ci", False),  # 273
+    ("utf8mb4", "utf8mb4_hu_0900_ai_ci", False),  # 274
+    ("utf8mb4", "utf8mb4_hr_0900_ai_ci", False),  # 275
+    None,
+    ("utf8mb4", "utf8mb4_vi_0900_ai_ci", False),  # 277
+    ("utf8mb4", "utf8mb4_0900_as_cs", False),  # 278
+    ("utf8mb4", "utf8mb4_de_pb_0900_as_cs", False),  # 279
+    ("utf8mb4", "utf8mb4_is_0900_as_cs", False),  # 280
+    ("utf8mb4", "utf8mb4_lv_0900_as_cs", False),  # 281
+    ("utf8mb4", "utf8mb4_ro_0900_as_cs", False),  # 282
+    ("utf8mb4", "utf8mb4_sl_0900_as_cs", False),  # 283
+    ("utf8mb4", "utf8mb4_pl_0900_as_cs", False),  # 284
+    ("utf8mb4", "utf8mb4_et_0900_as_cs", False),  # 285
+    ("utf8mb4", "utf8mb4_es_0900_as_cs", False),  # 286
+    ("utf8mb4", "utf8mb4_sv_0900_as_cs", False),  # 287
+    ("utf8mb4", "utf8mb4_tr_0900_as_cs", False),  # 288
+    ("utf8mb4", "utf8mb4_cs_0900_as_cs", False),  # 289
+    ("utf8mb4", "utf8mb4_da_0900_as_cs", False),  # 290
+    ("utf8mb4", "utf8mb4_lt_0900_as_cs", False),  # 291
+    ("utf8mb4", "utf8mb4_sk_0900_as_cs", False),  # 292
+    ("utf8mb4", "utf8mb4_es_trad_0900_as_cs", False),  # 293
+    ("utf8mb4", "utf8mb4_la_0900_as_cs", False),  # 294
+    None,
+    ("utf8mb4", "utf8mb4_eo_0900_as_cs", False),  # 296
+    ("utf8mb4", "utf8mb4_hu_0900_as_cs", False),  # 297
+    ("utf8mb4", "utf8mb4_hr_0900_as_cs", False),  # 298
+    None,
+    ("utf8mb4", "utf8mb4_vi_0900_as_cs", False),  # 300
+    None,
+    None,
+    ("utf8mb4", "utf8mb4_ja_0900_as_cs", False),  # 303
+    ("utf8mb4", "utf8mb4_ja_0900_as_cs_ks", False),  # 304
+    ("utf8mb4", "utf8mb4_0900_as_ci", False),  # 305
+    ("utf8mb4", "utf8mb4_ru_0900_ai_ci", False),  # 306
+    ("utf8mb4", "utf8mb4_ru_0900_as_cs", False),  # 307
 ]
 
