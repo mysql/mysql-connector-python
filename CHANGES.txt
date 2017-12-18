@@ -8,6 +8,16 @@ Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.6
+======
+- WL#11372: Remove configuration API
+- WL#11303: Remove CreateTable and CreateView
+- WL#11281: Transaction savepoints
+- WL#11278: Collection.create_index
+- WL#11149: Create Pylint test for mysqlx
+- WL#11142: Modify/MergePatch
+- WL#11079: Add support for Python 3.6
+
 v8.0.5
 ======
 - WL#11073: Add caching_sha2_password authentication plugin
