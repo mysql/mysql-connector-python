@@ -30,7 +30,8 @@ from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.version import LooseVersion
-from distutils.dir_util import copy_tree
+from distutils.dir_util import copy_tree, mkpath
+from distutils.sysconfig import get_python_lib
 from distutils import log
 from glob import glob
 import os
@@ -167,6 +168,8 @@ def parse_mysql_config_info(options, stdout):
 
     info['version'] = tuple([int(v) for v in ver.split('.')[0:3]])
     libs = shlex.split(info['libs'])
+    if ',' in libs[1]:
+        libs.pop(1)
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
     if platform.uname()[0] == 'SunOS':
@@ -176,9 +179,10 @@ def parse_mysql_config_info(options, stdout):
     for lib in info['libs']:
         log.debug("#   {0}".format(lib))
     libs = shlex.split(info['libs_r'])
+    if ',' in libs[1]:
+        libs.pop(1)
     info['lib_r_dir'] = libs[0].replace('-L', '')
     info['libs_r'] = [ lib.replace('-l', '') for lib in libs[1:] ]
-
     info['include'] = [x.strip() for x in info['include'].split('-I')[1:]]
 
     return info
@@ -300,6 +304,28 @@ class BuildExtDynamic(build_ext):
         self.with_protobuf_include_dir = None
         self.with_protobuf_lib_dir = None
         self.with_protoc = None
+
+    def _copy_vendor_libraries(self):
+        if self.with_mysql_capi and platform.system() == "Darwin":
+            data_files = []
+            openssl_libs = ["libssl.1.0.0.dylib", "libcrypto.1.0.0.dylib"]
+            vendor_folder = "vendor"
+            mkpath(os.path.join(os.getcwd(), vendor_folder))
+
+            # Copy OpenSSL libraries to 'vendor' folder
+            log.info("Copying OpenSSL libraries")
+            for filename in openssl_libs:
+                data_files.append(os.path.join(vendor_folder, filename))
+                src = os.path.join(self.with_mysql_capi, "lib", filename)
+                dst = os.path.join(os.getcwd(), vendor_folder)
+                log.info("Copying {0} -> {1}".format(src, dst))
+                shutil.copy(src, dst)
+
+            # Add data_files to distribution
+            self.distribution.data_files = [(
+                os.path.join(get_python_lib(), vendor_folder),
+                data_files
+            )]
 
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
@@ -427,6 +453,8 @@ class BuildExtDynamic(build_ext):
             ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'),
             ('with_protoc', 'with_protoc'))
 
+        self._copy_vendor_libraries()
+
         build_ext.finalize_options(self)
 
         print("# Python architecture: {0}".format(py_arch))
@@ -534,7 +562,7 @@ class BuildExtDynamic(build_ext):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args:
+            if self.extra_link_args and ext.name != "_mysqlxpb":
                 ext.extra_link_args.extend(self.extra_link_args.split())
             # Add system headers
             for sysheader in sysheaders:
@@ -562,7 +590,7 @@ class BuildExtDynamic(build_ext):
                 if self.extra_compile_args:
                     ext.extra_compile_args.extend(self.extra_compile_args.split())
                 # Add extra link args
-                if self.extra_link_args:
+                if self.extra_link_args and ext.name != "_mysqlxpb":
                     ext.extra_link_args.extend(self.extra_link_args.split())
             if self.with_mysqlxpb_cext:
                 self.run_protoc()
@@ -576,6 +604,25 @@ class BuildExtDynamic(build_ext):
                 self.run_protoc()
             self.real_build_extensions()
 
+            if platform.system() == "Darwin":
+                cmd_libssl = [
+                    "install_name_tool", "-change", "libssl.1.0.0.dylib",
+                    "@loader_path/vendor/libssl.1.0.0.dylib",
+                    build_ext.get_ext_fullpath(self, "_mysql_connector")
+                ]
+                log.info("Executing: {0}".format(" ".join(cmd_libssl)))
+                proc = Popen(cmd_libssl, stdout=PIPE, universal_newlines=True)
+                stdout, _ = proc.communicate()
+
+                cmd_libcrypto = [
+                    "install_name_tool", "-change", "libcrypto.1.0.0.dylib",
+                    "@loader_path/vendor/libcrypto.1.0.0.dylib",
+                    build_ext.get_ext_fullpath(self, "_mysql_connector")
+                ]
+                log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
+                proc = Popen(cmd_libcrypto, stdout=PIPE, universal_newlines=True)
+                stdout, _ = proc.communicate()
+
 
 class BuildExtStatic(BuildExtDynamic):
 
@@ -584,6 +631,8 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
+        self._copy_vendor_libraries()
+
         install_obj = self.distribution.get_command_obj('install')
         install_obj.with_mysql_capi = self.with_mysql_capi
         install_obj.with_protobuf_include_dir = self.with_protobuf_include_dir
@@ -746,7 +795,7 @@ class BuildExtStatic(BuildExtDynamic):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args:
+            if self.extra_link_args and ext.name != "_mysqlxpb":
                 ext.extra_link_args.extend(self.extra_link_args.split())
 
 
