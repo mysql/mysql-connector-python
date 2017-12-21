@@ -136,3 +136,4 @@ classifiers = [
     'Topic :: Software Development :: Libraries :: Application Frameworks',
     'Topic :: Software Development :: Libraries :: Python Modules'
 ]
+install_requires = ["protobuf >= 3.0.0"]

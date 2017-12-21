@@ -68,5 +68,6 @@ setup(
     classifiers=setupinfo.classifiers,
     cmdclass=setupinfo.command_classes,
     ext_modules=setupinfo.extensions,
+    install_requires=setupinfo.install_requires,
 )
 
