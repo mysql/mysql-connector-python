@@ -806,7 +806,7 @@ def setup_logger(logger, debug=False, logfile=None):
 
 def install_connector(root_dir, install_dir, protobuf_include_dir,
                       protobuf_lib_dir, protoc, connc_location=None,
-                      extra_compile_args=None):
+                      extra_compile_args=None, extra_link_args=None):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -845,6 +845,9 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
 
     if extra_compile_args:
         cmd.extend(['--extra-compile-args', extra_compile_args])
+
+    if extra_link_args:
+        cmd.extend(['--extra-link-args', extra_link_args])
 
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,

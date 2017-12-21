@@ -376,6 +376,12 @@ _UNITTESTS_CMD_ARGS = {
         'default': None,
         'help': ("Extra compile args for the C extension")
     },
+
+    ('', '--extra-link-args'): {
+        'dest': 'extra_link_args', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Extra link args for the C extension")
+    },
 }
 
 
@@ -842,7 +848,8 @@ def main():
                                 protobuf_lib_dir,
                                 protoc,
                                 options.mysql_capi,
-                                options.extra_compile_args)
+                                options.extra_compile_args,
+                                options.extra_link_args)
 
     # Which tests cases to run
     testcases = []
