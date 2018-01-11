@@ -317,9 +317,11 @@ class BuildExtDynamic(build_ext):
         if os.name == "nt":
             openssl_libs = ["ssleay32.dll", "libeay32.dll"]
             vendor_folder = ""
+            mysql_capi = os.path.join(self.with_mysql_capi, "bin")
         elif platform.system() == "Darwin":
             openssl_libs = ["libssl.1.0.0.dylib", "libcrypto.1.0.0.dylib"]
-            vendor_folder = os.path.join("mysql-vendor")
+            vendor_folder = "mysql-vendor"
+            mysql_capi = os.path.join(self.with_mysql_capi, "lib")
         else:
             return
 
@@ -331,7 +333,7 @@ class BuildExtDynamic(build_ext):
         log.info("Copying OpenSSL libraries")
         for filename in openssl_libs:
             data_files.append(os.path.join(vendor_folder, filename))
-            src = os.path.join(self.with_mysql_capi, "lib", filename)
+            src = os.path.join(mysql_capi, filename)
             dst = os.path.join(os.getcwd(), vendor_folder)
             log.info("copying {0} -> {1}".format(src, dst))
             shutil.copy(src, dst)
