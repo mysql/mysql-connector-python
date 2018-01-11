@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -311,26 +311,35 @@ class BuildExtDynamic(build_ext):
         self.with_protoc = None
 
     def _copy_vendor_libraries(self):
-        if self.with_mysql_capi and platform.system() == "Darwin":
-            data_files = []
+        if not self.with_mysql_capi:
+            return
+
+        if os.name == "nt":
+            openssl_libs = ["ssleay32.dll", "libeay32.dll"]
+            vendor_folder = ""
+        elif platform.system() == "Darwin":
             openssl_libs = ["libssl.1.0.0.dylib", "libcrypto.1.0.0.dylib"]
-            vendor_folder = "vendor"
+            vendor_folder = os.path.join("mysql-vendor")
+        else:
+            return
+
+        data_files = []
+        if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
 
-            # Copy OpenSSL libraries to 'vendor' folder
-            log.info("Copying OpenSSL libraries")
-            for filename in openssl_libs:
-                data_files.append(os.path.join(vendor_folder, filename))
-                src = os.path.join(self.with_mysql_capi, "lib", filename)
-                dst = os.path.join(os.getcwd(), vendor_folder)
-                log.info("Copying {0} -> {1}".format(src, dst))
-                shutil.copy(src, dst)
-
-            # Add data_files to distribution
-            self.distribution.data_files = [(
-                os.path.join(get_python_lib(), vendor_folder),
-                data_files
-            )]
+        # Copy OpenSSL libraries to 'vendor' folder
+        log.info("Copying OpenSSL libraries")
+        for filename in openssl_libs:
+            data_files.append(os.path.join(vendor_folder, filename))
+            src = os.path.join(self.with_mysql_capi, "lib", filename)
+            dst = os.path.join(os.getcwd(), vendor_folder)
+            log.info("copying {0} -> {1}".format(src, dst))
+            shutil.copy(src, dst)
+        # Add data_files to distribution
+        is_wheel = self.distribution.get_command_obj("install").is_wheel
+        directory = vendor_folder if is_wheel \
+            else os.path.join(get_python_lib(), vendor_folder)
+        self.distribution.data_files = [(directory, data_files)]
 
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
@@ -612,7 +621,7 @@ class BuildExtDynamic(build_ext):
             if platform.system() == "Darwin":
                 cmd_libssl = [
                     "install_name_tool", "-change", "libssl.1.0.0.dylib",
-                    "@loader_path/vendor/libssl.1.0.0.dylib",
+                    "@loader_path/mysql-vendor/libssl.1.0.0.dylib",
                     build_ext.get_ext_fullpath(self, "_mysql_connector")
                 ]
                 log.info("Executing: {0}".format(" ".join(cmd_libssl)))
@@ -621,7 +630,7 @@ class BuildExtDynamic(build_ext):
 
                 cmd_libcrypto = [
                     "install_name_tool", "-change", "libcrypto.1.0.0.dylib",
-                    "@loader_path/vendor/libcrypto.1.0.0.dylib",
+                    "@loader_path/mysql-vendor/libcrypto.1.0.0.dylib",
                     build_ext.get_ext_fullpath(self, "_mysql_connector")
                 ]
                 log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))

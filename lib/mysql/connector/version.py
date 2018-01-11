@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -39,6 +39,6 @@ if VERSION[3] and VERSION[4]:
 else:
     VERSION_TEXT = '{0}.{1}.{2}'.format(*VERSION[0:3])
 
-VERSION_EXTRA = 'dmr'
+VERSION_EXTRA = 'rc'
 LICENSE = 'GPLv2 with FOSS License Exception'
 EDITION = ''  # Added in package names, after the version

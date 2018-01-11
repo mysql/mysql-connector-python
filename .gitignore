@@ -10,6 +10,8 @@ commit.txt
 dist/
 build/
 venv/
+venv2/
+venv3/
 MANIFEST
 cpy_server*/
 *_output.txt
