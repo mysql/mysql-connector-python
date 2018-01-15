@@ -330,16 +330,23 @@ class BuildExtDynamic(build_ext):
         if not self.with_mysql_capi or not is_wheel:
             return
 
+        data_files = []
+
         if os.name == "nt":
             openssl_libs = ["ssleay32.dll", "libeay32.dll"]
             vendor_folder = ""
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
+            # Bundle libmysql.dll
+            src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
+            dst = os.getcwd()
+            log.info("copying {0} -> {1}".format(src, dst))
+            shutil.copy(src, dst)
+            data_files.append("libmysql.dll")
         else:
             openssl_libs = self._get_posix_openssl_libs()
             vendor_folder = "mysql-vendor"
             mysql_capi = os.path.join(self.with_mysql_capi, "lib")
 
-        data_files = []
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
 
@@ -725,6 +732,10 @@ class BuildExtStatic(BuildExtDynamic):
                 lib_file_path = os.path.join(self.connc_lib, lib_file)
                 if os.path.isfile(lib_file_path) and not lib_file.endswith('.a'):
                     os.unlink(os.path.join(self.connc_lib, lib_file))
+        elif os.name == 'nt':
+            self.include_dirs.extend([self.connc_include])
+            self.libraries.extend(['libmysql'])
+            self.library_dirs.extend([self.connc_lib])
 
     def _finalize_protobuf(self):
         if not self.with_protobuf_include_dir:
