@@ -311,20 +311,23 @@ class BuildExtDynamic(build_ext):
         self.with_protoc = None
 
     def _get_posix_openssl_libs(self):
+        openssl_libs = []
         try:
             openssl_libs_path = os.path.join(self.with_mysql_capi, "lib")
-            openssl_libs = [
+            openssl_libs.extend([
                 os.path.basename(glob(
                     os.path.join(openssl_libs_path, "libssl.*.*.*"))[0]),
                 os.path.basename(glob(
                     os.path.join(openssl_libs_path, "libcrypto.*.*.*"))[0])
-            ]
+            ])
         except IndexError:
             log.error("Couldn't find OpenSSL libraries in libmysqlclient")
         return openssl_libs
 
     def _copy_vendor_libraries(self):
-        if not self.with_mysql_capi:
+        is_wheel = getattr(self.distribution.get_command_obj("install"),
+                           "is_wheel", False)
+        if not self.with_mysql_capi or not is_wheel:
             return
 
         if os.name == "nt":
@@ -349,11 +352,7 @@ class BuildExtDynamic(build_ext):
             log.info("copying {0} -> {1}".format(src, dst))
             shutil.copy(src, dst)
         # Add data_files to distribution
-        is_wheel = getattr(self.distribution.get_command_obj("install"),
-                           "is_wheel", False)
-        directory = vendor_folder if is_wheel \
-            else os.path.join(get_python_lib(), vendor_folder)
-        self.distribution.data_files = [(directory, data_files)]
+        self.distribution.data_files = [(vendor_folder, data_files)]
 
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
