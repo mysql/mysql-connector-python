@@ -310,6 +310,19 @@ class BuildExtDynamic(build_ext):
         self.with_protobuf_lib_dir = None
         self.with_protoc = None
 
+    def _get_posix_openssl_libs(self):
+        try:
+            openssl_libs_path = os.path.join(self.with_mysql_capi, "lib")
+            openssl_libs = [
+                os.path.basename(glob(
+                    os.path.join(openssl_libs_path, "libssl.*.*.*"))[0]),
+                os.path.basename(glob(
+                    os.path.join(openssl_libs_path, "libcrypto.*.*.*"))[0])
+            ]
+        except IndexError:
+            log.error("Couldn't find OpenSSL libraries in libmysqlclient")
+        return openssl_libs
+
     def _copy_vendor_libraries(self):
         if not self.with_mysql_capi:
             return
@@ -318,18 +331,16 @@ class BuildExtDynamic(build_ext):
             openssl_libs = ["ssleay32.dll", "libeay32.dll"]
             vendor_folder = ""
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
-        elif platform.system() == "Darwin":
-            openssl_libs = ["libssl.1.0.0.dylib", "libcrypto.1.0.0.dylib"]
+        else:
+            openssl_libs = self._get_posix_openssl_libs()
             vendor_folder = "mysql-vendor"
             mysql_capi = os.path.join(self.with_mysql_capi, "lib")
-        else:
-            return
 
         data_files = []
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
 
-        # Copy OpenSSL libraries to 'vendor' folder
+        # Copy OpenSSL libraries to 'mysql-vendor' folder
         log.info("Copying OpenSSL libraries")
         for filename in openssl_libs:
             data_files.append(os.path.join(vendor_folder, filename))
@@ -338,7 +349,8 @@ class BuildExtDynamic(build_ext):
             log.info("copying {0} -> {1}".format(src, dst))
             shutil.copy(src, dst)
         # Add data_files to distribution
-        is_wheel = self.distribution.get_command_obj("install").is_wheel
+        is_wheel = getattr(self.distribution.get_command_obj("install"),
+                           "is_wheel", False)
         directory = vendor_folder if is_wheel \
             else os.path.join(get_python_lib(), vendor_folder)
         self.distribution.data_files = [(directory, data_files)]
@@ -526,13 +538,11 @@ class BuildExtDynamic(build_ext):
         check_call(command)
 
     def fix_compiler(self):
-        platform = get_platform()
-
         cc = self.compiler
         if not cc:
             return
 
-        if 'macosx-10.9' in platform:
+        if 'macosx-10.9' in get_platform():
             for needle in ['-mno-fused-madd']:
                 try:
                     cc.compiler.remove(needle)
@@ -578,8 +588,11 @@ class BuildExtDynamic(build_ext):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args and ext.name != "_mysqlxpb":
-                ext.extra_link_args.extend(self.extra_link_args.split())
+            if self.extra_link_args and ext.name == "_mysql_connector":
+                extra_link_args = self.extra_link_args.split()
+                if platform.system() == "Linux":
+                    extra_link_args += ["-Wl,-rpath,$ORIGIN/mysql-vendor"]
+                ext.extra_link_args.extend(extra_link_args)
             # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
@@ -621,9 +634,10 @@ class BuildExtDynamic(build_ext):
             self.real_build_extensions()
 
             if platform.system() == "Darwin":
+                libssl, libcrypto = self._get_posix_openssl_libs()
                 cmd_libssl = [
-                    "install_name_tool", "-change", "libssl.1.0.0.dylib",
-                    "@loader_path/mysql-vendor/libssl.1.0.0.dylib",
+                    "install_name_tool", "-change", libssl,
+                    "@loader_path/mysql-vendor/{0}".format(libssl),
                     build_ext.get_ext_fullpath(self, "_mysql_connector")
                 ]
                 log.info("Executing: {0}".format(" ".join(cmd_libssl)))
@@ -631,8 +645,8 @@ class BuildExtDynamic(build_ext):
                 stdout, _ = proc.communicate()
 
                 cmd_libcrypto = [
-                    "install_name_tool", "-change", "libcrypto.1.0.0.dylib",
-                    "@loader_path/mysql-vendor/libcrypto.1.0.0.dylib",
+                    "install_name_tool", "-change", libcrypto,
+                    "@loader_path/mysql-vendor/{0}".format(libcrypto),
                     build_ext.get_ext_fullpath(self, "_mysql_connector")
                 ]
                 log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
