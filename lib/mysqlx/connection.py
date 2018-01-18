@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -38,6 +38,7 @@ import sys
 import socket
 import logging
 import uuid
+import platform
 
 from functools import wraps
 
@@ -377,7 +378,17 @@ class Connection(object):
             self.close_connection()
             raise OperationalError("SSL not enabled at server.")
 
-        if sys.version_info < (2, 7, 9):
+        is_ol7 = False
+        if platform.system() == "Linux":
+            # pylint: disable=W1505
+            distname, version, _ = platform.linux_distribution()
+            try:
+                is_ol7 = "Oracle Linux" in distname and \
+                    version.split(".")[0] == "7"
+            except IndexError:
+                is_ol7 = False
+
+        if sys.version_info < (2, 7, 9) and not is_ol7:
             self.close_connection()
             raise RuntimeError("The support for SSL is not available for "
                                "this Python version.")
