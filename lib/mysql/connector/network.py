@@ -403,7 +403,7 @@ class BaseMySQLSocket(object):
         self._connection_timeout = timeout
 
     # pylint: disable=C0103
-    def switch_to_ssl(self, ca, cert, key, verify_cert=False, cipher=None):
+    def switch_to_ssl(self, ca, cert, key, verify_cert=False, verify_identity=False, cipher=None):
         """Switch the socket to use SSL"""
         if not self.sock:
             raise errors.InterfaceError(errno=2048)
@@ -419,12 +419,16 @@ class BaseMySQLSocket(object):
                 cert_reqs=cert_reqs, do_handshake_on_connect=False,
                 ssl_version=ssl.PROTOCOL_TLSv1, ciphers=cipher)
             self.sock.do_handshake()
+            if verify_identity:
+                ssl.match_hostname(self.sock.getpeercert(), self.server_host)
         except NameError:
             raise errors.NotSupportedError(
                 "Python installation has no SSL support")
         except (ssl.SSLError, IOError) as err:
             raise errors.InterfaceError(
                 errno=2055, values=(self.get_address(), _strioerror(err)))
+        except ssl.CertificateError as err:
+            raise errors.InterfaceError(str(err))
         except NotImplementedError as err:
             raise errors.InterfaceError(str(err))
 
