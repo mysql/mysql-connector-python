@@ -415,16 +415,23 @@ class CMySQLCursor(MySQLCursorAbstract):
             argnames = []
             argtypes = []
             if args:
+                argvalues = []
                 for idx, arg in enumerate(args):
                     argname = argfmt.format(name=procname, index=idx + 1)
                     argnames.append(argname)
                     if isinstance(arg, tuple):
                         argtypes.append(" CAST({0} AS {1})".format(argname,
                                                                    arg[1]))
-                        self.execute("SET {0}=%s".format(argname), (arg[0],))
+                        argvalues.append(arg[0])
                     else:
                         argtypes.append(argname)
-                        self.execute("SET {0}=%s".format(argname), (arg,))
+                        argvalues.append(arg)
+
+                self.execute(
+                    "SET %s" % ','.join('{0}=%s'.format(arg)
+                                        for arg in argnames),
+                    argvalues
+                )
 
             call = "CALL {0}({1})".format(procname, ','.join(argnames))
 
