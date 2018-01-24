@@ -3,7 +3,7 @@ MySQL Connector/Python 8.0
 ==========================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 License information can be found in the LICENSE.txt file.
 
@@ -29,7 +29,7 @@ They can be found in the examples/ directory.
 License
 =======
 
-Copyright (c) 2011, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
 
 This is a release of MySQL Connector/Python, Oracle's Python driver for MySQL.
 

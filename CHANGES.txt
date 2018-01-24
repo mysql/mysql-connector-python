@@ -3,13 +3,14 @@ MySQL Connector/Python 8.0 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
 v8.0.6
 ======
+
 - WL#11372: Remove configuration API
 - WL#11303: Remove CreateTable and CreateView
 - WL#11281: Transaction savepoints
@@ -20,6 +21,7 @@ v8.0.6
 
 v8.0.5
 ======
+
 - WL#11073: Add caching_sha2_password authentication plugin
 - WL#10975: Add Single document operations
 - WL#10974: Add Row locking methods to find and select operations
@@ -30,6 +32,7 @@ v8.0.5
 
 v8.0.4
 ======
+
 - WL#10772: Cleanup Drop APIs
 - WL#10770: Ensure all Session connections are secure by default
 - WL#10754: Forbid modify() and remove() with no condition
@@ -46,6 +49,7 @@ v8.0.4
 
 v2.2.3
 ======
+
 - WL#10452: Add Protobuf C++ extension for Linux variants and Mac OSX
 - WL#10081: DevAPI: IPv6 support
 - BUG#25614860: Fix defined_as method in the view creation

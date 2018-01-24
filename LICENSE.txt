@@ -3,45 +3,36 @@ Licensing Information User Manual
 MySQL Connector/Python
      __________________________________________________________________
 
-   This is a license book. It contains Oracle's product license and other
-   licensing information, including licensing information for third-party
-   software which may be included in this GPL release of MySQL
-   Connector/Python.
-
-   Last updated: December 2017.
-
 Introduction
 
-   This Licensing Information document is a part of the product or program
-   documentation under the terms of your Oracle license agreement and is
-   intended to help you understand the program editions, entitlements,
-   restrictions, prerequisites, special license rights, and/or separately
-   licensed third party technology terms associated with the Oracle
-   software program(s) covered by this document (the "Program(s)").
-   Entitled or restricted use products or components identified in this
-   document that are not provided with the particular Program may be
-   obtained from the Oracle Software Delivery Cloud website
-   (https://edelivery.oracle.com/) or from media Oracle may provide. If
-   you have a question about your license rights and obligations, please
-   contact your Oracle sales representative, review the information
-   provided in Oracle's Software Investment Guide
-   (http://www.oracle.com/us/corporate/pricing/software-investment-guide/i
-   ndex.html), and/or contact the applicable Oracle License Management
-   Services representative listed on
-   http://www.oracle.com/us/corporate/license-management-services/index.ht
-   ml.
+   This License Information User Manual contains Oracle's product license
+   and other licensing information, including licensing information for
+   third-party software which may be included in this distribution of
+   MySQL Connector/Python.
+
+   Last updated: January 2018.
 
 Licensing Information
 
 Product License - MySQL Connector/Python
 
    This is a release of MySQL Connector/Python, the dual-license Python
-   API for MySQL . For the avoidance of doubt, this particular copy of the
+   API for MySQL. For the avoidance of doubt, this particular copy of the
    software is released under version 2 of the GNU General Public License.
    MySQL Connector/Python is brought to you by the MySQL team at Oracle.
 
-   Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights
+   Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights
    reserved.
+
+Election of GPLv2
+
+   For the avoidance of doubt, except that if any license choice other
+   than GPL or LGPL is available it will apply instead, Oracle elects to
+   use only the General Public License version 2 (GPLv2) at this time for
+   any software where a choice of GPL license versions is made available
+   with the language indicating that GPLv2 or any later version may be
+   used, or where a choice of which version of the GPL is applied is
+   otherwise unspecified.
 
 GNU General Public License Version 2.0, June 1991
 
@@ -427,34 +418,23 @@ MySQL FOSS License Exception
    This software is OSI Certified Open Source Software. OSI Certified is a
    certification mark of the Open Source Initiative.
 
-GPLv2 Disclaimer
-
-   For the avoidance of doubt, except that if any license choice other
-   than GPL or LGPL is available it will apply instead, Oracle elects to
-   use only the General Public License version 2 (GPLv2) at this time for
-   any software where a choice of GPL license versions is made available
-   with the language indicating that GPLv2 or any later version may be
-   used, or where a choice of which version of the GPL is applied is
-   otherwise unspecified.
-
 Written Offer for Source Code
 
-   For third-party software that you receive from Oracle in binary form
-   which is licensed under an open source license that gives you the right
-   to receive the source code for that binary, you can obtain a copy of
-   the applicable source code by visiting
+   For any software that you receive from Oracle in binary form which is
+   licensed under an open source license that gives you the right to
+   receive the source code for that binary, you can obtain a copy of the
+   applicable source code by visiting
    http://www.oracle.com/goto/opensourcecode. If the source code for the
    binary was not provided to you with the binary, you can also receive a
    copy of the source code on physical media by submitting a written
    request to the address listed below or by sending an email to Oracle
    using the following link:
-
-   http://www.oracle.com/goto/opensourcecode/request
-      Oracle America, Inc.
-      Attn: Senior Vice President
-      Development and Engineering Legal
-      500 Oracle Parkway, 10th Floor
-      Redwood Shores, CA 94065
+   http://www.oracle.com/goto/opensourcecode/request.
+  Oracle America, Inc.
+  Attn: Senior Vice President
+  Development and Engineering Legal
+  500 Oracle Parkway, 10th Floor
+  Redwood Shores, CA 94065
 
    Your request should include:
 
@@ -477,7 +457,7 @@ Written Offer for Source Code
    processing.
 
    Your request must be sent
-    a. within three (3) years of the date you received the Oracleproduct
+    a. within three (3) years of the date you received the Oracle product
        that included the binary that is the subject of your request, or
     b. in the case of code licensed under the GPL v3 for as long as Oracle
        offers spare parts or customer support for that product model.
@@ -489,7 +469,7 @@ Licenses for Third-Party Components
    used to test MySQL Connector/Python. We are thankful to all individuals
    that have created these.
 
-Django 1.5.1 License
+Django 1.5.1
 
    The following software may be included in this product:
 Copyright (c) Django Software Foundation and individual contributors.
@@ -526,10 +506,9 @@ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
-Google Protocol Buffers License
+Google Protocol Buffers
 
-The following software may be included in this product:
-
+   The following software may be included in this product:
 Protocol Buffers (aka Google protobuf)
 
 Google Protocol Buffers - protobuf
