@@ -857,7 +857,9 @@ class InstallLib(install_lib):
 
     def run(self):
         self.build()
-        outfiles = self.install()
+        outfiles = [
+            filename for filename in self.install() if filename.endswith(".py")
+        ]
 
         # (Optionally) compile .py to .pyc
         if outfiles is not None and self.distribution.has_pure_modules():
@@ -865,8 +867,6 @@ class InstallLib(install_lib):
 
         if self.byte_code_only:
             for source_file in outfiles:
-                if os.path.join('mysql', '__init__.py') in source_file:
-                    continue
                 log.info("Removing %s", source_file)
                 os.remove(source_file)
 
