@@ -65,7 +65,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'MySQL Connector/Python X DevAPI Reference'
-copyright = u'2016, 2017, Oracle and/or its affiliates. All rights reserved'
+copyright = u'2016, 2018, Oracle and/or its affiliates. All rights reserved'
 author = u'Nuno Mariz'
 
 # The version info for the project you're documenting, acts as replacement for

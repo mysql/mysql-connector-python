@@ -3,6 +3,17 @@ Installation
 
 Packages are available at the `Connector/Python download site <http://dev.mysql.com/downloads/connector/python/>`_. For some packaging formats, there are different packages for different versions of Python; choose the one appropriate for the version of Python installed on your system.
 
+Installing Connector/Python with pip
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This is the recommended way to install Connector/Python.
+
+Make sure you have a recent `pip <https://pip.pypa.io/>`_ version installed on your system. If your system already has ``pip`` installed, you might need to update it. Or you can use the `standalone pip installer <https://pip.pypa.io/en/latest/installing/#installing-with-get-pip-py>`_.
+
+.. code-block:: bash
+
+    shell> pip install mysql-connector-python
+
 Installing Connector/Python on Microsoft Windows Using an MSI Package
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
