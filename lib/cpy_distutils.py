@@ -29,7 +29,9 @@ from distutils.command.install import install
 from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
-from distutils.dir_util import copy_tree
+from distutils.version import LooseVersion
+from distutils.dir_util import copy_tree, mkpath
+from distutils.sysconfig import get_python_lib
 from distutils import log
 from glob import glob
 import os
@@ -160,6 +162,8 @@ def parse_mysql_config_info(options, stdout):
 
     info['version'] = tuple([int(v) for v in ver.split('.')[0:3]])
     libs = shlex.split(info['libs'])
+    if ',' in libs[1]:
+        libs.pop(1)
     info['lib_dir'] = libs[0].replace('-L', '')
     info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
     if platform.uname()[0] == 'SunOS':
@@ -169,9 +173,10 @@ def parse_mysql_config_info(options, stdout):
     for lib in info['libs']:
         log.debug("#   {0}".format(lib))
     libs = shlex.split(info['libs_r'])
+    if ',' in libs[1]:
+        libs.pop(1)
     info['lib_r_dir'] = libs[0].replace('-L', '')
     info['libs_r'] = [ lib.replace('-l', '') for lib in libs[1:] ]
-
     info['include'] = [x.strip() for x in info['include'].split('-I')[1:]]
 
     return info
@@ -290,6 +295,58 @@ class BuildExtDynamic(build_ext):
         self.extra_link_args = None
         self.with_mysql_capi = None
 
+    def _get_posix_openssl_libs(self):
+        openssl_libs = []
+        try:
+            openssl_libs_path = os.path.join(self.with_mysql_capi, "lib")
+            openssl_libs.extend([
+                os.path.basename(glob(
+                    os.path.join(openssl_libs_path, "libssl.*.*.*"))[0]),
+                os.path.basename(glob(
+                    os.path.join(openssl_libs_path, "libcrypto.*.*.*"))[0])
+            ])
+        except IndexError:
+            log.error("Couldn't find OpenSSL libraries in libmysqlclient")
+        return openssl_libs
+
+    def _copy_vendor_libraries(self):
+        if not self.with_mysql_capi:
+            return
+
+        data_files = []
+
+        if os.name == "nt":
+            openssl_libs = ["ssleay32.dll", "libeay32.dll"]
+            vendor_folder = ""
+            mysql_capi = os.path.join(self.with_mysql_capi, "bin")
+            # Bundle libmysql.dll
+            src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
+            dst = os.getcwd()
+            log.info("copying {0} -> {1}".format(src, dst))
+            shutil.copy(src, dst)
+            data_files.append("libmysql.dll")
+        else:
+            openssl_libs = self._get_posix_openssl_libs()
+            vendor_folder = "mysql-vendor"
+            mysql_capi = os.path.join(self.with_mysql_capi, "lib")
+
+        if vendor_folder:
+            mkpath(os.path.join(os.getcwd(), vendor_folder))
+
+        # Copy OpenSSL libraries to 'mysql-vendor' folder
+        log.info("Copying OpenSSL libraries")
+        for filename in openssl_libs:
+            data_files.append(os.path.join(vendor_folder, filename))
+            src = os.path.join(mysql_capi, filename)
+            dst = os.path.join(os.getcwd(), vendor_folder)
+            log.info("copying {0} -> {1}".format(src, dst))
+            shutil.copy(src, dst)
+        # Add data_files to distribution
+        self.distribution.data_files = [(
+            os.path.join(get_python_lib(), vendor_folder),
+            data_files
+        )]
+
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
         """
@@ -317,22 +374,21 @@ class BuildExtDynamic(build_ext):
                 log.debug("# connc_loc: {0}".format(connc_loc))
             else:
                 # Probably using MS Windows
-                myconfigh = os.path.join(connc_loc, 'include', 'my_config.h')
+                myversionh = os.path.join(connc_loc, 'include',
+                                          'mysql_version.h')
 
-                if not os.path.exists(myconfigh):
+                if not os.path.exists(myversionh):
                     log.error("MySQL C API installation invalid "
-                              "(my_config.h not found)")
+                              "(mysql_version.h not found)")
                     sys.exit(1)
                 else:
-                    with open(myconfigh, 'rb') as fp:
+                    with open(myversionh, 'rb') as fp:
                         for line in fp.readlines():
-                            if b'#define VERSION' in line:
-                                version = tuple([
-                                    int(v) for v in
-                                    line.split()[2].replace(
-                                        b'"', b'').split(b'.')
-                                ])
-                                if version < min_version:
+                            if b'#define LIBMYSQL_VERSION' in line:
+                                version = LooseVersion(
+                                    line.split()[2].replace(b'"', b'').decode()
+                                ).version
+                                if tuple(version) < min_version:
                                     log.error(err_version);
                                     sys.exit(1)
                                 break
@@ -414,6 +470,8 @@ class BuildExtDynamic(build_ext):
             ('extra_link_args', 'extra_link_args'),
             ('with_mysql_capi', 'with_mysql_capi'))
 
+        self._copy_vendor_libraries()
+
         build_ext.finalize_options(self)
 
         print("# Python architecture: {0}".format(py_arch))
@@ -423,13 +481,11 @@ class BuildExtDynamic(build_ext):
             self._finalize_connector_c(self.with_mysql_capi)
 
     def fix_compiler(self):
-        platform = get_platform()
-
         cc = self.compiler
         if not cc:
             return
 
-        if 'macosx-10.9' in platform:
+        if 'macosx-10.9' in get_platform():
             for needle in ['-mno-fused-madd']:
                 try:
                     cc.compiler.remove(needle)
@@ -467,8 +523,11 @@ class BuildExtDynamic(build_ext):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args:
-                ext.extra_link_args.extend(self.extra_link_args.split())
+            if self.extra_link_args and ext.name == "_mysql_connector":
+                extra_link_args = self.extra_link_args.split()
+                if platform.system() == "Linux":
+                    extra_link_args += ["-Wl,-rpath,$ORIGIN/mysql-vendor"]
+                ext.extra_link_args.extend(extra_link_args)
             # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
@@ -480,6 +539,8 @@ class BuildExtDynamic(build_ext):
 
     def run(self):
         """Run the command"""
+        if not self.with_mysql_capi:
+            return
         if os.name == 'nt':
             for ext in self.extensions:
                 # Use the multithread, static version of the run-time library
@@ -498,6 +559,26 @@ class BuildExtDynamic(build_ext):
             self.fix_compiler()
             self.real_build_extensions()
 
+            if platform.system() == "Darwin":
+                libssl, libcrypto = self._get_posix_openssl_libs()
+                cmd_libssl = [
+                    "install_name_tool", "-change", libssl,
+                    "@loader_path/mysql-vendor/{0}".format(libssl),
+                    build_ext.get_ext_fullpath(self, "_mysql_connector")
+                ]
+                log.info("Executing: {0}".format(" ".join(cmd_libssl)))
+                proc = Popen(cmd_libssl, stdout=PIPE, universal_newlines=True)
+                stdout, _ = proc.communicate()
+
+                cmd_libcrypto = [
+                    "install_name_tool", "-change", libcrypto,
+                    "@loader_path/mysql-vendor/{0}".format(libcrypto),
+                    build_ext.get_ext_fullpath(self, "_mysql_connector")
+                ]
+                log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
+                proc = Popen(cmd_libcrypto, stdout=PIPE, universal_newlines=True)
+                stdout, _ = proc.communicate()
+
 
 class BuildExtStatic(BuildExtDynamic):
 
@@ -506,6 +587,8 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
+        self._copy_vendor_libraries()
+
         install_obj = self.distribution.get_command_obj('install')
         install_obj.with_mysql_capi = self.with_mysql_capi
         install_obj.extra_compile_args = self.extra_compile_args
@@ -550,7 +633,10 @@ class BuildExtStatic(BuildExtDynamic):
                 lib_file_path = os.path.join(self.connc_lib, lib_file)
                 if os.path.isfile(lib_file_path) and not lib_file.endswith('.a'):
                     os.unlink(os.path.join(self.connc_lib, lib_file))
-
+        elif os.name == 'nt':
+            self.include_dirs.extend([self.connc_include])
+            self.libraries.extend(['libmysql'])
+            self.library_dirs.extend([self.connc_lib])
 
     def fix_compiler(self):
         BuildExtDynamic.fix_compiler(self)
@@ -601,7 +687,9 @@ class InstallLib(install_lib):
 
     def run(self):
         self.build()
-        outfiles = self.install()
+        outfiles = [
+            filename for filename in self.install() if filename.endswith(".py")
+        ]
 
         # (Optionally) compile .py to .pyc
         if outfiles is not None and self.distribution.has_pure_modules():
@@ -609,8 +697,6 @@ class InstallLib(install_lib):
 
         if self.byte_code_only:
             for source_file in outfiles:
-                if os.path.join('mysql', '__init__.py') in source_file:
-                    continue
                 log.info("Removing %s", source_file)
                 os.remove(source_file)
 

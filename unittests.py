@@ -99,9 +99,6 @@ else:
 # MySQL option file template. Platform specifics dynamically added later.
 MY_CNF = """
 # MySQL option file for MySQL Connector/Python tests
-[mysqld-8.0]
-information-schema-stats=LATEST
-
 [mysqld-5.6]
 innodb_compression_level = 0
 innodb_compression_failure_threshold_pct = 0
@@ -140,7 +137,6 @@ local_infile = 1
 innodb_flush_log_at_trx_commit = 2
 innodb_log_file_size = 1Gb
 general_log_file = general_{name}.log
-ssl
 """
 
 # Platform specifics
@@ -160,6 +156,8 @@ else:
         "innodb_flush_method = O_DIRECT",
     ))
     MYSQL_DEFAULT_BASE = os.path.join('/', 'usr', 'local', 'mysql')
+
+MY_CNF += "\nssl={ssl}"
 
 MYSQL_DEFAULT_TOPDIR = _TOPDIR
 
@@ -337,6 +335,12 @@ _UNITTESTS_CMD_ARGS = {
         'dest': 'extra_compile_args', 'metavar': 'NAME',
         'default': None,
         'help': ("Extra compile args for the C extension")
+    },
+
+    ('', '--extra-link-args'): {
+        'dest': 'extra_link_args', 'metavar': 'NAME',
+        'default': None,
+        'help': ("Extra link args for the C extension")
     },
 }
 
@@ -769,7 +773,8 @@ def main():
     if not options.skip_install:
         tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
                                 options.mysql_capi,
-                                options.extra_compile_args)
+                                options.extra_compile_args,
+                                options.extra_link_args)
 
     # Which tests cases to run
     testcases = []

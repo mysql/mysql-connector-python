@@ -133,7 +133,7 @@ class SetupInfoTests(tests.MySQLConnectorTests):
             if 'Programming Language :: Python' in clsfr:
                 ver = clsfr.replace('Programming Language :: Python :: ', '')
                 if ver not in ('2.6', '2.7', '3', '3.1', '3.2', '3.3', '3.4',
-                               '3.5'):
+                               '3.5', '3.6'):
                     self.fail('Unsupported version in classifiers')
             if 'Development Status ::' in clsfr:
                 status = clsfr.replace('Development Status :: ', '')
