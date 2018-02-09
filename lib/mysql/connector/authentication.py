@@ -23,11 +23,11 @@
 
 """Implementing support for MySQL Authentication Plugins"""
 
-from hashlib import sha1
+from hashlib import sha1, sha256
 import struct
 
 from . import errors
-from .catch23 import PY2, isstr
+from .catch23 import PY2, isstr, UNICODE_TYPES
 
 
 class BaseAuthPlugin(object):
@@ -160,6 +160,81 @@ class MySQLSHA256PasswordAuthPlugin(BaseAuthPlugin):
 
     def prepare_password(self):
         """Returns password as as clear text"""
+        if not self._password:
+            return b'\x00'
+        password = self._password
+
+        if PY2:
+            if isinstance(password, unicode):  # pylint: disable=E0602
+                password = password.encode('utf8')
+        elif isinstance(password, str):
+            password = password.encode('utf8')
+
+        return password + b'\x00'
+
+
+class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
+    """Class implementing the MySQL caching_sha2_password authentication plugin
+
+    Note that encrypting using RSA is not supported since the Python
+    Standard Library does not provide this OpenSSL functionality.
+    """
+    requires_ssl = False
+    plugin_name = 'caching_sha2_password'
+    perform_full_authentication = 4
+    fast_auth_success = 3
+
+    def _scramble(self):
+        """ Returns a scramble of the password using a Nonce sent by the
+        server.
+
+        The scramble is of the form:
+        XOR(SHA2(password), SHA2(SHA2(SHA2(password)), Nonce))
+        """
+        if not self._auth_data:
+            raise errors.InterfaceError("Missing authentication data (seed)")
+
+        if not self._password:
+            return b''
+
+        password = self._password.encode('utf-8') \
+            if isinstance(self._password, UNICODE_TYPES) else self._password
+
+        if PY2:
+            password = buffer(password)  # pylint: disable=E0602
+            try:
+                auth_data = buffer(self._auth_data)  # pylint: disable=E0602
+            except TypeError:
+                raise errors.InterfaceError("Authentication data incorrect")
+        else:
+            password = password
+            auth_data = self._auth_data
+
+        hash1 = sha256(password).digest()
+        hash2 = sha256()
+        hash2.update(sha256(hash1).digest())
+        hash2.update(auth_data)
+        hash2 = hash2.digest()
+        if PY2:
+            xored = [ord(h1) ^ ord(h2) for (h1, h2) in zip(hash1, hash2)]
+        else:
+            xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
+        hash3 = struct.pack('32B', *xored)
+
+        return hash3
+
+    def prepare_password(self):
+        if len(self._auth_data) > 1:
+            return self._scramble()
+        elif self._auth_data[0] == self.perform_full_authentication:
+            return self._full_authentication()
+
+    def _full_authentication(self):
+        """Returns password as as clear text"""
+        if not self._ssl_enabled:
+            raise errors.InterfaceError("{name} requires SSL".format(
+                name=self.plugin_name))
+
         if not self._password:
             return b'\x00'
         password = self._password

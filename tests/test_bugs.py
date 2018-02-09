@@ -386,6 +386,7 @@ class Bug519301(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_auth(self):
         config = self.config.copy()
+        config.pop('unix_socket')
         config['user'] = 'ham'
         config['password'] = 'spam'
 
@@ -4197,6 +4198,7 @@ class BugOra21656282(tests.MySQLConnectorTests):
 
     def test_unicode_password(self):
         config = tests.get_mysql_config()
+        config.pop('unix_socket')
         config['user'] = self.user
         config['password'] = self.password
         try:
@@ -4292,7 +4294,7 @@ class BugOra21947091(tests.MySQLConnectorTests):
         self.server.stop()
         self.server.wait_down()
 
-        self.server.start(ssl_ca='', ssl_cert='', ssl_key='')
+        self.server.start(ssl_ca='', ssl_cert='', ssl_key='', ssl=0)
         self.server.wait_up()
         time.sleep(1)
 
