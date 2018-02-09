@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -52,6 +52,7 @@ from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.catch23 import STRING_TYPES
 import mysql.connector
 import cpy_distutils
 
@@ -4525,3 +4526,24 @@ class BugOra24659561(tests.MySQLConnectorTests):
             "INSERT INTO {0} VALUES (%s, %s)".format(self.tbl),
             [(1, "Nuno"), (2, "Amitabh"), (3, "Rafael")]
         )
+
+
+class BugOra24948205(tests.MySQLConnectorTests):
+    """BUG#24948205: RESULT OF JSON_TYPE IS BYTEARRAY INSTEAD OF STR
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.tbl = "BugOra24948205"
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor()
+
+    def test_execute_get_json_type_as_str(self):
+        self.cur.execute("SELECT j, JSON_TYPE(j), 'foo'"
+                         "FROM (SELECT json_object('foo', 'bar') AS j) jdata")
+        data = [('{"foo": "bar"}', 'OBJECT', 'foo')]
+        rows = self.cur.fetchall()
+        self.assertEqual(data, rows)
+        for col in rows[0]:
+            self.assertTrue(isinstance(col, STRING_TYPES),
+                            "{} is type {} and not the expected type "
+                            "string".format(col, type(col)))
