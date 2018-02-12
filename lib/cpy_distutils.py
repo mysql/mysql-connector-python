@@ -310,7 +310,7 @@ class BuildExtDynamic(build_ext):
         return openssl_libs
 
     def _copy_vendor_libraries(self):
-        if not self.with_mysql_capi:
+        if not self.with_mysql_capi or self.distribution.data_files:
             return
 
         data_files = []
@@ -342,10 +342,7 @@ class BuildExtDynamic(build_ext):
             log.info("copying {0} -> {1}".format(src, dst))
             shutil.copy(src, dst)
         # Add data_files to distribution
-        self.distribution.data_files = [(
-            os.path.join(get_python_lib(), vendor_folder),
-            data_files
-        )]
+        self.distribution.data_files = [(vendor_folder, data_files)]
 
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
