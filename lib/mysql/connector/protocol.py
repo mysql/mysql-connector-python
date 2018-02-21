@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -423,7 +423,7 @@ class MySQLProtocol(object):
 
         return (packet[length + 1:], tmp)
 
-    def _parse_binary_values(self, fields, packet):
+    def _parse_binary_values(self, fields, packet, charset='utf-8'):
         """Parse values from a binary result packet"""
         null_bitmap_length = (len(fields) + 7 + 2) // 8
         null_bitmap = [int(i) for i in packet[0:null_bitmap_length]]
@@ -451,11 +451,11 @@ class MySQLProtocol(object):
                 values.append(value)
             else:
                 (packet, value) = utils.read_lc_string(packet)
-                values.append(value)
+                values.append(value.decode(charset))
 
         return tuple(values)
 
-    def read_binary_result(self, sock, columns, count=1):
+    def read_binary_result(self, sock, columns, count=1, charset='utf-8'):
         """Read MySQL binary protocol result
 
         Reads all or given number of binary resultset rows from the socket.
@@ -475,7 +475,7 @@ class MySQLProtocol(object):
                 values = None
             elif packet[4] == 0:
                 eof = None
-                values = self._parse_binary_values(columns, packet[5:])
+                values = self._parse_binary_values(columns, packet[5:], charset)
             if eof is None and values is not None:
                 rows.append(values)
             elif eof is None and values is None:
@@ -631,6 +631,8 @@ class MySQLProtocol(object):
         values = []
         types = []
         packed = b''
+        if charset == 'utf8mb4':
+            charset = 'utf8'
         if long_data_used is None:
             long_data_used = {}
         if parameters and data:

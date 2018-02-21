@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1239,7 +1239,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         self.assertEqual(3, cur.rowcount)
 
         cur.execute(stmt_select)
-        self.assertEqual([(1, b'100'), (2, b'200'), (3, b'300')],
+        self.assertEqual([(1, '100'), (2, '200'), (3, '300')],
                          cur.fetchall(), "Multi insert test failed")
 
         data = [(2,), (3,)]

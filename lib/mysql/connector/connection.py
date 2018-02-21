@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -474,8 +474,11 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         try:
             if binary:
+                charset = self.charset
+                if charset == 'utf8mb4':
+                    charset = 'utf8'
                 rows = self._protocol.read_binary_result(
-                    self._socket, columns, count)
+                    self._socket, columns, count, charset)
             else:
                 rows = self._protocol.read_text_result(self._socket,
                                                        self._server_version,
