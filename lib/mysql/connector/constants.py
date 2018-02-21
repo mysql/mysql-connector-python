@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -164,6 +164,7 @@ class FieldType(_Constants):
     NEWDATE = 0x0e
     VARCHAR = 0x0f
     BIT = 0x10
+    JSON = 0xf5
     NEWDECIMAL = 0xf6
     ENUM = 0xf7
     SET = 0xf8
@@ -193,6 +194,7 @@ class FieldType(_Constants):
         'NEWDATE': (0x0e, 'NEWDATE'),
         'VARCHAR': (0x0f, 'VARCHAR'),
         'BIT': (0x10, 'BIT'),
+        'JSON': (0xf5, 'JSON'),
         'NEWDECIMAL': (0xf6, 'NEWDECIMAL'),
         'ENUM': (0xf7, 'ENUM'),
         'SET': (0xf8, 'SET'),

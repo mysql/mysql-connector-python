@@ -328,7 +328,7 @@ class MySQLCursorTests(tests.TestsCursor):
         self.cur = cursor.MySQLCursor(self.cnx)
         self.assertRaises(StopIteration, self.cur.__next__)
         self.cur.execute("SELECT BINARY 'ham'")
-        exp = (b'ham',)
+        exp = ('ham',)
         self.assertEqual(exp, next(self.cur))
         self.cur.close()
 
@@ -561,7 +561,7 @@ class MySQLCursorTests(tests.TestsCursor):
         self.assertTrue(tests.cmp_result(exp, self.cur._warnings))
 
         self.cur.execute("SELECT BINARY 'ham'")
-        exp = [(b'ham',)]
+        exp = [('ham',)]
         self.assertEqual(exp, self.cur.fetchall())
         self.cur.close()
 
@@ -833,7 +833,7 @@ class MySQLCursorTests(tests.TestsCursor):
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
         self.cur = self.cnx.cursor()
         self.cur.execute("SELECT BINARY 'ham'")
-        exp = (b'ham',)
+        exp = ('ham',)
         self.assertEqual(exp, self.cur.fetchone())
         self.assertEqual(None, self.cur.fetchone())
         self.cur.close()
@@ -1262,8 +1262,8 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
             return row
         cur._fetch_row = _fetch_row
 
-        cur._test_fetch_row = [(b'ham',)]
-        self.assertEqual((b'ham',), cur.fetchone())
+        cur._test_fetch_row = [('ham',)]
+        self.assertEqual(('ham',), cur.fetchone())
         self.assertEqual(None, cur.fetchone())
 
     def test_fetchmany(self):
