@@ -58,6 +58,7 @@ from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.catch23 import STRING_TYPES
 import mysql.connector
 import cpy_distutils
 
