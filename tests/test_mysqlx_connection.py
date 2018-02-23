@@ -38,6 +38,7 @@ import tests
 import mysqlx
 
 from mysqlx.errors import InterfaceError, ProgrammingError
+from mysqlx.protobuf import Protobuf
 
 if mysqlx.compat.PY3:
     from urllib.parse import quote_plus
@@ -64,6 +65,11 @@ _URI_TEST_RESULTS = (  # (uri, result)
     ("user:@127.0.0.1/schema", {"schema": "schema", "host": "127.0.0.1",
                                 "password": "", "port": 33060,
                                 "user": "user"}),
+    ("user:@127.0.0.1/schema?use_pure=true", {"schema": "schema",
+                                              "host": "127.0.0.1",
+                                              "password": "", "port": 33060,
+                                              "user": "user",
+                                              "use-pure": True}),
     ("mysqlx://user:@127.0.0.1", {"schema": "", "host": "127.0.0.1",
                                   "password": "", "port": 33060,
                                   "user": "user"}),
@@ -162,6 +168,8 @@ def build_uri(**kwargs):
         query.append("ssl-cert={0}".format(kwargs["ssl_cert"]))
     if "ssl_key" in kwargs:
         query.append("ssl-key={0}".format(kwargs["ssl_key"]))
+    if "use_pure" in kwargs:
+        query.append("use-pure={0}".format(kwargs["use_pure"]))
 
     if len(query) > 0:
         uri = "{0}?{1}".format(uri, "&".join(query))
@@ -349,10 +357,11 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     def test_connection_uri(self):
         uri = build_uri(user=self.connect_kwargs["user"],
-                         password=self.connect_kwargs["password"],
-                         host=self.connect_kwargs["host"],
-                         port=self.connect_kwargs["port"],
-                         schema=self.connect_kwargs["schema"])
+                        password=self.connect_kwargs["password"],
+                        host=self.connect_kwargs["host"],
+                        port=self.connect_kwargs["port"],
+                        schema=self.connect_kwargs["schema"],
+                        use_pure=False)
         session = mysqlx.get_session(uri)
         self.assertIsInstance(session, mysqlx.Session)
 
@@ -626,3 +635,16 @@ class MySQLxSessionTests(tests.MySQLxTests):
         settings["port"] = res[0][1]  # Lets use the MySQL classic port
         session.close()
         self.assertRaises(ProgrammingError, mysqlx.get_session, settings)
+
+    def test_use_pure(self):
+        settings = self.connect_kwargs.copy()
+        settings["use-pure"] = False
+        session = mysqlx.get_session(settings)
+        self.assertFalse(session.use_pure)
+        self.assertEqual(Protobuf.mysqlxpb.__name__, "_mysqlxpb")
+        session.use_pure = True
+        self.assertTrue(session.use_pure)
+        self.assertEqual(Protobuf.mysqlxpb.__name__, "_mysqlxpb_pure")
+        # 'use_pure' should be a bool type
+        self.assertRaises(ProgrammingError, setattr, session, "use_pure", -1)
+        session.close()

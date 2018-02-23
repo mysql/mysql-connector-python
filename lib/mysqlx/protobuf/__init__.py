@@ -29,20 +29,19 @@
 """This module contains the implementation of a helper class for MySQL X
 Protobuf messages."""
 
-from mysqlx.compat import PY3, NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES
-from mysqlx.helpers import encode_to_bytes
-
-
 _SERVER_MESSAGES_TUPLES = (
-    ("Mysqlx.ServerMessages.Type.OK", "Mysqlx.Ok"),
-    ("Mysqlx.ServerMessages.Type.ERROR", "Mysqlx.Error"),
+    ("Mysqlx.ServerMessages.Type.OK",
+     "Mysqlx.Ok"),
+    ("Mysqlx.ServerMessages.Type.ERROR",
+     "Mysqlx.Error"),
     ("Mysqlx.ServerMessages.Type.CONN_CAPABILITIES",
      "Mysqlx.Connection.Capabilities"),
     ("Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_CONTINUE",
      "Mysqlx.Session.AuthenticateContinue"),
     ("Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_OK",
      "Mysqlx.Session.AuthenticateOk"),
-    ("Mysqlx.ServerMessages.Type.NOTICE", "Mysqlx.Notice.Frame"),
+    ("Mysqlx.ServerMessages.Type.NOTICE",
+     "Mysqlx.Notice.Frame"),
     ("Mysqlx.ServerMessages.Type.RESULTSET_COLUMN_META_DATA",
      "Mysqlx.Resultset.ColumnMetaData"),
     ("Mysqlx.ServerMessages.Type.RESULTSET_ROW",
@@ -63,11 +62,27 @@ PROTOBUF_REPEATED_TYPES = [list]
 
 try:
     import _mysqlxpb
-
-    HAVE_MYSQLXPB_CEXT = True
     SERVER_MESSAGES = dict([(int(_mysqlxpb.enum_value(key)), val)
                             for key, val in _SERVER_MESSAGES_TUPLES])
+    HAVE_MYSQLXPB_CEXT = True
 except ImportError:
+    HAVE_MYSQLXPB_CEXT = False
+
+from ..compat import PY3, NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES
+from ..helpers import encode_to_bytes
+
+try:
+    from . import mysqlx_connection_pb2
+    from . import mysqlx_crud_pb2
+    from . import mysqlx_datatypes_pb2
+    from . import mysqlx_expect_pb2
+    from . import mysqlx_expr_pb2
+    from . import mysqlx_notice_pb2
+    from . import mysqlx_pb2
+    from . import mysqlx_resultset_pb2
+    from . import mysqlx_session_pb2
+    from . import mysqlx_sql_pb2
+
     from google.protobuf import descriptor_database
     from google.protobuf import descriptor_pb2
     from google.protobuf import descriptor_pool
@@ -80,19 +95,6 @@ except ImportError:
         PROTOBUF_REPEATED_TYPES.append(RepeatedCompositeContainer)
     except ImportError:
         pass
-
-    from . import mysqlx_connection_pb2
-    from . import mysqlx_crud_pb2
-    from . import mysqlx_datatypes_pb2
-    from . import mysqlx_expect_pb2
-    from . import mysqlx_expr_pb2
-    from . import mysqlx_notice_pb2
-    from . import mysqlx_pb2
-    from . import mysqlx_resultset_pb2
-    from . import mysqlx_session_pb2
-    from . import mysqlx_sql_pb2
-
-    HAVE_MYSQLXPB_CEXT = False
 
     PROTOBUF_REPEATED_TYPES.append(RepeatedCompositeFieldContainer)
 
@@ -115,8 +117,7 @@ except ImportError:
     for key, val in mysqlx_crud_pb2.Order.Direction.items():
         _MESSAGES["Mysqlx.Crud.Order.Direction.{0}".format(key)] = val
     for key, val in mysqlx_crud_pb2.UpdateOperation.UpdateType.items():
-        _MESSAGES["Mysqlx.Crud.UpdateOperation.UpdateType.{0}"
-                  "".format(key)] = val
+        _MESSAGES["Mysqlx.Crud.UpdateOperation.UpdateType.{0}".format(key)] = val
 
     # Mysqlx.Datatypes
     for key, val in mysqlx_datatypes_pb2.Scalar.Type.items():
@@ -125,13 +126,11 @@ except ImportError:
         _MESSAGES["Mysqlx.Datatypes.Any.Type.{0}".format(key)] = val
 
     # Mysqlx.Expect
-    for key, val in \
-        mysqlx_expect_pb2.Open.Condition.ConditionOperation.items():
+    for key, val in mysqlx_expect_pb2.Open.Condition.ConditionOperation.items():
         _MESSAGES["Mysqlx.Expect.Open.Condition.ConditionOperation.{0}"
                   "".format(key)] = val
     for key, val in mysqlx_expect_pb2.Open.CtxOperation.items():
-        _MESSAGES["Mysqlx.Expect.Open.CtxOperation.{0}"
-                  "".format(key)] = val
+        _MESSAGES["Mysqlx.Expect.Open.CtxOperation.{0}".format(key)] = val
 
     # Mysqlx.Expr
     for key, val in mysqlx_expr_pb2.Expr.Type.items():
@@ -150,12 +149,7 @@ except ImportError:
 
     # Mysql.Resultset
     for key, val in mysqlx_resultset_pb2.ColumnMetaData.FieldType.items():
-        _MESSAGES["Mysqlx.Resultset.ColumnMetaData.FieldType.{0}"
-                  "".format(key)] = val
-
-    SERVER_MESSAGES = dict(
-        [(_MESSAGES[key], val) for key, val in _SERVER_MESSAGES_TUPLES]
-    )
+        _MESSAGES["Mysqlx.Resultset.ColumnMetaData.FieldType.{0}".format(key)] = val
 
     # Add messages to the descriptor pool
     _DESCRIPTOR_DB = descriptor_database.DescriptorDatabase()
@@ -182,8 +176,13 @@ except ImportError:
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
         mysqlx_sql_pb2.DESCRIPTOR.serialized_pb))
 
+    SERVER_MESSAGES = dict(
+        [(_MESSAGES[key], val) for key, val in _SERVER_MESSAGES_TUPLES]
+    )
+    HAVE_PROTOBUF = True
 
-    class _mysqlxpb(object):
+
+    class _mysqlxpb_pure(object):
         """This class implements the methods in pure Python used by the
         _mysqlxpb C++ extension."""
 
@@ -191,7 +190,7 @@ except ImportError:
 
         @staticmethod
         def new_message(name):
-            cls = _mysqlxpb.factory.GetPrototype(
+            cls = _mysqlxpb_pure.factory.GetPrototype(
                 _DESCRIPTOR_POOL.FindMessageTypeByName(name))
             return cls()
 
@@ -205,7 +204,7 @@ except ImportError:
 
         @staticmethod
         def parse_message(msg_type_name, payload):
-            msg = _mysqlxpb.new_message(msg_type_name)
+            msg = _mysqlxpb_pure.new_message(msg_type_name)
             msg.ParseFromString(payload)
             return msg
 
@@ -214,21 +213,36 @@ except ImportError:
             msg_type_name = SERVER_MESSAGES.get(msg_type)
             if not msg_type_name:
                 raise ValueError("Unknown msg_type: {0}".format(msg_type))
-            msg = _mysqlxpb.new_message(msg_type_name)
+            msg = _mysqlxpb_pure.new_message(msg_type_name)
             msg.ParseFromString(payload)
             return msg
+except ImportError:
+    HAVE_PROTOBUF = False
+    if not HAVE_MYSQLXPB_CEXT:
+        raise ImportError("Protobuf is not available")
 
 
-def mysqlxpb_enum(name):
-    """Returns the value of a MySQL X Protobuf enumerator.
-
-    Args:
-        name (string): MySQL X Protobuf numerator name.
-
-    Returns:
-        int: Value of the enumerator.
+class Protobuf(object):
+    """Protobuf class acts as a container of the Protobuf message class.
+    It allows the switch between the C extension and pure Python implementation
+    message handlers, by patching the `mysqlxpb` class attribute.
     """
-    return _mysqlxpb.enum_value(name)
+    mysqlxpb = _mysqlxpb if HAVE_MYSQLXPB_CEXT else _mysqlxpb_pure
+    use_pure = False if HAVE_MYSQLXPB_CEXT else True
+
+    @staticmethod
+    def set_use_pure(use_pure):
+        """Sets whether to use the C extension or pure Python implementation.
+
+        Args:
+            use_pure (bool): `True` to use pure Python implementation.
+        """
+        if use_pure and not HAVE_PROTOBUF:
+            raise ImportError("Protobuf is not available")
+        elif not use_pure and not HAVE_MYSQLXPB_CEXT:
+            raise ImportError("MySQL X Protobuf C extension is not available")
+        Protobuf.mysqlxpb = _mysqlxpb_pure if use_pure else _mysqlxpb
+        Protobuf.use_pure = use_pure
 
 
 class Message(object):
@@ -239,16 +253,13 @@ class Message(object):
         **kwargs: Arbitrary keyword arguments with values for the message.
     """
     def __init__(self, msg_type_name=None, **kwargs):
-        self.__dict__["_msg"] = _mysqlxpb.new_message(msg_type_name) \
+        self.__dict__["_msg"] = Protobuf.mysqlxpb.new_message(msg_type_name) \
             if msg_type_name else None
         for key, value in kwargs.items():
             self.__setattr__(key, value)
 
     def __setattr__(self, name, value):
-        if HAVE_MYSQLXPB_CEXT:
-            self._msg[name] = value.get_message() \
-                if isinstance(value, Message) else value
-        else:
+        if Protobuf.use_pure:
             if PY3 and isinstance(value, STRING_TYPES):
                 setattr(self._msg, name, encode_to_bytes(value))
             elif isinstance(value, (NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES)):
@@ -259,11 +270,14 @@ class Message(object):
                 getattr(self._msg, name).MergeFrom(value.get_message())
             else:
                 getattr(self._msg, name).MergeFrom(value)
+        else:
+            self._msg[name] = value.get_message() \
+                if isinstance(value, Message) else value
 
     def __getattr__(self, name):
         try:
-            return self._msg[name] if HAVE_MYSQLXPB_CEXT else \
-                getattr(self._msg, name)
+            return self._msg[name] if not Protobuf.use_pure \
+                else getattr(self._msg, name)
         except KeyError:
             raise AttributeError
 
@@ -283,8 +297,9 @@ class Message(object):
         Returns:
             object: The value of the provided key name.
         """
-        return self.__dict__["_msg"].get(name, default) if HAVE_MYSQLXPB_CEXT \
-            else getattr(self.__dict__["_msg"], name, default)
+        return self.__dict__["_msg"].get(name, default) \
+            if not Protobuf.use_pure \
+               else getattr(self.__dict__["_msg"], name, default)
 
     def set_message(self, msg):
         """Sets the message.
@@ -309,13 +324,13 @@ class Message(object):
         Returns:
            string: A string representing a message containing parsed data.
         """
-        return _mysqlxpb.serialize_message(self._msg)
+        return Protobuf.mysqlxpb.serialize_message(self._msg)
 
     @property
     def type(self):
         """string: Message type name."""
-        return self._msg["_mysqlxpb_type_name"] if HAVE_MYSQLXPB_CEXT else \
-            self._msg.DESCRIPTOR.full_name
+        return self._msg["_mysqlxpb_type_name"] if not Protobuf.use_pure \
+            else self._msg.DESCRIPTOR.full_name
 
     @staticmethod
     def parse(msg_type_name, payload):
@@ -328,7 +343,7 @@ class Message(object):
         Returns:
             dict: The dictionary representing a message containing parsed data.
         """
-        return _mysqlxpb.parse_message(msg_type_name, payload)
+        return Protobuf.mysqlxpb.parse_message(msg_type_name, payload)
 
     @staticmethod
     def parse_from_server(msg_type, payload):
@@ -341,7 +356,7 @@ class Message(object):
         Returns:
             dict: The dictionary representing a message containing parsed data.
         """
-        return _mysqlxpb.parse_server_message(msg_type, payload)
+        return Protobuf.mysqlxpb.parse_server_message(msg_type, payload)
 
     @classmethod
     def from_message(cls, msg_type_name, payload):
@@ -357,7 +372,7 @@ class Message(object):
                                      containing parsed data.
         """
         msg = cls()
-        msg.set_message(_mysqlxpb.parse_message(msg_type_name, payload))
+        msg.set_message(Protobuf.mysqlxpb.parse_message(msg_type_name, payload))
         return msg
 
     @classmethod
@@ -374,5 +389,18 @@ class Message(object):
                                      containing parsed data.
         """
         msg = cls()
-        msg.set_message(_mysqlxpb.parse_server_message(msg_type, payload))
+        msg.set_message(
+            Protobuf.mysqlxpb.parse_server_message(msg_type, payload))
         return msg
+
+
+def mysqlxpb_enum(name):
+    """Returns the value of a MySQL X Protobuf enumerator.
+
+    Args:
+        name (string): MySQL X Protobuf numerator name.
+
+    Returns:
+        int: Value of the enumerator.
+    """
+    return Protobuf.mysqlxpb.enum_value(name)

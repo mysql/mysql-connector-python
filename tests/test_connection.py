@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -40,8 +40,9 @@ import socket
 import tests
 from . import PY2
 
+from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
-from mysql.connector import (connection, network, errors,
+from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
 from mysql.connector.optionfiles import read_option_files
 
@@ -1783,3 +1784,14 @@ class WL7937(tests.MySQLConnectorTests):
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
         self.assertRaises(errors.ProgrammingError, self.cur.execute, sql,
                           (self.data_file, ))
+
+    @unittest.skipIf(HAVE_CMYSQL == False, "C Extension not available")
+    def test_use_pure(self):
+        config = tests.get_mysql_config()
+        cnx = connect(**config)
+        self.assertIsInstance(cnx, CMySQLConnection)
+        cnx.close()
+        config["use_pure"] = True
+        cnx = connect(**config)
+        self.assertIsInstance(cnx, connection.MySQLConnection)
+        cnx.close()

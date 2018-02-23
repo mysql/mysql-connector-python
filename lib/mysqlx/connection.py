@@ -52,6 +52,7 @@ from .helpers import get_item_or_attr
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
+from .protobuf import Protobuf
 
 
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
@@ -649,9 +650,22 @@ class Session(object):
         settings (dict): Connection data used to connect to the database.
     """
     def __init__(self, settings):
+        self.use_pure = settings.get("use-pure", Protobuf.use_pure)
         self._settings = settings
         self._connection = Connection(self._settings)
         self._connection.connect()
+
+    @property
+    def use_pure(self):
+        """bool: `True` to use pure Python Protobuf implementation.
+        """
+        return Protobuf.use_pure
+
+    @use_pure.setter
+    def use_pure(self, value):
+        if not isinstance(value, bool):
+            raise ProgrammingError("'use_pure' option should be True or False")
+        Protobuf.set_use_pure(value)
 
     def is_open(self):
         """Returns `True` if the session is open.

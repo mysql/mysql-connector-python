@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -54,7 +54,7 @@ _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
-                          "routers", "socket", "ssl-mode", "auth"]
+                          "routers", "socket", "ssl-mode", "auth", "use-pure"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -125,13 +125,19 @@ def _parse_connection_uri(uri):
         settings.update(_parse_address_list(host))
 
     for key, val in parse_qsl(query_str, True):
-        opt = key.lower()
+        opt = key.replace("_", "-").lower()
         if opt in settings:
             raise InterfaceError("Duplicate option '{0}'.".format(key))
         if opt in _SSL_OPTS:
             settings[opt] = unquote(val.strip("()"))
         else:
-            settings[opt] = val.lower()
+            val_str = val.lower()
+            if val_str in ("1", "true"):
+                settings[opt] = True
+            elif val_str in ("0", "false"):
+                settings[opt] = False
+            else:
+                settings[opt] = val_str
     return settings
 
 def _validate_settings(settings):
@@ -227,7 +233,8 @@ def _get_connection_settings(*args, **kwargs):
         if isinstance(args[0], STRING_TYPES):
             settings = _parse_connection_uri(args[0])
         elif isinstance(args[0], dict):
-            settings.update(args[0])
+            for key, val in args[0].items():
+                settings[key.replace("_", "-")] = val
     elif kwargs:
         settings.update(kwargs)
         for key in settings:

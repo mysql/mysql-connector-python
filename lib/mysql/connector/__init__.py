@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -170,7 +170,7 @@ def connect(*args, **kwargs):
         # No pooling
         pass
 
-    use_pure = kwargs.setdefault('use_pure', True)
+    use_pure = kwargs.setdefault('use_pure', False)
 
     try:
         del kwargs['use_pure']

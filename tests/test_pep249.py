@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -76,14 +76,12 @@ class PEP249ModuleTests(PEP249Base):
                         "Module does not export the connect()-function")
         cnx = myconn.connect(use_pure=True, **tests.get_mysql_config())
         self.assertTrue(isinstance(cnx, myconn.connection.MySQLConnection),
-                        "The connect()-method returns incorrect instance")
-        cnx = myconn.connect(**tests.get_mysql_config())
-        self.assertTrue(isinstance(cnx, myconn.connection.MySQLConnection),
                         "connect() not returning by default pure "
                         "MySQLConnection object")
 
         if tests.MYSQL_CAPI:
-            cnx = myconn.connect(use_pure=False, **tests.get_mysql_config())
+            # By default use_pure=False
+            cnx = myconn.connect(**tests.get_mysql_config())
             self.assertTrue(isinstance(cnx,
                                        myconn.connection_cext.CMySQLConnection),
                             "The connect()-method returns incorrect instance")

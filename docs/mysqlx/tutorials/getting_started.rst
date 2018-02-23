@@ -66,6 +66,20 @@ If ``ssl-ca`` option is set, only the following SSL Modes are allowed:
        'ssl-ca': '/path/to/ca.cert'
    })
 
+Connector/Python has a C extension for `Protobuf <https://developers.google.com/protocol-buffers/>`_ message serialization, this C extension is enabled by default if available. It can be disabled by setting the ``use-pure`` option to :data:`True`.
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060?use-pure=true')
+   session = mysqlx.get_session(host='localhost', port=33060, user='root', password='', use_pure=True)
+   session = mysqlx.get_session({
+       'host': 'localhost',
+       'port': 33060,
+       'user': 'root',
+       'password': '',
+       'use-pure': True
+   })
+
 The :func:`mysqlx.Schema.get_schema()` method returns a :class:`mysqlx.Schema` object. We can use this :class:`mysqlx.Schema` object to access collections and tables. X DevAPI's ability to chain all object constructions, enables you to get to the schema object in one line. For example:
 
 .. code-block:: python

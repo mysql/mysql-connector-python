@@ -195,6 +195,8 @@ class MySQLConnectionPool(object):
         with CONNECTION_POOL_LOCK:
             try:
                 test_cnx = MySQLConnection()
+                if "use_pure" in kwargs:
+                    del kwargs["use_pure"]
                 test_cnx.config(**kwargs)
                 self._cnx_config = kwargs
                 self._config_version = uuid4()
