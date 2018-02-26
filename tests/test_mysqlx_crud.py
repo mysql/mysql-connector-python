@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -221,7 +221,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_lock_shared(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add({"name": "Fred", "age": 21}).execute()
+        collection.add({"_id": "1", "name": "Fred", "age": 21}).execute()
 
         waiting = threading.Event()
 
@@ -301,7 +301,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_lock_exclusive(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add({"name": "Fred", "age": 21}).execute()
+        collection.add({"_id": "1", "name": "Fred", "age": 21}).execute()
         event = threading.Event()
 
         pause = threading.Event()
@@ -380,34 +380,98 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         if errors:
             self.fail(errors[0])
 
+
+    @unittest.skipIf(tests.MYSQL_VERSION > (8, 0, 4),
+                     "id field creation on server must not be available.")
+    def test_add_old_versions(self):
+        """Tests error message when adding documents without an ids on old
+        servers"""
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+
+        coll_add = collection.add({"name": "Fred", "age": 21})
+        self.assertRaises(mysqlx.errors.OperationalError, coll_add.execute)
+
+        # Providing _id for each document must allow his insertion
+        persons = [{"_id": "12345678901234567890123456789012",
+                    "name": "Dyno dog dinosaur", "age": 33},
+                   {"_id": "12345678901234567890123456789013",
+                    "name": "Puss saber-toothed cat", "age": 42}]
+
+        result = collection.add(persons).execute()
+
+        self.assertEqual(2, result.get_affected_items_count(),
+                         "documents not inserted")
+
+        # Empty list is expected here since the server did not generate the ids
+        self.assertEqual([], result.get_generated_ids(),
+                         "_id from user was overwritten")
+
+        self.schema.drop_collection(collection_name)
+
     def test_add(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add({"name": "Fred", "age": 21}).execute()
+        result = collection.add(
+            {"_id": 1, "name": "Fred", "age": 21}
+        ).execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(1, collection.count())
 
         # now add multiple dictionaries at once
-        result = collection.add({"name": "Wilma", "age": 33},
-                                {"name": "Barney", "age": 42}).execute()
+        result = collection.add(
+            {"_id": 2, "name": "Wilma", "age": 33},
+            {"_id": 3, "name": "Barney", "age": 42}
+        ).execute()
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(3, collection.count())
 
         # now let's try adding strings
-        result = collection.add('{"name": "Bambam", "age": 8}',
-                                '{"name": "Pebbles", "age": 8}').execute()
+        result = collection.add(
+            '{"_id": 4, "name": "Bambam", "age": 8}',
+            '{"_id": 5, "name": "Pebbles", "age": 8}'
+        ).execute()
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
 
-        # ensure _id is created
-        persons = [{"name": "Wilma", "age": 33}, {"name": "Barney", "age": 42}]
-        result = collection.add(persons).execute()
-        for person in persons:
-            if tests.PY2:
-                self.assertTrue(person.has_key("_id"))
-            else:
-                self.assertTrue("_id" in person)
-            self.assertEqual(len(person["_id"]), 32)
+        if tests.MYSQL_VERSION > (8, 0, 4):
+            # Following test are only possible on servers with id generetion.
+            # Ensure _id is created at the server side
+            persons = [{"name": "Wilma", "age": 33},
+                       {"name": "Barney", "age": 42}]
+            result = collection.add(persons).execute()
+            for person in persons:
+                # Ensure no '_id' field was added locally.
+                if tests.PY2:
+                    self.assertFalse(person.has_key("_id"))
+                else:
+                    self.assertFalse("_id" in person)
+
+            self.assertEqual(2, result.get_affected_items_count(),
+                             "Not all documents were inserted")
+
+            # Allow _id given from the user and server side generation
+            persons = [{"_id": "12345678901234567890123456789012",
+                        "name": "Dyno", "desc": "dog dinosaur"},
+                       {"_id": "12345678901234567890123456789013",
+                        "name": "Puss", "desc": "saber-toothed cat"},
+                       # following doc does not have id field and must be
+                       # generated at the server side
+                       {"name": "hoppy", "desc": "hoppy kangaroo/dinosaur"}]
+
+            result = collection.add(persons).execute()
+
+            self.assertEqual(3, result.get_affected_items_count(),
+                             "Not all documents were inserted")
+
+            # Only 1 `_id` was generated, 2 were given by us.
+            self.assertEqual(1, len(result.get_generated_ids()),
+                             "Unexpected number of _id were generated.")
+
+            result = collection.find().execute()
+            for row in result.fetch_all():
+                self.assertTrue(hasattr(row, "_id"),
+                                "`_id` field could not be found in doc")
 
         self.schema.drop_collection(collection_name)
 
@@ -511,11 +575,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
 
-        result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         # is
@@ -564,11 +628,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
 
-        result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         # sign_plus
@@ -602,10 +666,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
 
-        result = collection.add(
-                {"adate": "2000-01-01", "adatetime": "2000-01-01 12:00:01"},
-        ).execute()
-
+        collection.add({"_id": "1", "adate": "2000-01-01",
+                        "adatetime": "2000-01-01 12:00:01"}).execute()
 
         result = collection.find().fields("$.adatetime + interval 1000000 "
                                           "microsecond = '2000-01-01 12:00:02'"
@@ -713,10 +775,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection = self.schema.create_collection(collection_name)
 
         result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         # &
@@ -750,11 +812,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
 
-        result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         # =
@@ -842,25 +904,29 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
-    def test_get_document_ids(self):
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5),
+                     "id field creation on server side is required.")
+    def test_get_generated_ids(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         result = collection.add({"name": "Fred", "age": 21}).execute()
-        self.assertTrue(result.get_document_id() is not None)
+        self.assertTrue(result.get_generated_ids() is not None)
 
         result = collection.add(
             {"name": "Fred", "age": 21},
             {"name": "Barney", "age": 45}).execute()
-        self.assertEqual(2, len(result.get_document_ids()))
+        self.assertEqual(2, len(result.get_generated_ids()))
 
         self.schema.drop_collection(collection_name)
 
     def test_remove(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        collection.add({"name": "Fred", "age": 21},
-                       {"name": "Barney", "age": 45},
-                       {"name": "Wilma", "age": 42}).execute()
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 45},
+            {"_id": "3", "name": "Wilma", "age": 42}
+        ).execute()
         self.assertEqual(3, collection.count())
         result = collection.remove("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
@@ -878,11 +944,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_find(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
         result = collection.find("$.age == 67").execute()
         docs = result.fetch_all()
@@ -943,11 +1009,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_modify(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         result = collection.modify("age < 67").set("young", True).execute()
@@ -981,27 +1047,34 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_modify_patch(self):
         collection_name = "collection_GOT"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add(
-            {"name": "Bran", "family_name": "Stark", "age": 18,
+        collection.add(
+            {"_id": "1", "name": "Bran", "family_name": "Stark", "age": 18,
              "actors_bio": {"bd": "1999 April 9", "rn": "Isaac Hempstead"},
              "parents": ["Eddard Stark", "Catelyn Stark"]},
-            {"name": "Sansa", "family_name": "Stark", "age": 21,
-             "actors_bio": {"bd": "1996 February 21", "rn": "Sophie Turner"},
+            {"_id": "2", "name": "Sansa", "family_name": "Stark", "age": 21,
+             "actors_bio": {"bd": "1996 February 21",
+                            "rn": "Sophie Turner"},
              "parents": ["Eddard Stark", "Catelyn Stark"]},
-            {"name": "Arya", "family_name": "Stark", "age": 20,
-             "actors_bio": {"bd": "1997 April 15", "rn": "Maisie Williams"},
+            {"_id": "3", "name": "Arya", "family_name": "Stark", "age": 20,
+             "actors_bio": {"bd": "1997 April 15",
+                            "rn": "Maisie Williams"},
              "parents": ["Eddard Stark", "Catelyn Stark"]},
-            {"name": "Jon", "family_name": "Snow", "age": 30,
-             "actors_bio": {"bd": "1986 December 26", "rn": "Kit Harington"}, },
-            {"name": "Daenerys", "family_name": "Targaryen", "age": 30,
-             "actors_bio": {"bd": "1986 October 23", "rn": "Emilia Clarke"}, },
-            {"name": "Margaery", "family_name": "Tyrell", "age": 35,
-             "actors_bio": {"bd": "1982 February 11", "rn": "Natalie Dormer"}, },
-            {"name": "Cersei", "family_name": "Lannister", "age": 44,
-             "actors_bio": {"bd": "1973 October 3", "rn": "Lena Headey"},
+            {"_id": "4", "name": "Jon", "family_name": "Snow", "age": 30,
+             "actors_bio": {"bd": "1986 December 26",
+                            "rn": "Kit Harington"}, },
+            {"_id": "5", "name": "Daenerys", "family_name": "Targaryen",
+             "age": 30, "actors_bio": {"bd": "1986 October 23",
+                                       "rn": "Emilia Clarke"}, },
+            {"_id": "6", "name": "Margaery", "family_name": "Tyrell",
+             "age": 35, "actors_bio": {"bd": "1982 February 11",
+                                       "rn": "Natalie Dormer"}, },
+            {"_id": "7", "name": "Cersei", "family_name": "Lannister",
+             "age": 44, "actors_bio": {"bd": "1973 October 3",
+                                       "rn": "Lena Headey"},
              "parents": ["Tywin Lannister, Joanna Lannister"]},
-            {"name": "Tyrion", "family_name": "Lannister", "age": 48,
-             "actors_bio": {"bd": "1969 June 11", "rn": "Peter Dinklage"},
+            {"_id": "8", "name": "Tyrion", "family_name": "Lannister",
+             "age": 48, "actors_bio": {"bd": "1969 June 11",
+                                       "rn": "Peter Dinklage"},
              "parents": ["Tywin Lannister, Joanna Lannister"]},
         ).execute()
 
@@ -1189,10 +1262,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         result = collection.find("age = 21").execute().fetch_one()
@@ -1210,10 +1283,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         result = collection.find("age = 21").execute().fetch_one()
@@ -1226,9 +1299,9 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         result = collection.find("_id = 'new_id'").execute().fetch_all()
         self.assertEqual(0, len(result))
-        upsert = {'name': 'Melissandre', "age": 99999}
+        upsert = {"_id": "11", 'name': 'Melissandre', "age": 99999}
         collection.add_or_replace_one("new_id", upsert)
-        result = collection.find("_id = 'new_id'").execute().fetch_one()
+        result = collection.find("age = 99999").execute().fetch_one()
         self.assertEqual("Melissandre", result["name"])
 
         self.schema.drop_collection(collection_name)
@@ -1237,10 +1310,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         result = collection.find("name = 'Fred'").execute().fetch_one()
@@ -1253,10 +1326,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
 
         result = collection.find("name = 'Fred'").execute().fetch_one()
@@ -1270,10 +1343,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
         result1 = collection.find().execute()
         # now do another collection find.
@@ -1537,11 +1610,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_parameter_binding(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add(
-            {"name": "Fred", "age": 21},
-            {"name": "Barney", "age": 28},
-            {"name": "Wilma", "age": 42},
-            {"name": "Betty", "age": 67},
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
         ).execute()
         result = collection.find("age == :age").bind("age", 67).execute()
         docs = result.fetch_all()
@@ -1564,10 +1637,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_unicode_parameter_binding(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add(
-            {"name": u"José", "age": 21},
-            {"name": u"João", "age": 28},
-            {"name": u"Célia", "age": 42},
+        collection.add(
+            {"_id": "1", "name": u"José", "age": 21},
+            {"_id": "2", "name": u"João", "age": 28},
+            {"_id": "3", "name": u"Célia", "age": 42},
         ).execute()
         result = collection.find("name == :name").bind("name", u"José") \
                                                  .execute()
@@ -1726,7 +1799,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test")
 
         coll = self.schema.create_collection("test")
-        coll.add({"a": 21}, {"a": 22}, {"a": 23}, {"a": 24}).execute()
+        coll.add(
+            {"_id": "1", "a": 21},
+            {"_id": "2", "a": 22},
+            {"_id": "3", "a": 23},
+            {"_id": "4", "a": 24}
+        ).execute()
 
         table = self.schema.get_collection_as_table("test")
         result = table.select("doc->'$.a' as a").execute()

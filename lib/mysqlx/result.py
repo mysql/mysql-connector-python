@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -617,6 +617,7 @@ class BaseResult(object):
         self._closed = False
         self._rows_affected = 0
         self._generated_id = -1
+        self._generated_ids = []
         self._warnings = []
 
         if connection is None:
@@ -656,8 +657,13 @@ class BaseResult(object):
         """
         self._warnings.append((level, code, msg,))
 
-    def set_generated_id(self, generated_id):
-        """Sets the generated ID.
+    def set_generated_ids(self, generated_ids):
+        """Sets the generated ids.
+        """
+        self._generated_ids = generated_ids
+
+    def set_generated_insert_id(self, generated_id):
+        """Sets the generated insert id.
         """
         self._generated_id = generated_id
 
@@ -705,10 +711,15 @@ class Result(BaseResult):
             return None
         return self._ids[0]
 
-    def get_document_ids(self):
-        """Returns the list of generated documents IDs.
+    def get_generated_insert_id(self):
+        """Returns the generated insert id.
         """
-        return self._ids
+        return self._generated_id
+
+    def get_generated_ids(self):
+        """Returns the generated ids.
+        """
+        return self._generated_ids
 
 
 class BufferingResult(BaseResult):

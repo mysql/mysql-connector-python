@@ -1,4 +1,4 @@
-# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -59,6 +59,7 @@ _SERVER_MESSAGES_TUPLES = (
      "Mysqlx.Resultset.FetchDoneMoreOutParams"),
 )
 
+PROTOBUF_REPEATED_TYPES = [list]
 
 try:
     import _mysqlxpb
@@ -71,6 +72,14 @@ except ImportError:
     from google.protobuf import descriptor_pb2
     from google.protobuf import descriptor_pool
     from google.protobuf import message_factory
+    from google.protobuf.internal.containers import (
+        RepeatedCompositeFieldContainer)
+    try:
+        from google.protobuf.pyext._message import (
+            RepeatedCompositeContainer)
+        PROTOBUF_REPEATED_TYPES.append(RepeatedCompositeContainer)
+    except ImportError:
+        pass
 
     from . import mysqlx_connection_pb2
     from . import mysqlx_crud_pb2
@@ -84,6 +93,8 @@ except ImportError:
     from . import mysqlx_sql_pb2
 
     HAVE_MYSQLXPB_CEXT = False
+
+    PROTOBUF_REPEATED_TYPES.append(RepeatedCompositeFieldContainer)
 
     # Dictionary with all messages descriptors
     _MESSAGES = {}

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -516,9 +516,6 @@ class AddStatement(WriteStatement):
         """
         if len(self._values) == 0:
             return Result()
-
-        for doc in self._values:
-            self.ids.append(doc.ensure_id())
 
         return self._connection.send_insert(self)
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,7 +29,6 @@
 """Implementation of the DbDoc."""
 
 import json
-import uuid
 
 from .compat import STRING_TYPES
 from .errors import ProgrammingError
@@ -70,17 +69,3 @@ class DbDoc(object):
             `list`: The keys.
         """
         return self.__dict__.keys()
-
-    def ensure_id(self, doc_id=None):
-        """Ensure ID.
-
-        Args:
-            doc_id (str): Document ID.
-        """
-        if doc_id:
-            self.__dict__["_id"] = doc_id
-        elif "_id" not in self.__dict__:
-            uuid1 = str(uuid.uuid1()).upper().split("-")
-            uuid1.reverse()
-            self.__dict__["_id"] = "".join(uuid1)
-        return self.__dict__["_id"]

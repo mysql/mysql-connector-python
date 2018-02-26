@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -477,20 +477,20 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         self.session.start_transaction()
 
-        collection.add({"name": "Fred", "age": 21}).execute()
+        collection.add({"_id": "1", "name": "Fred", "age": 21}).execute()
         self.assertEqual(1, collection.count())
 
         # Create a savepoint named 'sp2'
         sp2 = self.session.set_savepoint("sp2")
         self.assertEqual(sp2, "sp2")
 
-        collection.add({"name": "Wilma", "age": 33}).execute()
+        collection.add({"_id": "2", "name": "Wilma", "age": 33}).execute()
         self.assertEqual(2, collection.count())
 
         # Create a savepoint named 'sp3'
         sp3 = self.session.set_savepoint("sp3")
 
-        collection.add({"name": "Betty", "age": 67}).execute()
+        collection.add({"_id": "3", "name": "Betty", "age": 67}).execute()
         self.assertEqual(3, collection.count())
 
         # Rollback to 'sp3' savepoint
@@ -505,13 +505,13 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(mysqlx.errors.OperationalError,
                           self.session.rollback_to, sp3)
 
-        collection.add({"name": "Barney", "age": 42}).execute()
+        collection.add({"_id": "4", "name": "Barney", "age": 42}).execute()
         self.assertEqual(2, collection.count())
 
         # Create an unnamed savepoint
         sp4 = self.session.set_savepoint()
 
-        collection.add({"name": "Wilma", "age": 33}).execute()
+        collection.add({"_id": "3", "name": "Wilma", "age": 33}).execute()
         self.assertEqual(3, collection.count())
 
         # Release unnamed savepoint

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,7 +36,8 @@ from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
                    build_int_scalar, build_unsigned_int_scalar)
 from .helpers import encode_to_bytes, get_item_or_attr
 from .result import ColumnMetaData
-from .protobuf import SERVER_MESSAGES, Message, mysqlxpb_enum
+from .protobuf import (SERVER_MESSAGES, PROTOBUF_REPEATED_TYPES, Message,
+                       mysqlxpb_enum)
 
 
 class MessageReaderWriter(object):
@@ -214,14 +215,26 @@ class Protocol(object):
                 "Mysqlx.Notice.SessionStateChanged", msg["payload"])
             if sess_state_msg["param"] == mysqlxpb_enum(
                     "Mysqlx.Notice.SessionStateChanged.Parameter."
-                    "ROWS_AFFECTED"):
-                result.set_rows_affected(get_item_or_attr(
-                    sess_state_msg["value"], "v_unsigned_int"))
-            elif sess_state_msg["param"] == mysqlxpb_enum(
-                    "Mysqlx.Notice.SessionStateChanged.Parameter."
-                    "GENERATED_INSERT_ID"):
-                result.set_generated_id(get_item_or_attr(
-                    sess_state_msg["value"], "v_unsigned_int"))
+                    "GENERATED_DOCUMENT_IDS"):
+                result.set_generated_ids(
+                    [get_item_or_attr(
+                        get_item_or_attr(value, 'v_octets'), 'value').decode()
+                     for value in sess_state_msg["value"]])
+            else:  # Following results are unitary and not a list
+                sess_state_value = sess_state_msg["value"][0] \
+                    if isinstance(sess_state_msg["value"],
+                                  tuple(PROTOBUF_REPEATED_TYPES)) \
+                    else sess_state_msg["value"]
+                if sess_state_msg["param"] == mysqlxpb_enum(
+                        "Mysqlx.Notice.SessionStateChanged.Parameter."
+                        "ROWS_AFFECTED"):
+                    result.set_rows_affected(
+                        get_item_or_attr(sess_state_value, "v_unsigned_int"))
+                elif sess_state_msg["param"] == mysqlxpb_enum(
+                        "Mysqlx.Notice.SessionStateChanged.Parameter."
+                        "GENERATED_INSERT_ID"):
+                    result.set_generated_insert_id(get_item_or_attr(
+                        sess_state_value, "v_unsigned_int"))
 
     def _read_message(self, result):
         """Read message.
