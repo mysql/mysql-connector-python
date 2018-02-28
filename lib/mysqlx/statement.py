@@ -34,6 +34,7 @@ import json
 from .errors import ProgrammingError, NotSupportedError
 from .expr import ExprParser
 from .compat import STRING_TYPES
+from .constants import LockContention
 from .dbdoc import DbDoc
 from .result import SqlResult, Result
 from .protobuf import mysqlxpb_enum
@@ -709,6 +710,29 @@ class ReadStatement(FilterableStatement):
         super(ReadStatement, self).__init__(target, doc_based, condition)
         self._lock_exclusive = False
         self._lock_shared = False
+        self._lock_contention = LockContention.DEFAULT
+
+    @property
+    def lock_contention(self):
+        """:class:`mysqlx.LockContention`: The lock contention value."""
+        return self._lock_contention
+
+    def _set_lock_contention(self, lock_contention):
+        """Set the lock contention.
+
+        Args:
+            lock_contention (:class:`mysqlx.LockContention`): Lock contention.
+
+        Raises:
+            ProgrammingError: If is an invalid lock contention value.
+        """
+        try:
+            # Check if is a valid lock contention value
+            _ = LockContention.index(lock_contention)
+        except ValueError:
+            raise ProgrammingError("Invalid lock contention mode. Use 'NOWAIT' "
+                                   "or 'SKIP_LOCKED'")
+        self._lock_contention = lock_contention
 
     def is_lock_exclusive(self):
         """Returns `True` if is `EXCLUSIVE LOCK`.
@@ -726,20 +750,28 @@ class ReadStatement(FilterableStatement):
         """
         return self._lock_shared
 
-    def lock_shared(self):
-        """Execute a read operation with SHARED LOCK. Only one lock can be
+    def lock_shared(self, lock_contention=LockContention.DEFAULT):
+        """Execute a read operation with `SHARED LOCK`. Only one lock can be
            active at a time.
+
+        Args:
+            lock_contention (:class:`mysqlx.LockContention`): Lock contention.
         """
         self._lock_exclusive = False
         self._lock_shared = True
+        self._set_lock_contention(lock_contention)
         return self
 
-    def lock_exclusive(self):
-        """Execute a read operation with EXCLUSIVE LOCK. Only one lock can be
+    def lock_exclusive(self, lock_contention=LockContention.DEFAULT):
+        """Execute a read operation with `EXCLUSIVE LOCK`. Only one lock can be
            active at a time.
+
+        Args:
+            lock_contention (:class:`mysqlx.LockContention`): Lock contention.
         """
         self._lock_exclusive = True
         self._lock_shared = False
+        self._set_lock_contention(lock_contention)
         return self
 
     def group_by(self, *fields):
@@ -848,6 +880,7 @@ class SelectStatement(ReadStatement):
                                         where=where, group=group_by,
                                         having=having, order=order_by))
         return stmt
+
 
 class InsertStatement(WriteStatement):
     """A statement for insert operations on Table.

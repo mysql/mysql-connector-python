@@ -422,7 +422,6 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         if errors:
             self.fail(errors[0])
 
-
     @unittest.skipIf(tests.MYSQL_VERSION > (8, 0, 4),
                      "id field creation on server must not be available.")
     def test_add_old_versions(self):
@@ -450,6 +449,107 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                          "_id from user was overwritten")
 
         self.schema.drop_collection(collection_name)
+
+    def _test_lock_contention(self, lock_type_1, lock_type_2, lock_contention):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add({"name": "Fred", "age": 21}).execute()
+
+        locking = threading.Event()
+        waiting = threading.Event()
+
+        errors = []
+
+        def thread_a(locking, waiting):
+            session = mysqlx.get_session(self.connect_kwargs)
+            schema = session.get_schema(self.schema_name)
+            collection = schema.get_collection(collection_name)
+
+            session.start_transaction()
+            result = collection.find("name = 'Fred'")
+            if lock_type_1 == "S":
+                result.lock_shared().execute()
+            else:
+                result.lock_exclusive().execute()
+
+            locking.set()
+            time.sleep(2)
+            locking.clear()
+
+            if not waiting.is_set():
+                errors.append("{0}-{0} lock test failure."
+                              "".format(lock_type_1, lock_type_2))
+                session.commit()
+                return
+
+            session.commit()
+
+        def thread_b(locking, waiting):
+            session = mysqlx.get_session(self.connect_kwargs)
+            schema = session.get_schema(self.schema_name)
+            collection = schema.get_collection(collection_name)
+
+            if not locking.wait(2):
+                errors.append("{0}-{0} lock test failure."
+                              "".format(lock_type_1, lock_type_2))
+                session.commit()
+                return
+
+            session.start_transaction()
+            if lock_type_2 == "S":
+                result = collection.find("name = 'Fred'") \
+                                   .lock_shared(lock_contention)
+            else:
+                result = collection.find("name = 'Fred'") \
+                                   .lock_exclusive(lock_contention)
+
+            if lock_contention == mysqlx.LockContention.NOWAIT \
+               and (lock_type_1 == "X" or lock_type_2 == "X"):
+                self.assertRaises(mysqlx.OperationalError, result.execute)
+                session.rollback()
+
+            waiting.set()
+            time.sleep(2)
+
+            session.start_transaction()
+            result.execute()
+            session.commit()
+            waiting.clear()
+
+        client1 = threading.Thread(target=thread_a, args=(locking, waiting,))
+        client2 = threading.Thread(target=thread_b, args=(locking, waiting,))
+
+        client1.start()
+        client2.start()
+
+        client1.join()
+        client2.join()
+
+        self.schema.drop_collection(collection_name)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5),
+                     "Lock contention unavailable.")
+    def test_lock_shared_with_nowait(self):
+        self._test_lock_contention("S", "S", mysqlx.LockContention.NOWAIT)
+        self._test_lock_contention("S", "X", mysqlx.LockContention.NOWAIT)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5),
+                     "Lock contention unavailable.")
+    def test_lock_exclusive_with_nowait(self):
+        self._test_lock_contention("X", "X", mysqlx.LockContention.NOWAIT)
+        self._test_lock_contention("X", "S", mysqlx.LockContention.NOWAIT)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5),
+                     "Lock contention unavailable.")
+    def test_lock_shared_with_skip_locked(self):
+        self._test_lock_contention("S", "S", mysqlx.LockContention.SKIP_LOCKED)
+        self._test_lock_contention("S", "X", mysqlx.LockContention.SKIP_LOCKED)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5),
+                     "Lock contention unavailable.")
+    def test_lock_exclusive_with_skip_locker(self):
+        self._test_lock_contention("X", "X", mysqlx.LockContention.SKIP_LOCKED)
+        self._test_lock_contention("X", "S", mysqlx.LockContention.SKIP_LOCKED)
 
     def test_add(self):
         collection_name = "collection_test"

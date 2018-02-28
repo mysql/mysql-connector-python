@@ -33,7 +33,7 @@ from . import constants
 
 from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
 from .connection import Session
-from .constants import SSLMode, Auth
+from .constants import Auth, LockContention, SSLMode
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, InterfaceError, DatabaseError, NotSupportedError,
@@ -269,7 +269,7 @@ __all__ = [
     "Session", "get_session",
 
     # mysqlx.constants
-    "constants",
+    "Auth", "LockContention", "SSLMode",
 
     # mysqlx.crud
     "Schema", "Collection", "Table", "View",

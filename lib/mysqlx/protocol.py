@@ -397,6 +397,9 @@ class Protocol(object):
             msg["locking"] = \
                 mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.SHARED_LOCK")
 
+        if stmt.lock_contention > 0:
+            msg["locking_options"] = stmt.lock_contention
+
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_FIND"), msg)
 
