@@ -30,6 +30,7 @@
 
 from .dbdoc import DbDoc
 from .errors import ProgrammingError
+from .helpers import escape, quote_identifier
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
@@ -41,9 +42,9 @@ _COUNT_VIEWS_QUERY = ("SELECT COUNT(*) FROM information_schema.views "
 _COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
                        "WHERE table_schema = '{0}' AND table_name = '{1}'")
 _COUNT_SCHEMAS_QUERY = ("SELECT COUNT(*) FROM information_schema.schemata "
-                        "WHERE schema_name like '{0}'")
-_COUNT_QUERY = "SELECT COUNT(*) FROM `{0}`.`{1}`"
-_DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
+                        "WHERE schema_name = '{0}'")
+_COUNT_QUERY = "SELECT COUNT(*) FROM {0}.{1}"
+_DROP_TABLE_QUERY = "DROP TABLE IF EXISTS {0}.{1}"
 
 
 class DatabaseObject(object):
@@ -143,7 +144,7 @@ class Schema(DatabaseObject):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_SCHEMAS_QUERY.format(self._name)
+        sql = _COUNT_SCHEMAS_QUERY.format(escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
     def get_session(self):
@@ -244,7 +245,8 @@ class Schema(DatabaseObject):
             name (str): The name of the collection to be dropped.
         """
         self._connection.execute_nonquery(
-            "sql", _DROP_TABLE_QUERY.format(self._name, name), False)
+            "sql", _DROP_TABLE_QUERY.format(quote_identifier(self._name),
+                                            quote_identifier(name)), False)
 
     def create_collection(self, name, reuse=False):
         """Creates in the current schema a new collection with the specified
@@ -286,7 +288,8 @@ class Collection(DatabaseObject):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_TABLES_QUERY.format(self._schema.get_name(), self._name)
+        sql = _COUNT_TABLES_QUERY.format(escape(self._schema.name),
+                                         escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
     def find(self, condition=None):
@@ -343,7 +346,8 @@ class Collection(DatabaseObject):
         Returns:
             int: The total of documents in the collection.
         """
-        sql = _COUNT_QUERY.format(self._schema.name, self._name)
+        sql = _COUNT_QUERY.format(quote_identifier(self._schema.name),
+                                  quote_identifier(self._name))
         return self._connection.execute_sql_scalar(sql)
 
     def create_index(self, index_name, fields_desc):
@@ -439,7 +443,8 @@ class Table(DatabaseObject):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_TABLES_QUERY.format(self._schema.name, self._name)
+        sql = _COUNT_TABLES_QUERY.format(escape(self._schema.name),
+                                         escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
     def select(self, *fields):
@@ -493,7 +498,8 @@ class Table(DatabaseObject):
         Returns:
             int: The total of rows in the table.
         """
-        sql = _COUNT_QUERY.format(self._schema.name, self._name)
+        sql = _COUNT_QUERY.format(quote_identifier(self._schema.name),
+                                  quote_identifier(self._name))
         return self._connection.execute_sql_scalar(sql)
 
     def is_view(self):
@@ -502,7 +508,8 @@ class Table(DatabaseObject):
         Returns:
             bool: `True` if the underlying object is a view.
         """
-        sql = _COUNT_VIEWS_QUERY.format(self._schema.get_name(), self._name)
+        sql = _COUNT_VIEWS_QUERY.format(escape(self._schema.name),
+                                        escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
 
@@ -522,5 +529,6 @@ class View(Table):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_VIEWS_QUERY.format(self._schema.name, self._name)
+        sql = _COUNT_VIEWS_QUERY.format(escape(self._schema.name),
+                                        escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1

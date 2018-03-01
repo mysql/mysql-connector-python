@@ -125,6 +125,17 @@ class MySQLxSchemaTests(tests.MySQLxTests):
     def tearDown(self):
         self.session.close()
 
+    def test_exists_in_database(self):
+        # Test with special chars
+        schema_name_1 = "myschema%"
+        schema_name_2 = "myschema_"
+        schema_1 = self.session.create_schema(schema_name_1)
+        self.assertTrue(schema_1.exists_in_database())
+        schema_2 = self.session.create_schema(schema_name_2)
+        self.assertTrue(schema_2.exists_in_database())
+        self.session.drop_schema(schema_name_1)
+        self.session.drop_schema(schema_name_2)
+
     def test_get_session(self):
         session = self.schema.get_session()
         self.assertEqual(session, self.session)
