@@ -445,7 +445,6 @@ class WriteStatement(Statement):
     def __init__(self, target, doc_based):
         super(WriteStatement, self).__init__(target, doc_based)
         self._values = []
-        self._upsert = False
 
     def get_values(self):
         """Returns the list of values.
@@ -454,6 +453,26 @@ class WriteStatement(Statement):
             `list`: The list of values.
         """
         return self._values
+
+    def execute(self):
+        """Execute the statement.
+
+        Raises:
+           NotImplementedError: This method must be implemented.
+        """
+        raise NotImplementedError
+
+
+class AddStatement(WriteStatement):
+    """A statement for document addition on a collection.
+
+    Args:
+        collection (mysqlx.Collection): The Collection object.
+    """
+    def __init__(self, collection):
+        super(AddStatement, self).__init__(collection, True)
+        self._upsert = False
+        self.ids = []
 
     def is_upsert(self):
         """Returns `True` if it's an upsert.
@@ -473,25 +492,6 @@ class WriteStatement(Statement):
         """
         self._upsert = value
         return self
-
-    def execute(self):
-        """Execute the statement.
-
-        Raises:
-           NotImplementedError: This method must be implemented.
-        """
-        raise NotImplementedError
-
-
-class AddStatement(WriteStatement):
-    """A statement for document addition on a collection.
-
-    Args:
-        collection (mysqlx.Collection): The Collection object.
-    """
-    def __init__(self, collection):
-        super(AddStatement, self).__init__(collection, True)
-        self.ids = []
 
     def add(self, *values):
         """Adds a list of documents into a collection.

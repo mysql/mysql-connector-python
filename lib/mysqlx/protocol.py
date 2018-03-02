@@ -511,7 +511,8 @@ class Protocol(object):
                 row["field"].extend([build_expr(value).get_message()])
             msg["row"].extend([row.get_message()])
 
-        msg["upsert"] = stmt.is_upsert()
+        if hasattr(stmt, "is_upsert"):
+            msg["upsert"] = stmt.is_upsert()
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_INSERT"), msg)
 
