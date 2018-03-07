@@ -43,7 +43,7 @@ import platform
 from functools import wraps
 
 from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
-                             ExternalAuthPlugin)
+                             Sha256MemoryAuthPlugin)
 from .errors import InterfaceError, OperationalError, ProgrammingError
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES
 from .crud import Schema
@@ -85,7 +85,7 @@ class SocketStream(object):
                 self._is_socket = True
                 self._socket.connect(params)
             except AttributeError:
-                raise InterfaceError("Unix socket unsupported.")
+                raise InterfaceError("Unix socket unsupported")
 
     def read(self, count):
         """Receive data from the socket.
@@ -142,7 +142,7 @@ class SocketStream(object):
         """
         if not SSL_AVAILABLE:
             self.close()
-            raise RuntimeError("Python installation has no SSL support.")
+            raise RuntimeError("Python installation has no SSL support")
 
         context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         context.load_default_certs()
@@ -228,7 +228,7 @@ def catch_network_exception(func):
             return func(self, *args, **kwargs)
         except (socket.error, RuntimeError):
             self.disconnect()
-            raise InterfaceError("Cannot connect to host.")
+            raise InterfaceError("Cannot connect to host")
     return wrapper
 
 
@@ -355,7 +355,7 @@ class Connection(object):
 
         if len(self._routers) <= 1:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
-        raise InterfaceError("Failed to connect to any of the routers.", 4001)
+        raise InterfaceError("Failed to connect to any of the routers", 4001)
 
     def _handle_capabilities(self):
         """Handle capabilities.
@@ -377,7 +377,7 @@ class Connection(object):
         if not (get_item_or_attr(data[0], "name").lower() == "tls"
                 if data else False):
             self.close_connection()
-            raise OperationalError("SSL not enabled at server.")
+            raise OperationalError("SSL not enabled at server")
 
         is_ol7 = False
         if platform.system() == "Linux":
@@ -392,7 +392,7 @@ class Connection(object):
         if sys.version_info < (2, 7, 9) and not is_ol7:
             self.close_connection()
             raise RuntimeError("The support for SSL is not available for "
-                               "this Python version.")
+                               "this Python version")
 
         self.protocol.set_capabilities(tls=True)
         self.stream.set_ssl(self.settings.get("ssl-mode", SSLMode.REQUIRED),
@@ -404,34 +404,56 @@ class Connection(object):
     def _authenticate(self):
         """Authenticate with the MySQL server."""
         auth = self.settings.get("auth")
-        if (not auth and self.stream.is_secure()) or auth == Auth.PLAIN:
+        if auth:
+            if auth == Auth.PLAIN:
+                self._authenticate_plain()
+            elif auth == Auth.SHA256_MEMORY:
+                self._authenticate_sha256_memory()
+            elif auth == Auth.MYSQL41:
+                self._authenticate_mysql41()
+        elif self.stream.is_secure():
+            # Use PLAIN if no auth provided and connection is secure
             self._authenticate_plain()
-        elif auth == Auth.EXTERNAL:
-            self._authenticate_external()
         else:
-            self._authenticate_mysql41()
+            # Use MYSQL41 if connection is not secure
+            try:
+                self._authenticate_mysql41()
+            except InterfaceError:
+                pass
+            else:
+                return
+            # Try SHA256_MEMORY if MYSQL41 fails
+            try:
+                self._authenticate_sha256_memory()
+            except InterfaceError:
+                raise InterfaceError("Authentication failed using MYSQL41 and "
+                                     "SHA256_MEMORY, check username and "
+                                     "password or try a secure connection")
 
     def _authenticate_mysql41(self):
         """Authenticate with the MySQL server using `MySQL41AuthPlugin`."""
         plugin = MySQL41AuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name())
         extra_data = self.protocol.read_auth_continue()
-        self.protocol.send_auth_continue(
-            plugin.build_authentication_response(extra_data))
+        self.protocol.send_auth_continue(plugin.auth_data(extra_data))
         self.protocol.read_auth_ok()
 
     def _authenticate_plain(self):
         """Authenticate with the MySQL server using `PlainAuthPlugin`."""
+        if not self.stream.is_secure():
+            raise InterfaceError("PLAIN authentication is not allowed via "
+                                 "unencrypted connection")
         plugin = PlainAuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name(),
                                       auth_data=plugin.auth_data())
         self.protocol.read_auth_ok()
 
-    def _authenticate_external(self):
-        """Authenticate with the MySQL server using `ExternalAuthPlugin`."""
-        plugin = ExternalAuthPlugin()
-        self.protocol.send_auth_start(
-            plugin.auth_name(), initial_response=plugin.initial_response())
+    def _authenticate_sha256_memory(self):
+        """Authenticate with the MySQL server using `Sha256MemoryAuthPlugin`."""
+        plugin = Sha256MemoryAuthPlugin(self._user, self._password)
+        self.protocol.send_auth_start(plugin.auth_name())
+        extra_data = self.protocol.read_auth_continue()
+        self.protocol.send_auth_continue(plugin.auth_data(extra_data))
         self.protocol.read_auth_ok()
 
     @catch_network_exception

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,13 +34,49 @@ import struct
 from .compat import PY3, UNICODE_TYPES, hexlify
 
 
-class MySQL41AuthPlugin(object):
-    """Class implementing the MySQL Native Password authentication plugin."""
-    def __init__(self, username, password):
-        self._username = username
-        self._password = password.encode("utf-8") \
-            if isinstance(password, UNICODE_TYPES) else password
+def xor_string(hash1, hash2, hash_size):
+    """Encrypt/Decrypt function used for password encryption in
+    authentication, using a simple XOR.
 
+    Args:
+        hash1 (str): The first hash.
+        hash2 (str): The second hash.
+
+    Returns:
+        str: A string with the xor applied.
+    """
+    if PY3:
+        xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
+    else:
+        xored = [ord(h1) ^ ord(h2) for (h1, h2) in zip(hash1, hash2)]
+    return struct.pack("{0}B".format(hash_size), *xored)
+
+
+class BaseAuthPlugin(object):
+    """Base class for implementing the authentication plugins."""
+    def __init__(self, username=None, password=None):
+        self._username = username
+        self._password = password
+
+    def name(self):
+        """Returns the plugin name.
+
+        Returns:
+            str: The plugin name.
+        """
+        raise NotImplementedError
+
+    def auth_name(self):
+        """Returns the authentication name.
+
+        Returns:
+            str: The authentication name.
+        """
+        raise NotImplementedError
+
+
+class MySQL41AuthPlugin(BaseAuthPlugin):
+    """Class implementing the MySQL Native Password authentication plugin."""
     def name(self):
         """Returns the plugin name.
 
@@ -57,24 +93,7 @@ class MySQL41AuthPlugin(object):
         """
         return "MYSQL41"
 
-    def xor_string(self, hash1, hash2):
-        """Encrypt/Decrypt function used for password encryption in
-        authentication, using a simple XOR.
-
-        Args:
-            hash1 (str): The first hash.
-            hash2 (str): The second hash.
-
-        Returns:
-            str: A string with the xor applied.
-        """
-        if PY3:
-            xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
-        else:
-            xored = [ord(h1) ^ ord(h2) for (h1, h2) in zip(hash1, hash2)]
-        return struct.pack("20B", *xored)
-
-    def build_authentication_response(self, data):
+    def auth_data(self, data):
         """Hashing for MySQL 4.1 authentication.
 
         Args:
@@ -84,22 +103,17 @@ class MySQL41AuthPlugin(object):
             str: The authentication response.
         """
         if self._password:
-            hash1 = hashlib.sha1(self._password).digest()
+            password = self._password.encode("utf-8") \
+                if isinstance(self._password, UNICODE_TYPES) else self._password
+            hash1 = hashlib.sha1(password).digest()
             hash2 = hashlib.sha1(hash1).digest()
-            auth_response = self.xor_string(
-                hash1, hashlib.sha1(data + hash2).digest())
-            return "{0}\0{1}\0*{2}\0".format("", self._username,
-                                             hexlify(auth_response))
+            xored = xor_string(hash1, hashlib.sha1(data + hash2).digest(), 20)
+            return "{0}\0{1}\0*{2}\0".format("", self._username, hexlify(xored))
         return "{0}\0{1}\0".format("", self._username)
 
 
-class PlainAuthPlugin(object):
+class PlainAuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Plain authentication plugin."""
-    def __init__(self, username, password):
-        self._username = username
-        self._password = password.encode("utf-8") \
-            if isinstance(password, UNICODE_TYPES) and not PY3 else password
-
     def name(self):
         """Returns the plugin name.
 
@@ -122,18 +136,21 @@ class PlainAuthPlugin(object):
         Returns:
             str: The authentication data.
         """
-        return "\0{0}\0{1}".format(self._username, self._password)
+        password = self._password.encode("utf-8") \
+            if isinstance(self._password, UNICODE_TYPES) and not PY3 \
+               else self._password
+        return "\0{0}\0{1}".format(self._username, password)
 
 
-class ExternalAuthPlugin(object):
-    """Class implementing the External authentication plugin."""
+class Sha256MemoryAuthPlugin(BaseAuthPlugin):
+    """Class implementing the SHA256_MEMORY authentication plugin."""
     def name(self):
         """Returns the plugin name.
 
         Returns:
             str: The plugin name.
         """
-        return "External Authentication Plugin"
+        return "SHA256_MEMORY Authentication Plugin"
 
     def auth_name(self):
         """Returns the authentication name.
@@ -141,12 +158,23 @@ class ExternalAuthPlugin(object):
         Returns:
             str: The authentication name.
         """
-        return "EXTERNAL"
+        return "SHA256_MEMORY"
 
-    def initial_response(self):
-        """Returns the initial response.
+    def auth_data(self, data):
+        """Hashing for SHA256_MEMORY authentication.
+
+        The scramble is of the form:
+            SHA256(SHA256(SHA256(PASSWORD)),NONCE) XOR SHA256(PASSWORD)
+
+        Args:
+            data (str): The authentication data.
 
         Returns:
-            str: The initial response.
+            str: The authentication response.
         """
-        return ""
+        password = self._password.encode("utf-8") \
+            if isinstance(self._password, UNICODE_TYPES) else self._password
+        hash1 = hashlib.sha256(password).digest()
+        hash2 = hashlib.sha256(hashlib.sha256(hash1).digest() + data).digest()
+        xored = xor_string(hash2, hash1, 32)
+        return "\0{0}\0{1}".format(self._username, hexlify(xored))

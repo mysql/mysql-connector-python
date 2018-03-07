@@ -325,14 +325,14 @@ class Protocol(object):
                                  "authentication handshake")
         return msg["auth_data"]
 
-    def send_auth_continue(self, data):
+    def send_auth_continue(self, auth_data):
         """Send authenticate continue.
 
         Args:
-            data (str): Authentication data.
+            auth_data (str): Authentication data.
         """
         msg = Message("Mysqlx.Session.AuthenticateContinue",
-                      auth_data=data)
+                      auth_data=auth_data)
         self._writer.write_message(mysqlxpb_enum(
             "Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_CONTINUE"), msg)
 

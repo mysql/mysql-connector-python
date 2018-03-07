@@ -302,6 +302,40 @@ class MySQLxSessionTests(tests.MySQLxTests):
         sess.sql("DROP USER 'sha256'@'%'").execute()
         sess.close()
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5),
+                     "SHA256_MEMORY authentation mechanism not available")
+    def test_auth_sha265_memory(self):
+        sess = mysqlx.get_session(self.connect_kwargs)
+        sess.sql("CREATE USER 'caching'@'%' IDENTIFIED WITH "
+                 "caching_sha2_password BY 'caching'").execute()
+        config = {
+            "user": "caching",
+            "password": "caching",
+            "host": self.connect_kwargs["host"],
+            "port": self.connect_kwargs["port"]
+        }
+
+        # Session creation is not possible with SSL disabled
+        config["ssl-mode"] = mysqlx.SSLMode.DISABLED
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+        config["auth"] = mysqlx.Auth.SHA256_MEMORY
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Session creation is possible with SSL enabled
+        config["ssl-mode"] = mysqlx.SSLMode.REQUIRED
+        config["auth"] = mysqlx.Auth.PLAIN
+        mysqlx.get_session(config)
+
+        # Disable SSL
+        config["ssl-mode"] = mysqlx.SSLMode.DISABLED
+
+        # Password is in cache will, session creation is possible
+        config["auth"] = mysqlx.Auth.SHA256_MEMORY
+        mysqlx.get_session(config)
+
+        sess.sql("DROP USER 'caching'@'%'").execute()
+        sess.close()
+
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
     def test_mysqlx_socket(self):
         # Connect with unix socket

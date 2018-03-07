@@ -53,8 +53,8 @@ SSLMode = create_enum("SSLMode",
                       ("REQUIRED", "DISABLED", "VERIFY_CA", "VERIFY_IDENTITY"),
                       ("required", "disabled", "verify_ca", "verify_identity"))
 Auth = create_enum("Auth",
-                   ("PLAIN", "EXTERNAL", "MYSQL41"),
-                   ("plain", "external", "mysql41"))
+                   ("PLAIN", "MYSQL41", "SHA256_MEMORY"),
+                   ("plain", "mysql41", "sha256_memory"))
 LockContention = create_enum("LockContention",
                              ("DEFAULT", "NOWAIT", "SKIP_LOCKED"), (0, 1, 2))
 
