@@ -32,6 +32,7 @@
 """
 
 import logging
+import os
 import unittest
 import sys
 import tests
@@ -336,7 +337,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         sess.sql("DROP USER 'caching'@'%'").execute()
         sess.close()
 
-    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option tests not available for this MySQL version")
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option"
+                     " tests not available for this MySQL version")
+    @unittest.skipIf(os.name == 'nt', "sockets not available"
+                     " on windows")
     def test_mysqlx_socket(self):
         # Connect with unix socket
         uri = "mysqlx://{user}:{password}@({socket})".format(

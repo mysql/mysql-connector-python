@@ -403,7 +403,8 @@ class MySQLServer(MySQLServerBase):
 
         if self._version[0:3] < (8, 0, 1):
             dirs.append(self._datadir)
-            dirs.append(os.path.join(self._datadir, 'mysql'))
+            if self._version[0:3] < (5, 7, 21):
+                dirs.append(os.path.join(self._datadir, 'mysql'))
 
         for adir in dirs:
             LOGGER.debug("Creating directory %s", adir)
@@ -429,7 +430,7 @@ class MySQLServer(MySQLServerBase):
             '--innodb_log_file_size=1Gb',
         ]
 
-        if self._version[0:2] >= (8, 0):
+        if self._version[0:2] >= (8, 0) or self._version >= (5, 7, 21):
             cmd.append("--initialize-insecure")
             cmd.append("--init-file={0}".format(self._init_sql))
         else:
@@ -475,7 +476,7 @@ class MySQLServer(MySQLServerBase):
             "CREATE DATABASE myconnpy;"
         ]
 
-        if self._version < (8, 0, 1):
+        if self._version < (8, 0, 1) and self._version < (5, 7, 21):
             defaults = ("'root'{0}, "
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
@@ -496,12 +497,28 @@ class MySQLServer(MySQLServerBase):
                 defaults = defaults.format(", ''", "")
 
             extra_sql.append(insert.format(defaults))
+        elif self._version[0:3] >= (5, 7, 21) and self._version < (8, 0, 1):
+                LOGGER.info("Appending extra SQL for mysqlx")
+                extra_sql.extend([
+                    "CREATE USER IF NOT EXISTS 'root'@'localhost';",
+                    "GRANT ALL ON *.* TO 'root'@'localhost' WITH GRANT "
+                    "OPTION;",
+                    "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
+                    "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT "
+                    "OPTION;",
+                    "CREATE USER IF NOT EXISTS 'root'@'::1';",
+                    "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;",
+                    "CREATE USER IF NOT EXISTS mysqlxsys@localhost IDENTIFIED "
+                    "WITH mysql_native_password AS 'password' ACCOUNT LOCK;",
+                    "GRANT SELECT ON mysql.user TO mysqlxsys@localhost;",
+                    "GRANT SUPER ON *.* TO mysqlxsys@localhost;"
+                ])
         else:
             extra_sql.extend([
-                "CREATE USER 'root'@'127.0.0.1';",
-                "GRANT ALL ON *.* TO 'root'@'127.0.0.1';",
-                "CREATE USER 'root'@'::1';",
-                "GRANT ALL ON *.* TO 'root'@'::1';"
+                "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
+                "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;",
+                "CREATE USER IF NOT EXISTS 'root'@'::1';",
+                "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;"
             ])
 
         bootstrap_log = os.path.join(self._topdir, 'bootstrap.log')
@@ -510,7 +527,7 @@ class MySQLServer(MySQLServerBase):
             cmd = self._get_bootstrap_cmd()
             sql = ["USE mysql;"]
 
-            if self._version[0:2] >= (8, 0):
+            if self._version[0:2] >= (8, 0) or self._version >= (5, 7, 21):
                 test_sql = open(self._init_sql, "w")
                 test_sql.write("\n".join(extra_sql))
                 test_sql.close()
@@ -522,7 +539,7 @@ class MySQLServer(MySQLServerBase):
                         sql.extend([line.strip() for line in fp.readlines()])
 
             fp_log = open(bootstrap_log, 'w')
-            if self._version[0:2] < (8, 0):
+            if self._version[0:2] < (8, 0) or self._version < (5, 7, 21):
                 sql.extend(extra_sql)
                 prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                        stderr=subprocess.STDOUT,

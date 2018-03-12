@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -68,7 +68,6 @@ def init_bytearray(payload=b'', encoding='utf-8'):
         except AttributeError:
             raise ValueError("payload must be a str or bytes")
 
-
     return bytearray(payload)
 
 
@@ -76,15 +75,13 @@ def isstr(obj):
     """Returns whether a variable is a string"""
     if PY2:
         return isinstance(obj, basestring)
-    else:
-        return isinstance(obj, str)
+    return isinstance(obj, str)
 
 def isunicode(obj):
     """Returns whether a variable is a of unicode type"""
     if PY2:
         return isinstance(obj, unicode)
-    else:
-        return isinstance(obj, str)
+    return isinstance(obj, str)
 
 
 if PY2:

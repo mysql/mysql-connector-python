@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -136,7 +136,7 @@ class MySQLConnectionAbstract(object):
                                     config_options[option][1] <= value[1]):
                                 config_options[option] = value
                         except KeyError:
-                            if group is 'connector_python':
+                            if group == 'connector_python':
                                 raise AttributeError("Unsupported argument "
                                                      "'{0}'".format(option))
                 except KeyError:
@@ -299,6 +299,10 @@ class MySQLConnectionAbstract(object):
             except KeyError:
                 password = self._password
             self.set_login(user, password)
+
+        # Configure host information
+        if 'host' in config and config['host']:
+            self._host = config['host']
 
         # Check network locations
         try:
@@ -630,8 +634,7 @@ class MySQLConnectionAbstract(object):
         encoding = CharacterSet.get_info(self._charset_id)[0]
         if encoding in ('utf8mb4', 'binary'):
             return 'utf8'
-        else:
-            return encoding
+        return encoding
 
     def set_charset_collation(self, charset=None, collation=None):
         """Sets the character set and collation for the current connection
@@ -726,7 +729,7 @@ class MySQLConnectionAbstract(object):
         arguments are given, it will use the already configured or default
         values.
         """
-        if len(kwargs) > 0:
+        if kwargs:
             self.config(**kwargs)
 
         self.disconnect()
@@ -1054,7 +1057,7 @@ class MySQLCursorAbstract(object):
         pass
 
     @abstractmethod
-    def executemany(self, operation, seqparams):
+    def executemany(self, operation, seq_params):
         """Execute the given operation multiple times
 
         The executemany() method will execute the operation iterating

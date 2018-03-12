@@ -780,7 +780,8 @@ class BugOra13435186(tests.MySQLConnectorTests):
                 counters[value] = 1
 
         if len(counters) > self.tolerate:
-            self.fail("Counters of collected object higher than tolerated.")
+            self.fail("Counters {} of collected object higher than tolerated."
+                      "".format(len(counters)))
 
     def test_converter(self):
         for i in range(0, self.sample_size):
@@ -1137,6 +1138,8 @@ class BugOra15916486(tests.MySQLConnectorTests):
 
 @unittest.skipIf(os.name == 'nt',
                  "Cannot test error handling when doing handshake on Windows")
+@unittest.skipIf(tests.MYSQL_VERSION > (8, 0, 4),
+                 "Revoked users can no more grant")
 class BugOra15836979(tests.MySQLConnectorTests):
 
     """BUG#15836979: UNCLEAR ERROR MESSAGE CONNECTING USING UNALLOWED IP ADDRESS
@@ -1221,7 +1224,15 @@ class BugOra16217667(tests.MySQLConnectorTests):
         self.admin_cnx = connection.MySQLConnection(**config)
 
         self.admin_cnx.cmd_query(
-            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}' REQUIRE X509".format(
+            "CREATE USER 'ssluser'@'{host}'".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+
+        self.admin_cnx.cmd_query(
+            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+        
+        self.admin_cnx.cmd_query(
+            "ALTER USER 'ssluser'@'{host}' REQUIRE X509".format(
                 db=config['database'], host=tests.get_mysql_config()['host']))
 
     def tearDown(self):
@@ -1263,9 +1274,19 @@ class BugOra16316049(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         self.host = config['host']
         cnx = connection.MySQLConnection(**config)
+
         cnx.cmd_query(
-            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}' REQUIRE SSL".format(
-                db=config['database'], host=self.host))
+            "CREATE USER 'ssluser'@'{host}'".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+
+        cnx.cmd_query(
+            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+        
+        cnx.cmd_query(
+            "ALTER USER 'ssluser'@'{host}' REQUIRE SSL".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+
         cnx.close()
 
     def tearDown(self):
@@ -1757,10 +1778,16 @@ class BugOra16369511(tests.MySQLConnectorTests):
         cur.execute(sql, (self.data_file,))
         cur.execute("SELECT * FROM local_data")
 
-        exp = [
-            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        if os.name != 'nt':
+            exp = [
+                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        else:
+            exp = [
+                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
+                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
+                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, cur.fetchall())
 
     @cnx_config(compress=True)
@@ -1772,10 +1799,16 @@ class BugOra16369511(tests.MySQLConnectorTests):
         cur.execute(sql, (self.data_file,))
         cur.execute("SELECT * FROM local_data")
 
-        exp = [
-            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        if os.name != 'nt':
+            exp = [
+                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        else:
+            exp = [
+                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
+                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
+                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, cur.fetchall())
 
     @foreach_cnx()
@@ -2241,8 +2274,16 @@ class BugOra17054848(tests.MySQLConnectorTests):
         self.admin_cnx = connection.MySQLConnection(**config)
 
         self.admin_cnx.cmd_query(
-            "GRANT ALL ON %s.* TO 'ssluser'@'%s' REQUIRE SSL" % (
-                config['database'], config['host']))
+            "CREATE USER 'ssluser'@'{host}'".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+
+        self.admin_cnx.cmd_query(
+            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
+        
+        self.admin_cnx.cmd_query(
+            "ALTER USER 'ssluser'@'{host}' REQUIRE SSL".format(
+                db=config['database'], host=tests.get_mysql_config()['host']))
 
     def tearDown(self):
         config = tests.get_mysql_config()
@@ -2317,10 +2358,11 @@ class BugOra16217765(tests.MySQLConnectorTests):
                        "IDENTIFIED WITH {plugin}")
         cnx.cmd_query(create_user.format(user=user, host=host, plugin=plugin))
 
-        if plugin == 'sha256_password':
-            cnx.cmd_query("SET old_passwords = 2")
-        else:
-            cnx.cmd_query("SET old_passwords = 0")
+        if tests.MYSQL_VERSION[0:3] < (8, 0, 5):
+            if plugin == 'sha256_password':
+                cnx.cmd_query("SET old_passwords = 2")
+            else:
+                cnx.cmd_query("SET old_passwords = 0")
 
         if tests.MYSQL_VERSION < (5, 7, 5):
             passwd = ("SET PASSWORD FOR '{user}'@'{host}' = "
@@ -3909,10 +3951,16 @@ class BugOra21536507(tests.MySQLConnectorTests):
         select_stmt = "SELECT 'a'+'b'"
         cur.execute(select_stmt)
         self.assertRaises(errors.DatabaseError, cur.fetchall)
-        exp = [
-            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
-            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
-        ]
+        if os.name != 'nt':
+            exp = [
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
+            ]
+        else:
+            exp = [
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
+            ]
         self.assertEqual(exp, cur.fetchwarnings())
         try:
             cur.close()
@@ -4168,7 +4216,7 @@ class BugOra21656282(tests.MySQLConnectorTests):
     def setUp(self):
         config = tests.get_mysql_config()
         self.cnx = connection.MySQLConnection(**config)
-        self.host = 'localhost' if config['unix_socket'] and os.name != 'nt' \
+        self.host = '127.0.0.1' if config['unix_socket'] and os.name != 'nt' \
                     else config['host']
         self.user = 'unicode_user'
         self.password = u'步'
@@ -4208,8 +4256,9 @@ class BugOra21656282(tests.MySQLConnectorTests):
         config['password'] = self.password
         try:
             cnx = CMySQLConnection(**config)
-        except:
-            self.fail('Failed using password with unicode characters')
+        except Exception as err:
+            self.fail('Failed using password with unicode characters: '
+                      'e->{} t->{}'.format(err, type(err)))
         else:
             cnx.close()
 
@@ -4535,6 +4584,8 @@ class BugOra24659561(tests.MySQLConnectorTests):
         )
 
 
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 1),
+                 "Collation utf8mb4_0900_ai_ci not available on 5.7.x")
 class BugOra27277964(tests.MySQLConnectorTests):
     """BUG#27277964: NEW UTF8MB4 COLLATIONS NOT SUPPORTED
     """
@@ -4612,10 +4663,7 @@ class BugOra24948186(tests.MySQLConnectorTests):
         test_values = [-9223372036854775808]
         expected_values = test_values
         mysql_type = "INTEGER"
-        if PY2:
-            expected_type = long
-        else:
-            expected_type = int
+        expected_type = int
         self.run_test_mysql_json_type(stm, test_values, expected_values,
                                       mysql_type, expected_type)
 
@@ -4623,11 +4671,16 @@ class BugOra24948186(tests.MySQLConnectorTests):
                        18446744073709551615]
         expected_values = test_values
         mysql_type = "UNSIGNED INTEGER"
+        expected_type = int
+        self.run_test_mysql_json_type(stm, test_values[0:1],
+                                      expected_values[0:1],
+                                      mysql_type, expected_type)
         if PY2:
             expected_type = long
         else:
             expected_type = int
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
+        self.run_test_mysql_json_type(stm, test_values[1:],
+                                      expected_values[1:],
                                       mysql_type, expected_type)
 
     @foreach_cnx()

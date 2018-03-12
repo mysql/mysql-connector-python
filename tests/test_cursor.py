@@ -1120,7 +1120,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
 
     def test_callproc(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
-        self.assertRaises(errors.NotSupportedError, cur.callproc)
+        self.assertRaises(errors.NotSupportedError, cur.callproc, None)
 
     def test_close(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)

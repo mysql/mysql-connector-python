@@ -100,9 +100,9 @@ class MySQLConverterBase(object):
         except KeyError:
             return value
 
-    def escape(self, buf):
+    def escape(self, value):
         """Escape buffer for sending to MySQL"""
-        return buf
+        return value
 
     def quote(self, buf):
         """Quote buffer for sending to MySQL"""
@@ -168,14 +168,11 @@ class MySQLConverter(MySQLConverterBase):
             if PY2:
                 if isinstance(buf, float):
                     return repr(buf)
-                else:
-                    return str(buf)
-            else:
-                return str(buf).encode('ascii')
+                return str(buf)
+            return str(buf).encode('ascii')
         elif isinstance(buf, type(None)):
             return bytearray(b"NULL")
-        else:
-            return bytearray(b"'" + buf + b"'")
+        return bytearray(b"'" + buf + b"'")
 
     def to_mysql(self, value):
         """Convert Python data type to MySQL"""
@@ -262,8 +259,7 @@ class MySQLConverter(MySQLConverterBase):
         """Convert value to boolean"""
         if value:
             return 1
-        else:
-            return 0
+        return 0
 
     def _nonetype_to_mysql(self, value):
         """
@@ -363,8 +359,7 @@ class MySQLConverter(MySQLConverterBase):
 
         if PY2:
             return result
-        else:
-            return result.encode('ascii')
+        return result.encode('ascii')
 
     def _decimal_to_mysql(self, value):
         """
@@ -561,8 +556,7 @@ class MySQLConverter(MySQLConverterBase):
             num = float(value)
             if num.is_integer():
                 return int(value)
-            else:
-                return num
+            return num
         except ValueError:
             pass
 
@@ -643,8 +637,7 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.BINARY:
                 if PY2:
                     return value
-                else:
-                    return bytes(value)
+                return bytes(value)
 
         return self._STRING_to_python(value, dsc)
 

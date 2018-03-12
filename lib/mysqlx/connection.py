@@ -537,7 +537,7 @@ class Connection(object):
         return Result(self)
 
     @catch_network_exception
-    def execute_nonquery(self, namespace, cmd, raise_on_fail=False, *args):
+    def execute_nonquery(self, namespace, cmd, raise_on_fail, *args):
         """Execute a non query command.
 
         Args:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -81,7 +81,7 @@ MYSQL_CHARACTER_SETS = [
     ("latin7", "latin7_general_cs", False),  # 42
     ("macce", "macce_bin", False),  # 43
     ("cp1250", "cp1250_croatian_ci", False),  # 44
-    ("utf8mb4", "utf8mb4_general_ci", False),  # 45
+    ("utf8mb4", "utf8mb4_general_ci", True),  # 45
     ("utf8mb4", "utf8mb4_bin", False),  # 46
     ("latin1", "latin1_bin", False),  # 47
     ("latin1", "latin1_general_ci", False),  # 48
@@ -291,7 +291,7 @@ MYSQL_CHARACTER_SETS = [
     None,
     None,
     None,
-    ("utf8mb4", "utf8mb4_0900_ai_ci", True),  # 255
+    ("utf8mb4", "utf8mb4_0900_ai_ci", False),  # 255
     ("utf8mb4", "utf8mb4_de_pb_0900_ai_ci", False),  # 256
     ("utf8mb4", "utf8mb4_is_0900_ai_ci", False),  # 257
     ("utf8mb4", "utf8mb4_lv_0900_ai_ci", False),  # 258

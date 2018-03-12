@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -48,9 +48,8 @@ def intread(buf):
         elif length <= 4:
             tmp = buf + b'\x00'*(4-length)
             return struct_unpack('<I', tmp)[0]
-        else:
-            tmp = buf + b'\x00'*(8-length)
-            return struct_unpack('<Q', tmp)[0]
+        tmp = buf + b'\x00'*(8-length)
+        return struct_unpack('<Q', tmp)[0]
     except:
         raise
 
@@ -155,8 +154,8 @@ def lc_int(i):
         return b'\xfc' + bytearray(struct.pack('<H', i))
     elif i <= 16777215:
         return b'\xfd' + bytearray(struct.pack('<I', i)[0:3])
-    else:
-        return b'\xfe' + bytearray(struct.pack('<Q', i))
+
+    return b'\xfe' + bytearray(struct.pack('<Q', i))
 
 
 def read_bytes(buf, size):

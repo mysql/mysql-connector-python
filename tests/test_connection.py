@@ -291,15 +291,27 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'status_flag': 1, 'affected_rows': 6}
         self.assertEqual(exp, self.cnx._handle_result(packet))
 
-        exp = [
-            bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
-                      b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
-                      b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
-                      b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
-                      b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
-                      b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
-            bytearray(b'\x00\x00\x00\x05')
-        ]
+        if os.name != 'nt':
+            exp = [
+                bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
+                          b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
+                          b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
+                          b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
+                          b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
+                          b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+                bytearray(b'\x00\x00\x00\x05')
+            ]
+        else:
+            exp = [
+                bytearray(b'\x4c\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63'
+                          b'\x32\x5f\x31\x0d\x0a\x32\x09\x63\x31\x5f\x32\x09'
+                          b'\x63\x32\x5f\x32\x0d\x0a\x33\x09\x63\x31\x5f\x33'
+                          b'\x09\x63\x32\x5f\x33\x0d\x0a\x34\x09\x63\x31\x5f'
+                          b'\x34\x09\x63\x32\x5f\x34\x0d\x0a\x35\x09\x63\x31'
+                          b'\x5f\x35\x09\x63\x32\x5f\x35\x0d\x0a\x36\x09\x63'
+                          b'\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+                bytearray(b'\x00\x00\x00\x05')
+            ]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
         # Column count is invalid ( more than 4096)
@@ -1768,10 +1780,16 @@ class WL7937(tests.MySQLConnectorTests):
         self.cur.execute(sql, (self.data_file, ))
         self.cur.execute("SELECT * FROM local_data")
 
-        exp = [
-            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        if os.name != 'nt':
+            exp = [
+                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        else:
+            exp = [
+                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
+                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
+                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, self.cur.fetchall())
 
     def test_without_load_local_infile(self):

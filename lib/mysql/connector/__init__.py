@@ -180,8 +180,7 @@ def connect(*args, **kwargs):
 
     if HAVE_CEXT and not use_pure:
         return CMySQLConnection(*args, **kwargs)
-    else:
-        return MySQLConnection(*args, **kwargs)
+    return MySQLConnection(*args, **kwargs)
 Connect = connect  # pylint: disable=C0103
 
 __version_info__ = version.VERSION

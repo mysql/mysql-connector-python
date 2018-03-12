@@ -81,6 +81,7 @@ def escape(*args):
         str: The value if not a string, or the escaped string.
     """
     def _escape(value):
+        """Escapes special characters."""
         if value is None:
             return value
         elif isinstance(value, NUMERIC_TYPES):

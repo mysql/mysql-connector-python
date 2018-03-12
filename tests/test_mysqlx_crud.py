@@ -1197,6 +1197,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 4), "Unavailable")
     def test_modify_patch(self):
         collection_name = "collection_GOT"
         collection = self.schema.create_collection(collection_name)
@@ -1520,6 +1521,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 4), "Dev API change")
     def test_create_index(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -1732,6 +1734,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 4), "Dev API change")
     def test_drop_index(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)

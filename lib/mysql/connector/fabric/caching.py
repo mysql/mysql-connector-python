@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -125,7 +125,6 @@ class CacheShardTable(CacheEntry):
         elif self.shard_type == 'RANGE_DATETIME':
             try:
                 if ':' in key:
-                    # pylint: disable=R0204
                     _key = datetime.strptime(key, "%Y-%m-%d %H:%M:%S")
                 else:
                     _key = datetime.strptime(key, "%Y-%m-%d").date()

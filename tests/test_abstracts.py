@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -94,9 +94,12 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
             exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,'
                    'NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,'
                    'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
-        else:
+        elif tests.MYSQL_VERSION[0:3] < (8, 0, 5):
             exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,'
                    'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
+        else:
+            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,'
+                   'NO_ENGINE_SUBSTITUTION')
 
         try:
             self.cnx.sql_mode = exp
@@ -181,12 +184,12 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.assertEqual(exp, [self.cnx.autocommit, self.cnx.sql_mode,
                                self.cnx.time_zone, self.cnx._charset_id])
 
-        exp_user_variables = {'ham': '1', 'spam': '2'}
+        exp_user_variables = {'ham': 1, 'spam': 2}
         exp_session_variables = {'wait_timeout': 100000}
 
         for key, value in exp_user_variables.items():
             row = self.cnx.info_query("SELECT @{0}".format(key))
-            self.assertEqual(value, row[0])
+            self.assertEqual(value, int(row[0]))
         for key, value in exp_session_variables.items():
             row = self.cnx.info_query("SELECT @@session.{0}".format(key))
             self.assertEqual(value, row[0])

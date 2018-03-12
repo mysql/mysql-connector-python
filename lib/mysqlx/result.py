@@ -282,6 +282,7 @@ class ColumnType(object):
         for key, value in vars(cls).items():
             if value == needle:
                 return key
+        return None
 
     @classmethod
     def from_string(cls, key):
