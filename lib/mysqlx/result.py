@@ -655,7 +655,7 @@ class BaseResult(object):
             code (int): The warning code.
             msg (str): The warning message.
         """
-        self._warnings.append((level, code, msg,))
+        self._warnings.append({"level": level, "code": code, "msg": msg})
 
     def set_generated_ids(self, generated_ids):
         """Sets the generated ids.
