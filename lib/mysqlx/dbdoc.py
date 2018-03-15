@@ -54,11 +54,34 @@ class DbDoc(object):
     def __str__(self):
         return json.dumps(self.__dict__)
 
+    def __repr__(self):
+        return repr(self.__dict__)
+
     def __setitem__(self, index, value):
+        if index == "_id":
+            raise ProgrammingError("Cannot modify _id")
         self.__dict__[index] = value
 
     def __getitem__(self, index):
         return self.__dict__[index]
+
+    def copy(self, doc_id=None):
+        """Returns a new copy of a :class:`mysqlx.DbDoc` object containing the
+        `doc_id` provided. If `doc_id` is not provided, it will be removed from
+        new :class:`mysqlx.DbDoc` object.
+
+        Args:
+            doc_id (Optional[str]): Document ID
+
+        Returns:
+            mysqlx.DbDoc: A new instance of DbDoc containing the _id provided
+        """
+        new_dict = self.__dict__.copy()
+        if doc_id:
+            new_dict["_id"] = doc_id
+        elif "_id" in new_dict:
+            del new_dict["_id"]
+        return DbDoc(new_dict)
 
     def keys(self):
         """Returns the keys.

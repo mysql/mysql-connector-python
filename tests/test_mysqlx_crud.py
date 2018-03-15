@@ -69,6 +69,48 @@ def drop_view(schema, view_name):
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+class MySQLxDbDocTests(tests.MySQLxTests):
+
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.schema_name = self.connect_kwargs["schema"]
+        self.collection_name = "collection_test"
+        try:
+            self.session = mysqlx.get_session(self.connect_kwargs)
+        except mysqlx.Error as err:
+            self.fail("{0}".format(err))
+        self.schema = self.session.get_schema(self.schema_name)
+        self.collection = self.schema.create_collection(self.collection_name)
+
+    def tearDown(self):
+        self.schema.drop_collection(self.collection_name)
+        self.session.close()
+
+    def test_dbdoc_creation(self):
+        doc_1 = mysqlx.DbDoc({"_id": "1", "name": "Fred", "age": 21})
+        self.collection.add(doc_1).execute()
+        self.assertEqual(1, self.collection.count())
+
+        # Don't allow _id assignment
+        self.assertRaises(mysqlx.ProgrammingError,
+                          doc_1.__setitem__, "_id", "1")
+
+        doc_2 = {"_id": "2", "name": "Wilma", "age": 33}
+        self.collection.add(doc_2).execute()
+        self.assertEqual(2, self.collection.count())
+
+        # Copying a DbDoc
+        doc_3 = self.collection.find().execute().fetch_one()
+        doc_4 = doc_3.copy("new_id")
+        self.assertEqual(doc_4["_id"], "new_id")
+        self.assertNotEqual(doc_3, doc_4)
+
+        # Copying a DbDoc without _id
+        doc_5 = mysqlx.DbDoc({"name": "Fred", "age": 21})
+        doc_6 = doc_5.copy()
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxSchemaTests(tests.MySQLxTests):
 
     def setUp(self):
