@@ -462,15 +462,15 @@ class WriteStatement(Statement):
         """
         return self._upsert
 
-    def upsert(self, val=True):
+    def upsert(self, value=True):
         """Sets the upset flag to the boolean of the value provided.
         Setting of this flag allows updating of the matched rows/documents
         with the provided value.
 
         Args:
-            val (optional[bool]): Set or unset the upsert flag.
+            value (optional[bool]): Set or unset the upsert flag.
         """
-        self._upsert = val
+        self._upsert = value
         return self
 
     def execute(self):

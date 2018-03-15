@@ -1303,6 +1303,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection.add_or_replace_one("new_id", upsert)
         result = collection.find("age = 99999").execute().fetch_one()
         self.assertEqual("Melissandre", result["name"])
+        self.assertEqual("new_id", result["_id"])
 
         self.schema.drop_collection(collection_name)
 

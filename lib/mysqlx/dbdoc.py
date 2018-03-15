@@ -55,8 +55,6 @@ class DbDoc(object):
         return json.dumps(self.__dict__)
 
     def __setitem__(self, index, value):
-        if index == "_id":
-            raise ProgrammingError("Cannot modify _id")
         self.__dict__[index] = value
 
     def __getitem__(self, index):

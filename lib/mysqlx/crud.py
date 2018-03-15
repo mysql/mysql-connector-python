@@ -400,6 +400,7 @@ class Collection(DatabaseObject):
         """
         if not isinstance(doc, DbDoc):
             doc = DbDoc(doc)
+        doc["_id"] = doc_id
         return self.add(doc).upsert(True).execute()
 
     def get_one(self, doc_id):
