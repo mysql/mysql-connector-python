@@ -8,6 +8,22 @@ Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.11
+=======
+
+- WL#11668: Add SHA256_MEMORY authentication mechanism
+- WL#11614: Enable C extension by default
+- WL#11448: New document _id generation support
+- WL#11282: Support new locking modes NOWAIT and SKIP LOCKED
+- BUG#27639119: Use a list of dictionaries to store warnings
+- BUG#27634885: Update error codes for MySQL 8.0.11
+- BUG#27589450: Remove upsert functionality from WriteStatement class
+- BUG#27528842: Fix internal queries open for SQL injection
+- BUG#27364914: Cursor prepared statements do not convert strings
+- BUG#24953913: Fix failing unittests
+- BUG#24948205: Results from JSON_TYPE() are returned as bytearray
+- BUG#24948186: JSON type results are bytearray instead of corresponding python type
+
 v8.0.6
 ======
 

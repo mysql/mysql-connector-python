@@ -7,6 +7,7 @@
 commit.txt
 *.patch
 *.diff
+*.egg-info/
 dist/
 build/
 venv/
