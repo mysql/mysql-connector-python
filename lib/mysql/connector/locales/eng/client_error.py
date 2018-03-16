@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,8 +29,8 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 # This file was auto-generated.
-_GENERATED_ON = '2015-12-13'
-_MYSQL_VERSION = (5, 7, 10)
+_GENERATED_ON = '2018-03-16'
+_MYSQL_VERSION = (8, 0, 11)
 
 # Start MySQL Error messages
 CR_UNKNOWN_ERROR = u"Unknown MySQL error"
@@ -96,5 +96,7 @@ CR_AUTH_PLUGIN_CANNOT_LOAD = u"Authentication plugin '%s' cannot be loaded: %s"
 CR_DUPLICATE_CONNECTION_ATTR = u"There is an attribute with the same name already"
 CR_AUTH_PLUGIN_ERR = u"Authentication plugin '%s' reported error: %s"
 CR_INSECURE_API_ERR = u"Insecure API function call: '%s' Use instead: '%s'"
+CR_FILE_NAME_TOO_LONG = u"File name is too long"
+CR_SSL_FIPS_MODE_ERR = u"Set FIPS mode ON/STRICT failed"
 # End MySQL Error messages
 

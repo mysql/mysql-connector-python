@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -50,7 +50,7 @@ class ErrorCodeTests(tests.MySQLConnectorTests):
 
     def test_server_error_codes(self):
         cases = {
-            'ER_HASHCHK': 1000,
+            'OBSOLETE_ER_HASHCHK': 1000,
             'ER_TRG_INVALID_CREATION_CTX': 1604,
             'ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION': 1792,
         }
