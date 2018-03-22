@@ -331,11 +331,19 @@ class BuildExtDynamic(build_ext):
             return
 
         data_files = []
+        vendor_libs = []
 
         if os.name == "nt":
-            openssl_libs = ["ssleay32.dll", "libeay32.dll"]
-            vendor_folder = ""
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
+            vendor_libs.append(
+                (mysql_capi,
+                 ["ssleay32.dll", "libeay32.dll"]),
+                ("C:/Windows/System32/",
+                 ["msvcp140.dll", "ucrtbase.dll", "vcruntime140.dll"]),
+                ("C:/Windows/System32/",
+                 ["msvcp140d.dll", "ucrtbased.dll", "vcruntime140d.dll"])
+            )
+            vendor_folder = ""
             # Bundle libmysql.dll
             src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
             dst = os.getcwd()
@@ -343,21 +351,22 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         else:
-            openssl_libs = self._get_posix_openssl_libs()
-            vendor_folder = "mysql-vendor"
             mysql_capi = os.path.join(self.with_mysql_capi, "lib")
+            vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
+            vendor_folder = "mysql-vendor"
 
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
 
-        # Copy OpenSSL libraries to 'mysql-vendor' folder
-        log.info("Copying OpenSSL libraries")
-        for filename in openssl_libs:
-            data_files.append(os.path.join(vendor_folder, filename))
-            src = os.path.join(mysql_capi, filename)
-            dst = os.path.join(os.getcwd(), vendor_folder)
-            log.info("copying {0} -> {1}".format(src, dst))
-            shutil.copy(src, dst)
+        # Copy vendor libraries to 'mysql-vendor' folder
+        log.info("Copying vendor libraries")
+        for src_folder, files in vendor_libs:
+            for filename in files:
+                data_files.append(os.path.join(vendor_folder, filename))
+                src = os.path.join(src_folder, filename)
+                dst = os.path.join(os.getcwd(), vendor_folder)
+                log.info("copying {0} -> {1}".format(src, dst))
+                shutil.copy(src, dst)
         # Add data_files to distribution
         self.distribution.data_files = [(vendor_folder, data_files)]
 
@@ -619,8 +628,6 @@ class BuildExtDynamic(build_ext):
                     ext.include_dirs.append(self.with_protobuf_include_dir)
                     ext.library_dirs.append(self.with_protobuf_lib_dir)
                     ext.libraries.append("libprotobuf")
-                # Use the multithread, static version of the run-time library
-                ext.extra_compile_args.append("/MT")
                 # Add extra compile args
                 if self.extra_compile_args:
                     ext.extra_compile_args.extend(self.extra_compile_args.split())
