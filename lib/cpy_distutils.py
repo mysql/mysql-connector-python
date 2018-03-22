@@ -335,14 +335,14 @@ class BuildExtDynamic(build_ext):
 
         if os.name == "nt":
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
-            vendor_libs.append(
+            vendor_libs.extend([
                 (mysql_capi,
                  ["ssleay32.dll", "libeay32.dll"]),
                 ("C:/Windows/System32/",
                  ["msvcp140.dll", "ucrtbase.dll", "vcruntime140.dll"]),
                 ("C:/Windows/System32/",
                  ["msvcp140d.dll", "ucrtbased.dll", "vcruntime140d.dll"])
-            )
+            ])
             vendor_folder = ""
             # Bundle libmysql.dll
             src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
