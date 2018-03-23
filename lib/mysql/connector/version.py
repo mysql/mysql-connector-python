@@ -39,6 +39,6 @@ if VERSION[3] and VERSION[4]:
 else:
     VERSION_TEXT = '{0}.{1}.{2}'.format(*VERSION[0:3])
 
-VERSION_EXTRA = 'rc'
+VERSION_EXTRA = ''
 LICENSE = 'GPLv2 with FOSS License Exception'
 EDITION = ''  # Added in package names, after the version
