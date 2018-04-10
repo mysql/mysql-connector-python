@@ -36,7 +36,7 @@ from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.version import LooseVersion
 from distutils.dir_util import copy_tree, mkpath
-from distutils.sysconfig import get_python_lib
+from distutils.sysconfig import get_python_lib, get_python_version
 from distutils import log
 from glob import glob
 import os
@@ -866,6 +866,16 @@ class InstallLib(install_lib):
             self.byte_compile(outfiles)
 
         if self.byte_code_only:
+            if get_python_version().startswith("3"):
+                for base, _, files in os.walk(self.install_dir):
+                    for filename in files:
+                        if filename.endswith(".pyc"):
+                            new_name = "{0}.pyc".format(filename.split(".")[0])
+                            os.rename(os.path.join(base, filename),
+                                      os.path.join(base, "..", new_name))
+                for base, _, files in os.walk(self.install_dir):
+                    if base.endswith("__pycache__"):
+                        os.rmdir(base)
             for source_file in outfiles:
                 log.info("Removing %s", source_file)
                 os.remove(source_file)
