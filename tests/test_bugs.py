@@ -1227,13 +1227,21 @@ class BugOra16217667(tests.MySQLConnectorTests):
             "CREATE USER 'ssluser'@'{host}'".format(
                 db=config['database'], host=tests.get_mysql_config()['host']))
 
-        self.admin_cnx.cmd_query(
-            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
-        
-        self.admin_cnx.cmd_query(
-            "ALTER USER 'ssluser'@'{host}' REQUIRE X509".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
+        if tests.MYSQL_VERSION < (5, 7, 21):
+            self.admin_cnx.cmd_query(
+                "GRANT ALL ON {db}.* TO 'ssluser'@'{host}' REQUIRE X509"
+                "".format(db=config['database'],
+                          host=tests.get_mysql_config()['host']))
+        else:
+            self.admin_cnx.cmd_query(
+                "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'"
+                "".format(db=config['database'],
+                          host=tests.get_mysql_config()['host']))
+
+            self.admin_cnx.cmd_query(
+                "ALTER USER 'ssluser'@'{host}' REQUIRE X509"
+                "".format(db=config['database'],
+                          host=tests.get_mysql_config()['host']))
 
     def tearDown(self):
         self.admin_cnx.cmd_query("DROP USER 'ssluser'@'{0}'".format(
@@ -1275,17 +1283,25 @@ class BugOra16316049(tests.MySQLConnectorTests):
         self.host = config['host']
         cnx = connection.MySQLConnection(**config)
 
-        cnx.cmd_query(
-            "CREATE USER 'ssluser'@'{host}'".format(
+        if tests.MYSQL_VERSION < (5, 7, 21):
+            cnx.cmd_query(
+            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}' REQUIRE SSL".format(
                 db=config['database'], host=tests.get_mysql_config()['host']))
+        else:
+            cnx.cmd_query(
+                "CREATE USER 'ssluser'@'{host}'".format(
+                    db=config['database'],
+                    host=tests.get_mysql_config()['host']))
 
-        cnx.cmd_query(
-            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
-        
-        cnx.cmd_query(
-            "ALTER USER 'ssluser'@'{host}' REQUIRE SSL".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
+            cnx.cmd_query(
+                "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
+                    db=config['database'],
+                    host=tests.get_mysql_config()['host']))
+
+            cnx.cmd_query(
+                "ALTER USER 'ssluser'@'{host}' REQUIRE SSL".format(
+                    db=config['database'],
+                    host=tests.get_mysql_config()['host']))
 
         cnx.close()
 
@@ -1868,6 +1884,8 @@ class BugOra17002411(tests.MySQLConnectorTests):
 
 @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
                  "BugOra17422299 not tested with MySQL version >= 8.0.1")
+@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1),
+                 "BugOra17422299 not tested with MySQL version 5.6")
 class BugOra17422299(tests.MySQLConnectorTests):
     """BUG#17422299: cmd_shutdown fails with malformed connection packet
     """
@@ -2273,17 +2291,25 @@ class BugOra17054848(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         self.admin_cnx = connection.MySQLConnection(**config)
 
-        self.admin_cnx.cmd_query(
-            "CREATE USER 'ssluser'@'{host}'".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
+        if tests.MYSQL_VERSION < (5, 7, 21):
+            self.admin_cnx.cmd_query(
+                "GRANT ALL ON %s.* TO 'ssluser'@'%s' REQUIRE SSL" % (
+                    config['database'], config['host']))
+        else:
+            self.admin_cnx.cmd_query(
+                "CREATE USER 'ssluser'@'{host}'".format(
+                    db=config['database'],
+                    host=tests.get_mysql_config()['host']))
 
-        self.admin_cnx.cmd_query(
-            "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
-        
-        self.admin_cnx.cmd_query(
-            "ALTER USER 'ssluser'@'{host}' REQUIRE SSL".format(
-                db=config['database'], host=tests.get_mysql_config()['host']))
+            self.admin_cnx.cmd_query(
+                "GRANT ALL ON {db}.* TO 'ssluser'@'{host}'".format(
+                    db=config['database'],
+                    host=tests.get_mysql_config()['host']))
+
+            self.admin_cnx.cmd_query(
+                "ALTER USER 'ssluser'@'{host}' REQUIRE SSL".format(
+                    db=config['database'],
+                    host=tests.get_mysql_config()['host']))
 
     def tearDown(self):
         config = tests.get_mysql_config()
@@ -4608,6 +4634,8 @@ class BugOra27277964(tests.MySQLConnectorTests):
         self.cur.execute("INSERT INTO {0} VALUES (1, 'Nuno')".format(self.tbl))
 
 
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 8),
+                 "Support for native JSON data types introduced on 5.7.8 ")
 class BugOra24948186(tests.MySQLConnectorTests):
     """BUG#24948186: MySQL JSON TYPES RETURNED AS BYTES INSTEAD OF PYTHON TYPES
     """

@@ -476,7 +476,9 @@ class MySQLServer(MySQLServerBase):
             "CREATE DATABASE myconnpy;"
         ]
 
-        if self._version < (8, 0, 1) and self._version < (5, 7, 21):
+        if self._version > (5, 7, 5) and self._version < (5, 7, 21):
+            # Note: server is running with --skip-grant-tables
+            # (can not user 'CREATE USER' statements).
             defaults = ("'root'{0}, "
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
@@ -513,6 +515,11 @@ class MySQLServer(MySQLServerBase):
                     "GRANT SELECT ON mysql.user TO mysqlxsys@localhost;",
                     "GRANT SUPER ON *.* TO mysqlxsys@localhost;"
                 ])
+        elif self._version[0:3] >= (5, 6, 39):
+            # Following required user accounts are created by the server it self.
+            # 'root'@'127.0.0.1', 'root'@'localhost' and 'root'@'::1'
+            # Note: server is running with --skip-grant-tables.
+            pass
         else:
             extra_sql.extend([
                 "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",

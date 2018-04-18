@@ -223,6 +223,8 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
 
     @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
                      "As of MySQL 8.0.1, CMD_SHUTDOWN is not recognized.")
+    @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1),
+                     "BugOra17422299 not tested with MySQL version 5.6")
     @foreach_cnx()
     def test_cmd_shutdown(self):
         server = tests.MYSQL_SERVERS[0]
