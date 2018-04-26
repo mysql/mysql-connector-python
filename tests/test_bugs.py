@@ -51,6 +51,7 @@ import traceback
 import time
 import unittest
 import pickle
+import sys
 
 import tests
 from tests import foreach_cnx, cnx_config
@@ -4322,6 +4323,8 @@ class BugOra21530841(tests.MySQLConnectorTests):
         cur.close()
 
 
+@unittest.skipIf(sys.version_info < (2, 7, 9),
+                 "Python 2.7.9+ is required for SSL")
 class BugOra25397650(tests.MySQLConnectorTests):
     """BUG#25397650: CERTIFICATE VALIDITY NOT VERIFIED 
     """

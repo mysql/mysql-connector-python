@@ -1707,6 +1707,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             else:
                 self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
 
+    @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1), "Shutdown CMD "
+                     "not tested with MySQL version 5.6 (BugOra17422299)")
     def test_shutdown(self):
         """Shutting down a connection"""
         config = tests.get_mysql_config()
