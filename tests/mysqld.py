@@ -515,8 +515,9 @@ class MySQLServer(MySQLServerBase):
                     "GRANT SELECT ON mysql.user TO mysqlxsys@localhost;",
                     "GRANT SUPER ON *.* TO mysqlxsys@localhost;"
                 ])
-        elif self._version[0:3] >= (5, 6, 39):
-            # Following required user accounts are created by the server it self.
+        elif self._version[0:3] >= (5, 6, 39) and \
+             self._version[0:3] < (5, 7, 5):
+            # Following required user accounts are created by the server itself:
             # 'root'@'127.0.0.1', 'root'@'localhost' and 'root'@'::1'
             # Note: server is running with --skip-grant-tables.
             pass
