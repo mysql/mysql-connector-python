@@ -314,11 +314,12 @@ class BuildExtDynamic(build_ext):
             return
 
         data_files = []
+        vendor_libs = []
 
         if os.name == "nt":
-            openssl_libs = ["ssleay32.dll", "libeay32.dll"]
-            vendor_folder = ""
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
+            vendor_libs.append((mysql_capi, ["ssleay32.dll", "libeay32.dll"]))
+            vendor_folder = ""
             # Bundle libmysql.dll
             src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
             dst = os.getcwd()
@@ -326,21 +327,22 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         else:
-            openssl_libs = self._get_posix_openssl_libs()
-            vendor_folder = "mysql-vendor"
             mysql_capi = os.path.join(self.with_mysql_capi, "lib")
+            vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
+            vendor_folder = "mysql-vendor"
 
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
 
-        # Copy OpenSSL libraries to 'mysql-vendor' folder
-        log.info("Copying OpenSSL libraries")
-        for filename in openssl_libs:
-            data_files.append(os.path.join(vendor_folder, filename))
-            src = os.path.join(mysql_capi, filename)
-            dst = os.path.join(os.getcwd(), vendor_folder)
-            log.info("copying {0} -> {1}".format(src, dst))
-            shutil.copy(src, dst)
+        # Copy vendor libraries to 'mysql-vendor' folder
+        log.info("Copying vendor libraries")
+        for src_folder, files in vendor_libs:
+            for filename in files:
+                data_files.append(os.path.join(vendor_folder, filename))
+                src = os.path.join(src_folder, filename)
+                dst = os.path.join(os.getcwd(), vendor_folder)
+                log.info("copying {0} -> {1}".format(src, dst))
+                shutil.copy(src, dst)
         # Add data_files to distribution
         self.distribution.data_files = [(vendor_folder, data_files)]
 
@@ -693,6 +695,16 @@ class InstallLib(install_lib):
             self.byte_compile(outfiles)
 
         if self.byte_code_only:
+            if get_python_version().startswith("3"):
+                for base, _, files in os.walk(self.install_dir):
+                    for filename in files:
+                        if filename.endswith(".pyc"):
+                            new_name = "{0}.pyc".format(filename.split(".")[0])
+                            os.rename(os.path.join(base, filename),
+                                      os.path.join(base, "..", new_name))
+                for base, _, files in os.walk(self.install_dir):
+                    if base.endswith("__pycache__"):
+                        os.rmdir(base)
             for source_file in outfiles:
                 log.info("Removing %s", source_file)
                 os.remove(source_file)
