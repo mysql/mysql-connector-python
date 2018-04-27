@@ -31,7 +31,7 @@ from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.version import LooseVersion
 from distutils.dir_util import copy_tree, mkpath
-from distutils.sysconfig import get_python_lib
+from distutils.sysconfig import get_python_lib, get_python_version
 from distutils import log
 from glob import glob
 import os
