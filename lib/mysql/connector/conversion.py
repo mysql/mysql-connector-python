@@ -547,6 +547,62 @@ class MySQLConverter(MySQLConverterBase):
             raise ValueError("Could not convert set %s to a sequence." % value)
         return set_type
 
+    def _JSON_to_python(self, value, dsc=None):  # pylint: disable=C0103
+        """Returns JSON column type as python type
+
+        Returns JSON column type as python type.
+        """
+        try:
+            num = float(value)
+            if num.is_integer():
+                return int(value)
+            else:
+                return num
+        except ValueError:
+            pass
+
+        if value == b'true':
+            return True
+        elif value == b'false':
+            return False
+
+        # The following types are returned between double quotes or
+        # bytearray(b'"')[0] or int 34 for shortness.
+        if value[0] == 34 and value[-1] == 34:
+            value_nq = value[1:-1]
+
+            value_datetime = self._DATETIME_to_python(value_nq)
+            if value_datetime is not None:
+                return value_datetime
+
+            value_date = self._DATE_to_python(value_nq)
+            if value_date is not None:
+                return value_date
+            try:
+                value_time = self._TIME_to_python(value_nq)
+                if value_time is not None:
+                    return value_time
+            except ValueError:
+                pass
+
+            if isinstance(value, (bytes, bytearray)):
+                return value.decode(self.charset)
+
+        if dsc is not None:
+            # Check if we deal with a SET
+            if dsc[7] & FieldFlag.SET:
+                return self._SET_to_python(value, dsc)
+            if dsc[7] & FieldFlag.BINARY:
+                if self.charset != 'binary':
+                    try:
+                        return value.decode(self.charset)
+                    except (LookupError, UnicodeDecodeError):
+                        return value
+                else:
+                    return value
+
+        return self._STRING_to_python(value, dsc)
+
     def _STRING_to_python(self, value, dsc=None):  # pylint: disable=C0103
         """
         Note that a SET is a string too, but using the FieldFlag we can see
@@ -559,9 +615,12 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.SET:
                 return self._SET_to_python(value, dsc)
             if dsc[7] & FieldFlag.BINARY:
-                try:
-                    return value.decode(self.charset)
-                except (LookupError, UnicodeDecodeError):
+                if self.charset != 'binary':
+                    try:
+                        return value.decode(self.charset)
+                    except (LookupError, UnicodeDecodeError):
+                        return value
+                else:
                     return value
 
         if self.charset == 'binary':
@@ -579,11 +638,10 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.BINARY:
                 if PY2:
                     return value
-                else:
-                    return bytes(value)
+                return bytes(value)
 
         return self._STRING_to_python(value, dsc)
 
-    _LONG_BLOB_to_python = _BLOB_to_python
+    _LONG_BLOB_to_python = _JSON_to_python
     _MEDIUM_BLOB_to_python = _BLOB_to_python
     _TINY_BLOB_to_python = _BLOB_to_python

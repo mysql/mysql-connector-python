@@ -159,6 +159,7 @@ class FieldType(_Constants):
     NEWDATE = 0x0e
     VARCHAR = 0x0f
     BIT = 0x10
+    JSON = 0xf5
     NEWDECIMAL = 0xf6
     ENUM = 0xf7
     SET = 0xf8
@@ -188,6 +189,7 @@ class FieldType(_Constants):
         'NEWDATE': (0x0e, 'NEWDATE'),
         'VARCHAR': (0x0f, 'VARCHAR'),
         'BIT': (0x10, 'BIT'),
+        'JSON': (0xf5, 'JSON'),
         'NEWDECIMAL': (0xf6, 'NEWDECIMAL'),
         'ENUM': (0xf7, 'ENUM'),
         'SET': (0xf8, 'SET'),

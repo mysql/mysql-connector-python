@@ -1255,8 +1255,8 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
             return row
         cur._fetch_row = _fetch_row
 
-        cur._test_fetch_row = [(b'ham',)]
-        self.assertEqual((b'ham',), cur.fetchone())
+        cur._test_fetch_row = [('ham',)]
+        self.assertEqual(('ham',), cur.fetchone())
         self.assertEqual(None, cur.fetchone())
 
     def test_fetchmany(self):
