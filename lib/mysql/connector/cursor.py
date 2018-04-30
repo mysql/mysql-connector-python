@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -188,7 +188,7 @@ class CursorBase(MySQLCursorAbstract):
         """
         pass
 
-    def executemany(self, operation, seqparams):
+    def executemany(self, operation, seq_params):
         """Execute the given operation multiple times
 
         The executemany() method will execute the operation iterating
@@ -493,7 +493,7 @@ class MySQLCursor(CursorBase):
 
         i = 0
         while True:
-            result = next(query_iter)
+            result = next(query_iter)  # pylint: disable=R1708
             self._reset_result()
             self._handle_result(result)
             try:
@@ -556,15 +556,15 @@ class MySQLCursor(CursorBase):
         if multi:
             self._executed_list = []
             return self._execute_iter(self._connection.cmd_query_iter(stmt))
-        else:
-            try:
-                self._handle_result(self._connection.cmd_query(stmt))
-            except errors.InterfaceError:
-                if self._connection._have_next_result:  # pylint: disable=W0212
-                    raise errors.InterfaceError(
-                        "Use multi=True when executing multiple statements")
-                raise
-            return None
+
+        try:
+            self._handle_result(self._connection.cmd_query(stmt))
+        except errors.InterfaceError:
+            if self._connection._have_next_result:  # pylint: disable=W0212
+                raise errors.InterfaceError(
+                    "Use multi=True when executing multiple statements")
+            raise
+        return None
 
     def _batch_insert(self, operation, seq_params):
         """Implements multi row insert"""
@@ -577,8 +577,7 @@ class MySQLCursor(CursorBase):
             """
             if match.group(1):
                 return ""
-            else:
-                return match.group(2)
+            return match.group(2)
 
         tmp = re.sub(RE_SQL_ON_DUPLICATE, '',
                      re.sub(RE_SQL_COMMENT, remove_comments, operation))
@@ -612,8 +611,7 @@ class MySQLCursor(CursorBase):
                 stmt = stmt.replace(fmt, b','.join(values), 1)
                 self._executed = stmt
                 return stmt
-            else:
-                return None
+            return None
         except (UnicodeDecodeError, UnicodeEncodeError) as err:
             raise errors.ProgrammingError(str(err))
         except errors.Error:
@@ -658,7 +656,7 @@ class MySQLCursor(CursorBase):
         if re.match(RE_SQL_INSERT_STMT, operation):
             if not seq_params:
                 self._rowcount = 0
-                return
+                return None
             stmt = self._batch_insert(operation, seq_params)
             if stmt is not None:
                 return self.execute(stmt)
@@ -677,6 +675,7 @@ class MySQLCursor(CursorBase):
             # Raise whatever execute() raises
             raise
         self._rowcount = rowcnt
+        return None
 
     def stored_results(self):
         """Returns an iterator for stored results
@@ -758,12 +757,10 @@ class MySQLCursor(CursorBase):
             can_consume_results = self._connection._consume_results
             for result in self._connection.cmd_query_iter(call):
                 self._connection._consume_results = False
-                # pylint: disable=R0204
                 if self._raw:
                     tmp = MySQLCursorBufferedRaw(self._connection._get_self())
                 else:
                     tmp = MySQLCursorBuffered(self._connection._get_self())
-                # pylint: enable=R0204
                 tmp._executed = "(a result of {0})".format(call)
                 tmp._handle_result(result)
                 if tmp._warnings is not None:
@@ -778,9 +775,9 @@ class MySQLCursor(CursorBase):
                 self.execute(select)
                 self._stored_results = results
                 return self.fetchone()
-            else:
-                self._stored_results = results
-                return ()
+
+            self._stored_results = results
+            return ()
 
         except errors.Error:
             raise
@@ -815,7 +812,7 @@ class MySQLCursor(CursorBase):
             raise errors.InterfaceError(
                 "Failed getting warnings; %s" % err)
 
-        if len(res):
+        if res:
             return res
 
         return None
@@ -1113,7 +1110,7 @@ class MySQLCursorPrepared(MySQLCursor):
                                            eof.get('server_status', 0)))
         super(MySQLCursorPrepared, self)._handle_eof(eof)
 
-    def callproc(self, *args, **kwargs):
+    def callproc(self, procname, args=()):
         """Calls a stored procedue
 
         Not supported with MySQLCursorPrepared.
@@ -1137,21 +1134,21 @@ class MySQLCursorPrepared(MySQLCursor):
         """
         pass
 
-    def _handle_result(self, res):
+    def _handle_result(self, result):
         """Handle result after execution"""
-        if isinstance(res, dict):
+        if isinstance(result, dict):
             self._connection.unread_result = False
             self._have_result = False
-            self._handle_noresultset(res)
+            self._handle_noresultset(result)
         else:
-            self._description = res[1]
+            self._description = result[1]
             self._connection.unread_result = True
             self._have_result = True
 
-            if 'status_flag' in res[2]:
-                self._handle_server_status(res[2]['status_flag'])
-            elif 'server_status' in res[2]:
-                self._handle_server_status(res[2]['server_status'])
+            if 'status_flag' in result[2]:
+                self._handle_server_status(result[2]['status_flag'])
+            elif 'server_status' in result[2]:
+                self._handle_server_status(result[2]['server_status'])
 
     def execute(self, operation, params=(), multi=False):  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
@@ -1345,6 +1342,7 @@ class MySQLCursorNamedTuple(MySQLCursor):
                 NAMED_TUPLE_CACHE[columns] = named_tuple
             # pylint: enable=W0201
             return named_tuple(*row)
+        return None
 
     def fetchone(self):
         """Returns next row of a query result set
@@ -1353,8 +1351,7 @@ class MySQLCursorNamedTuple(MySQLCursor):
         if row:
             if hasattr(self._connection, 'converter'):
                 return self._row_to_python(row, self.description)
-            else:
-                return row
+            return row
         return None
 
     def fetchall(self):

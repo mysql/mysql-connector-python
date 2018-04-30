@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -103,10 +103,10 @@ class _Constants(object):
             return None
 
     @classmethod
-    def get_info(cls, num):
+    def get_info(cls, setid):
         """Get information about given constant"""
         for name, info in cls.desc.items():
-            if info[0] == num:
+            if info[0] == setid:
                 return name
         return None
 
@@ -621,7 +621,7 @@ class CharacterSet(_Constants):
                 "Character set '{0}' unsupported".format(setid))
 
     @classmethod
-    def get_desc(cls, setid):
+    def get_desc(cls, name):
         """Retrieves character set information as string using an ID
 
         Retrieves character set and collation information based on the
@@ -630,7 +630,7 @@ class CharacterSet(_Constants):
         Returns a tuple.
         """
         try:
-            return "%s/%s" % cls.get_info(setid)
+            return "%s/%s" % cls.get_info(name)
         except:
             raise
 
@@ -763,7 +763,7 @@ class SQLMode(_Constants):
         raise NotImplementedError
 
     @classmethod
-    def get_info(cls, number):
+    def get_info(cls, setid):
         raise NotImplementedError
 
     @classmethod

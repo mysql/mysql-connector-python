@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -175,8 +175,7 @@ def connect(*args, **kwargs):
 
     if HAVE_CEXT and not use_pure:
         return CMySQLConnection(*args, **kwargs)
-    else:
-        return MySQLConnection(*args, **kwargs)
+    return MySQLConnection(*args, **kwargs)
 Connect = connect  # pylint: disable=C0103
 
 __version_info__ = version.VERSION

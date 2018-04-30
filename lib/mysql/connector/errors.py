@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -72,7 +72,7 @@ def custom_error_exception(error=None, exception=None):
     """
     global _CUSTOM_ERROR_EXCEPTIONS  # pylint: disable=W0603
 
-    if isinstance(error, dict) and not len(error):
+    if isinstance(error, dict) and not error:
         _CUSTOM_ERROR_EXCEPTIONS = {}
         return _CUSTOM_ERROR_EXCEPTIONS
 
@@ -86,15 +86,15 @@ def custom_error_exception(error=None, exception=None):
     if isinstance(error, int):
         error = {error: exception}
 
-    for errno, exception in error.items():
+    for errno, _exception in error.items():
         if not isinstance(errno, int):
             raise ValueError("error number should be an integer")
         try:
-            if not issubclass(exception, Exception):
+            if not issubclass(_exception, Exception):
                 raise TypeError
         except TypeError:
             raise ValueError("exception should be subclass of Exception")
-        _CUSTOM_ERROR_EXCEPTIONS[errno] = exception
+        _CUSTOM_ERROR_EXCEPTIONS[errno] = _exception
 
     return _CUSTOM_ERROR_EXCEPTIONS
 

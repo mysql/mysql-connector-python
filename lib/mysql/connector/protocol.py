@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -90,7 +90,7 @@ class MySQLProtocol(object):
             username_bytes = username.encode('utf8')  # pylint: disable=E1103
         except AttributeError:
             # Username is already bytes
-            username_bytes = username  # pylint: disable=R0204
+            username_bytes = username
         packet = struct.pack('<IIB{filler}{usrlen}sx'.format(
             filler='x' * 23, usrlen=len(username_bytes)),
                              client_flags, max_allowed_packet, charset,
@@ -145,7 +145,7 @@ class MySQLProtocol(object):
             username_bytes = username.encode('utf8')  # pylint: disable=E1103
         except AttributeError:
             # Username is already bytes
-            username_bytes = username  # pylint: disable=R0204
+            username_bytes = username
         packet = struct.pack('<B{usrlen}sx'.format(usrlen=len(username_bytes)),
                              ServerCmd.CHANGE_USER, username_bytes)
 
@@ -389,7 +389,7 @@ class MySQLProtocol(object):
             mcs = 0
             if length == 11:
                 mcs = struct_unpack('I', packet[8:length + 1])[0]
-            value = datetime.datetime(  # pylint: disable=R0204
+            value = datetime.datetime(
                 year=struct_unpack('H', packet[1:3])[0],
                 month=packet[3],
                 day=packet[4],

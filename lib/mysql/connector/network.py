@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -168,9 +168,9 @@ class BaseMySQLSocket(object):
                 tmpbuf = bytearray()
                 for pkt in pkts:
                     tmpbuf += pkt
-                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602,R0204
+                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
             else:
-                tmpbuf = b''.join(pkts)  # pylint: disable=R0204
+                tmpbuf = b''.join(pkts)
             del pkts
             zbuf = zlib.compress(tmpbuf[:16384])
             header = (struct.pack('<I', len(zbuf))[0:3]
@@ -351,7 +351,7 @@ class BaseMySQLSocket(object):
                 while len(zip_payload) < zip_payload_length:
                     chunk = self.sock.recv(zip_payload_length
                                            - len(zip_payload))
-                    if len(chunk) == 0:
+                    if not chunk:
                         raise errors.InterfaceError(errno=2013)
                     zip_payload = zip_payload + chunk
 
@@ -447,7 +447,8 @@ class MySQLUnixSocket(BaseMySQLSocket):
 
     def open_connection(self):
         try:
-            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.sock = socket.socket(socket.AF_UNIX, # pylint: disable=E1101
+                                      socket.SOCK_STREAM)
             self.sock.settimeout(self._connection_timeout)
             self.sock.connect(self.unix_socket)
         except IOError as err:

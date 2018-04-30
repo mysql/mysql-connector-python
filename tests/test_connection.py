@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -285,15 +285,27 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'status_flag': 1, 'affected_rows': 6}
         self.assertEqual(exp, self.cnx._handle_result(packet))
 
-        exp = [
-            bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
-                      b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
-                      b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
-                      b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
-                      b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
-                      b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
-            bytearray(b'\x00\x00\x00\x05')
-        ]
+        if os.name != 'nt':
+            exp = [
+                bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
+                          b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
+                          b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
+                          b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
+                          b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
+                          b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+                bytearray(b'\x00\x00\x00\x05')
+            ]
+        else:
+            exp = [
+                bytearray(b'\x4c\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63'
+                          b'\x32\x5f\x31\x0d\x0a\x32\x09\x63\x31\x5f\x32\x09'
+                          b'\x63\x32\x5f\x32\x0d\x0a\x33\x09\x63\x31\x5f\x33'
+                          b'\x09\x63\x32\x5f\x33\x0d\x0a\x34\x09\x63\x31\x5f'
+                          b'\x34\x09\x63\x32\x5f\x34\x0d\x0a\x35\x09\x63\x31'
+                          b'\x5f\x35\x09\x63\x32\x5f\x35\x0d\x0a\x36\x09\x63'
+                          b'\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+                bytearray(b'\x00\x00\x00\x05')
+            ]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
         # Column count is invalid ( more than 4096)
@@ -1689,6 +1701,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             else:
                 self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
 
+    @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1), "Shutdown CMD "
+                     "not tested with MySQL version 5.6 (BugOra17422299)")
     def test_shutdown(self):
         """Shutting down a connection"""
         config = tests.get_mysql_config()
@@ -1762,10 +1776,16 @@ class WL7937(tests.MySQLConnectorTests):
         self.cur.execute(sql, (self.data_file, ))
         self.cur.execute("SELECT * FROM local_data")
 
-        exp = [
-            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        if os.name != 'nt':
+            exp = [
+                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+        else:
+            exp = [
+                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
+                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
+                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, self.cur.fetchall())
 
     def test_without_load_local_infile(self):

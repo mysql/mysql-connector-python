@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -455,6 +455,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 0), "Plugin unavailable.")
     def test_change_user(self):
         connect_kwargs = self.connect_kwargs.copy()
         connect_kwargs['unix_socket'] = None
@@ -480,9 +481,13 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED WITH "
                 "caching_sha2_password").format(**new_user)
         cmy1.query(stmt)
-        cmy1.query("SET old_passwords = 0")
-        res = cmy1.query("SET PASSWORD FOR '{user}'@'{host}' = "
-                   "PASSWORD('{password}')".format(**new_user))
+        if tests.MYSQL_VERSION < (8, 0, 5):
+            cmy1.query("SET old_passwords = 0")
+            res = cmy1.query("SET PASSWORD FOR '{user}'@'{host}' = "
+                             "PASSWORD('{password}')".format(**new_user))
+        else:
+            res = cmy1.query("ALTER USER '{user}'@'{host}' IDENTIFIED BY "
+                             "'{password}'".format(**new_user))
         cmy1.query("GRANT ALL ON {database}.* "
                    "TO '{user}'@'{host}'".format(**new_user))
 

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -228,6 +228,7 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
             return self._scramble()
         elif self._auth_data[0] == self.perform_full_authentication:
             return self._full_authentication()
+        return None
 
     def _full_authentication(self):
         """Returns password as as clear text"""

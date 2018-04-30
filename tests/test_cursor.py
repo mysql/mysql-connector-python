@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -1113,7 +1113,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
 
     def test_callproc(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
-        self.assertRaises(errors.NotSupportedError, cur.callproc)
+        self.assertRaises(errors.NotSupportedError, cur.callproc, None)
 
     def test_close(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)

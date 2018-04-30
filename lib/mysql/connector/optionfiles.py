@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -95,7 +95,7 @@ def read_option_files(**config):
                                 config_options[option][1] <= value[1]):
                             config_options[option] = value
                     except KeyError:
-                        if group is 'connector_python':
+                        if group == 'connector_python':
                             raise AttributeError("Unsupported argument "
                                                  "'{0}'".format(option))
             except KeyError:
@@ -282,7 +282,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         Returns a dictionary
         """
-        if len(args) == 0:
+        if not args:
             args = self._options_dict.keys()
 
         options = {}
@@ -315,7 +315,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         Returns an dictionary of dictionaries
         """
-        if len(args) == 0:
+        if not args:
             args = self._options_dict.keys()
 
         options = dict()
@@ -340,7 +340,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         Returns an dictionary of dictionaries
         """
-        if len(args) == 0:
+        if not args:
             args = self._options_dict.keys()
 
         options = dict()

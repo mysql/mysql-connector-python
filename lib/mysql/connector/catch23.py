@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -63,7 +63,6 @@ def init_bytearray(payload=b'', encoding='utf-8'):
         except AttributeError:
             raise ValueError("payload must be a str or bytes")
 
-
     return bytearray(payload)
 
 
@@ -71,15 +70,13 @@ def isstr(obj):
     """Returns whether a variable is a string"""
     if PY2:
         return isinstance(obj, basestring)
-    else:
-        return isinstance(obj, str)
+    return isinstance(obj, str)
 
 def isunicode(obj):
     """Returns whether a variable is a of unicode type"""
     if PY2:
         return isinstance(obj, unicode)
-    else:
-        return isinstance(obj, str)
+    return isinstance(obj, str)
 
 
 if PY2:

@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -90,12 +90,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._auth_plugin = None
         self._pool_config_version = None
 
-        if len(kwargs) > 0:
+        if kwargs:
             try:
                 self.connect(**kwargs)
             except:
                 # Tidy-up underlying socket on failure
                 self.close()
+                self._socket = None
                 raise
 
     def _do_handshake(self):
@@ -202,6 +203,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             return self._handle_ok(packet)
         elif packet[4] == 255:
             raise errors.get_exception(packet)
+        return None
 
     def _get_connection(self, prtcls=None):
         """Get connection based on configuration
@@ -211,7 +213,6 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns subclass of MySQLBaseSocket.
         """
-        # pylint: disable=R0204
         conn = None
         if self.unix_socket and os.name != 'nt':
             conn = MySQLUnixSocket(unix_socket=self.unix_socket)
@@ -219,7 +220,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             conn = MySQLTCPSocket(host=self.server_host,
                                   port=self.server_port,
                                   force_ipv6=self._force_ipv6)
-        # pylint: enable=R0204
+
         conn.set_connection_timeout(self._connection_timeout)
         return conn
 
@@ -232,15 +233,20 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         self._protocol = MySQLProtocol()
         self._socket = self._get_connection()
-        self._socket.open_connection()
-        self._do_handshake()
-        self._do_auth(self._user, self._password,
-                      self._database, self._client_flags, self._charset_id,
-                      self._ssl)
-        self.set_converter_class(self._converter_class)
-        if self._client_flags & ClientFlag.COMPRESS:
-            self._socket.recv = self._socket.recv_compressed
-            self._socket.send = self._socket.send_compressed
+        try:
+            self._socket.open_connection()
+            self._do_handshake()
+            self._do_auth(self._user, self._password,
+                          self._database, self._client_flags, self._charset_id,
+                          self._ssl)
+            self.set_converter_class(self._converter_class)
+            if self._client_flags & ClientFlag.COMPRESS:
+                self._socket.recv = self._socket.recv_compressed
+                self._socket.send = self._socket.send_compressed
+        except:
+            # close socket
+            self.close()
+            raise
 
     def shutdown(self):
         """Shut down connection to MySQL Server.
@@ -252,7 +258,6 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._socket.shutdown()
         except (AttributeError, errors.Error):
             pass  # Getting an exception would mean we are disconnected.
-        self._socket = None
 
     def close(self):
         """Disconnect from the MySQL server"""
@@ -261,10 +266,9 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         try:
             self.cmd_quit()
-            self._socket.close_connection()
         except (AttributeError, errors.Error):
             pass  # Getting an exception would mean we are disconnected.
-        self._socket = None
+        self._socket.close_connection()
 
     disconnect = close
 
@@ -451,7 +455,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         Returns a tuple.
         """
         (rows, eof) = self.get_rows(count=1, binary=binary, columns=columns)
-        if len(rows):
+        if rows:
             return (rows[0], eof)
         return (None, eof)
 

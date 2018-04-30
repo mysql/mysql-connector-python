@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -43,9 +43,8 @@ def intread(buf):
         elif length <= 4:
             tmp = buf + b'\x00'*(4-length)
             return struct_unpack('<I', tmp)[0]
-        else:
-            tmp = buf + b'\x00'*(8-length)
-            return struct_unpack('<Q', tmp)[0]
+        tmp = buf + b'\x00'*(8-length)
+        return struct_unpack('<Q', tmp)[0]
     except:
         raise
 
@@ -150,8 +149,8 @@ def lc_int(i):
         return b'\xfc' + bytearray(struct.pack('<H', i))
     elif i <= 16777215:
         return b'\xfd' + bytearray(struct.pack('<I', i)[0:3])
-    else:
-        return b'\xfe' + bytearray(struct.pack('<Q', i))
+
+    return b'\xfe' + bytearray(struct.pack('<Q', i))
 
 
 def read_bytes(buf, size):

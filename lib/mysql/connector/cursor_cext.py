@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -200,7 +200,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         while True:
             try:
                 if not self.nextset():
-                    raise StopIteration
+                    raise StopIteration  # pylint: disable=R1708
             except errors.InterfaceError as exc:
                 # Result without result set
                 if exc.errno != CR_NO_RESULT_SET:
@@ -280,8 +280,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             """
             if match.group(1):
                 return ""
-            else:
-                return match.group(2)
+            return match.group(2)
 
         tmp = re.sub(RE_SQL_ON_DUPLICATE, '',
                      re.sub(RE_SQL_COMMENT, remove_comments, operation))
@@ -315,8 +314,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                 stmt = stmt.replace(fmt, b','.join(values), 1)
                 self._executed = stmt
                 return stmt
-            else:
-                return None
+            return None
         except (UnicodeDecodeError, UnicodeEncodeError) as err:
             raise errors.ProgrammingError(str(err))
         except Exception as err:
@@ -341,7 +339,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         if re.match(RE_SQL_INSERT_STMT, operation):
             if not seq_params:
                 self._rowcount = 0
-                return
+                return None
             stmt = self._batch_insert(operation, seq_params)
             if stmt is not None:
                 return self.execute(stmt)
@@ -367,6 +365,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                 "Failed executing the operation; {0}".format(err))
 
         self._rowcount = rowcnt
+        return None
 
     @property
     def description(self):
@@ -378,8 +377,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         """Returns the number of rows produced or affected"""
         if self._rowcount == -1:
             return self._affected_rows
-        else:
-            return self._rowcount
+        return self._rowcount
 
     @property
     def lastrowid(self):
@@ -434,14 +432,14 @@ class CMySQLCursor(MySQLCursorAbstract):
             results = []
             while self._cnx.result_set_available:
                 result = self._cnx.fetch_eof_columns()
-                # pylint: disable=W0212,R0204
+                # pylint: disable=W0212
                 if self._raw:
                     cur = CMySQLCursorBufferedRaw(self._cnx._get_self())
                 else:
                     cur = CMySQLCursorBuffered(self._cnx._get_self())
                 cur._executed = "(a result of {0})".format(call)
                 cur._handle_result(result)
-                # pylint: enable=W0212,R0204
+                # pylint: enable=W0212
                 results.append(cur)
                 self._cnx.next_result()
             self._stored_results = results
@@ -453,8 +451,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                 self.execute(select)
 
                 return self.fetchone()
-            else:
-                return tuple()
+            return tuple()
 
         except errors.Error:
             raise
@@ -718,8 +715,7 @@ class CMySQLCursorDict(CMySQLCursor):
         row = super(CMySQLCursorDict, self).fetchone()
         if row:
             return dict(zip(self.column_names, row))
-        else:
-            return None
+        return None
 
     def fetchmany(self, size=1):
         """Returns next set of rows as list of dictionaries"""
@@ -742,8 +738,7 @@ class CMySQLCursorBufferedDict(CMySQLCursorBuffered):
         row = super(CMySQLCursorBufferedDict, self)._fetch_row()
         if row:
             return dict(zip(self.column_names, row))
-        else:
-            return None
+        return None
 
     def fetchall(self):
         res = super(CMySQLCursorBufferedDict, self).fetchall()
@@ -772,8 +767,7 @@ class CMySQLCursorNamedTuple(CMySQLCursor):
         row = super(CMySQLCursorNamedTuple, self).fetchone()
         if row:
             return self.named_tuple(*row)
-        else:
-            return None
+        return None
 
     def fetchmany(self, size=1):
         """Returns next set of rows as list of named tuples"""
@@ -800,8 +794,7 @@ class CMySQLCursorBufferedNamedTuple(CMySQLCursorBuffered):
         row = super(CMySQLCursorBufferedNamedTuple, self)._fetch_row()
         if row:
             return self.named_tuple(*row)
-        else:
-            return None
+        return None
 
     def fetchall(self):
         res = super(CMySQLCursorBufferedNamedTuple, self).fetchall()

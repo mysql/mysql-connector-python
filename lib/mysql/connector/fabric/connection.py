@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -359,7 +359,7 @@ class FabricSet(FabricResponse):
         self.__names = self.coded_rows[0]['info']['names']
         self.__rows = self.coded_rows[0]['rows']
         assert all(len(self.__names) == len(row) for row in self.__rows) or \
-               len(self.__rows) == 0
+               not self.__rows
         self.__result = collections.namedtuple('ResultSet', self.__names)
 
     def rowcount(self):
@@ -1139,6 +1139,8 @@ class FabricXMLRPCConnection(FabricConnection):
                         host=self.host, port=self.port, counter=counter))
             if delay > 0:
                 time.sleep(delay)
+
+        return None
 
     def connect(self):
         """Connect with MySQL Fabric"""

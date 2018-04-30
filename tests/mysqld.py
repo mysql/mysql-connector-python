@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -394,7 +394,8 @@ class MySQLServer(MySQLServerBase):
 
         if self._version[0:3] < (8, 0, 1):
             dirs.append(self._datadir)
-            dirs.append(os.path.join(self._datadir, 'mysql'))
+            if self._version[0:3] < (5, 7, 21):
+                dirs.append(os.path.join(self._datadir, 'mysql'))
 
         for adir in dirs:
             LOGGER.debug("Creating directory %s", adir)
@@ -420,7 +421,7 @@ class MySQLServer(MySQLServerBase):
             '--innodb_log_file_size=1Gb',
         ]
 
-        if self._version[0:2] >= (8, 0):
+        if self._version[0:2] >= (8, 0) or self._version >= (5, 7, 21):
             cmd.append("--initialize-insecure")
             cmd.append("--init-file={0}".format(self._init_sql))
         else:
@@ -436,7 +437,7 @@ class MySQLServer(MySQLServerBase):
                 '--lc-messages-dir={0}'.format(self._lc_messages_dir),
                 '--lc-messages=en_US'
             ])
-        if self._version[0:2] >= (5, 1):
+        if self._version[0:2] >= (5, 1) and self._version < (8, 0, 11):
             cmd.append('--loose-skip-ndbcluster')
 
         return cmd
@@ -466,7 +467,9 @@ class MySQLServer(MySQLServerBase):
             "CREATE DATABASE myconnpy;"
         ]
 
-        if self._version < (8, 0, 1):
+        if self._version > (5, 7, 5) and self._version < (5, 7, 21):
+            # Note: server is running with --skip-grant-tables
+            # (can not user 'CREATE USER' statements).
             defaults = ("'root'{0}, "
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
@@ -487,12 +490,18 @@ class MySQLServer(MySQLServerBase):
                 defaults = defaults.format(", ''", "")
 
             extra_sql.append(insert.format(defaults))
+        elif self._version[0:3] >= (5, 6, 39) and \
+             self._version[0:3] < (5, 7, 5):
+            # Following required user accounts are created by the server itself:
+            # 'root'@'127.0.0.1', 'root'@'localhost' and 'root'@'::1'
+            # Note: server is running with --skip-grant-tables.
+            pass
         else:
             extra_sql.extend([
-                "CREATE USER 'root'@'127.0.01';",
-                "GRANT ALL ON *.* TO 'root'@'127.0.0.1';",
-                "CREATE USER 'root'@'::1';",
-                "GRANT ALL ON *.* TO 'root'@'::1';"
+                "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
+                "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;",
+                "CREATE USER IF NOT EXISTS 'root'@'::1';",
+                "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;"
             ])
 
         bootstrap_log = os.path.join(self._topdir, 'bootstrap.log')
@@ -501,7 +510,7 @@ class MySQLServer(MySQLServerBase):
             cmd = self._get_bootstrap_cmd()
             sql = ["USE mysql;"]
 
-            if self._version[0:2] >= (8, 0):
+            if self._version[0:2] >= (8, 0) or self._version >= (5, 7, 21):
                 test_sql = open(self._init_sql, "w")
                 test_sql.write("\n".join(extra_sql))
                 test_sql.close()
@@ -513,7 +522,7 @@ class MySQLServer(MySQLServerBase):
                         sql.extend([line.strip() for line in fp.readlines()])
 
             fp_log = open(bootstrap_log, 'w')
-            if self._version[0:2] < (8, 0):
+            if self._version[0:2] < (8, 0) or self._version < (5, 7, 21):
                 sql.extend(extra_sql)
                 prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                        stderr=subprocess.STDOUT,
