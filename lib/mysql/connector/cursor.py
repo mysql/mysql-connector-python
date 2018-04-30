@@ -1169,7 +1169,10 @@ class MySQLCursorPrepared(MySQLCursor):
             self._executed = operation
             try:
                 if not isinstance(operation, bytes):
-                    operation = operation.encode(self._connection.charset)
+                    charset = self._connection.charset
+                    if charset == 'utf8mb4':
+                        charset = 'utf8'
+                    operation = operation.encode(charset)
             except (UnicodeDecodeError, UnicodeEncodeError) as err:
                 raise errors.ProgrammingError(str(err))
 

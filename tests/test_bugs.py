@@ -2500,8 +2500,7 @@ class BugOra18144971(tests.MySQLConnectorTests):
         stmt = "INSERT INTO {0} VALUES (?,?,?)".format(
             self.table)
         data = [(1, b'bytes', '1234'), (2, u'aaaаффф', '1111')]
-        exp = [(1, b'bytes', b'1234'),
-               (2, u'aaaаффф'.encode('cp1251'), b'1111')]
+        exp = [(1, 'bytes', '1234'), (2, u'aaaаффф', '1111')]
         cur.execute(stmt, data[0])
         self.cnx.commit()
         cur.execute("SELECT * FROM {0}".format(self.table))
@@ -3078,8 +3077,8 @@ class BugOra19282158(tests.MySQLConnectorTests):
                "VALUES (?, ?, ?, ?, ?, ?, ?)".format(self.tbl))
         params = (100, None, 'foo', None, datetime(2014, 8, 4, 9, 11, 14),
                   10, 'bar')
-        exp = (100, None, bytearray(b'foo'), None,
-               datetime(2014, 8, 4, 9, 11, 14), 10, bytearray(b'bar'))
+        exp = (100, None, 'foo', None,
+               datetime(2014, 8, 4, 9, 11, 14), 10, 'bar')
         cur.execute(sql, params)
 
         sql = "SELECT * FROM {0}".format(self.tbl)
@@ -4549,3 +4548,84 @@ class BugOra24948205(tests.MySQLConnectorTests):
             self.assertTrue(isinstance(col, STRING_TYPES),
                             "{} is type {} and not the expected type "
                             "string".format(col, type(col)))
+
+
+class BugOra27364914(tests.MySQLConnectorTests):
+    """BUG#27364914: CURSOR PREPARED STATEMENTS DO NOT CONVERT STRINGS
+    """
+    charsets_list = ('gbk', 'sjis', 'big5', 'utf8', 'utf8mb4', 'latin1')
+
+    def setUp(self):
+        cnx = connection.MySQLConnection(**tests.get_mysql_config())
+        cur = cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
+
+        for charset in self.charsets_list:
+            tablename = '{0}_ps_test'.format(charset)
+            cur.execute("DROP TABLE IF EXISTS {0}".format(tablename))
+            table = (
+                "CREATE TABLE {table} ("
+                "  id INT AUTO_INCREMENT KEY,"
+                "  c1 VARCHAR(40),"
+                "  val2 datetime"
+                ") CHARACTER SET '{charset}'"
+            ).format(table=tablename, charset=charset)
+            cur.execute(table)
+            cnx.commit()
+        cur.close()
+        cnx.close()
+
+    def tearDown(self):
+        cnx = connection.MySQLConnection(**tests.get_mysql_config())
+        for charset in self.charsets_list:
+            tablename = '{0}_ps_test'.format(charset)
+            cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(tablename))
+        cnx.close()
+
+    def _test_charset(self, charset, data):
+        config = tests.get_mysql_config()
+        config['charset'] = charset
+        config['use_unicode'] = True
+        self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
+        cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
+
+        tablename = '{0}_ps_test'.format(charset)
+        cur.execute("TRUNCATE {0}".format(tablename))
+        self.cnx.commit()
+
+        insert = "INSERT INTO {0} (c1) VALUES (%s)".format(tablename)
+        for value in data:
+            cur.execute(insert, (value,))
+        self.cnx.commit()
+
+        cur.execute("SELECT id, c1 FROM {0} ORDER BY id".format(tablename))
+        for row in cur:
+            self.assertTrue(isinstance(row[1], STRING_TYPES),
+                            "The value is expected to be a string")
+            self.assertEqual(data[row[0] - 1], row[1])
+
+        cur.close()
+        self.cnx.close()
+
+    @foreach_cnx()
+    def test_cursor_prepared_statement_with_charset_gbk(self):
+        self._test_charset('gbk', [u'赵孟頫', u'赵\孟\頫\\', u'遜'])
+
+    @foreach_cnx()
+    def test_cursor_prepared_statement_with_charset_sjis(self):
+        self._test_charset('sjis', ['\u005c'])
+
+    @foreach_cnx()
+    def test_cursor_prepared_statement_with_charset_big5(self):
+        self._test_charset('big5', ['\u5C62'])
+
+    @foreach_cnx()
+    def test_cursor_prepared_statement_with_charset_utf8mb4(self):
+        self._test_charset('utf8mb4', ['\u5C62'])
+
+    @foreach_cnx()
+    def test_cursor_prepared_statement_with_charset_utf8(self):
+        self._test_charset('utf8', [u'データベース', u'데이터베이스'])
+
+    @foreach_cnx()
+    def test_cursor_prepared_statement_with_charset_latin1(self):
+        self._test_charset('latin1', [u'ñ', u'Ñ'])

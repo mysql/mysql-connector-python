@@ -1232,7 +1232,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         self.assertEqual(3, cur.rowcount)
 
         cur.execute(stmt_select)
-        self.assertEqual([(1, b'100'), (2, b'200'), (3, b'300')],
+        self.assertEqual([(1, '100'), (2, '200'), (3, '300')],
                          cur.fetchall(), "Multi insert test failed")
 
         data = [(2,), (3,)]

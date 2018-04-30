@@ -408,9 +408,9 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
                            b'\x00\x0a\x00\x00\x00\x10\x0f\x1e\x70\x82\x03\x00')
 
         # float/double are returned as DECIMAL by MySQL
-        exp = (bytearray(b'abc'),
-               bytearray(b'3.14'),
-               bytearray(b'-3.14159'),
+        exp = ('abc',
+               '3.14',
+               '-3.14159',
                datetime.date(2003, 1, 31),
                datetime.datetime(1977, 6, 14, 21, 33, 14),
                datetime.timedelta(10, 58530, 230000),

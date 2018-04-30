@@ -561,7 +561,7 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.BINARY:
                 try:
                     return value.decode(self.charset)
-                except LookupError:
+                except (LookupError, UnicodeDecodeError):
                     return value
 
         if self.charset == 'binary':

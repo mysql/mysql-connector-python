@@ -469,8 +469,11 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         try:
             if binary:
+                charset = self.charset
+                if charset == 'utf8mb4':
+                    charset = 'utf8'
                 rows = self._protocol.read_binary_result(
-                    self._socket, columns, count)
+                    self._socket, columns, count, charset)
             else:
                 rows = self._protocol.read_text_result(self._socket,
                                                        self._server_version,
