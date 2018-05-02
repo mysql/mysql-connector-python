@@ -883,6 +883,108 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(packets[1][4:], auth_pkt)
 
     @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
+    def test_auth_plugin_is_not_supported_but_required(self):
+        """Test behavior when server's default auth_plugin is required"""
+        self.cnx._socket.sock = tests.DummySocket()
+        flags = constants.ClientFlag.get_default()
+        flags |= constants.ClientFlag.SSL
+        kwargs = {
+            'username': 'ham',
+            'password': 'spam',
+            'database': 'test',
+            'charset': 33,
+            'client_flags': flags,
+            'ssl_options': {
+                'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
+                'cert': os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'),
+                'key': os.path.join(tests.SSL_DIR, 'tests_client_key.pem'),
+            },
+        }
+
+        self.cnx._handshake['auth_plugin'] = 'unsupported_auth_plugin'
+        self.cnx._handshake['auth_data'] = b'abcdef!012345'
+        self.cnx._socket.switch_to_ssl = \
+            lambda ca, cert, key, verify_cert, cipher: None
+
+        # Test perform_full_authentication
+        # Exchange:
+        # Client              Server
+        # ------              ------
+        # make_ssl_auth
+        # first_auth
+        #                     Sorry user requires the unsupported_auth_plugin
+        # second_auth
+        #                     OK
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            bytearray(b'\x2c\x00\x00\x03\xfe\x75\x6e\x73\x75\x70\x70\x6f\x72'
+                      b'\x74\x65\x64\x5f\x61\x75\x74\x68\x5f\x70\x6c\x75\x67'
+                      b'\x69\x6e\x00\x60\x1e\x10\x78\x01\x3c\x1e\x33\x38\x6f'
+                      b'\x08\x5f\x0d\x7a\x6f\x01\x7b\x7a\x4a\x0d\x00')
+        ])
+        # Since the fictional authoritation plugin 'unsupported_auth_plugin' is
+        # not supported a NotSupportedError is raised
+        self.assertRaises(errors.NotSupportedError, self.cnx._do_auth, **kwargs)
+
+    @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 3),
+                     "caching_sha2_password plugin not supported by server.")
+    def test_auth_plugin_fall_back_if_not_supported(self):
+        """Test Fall back to dflt auth_plugin if server's plugin is unknown"""
+        self.cnx._socket.sock = tests.DummySocket()
+        flags = constants.ClientFlag.get_default()
+        flags |= constants.ClientFlag.SSL
+        kwargs = {
+            'username': 'ham',
+            'password': 'spam',
+            'database': 'test',
+            'charset': 33,
+            'client_flags': flags,
+            'ssl_options': {
+                'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
+                'cert': os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'),
+                'key': os.path.join(tests.SSL_DIR, 'tests_client_key.pem'),
+            },
+        }
+
+        self.cnx._handshake['auth_plugin'] = 'unsupported_auth_plugin'
+        self.cnx._handshake['auth_data'] = b'abcdef!012345'
+        self.cnx._socket.switch_to_ssl = \
+            lambda ca, cert, key, verify_cert, cipher: None
+
+        # Test perform_full_authentication
+        # Exchange:
+        # Client              Server
+        # ------              ------
+        # make_ssl_auth
+        # first_auth
+        #                     auth_switch to mysql_native_password
+        # second_auth
+        #                     OK
+        self.cnx._socket.sock.reset()
+        self.cnx._socket.sock.add_packets([
+            bytearray(b'\x8d\xaa\x0b\x00\x00\x00'), # full_auth request
+            bytearray(b'\x00@!\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+                      b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'),
+            bytearray(b'\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00') # OK
+        ])
+
+        # No exception should be raided
+        self.cnx._do_auth(**kwargs)
+
+        packets = self.cnx._socket.sock._client_sends
+
+        self.cnx._handshake['auth_plugin'] = 'mysql_native_password'
+        auth_pkt = self.cnx._protocol.make_auth(
+            self.cnx._handshake, kwargs['username'],
+            kwargs['password'], kwargs['database'],
+            charset=kwargs['charset'],
+            client_flags=kwargs['client_flags'],
+            ssl_enabled=True)
+        # Check the first_auth packet
+        self.assertEqual(packets[1][4:], auth_pkt)
+
+    @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
     def test__do_auth_ssl(self):
         """Authenticate with the MySQL server using SSL"""
         self.cnx._socket.sock = tests.DummySocket()

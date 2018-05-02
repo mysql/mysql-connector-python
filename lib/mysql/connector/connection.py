@@ -233,20 +233,17 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         self._protocol = MySQLProtocol()
         self._socket = self._get_connection()
-        try:
-            self._socket.open_connection()
-            self._do_handshake()
-            self._do_auth(self._user, self._password,
-                          self._database, self._client_flags, self._charset_id,
-                          self._ssl)
-            self.set_converter_class(self._converter_class)
-            if self._client_flags & ClientFlag.COMPRESS:
-                self._socket.recv = self._socket.recv_compressed
-                self._socket.send = self._socket.send_compressed
-        except:
-            # close socket
-            self.close()
-            raise
+        self._socket.open_connection()
+        self._do_handshake()
+
+        self._do_auth(self._user, self._password,
+                      self._database, self._client_flags, self._charset_id,
+                      self._ssl)
+
+        self.set_converter_class(self._converter_class)
+        if self._client_flags & ClientFlag.COMPRESS:
+            self._socket.recv = self._socket.recv_compressed
+            self._socket.send = self._socket.send_compressed
 
     def shutdown(self):
         """Shut down connection to MySQL Server.

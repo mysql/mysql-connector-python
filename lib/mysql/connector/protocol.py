@@ -96,10 +96,23 @@ class MySQLProtocol(object):
                              client_flags, max_allowed_packet, charset,
                              username_bytes)
 
-        packet += self._auth_response(client_flags, username, password,
-                                      database,
-                                      auth_plugin,
-                                      auth_data, ssl_enabled)
+        try:
+            packet += self._auth_response(client_flags, username, password,
+                                          database,
+                                          auth_plugin,
+                                          auth_data, ssl_enabled)
+        except errors.NotSupportedError:
+            # IF the default server authentication plugin is unsupported,
+            # fall back to default auth_plugin if default server auth plugin.
+            # In case our default auth_plugin is the one required to identify
+            # the user, the server will ask for the authentification data using
+            # this plugin, otherwise server will request the plugin used by the
+            # user and a AuthSwitchRequest will occur.
+            auth_plugin = "mysql_native_password"
+            packet += self._auth_response(client_flags, username, password,
+                                          database,
+                                          auth_plugin,
+                                          auth_data, ssl_enabled)
 
         packet += self._connect_with_db(client_flags, database)
 
