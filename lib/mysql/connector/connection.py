@@ -148,7 +148,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                                        ssl_options.get('cert'),
                                        ssl_options.get('key'),
                                        ssl_options.get('verify_cert') or False,
-                                       ssl_options.get('cipher'))
+                                       ssl_options.get('cipher'),
+                                       ssl_options.get('version', None))
             self._ssl_active = True
 
         packet = self._protocol.make_auth(

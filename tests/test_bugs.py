@@ -48,6 +48,9 @@ import pickle
 import sys
 
 import tests
+if tests.SSL_AVAILABLE:
+    import ssl
+
 from tests import foreach_cnx, cnx_config
 from . import PY2
 from mysql.connector import (connection, cursor, conversion, protocol,
@@ -64,6 +67,10 @@ except ImportError:
     CMySQLConnection = None
 
 ERR_NO_CEXT = "C Extension not available"
+if tests.SSL_AVAILABLE:
+    TLS_VERSIONS = {"TLSv1": ssl.PROTOCOL_TLSv1,
+                    "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
+                    "TLSv1.2": ssl.PROTOCOL_TLSv1_2}
 
 
 @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
@@ -4486,7 +4493,8 @@ class BugOra25383644(tests.MySQLConnectorTests):
                 self.mysql_server.stop()
                 self.mysql_server.wait_down()
                 cur.execute(sql)
-            except mysql.connector.errors.OperationalError:
+            except (mysql.connector.errors.OperationalError,
+                    mysql.connector.errors.ProgrammingError):
                 try:
                     cur.close()
                     cnx.close()
@@ -4932,3 +4940,83 @@ class BugOra27364914(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_cursor_prepared_statement_with_charset_latin1(self):
         self._test_charset('latin1', [u'ñ', u'Ñ'])
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 21),
+                 "Not support for TLSv1.2 or not available by default")
+class Bug26484601(tests.MySQLConnectorTests):
+    """UNABLE TO CONNECT TO A MYSQL SERVER USING TLSV1.2"""
+
+    def try_connect(self, tls_version, expected_ssl_version):
+        config = tests.get_mysql_config().copy()
+        config['ssl_version'] = tls_version
+        config['ssl_ca'] = ''
+        cnx = connection.MySQLConnection(**config)
+        query = "SHOW STATUS LIKE 'ssl_version%'"
+        cur = cnx.cursor()
+        cur.execute(query)
+        res = cur.fetchall()
+        msg = ("Not using the expected TLS version: {}, instead the "
+               "connection used: {}.")
+        self.assertEqual(res[0][1], expected_ssl_version,
+                         msg.format(expected_ssl_version, res))
+
+    def test_get_connection_using_given_TLS_version(self):
+        """Test connect using the given TLS version
+
+        The system variable tls_version determines which protocols the
+        server is permitted to use from those that are available (note#3).
+        +---------------+-----------------------+
+        | Variable_name | Value                 |
+        +---------------+-----------------------+
+        | tls_version   | TLSv1,TLSv1.1,TLSv1.2 |
+        +---------------+-----------------------+
+
+        To restrict and permit only connections with a specific version, the
+        variable can be set with those specific versions that will be allowed,
+        changing the configuration file.
+
+        [mysqld]
+        tls_version=TLSv1.1,TLSv1.2
+
+        This test will take adventage of the fact that the connector can
+        request to use a defined version of TLS to test that the connector can
+        connect to the server using such version instead of changing the
+        configuration of the server that will imply the stoping and restarting
+        of the server incrementing the time to run the test. In addition the
+        test relay in the default value of the 'tls_version' variable is set to
+        'TLSv1,TLSv1.1,TLSv1.2' (note#2).
+
+        On this test a connection will be
+        attempted forcing to use a determined version of TLS, (all of them
+        must be successfully) finally making sure that the connection was done
+        using the given TLS_version using the ssl.version() method (note#3).
+
+        Notes:
+        1.- tls_version is only available on MySQL 5.7
+        2.- 5.6.39 does not support TLSv1.2 so for test will be skip. Currently
+            in 5.7.21 is set to default values TLSv1,TLSv1.1,TLSv1.2 same as in
+            8.0.11+. This test will be only run in such versions and above.
+        3.- The ssl.version() method returns the version of tls used in during
+            the connection, however the version returned using ssl.cipher() is
+            not correct on windows, only indicates the newer version supported.
+
+        """
+        for tls_v_name, tls_version in TLS_VERSIONS.items():
+            self.try_connect(tls_version, tls_v_name)
+
+    def test_get_connection_using_servers_TLS_version(self):
+        """Test connect using the servers default TLS version
+
+        The TLS version used during the secured connection is chosen by the
+        server at the time the ssl handshake is made if the connector does not
+        specifies any specific version to use. The default value of the
+        ssl_version is None, however this only mean to the connector that none
+        specific version will be chosen by the server when the ssl handshake
+        occurs.
+        """
+        # The default value for the connector 'ssl_version' is None
+        # For the expected version, the server will use the latest version of
+        # TLS available "TLSv1.2".
+        tls_version = None
+        self.try_connect(tls_version, "TLSv1.2")
