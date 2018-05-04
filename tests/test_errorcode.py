@@ -50,7 +50,7 @@ class ErrorCodeTests(tests.MySQLConnectorTests):
 
     def test_server_error_codes(self):
         cases = {
-            'ER_HASHCHK': 1000,
+            'OBSOLETE_ER_HASHCHK': 1000,
             'ER_TRG_INVALID_CREATION_CTX': 1604,
             'ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION': 1792,
         }
