@@ -3,10 +3,20 @@ MySQL Connector/Python 2.1 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
+
+v2.1.8
+======
+
+- WL#11680: Add caching_sha2_password authentication plugin
+- WL#11665: Allow OpenSSL linkage in the C extension
+- WL#11643: Update copyright source headers and license text
+- BUG#27945883: Fixes for failing unittest with MySQL latest versions
+- BUG#27371245: Connection fails on unsupported default's auth_plugin
+- BUG#26484601: Unable to connect to a server using other than TLSv1
 
 v2.1.7
 ======
