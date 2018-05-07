@@ -4947,7 +4947,7 @@ class BugOra27364914(tests.MySQLConnectorTests):
         self._test_charset('latin1', [u'ñ', u'Ñ'])
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 21),
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 11),
                  "Not support for TLSv1.2 or not available by default")
 class Bug26484601(tests.MySQLConnectorTests):
     """UNABLE TO CONNECT TO A MYSQL SERVER USING TLSV1.2"""
