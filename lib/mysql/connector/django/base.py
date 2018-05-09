@@ -114,6 +114,9 @@ class DjangoMySQLConverter(MySQLConverter):
 
         Returns datetime.datetime()
         """
+        if isinstance(value, datetime):
+            return value
+
         if not value:
             return None
         dt = MySQLConverter._DATETIME_to_python(self, value)
@@ -151,6 +154,9 @@ class DjangoCMySQLConverter(MySQLConverterBase):
 
         Returns datetime.datetime()
         """
+        if isinstance(value, datetime):
+            return value
+
         if not value:
             return None
         if settings.USE_TZ and timezone.is_naive(value):
