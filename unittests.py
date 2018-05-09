@@ -572,6 +572,12 @@ class BasicTestResult(TextTestResult):
 
     def addSkip(self, test, reason):
         """Save skipped reasons"""
+        if self.showAll:
+            self.stream.writeln("skipped")
+        elif self.dots:
+            self.stream.write("s")
+            self.stream.flush()
+
         tests.MESSAGES['SKIPPED'].append(reason)
 
 
