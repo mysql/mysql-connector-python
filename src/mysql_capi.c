@@ -1751,10 +1751,12 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         if (PyIntLong_Check(value) || PyFloat_Check(value))
         {
 #ifdef PY3
+            new_value = PyObject_Str(value);
             PyTuple_SET_ITEM(prepared, i,
                              PyBytes_FromString(
                                 (const char *)PyUnicode_1BYTE_DATA(
-                                PyObject_Str(value))));
+                                new_value)));
+            Py_CLEAR(new_value);
 #else
             numeric= PyObject_Repr(value);
             tmp= PyString_AsString(numeric);
@@ -1764,6 +1766,7 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
                 new_num= PyString_FromStringAndSize(tmp, tmp_size);
                 _PyString_Resize(&new_num, tmp_size - 1);
                 PyTuple_SET_ITEM(prepared, i, new_num);
+                Py_CLEAR(numeric);
             }
             else
             {
