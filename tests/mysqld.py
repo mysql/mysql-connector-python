@@ -194,11 +194,21 @@ class MySQLServerBase(object):
                 if (afile == EXEC_MYSQLD and
                         os.access(os.path.join(root, afile), 0)):
                     self._sbindir = root
-                    files_to_find.remove(EXEC_MYSQLD)
+                    LOGGER.debug("Located {} in {}".format(
+                        EXEC_MYSQLD, self._sbindir))
+                    try:
+                        files_to_find.remove(EXEC_MYSQLD)
+                    except ValueError:
+                            pass
                 elif (afile == EXEC_MYSQL and
                         os.access(os.path.join(root, afile), 0)):
                     self._bindir = root
-                    files_to_find.remove(EXEC_MYSQL)
+                    LOGGER.debug("Located {} in {}".format(
+                        EXEC_MYSQL, self._bindir))
+                    try:
+                        files_to_find.remove(EXEC_MYSQLD)
+                    except ValueError:
+                            pass
 
                 if not files_to_find:
                     break
