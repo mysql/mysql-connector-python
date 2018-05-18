@@ -40,7 +40,13 @@ import socket
 import tests
 from . import PY2
 
-from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+try:
+    from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+except ImportError:
+    # Test without C Extension
+    CMySQLConnection = None
+    HAVE_CMYSQL = False
+
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
