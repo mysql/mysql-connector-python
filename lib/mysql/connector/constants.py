@@ -74,11 +74,6 @@ DEFAULT_CONFIGURATION = {
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
-CNX_FABRIC_ARGS = ['fabric_host', 'fabric_username', 'fabric_password',
-                   'fabric_port', 'fabric_connect_attempts',
-                   'fabric_connect_delay', 'fabric_report_errors',
-                   'fabric_ssl_ca', 'fabric_ssl_key', 'fabric_ssl_cert',
-                   'fabric_user']
 
 def flag_is_set(flag, flags):
     """Checks if the flag is set

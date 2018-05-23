@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -357,18 +357,6 @@ _UNITTESTS_CMD_ARGS = {
         'dest': 'protoc', 'metavar': 'NAME',
         'default': None,
         'help': ("Location of Protobuf protoc binary")
-    },
-
-    ('', '--with-fabric'): {
-        'dest': 'fabric_config', 'metavar': 'NAME',
-        'default': None,
-        'help': ("Fabric configuration as URI fabric://user:pass@server:port")
-    },
-
-    ('', '--with-fabric-protocol'): {
-        'dest': 'fabric_protocol', 'metavar': 'NAME',
-        'default': 'xmlrpc',
-        'help': ("Protocol to talk to MySQL Fabric")
     },
 
     ('', '--extra-compile-args'): {
@@ -809,26 +797,6 @@ def main():
             LOGGER.error("Django older than v1.5 will not work with Python 3")
             sys.exit(1)
 
-    if options.fabric_config:
-        # URL example: fabric://user:pass@mysqlfabric.example.com:32274
-        fab = urlsplit(options.fabric_config)
-        tests.FABRIC_CONFIG = {}
-        default_ports = {
-            'xmlrpc': 32274,
-            'mysql': 32275
-        }
-        if options.fabric_protocol:
-            tests.FABRIC_CONFIG['protocol'] = options.fabric_protocol
-        else:
-            tests.FABRIC_CONFIG['protocol'] = 'xmlrpc'
-        LOGGER.info("Fabric will be tested using the '{}' protocol".format(
-            tests.FABRIC_CONFIG['protocol'].upper()))
-        tests.FABRIC_CONFIG = {
-            'host': fab.hostname,
-            'port': fab.port or default_ports[tests.FABRIC_CONFIG['protocol']],
-            'user': fab.username,
-            'password': fab.password,
-        }
     # We have to at least run 1 MySQL server
     init_mysql_server(port=(options.port), options=options)
 

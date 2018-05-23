@@ -3166,21 +3166,6 @@ class BugOra19168737(tests.MySQLConnectorTests):
         conn.close()
 
         new_config = read_option_files(option_files=opt_file,
-                                       option_groups=['fabric'], **config)
-
-        exp = {
-            'fabric': {
-                'connect_delay': 3,
-                'host': 'fabric.example.com',
-                'password': 'foo',
-                'ssl_ca': '/path/to/ssl'
-           }
-        }
-        exp.update(config)
-
-        self.assertEqual(exp, new_config)
-
-        new_config = read_option_files(option_files=opt_file,
                                        option_groups=['failover'], **config)
 
         exp = {

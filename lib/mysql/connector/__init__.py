@@ -147,16 +147,6 @@ def connect(*args, **kwargs):
         new_config = read_option_files(**kwargs)
         return connect(**new_config)
 
-    if all(['fabric' in kwargs, 'failover' in kwargs]):
-        raise InterfaceError("fabric and failover arguments can not be used")
-
-    if 'fabric' in kwargs:
-        if 'pool_name' in kwargs:
-            raise AttributeError("'pool_name' argument is not supported with "
-                                 " MySQL Fabric. Use 'pool_size' instead.")
-        from .fabric import connect as fabric_connect
-        return fabric_connect(*args, **kwargs)
-
     # Failover
     if 'failover' in kwargs:
         return _get_failover_connection(**kwargs)

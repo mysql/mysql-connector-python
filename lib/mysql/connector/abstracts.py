@@ -380,12 +380,7 @@ class MySQLConnectionAbstract(object):
             raise errors.InterfaceError("Failed parsing MySQL version")
 
         version = tuple([int(v) for v in match.groups()[0:3]])
-        if 'fabric' in match.group(4).lower():
-            if version < (1, 5):
-                raise errors.InterfaceError(
-                    "MySQL Fabric '{0}' is not supported".format(
-                        server_version))
-        elif version < (4, 1):
+        if version < (4, 1):
             raise errors.InterfaceError(
                 "MySQL Version '{0}' is not supported.".format(server_version))
 

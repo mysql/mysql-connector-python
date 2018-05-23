@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -119,7 +119,6 @@ TEST_BUILD_DIR = None
 MYSQL_CAPI = None
 
 DJANGO_VERSION = None
-FABRIC_CONFIG = None
 
 __all__ = [
     'MySQLConnectorTests',
@@ -229,7 +228,6 @@ def get_test_modules():
     for finder, name, is_pkg in walk_packages(__path__, prefix=__name__+'.'):
         if ('.test_' not in name or
                 ('django' in name and not DJANGO_VERSION) or
-                ('fabric' in name and not FABRIC_CONFIG) or
                 ('cext' in name and not MYSQL_CAPI)):
             continue
 

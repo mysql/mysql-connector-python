@@ -35,7 +35,7 @@ import os
 import re
 
 from .catch23 import PY2
-from .constants import DEFAULT_CONFIGURATION, CNX_POOL_ARGS, CNX_FABRIC_ARGS
+from .constants import DEFAULT_CONFIGURATION, CNX_POOL_ARGS
 
 # pylint: disable=F0401
 if PY2:
@@ -76,7 +76,6 @@ def read_option_files(**config):
         config_from_file = option_parser.get_groups_as_dict_with_priority(
             *groups)
         config_options = {}
-        fabric_options = {}
         for group in groups:
             try:
                 for option, value in config_from_file[group].items():
@@ -84,14 +83,8 @@ def read_option_files(**config):
                         if option == 'socket':
                             option = 'unix_socket'
 
-                        if option in CNX_FABRIC_ARGS:
-                            if (option not in fabric_options or
-                                    fabric_options[option][1] <= value[1]):
-                                fabric_options[option] = value
-                            continue
-
                         if (option not in CNX_POOL_ARGS and
-                                option not in ['fabric', 'failover']):
+                                option != 'failover'):
                             # pylint: disable=W0104
                             DEFAULT_CONFIGURATION[option]
                             # pylint: enable=W0104
@@ -117,15 +110,6 @@ def read_option_files(**config):
                 except (NameError, SyntaxError):
                     config[option] = value[0]
 
-        if fabric_options:
-            config['fabric'] = {}
-            for option, value in fabric_options.items():
-                try:
-                     # pylint: disable=W0123
-                    config['fabric'][option.split('_', 1)[1]] = eval(value[0])
-                     # pylint: enable=W0123
-                except (NameError, SyntaxError):
-                    config['fabric'][option.split('_', 1)[1]] = value[0]
     return config
 
 
