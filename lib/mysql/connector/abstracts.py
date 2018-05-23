@@ -897,7 +897,7 @@ class MySQLConnectionAbstract(object):
                             "of conversion.MySQLConverterBase.")
 
     @abstractmethod
-    def get_rows(self, count=None, binary=False, columns=None):
+    def get_rows(self, count=None, binary=False, columns=None, raw=None):
         """Get all rows returned by the MySQL server"""
         pass
 

@@ -255,10 +255,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return None
 
-    def get_rows(self, count=None, binary=False, columns=None):
+    def get_rows(self, count=None, binary=False, columns=None, raw=None):
         """Get all or a subset of rows returned by the MySQL server"""
         if not (self._cmysql and self.unread_result):
             raise errors.InternalError("No result set available")
+
+        if raw is None:
+            raw = self._raw
 
         rows = []
         if count is not None and count <= 0:
@@ -271,8 +274,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 if self.converter:
                     row = list(row)
                     for i, _ in enumerate(row):
-                        row[i] = self.converter.to_python(self._columns[i],
-                                                          row[i])
+                        if not raw:
+                            row[i] = self.converter.to_python(self._columns[i],
+                                                              row[i])
                     row = tuple(row)
                 rows.append(row)
                 counter += 1
@@ -286,10 +290,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return rows
 
-    def get_row(self, binary=False, columns=None):
+    def get_row(self, binary=False, columns=None, raw=None):
         """Get the next rows returned by the MySQL server"""
         try:
-            return self.get_rows(count=1, binary=binary, columns=columns)[0]
+            return self.get_rows(count=1, binary=binary, columns=columns,
+                                 raw=raw)[0]
         except IndexError:
             # No row available
             return None

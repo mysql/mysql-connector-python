@@ -2239,10 +2239,7 @@ class BugOra18040042(tests.MySQLConnectorTests):
         pcnx = cnxpool.get_connection()
         pcnx.cmd_query("SELECT @ham")
         self.assertEqual(exp_session_id, pcnx.connection_id)
-        if PY2:
-            self.assertEqual(('2',), pcnx.get_rows()[0][0])
-        else:
-            self.assertEqual((b'2',), pcnx.get_rows()[0][0])
+        self.assertEqual((2,), pcnx.get_rows()[0][0])
 
 
 class BugOra17965619(tests.MySQLConnectorTests):
@@ -3937,7 +3934,7 @@ class BugOra21535573(tests.MySQLConnectorTests):
 class BugOra21536507(tests.MySQLConnectorTests):
     """BUG#21536507:C/PYTHON BEHAVIOR NOT PROPER WHEN RAISE_ON_WARNINGS=TRUE
     """
-    @cnx_config(raw=True, get_warnings=True, raise_on_warnings=True)
+    @cnx_config(raw=False, get_warnings=True, raise_on_warnings=True)
     @foreach_cnx()
     def test_with_raw(self):
         cur = self.cnx.cursor()
@@ -4950,3 +4947,128 @@ class BugOra27364914(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_cursor_prepared_statement_with_charset_latin1(self):
         self._test_charset('latin1', [u'ñ', u'Ñ'])
+
+
+class BugOra27802700(tests.MySQLConnectorTests):
+    """BUG#27802700: A BYTEARRAY IS RETURNED FROM USING get_rows METHOD
+    """
+    table_name = "BugOra27802700"
+    insert_stmt = u"INSERT INTO {} ({}) values ({{value}})"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        config['charset'] = "utf8"
+        config['use_unicode'] = True
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {}".format(self.table_name))
+        cur.execute("CREATE TABLE IF NOT EXISTS {} ("
+                    "  id INT(11) UNSIGNED AUTO_INCREMENT UNIQUE KEY,"
+                    "  int_long INT,"
+                    "  time TIME,"
+                    "  date DATE,"
+                    "  datetime DATETIME,"
+                    "  str TEXT) CHARACTER SET utf8"
+                    "  COLLATE utf8_general_ci".format(self.table_name))
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+        try:
+            cur.execute("DROP TABLE IF EXISTS {}".format(self.table_name))
+        except:
+            pass
+
+    def run_test_retrieve_stored_type(self, stm, test_values, expected_values,
+                                      column, expected_type):
+        config = tests.get_mysql_config()
+        config['charset'] = "utf8"
+        config['use_unicode'] = True
+        config['autocommit'] = True
+        cnx = connection.MySQLConnection(**config)
+        cur = cnx.cursor()
+
+        for test_value in test_values:
+            cnx.cmd_query(stm.format(value=test_value))
+
+        qry = "SELECT {column} FROM {table} ORDER BY id"
+        cur.execute(qry.format(column=column, table=self.table_name))
+
+        rows = cnx.get_rows()[0][len(test_values) * (-1):]
+        for returned_val, expected_value in zip(rows, expected_values):
+            self.assertEqual(returned_val[0], expected_value,
+                             u"value {} is not the expected {}."
+                             u"".format(returned_val[0], expected_value))
+            self.assertTrue(isinstance(returned_val[0], expected_type),
+                            u"value {} is not python type {},"
+                            u"instead found a type {}"
+                            u"".format(returned_val, expected_type,
+                                       type(returned_val)))
+
+        cur.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_retrieve_stored_int_long(self):
+        column = "int_long"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ["-12345", "0", "12345"]
+        expected_values = [-12345, 0, 12345]
+
+        if PY2:
+            expected_type = (int, long)
+        else:
+            expected_type = (int)
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)
+
+    @foreach_cnx()
+    def test_retrieve_stored_str(self):
+        column = "str"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
+                       '"12345"']
+        expected_values = [' ', 'some text', u'データベース', "12345"]
+        expected_type = STRING_TYPES
+
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)
+
+    @foreach_cnx()
+    def test_retrieve_stored_datetime_types(self):
+        column = "datetime"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ["cast('1972-01-01 00:42:49.000000' as DATETIME)",
+                       "cast('2018-01-01 23:59:59.000000' as DATETIME)"]
+        expected_values = [datetime(1972, 1, 1, 0, 42, 49),
+                           datetime(2018, 1, 1, 23, 59, 59)]
+
+        expected_type = datetime
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)
+
+    @foreach_cnx()
+    def test_retrieve_stored_date_types(self):
+        column = "date"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ["DATE('1972-01-01')",
+                       "DATE('2018-12-31')"]
+        expected_values = [date(1972, 1, 1),
+                           date(2018, 12, 31)]
+
+        expected_type = date
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)
+
+    @foreach_cnx()
+    def test_retrieve_stored_time_types(self):
+        column = "time"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ["TIME('00:42:49.00000')",
+                       "TIME('23:59:59.00000')"]
+        expected_values = [timedelta(hours=0, minutes=42, seconds=49),
+                           timedelta(hours=23, minutes=59, seconds=59)]
+        expected_type = timedelta
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)

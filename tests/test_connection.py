@@ -357,7 +357,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
              (b'MEMORY',), (b'FEDERATED',), (b'ARCHIVE',), (b'MRG_MYISAM',)],
             {'status_flag': 32, 'warning_count': 0}
         )
-        res = self.cnx.get_rows()
+        res = self.cnx.get_rows(raw=True)
         self.assertEqual(exp, res)
 
         self.__helper_get_rows_buffer()
@@ -365,11 +365,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         i = 0
         while i < len(rows):
             exp = (rows[i:i + 2], None)
-            res = self.cnx.get_rows(2)
+            res = self.cnx.get_rows(count=2, raw=True)
             self.assertEqual(exp, res)
             i += 2
         exp = ([], {'status_flag': 32, 'warning_count': 0})
-        self.assertEqual(exp, self.cnx.get_rows())
+        self.assertEqual(exp, self.cnx.get_rows(raw=True))
 
         # Test unread results
         self.cnx.unread_result = False
@@ -379,7 +379,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._have_next_results = False
         self.__helper_get_rows_buffer(toggle_next_result=True)
         exp = {'status_flag': 8, 'warning_count': 0}
-        self.assertEqual(exp, self.cnx.get_rows()[-1])
+        self.assertEqual(exp, self.cnx.get_rows(raw=True)[-1])
         self.assertTrue(self.cnx._have_next_result)
 
     def test_get_row(self):
@@ -394,11 +394,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         rows = expall[0]
         for row in rows:
-            res = self.cnx.get_row()
+            res = self.cnx.get_row(raw=True)
             exp = (row, None)
             self.assertEqual(exp, res)
         exp = ([], {'status_flag': 32, 'warning_count': 0})
-        self.assertEqual(exp, self.cnx.get_rows())
+        self.assertEqual(exp, self.cnx.get_rows(raw=True))
 
     def test_cmd_init_db(self):
         """Send the Init_db-command to MySQL"""
@@ -475,7 +475,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp = [
             {'columns': [('1', 8, None, None, None, None, 0, 129)],
              'eof': {'status_flag': 8, 'warning_count': 0}},
-            ([(b'1',)], {'status_flag': 8, 'warning_count': 0}),
+            ([(1,)], {'status_flag': 8, 'warning_count': 0}),
             {'affected_rows': 1,
              'field_count': 0,
              'insert_id': 0,
@@ -483,7 +483,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
              'warning_count': 0},
             {'columns': [('2', 8, None, None, None, None, 0, 129)],
              'eof': {'status_flag': 0, 'warning_count': 0}},
-            ([(b'2',)], {'status_flag': 0, 'warning_count': 0}),
+            ([(2,)], {'status_flag': 0, 'warning_count': 0}),
         ]
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets(packets)
