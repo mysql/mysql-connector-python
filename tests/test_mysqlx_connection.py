@@ -41,6 +41,8 @@ import mysqlx
 from mysqlx.errors import InterfaceError, ProgrammingError
 from mysqlx.protobuf import Protobuf
 
+from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT
+
 if mysqlx.compat.PY3:
     from urllib.parse import quote_plus
 else:
@@ -392,7 +394,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual("../path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
     def test_connection_uri(self):
         uri = build_uri(user=self.connect_kwargs["user"],
                         password=self.connect_kwargs["password"],
@@ -674,6 +676,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         session.close()
         self.assertRaises(ProgrammingError, mysqlx.get_session, settings)
 
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
     def test_use_pure(self):
         settings = self.connect_kwargs.copy()
         settings["use-pure"] = False

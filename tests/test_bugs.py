@@ -4492,7 +4492,8 @@ class BugOra25383644(tests.MySQLConnectorTests):
                 self.mysql_server.stop()
                 self.mysql_server.wait_down()
                 cur.execute(sql)
-            except mysql.connector.errors.OperationalError:
+            except (mysql.connector.errors.OperationalError,
+                    mysql.connector.errors.ProgrammingError):
                 try:
                     cur.close()
                     cnx.close()
@@ -4519,6 +4520,7 @@ class BugOra25558885(tests.MySQLConnectorTests):
         cur.close()
         db_conn.disconnect()
 
+    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
     def test_cext_cnx(self):
         config = tests.get_mysql_config()
         config["use_pure"] = False
@@ -4694,7 +4696,10 @@ class BugOra24948186(tests.MySQLConnectorTests):
         test_values = [-9223372036854775808]
         expected_values = test_values
         mysql_type = "INTEGER"
-        expected_type = int
+        if PY2:
+            expected_type = long
+        else:
+            expected_type = int
         self.run_test_mysql_json_type(stm, test_values, expected_values,
                                       mysql_type, expected_type)
 
@@ -4702,16 +4707,12 @@ class BugOra24948186(tests.MySQLConnectorTests):
                        18446744073709551615]
         expected_values = test_values
         mysql_type = "UNSIGNED INTEGER"
-        expected_type = int
-        self.run_test_mysql_json_type(stm, test_values[0:1],
-                                      expected_values[0:1],
-                                      mysql_type, expected_type)
         if PY2:
             expected_type = long
         else:
             expected_type = int
-        self.run_test_mysql_json_type(stm, test_values[1:],
-                                      expected_values[1:],
+        self.run_test_mysql_json_type(stm, test_values,
+                                      expected_values,
                                       mysql_type, expected_type)
 
     @foreach_cnx()
