@@ -806,7 +806,8 @@ def setup_logger(logger, debug=False, logfile=None):
 
 def install_connector(root_dir, install_dir, protobuf_include_dir,
                       protobuf_lib_dir, protoc, connc_location=None,
-                      extra_compile_args=None, extra_link_args=None):
+                      extra_compile_args=None, extra_link_args=None,
+                      debug=False):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -858,6 +859,9 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
             logfp.write(stdout)
         LOGGER.error("Failed installing Connector/Python, see {log}".format(
             log=logfile))
+        if debug:
+            with open(logfile) as logfr:
+                print(logfr.read())
         sys.exit(1)
 
 

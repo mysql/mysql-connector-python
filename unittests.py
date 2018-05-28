@@ -855,7 +855,7 @@ def main():
                                 protoc,
                                 options.mysql_capi,
                                 options.extra_compile_args,
-                                options.extra_link_args)
+                                options.extra_link_args, options.debug)
 
     # Which tests cases to run
     testcases = []

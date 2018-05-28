@@ -456,7 +456,7 @@ class MySQLServer(MySQLServerBase):
                 '--lc-messages-dir={0}'.format(self._lc_messages_dir),
                 '--lc-messages=en_US'
             ])
-        if self._version[0:2] >= (5, 1):
+        if self._version[0:2] >= (5, 1) and self._version < (8, 0, 11):
             cmd.append('--loose-skip-ndbcluster')
 
         return cmd
