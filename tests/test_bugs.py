@@ -4696,15 +4696,25 @@ class BugOra24948186(tests.MySQLConnectorTests):
         test_values = [-9223372036854775808]
         expected_values = test_values
         mysql_type = "INTEGER"
-        if PY2:
+        if PY2 and os.name == 'nt':
             expected_type = long
         else:
             expected_type = int
         self.run_test_mysql_json_type(stm, test_values, expected_values,
                                       mysql_type, expected_type)
 
-        test_values = [92233720368547760,
-                       18446744073709551615]
+        test_values = [92233720368547760]
+        expected_values = test_values
+        mysql_type = "UNSIGNED INTEGER"
+        if PY2 and os.name == 'nt':
+            expected_type = long
+        else:
+            expected_type = int
+        self.run_test_mysql_json_type(stm, test_values,
+                                      expected_values,
+                                      mysql_type, expected_type)
+
+        test_values = [18446744073709551615]
         expected_values = test_values
         mysql_type = "UNSIGNED INTEGER"
         if PY2:
