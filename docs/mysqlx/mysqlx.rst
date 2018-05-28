@@ -27,7 +27,7 @@ Result
 .. toctree::
    :maxdepth: 4
 
-   mysqlx.ColumnMetaData
+   mysqlx.Column
    mysqlx.Row
    mysqlx.Result
    mysqlx.BufferingResult

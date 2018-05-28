@@ -726,6 +726,17 @@ class Session(object):
         """
         return self._connection
 
+    def get_schemas(self):
+        """Returns the list of schemas in the current session.
+
+        Returns:
+            `list`: The list of schemas in the current session.
+
+        .. versionadded:: 8.0.12
+        """
+        result = self.sql("SHOW DATABASES").execute()
+        return [row[0] for row in result.fetch_all()]
+
     def get_schema(self, name):
         """Retrieves a Schema object from the current session by it's name.
 

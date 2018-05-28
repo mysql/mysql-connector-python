@@ -1086,7 +1086,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(2, collection.count())
 
         # Collection.remove() is not allowed without a condition
-        result = collection.remove()
+        result = collection.remove(None)
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         result = collection.remove("")
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
@@ -1155,7 +1155,16 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # tests comma seperated fields
         result = collection.find("$.age = 21").fields("$.age, $.name").execute()
         docs = result.fetch_all()
-        self.assertEqual("Fred", docs[0]['$.name'])
+        self.assertEqual("Fred", docs[0]["$.name"])
+
+        # test limit and offset
+        result = collection.find().fields("$.name").limit(2).offset(2).execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+        self.assertEqual("Wilma", docs[0]["$.name"])
+        self.assertEqual("Betty", docs[1]["$.name"])
+        self.assertRaises(ValueError, collection.find().limit, -1)
+        self.assertRaises(ValueError, collection.find().limit(1).offset, -1)
 
         self.schema.drop_collection(collection_name)
 
@@ -1190,7 +1199,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, result.get_affected_items_count())
 
         # Collection.modify() is not allowed without a condition
-        result = collection.modify().unset(["young"])
+        result = collection.modify(None).unset(["young"])
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         result = collection.modify("").unset(["young"])
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
@@ -1392,7 +1401,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(8, result.get_affected_items_count())
 
         # Collection.modify() is not allowed without a condition
-        result = collection.modify().patch('{"status":"alive"}')
+        result = collection.modify(None).patch('{"status":"alive"}')
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         result = collection.modify("").patch('{"status":"alive"}')
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
@@ -2069,15 +2078,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 3)
-        table.delete("id = 1").execute()
+        table.delete().where("id = 1").execute()
         self.assertEqual(table.count(), 2)
 
         # Table.delete() is not allowed without a condition
         result = table.delete()
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
-        result = table.delete("")
-        self.assertRaises(mysqlx.ProgrammingError, result.execute)
-        self.assertRaises(mysqlx.ProgrammingError, table.delete, " ")
 
         drop_table(self.schema, table_name)
 
@@ -2097,10 +2103,26 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
                          "".format(table_name)).execute()
+
+        # Test if result has no data
+        result = self.session.sql("SELECT age, name FROM {0}"
+                                  "".format(table_name)).execute()
+        self.assertFalse(result.has_data())
+        rows = result.fetch_all()
+        self.assertEqual(len(rows), 0)
+
+        # Insert data
         self.session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
                          "".format(table_name)).execute()
         self.session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
                          "".format(table_name)).execute()
+
+        # Test if result has data
+        result = self.session.sql("SELECT age, name FROM {0}"
+                                  "".format(table_name)).execute()
+        self.assertTrue(result.has_data())
+        rows = result.fetch_all()
+        self.assertEqual(len(rows), 2)
 
         table = self.schema.get_table("test")
         result = table.select().execute()
@@ -2201,6 +2223,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("active", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())
+
+        self.assertEqual(result.columns, result.get_columns())
 
         drop_table(self.schema, "test")
 
@@ -2369,7 +2393,7 @@ class MySQLxViewTests(tests.MySQLxTests):
                                                      self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
-        view.delete("id = 1").execute()
+        view.delete().where("id = 1").execute()
         self.assertEqual(view.count(), 0)
 
     def test_count(self):

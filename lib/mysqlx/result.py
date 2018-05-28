@@ -37,7 +37,7 @@ from datetime import datetime, timedelta
 from .dbdoc import DbDoc
 from .charsets import MYSQL_CHARACTER_SETS
 from .compat import STRING_TYPES
-from .helpers import decode_from_bytes
+from .helpers import decode_from_bytes, deprecated
 
 
 # pylint: disable=C0111
@@ -401,9 +401,28 @@ class BytesContentType(ColumnFlags):
     GEOMETRY = 0x0001
     JSON = 0x0002
     XML = 0x0003
+# pylint: enable=C0111
 
 
-class ColumnMetaData(object):
+class Column(object):
+    """Represents meta data for a table column.
+
+    Args:
+        col_type (int): The column type.
+        catalog (str): The catalog.
+        schema (str): The schema name.
+        table (str): The table name.
+        original_table (str): The original table name.
+        name (str): The column name.
+        original_name (str): The original table name.
+        length (int): The column length,
+        collation (str): The collation name.
+        fractional_digits (int): The fractional digits.
+        flags (int): The flags.
+        content_type (int): The content type.
+
+    .. versionchanged:: 8.0.12
+    """
     def __init__(self, col_type, catalog=None, schema=None, table=None,
                  original_table=None, name=None, original_name=None,
                  length=None, collation=None, fractional_digits=None,
@@ -452,6 +471,7 @@ class ColumnMetaData(object):
         })
 
     def _map_bytes(self):
+        """Map bytes."""
         if self._content_type == BytesContentType.GEOMETRY:
             self._col_type = ColumnType.GEOMETRY
         elif self._content_type == BytesContentType.JSON:
@@ -465,6 +485,7 @@ class ColumnMetaData(object):
         self._is_padded = self._flags & 1
 
     def _map_datetime(self):
+        """Map datetime."""
         if self._length == 10:
             self._col_type = ColumnType.DATE
         elif self._length == 19:
@@ -475,6 +496,7 @@ class ColumnMetaData(object):
             raise ValueError("Datetime mapping scenario unhandled")
 
     def _map_int_type(self):
+        """Map int type."""
         if self._length <= 4:
             self._col_type = ColumnType.TINYINT
         elif self._length <= 6:
@@ -488,6 +510,7 @@ class ColumnMetaData(object):
         self._number_signed = True
 
     def _map_uint_type(self):
+        """Map uint type."""
         if self._length <= 3:
             self._col_type = ColumnType.TINYINT
         elif self._length <= 5:
@@ -501,6 +524,7 @@ class ColumnMetaData(object):
         self._zero_fill = self._flags & 1
 
     def _map_type(self):
+        """Map type."""
         if self._proto_type == ColumnProtoType.SINT:
             self._map_int_type()
         elif self._proto_type == ColumnProtoType.UINT:
@@ -532,48 +556,198 @@ class ColumnMetaData(object):
         else:
             raise ValueError("Unknown column type {0}".format(self._proto_type))
 
+    @property
+    def schema_name(self):
+        """str: The schema name.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._schema
+
+    @property
+    def table_name(self):
+        """str: The table name.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._original_table or self._table
+
+    @property
+    def table_label(self):
+        """str: The table label.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._table or self._original_table
+
+    @property
+    def column_name(self):
+        """str: The column name.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._original_name or self._name
+
+    @property
+    def column_label(self):
+        """str: The column label.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._name or self._original_name
+
+    @property
+    def type(self):
+        """int: The column type.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._col_type
+
+    @property
+    def length(self):
+        """int. The column length.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._length
+
+    @property
+    def fractional_digits(self):
+        """int: The column fractional digits.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._fractional_digits
+
+    @property
+    def collation_name(self):
+        """str: The collation name.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._collation_name
+
+    @property
+    def character_set_name(self):
+        """str: The character set name.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._character_set_name
+
     def get_schema_name(self):
+        """Returns the schema name.
+
+        Returns:
+            str: The schema name.
+        """
         return self._schema
 
     def get_table_name(self):
+        """Returns the table name.
+
+        Returns:
+            str: The table name.
+        """
         return self._original_table or self._table
 
     def get_table_label(self):
+        """Returns the table label.
+
+        Returns:
+            str: The table label.
+        """
         return self._table or self._original_table
 
     def get_column_name(self):
+        """Returns the column name.
+
+        Returns:
+            str: The column name.
+        """
         return self._original_name or self._name
 
     def get_column_label(self):
+        """Returns the column label.
+
+        Returns:
+            str: The column label.
+        """
         return self._name or self._original_name
 
     def get_proto_type(self):
+        """Returns the column proto type.
+
+        Returns:
+            int: The column proto type.
+        """
         return self._proto_type
 
     def get_type(self):
+        """Returns the column type.
+
+        Returns:
+            int: The column type.
+        """
         return self._col_type
 
     def get_length(self):
+        """Returns the column length.
+
+        Returns:
+            int: The column length.
+        """
         return self._length
 
     def get_fractional_digits(self):
+        """Returns the column fractional digits.
+
+        Returns:
+            int: The column fractional digits.
+        """
         return self._fractional_digits
 
     def get_collation_name(self):
+        """Returns the collation name.
+
+        Returns:
+            str: The collation name.
+        """
         return self._collation_name
 
     def get_character_set_name(self):
+        """Returns the character set name.
+
+        Returns:
+            str: The character set name.
+        """
         return self._character_set_name
 
     def is_number_signed(self):
+        """Returns `True` if is a number signed.
+
+        Returns:
+            bool: Returns `True` if is a number signed.
+        """
         return self._number_signed
 
     def is_padded(self):
+        """Returns `True` if is padded.
+
+        Returns:
+            bool: Returns `True` if is padded.
+        """
         return self._is_padded
 
     def is_bytes(self):
+        """Returns `True` if is bytes.
+
+        Returns:
+            bool: Returns `True` if is bytes.
+        """
         return self._is_bytes
-# pylint: enable=C0111
+
 
 class Row(object):
     """Represents a row element returned from a SELECT query.
@@ -626,6 +800,14 @@ class BaseResult(object):
         else:
             self._protocol = connection.protocol
             connection.fetch_active_result()
+
+    def get_affected_items_count(self):
+        """Returns the number of affected items for the last operation.
+
+        Returns:
+            int: The number of affected items.
+        """
+        return self._rows_affected
 
     def get_warnings(self):
         """Returns the warnings.
@@ -689,14 +871,6 @@ class Result(BaseResult):
         if connection is not None:
             self._connection.close_result(self)
 
-    def get_affected_items_count(self):
-        """Returns the number of affected items for the last operation.
-
-        Returns:
-            int: The number of affected items.
-        """
-        return self._rows_affected
-
     def get_autoincrement_value(self):
         """Returns the last insert id auto generated.
 
@@ -705,15 +879,21 @@ class Result(BaseResult):
         """
         return self._generated_id
 
+    @deprecated("8.0.12")
     def get_document_id(self):
         """Returns ID of the last document inserted into a collection.
+
+        .. deprecated:: 8.0.12
         """
         if self._ids is None or len(self._ids) == 0:
             return None
         return self._ids[0]
 
+    @deprecated("8.0.12")
     def get_generated_insert_id(self):
         """Returns the generated insert id.
+
+        .. deprecated:: 8.0.12
         """
         return self._generated_id
 
@@ -733,6 +913,7 @@ class BufferingResult(BaseResult):
     def __init__(self, connection):
         super(BufferingResult, self).__init__(connection)
         self._columns = []
+        self._has_data = False
         self._has_more_results = False
         self._items = []
         self._page_size = 0
@@ -809,7 +990,7 @@ class BufferingResult(BaseResult):
         return -1
 
     def fetch_one(self):
-        """ Fetch one item.
+        """Fetch one item.
 
         Returns:
             :class:`mysqlx.Row` or :class:`mysqlx.DbDoc`: one result item.
@@ -831,8 +1012,20 @@ class BufferingResult(BaseResult):
                 break
         return self._items
 
+    def set_has_data(self, flag):
+        """Sets if result has data.
+
+        Args:
+            flag (bool): `True` if result has data.
+        """
+        self._has_data = flag
+
     def set_has_more_results(self, flag):
-        """Sets if has more resultsets."""
+        """Sets if has more results.
+
+        Args:
+            flag (bool): `True` if has more results.
+        """
         self._has_more_results = flag
 
 
@@ -848,6 +1041,16 @@ class RowResult(BufferingResult):
     @property
     def columns(self):
         """`list`: The list of columns."""
+        return self._columns
+
+    def get_columns(self):
+        """Returns the list of columns.
+
+        Returns:
+            `list`: The list of columns.
+
+        .. versionadded:: 8.0.12
+        """
         return self._columns
 
 
@@ -872,7 +1075,7 @@ class SqlResult(RowResult):
         """Process the next result.
 
         Returns:
-            bool: Return `True` if the fetch is done.
+            bool: Returns `True` if the fetch is done.
         """
         if self._closed:
             return False
@@ -880,6 +1083,15 @@ class SqlResult(RowResult):
         self._init_result()
         return True
 
+    def has_data(self):
+        """Returns True if result has data.
+
+        Returns:
+            bool: Returns `True` if result has data.
+
+        .. versionadded:: 8.0.12
+        """
+        return self._has_data
 
 class DocResult(BufferingResult):
     """Allows traversing the DbDoc objects returned by a Collection.find

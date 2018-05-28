@@ -1,7 +1,7 @@
-mysqlx.ColumnMetaData
-=====================
+mysqlx.Column
+=============
 
-.. autoclass:: mysqlx.ColumnMetaData
+.. autoclass:: mysqlx.Column
     :members:
     :undoc-members:
     :inherited-members:

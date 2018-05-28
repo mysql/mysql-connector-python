@@ -35,7 +35,7 @@ from .errors import InterfaceError, OperationalError, ProgrammingError
 from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
                    build_int_scalar, build_unsigned_int_scalar)
 from .helpers import encode_to_bytes, get_item_or_attr
-from .result import ColumnMetaData
+from .result import Column
 from .protobuf import (SERVER_MESSAGES, PROTOBUF_REPEATED_TYPES, Message,
                        mysqlxpb_enum)
 
@@ -254,6 +254,9 @@ class Protocol(object):
                 result.set_closed(True)
             elif msg.type == "Mysqlx.Resultset.FetchDoneMoreResultsets":
                 result.set_has_more_results(True)
+            elif msg.type == "Mysqlx.Resultset.Row":
+                result.set_has_data(True)
+                break
             else:
                 break
         return msg
@@ -562,14 +565,14 @@ class Protocol(object):
                 break
             if msg.type != "Mysqlx.Resultset.ColumnMetaData":
                 raise InterfaceError("Unexpected msg type")
-            col = ColumnMetaData(msg["type"], msg["catalog"], msg["schema"],
-                                 msg["table"], msg["original_table"],
-                                 msg["name"], msg["original_name"],
-                                 msg.get("length", 21),
-                                 msg.get("collation", 0),
-                                 msg.get("fractional_digits", 0),
-                                 msg.get("flags", 16),
-                                 msg.get("content_type"))
+            col = Column(msg["type"], msg["catalog"], msg["schema"],
+                         msg["table"], msg["original_table"],
+                         msg["name"], msg["original_name"],
+                         msg.get("length", 21),
+                         msg.get("collation", 0),
+                         msg.get("fractional_digits", 0),
+                         msg.get("flags", 16),
+                         msg.get("content_type"))
             columns.append(col)
         return columns
 

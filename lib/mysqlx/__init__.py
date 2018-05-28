@@ -39,7 +39,7 @@ from .dbdoc import DbDoc
 from .errors import (Error, InterfaceError, DatabaseError, NotSupportedError,
                      DataError, IntegrityError, ProgrammingError,
                      OperationalError, InternalError, PoolError)
-from .result import (ColumnMetaData, Row, Result, BufferingResult, RowResult,
+from .result import (Column, Row, Result, BufferingResult, RowResult,
                      SqlResult, DocResult, ColumnType)
 from .statement import (Statement, FilterableStatement, SqlStatement,
                         FindStatement, AddStatement, RemoveStatement,
@@ -280,7 +280,7 @@ __all__ = [
     "InternalError", "PoolError",
 
     # mysqlx.result
-    "ColumnMetaData", "Row", "Result", "BufferingResult", "RowResult",
+    "Column", "Row", "Result", "BufferingResult", "RowResult",
     "SqlResult", "DocResult", "ColumnType",
 
     # mysqlx.statement

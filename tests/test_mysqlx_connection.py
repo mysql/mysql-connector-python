@@ -421,6 +421,14 @@ class MySQLxSessionTests(tests.MySQLxTests):
             except mysqlx.Error:
                 self.assertEqual(res, None)
 
+    def test_get_schemas(self):
+        schema_name = "test_get_schemas"
+        self.session.create_schema(schema_name)
+        schemas = self.session.get_schemas()
+        self.assertIsInstance(schemas, list)
+        self.assertTrue(schema_name in schemas)
+        self.session.drop_schema(schema_name)
+
     def test_get_schema(self):
         schema = self.session.get_schema(self.schema_name)
         self.assertTrue(schema, mysqlx.Schema)
