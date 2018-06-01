@@ -4868,6 +4868,166 @@ class BugOra24948186(tests.MySQLConnectorTests):
                                       mysql_type, expected_type)
 
 
+@unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+class BugOra27650437(tests.MySQLConnectorTests):
+    """BUG#27650437: DIFFERENCES PYTHON AND C-EXT FOR GET_ROW()/GET_ROWS()
+    """
+    test_sql_single_result = "show variables like '%port%'"
+    cnx_pure = None
+    cnx_cext = None
+    cnx_pure_raw = None
+    cnx_cext_raw = None
+
+    def setUp(self):
+        config_pure = tests.get_mysql_config()
+        config_pure["use_pure"] = True
+        self.cnx_pure = mysql.connector.connect(**config_pure)
+
+        config_cext = tests.get_mysql_config()
+        config_cext["use_pure"] = False
+        self.cnx_cext = mysql.connector.connect(**config_cext)
+
+        config_pure_raw = tests.get_mysql_config()
+        config_pure_raw["use_pure"] = True
+        config_pure_raw["raw"] = True
+        self.cnx_pure_raw = mysql.connector.connect(**config_pure_raw)
+
+        config_cext_raw = tests.get_mysql_config()
+        config_cext_raw["use_pure"] = False
+        config_cext_raw["raw"] = True
+        self.cnx_cext_raw = mysql.connector.connect(**config_cext_raw)
+
+    def tearDown(self):
+        self.cnx_pure.close()
+        self.cnx_cext.close()
+        self.cnx_pure_raw.close()
+        self.cnx_cext_raw.close()
+
+    def test_get_row(self):
+        """Test result from get_row is the same in pure and using c-ext"""
+        self.cnx_pure.cmd_query(self.test_sql_single_result)
+        res_pure = self.cnx_pure.get_row()
+
+        self.cnx_cext.cmd_query(self.test_sql_single_result)
+        res_cext = self.cnx_cext.get_row()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def test_get_rows(self):
+        """Test results from get_rows are the same in pure and using c-ext"""
+        self.cnx_pure.cmd_query(self.test_sql_single_result)
+        res_pure = self.cnx_pure.get_rows()
+
+        self.cnx_cext.cmd_query(self.test_sql_single_result)
+        res_cext = self.cnx_cext.get_rows()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def test_get_row_raw(self):
+        """Test result from get_row is the same in pure and using c-ext"""
+        self.cnx_pure_raw.cmd_query(self.test_sql_single_result)
+        res_pure = self.cnx_pure_raw.get_row()
+
+        self.cnx_cext_raw.cmd_query(self.test_sql_single_result)
+        res_cext = self.cnx_cext_raw.get_row()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def test_get_rows_raw(self):
+        """Test results from get_rows are the same in pure and using c-ext"""
+        self.cnx_pure_raw.cmd_query(self.test_sql_single_result)
+        res_pure = self.cnx_pure_raw.get_rows()
+
+        self.cnx_cext_raw.cmd_query(self.test_sql_single_result)
+        res_cext = self.cnx_cext_raw.get_rows()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def _test_fetchone(self, cur_pure, cur_cext):
+        """Test result from fetchone is the same in pure and using c-ext"""
+        cur_pure.execute(self.test_sql_single_result)
+        res_pure = cur_pure.fetchone()
+        _ = cur_pure.fetchall()
+
+        cur_cext.execute(self.test_sql_single_result)
+        res_cext = cur_cext.fetchone()
+        _ = cur_cext.fetchall()
+        self.cnx_cext.free_result()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def _test_fetchmany(self, cur_pure, cur_cext):
+        """Test results from fetchmany are the same in pure and using c-ext"""
+        cur_pure.execute(self.test_sql_single_result)
+        res_pure = cur_pure.fetchmany()
+
+        cur_cext.execute(self.test_sql_single_result)
+        res_cext = cur_cext.fetchmany()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+        res_pure = cur_pure.fetchmany(2)
+        res_cext = cur_cext.fetchmany(2)
+
+        _ = cur_pure.fetchall()
+        _ = cur_cext.fetchall()
+        self.cnx_cext.free_result()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def _test_fetch_fetchall(self, cur_pure, cur_cext):
+        """Test results from fetchall are the same in pure and using c-ext"""
+        cur_pure.execute(self.test_sql_single_result)
+        res_pure = cur_pure.fetchall()
+
+        cur_cext.execute(self.test_sql_single_result)
+        res_cext = cur_cext.fetchall()
+
+        self.cnx_cext.free_result()
+
+        self.assertEqual(res_pure, res_cext, "Result using pure: {} differs"
+                         "from c-ext result {}".format(res_pure, res_cext))
+
+    def test_cursor(self):
+        """Test results from cursor are the same in pure and using c-ext"""
+        cur_pure = self.cnx_pure.cursor()
+        cur_cext = self.cnx_cext.cursor()
+        self._test_fetchone(cur_pure, cur_cext)
+        self._test_fetchmany(cur_pure, cur_cext)
+        self._test_fetch_fetchall(cur_pure, cur_cext)
+        cur_pure.close()
+        cur_cext.close()
+
+    def test_cursor_raw(self):
+        """Test results from cursor raw are the same in pure and using c-ext"""
+        raw = True
+        cur_pure_raw = self.cnx_pure.cursor(raw=raw)
+        cur_cext_raw = self.cnx_cext.cursor(raw=raw)
+        self._test_fetchone(cur_pure_raw, cur_cext_raw)
+        self._test_fetchmany(cur_pure_raw, cur_cext_raw)
+        self._test_fetch_fetchall(cur_pure_raw, cur_cext_raw)
+        cur_pure_raw.close()
+        cur_cext_raw.close()
+
+    def test_cursor_buffered(self):
+        """Test results from cursor buffered are the same in pure or c-ext"""
+        buffered = True
+        cur_pure_buffered = self.cnx_pure.cursor(buffered=buffered)
+        cur_cext_buffered = self.cnx_cext.cursor(buffered=buffered)
+        self._test_fetchone(cur_pure_buffered, cur_cext_buffered)
+        self._test_fetchmany(cur_pure_buffered, cur_cext_buffered)
+        self._test_fetch_fetchall(cur_pure_buffered, cur_cext_buffered)
+        cur_pure_buffered.close()
+        cur_cext_buffered.close()
+
+
 class BugOra27364914(tests.MySQLConnectorTests):
     """BUG#27364914: CURSOR PREPARED STATEMENTS DO NOT CONVERT STRINGS
     """

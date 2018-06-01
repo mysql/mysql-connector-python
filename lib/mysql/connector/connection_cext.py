@@ -183,6 +183,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         """Disconnect from the MySQL server"""
         if self._cmysql:
             try:
+                self.free_result()
                 self._cmysql.close()
             except MySQLInterfaceError as exc:
                 raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
@@ -271,7 +272,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         try:
             row = self._cmysql.fetch_row()
             while row:
-                if self.converter:
+                if not self._raw and self.converter:
                     row = list(row)
                     for i, _ in enumerate(row):
                         if not raw:
@@ -283,21 +284,29 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 if count and counter == count:
                     break
                 row = self._cmysql.fetch_row()
+            if not row:
+                _eof = self.fetch_eof_columns()['eof']
+                self.free_result()
+            else:
+                _eof = None
         except MySQLInterfaceError as exc:
             self.free_result()
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
 
-        return rows
+        return rows, _eof
 
     def get_row(self, binary=False, columns=None, raw=None):
         """Get the next rows returned by the MySQL server"""
         try:
-            return self.get_rows(count=1, binary=binary, columns=columns,
-                                 raw=raw)[0]
+            rows, eof = self.get_rows(count=1, binary=binary, columns=columns,
+                                      raw=raw)
+            if rows:
+                return (rows[0], eof)
+            return (None, eof)
         except IndexError:
             # No row available
-            return None
+            return (None, None)
 
     def next_result(self):
         """Reads the next result"""
@@ -370,10 +379,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return None
 
-    def cmd_query(self, query, raw=False, buffered=False, raw_as_string=False):
+    def cmd_query(self, query, raw=None, buffered=False, raw_as_string=False):
         """Send a query to the MySQL server"""
         self.handle_unread_result()
-
+        if raw is None:
+            raw = self._raw
         try:
             if not isinstance(query, bytes):
                 query = query.encode('utf-8')
