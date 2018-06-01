@@ -4693,6 +4693,49 @@ class BugOra24659561(tests.MySQLConnectorTests):
         )
 
 
+@unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+class BugOra27991948(tests.MySQLConnectorTests):
+    """BUG#27991948: UNREAD_RESULT IS NOT UNSET AFTER INVOKE GET_ROWS ON C-EXT
+    """
+    test_sql_single_result = "show variables like '%port%'"
+    cnx_cext = None
+    cnx_cext_raw = None
+
+    def setUp(self):
+        config_cext = tests.get_mysql_config()
+        config_cext["use_pure"] = False
+        self.cnx_cext = mysql.connector.connect(**config_cext)
+
+    def tearDown(self):
+        self.cnx_cext.close()
+
+    def test_automatically_set_of_unread_rows(self):
+        """Test unread_rows is automatically set after fetchall()"""
+        # Test get all the rows and execute a query without invoke free_result
+        self.cnx_cext.cmd_query(self.test_sql_single_result)
+        unread_result = self.cnx_cext.unread_result
+        self.assertTrue(unread_result, "unread_rows is expected to be True")
+        _ = self.cnx_cext.get_rows()
+        unread_result = self.cnx_cext.unread_result
+        self.assertFalse(unread_result, "unread_rows was not set to False")
+        # Query execution must not raise InternalError: Unread result found
+        self.cnx_cext.cmd_query(self.test_sql_single_result)
+        _ = self.cnx_cext.get_rows()
+
+        # Test cursor fetchall
+        cur_cext = self.cnx_cext.cursor()
+        cur_cext.execute(self.test_sql_single_result)
+        unread_result = self.cnx_cext.unread_result
+        self.assertTrue(unread_result, "unread_rows is expected to be True")
+        _ = cur_cext.fetchall()
+        unread_result = self.cnx_cext.unread_result
+        self.assertFalse(unread_result, "unread_rows was not set to False")
+        # Query execution must not raise InternalError: Unread result found
+        cur_cext.execute(self.test_sql_single_result)
+        _ = cur_cext.fetchall()
+
+        cur_cext.close()
+
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 1),
                  "Collation utf8mb4_0900_ai_ci not available on 5.7.x")
 class BugOra27277964(tests.MySQLConnectorTests):
