@@ -5275,3 +5275,26 @@ class BugOra27802700(tests.MySQLConnectorTests):
         expected_type = timedelta
         self.run_test_retrieve_stored_type(stm, test_values, expected_values,
                                            column, expected_type)
+
+
+class BugOra27277937(tests.MySQLConnectorTests):
+    """BUG#27277937: CONFUSING ERROR MESSAGE WHEN SPECIFYING UNSUPPORTED
+    COLLATION
+    """
+    def setUp(self):
+        pass
+
+    def test_invalid_collation(self):
+        config = tests.get_mysql_config()
+        config["charset"] = "utf8"
+        config["collation"] = "foobar"
+        self.cnx = connection.MySQLConnection()
+        try:
+            self.cnx.connect(**config)
+        except errors.ProgrammingError as err:
+            self.assertEqual(err.msg, "Collation 'foobar' unknown.")
+        else:
+            self.fail("A ProgrammingError was expected")
+
+    def tearDown(self):
+        pass

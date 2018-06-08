@@ -699,8 +699,8 @@ class CharacterSet(_Constants):
                     continue
                 if info[0] == charset and info[1] == collation:
                     return (cid, info[0], info[1])
-            raise ProgrammingError("Character set '{0}' unknown.".format(
-                charset))
+            _ = cls.get_default_collation(charset)
+            raise ProgrammingError("Collation '{0}' unknown.".format(collation))
 
     @classmethod
     def get_supported(cls):
