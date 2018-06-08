@@ -1795,16 +1795,11 @@ class BugOra16369511(tests.MySQLConnectorTests):
         cur.execute(sql, (self.data_file,))
         cur.execute("SELECT * FROM local_data")
 
-        if os.name != 'nt':
-            exp = [
-                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
-        else:
-            exp = [
-                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
-                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
-                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
+        exp = [
+            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
+
         self.assertEqual(exp, cur.fetchall())
 
     @cnx_config(compress=True)
@@ -1816,16 +1811,10 @@ class BugOra16369511(tests.MySQLConnectorTests):
         cur.execute(sql, (self.data_file,))
         cur.execute("SELECT * FROM local_data")
 
-        if os.name != 'nt':
-            exp = [
-                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
-        else:
-            exp = [
-                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
-                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
-                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
+        exp = [
+            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, cur.fetchall())
 
     @foreach_cnx()

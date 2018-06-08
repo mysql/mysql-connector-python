@@ -39,6 +39,7 @@ import socket
 import logging
 import uuid
 import platform
+import os
 
 from functools import wraps
 
@@ -172,13 +173,27 @@ class SocketStream(object):
 
         self._socket = context.wrap_socket(self._socket)
         if ssl_mode == SSLMode.VERIFY_IDENTITY:
-            try:
-                hostname = socket.gethostbyaddr(self._host)
-                ssl.match_hostname(self._socket.getpeercert(), hostname[0])
-            except ssl.CertificateError as err:
+            hostnames = []
+            # Windows does not return loopback aliases on gethostbyaddr
+            if os.name == 'nt' and (self._host == 'localhost' or \
+               self._host == '127.0.0.1'):
+                hostnames = ['localhost', '127.0.0.1']
+            aliases = socket.gethostbyaddr(self._host)
+            hostnames.extend([aliases[0]] + aliases[1])
+            match_found = False
+            errs = []
+            for hostname in hostnames:
+                try:
+                    ssl.match_hostname(self._socket.getpeercert(), hostname)
+                except ssl.CertificateError as err:
+                    errs.append(err)
+                else:
+                    match_found = True
+                    break
+            if not match_found:
                 self.close()
                 raise InterfaceError("Unable to verify server identity: {}"
-                                     "".format(err))
+                                     "".format(", ".join(errs)))
         self._is_ssl = True
 
     def is_ssl(self):
