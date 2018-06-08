@@ -740,8 +740,8 @@ class ModifyStatement(FilterableStatement):
         return self
 
     def patch(self, doc):
-        """Inserts a value into a specific position in an array attribute in
-        documents of a collection.
+        """Takes a :class:`mysqlx.DbDoc`, string JSON format or a dict with the
+        changes and applies it on all matching documents.
 
         Args:
             doc (object): A generic document (DbDoc), string in JSON format or
