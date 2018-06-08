@@ -81,13 +81,13 @@ To install Connector/Python from a tar archive, download the latest version (den
 
    shell> tar xzf mysql-connector-python-<version>.tar.gz
    shell> cd mysql-connector-python-<version>.tar.gz
-   shell> python setup.py --with-protobuf-include-dir=<protobuf-include-dir> --with-protobuf-lib-dir=<protobuf-lib-dir> --with-protoc=<protoc-binary>
+   shell> python setup.py install --with-protobuf-include-dir=<protobuf-include-dir> --with-protobuf-lib-dir=<protobuf-lib-dir> --with-protoc=<protoc-binary>
 
 To include the C Extension that interfaces with the MySQL C client library, add the ``--with-mysql-capi`` option:
 
 .. code-block:: bash
 
-   shell> python setup.py --with-protobuf-include-dir=<protobuf-include-dir> --with-protobuf-lib-dir=<protobuf-lib-dir> --with-protoc=<protoc-binary> --with-mysql-capi=<mysql-capi>
+   shell> python setup.py install --with-protobuf-include-dir=<protobuf-include-dir> --with-protobuf-lib-dir=<protobuf-lib-dir> --with-protoc=<protoc-binary> --with-mysql-capi=<mysql-capi>
 
 The argument to --with-mysql-capi is the path to the installation directory of either MySQL Connector/C or MySQL Server, or the path to the mysql_config command.
 
