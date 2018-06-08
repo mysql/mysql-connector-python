@@ -756,7 +756,7 @@ mytopy_string(const char *data, const unsigned long length,
         return NULL;
     }
 
-    if (!(flags & BINARY_FLAG) && use_unicode && strcmp(charset, "binary") != 0)
+    if (!((flags != NULL) & flags & BINARY_FLAG) && use_unicode && strcmp(charset, "binary") != 0)
     {
         return PyUnicode_Decode(data, length, charset, NULL);
     }

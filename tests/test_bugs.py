@@ -4216,7 +4216,7 @@ class BugOra21656282(tests.MySQLConnectorTests):
     """
     def setUp(self):
         config = tests.get_mysql_config()
-        self.cnx = connection.MySQLConnection(**config)
+        self.cnx = CMySQLConnection(**config)
         self.host = '127.0.0.1' if config['unix_socket'] and os.name != 'nt' \
                     else config['host']
         self.user = 'unicode_user'
@@ -4338,6 +4338,113 @@ class BugOra25397650(tests.MySQLConnectorTests):
         config['use_pure'] = False
 
         self._verify_cert(config)
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 39), "skip in older server")
+@unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+class Bug28133321(tests.MySQLConnectorTests):
+    """BUG#28133321: FIX INCORRECT COLUMNS NAMES REPRESENTING AGGREGATE
+    FUNCTIONS
+    """
+    tbl = "BUG28133321"
+
+    def setUp(self):
+        create_table = ("CREATE TABLE {} ("
+                        "  dish_id INT(11) UNSIGNED AUTO_INCREMENT UNIQUE KEY,"
+                        "  category TEXT,"
+                        "  dish_name TEXT,"
+                        "  price FLOAT,"
+                        "  servings INT,"
+                        "  order_time TIME) CHARACTER SET utf8"
+                        " COLLATE utf8_general_ci")
+        config = tests.get_mysql_config()
+        cnx = CMySQLConnection(**config)
+
+        try:
+            cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        except:
+            pass
+        cnx.cmd_query(create_table.format(self.tbl))
+
+        cur = cnx.cursor(dictionary=True)
+        insert_stmt = ('INSERT INTO {} ('
+                       '  category, dish_name, price, servings, order_time'
+                       ') VALUES ("{{}}", "{{}}", {{}}, {{}}, "{{}}")'
+                       ).format(self.tbl)
+        values = [("dinner", "lassanya", 10.53, "2", "00:10"),
+                  ("dinner", "hamburger", 9.35, "1", "00:15"),
+                  ("dinner", "hamburger whit fries", 10.99, "2", "00:20"),
+                  ("dinner", "Pizza", 9.99, "4", "00:30"),
+                  ("dessert", "cheescake", 4.95, "1", "00:05"),
+                  ("dessert", "cheescake special", 5.95, "2", "00:05")]
+
+        for value in values:
+            cur.execute(insert_stmt.format(*value))
+        cnx.close()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        cnx = CMySQLConnection(**config)
+        try:
+            cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        except:
+            pass
+        cnx.close()
+
+    def test_columns_name_are_not_bytearray(self):
+        sql_statement = ["SELECT",
+                         "  dish_id,",
+                         "  category,",
+                         "  JSON_OBJECTAGG(category, dish_name) as special,",
+                         "  JSON_ARRAYAGG(dish_name) as dishes,",
+                         "  GROUP_CONCAT(dish_name) as dishes2,",
+                         "  price,",
+                         "  servings,",
+                         "  ROUND(AVG(price)) AS round_avg_price,",
+                         "  AVG(price) AS avg_price,",
+                         "  MIN(price) AS min_price,",
+                         "  MAX(price) AS max_price,",
+                         "  MAX(order_time) AS preparation_time,",
+                         "  STD(servings) as deviation,",
+                         "  SUM(price) AS sum,",
+                         "  VARIANCE(price) AS var,",
+                         "  COUNT(DISTINCT servings) AS cd_servings,",
+                         "  COUNT(servings) AS c_servings ",
+                         "FROM {} ",
+                         "GROUP BY category"]
+        # Remove JSON functions when testing againsts server version < 5.7.22
+        # JSON_OBJECTAGG JSON_ARRAYAGG were introduced on 5.7.22
+        if tests.MYSQL_VERSION < (5, 7, 22):
+            sql_statement.pop(3)
+            sql_statement.pop(3)
+        sql_statement = "".join(sql_statement)
+        config = tests.get_mysql_config()
+        cnx = CMySQLConnection(**config)
+
+        cur = cnx.cursor(dictionary=True)
+        cur.execute(sql_statement.format(self.tbl))
+        rows = cur.fetchall()
+        col_names = [x[0] for x in cur.description]
+
+        for row in rows:
+            for col, val in row.items():
+                self.assertTrue(isinstance(col, STRING_TYPES),
+                                "The columns name {} is not a string type"
+                                "".format(col))
+                self.assertFalse(isinstance(col, (bytearray)),
+                                "The columns name {} is a bytearray type"
+                                "".format(col))
+                self.assertFalse(isinstance(val, (bytearray)),
+                                "The value {} of column {} is a bytearray type"
+                                "".format(val, col))
+
+        for col_name in col_names:
+            self.assertTrue(isinstance(col_name, STRING_TYPES),
+                            "The columns name {} is not a string type"
+                            "".format(col_name))
+            self.assertFalse(isinstance(col_name, (bytearray)),
+                            "The columns name {} is a bytearray type"
+                            "".format(col_name))
 
 
 class BugOra21947091(tests.MySQLConnectorTests):
