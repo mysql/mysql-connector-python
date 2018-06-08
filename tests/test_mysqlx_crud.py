@@ -2127,8 +2127,21 @@ class MySQLxTableTests(tests.MySQLxTests):
         table = self.schema.get_table("test")
         result = table.select().execute()
 
-        self.assertEqual("Fred", result.fetch_one()["name"])
-        self.assertEqual("Barney", result.fetch_one()["name"])
+        row = result.fetch_one()
+        # Test access by column name and index
+        self.assertEqual("Fred", row["name"])
+        self.assertEqual("Fred", row[1])
+        # Test if error is raised with negative indexes and out of bounds
+        self.assertRaises(IndexError, row.__getitem__, -1)
+        self.assertRaises(IndexError, row.__getitem__, -2)
+        self.assertRaises(IndexError, row.__getitem__, -3)
+        self.assertRaises(IndexError, row.__getitem__, 3)
+        # Test if error is raised with an invalid column name
+        self.assertRaises(ValueError, row.__getitem__, "last_name")
+
+        row = result.fetch_one()
+        self.assertEqual("Barney", row["name"])
+        self.assertEqual("Barney", row[1])
         self.assertEqual(None, result.fetch_one())
 
         drop_table(self.schema, "test")

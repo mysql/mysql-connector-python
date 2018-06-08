@@ -180,12 +180,12 @@ class Schema(DatabaseObject):
         rows.fetch_all()
         collections = []
         for row in rows:
-            if row.get_string("type") != "COLLECTION":
+            if row["type"] != "COLLECTION":
                 continue
             try:
-                collection = Collection(self, row.get_string("TABLE_NAME"))
+                collection = Collection(self, row["TABLE_NAME"])
             except ValueError:
-                collection = Collection(self, row.get_string("name"))
+                collection = Collection(self, row["name"])
             collections.append(collection)
         return collections
 
@@ -209,11 +209,11 @@ class Schema(DatabaseObject):
         tables = []
         object_types = ("TABLE", "VIEW",)
         for row in rows:
-            if row.get_string("type") in object_types:
+            if row["type"] in object_types:
                 try:
-                    table = Table(self, row.get_string("TABLE_NAME"))
+                    table = Table(self, row["TABLE_NAME"])
                 except ValueError:
-                    table = Table(self, row.get_string("name"))
+                    table = Table(self, row["name"])
                 tables.append(table)
         return tables
 

@@ -753,7 +753,7 @@ class Row(object):
     """Represents a row element returned from a SELECT query.
 
     Args:
-        rs (mysqlx.Result): The Result set.
+        rs (mysqlx.SqlResult or mysqlx.RowResult): The result set.
         fields (`list`): The list of fields.
     """
     def __init__(self, rs, fields):
@@ -761,17 +761,26 @@ class Row(object):
         self._resultset = rs
 
     def __getitem__(self, index):
-        if isinstance(index, STRING_TYPES):
-            index = self._resultset.index_of(index)
-        elif index >= len(self._fields):
-            raise IndexError("Index out of range")
-        return self._fields[index]
+        """Returns the value of a column by name or index.
 
+        .. versionchanged:: 8.0.12
+        """
+        int_index = self._resultset.index_of(index) \
+            if isinstance(index, STRING_TYPES) else index
+        if int_index == -1 and isinstance(index, STRING_TYPES):
+            raise ValueError("Column name '{0}' not found".format(index))
+        elif int_index >= len(self._fields) or int_index < 0:
+            raise IndexError("Index out of range")
+        return self._fields[int_index]
+
+    @deprecated("8.0.12")
     def get_string(self, str_index):
         """Returns the value using the column name.
 
         Args:
             str_index (str): The column name.
+
+        .. deprecated:: 8.0.12
         """
         int_index = self._resultset.index_of(str_index)
         if int_index >= len(self._fields):
@@ -986,7 +995,7 @@ class BufferingResult(BaseResult):
         for col in self._columns:
             if col.get_column_name() == col_name:
                 return index
-            index = index + 1
+            index += 1
         return -1
 
     def fetch_one(self):
