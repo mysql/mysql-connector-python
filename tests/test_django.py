@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -276,17 +276,6 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         exp = self.conn.get_server_version()
         self.assertEqual(exp, self.cnx.mysql_version)
 
-        value = datetime.time(2, 5, 7)
-        exp = self.conn.converter._time_to_mysql(value)
-        self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
-
-        self.cnx.connection = None
-        value = datetime.time(2, 5, 7)
-        exp = self.conn.converter._time_to_mysql(value)
-        self.assertEqual(exp, self.cnx.ops.value_to_db_time(value))
-
-
-
     def test_signal(self):
         from django.db import connection
 
@@ -329,6 +318,7 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
 
     def setUp(self):
         dbconfig = tests.get_mysql_config()
+        dbconfig['use_pure'] = True
         self.conn = mysql.connector.connect(**dbconfig)
         self.cnx = DatabaseWrapper(settings.DATABASES['default'])
         self.dbo = DatabaseOperations(self.cnx)
@@ -412,7 +402,7 @@ class BugOra20106629(tests.MySQLConnectorTests):
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
         self.cur.execute("CREATE TABLE {0}(col1 TEXT, col2 BLOB)".format(self.tbl), ())
 
-    def teardown(self):
+    def tearDown(self):
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
 
     def test_safe_string(self):

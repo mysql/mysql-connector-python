@@ -465,6 +465,8 @@ class MySQLConverter(MySQLConverterBase):
         """
         Returns DATE column type as datetime.date type.
         """
+        if isinstance(value, datetime.date):
+            return value
         try:
             parts = value.split(b'-')
             return datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
@@ -501,6 +503,8 @@ class MySQLConverter(MySQLConverterBase):
         """
         Returns DATETIME column type as datetime.datetime type.
         """
+        if isinstance(value, datetime.datetime):
+            return value
         datetime_val = None
         try:
             (date_, time_) = value.split(b' ')
@@ -592,7 +596,7 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.SET:
                 return self._SET_to_python(value, dsc)
             if dsc[7] & FieldFlag.BINARY:
-                if self.charset != 'binary':
+                if self.charset != 'binary' and not isinstance(value, str):
                     try:
                         return value.decode(self.charset)
                     except (LookupError, UnicodeDecodeError):
@@ -614,7 +618,7 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.SET:
                 return self._SET_to_python(value, dsc)
             if dsc[7] & FieldFlag.BINARY:
-                if self.charset != 'binary':
+                if self.charset != 'binary' and not isinstance(value, str):
                     try:
                         return value.decode(self.charset)
                     except (LookupError, UnicodeDecodeError):
@@ -637,6 +641,8 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[7] & FieldFlag.BINARY:
                 if PY2:
                     return value
+                elif isinstance(value, str):
+                    return bytes(value, self.charset)
                 return bytes(value)
 
         return self._STRING_to_python(value, dsc)

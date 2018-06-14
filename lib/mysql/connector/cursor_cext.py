@@ -509,7 +509,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         if size and self._cnx.unread_result:
             rows.extend(self._cnx.get_rows(size)[0])
 
-        if rows:
+        if size and self._cnx.unread_result:
             self._nextrow = self._cnx.get_row()
             if self._nextrow and not self._nextrow[0] and \
                not self._cnx.more_results:

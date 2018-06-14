@@ -385,6 +385,15 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
                         "Fetching next 3 rows test failed.")
         self.assertEqual([], cur.fetchmany())
 
+        # Fetch more than we have.
+        cur.execute(stmt_select)
+        rows = cur.fetchmany(100)
+        exp = [(10, '1000'), (9, '900'), (8, '800'), (7, '700'),
+               (6, '600'), (5, '500'), (4, '400'),
+               (3, '300'), (2, '200'), (1, '100')]
+        self.assertTrue(tests.cmp_result(exp, rows),
+                        "Fetching next 3 rows test failed.")
+
         cur.close()
 
     def test_fetchall(self):
