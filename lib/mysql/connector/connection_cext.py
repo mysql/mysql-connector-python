@@ -341,7 +341,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 None,
                 None,
                 ~int(col[9]) & FieldFlag.NOT_NULL,
-                int(col[9])
+                int(col[9]),
+                int(col[6])
             ))
 
         return {

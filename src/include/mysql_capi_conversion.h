@@ -71,7 +71,7 @@ mytopy_bit(const char *data, const unsigned long length);
 
 PyObject*
 mytopy_string(const char *data, const unsigned long length,
-              const unsigned long flags, const char *charset,
+              const unsigned long charset_id, const char *charset_out,
               unsigned int use_unicode);
 
 #endif /* MYCONNPY_MYSQL_CAPI_CONVERSION_H */

@@ -2316,7 +2316,7 @@ MySQL_fetch_row(MySQL *self)
 	unsigned long *field_lengths;
 	unsigned int num_fields;
 	unsigned int i;
-	unsigned long field_type, field_flags;
+	unsigned long field_type, field_flags, field_charset_id;
 	const char *charset= NULL;
 
     CHECK_SESSION(self);
@@ -2393,6 +2393,7 @@ MySQL_fetch_row(MySQL *self)
 
         field_type= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 8));
         field_flags= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 9));
+        field_charset_id= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 6));
 
         // Convert MySQL values to Python objects
         if (field_type == MYSQL_TYPE_TINY ||
@@ -2424,7 +2425,7 @@ MySQL_fetch_row(MySQL *self)
                  field_type == MYSQL_TYPE_ENUM ||
                  field_type == MYSQL_TYPE_VAR_STRING)
         {
-            value= mytopy_string(row[i], field_lengths[i], field_flags,
+            value= mytopy_string(row[i], field_lengths[i], field_charset_id,
                                   charset, self->use_unicode);
             if (!value)
             {
@@ -2487,7 +2488,7 @@ MySQL_fetch_row(MySQL *self)
         }
         else if (field_type == MYSQL_TYPE_BLOB)
         {
-            value= mytopy_string(row[i], field_lengths[i], field_flags,
+            value= mytopy_string(row[i], field_lengths[i], field_charset_id,
                                   charset, self->use_unicode);
             PyTuple_SET_ITEM(result_row, i, value);
         }
@@ -2500,7 +2501,7 @@ MySQL_fetch_row(MySQL *self)
     	else
     	{
     	    // Do our best to convert whatever we got from MySQL to a str/bytes
-            value = mytopy_string(row[i], field_lengths[i], field_flags,
+            value = mytopy_string(row[i], field_lengths[i], field_charset_id,
                                   charset, self->use_unicode);
     		PyTuple_SET_ITEM(result_row, i, value);
     	}

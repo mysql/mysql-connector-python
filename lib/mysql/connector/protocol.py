@@ -250,7 +250,7 @@ class MySQLProtocol(object):
         (packet, _) = utils.read_lc_string(packet)  # org_name
 
         try:
-            (_, _, field_type,
+            (charset_id, _, field_type,
              flags, _) = struct_unpack('<xHIBHBxx', packet)
         except struct.error:
             raise errors.InterfaceError("Failed parsing column information")
@@ -264,6 +264,7 @@ class MySQLProtocol(object):
             None,  # scale
             ~flags & FieldFlag.NOT_NULL,  # null_ok
             flags,  # MySQL specific
+            charset_id,  # field character set
         )
 
     def parse_eof(self, packet):

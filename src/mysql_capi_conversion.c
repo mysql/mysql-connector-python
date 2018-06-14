@@ -729,25 +729,25 @@ pytomy_decimal(PyObject *obj)
 
   @param    data        string to be converted
   @param    length      length of data
-  @param    flags       field flags
-  @param    charset     character used for decoding
+  @param    charset_id  character set of field
+  @param    charset_out character used for decoding
   @param    use_unicode return Unicode
 
   @return   Converted string
-    @retval PyUnicode   if not BINARY_FLAG
+    @retval PyUnicode   if binary charset_id
     @retval PyBytes     Python v3 if not use_unicode
     @retval PyString    Python v2 if not use_unicode
     @retval NULL    Exception
  */
 PyObject*
 mytopy_string(const char *data, const unsigned long length,
-              const unsigned long flags, const char *charset,
+              const unsigned long charset_id, const char *charset_out,
               unsigned int use_unicode)
 {
-    if (!charset || !data) {
+    if (!charset_out || !data) {
         printf("\n==> here ");
-        if (charset) {
-            printf(" charset:%s", charset);
+        if (charset_out) {
+            printf(" charset:%s", charset_out);
         }
         if (data) {
             printf(" data:'%s'", data);
@@ -756,9 +756,10 @@ mytopy_string(const char *data, const unsigned long length,
         return NULL;
     }
 
-    if (!(flags & BINARY_FLAG) && use_unicode && strcmp(charset, "binary") != 0)
+    // 63 designates binary character set for field
+    if (63 != charset_id && use_unicode && strcmp(charset_out, "binary") != 0)
     {
-        return PyUnicode_Decode(data, length, charset, NULL);
+        return PyUnicode_Decode(data, length, charset_out, NULL);
     }
     else
     {

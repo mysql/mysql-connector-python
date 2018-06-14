@@ -591,7 +591,7 @@ class MySQLConverter(MySQLConverterBase):
             # Check if we deal with a SET
             if dsc[7] & FieldFlag.SET:
                 return self._SET_to_python(value, dsc)
-            if dsc[7] & FieldFlag.BINARY:
+            if dsc[8] == 63:
                 if self.charset != 'binary':
                     try:
                         return value.decode(self.charset)
@@ -613,7 +613,8 @@ class MySQLConverter(MySQLConverterBase):
             # Check if we deal with a SET
             if dsc[7] & FieldFlag.SET:
                 return self._SET_to_python(value, dsc)
-            if dsc[7] & FieldFlag.BINARY:
+            # Binary field character set
+            if dsc[8] == 63:
                 if self.charset != 'binary':
                     try:
                         return value.decode(self.charset)
@@ -634,7 +635,7 @@ class MySQLConverter(MySQLConverterBase):
     def _BLOB_to_python(self, value, dsc=None):  # pylint: disable=C0103
         """Convert BLOB data type to Python"""
         if dsc is not None:
-            if dsc[7] & FieldFlag.BINARY:
+            if dsc[8] == 63:
                 if PY2:
                     return value
                 return bytes(value)
