@@ -129,6 +129,9 @@ class BaseMySQLSocket(object):
         except (socket.error, AttributeError):
             pass
 
+    def __del__(self):
+        self.shutdown()
+
     def send_plain(self, buf, packet_number=None,
                    compressed_packet_number=None):
         """Send packets to the MySQL server"""
