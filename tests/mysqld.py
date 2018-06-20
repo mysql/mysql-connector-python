@@ -106,7 +106,9 @@ def process_running(pid):
         for name, apid, _ in lines:
             name = name.decode('utf-8')
             if name == EXEC_MYSQLD and pid == int(apid):
+                LOGGER.debug("Process %d is running.", pid)
                 return True
+        LOGGER.debug("Process %d not running.", pid)
         return False
 
     # We are on a UNIX-like system
@@ -328,12 +330,11 @@ class MySQLServerBase(object):
         except (OSError, ValueError) as err:
             raise MySQLServerError(err)
 
-    def _stop_server(self):
+    def _stop_server(self, pid=None):
         """Stop the MySQL server"""
-        if not self._process:
-            return False
+        pid = pid if pid is not None else get_pid(self._pid_file)
         try:
-            process_terminate(self._process.pid)
+            process_terminate(pid)
         except (OSError, ValueError) as err:
             raise MySQLServerError(err)
 
@@ -646,6 +647,7 @@ class MySQLServer(MySQLServerBase):
             sys.exit(1)
 
     def start(self, **kwargs):
+        LOGGER.debug("Attempting to start MySQL server %s", self.name)
         if self.check_running():
             LOGGER.error("MySQL server '{name}' already running".format(
                 name=self.name))
@@ -691,23 +693,31 @@ class MySQLServer(MySQLServerBase):
         """
         pid = get_pid(self._pid_file)
         if not pid:
+            LOGGER.error("Process id not found, unable to stop MySQL server.")
             return
-        try:
-            if not self._stop_server():
-                process_terminate(pid)
-        except (MySQLServerError, OSError) as err:
-            if self._debug is True:
-                raise
-            LOGGER.error("Failed stopping MySQL server '{name}': "
-                         "{error}".format(error=str(err), name=self._name))
-            sys.exit(1)
-        else:
-            time.sleep(3)
+        LOGGER.debug("Attempting to stop MySQL server %s (pid=%s).",
+                     self._name, pid)
+        tries = 5
+        while tries > 0:
+            try:
+                self._stop_server(pid)
+            except (MySQLServerError, OSError) as err:
+                LOGGER.error("Failed stopping MySQL server '{name}': "
+                             "{error}".format(error=str(err), name=self._name))
+                if self._debug is True:
+                    raise
+                sys.exit(1)
+            else:
+                LOGGER.debug("Waiting for MySQL server to stop...")
+                time.sleep(1)
+                if not self.check_running(pid):
+                    LOGGER.debug("MySQL server stopped '{name}' "
+                                 "(pid={pid})".format(pid=pid, name=self._name))
+                    return True
+            tries =- 1
 
-        if self.check_running(pid):
-            LOGGER.debug("MySQL server stopped '{name}' "
-                        "(pid={pid})".format(pid=pid, name=self._name))
-            return True
+        LOGGER.error("Failed stopping MySQL server '{name}': "
+                     "{error}".format(error=str(err), name=self._name))
 
         return False
 
@@ -734,7 +744,7 @@ class MySQLServer(MySQLServerBase):
         """
         pid = pid or get_pid(self._pid_file)
         if pid:
-            LOGGER.debug("Got PID %d", pid)
+            LOGGER.debug("Checking PID %d", pid)
             return process_running(pid)
 
         return False
