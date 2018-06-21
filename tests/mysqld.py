@@ -716,8 +716,8 @@ class MySQLServer(MySQLServerBase):
                     return True
             tries =- 1
 
-        LOGGER.error("Failed stopping MySQL server '{name}': "
-                     "{error}".format(error=str(err), name=self._name))
+        LOGGER.error("Failed stopping MySQL server '{name}' (pid={pid})"
+                     "".format(name=self._name, pid=pid))
 
         return False
 
