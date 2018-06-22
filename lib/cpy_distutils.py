@@ -74,6 +74,8 @@ CEXT_STATIC_OPTIONS = [
 INSTALL_OPTIONS = [
     ('byte-code-only=', None,
      "Remove Python .py files; leave byte code .pyc only"),
+    ('is-wheel', None,
+     "Install beehaves as wheel package requires"),
 ]
 
 
@@ -330,6 +332,7 @@ class BuildExtDynamic(build_ext):
         if not self.with_mysql_capi or not is_wheel:
             return
 
+        log.info("Copying vendor files (dll libraries)")
         data_files = []
         vendor_libs = []
 
@@ -890,7 +893,7 @@ class Install(install):
     user_options = install.user_options + CEXT_OPTIONS + INSTALL_OPTIONS + \
                    CEXT_STATIC_OPTIONS
 
-    boolean_options = ['byte-code-only', 'static']
+    boolean_options = ['byte-code-only', 'static', 'is-wheel']
     need_ext = False
 
     def initialize_options(self):

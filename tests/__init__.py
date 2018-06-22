@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import errno
 import traceback
+from distutils.dist import Distribution
 from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
@@ -825,12 +826,21 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
         'clean', '--all',  # necessary for removing the build/
     ]
 
+    dist = Distribution()
+    cmd_build = dist.get_command_obj('build')
+    cmd_build.ensure_finalized()
+
     cmd.extend([
         'install',
         '--root', install_dir,
         '--install-lib', '.',
         '--static',
+        '--is-wheel'
     ])
+    if os.name == 'nt':
+        cmd.extend([
+            '--install-data', cmd_build.build_platlib
+        ])
 
     if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
         cmd.extend([
@@ -848,6 +858,7 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
     if extra_link_args:
         cmd.extend(['--extra-link-args', extra_link_args])
 
+    LOGGER.debug("Installing command: {0}".format(cmd))
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                            cwd=root_dir)
