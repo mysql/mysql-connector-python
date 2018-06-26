@@ -5070,6 +5070,86 @@ class BugOra27650437(tests.MySQLConnectorTests):
         cur_pure_buffered.close()
         cur_cext_buffered.close()
 
+    def test_cursor_dictionary(self):
+        """Test results from cursor buffered are the same in pure or c-ext"""
+        cur_pure_dictionary = self.cnx_pure.cursor(dictionary=True)
+        cur_cext_dictionary = self.cnx_cext.cursor(dictionary=True)
+        self._test_fetchone(cur_pure_dictionary, cur_cext_dictionary)
+        self._test_fetchmany(cur_pure_dictionary, cur_cext_dictionary)
+        self._test_fetch_fetchall(cur_pure_dictionary, cur_cext_dictionary)
+        cur_pure_dictionary.close()
+        cur_cext_dictionary.close()
+
+    def test_cursor_dictionary_buf(self):
+        """Test results from cursor buffered are the same in pure or c-ext"""
+        cur_pure = self.cnx_pure.cursor(dictionary=True,
+                                                   buffered=True)
+        cur_cext = self.cnx_cext.cursor(dictionary=True,
+                                                   buffered=True)
+        self._test_fetchone(cur_pure, cur_cext)
+        self._test_fetchmany(cur_pure, cur_cext)
+        self._test_fetch_fetchall(cur_pure, cur_cext)
+        cur_pure.close()
+        cur_cext.close()
+
+
+class BugOra28239074(tests.MySQLConnectorTests):
+    """BUG#28239074: CURSOR DICTIONARY DOES NOT RETURN DICTIONARY TYPE RESULTS
+    """
+    table = "bug28239074"
+
+    def setUp(self):
+        config_pure = tests.get_mysql_config()
+        config_pure["use_pure"] = True
+        self.cnx = mysql.connector.connect(**config_pure)
+        cur = self.cnx.cursor(dictionary=True)
+
+        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
+        cur.execute("CREATE TABLE {0}(a char(50) ,b int) "
+                                    "DEFAULT CHARSET utf8".format(self.table))
+        data = [(chr(1), 1),('s', 2),(chr(120), 3),(chr(121), 4),(chr(127), 5)]
+        cur.executemany("INSERT INTO {0} (a, b) VALUES "
+                                        "(%s, %s)".format(self.table), data)
+
+    def tearDown(self):
+        self.cnx.cmd_query("DROP TABLE IF EXISTS {}".format(self.table))
+        self.cnx.close()
+
+    def test_cursor_dict(self):
+        exp = [
+            {u'a': u'\x01', u'b': 1},
+            {u'a': u's', u'b': 2},
+            {u'a': u'\x78', u'b': 3},
+            {u'a': u'\x79', u'b': 4},
+            {u'a': u'\x7f', u'b': 5}
+        ]
+        cur = self.cnx.cursor(dictionary=True)
+
+        # Test fetchone
+        cur.execute("SELECT * FROM {}".format(self.table))
+        i = 0
+        row = cur.fetchone()
+        while row is not None:
+            self.assertTrue(isinstance(row, dict))
+            self.assertEqual(exp[i], row, "row {} is not equal to expected row"
+                             " {}".format(row, exp[i]))
+            row = cur.fetchone()
+            i += 1
+
+        # Test fetchall
+        cur.execute("SELECT * FROM {}".format(self.table))
+        rows = cur.fetchall()
+        self.assertEqual(exp, rows, "rows {} is not equal to expected row")
+
+        # Test for each in cursor
+        cur.execute("SELECT * FROM {}".format(self.table))
+        i = 0
+        for row in cur:
+            self.assertTrue(isinstance(row, dict))
+            self.assertEqual(exp[i], row, "row {} is not equal to expected row"
+                             " {}".format(row, exp[i]))
+            i += 1
+
 
 class BugOra27364914(tests.MySQLConnectorTests):
     """BUG#27364914: CURSOR PREPARED STATEMENTS DO NOT CONVERT STRINGS
