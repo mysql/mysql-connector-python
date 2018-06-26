@@ -544,7 +544,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._cmysql.consume_result()
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=33):
+                        charset=45):
         """Change the current logged in user"""
         try:
             self._cmysql.change_user(username, password, database)

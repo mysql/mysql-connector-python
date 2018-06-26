@@ -296,11 +296,11 @@ class CMySQLCursor(MySQLCursorAbstract):
                 "Failed rewriting statement for multi-row INSERT. "
                 "Check SQL syntax."
             )
-        fmt = matches.group(1).encode(self._cnx.charset)
+        fmt = matches.group(1).encode(self._cnx.python_charset)
         values = []
 
         try:
-            stmt = operation.encode(self._cnx.charset)
+            stmt = operation.encode(self._cnx.python_charset)
             for params in seq_params:
                 tmp = fmt
                 prepared = self._cnx.prepare_for_mysql(params)

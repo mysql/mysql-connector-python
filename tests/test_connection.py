@@ -148,7 +148,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'converter': None,
             '_converter_class': MySQLConverter,
             '_client_flags': constants.ClientFlag.get_default(),
-            '_charset_id': 33,
+            '_charset_id': 45,
             '_user': '',
             '_password': '',
             '_database': '',
@@ -760,7 +760,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'username': 'ham',
             'password': 'spam',
             'database': 'test',
-            'charset': 33,
+            'charset': 45,
             'client_flags': flags,
         }
 
@@ -806,7 +806,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'username': 'ham',
             'password': 'spam',
             'database': 'test',
-            'charset': 33,
+            'charset': 45,
             'client_flags': flags,
             'ssl_options': {
                 'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
@@ -892,7 +892,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'username': 'ham',
             'password': 'spam',
             'database': 'test',
-            'charset': 33,
+            'charset': 45,
             'client_flags': flags,
             'ssl_options': {
                 'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
@@ -1030,8 +1030,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                               constants.ClientFlag.COMPRESS)
 
         # Test character set
-        # utf8 is default, which is mapped to 33
-        self.assertEqual(33, cnx._charset_id)
+        # utf8mb4 is default, which is mapped to 45
+        self.assertEqual(45, cnx._charset_id)
         cnx.config(charset='latin1')
         self.assertEqual(8, cnx._charset_id)
         cnx.config(charset='latin1', collation='latin1_general_ci')
@@ -1150,12 +1150,12 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test__post_connection(self):
         """Executes commands after connection has been established"""
-        self.cnx._charset_id = 33
+        self.cnx._charset_id = 45
         self.cnx._autocommit = True
         self.cnx._time_zone = "-09:00"
         self.cnx._sql_mode = "STRICT_ALL_TABLES"
         self.cnx._post_connection()
-        self.assertEqual('utf8', self.cnx.charset)
+        self.assertEqual('utf8mb4', self.cnx.charset)
         self.assertEqual(self.cnx._autocommit, self.cnx.autocommit)
         self.assertEqual(self.cnx._time_zone, self.cnx.time_zone)
         self.assertEqual(self.cnx._sql_mode, self.cnx.sql_mode)

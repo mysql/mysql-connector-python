@@ -77,7 +77,7 @@ class MySQLProtocol(object):
         return auth_response
 
     def make_auth(self, handshake, username=None, password=None, database=None,
-                  charset=33, client_flags=0,
+                  charset=45, client_flags=0,
                   max_allowed_packet=1073741824, ssl_enabled=False,
                   auth_plugin=None):
         """Make a MySQL Authentication packet"""
@@ -113,7 +113,7 @@ class MySQLProtocol(object):
 
         return packet
 
-    def make_auth_ssl(self, charset=33, client_flags=0,
+    def make_auth_ssl(self, charset=45, client_flags=0,
                       max_allowed_packet=1073741824):
         """Make a SSL authentication packet"""
         return utils.int4store(client_flags) + \
@@ -133,7 +133,7 @@ class MySQLProtocol(object):
         return utils.int4store(statement_id) + utils.int4store(rows)
 
     def make_change_user(self, handshake, username=None, password=None,
-                         database=None, charset=33, client_flags=0,
+                         database=None, charset=45, client_flags=0,
                          ssl_enabled=False, auth_plugin=None):
         """Make a MySQL packet with the Change User command"""
 

@@ -44,7 +44,7 @@ DEFAULT_CONFIGURATION = {
     'port': 3306,
     'unix_socket': None,
     'use_unicode': True,
-    'charset': 'utf8',
+    'charset': 'utf8mb4',
     'collation': None,
     'converter_class': None,
     'autocommit': False,

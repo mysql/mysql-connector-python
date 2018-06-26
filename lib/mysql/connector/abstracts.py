@@ -49,7 +49,7 @@ class MySQLConnectionAbstract(object):
     def __init__(self, **kwargs):
         """Initialize"""
         self._client_flags = ClientFlag.get_default()
-        self._charset_id = 33
+        self._charset_id = 45
         self._sql_mode = None
         self._time_zone = None
         self._autocommit = False
@@ -955,7 +955,7 @@ class MySQLConnectionAbstract(object):
         raise NotImplementedError
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=33):
+                        charset=45):
         """Change the current logged in user"""
         raise NotImplementedError
 

@@ -14,6 +14,7 @@ v8.0.12
 - WL#11951: Consolidate discrepancies between pure and c extension
 - WL#11932: Remove Fabric support
 - WL#11898: Core API v1 alignment
+- BUG#28188883: Use utf8mb4 as the default character set
 - BUG#28133321: Fix incorrect columns names representing aggregate functions
 - BUG#27962293: Fix Django 2.0 and MySQL 8.0 compatibility issues
 - BUG#27567999: Fix wrong docstring in ModifyStatement.patch()

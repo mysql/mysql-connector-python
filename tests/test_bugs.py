@@ -4080,7 +4080,7 @@ class BugOra21476495(tests.MySQLConnectorTests):
         cursor = cnx.cursor(raw="true",buffered="true")
         cursor.execute("SHOW VARIABLES LIKE 'character_set_connection'")
         row = cursor.fetchone()
-        self.assertEqual(row[1], u"utf8")
+        self.assertEqual(row[1], u"utf8mb4")
         cursor.close()
 
         self.assertEqual(self.cnx._charset_id, old_val)
@@ -5298,3 +5298,31 @@ class BugOra27277937(tests.MySQLConnectorTests):
 
     def tearDown(self):
         pass
+
+
+class BugOra28188883(tests.MySQLConnectorTests):
+    """BUG#27277937: DEPRECATED UTF8 IS THE DEFAULT CHARACTER SET IN 8.0
+    """
+    def setUp(self):
+        # Remove charset from the connection configuration if is set, so the
+        # default charset 'utf8mb4' is used for each connection
+        self.config = tests.get_mysql_config().copy()
+        if "charset" in self.config:
+            del self.config
+
+    @foreach_cnx()
+    def test_utf8mb4_default_charset(self):
+        self.assertEqual(self.cnx.charset, "utf8mb4")
+        data = [(1, u'🐬'), (2, u'🐍'), (3, u'🐶')]
+        tbl = "BugOra28188883"
+        cur = self.cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
+        cur.execute("CREATE TABLE {0} (id INT, name VARCHAR(100)) "
+                    "DEFAULT CHARSET utf8mb4".format(tbl))
+        stmt = "INSERT INTO {0} (id, name) VALUES (%s, %s)".format(tbl)
+        cur.executemany(stmt, data)
+        cur.execute("SELECT id, name FROM {0}".format(tbl))
+        self.assertEqual(data, cur.fetchall())
+        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
+        cur.close()
+        self.cnx.close()
