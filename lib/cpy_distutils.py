@@ -1,5 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
 # MySQL Connector/Python is licensed under the terms of the GPLv2
 # <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>, like most
@@ -295,57 +295,6 @@ class BuildExtDynamic(build_ext):
         self.extra_link_args = None
         self.with_mysql_capi = None
 
-    def _get_posix_openssl_libs(self):
-        openssl_libs = []
-        try:
-            openssl_libs_path = os.path.join(self.with_mysql_capi, "lib")
-            openssl_libs.extend([
-                os.path.basename(glob(
-                    os.path.join(openssl_libs_path, "libssl.*.*.*"))[0]),
-                os.path.basename(glob(
-                    os.path.join(openssl_libs_path, "libcrypto.*.*.*"))[0])
-            ])
-        except IndexError:
-            log.error("Couldn't find OpenSSL libraries in libmysqlclient")
-        return openssl_libs
-
-    def _copy_vendor_libraries(self):
-        if not self.with_mysql_capi or self.distribution.data_files:
-            return
-
-        data_files = []
-        vendor_libs = []
-
-        if os.name == "nt":
-            mysql_capi = os.path.join(self.with_mysql_capi, "bin")
-            vendor_libs.append((mysql_capi, ["ssleay32.dll", "libeay32.dll"]))
-            vendor_folder = ""
-            # Bundle libmysql.dll
-            src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
-            dst = os.getcwd()
-            log.info("copying {0} -> {1}".format(src, dst))
-            shutil.copy(src, dst)
-            data_files.append("libmysql.dll")
-        else:
-            mysql_capi = os.path.join(self.with_mysql_capi, "lib")
-            vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
-            vendor_folder = "mysql-vendor"
-
-        if vendor_folder:
-            mkpath(os.path.join(os.getcwd(), vendor_folder))
-
-        # Copy vendor libraries to 'mysql-vendor' folder
-        log.info("Copying vendor libraries")
-        for src_folder, files in vendor_libs:
-            for filename in files:
-                data_files.append(os.path.join(vendor_folder, filename))
-                src = os.path.join(src_folder, filename)
-                dst = os.path.join(os.getcwd(), vendor_folder)
-                log.info("copying {0} -> {1}".format(src, dst))
-                shutil.copy(src, dst)
-        # Add data_files to distribution
-        self.distribution.data_files = [(vendor_folder, data_files)]
-
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
         """
@@ -469,8 +418,6 @@ class BuildExtDynamic(build_ext):
             ('extra_link_args', 'extra_link_args'),
             ('with_mysql_capi', 'with_mysql_capi'))
 
-        self._copy_vendor_libraries()
-
         build_ext.finalize_options(self)
 
         print("# Python architecture: {0}".format(py_arch))
@@ -524,8 +471,6 @@ class BuildExtDynamic(build_ext):
             # Add extra link args
             if self.extra_link_args and ext.name == "_mysql_connector":
                 extra_link_args = self.extra_link_args.split()
-                if platform.system() == "Linux":
-                    extra_link_args += ["-Wl,-rpath,$ORIGIN/mysql-vendor"]
                 ext.extra_link_args.extend(extra_link_args)
             # Add system headers
             for sysheader in sysheaders:
@@ -558,26 +503,6 @@ class BuildExtDynamic(build_ext):
             self.fix_compiler()
             self.real_build_extensions()
 
-            if platform.system() == "Darwin":
-                libssl, libcrypto = self._get_posix_openssl_libs()
-                cmd_libssl = [
-                    "install_name_tool", "-change", libssl,
-                    "@loader_path/mysql-vendor/{0}".format(libssl),
-                    build_ext.get_ext_fullpath(self, "_mysql_connector")
-                ]
-                log.info("Executing: {0}".format(" ".join(cmd_libssl)))
-                proc = Popen(cmd_libssl, stdout=PIPE, universal_newlines=True)
-                stdout, _ = proc.communicate()
-
-                cmd_libcrypto = [
-                    "install_name_tool", "-change", libcrypto,
-                    "@loader_path/mysql-vendor/{0}".format(libcrypto),
-                    build_ext.get_ext_fullpath(self, "_mysql_connector")
-                ]
-                log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
-                proc = Popen(cmd_libcrypto, stdout=PIPE, universal_newlines=True)
-                stdout, _ = proc.communicate()
-
 
 class BuildExtStatic(BuildExtDynamic):
 
@@ -586,8 +511,6 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
-        self._copy_vendor_libraries()
-
         install_obj = self.distribution.get_command_obj('install')
         install_obj.with_mysql_capi = self.with_mysql_capi
         install_obj.extra_compile_args = self.extra_compile_args
