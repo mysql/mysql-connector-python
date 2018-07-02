@@ -12,8 +12,6 @@ v2.1.8
 ======
 
 - WL#11680: Add caching_sha2_password authentication plugin
-- WL#11665: Allow OpenSSL linkage in the C extension
-- WL#11643: Update copyright source headers and license text
 - BUG#27945883: Fixes for failing unittest with MySQL latest versions
 - BUG#27371245: Connection fails on unsupported default's auth_plugin
 - BUG#26484601: Unable to connect to a server using other than TLSv1
