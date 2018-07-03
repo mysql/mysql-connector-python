@@ -5,6 +5,8 @@ import re
 from collections import namedtuple
 
 import django
+from django.db.models.indexes import Index
+
 if django.VERSION >= (1, 8):
     from django.db.backends.base.introspection import (
         BaseDatabaseIntrospection, FieldInfo, TableInfo
@@ -348,8 +350,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         # Now add in the indexes
         cursor.execute("SHOW INDEX FROM %s" % self.connection.ops.quote_name(
             table_name))
-        for table, non_unique, index, colseq, column in [x[:5] for x in
-                                                         cursor.fetchall()]:
+        for table, non_unique, index, colseq, column, type_ in [x[:5] + (x[10],) for x in cursor.fetchall()]:
             if index not in constraints:
                 constraints[index] = {
                     'columns': OrderedSet(),
@@ -360,6 +361,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     'foreign_key': None,
                 }
             constraints[index]['index'] = True
+            constraints[index]['type'] = Index.suffix if type_ == 'BTREE' else type_.lower()
             constraints[index]['columns'].add(column)
         # Convert the sorted sets to lists
         for constraint in constraints.values():
