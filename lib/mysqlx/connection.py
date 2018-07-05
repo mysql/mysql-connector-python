@@ -145,7 +145,7 @@ class SocketStream(object):
             self.close()
             raise RuntimeError("Python installation has no SSL support")
 
-        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
         context.load_default_certs()
 
         if ssl_ca:
