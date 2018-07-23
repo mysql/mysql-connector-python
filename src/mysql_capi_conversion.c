@@ -211,7 +211,8 @@ pytomy_timedelta(PyObject *obj)
 
     if (days < 0)
     {
-        for(int index = 31; index > 0; index--){
+        int index;
+        for(index = 31; index > 0; index--){
             fmt[index] = fmt[index - 1];
         }
         fmt[0] = '-';
