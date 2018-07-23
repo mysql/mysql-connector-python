@@ -171,9 +171,8 @@ pytomy_timedelta(PyObject *obj)
 {
     int days= 0, secs= 0 , micro_secs= 0, total_secs= 0;
     int hours= 0, mins= 0, remainder= 0;
-    char fmt[32]= "";
-    char result[17]= "";
-    char minus[1]= "";
+    char fmt[32]= {0};
+    char result[17]= {0};
 
     PyDateTime_IMPORT;
 
@@ -194,9 +193,11 @@ pytomy_timedelta(PyObject *obj)
 #pragma warning(push)
 // result of strncpy does not accept direct user input
 #pragma warning(disable: 4996)
+
+
     if (micro_secs)
     {
-        strncpy(fmt, "%s%02d:%02d:%02d.%06d", 21);
+        strncpy(fmt, "%02d:%02d:%02d.%06d", 19);
         if (days < 0)
         {
             micro_secs= 1000000 - micro_secs;
@@ -205,14 +206,17 @@ pytomy_timedelta(PyObject *obj)
     }
     else
     {
-        strncpy(fmt, "%s%02d:%02d:%02d", 16);
+        strncpy(fmt, "%02d:%02d:%02d", 14);
     }
-#pragma warning(pop)
 
     if (days < 0)
     {
-        minus[0]= '-';
+        for(int index = 31; index > 0; index--){
+            fmt[index] = fmt[index - 1];
+        }
+        fmt[0] = '-';
     }
+#pragma warning(pop)
 
     hours= total_secs / 3600;
     remainder= total_secs % 3600;
@@ -221,11 +225,11 @@ pytomy_timedelta(PyObject *obj)
 
     if (micro_secs)
     {
-        PyOS_snprintf(result, 17, fmt, minus, hours, mins, secs, micro_secs);
+        PyOS_snprintf(result, 17, fmt, hours, mins, secs, micro_secs);
     }
     else
     {
-        PyOS_snprintf(result, 17, fmt, minus, hours, mins, secs);
+        PyOS_snprintf(result, 17, fmt, hours, mins, secs);
     }
 
     return PyBytesFromString(result);
@@ -249,7 +253,7 @@ pytomy_timedelta(PyObject *obj)
 PyObject*
 pytomy_time(PyObject *obj)
 {
-    char result[17]= "";
+    char result[17]= {0};
 
     PyDateTime_IMPORT;
 
@@ -297,7 +301,7 @@ pytomy_time(PyObject *obj)
 PyObject*
 pytomy_datetime(PyObject *obj)
 {
-    char result[27]= "";
+    char result[27]= {0};
     PyDateTime_IMPORT;
 
     if (!obj || !PyDateTime_Check(obj))
@@ -328,7 +332,6 @@ pytomy_datetime(PyObject *obj)
                  PyDateTime_DATE_GET_MINUTE(obj),
                  PyDateTime_DATE_GET_SECOND(obj));
     }
-
     return PyBytesFromString(result);
 }
 
