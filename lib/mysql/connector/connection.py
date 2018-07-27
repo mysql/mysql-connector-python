@@ -64,7 +64,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._converter_class = MySQLConverter
 
         self._client_flags = ClientFlag.get_default()
-        self._charset_id = 33
+        self._charset_id = 45
         self._sql_mode = None
         self._time_zone = None
         self._autocommit = False
@@ -136,7 +136,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._handshake = handshake
 
     def _do_auth(self, username=None, password=None, database=None,
-                 client_flags=0, charset=33, ssl_options=None):
+                 client_flags=0, charset=45, ssl_options=None):
         """Authenticate with the MySQL server
 
         Authentication happens in two parts. We first send a response to the
@@ -686,7 +686,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         return self._handle_ok(self._send_cmd(ServerCmd.PING))
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=33):
+                        charset=45):
         """Change the current logged in user
 
         This method allows to change the current logged in user information.

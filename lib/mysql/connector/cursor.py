@@ -1315,7 +1315,9 @@ class MySQLCursorDict(MySQLCursor):
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
-        res = rows
+        res = []
+        for row in rows:
+            res.append(self._row_to_python(row, self.description))
         self._handle_eof(eof)
         rowcount = len(rows)
         if rowcount >= 0 and self._rowcount == -1:
