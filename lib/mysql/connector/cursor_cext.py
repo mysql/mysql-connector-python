@@ -205,11 +205,13 @@ class CMySQLCursor(MySQLCursorAbstract):
         while True:
             try:
                 if not self.nextset():
-                    raise StopIteration  # pylint: disable=R1708
+                    raise StopIteration
             except errors.InterfaceError as exc:
                 # Result without result set
                 if exc.errno != CR_NO_RESULT_SET:
                     raise
+            except StopIteration:
+                return
             i += 1
             try:
                 self._executed = executed_list[i].strip()

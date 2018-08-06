@@ -242,7 +242,9 @@ class MySQLServerBase(object):
                    afile == 'innodb_memcached_config.sql':
                     self._scriptdir = root
 
-        if not self._lc_messages_dir or not self._scriptdir:
+        version = self._get_version()
+        if not self._lc_messages_dir or (version < (8, 0, 13) and
+                                         not self._scriptdir):
             raise MySQLBootstrapError(
                 "errmsg.sys and mysql_system_tables.sql not found"
                 " under {0}".format(self._sharedir))
@@ -549,7 +551,7 @@ class MySQLServer(MySQLServerBase):
                 test_sql = open(self._init_sql, "w")
                 test_sql.write("\n".join(extra_sql))
                 test_sql.close()
-            else:
+            elif self._version < (8, 0, 13):
                 for filename in script_files:
                     full_path = os.path.join(self._scriptdir, filename)
                     LOGGER.debug("Reading SQL from '%s'", full_path)

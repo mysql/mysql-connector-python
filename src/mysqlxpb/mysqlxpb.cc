@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -667,7 +667,7 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
     PyObject* type_name_obj = PyDict_GetItemString(dict, kMessageTypeKey);
 
     if (type_name_obj && PyString_CheckExact(type_name_obj)) {
-      char* type_name = PyString_AsString(type_name_obj);
+      const char* type_name = PyString_AsString(type_name_obj);
       const google::protobuf::Descriptor* descriptor =
           MessageDescriptorByName(type_name);
 
@@ -682,7 +682,7 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
 
             while (PyDict_Next(dict, &pos, &key, &value)) {
               if (key && PyString_CheckExact(key)) {
-                char* key_name = PyString_AsString(key);
+                const char* key_name = PyString_AsString(key);
 
                 if (::strcmp(key_name, kMessageTypeKey) == 0)
                   continue;

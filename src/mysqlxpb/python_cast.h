@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -128,7 +128,7 @@ std::string python_cast<std::string>(PyObject* obj) {
 #ifdef PY3
   else if (PyUnicode_CheckExact(obj)) {
     Py_ssize_t len;
-    char* str = PyUnicode_AsUTF8AndSize(obj, &len);
+    const char* str = PyUnicode_AsUTF8AndSize(obj, &len);
     return std::string(str, len);
   } else if (PyBytes_CheckExact(obj)) {
     return std::string(PyBytes_AsString(obj), PyBytes_Size(obj));

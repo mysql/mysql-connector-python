@@ -498,16 +498,19 @@ class MySQLCursor(CursorBase):
 
         i = 0
         while True:
-            result = next(query_iter)  # pylint: disable=R1708
-            self._reset_result()
-            self._handle_result(result)
             try:
-                self._executed = executed_list[i].strip()
-                i += 1
-            except IndexError:
-                self._executed = executed_list[0]
+                result = next(query_iter)
+                self._reset_result()
+                self._handle_result(result)
+                try:
+                    self._executed = executed_list[i].strip()
+                    i += 1
+                except IndexError:
+                    self._executed = executed_list[0]
 
-            yield self
+                yield self
+            except StopIteration:
+                return
 
     def execute(self, operation, params=None, multi=False):
         """Executes the given operation
