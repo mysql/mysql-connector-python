@@ -31,14 +31,14 @@
 import re
 from . import constants
 
-from .compat import STRING_TYPES, urlparse, unquote, parse_qsl
+from .compat import INT_TYPES, STRING_TYPES, urlparse, unquote, parse_qsl
 from .connection import Session
 from .constants import Auth, LockContention, SSLMode
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 from .errors import (Error, InterfaceError, DatabaseError, NotSupportedError,
                      DataError, IntegrityError, ProgrammingError,
-                     OperationalError, InternalError, PoolError)
+                     OperationalError, InternalError, PoolError, TimeoutError)
 from .result import (Column, Row, Result, BufferingResult, RowResult,
                      SqlResult, DocResult, ColumnType)
 from .statement import (Statement, FilterableStatement, SqlStatement,
@@ -54,7 +54,8 @@ _SPLIT = re.compile(r',(?![^\(\)]*\))')
 _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
-                          "routers", "socket", "ssl-mode", "auth", "use-pure"]
+                          "routers", "socket", "ssl-mode", "auth", "use-pure",
+                          "connect-timeout"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -89,6 +90,7 @@ def _parse_address_list(path):
         routers.append(router)
 
     return {"routers": routers} if array else routers[0]
+
 
 def _parse_connection_uri(uri):
     """Parses the connection string and returns a dictionary with the
@@ -140,6 +142,7 @@ def _parse_connection_uri(uri):
             else:
                 settings[opt] = val_str
     return settings
+
 
 def _validate_settings(settings):
     """Validates the settings to be passed to a Session object
@@ -215,6 +218,7 @@ def _validate_hosts(settings):
     elif "host" in settings:
         settings["port"] = 33060
 
+
 def _get_connection_settings(*args, **kwargs):
     """Parses the connection string and returns a dictionary with the
     connection settings.
@@ -228,6 +232,9 @@ def _get_connection_settings(*args, **kwargs):
 
     Returns:
         mysqlx.Session: Session object.
+
+    Raises:
+        TypeError: If connection timeout is not a positive integer.
     """
     settings = {}
     if args:
@@ -245,8 +252,20 @@ def _get_connection_settings(*args, **kwargs):
     if not settings:
         raise InterfaceError("Settings not provided")
 
+    if "connect-timeout" in settings:
+        try:
+            if isinstance(settings["connect-timeout"], STRING_TYPES):
+                settings["connect-timeout"] = int(settings["connect-timeout"])
+            if not isinstance(settings["connect-timeout"], INT_TYPES) \
+               or settings["connect-timeout"] < 0:
+                raise ValueError
+        except ValueError:
+            raise TypeError("The connection timeout value must be a positive "
+                            "integer (including 0)")
+
     _validate_settings(settings)
     return settings
+
 
 def get_session(*args, **kwargs):
     """Creates a Session instance using the provided connection data.
@@ -278,7 +297,7 @@ __all__ = [
     # mysqlx.errors
     "Error", "InterfaceError", "DatabaseError", "NotSupportedError",
     "DataError", "IntegrityError", "ProgrammingError", "OperationalError",
-    "InternalError", "PoolError",
+    "InternalError", "PoolError", "TimeoutError",
 
     # mysqlx.result
     "Column", "Row", "Result", "BufferingResult", "RowResult",

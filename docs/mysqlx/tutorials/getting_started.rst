@@ -66,6 +66,12 @@ If ``ssl-ca`` option is set, only the following SSL Modes are allowed:
        'ssl-ca': '/path/to/ca.cert'
    })
 
+The connection settings accepts a connect timeout option ``connect-timeout``, which should be a non-negative integer that defines a time frame in milliseconds. The timeout will assume a default value of 10000 ms (10s) if a value is not provided. And can be disabled if it's value is set to 0, and in that case, the client will wait until the underlying socket (platform-dependent) times-out.
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060?connect-timeout=5000')
+
 Connector/Python has a C extension for `Protobuf <https://developers.google.com/protocol-buffers/>`_ message serialization, this C extension is enabled by default if available. It can be disabled by setting the ``use-pure`` option to :data:`True`.
 
 .. code-block:: python

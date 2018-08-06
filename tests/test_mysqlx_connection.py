@@ -36,6 +36,7 @@ import os
 import unittest
 import sys
 import tests
+import time
 import mysqlx
 
 from mysqlx.errors import InterfaceError, ProgrammingError
@@ -178,6 +179,8 @@ def build_uri(**kwargs):
         query.append("ssl-key={0}".format(kwargs["ssl_key"]))
     if "use_pure" in kwargs:
         query.append("use-pure={0}".format(kwargs["use_pure"]))
+    if "connect_timeout" in kwargs:
+        query.append("connect-timeout={0}".format(kwargs["connect_timeout"]))
 
     if len(query) > 0:
         uri = "{0}?{1}".format(uri, "&".join(query))
@@ -425,6 +428,76 @@ class MySQLxSessionTests(tests.MySQLxTests):
                 self.assertEqual(res, settings)
             except mysqlx.Error:
                 self.assertEqual(res, None)
+
+    def test_connect_timeout(self):
+        config = self.connect_kwargs.copy()
+        # 0 ms disables timouts on socket connections
+        config["connect-timeout"] = 0
+        session = mysqlx.get_session(config)
+        session.close()
+
+        # 10000 ms should be time enough to connect
+        config["connect-timeout"] = 10000
+        session = mysqlx.get_session(config)
+        session.close()
+
+        # Use connect timeout in URI
+        session = mysqlx.get_session(build_uri(**config))
+        session.close()
+
+        # Timeout for an unreachable host
+        # https://en.wikipedia.org/wiki/IPv4#Special-use_addresses
+        config["host"] = "198.51.100.255"
+        config["connect-timeout"] = 2000
+        self.assertRaises(mysqlx.TimeoutError, mysqlx.get_session, config)
+
+        # Multi-host scenarios
+        # Connect to a secondary host if the primary fails
+        routers = [
+            {"host": "198.51.100.255", "port": config["port"], "priority": 100},
+            {"host": "127.0.0.1", "port": config["port"], "priority": 90}
+        ]
+        uri = build_uri(user=config["user"], password=config["password"],
+                        connect_timeout=2000, routers=routers)
+        session = mysqlx.get_session(uri)
+        session.close()
+
+        # Fail to connect to all hosts
+        routers = [
+            {"host": "198.51.100.255", "port": config["port"], "priority": 100},
+            {"host": "192.0.2.255", "port": config["port"], "priority": 90}
+        ]
+        uri = build_uri(user=config["user"], password=config["password"],
+                        connect_timeout=2000, routers=routers)
+        try:
+            mysqlx.get_session(uri)
+            self.fail("It should not connect to any unreachable host")
+        except mysqlx.TimeoutError as err:
+            self.assertEqual(err.msg,
+                             "All server connection attempts were aborted. "
+                             "Timeout of 2000 ms was exceeded for each "
+                             "selected server")
+
+        # Trying to establish a connection with a wrong password should not
+        # wait for timeout
+        config["host"] = "127.0.0.1"
+        config["password"] = "invalid_password"
+        config["connect-timeout"] = 2000
+        time_start = time.time()
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+        time_elapsed = time.time() - time_start
+        session.close()
+        if time_elapsed >= config["connect-timeout"]:
+            self.fail("Trying to establish a connection with a wrong password "
+                      "should not wait for timeout")
+
+        # The connection timeout value must be a positive integer
+        config["connect-timeout"] = -1
+        self.assertRaises(TypeError, mysqlx.get_session, config)
+        config["connect-timeout"] = 10.0983
+        self.assertRaises(TypeError, mysqlx.get_session, config)
+        config["connect-timeout"] = "abc"
+        self.assertRaises(TypeError, mysqlx.get_session, config)
 
     def test_get_schemas(self):
         schema_name = "test_get_schemas"

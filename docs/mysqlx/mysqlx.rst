@@ -73,3 +73,4 @@ Errors
    mysqlx.OperationalError
    mysqlx.PoolError
    mysqlx.ProgrammingError
+   mysqlx.TimeoutError

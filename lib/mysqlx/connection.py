@@ -45,7 +45,8 @@ from functools import wraps
 
 from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
                              Sha256MemoryAuthPlugin)
-from .errors import InterfaceError, OperationalError, ProgrammingError
+from .errors import (InterfaceError, OperationalError, ProgrammingError,
+                     TimeoutError)
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES
 from .crud import Schema
 from .constants import SSLMode, Auth
@@ -56,9 +57,11 @@ from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
 
 
+_CONNECT_TIMEOUT = 10000  # Default connect timeout in milliseconds
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
 _LOGGER = logging.getLogger("mysqlx")
+
 
 class SocketStream(object):
     """Implements a socket stream."""
@@ -68,7 +71,7 @@ class SocketStream(object):
         self._is_socket = False
         self._host = None
 
-    def connect(self, params):
+    def connect(self, params, connect_timeout=_CONNECT_TIMEOUT):
         """Connects to a TCP service.
 
         Args:
@@ -77,14 +80,17 @@ class SocketStream(object):
         Raises:
             :class:`mysqlx.InterfaceError`: If Unix socket is not supported.
         """
+        if connect_timeout is not None:
+            connect_timeout = connect_timeout / 1000  # Convert to seconds
         try:
-            self._socket = socket.create_connection(params)
+            self._socket = socket.create_connection(params, connect_timeout)
             self._host = params[0]
         except ValueError:
             try:
                 self._socket = socket.socket(socket.AF_UNIX)
-                self._is_socket = True
+                self._socket.settimeout(connect_timeout)
                 self._socket.connect(params)
+                self._is_socket = True
             except AttributeError:
                 raise InterfaceError("Unix socket unsupported")
 
@@ -278,6 +284,12 @@ class Connection(object):
         self._can_failover = True
         self._ensure_priorities()
         self._routers.sort(key=lambda x: x['priority'], reverse=True)
+        self._connect_timeout = settings.get("connect-timeout",
+                                             _CONNECT_TIMEOUT)
+        if self._connect_timeout == 0:
+            # None is assigned if connect timeout is 0, which disables timeouts
+            # on socket operations
+            self._connect_timeout = None
 
     def fetch_active_result(self):
         """Fetch active result."""
@@ -358,12 +370,14 @@ class Connection(object):
         Raises:
             :class:`mysqlx.InterfaceError`: If fails to connect to the MySQL
                                             server.
+            :class:`mysqlx.TimeoutError`: If connect timeout was exceeded.
         """
         # Loop and check
         error = None
         while self._can_failover:
             try:
-                self.stream.connect(self._get_connection_params())
+                self.stream.connect(self._get_connection_params(),
+                                    self._connect_timeout)
                 self.reader_writer = MessageReaderWriter(self.stream)
                 self.protocol = Protocol(self.reader_writer)
                 self._handle_capabilities()
@@ -372,6 +386,18 @@ class Connection(object):
             except socket.error as err:
                 error = err
 
+        # Python 2.7 does not raise a socket.timeout exception when using
+        # settimeout(), but it raises a socket.error with errno.EAGAIN (11)
+        # or errno.EINPROGRESS (115) if connect-timeout value is too low
+        if error is not None and (isinstance(error, socket.timeout) or
+                                  (error.errno in (11, 115) and not PY3)):
+            if len(self._routers) <= 1:
+                raise TimeoutError("Connection attempt to the server was "
+                                   "aborted. Timeout of {0} ms was exceeded"
+                                   "".format(self._connect_timeout))
+            raise TimeoutError("All server connection attempts were aborted. "
+                               "Timeout of {0} ms was exceeded for each "
+                               "selected server".format(self._connect_timeout))
         if len(self._routers) <= 1:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
         raise InterfaceError("Failed to connect to any of the routers", 4001)
