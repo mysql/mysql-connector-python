@@ -362,10 +362,14 @@ class Protocol(object):
         Returns:
             list: A list of ``mysqlx.protobuf.Message`` objects.
         """
-        count = len(stmt.get_binding_map())
-        scalars = count * [None]
+        bindings = stmt.get_bindings()
         binding_map = stmt.get_binding_map()
-        for binding in stmt.get_bindings():
+        count = len(binding_map)
+        scalars = count * [None]
+        if count != len(bindings):
+            raise ProgrammingError("The number of bind parameters and "
+                                   "placeholders do not match")
+        for binding in bindings:
             name = binding["name"]
             if name not in binding_map:
                 raise ProgrammingError("Unable to find placeholder for "

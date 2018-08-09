@@ -1834,6 +1834,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
 
+        # The number of bind parameters and placeholders do not match
+        self.assertRaises(mysqlx.ProgrammingError,
+                          collection.find("$.age = ? and $.name = ?").bind, 42)
+
         # Binding anonymous parameters are not allowed in crud operations
         self.assertRaises(mysqlx.ProgrammingError,
                           collection.find("$.age = ?").bind, 42)
