@@ -44,9 +44,10 @@ from mysqlx.protobuf import Protobuf
 from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT
 
 if mysqlx.compat.PY3:
-    from urllib.parse import quote_plus
+    from urllib.parse import quote_plus, quote
 else:
     from urllib import quote_plus
+    from urlparse import quote
 
 from .test_mysqlx_crud import drop_table
 
@@ -73,6 +74,11 @@ _URI_TEST_RESULTS = (  # (uri, result)
                                               "password": "", "port": 33060,
                                               "user": "user",
                                               "use-pure": True}),
+    ("user{0}:password{0}@127.0.0.1/schema?use_pure=true"
+     "".format(quote("?!@#$%/:")), {"schema": "schema", "host": "127.0.0.1",
+                                    "port": 33060, "user": "user?!@#$%/:",
+                                    "password": "password?!@#$%/:",
+                                    "use-pure": True}),
     ("mysqlx://user:@127.0.0.1", {"schema": "", "host": "127.0.0.1",
                                   "password": "", "port": 33060,
                                   "user": "user"}),

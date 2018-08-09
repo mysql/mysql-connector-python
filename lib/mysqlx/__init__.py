@@ -115,7 +115,8 @@ def _parse_connection_uri(uri):
 
     if not host or not userinfo or ":" not in userinfo:
         raise InterfaceError("Malformed URI '{0}'".format(uri))
-    settings["user"], settings["password"] = userinfo.split(":", 1)
+    user, password = userinfo.split(":", 1)
+    settings["user"], settings["password"] = unquote(user), unquote(password)
 
     if host.startswith(("/", "..", ".")):
         settings["socket"] = unquote(host)

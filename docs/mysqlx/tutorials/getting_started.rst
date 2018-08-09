@@ -80,7 +80,15 @@ Connector/Python has a C extension for `Protobuf <https://developers.google.com/
        'use-pure': True
    })
 
-The :func:`mysqlx.Schema.get_schema()` method returns a :class:`mysqlx.Schema` object. We can use this :class:`mysqlx.Schema` object to access collections and tables. X DevAPI's ability to chain all object constructions, enables you to get to the schema object in one line. For example:
+.. note:: The `urllib.parse.quote <https://docs.python.org/3/library/urllib.parse.html#urllib.parse.quote>`_ function should be used to quote special characters for user and password when using a connection string in the :func:`mysqlx.get_session()` function.
+
+.. code-block:: python
+
+   from urllib.parse import quote
+   session = mysqlx.get_session('mysqlx://root:{0}@localhost:33060?use-pure=true'
+                                ''.format(quote('pass?!#%@/')))
+
+The :func:`mysqlx.Session.get_schema()` method returns a :class:`mysqlx.Schema` object. We can use this :class:`mysqlx.Schema` object to access collections and tables. X DevAPI's ability to chain all object constructions, enables you to get to the schema object in one line. For example:
 
 .. code-block:: python
 
