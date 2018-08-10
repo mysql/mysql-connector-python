@@ -31,6 +31,7 @@
 """Unittests for mysqlx.crud
 """
 
+import gc
 import logging
 import unittest
 import threading
@@ -1091,6 +1092,46 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.remove("")
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         self.assertRaises(mysqlx.ProgrammingError, collection.remove, " ")
+
+        self.schema.drop_collection(collection_name)
+
+    def _assert_flat_line(self, samples, tolerance):
+        for sample in range(1, len(samples)):
+            self.assertLessEqual(samples[sample] - tolerance,
+                                 samples[sample - 1], "For sample {} Objects "
+                                 "{} overpass the tolerance () from previews "
+                                 "sample {}".format(sample, samples[sample],
+                                                    tolerance,
+                                                    samples[sample - 1]))
+
+    def _collect_samples(self, sample_size, funct, param):
+        samples = [0] * sample_size
+        for num in range(sample_size * 10):
+            _ = funct(eval(param)).execute()
+            if num % 10 == 0:
+                samples[int(num / 10)] = len(gc.get_objects())
+        return samples
+
+    def test_memory_use_in_sequential_calls(self):
+        "Tests the number of new open objects in sequential usage"
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        sample_size = 100
+        param = '{"_id": "{}".format(num), "name": repr(num), "number": num}'
+        add_samples = self._collect_samples(sample_size, collection.add,
+                                            param)
+
+        param = '\'$.name == "{}"\'.format(num)'
+        find_samples = self._collect_samples(sample_size, collection.find,
+                                             param)
+
+        # The tolerance here is the number of new objects that can be created
+        # on each sequential method invocation without exceed memory usage.
+        tolerance = 12
+
+        self._assert_flat_line(add_samples, tolerance)
+        self._assert_flat_line(find_samples, tolerance)
 
         self.schema.drop_collection(collection_name)
 

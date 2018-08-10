@@ -123,8 +123,12 @@ class SocketStream(object):
         if not self._socket:
             return
 
+        self._socket.shutdown(socket.SHUT_RDWR)
         self._socket.close()
         self._socket = None
+
+    def __del__(self):
+        self.close()
 
     def set_ssl(self, ssl_mode, ssl_ca, ssl_crl, ssl_cert, ssl_key):
         """Set SSL parameters.
