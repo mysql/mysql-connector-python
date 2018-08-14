@@ -46,8 +46,7 @@ from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT
 if mysqlx.compat.PY3:
     from urllib.parse import quote_plus, quote
 else:
-    from urllib import quote_plus
-    from urlparse import quote
+    from urllib import quote_plus, quote
 
 from .test_mysqlx_crud import drop_table
 
