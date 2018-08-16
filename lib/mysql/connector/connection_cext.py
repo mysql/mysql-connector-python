@@ -355,7 +355,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 'field_count': self._cmysql.st_field_count(),
                 'insert_id': self._cmysql.insert_id(),
                 'affected_rows': self._cmysql.affected_rows(),
-                'server_status': self._server_status,
+                'status_flag': self._server_status,
             }
 
         return None
@@ -534,6 +534,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         self._charset_id = charset
         self._post_connection()
+        return self.fetch_eof_status()
 
     def cmd_refresh(self, options):
         """Send the Refresh command to the MySQL server"""
