@@ -153,6 +153,7 @@ local_infile = 1
 innodb_flush_log_at_trx_commit = 2
 innodb_log_file_size = 1Gb
 general_log_file = general_{name}.log
+{secure_file_priv}
 """
 
 # Platform specifics
@@ -280,6 +281,13 @@ _UNITTESTS_CMD_ARGS = {
         'help': (
             "Where to bootstrap the new MySQL instances for testing. "
             "(default {default})").format(default=MYSQL_DEFAULT_TOPDIR)
+    },
+
+    ('', '--secure-file-priv'): {
+        'dest': 'secure_file_priv', 'metavar': 'DIRECTORY',
+        'default': None,
+        'help': (
+            "MySQL server option, can be empty to disable")
     },
 
     ('', '--bind-address'): {
@@ -644,6 +652,11 @@ def init_mysql_server(port, options):
         "options": {"mysqlx_bind_address": "mysqlx_bind_address={0}".format("::"
                     if tests.IPV6_AVAILABLE else "0.0.0.0")}
     }]
+    if not options.secure_file_priv is None:
+        extra_args += [{
+            "version": (5, 5, 53),
+            "options": {"secure_file_priv": "secure_file_priv = %s" % options.secure_file_priv}
+        }]
 
     try:
         mysql_server = mysqld.MySQLServer(

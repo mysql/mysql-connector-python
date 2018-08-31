@@ -60,7 +60,6 @@ TCPServer.allow_reuse_address = True
 import tests
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
-DEVNULL = open(os.devnull, 'w')
 
 
 # MySQL Server executable name
@@ -279,7 +278,7 @@ class MySQLServerBase(object):
             '--help', '--verbose'
         ]
 
-        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=DEVNULL)
+        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         help_verbose = prc.communicate()[0]
         regex = re.compile(needle)
         for help_line in help_verbose.splitlines():
@@ -304,7 +303,7 @@ class MySQLServerBase(object):
             '--version'
         ]
 
-        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=DEVNULL)
+        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         verstr = str(prc.communicate()[0])
         matches = re.match(r'.*Ver (\d)\.(\d).(\d{1,2}).*', verstr)
         if matches:
@@ -325,8 +324,7 @@ class MySQLServerBase(object):
         """Start the MySQL server"""
         try:
             cmd = self._get_cmd()
-            self._process = subprocess.Popen(cmd, stdout=DEVNULL,
-                                             stderr=DEVNULL)
+            self._process = subprocess.Popen(cmd, stderr=subprocess.STDOUT)
         except (OSError, ValueError) as err:
             raise MySQLServerError(err)
 
