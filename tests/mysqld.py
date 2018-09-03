@@ -238,7 +238,8 @@ class MySQLServerBase(object):
                     self._lc_messages_dir = os.path.abspath(
                         os.path.join(root, os.pardir)
                     )
-                elif afile == 'mysql_system_tables.sql':
+                elif afile == 'mysql_system_tables.sql' or \
+                   afile == 'innodb_memcached_config.sql':
                     self._scriptdir = root
 
         if not self._lc_messages_dir or not self._scriptdir:
