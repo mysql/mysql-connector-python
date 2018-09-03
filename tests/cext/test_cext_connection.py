@@ -118,6 +118,6 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         info = self.cnx.cmd_query("SET @a = 1")
         exp = {
             'warning_count': 0, 'insert_id': 0, 'affected_rows': 0,
-            'server_status': 0, 'field_count': 0
+            'status_flag': 0, 'field_count': 0
         }
         self.assertEqual(exp, info)

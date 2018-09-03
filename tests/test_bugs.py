@@ -4861,6 +4861,137 @@ class BugOra24948186(tests.MySQLConnectorTests):
                                       mysql_type, expected_type)
 
 
+unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 7),
+                 "BugOra16217765 not tested with MySQL version < 5.6.7")
+@unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+class Bug28443941(tests.MySQLConnectorTests):
+    """BUG#28443941: DIFFERENCE PURE AND C-EXT ON CMD_CHANGE_USER()
+    """
+
+    users = {
+        'sha256user': {
+            'username': 'sha256user',
+            'password': 'sha256P@ss',
+            'auth_plugin': 'sha256_password',
+        },
+        'nativeuser': {
+            'username': 'nativeuser',
+            'password': 'nativeP@ss',
+            'auth_plugin': 'mysql_native_password',
+        }
+    }
+
+    def _create_user(self, cnx, user, password, host, database,
+                     plugin):
+
+        self._drop_user(user, host)
+        create_user = ("CREATE USER '{user}'@'{host}' "
+                       "IDENTIFIED WITH {plugin}")
+        cnx.cmd_query(create_user.format(user=user, host=host, plugin=plugin))
+
+        if tests.MYSQL_VERSION[0:3] < (8, 0, 5):
+            if plugin == 'sha256_password':
+                cnx.cmd_query("SET old_passwords = 2")
+            else:
+                cnx.cmd_query("SET old_passwords = 0")
+
+        if tests.MYSQL_VERSION < (5, 7, 5):
+            passwd = ("SET PASSWORD FOR '{user}'@'{host}' = "
+                      "PASSWORD('{password}')").format(user=user, host=host,
+                                                       password=password)
+        else:
+            passwd = ("ALTER USER '{user}'@'{host}' IDENTIFIED BY "
+                      "'{password}'").format(user=user, host=host,
+                                             password=password)
+        cnx.cmd_query(passwd)
+
+        grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
+        cnx.cmd_query(grant.format(database=database, user=user, host=host))
+
+    def _drop_user(self, user, host):
+        try:
+            self.admin_cnx.cmd_query("DROP USER '{user}'@'{host}'".format(
+                host=host,
+                user=user))
+        except errors.DatabaseError:
+            # It's OK when drop fails
+            pass
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.admin_cnx = connection.MySQLConnection(**config)
+        for _, user in self.users.items():
+            self._create_user(self.admin_cnx, user['username'],
+                              user['password'],
+                              config['host'],
+                              config['database'],
+                              plugin=user['auth_plugin'])
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        for _, user in self.users.items():
+            self._drop_user(user['username'], config['host'])
+
+    def test_cmd_change_user(self):
+        config = tests.get_mysql_config()
+        config['unix_socket'] = None
+
+        user = self.users['sha256user']
+        config['user'] = user['username']
+        config['password'] = user['password']
+        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+        config['auth_plugin'] = user['auth_plugin']
+
+        try:
+            cnx = connection.MySQLConnection(**config)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            self.fail(self.errmsg.format(config['auth_plugin'], exc))
+
+        user2 = self.users['nativeuser']
+        config2 = {'user': user2['username'],
+                   'password': user2['password'],
+                   'client_flags': [constants.ClientFlag.PLUGIN_AUTH],
+                   'auth_plugin': user2['auth_plugin']}
+        try:
+            status_p = cnx.cmd_change_user(config2['user'],
+                                           config2['password'])
+        except:
+            self.fail("Changing user failed with pure Python connector")
+
+        try:
+            cnx = CMySQLConnection(**config)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            self.fail(self.errmsg.format(config['auth_plugin'], exc))
+
+        try:
+            status_c = cnx.cmd_change_user(config2['user'],
+                                           config2['password'])
+        except:
+            self.fail("cmd_change_user did not return any result.")
+
+        if status_c is None:
+            self.fail("Changing user failed with c-extension")
+
+        # Server status can be different, therefore we only check that exists.
+        for key in status_p.keys():
+            try:
+                value = status_c.pop(key)
+                if key is not 'status_flag':
+                    self.assertEqual(status_p[key], value, "status {} not "
+                                     "equal: {} differs from {}"
+                                     "".format(key, value, status_p[key]))
+            except KeyError as err:
+                self.fail("The cmd_change_user from c-ext is missing an"
+                          "element: {}".format(err))
+        if status_c:
+            self.fail("The cmd_change_user from c-ext has additional elements:"
+                      " {}".format(status_c))
+
+
 class BugOra27364914(tests.MySQLConnectorTests):
     """BUG#27364914: CURSOR PREPARED STATEMENTS DO NOT CONVERT STRINGS
     """
