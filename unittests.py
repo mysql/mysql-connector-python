@@ -652,10 +652,16 @@ def init_mysql_server(port, options):
         "options": {"mysqlx_bind_address": "mysqlx_bind_address={0}".format("::"
                     if tests.IPV6_AVAILABLE else "0.0.0.0")}
     }]
-    if not options.secure_file_priv is None:
+
+    if options.secure_file_priv is not None:
         extra_args += [{
             "version": (5, 5, 53),
             "options": {"secure_file_priv": "secure_file_priv = %s" % options.secure_file_priv}
+        }]
+    else:
+        extra_args += [{
+            "version": (5, 5, 53),
+            "options": {"secure_file_priv": ""}
         }]
 
     try:
