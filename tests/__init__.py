@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -72,7 +72,7 @@ except ImportError:
         LOGGER.error("Could not initialize Python's unittest module")
         sys.exit(1)
 
-from lib.cpy_distutils import get_mysql_config_info
+from lib.cpy_distutils import mysql_c_api_info
 
 SSL_AVAILABLE = True
 try:
@@ -902,7 +902,7 @@ def check_c_extension(exc=None):
             mysql_config = os.path.join(MYSQL_CAPI, 'bin', 'mysql_config')
         else:
             mysql_config = MYSQL_CAPI
-        lib_dir = get_mysql_config_info(mysql_config)['lib_dir']
+        lib_dir = mysql_c_api_info(mysql_config)['link_directories']
     elif os.path.isdir(MYSQL_CAPI):
         lib_dir = os.path.join(MYSQL_CAPI, 'lib')
     else:

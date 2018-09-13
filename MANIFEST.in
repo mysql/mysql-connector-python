@@ -10,3 +10,6 @@ recursive-include examples *.py
 recursive-include lib *.py
 recursive-include tests *.py *.csv *.pem *.cnf
 recursive-include src *.c *.h *.cc *.proto
+
+include docs/INFO_SRC
+include docs/INFO_BIN

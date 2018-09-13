@@ -29,6 +29,7 @@
 """Implements the DistUtils command 'build_ext'
 """
 
+from datetime import datetime
 from distutils.command.build_ext import build_ext
 from distutils.command.install import install
 from distutils.command.install_lib import install_lib
@@ -36,6 +37,7 @@ from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.version import LooseVersion
 from distutils.dir_util import copy_tree, mkpath
+from distutils.spawn import find_executable
 from distutils.sysconfig import get_python_lib, get_python_version
 from distutils import log
 from glob import glob
@@ -46,7 +48,33 @@ from subprocess import Popen, PIPE, STDOUT, check_call
 import sys
 import platform
 import shutil
+import logging
+import re
 
+try:
+    from dateutil.tz import tzlocal
+    NOW = datetime.now(tzlocal())
+except ImportError:
+    NOW = datetime.now()
+
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl
+
+
+# Logging
+LOGGER = logging.getLogger("mysql_c_api_info")
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(levelname)s[%(name)s]: %(message)s")
+handler.setFormatter(formatter)
+LOGGER.addHandler(handler)
+LOGGER.setLevel(logging.DEBUG)
+
+# Import mysql.connector.version
+version_py = os.path.join("lib", "mysql", "connector", "version.py")
+with open(version_py, "rb") as version_fp:
+    exec(compile(version_fp.read(), version_py, "exec"))
 
 ARCH_64BIT = sys.maxsize > 2**32  # Works with Python 2.6 and greater
 py_arch = '64-bit' if ARCH_64BIT else '32-bit'
@@ -161,119 +189,152 @@ def unix_lib_is64bit(lib_file):
     return False
 
 
-def parse_mysql_config_info(options, stdout):
-    log.debug("# stdout: {0}".format(stdout))
-    info = {}
-    for option, line in zip(options, stdout.split('\n')):
-        log.debug("# option: {0}".format(option))
-        log.debug("# line: {0}".format(line))
-        info[option] = line.strip()
+def parse_command_line(line, debug = False):
+    """Parse a command line.
 
-    ver = info['version']
-    if '-' in ver:
-        ver, _ = ver.split('-', 2)
+    This will never be perfect without special knowledge about all possible
+    command lines "mysql_config" might output. But it should be close enbough
+    for our usage.
+    """
+    args = shlex.split(line)
 
-    info['version'] = tuple([int(v) for v in ver.split('.')[0:3]])
-    libs = shlex.split(info['libs'])
-    if ',' in libs[1]:
-        libs.pop(1)
-    info['lib_dir'] = libs[0].replace('-L', '')
-    info['libs'] = [ lib.replace('-l', '') for lib in libs[1:] ]
-    if platform.uname()[0] == 'SunOS':
-        info['lib_dir'] = info['lib_dir'].replace('-R', '')
-        info['libs'] = [lib.replace('-R', '') for lib in info['libs']]
-    log.debug("# info['libs']: ")
-    for lib in info['libs']:
-        log.debug("#   {0}".format(lib))
-    libs = shlex.split(info['libs_r'])
-    if ',' in libs[1]:
-        libs.pop(1)
-    info['lib_r_dir'] = libs[0].replace('-L', '')
-    info['libs_r'] = [ lib.replace('-l', '') for lib in libs[1:] ]
-    info['include'] = [x.strip() for x in info['include'].split('-I')[1:]]
+    # Find out what kind of argument it is first,
+    # if starts with "--", "-" or nothing
+    pre_parsed_line = []
+    for arg in args:
+        re_obj = re.search(r"^(--|-|)(.*)", arg)
+        pre_parsed_line.append(re_obj.group(1, 2))
 
-    return info
+    parsed_line = []
+
+    while pre_parsed_line:
+        (type1, opt1) = pre_parsed_line.pop(0)
+
+        if "=" in opt1:
+            # One of "--key=val", "-key=val" or "key=val"
+            parsed_line.append(tuple(opt1.split("=", 1)))
+        elif type1:
+            # We have an option that might have a value
+            # in the next element in the list
+            if pre_parsed_line:
+                (type2, opt2) = pre_parsed_line[0]
+                if type2 == "" and not "=" in opt2:
+                    # Value was in the next list element
+                    parsed_line.append((opt1, opt2))
+                    pre_parsed_line.pop(0)
+                    continue
+            if type1 == "--":
+                # If "--" and no argument then it is an option like "--fast"
+                parsed_line.append(opt1)
+            else:
+                # If "-" (and no "=" handled above) then it is a
+                # traditional one character option name that might
+                # have a value
+                val = opt1[1:]
+                if val:
+                    parsed_line.append((opt1[:1], val))
+                else:
+                    parsed_line.append(opt1)
+        else:
+            LOGGER.warning("Could not handle '{}' in '{}'".format(opt1, line))
+
+    return parsed_line
 
 
-def get_mysql_config_info(mysql_config):
-    """Get MySQL information using mysql_config tool
+def mysql_c_api_info(mysql_config, debug=False):
+    """Get MySQL information using mysql_config tool.
 
     Returns a dict.
     """
-    options = ['cflags', 'include', 'libs', 'libs_r', 'plugindir', 'version']
 
-    cmd = [mysql_config] + [ "--{0}".format(opt) for opt in options ]
+    process = Popen([mysql_config], stdout=PIPE, stderr=PIPE)
+    stdout, stderr = process.communicate()
+    if not stdout:
+        raise ValueError("Error executing command: {} ({})".format(cmd, stderr))
 
-    try:
-        proc = Popen(cmd, stdout=PIPE, universal_newlines=True)
-        stdout, _ = proc.communicate()
-    except OSError as exc:
-        raise DistutilsExecError("Failed executing mysql_config: {0}".format(
-            str(exc)))
+    # Parse the output. Try to be future safe in case new options
+    # are added. This might of course fail.
+    info = {}
 
-    info = parse_mysql_config_info(options, stdout)
+    # FIXME: handle "Compiler:" ?
+    for line in stdout.splitlines():
+        re_obj = re.search(
+            r"^\s+(?:--)?(\w+)\s+\[\s*(.*?)\s*\]", line.decode("utf-8"))
+        if re_obj:
+            mc_key = re_obj.group(1)
+            mc_val = re_obj.group(2)
+
+            # We always add the raw output from the different "mysql_config"
+            # options. And in some cases, like "port", "socket", that is enough
+            # for use from Python.
+            info[mc_key] = mc_val
+            LOGGER.debug("OPTION: {} = {}".format(mc_key, mc_val))
+
+            if not re.search(r"^-", mc_val) and not "=" in mc_val:
+                # Not a Unix command line
+                continue
+
+            # In addition form useful information parsed from the
+            # above command line
+            parsed_line = parse_command_line(mc_val, debug = debug)
+
+            if mc_key == "include":
+                # Lets assume all arguments are paths with "-I", "--include", ..
+                include_directories = [val for _, val in parsed_line]
+                info["include_directories"] = include_directories
+                LOGGER.debug("OPTION: include_directories = {}"
+                             "".format(" ".join(include_directories)))
+            elif mc_key == "libs_r":
+                info["link_directories"] = [val for key, val in parsed_line \
+                                            if key in ("L", "library-path",)]
+                info["libraries"] = [val for key, val in parsed_line \
+                                     if key in ("l", "library",)]
+                LOGGER.debug("OPTION: link_directories = {}"
+                             "".format(" ".join(info["link_directories"])))
+                LOGGER.debug("OPTION: libraries = {}"
+                             "".format(" ".join(info["libraries"])))
 
     # Try to figure out the architecture
-    info['arch'] = None
-    if os.name == 'posix':
-        if platform.uname()[0] == 'SunOS':
-            print("info['lib_dir']: {0}".format(info['lib_dir']))
-            print("info['libs'][0]: {0}".format(info['libs'][0]))
-            pathname = os.path.abspath(os.path.join(info['lib_dir'],
-                                                    'lib',
-                                                    info['libs'][0])) + '/*'
-        else:
-            pathname = os.path.join(info['lib_dir'],
-                                    'lib' + info['libs'][0]) + '*'
-        print("# Looking mysqlclient_lib at path: {0}".format(pathname))
-        log.debug("# searching mysqlclient_lib at: %s", pathname)
-        libs = glob(pathname)
-        mysqlclient_libs = []
-        for filepath in libs:
-            _, filename = os.path.split(filepath)
-            log.debug("#  filename {0}".format(filename))
-            if filename.startswith('libmysqlclient') and \
-               not os.path.islink(filepath) and \
-               '_r' not in filename and \
-               '.a' not in filename:
-                mysqlclient_libs.append(filepath)
-        mysqlclient_libs.sort()
-
-        stdout = None
-        try:
-            log.debug("# mysqlclient_lib: {0}".format(mysqlclient_libs[-1]))
-            for mysqlclient_lib in mysqlclient_libs:
-                log.debug("#+   {0}".format(mysqlclient_lib))
-            log.debug("# tested mysqlclient_lib[-1]: "
-                      "{0}".format(mysqlclient_libs[-1]))
-            if platform.uname()[0] == 'SunOS':
-                print("mysqlclient_lib: {0}".format(mysqlclient_libs[-1]))
-                cmd_list = ['file', mysqlclient_libs[-1]]
-            else:
-                cmd_list = ['file', '-L', mysqlclient_libs[-1]]
-            proc = Popen(cmd_list, stdout=PIPE,
-                         universal_newlines=True)
-            stdout, _ = proc.communicate()
-            stdout = stdout.split(':')[1]
-        except OSError as exc:
-            raise DistutilsExecError(
-                "Although the system seems POSIX, the file-command could not "
-                "be executed: {0}".format(str(exc)))
-
-        if stdout:
-            if '64' in stdout:
-                info['arch'] = "x86_64"
-            else:
-                info['arch'] = "i386"
-        else:
-            raise DistutilsExecError(
-                "Failed getting out put from the file-command"
-            )
-    else:
-        raise DistutilsExecError(
-            "Cannot determine architecture on {0} systems".format(os.name))
-
+    info["arch"] = "x86_64" if sys.maxsize > 2**32 else "i386"
+    # Return a tuple for version instead of a string
+    info["version"] = tuple([int(num) if num.isdigit() else num
+                             for num in info["version"].split(".")])
     return info
+
+
+def get_git_info():
+    """Get Git information about the last commit.
+
+    Returns a dict.
+    """
+    is_git_repo = False
+    if find_executable("git") is not None:
+        # Check if it's a Git repository
+        proc = Popen(["git", "branch"], universal_newlines=True)
+        proc.communicate()
+        is_git_repo = proc.returncode == 0
+
+    if is_git_repo:
+        cmd = ["git", "log", "-n", "1", "--date=iso",
+               "--pretty=format:'branch=%D&date=%ad&commit=%H&short=%h'"]
+        proc = Popen(cmd, stdout=PIPE, universal_newlines=True)
+        stdout, _ = proc.communicate()
+        git_info = dict(parse_qsl(stdout.replace("'", "").replace("+", "%2B")
+                                  .split(",")[-1:][0].strip()))
+        git_info["branch"] = stdout.split(",")[0].split("->")[1].strip()
+        return git_info
+    else:
+        branch_src = os.getenv("BRANCH_SOURCE")
+        push_rev = os.getenv("PUSH_REVISION")
+        if branch_src and push_rev:
+            git_info = {
+                "branch": branch_src.split()[-1],
+                "date": None,
+                "commit": push_rev,
+                "short": push_rev[:7]
+            }
+            return git_info
+    return None
 
 
 def remove_cext(distribution, ext):
@@ -332,7 +393,7 @@ class BuildExtDynamic(build_ext):
         if not self.with_mysql_capi or not is_wheel:
             return
 
-        log.info("Copying vendor files (dll libraries)")
+        log.info("Copying vendor files")
         data_files = []
         vendor_libs = []
         vendor_folder = ""
@@ -347,9 +408,11 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         else:
-            myc_info = get_mysql_config_info(
-                os.path.join(self.with_mysql_capi, "bin", "mysql_config"))
-            if myc_info["version"] > (8, 0, 5):
+            mysql_config = self.with_mysql_capi \
+                if not os.path.isdir(self.with_mysql_capi) \
+                else os.path.join(self.with_mysql_capi, "bin", "mysql_config")
+            mysql_info = mysql_c_api_info(mysql_config)
+            if mysql_info["version"] >= (8, 0, 6):
                 mysql_capi = os.path.join(self.with_mysql_capi, "lib")
                 vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
                 vendor_folder = "mysql-vendor"
@@ -449,17 +512,17 @@ class BuildExtDynamic(build_ext):
                 and os.access(connc_loc, os.X_OK):
             mysql_config = connc_loc
             # Check mysql_config
-            myc_info = get_mysql_config_info(mysql_config)
-            log.debug("# myc_info: {0}".format(myc_info))
+            mysql_info = mysql_c_api_info(mysql_config)
+            log.debug("# mysql_info: {0}".format(mysql_info))
 
-            if myc_info['version'] < min_version:
+            if mysql_info['version'] < min_version:
                 log.error(err_version)
                 sys.exit(1)
 
-            include_dirs = myc_info['include']
-            libraries = myc_info['libs']
-            library_dirs = myc_info['lib_dir']
-            self._mysql_config_info = myc_info
+            include_dirs = mysql_info['include_directories']
+            libraries = mysql_info['libraries']
+            library_dirs = mysql_info['link_directories']
+            self._mysql_config_info = mysql_info
             self.arch = self._mysql_config_info['arch']
             connc_64bit = self.arch == 'x86_64'
 
@@ -620,8 +683,39 @@ class BuildExtDynamic(build_ext):
 
     def run(self):
         """Run the command"""
+        # Generate docs/INFO_SRC
+        git_info = get_git_info()
+        if git_info:
+            with open(os.path.join("docs", "INFO_SRC"), "w") as info_src:
+                info_src.write("version: {}\n".format(VERSION_TEXT))
+                if git_info:
+                    info_src.write("branch: {}\n".format(git_info["branch"]))
+                    if git_info.get("date"):
+                        info_src.write("date: {}\n".format(git_info["date"]))
+                    info_src.write("commit: {}\n".format(git_info["commit"]))
+                    info_src.write("short: {}\n".format(git_info["short"]))
+
         if not self.with_mysql_capi and not self.with_mysqlxpb_cext:
             return
+
+        if self.with_mysql_capi:
+            mysql_version = None
+            if os.name != "nt":
+                # Get MySQL info
+                mysql_capi = self.with_mysql_capi
+                mysql_config = os.path.join(mysql_capi, "bin", "mysql_config") \
+                    if os.path.isdir(mysql_capi) else mysql_capi
+                mysql_info = mysql_c_api_info(mysql_config)
+                mysql_version = "{}.{}.{}".format(*mysql_info["version"][:3])
+
+            # Generate docs/INFO_BIN
+            now = NOW.strftime("%Y-%m-%d %H:%M:%S %z")
+            with open(os.path.join("docs", "INFO_BIN"), "w") as info_bin:
+                info_bin.write("build-date: {}\n".format(now))
+                info_bin.write("os-info: {}\n".format(platform.platform()))
+                if mysql_version:
+                    info_bin.write("mysql-version: {}\n".format(mysql_version))
+
         if os.name == 'nt':
             for ext in self.extensions:
                 # Add Protobuf include and library dirs
@@ -647,32 +741,36 @@ class BuildExtDynamic(build_ext):
                 self.run_protoc()
             self.real_build_extensions()
 
-            use_openssl_libs = False
             if self.with_mysql_capi:
-                mysql_config = os.path.join(self.with_mysql_capi, "bin",
-                                            "mysql_config")
-                myc_info = get_mysql_config_info(mysql_config)
-                use_openssl_libs = myc_info["version"] > (8, 0, 5)
+                copy_openssl = mysql_info["version"] >= (8, 0, 6)
+                if platform.system() == "Darwin" and copy_openssl:
+                    libssl, libcrypto = self._get_posix_openssl_libs()
+                    cmd_libssl = [
+                        "install_name_tool", "-change", libssl,
+                        "@loader_path/mysql-vendor/{0}".format(libssl),
+                        build_ext.get_ext_fullpath(self, "_mysql_connector")
+                    ]
+                    log.info("Executing: {0}".format(" ".join(cmd_libssl)))
+                    proc = Popen(cmd_libssl, stdout=PIPE,
+                                 universal_newlines=True)
+                    stdout, _ = proc.communicate()
 
-            if platform.system() == "Darwin" and use_openssl_libs:
-                libssl, libcrypto = self._get_posix_openssl_libs()
-                cmd_libssl = [
-                    "install_name_tool", "-change", libssl,
-                    "@loader_path/mysql-vendor/{0}".format(libssl),
-                    build_ext.get_ext_fullpath(self, "_mysql_connector")
-                ]
-                log.info("Executing: {0}".format(" ".join(cmd_libssl)))
-                proc = Popen(cmd_libssl, stdout=PIPE, universal_newlines=True)
-                stdout, _ = proc.communicate()
+                    cmd_libcrypto = [
+                        "install_name_tool", "-change", libcrypto,
+                        "@loader_path/mysql-vendor/{0}".format(libcrypto),
+                        build_ext.get_ext_fullpath(self, "_mysql_connector")
+                    ]
+                    log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
+                    proc = Popen(cmd_libcrypto, stdout=PIPE,
+                                 universal_newlines=True)
+                    stdout, _ = proc.communicate()
 
-                cmd_libcrypto = [
-                    "install_name_tool", "-change", libcrypto,
-                    "@loader_path/mysql-vendor/{0}".format(libcrypto),
-                    build_ext.get_ext_fullpath(self, "_mysql_connector")
-                ]
-                log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
-                proc = Popen(cmd_libcrypto, stdout=PIPE, universal_newlines=True)
-                stdout, _ = proc.communicate()
+        if self.with_mysql_capi and self.compiler:
+            # Add compiler information to docs/INFO_BIN
+            if hasattr(self.compiler, "compiler_so"):
+                compiler = self.compiler.compiler_so[0]
+                with open(os.path.join("docs", "INFO_BIN"), "a") as info_bin:
+                    info_bin.write("compiler: {}\n".format(compiler))
 
 
 class BuildExtStatic(BuildExtDynamic):

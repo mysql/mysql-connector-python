@@ -16,7 +16,10 @@ venv2/
 venv3/
 MANIFEST
 cpy_server*/
+mysql-vendor/
 *_output.txt
 tests_*.log
 dev*.py
 src/mysqlxpb/mysqlx/mysqlx*
+docs/INFO_SRC
+docs/INFO_BIN
