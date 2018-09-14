@@ -29,13 +29,16 @@
 """MySQL X DevAPI Python implementation"""
 
 import re
-from . import constants
+import json
 
-from .compat import INT_TYPES, STRING_TYPES, urlparse, unquote, parse_qsl
-from .connection import Session
+from . import constants
+from .compat import (INT_TYPES, STRING_TYPES, JSONDecodeError, urlparse,
+                     unquote, parse_qsl)
+from .connection import Client, Session
 from .constants import Auth, LockContention, SSLMode
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
+# pylint: disable=W0622
 from .errors import (Error, InterfaceError, DatabaseError, NotSupportedError,
                      DataError, IntegrityError, ProgrammingError,
                      OperationalError, InternalError, PoolError, TimeoutError)
@@ -272,7 +275,7 @@ def get_session(*args, **kwargs):
 
     Args:
         *args: Variable length argument list with the connection data used
-               to connect to the database. It can be a dictionary or a
+               to connect to a MySQL server. It can be a dictionary or a
                connection string.
         **kwargs: Arbitrary keyword arguments with connection data used to
                   connect to the database.
@@ -284,9 +287,107 @@ def get_session(*args, **kwargs):
     return Session(settings)
 
 
+def get_client(connection_string, options_string):
+    """Creates a Client instance with the provided connection data and settings.
+
+    Args:
+        connection_string: A string or a dict type object to indicate the \
+            connection data used to connect to a MySQL server.
+
+            The string must have the following uri format::
+
+                cnx_str = 'mysqlx://{user}:{pwd}@{host}:{port}'
+                cnx_str = ('mysqlx://{user}:{pwd}@['
+                           '    (address={host}:{port}, priority=n),'
+                           '    (address={host}:{port}, priority=n), ...]'
+                           '       ?[option=value]')
+
+            And the dictionary::
+
+                cnx_dict = {
+                    'host': 'The host where the MySQL product is running',
+                    'port': '(int) the port number configured for X protocol',
+                    'user': 'The user name account',
+                    'password': 'The password for the given user account',
+                    'ssl-mode': 'The flags for ssl mode in mysqlx.SSLMode.FLAG',
+                    'ssl-ca': 'The path to the ca.cert'
+                    "connect-timeout": '(int) milliseconds to wait on timeout'
+                }
+
+        options_string: A string in the form of a document or a dictionary \
+            type with configuration for the client.
+
+            Current options include::
+
+                options = {
+                    'pooling': {
+                        'enabled': (bool), # [True | False], True by default
+                        'max_size': (int), # Maximum connections per pool
+                        "max_idle_time": (int), # milliseconds that a
+                            # connection will remain active while not in use.
+                            # By default 0, means infinite.
+                        "queue_timeout": (int), # milliseconds a request will
+                            # wait for a connection to become available.
+                            # By default 0, means infinite.
+                    }
+                }
+
+    Returns:
+        mysqlx.Client: Client object.
+
+    .. versionadded:: 8.0.13
+    """
+    if not isinstance(connection_string, (STRING_TYPES, dict)):
+        raise InterfaceError("connection_data must be a string or dict")
+
+    settings_dict = _get_connection_settings(connection_string)
+
+    if not isinstance(options_string, (STRING_TYPES, dict)):
+        raise InterfaceError("connection_options must be a string or dict")
+
+    if isinstance(options_string, STRING_TYPES):
+        try:
+            options_dict = json.loads(options_string)
+        except JSONDecodeError:
+            raise InterfaceError("'pooling' options must be given in the form "
+                                 "of a document or dict")
+    else:
+        options_dict = {}
+        for key, value in options_string.items():
+            options_dict[key.replace("-", "_")] = value
+
+    if not isinstance(options_dict, dict):
+        raise InterfaceError("'pooling' options must be given in the form of a "
+                             "document or dict")
+    pooling_options_dict = {}
+    if "pooling" in options_dict:
+        pooling_options = options_dict.pop("pooling")
+        if not isinstance(pooling_options, (dict)):
+            raise InterfaceError("'pooling' options must be given in the form "
+                                 "document or dict")
+        # Fill default pooling settings
+        pooling_options_dict["enabled"] = pooling_options.pop("enabled", True)
+        pooling_options_dict["max_size"] = pooling_options.pop("max_size", 25)
+        pooling_options_dict["max_idle_time"] = \
+            pooling_options.pop("max_idle_time", 0)
+        pooling_options_dict["queue_timeout"] = \
+            pooling_options.pop("queue_timeout", 0)
+
+        # No other options besides pooling are supported
+        if len(pooling_options) > 0:
+            raise InterfaceError("Unrecognized pooling options: {}"
+                                 "".format(pooling_options))
+        # No other options besides pooling are supported
+        if len(options_dict) > 0:
+            raise InterfaceError("Unrecognized connection options: {}"
+                                 "".format(options_dict.keys()))
+
+    return Client(settings_dict, pooling_options_dict)
+
+
 __all__ = [
     # mysqlx.connection
-    "Session", "get_session",
+    "Client", "Session", "get_client", "get_session",
 
     # mysqlx.constants
     "Auth", "LockContention", "SSLMode",

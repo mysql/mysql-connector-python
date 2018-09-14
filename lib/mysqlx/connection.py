@@ -40,14 +40,17 @@ import logging
 import uuid
 import platform
 import os
+import re
+import threading
 
 from functools import wraps
 
 from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
                              Sha256MemoryAuthPlugin)
-from .errors import (InterfaceError, OperationalError, ProgrammingError,
-                     TimeoutError)
-from .compat import PY3, STRING_TYPES, UNICODE_TYPES
+# pylint: disable=W0622
+from .errors import (InterfaceError, OperationalError, PoolError,
+                     ProgrammingError, TimeoutError)
+from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
 from .constants import SSLMode, Auth
 from .helpers import get_item_or_attr
@@ -60,7 +63,42 @@ from .protobuf import Protobuf
 _CONNECT_TIMEOUT = 10000  # Default connect timeout in milliseconds
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
+
+_CNX_POOL_MAXSIZE = 99
+_CNX_POOL_MAX_NAME_SIZE = 120
+_CNX_POOL_NAME_REGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')
+_CNX_POOL_MAX_IDLE_TIME = 2147483
+_CNX_POOL_QUEUE_TIMEOUT = 2147483
+
 _LOGGER = logging.getLogger("mysqlx")
+
+
+def generate_pool_name(**kwargs):
+    """Generate a pool name.
+
+    This function takes keyword arguments, usually the connection arguments and
+    tries to generate a name for the pool.
+
+    Args:
+        **kwargs: Arbitrary keyword arguments with the connection arguments.
+
+    Raises:
+        PoolError: If the name can't be generated.
+
+    Returns:
+        str: The generated pool name.
+    """
+    parts = []
+    for key in ("host", "port", "user", "database", "client_id"):
+        try:
+            parts.append(str(kwargs[key]))
+        except KeyError:
+            pass
+
+    if not parts:
+        raise PoolError("Failed generating pool name; specify pool_name")
+
+    return "_".join(parts)
 
 
 class SocketStream(object):
@@ -513,6 +551,8 @@ class Connection(object):
             :class:`mysqlx.ProgrammingError`: If the SQL statement is not a
                                               valid string.
         """
+        if self.protocol is None:
+            raise OperationalError("MySQLx Connection not available")
         if not isinstance(sql, STRING_TYPES):
             raise ProgrammingError("The SQL statement is not a valid string")
         elif not PY3 and isinstance(sql, UNICODE_TYPES):
@@ -532,6 +572,8 @@ class Connection(object):
         Returns:
             :class:`mysqlx.Result`: A result object.
         """
+        if self.protocol is None:
+            raise OperationalError("MySQLx Connection not available")
         self.protocol.send_insert(statement)
         ids = None
         if isinstance(statement, AddStatement):
@@ -684,11 +726,30 @@ class Connection(object):
         """Close a sucessfully authenticated session."""
         if not self.is_open():
             return
+        try:
+            if self._active_result is not None:
+                self._active_result.fetch_all()
+                self.protocol.send_close()
+                self.protocol.read_ok()
+        except (InterfaceError, OperationalError) as err:
+            _LOGGER.warning("Warning: An error occurred while attempting to "
+                            "close the connection: {}".format(err))
+        finally:
+            # The remote connection with the server has been lost,
+            # close the connection locally.
+            self.stream.close()
+
+    def reset_session(self):
+        """Reset a sucessfully authenticated session."""
+        if not self.is_open():
+            return
         if self._active_result is not None:
             self._active_result.fetch_all()
-        self.protocol.send_close()
-        self.protocol.read_ok()
-        self.stream.close()
+        try:
+            self.protocol.send_reset()
+        except (InterfaceError, OperationalError) as err:
+            _LOGGER.warning("Warning: An error occurred while attempting to "
+                            "reset the session: {}".format(err))
 
     def close_connection(self):
         """Announce to the server that the client wants to close the
@@ -701,6 +762,430 @@ class Connection(object):
         self.protocol.send_connection_close()
         self.protocol.read_ok()
         self.stream.close()
+
+
+class PooledConnection(Connection):
+    """Class to hold :class:`Connection` instances in a pool.
+
+    PooledConnection is used by :class:`ConnectionPool` to facilitate the
+    connection to return to the pool once is not required, more specifically
+    once the close_session() method is invoked. It works like a normal
+    Connection except for methods like close() and sql().
+
+    The close_session() method will add the connection back to the pool rather
+    than disconnecting from the MySQL server.
+
+    The sql() method is used to execute sql statements.
+
+    Args:
+        pool (ConnectionPool): The pool where this connection must return.
+
+    .. versionadded:: 8.0.13
+    """
+    def __init__(self, pool):
+        if not isinstance(pool, ConnectionPool):
+            raise AttributeError("pool should be a ConnectionPool object")
+        super(PooledConnection, self).__init__(pool.cnx_config)
+        self.pool = pool
+        self.host = pool.cnx_config["host"]
+        self.port = pool.cnx_config["port"]
+
+    def close_connection(self):
+        """Closes the connection.
+
+        This method closes the socket.
+        """
+        super(PooledConnection, self).close_session()
+
+    def close_session(self):
+        """Do not close, but add connection back to pool.
+
+        The close_session() method does not close the connection with the
+        MySQL server. The connection is added back to the pool so it
+        can be reused.
+
+        When the pool is configured to reset the session, the session
+        state will be cleared by re-authenticating the user once the connection
+        is get from the pool.
+        """
+        self.pool.add_connection(self)
+
+    def reconnect(self):
+        """Reconnect this connection.
+        """
+        if self._active_result is not None:
+            self._active_result.fetch_all()
+        self._authenticate()
+
+    def reset(self):
+        """Reset the connection.
+
+        Resets the connection by re-authenticate.
+        """
+        self.reconnect()
+
+    def sql(self, sql_statement):
+        """Creates a :class:`mysqlx.SqlStatement` object to allow running the
+        SQL statement on the target MySQL Server.
+
+        Returns:
+            :class:`mysqlx.SqlStatement`: The sql statement object.
+        """
+        return SqlStatement(self, sql_statement)
+
+
+class ConnectionPool(queue.Queue):
+    """This class represents a pool of connections.
+
+    Initializes the Pool with the given name and settings.
+
+    Args:
+        name (str): The name of the pool, used to track a single pool per
+                    combination of host and user.
+        **kwargs:
+            max_size (int): The maximun number of connections to hold in
+                            the pool.
+            reset_session (bool): If the connection should be reseted when
+                                  is taken from the pool.
+            max_idle_time (int): The maximum number of milliseconds to allow
+                                 a connection to be idle in the queue before
+                                 being closed. Zero value means infinite.
+            queue_timeout (int): The maximum number of milliseconds a
+                                 request will wait for a connection to
+                                 become available. A zero value means
+                                 infinite.
+            priority (int): The router priority, to choose this pool over
+                            other with lower priority.
+
+    Raises:
+        :class:`mysqlx.PoolError` on errors.
+
+    .. versionadded:: 8.0.13
+    """
+    def __init__(self, name, **kwargs):
+        self._set_pool_name(name)
+        self._open_sessions = 0
+        self._connections_openned = []
+        self.pool_max_size = kwargs.get("max_size", 25)
+        # Can't invoke super due to Queue not is a new-style class
+        queue.Queue.__init__(self, self.pool_max_size)
+        self.reset_session = kwargs.get("reset_session", True)
+        self.max_idle_time = kwargs.get("max_idle_time", 25)
+        self.settings = kwargs
+        self.queue_timeout = kwargs.get("queue_timeout", 25)
+        self._priority = kwargs.get('priority', 0)
+        self.cnx_config = kwargs
+        self.host = kwargs['host']
+        self.port = kwargs['port']
+
+    def _set_pool_name(self, pool_name):
+        r"""Set the name of the pool.
+
+        This method checks the validity and sets the name of the pool.
+
+        Args:
+            pool_name (str): The pool name.
+
+        Raises:
+            AttributeError: If the pool_name contains illegal characters
+                            ([^a-zA-Z0-9._\-*$#]) or is longer than
+                            connection._CNX_POOL_MAX_NAME_SIZE.
+        """
+        if _CNX_POOL_NAME_REGEX.search(pool_name):
+            raise AttributeError(
+                "Pool name '{0}' contains illegal characters".format(pool_name))
+        if len(pool_name) > _CNX_POOL_MAX_NAME_SIZE:
+            raise AttributeError(
+                "Pool name '{0}' is too long".format(pool_name))
+        self.name = pool_name
+
+    @property
+    def open_connections(self):
+        """Returns the number of open connections that can return to this pool.
+        """
+        return len(self._connections_openned)
+
+    def add_connection(self, cnx=None):
+        """Adds a connection to this pool.
+
+        This method instantiates a Connection using the configuration passed
+        when initializing the ConnectionPool instance or using the set_config()
+        method.
+        If cnx is a Connection instance, it will be added to the queue.
+
+        Args:
+            cnx (PooledConnection): The connection object.
+
+        Raises:
+            PoolError: If no configuration is set, if no more connection can
+                       be added (maximum reached) or if the connection can not
+                       be instantiated.
+        """
+        if not self.cnx_config:
+            raise PoolError("Connection configuration not available")
+
+        if self.full():
+            raise PoolError("Failed adding connection; queue is full")
+
+        if not cnx:
+            cnx = PooledConnection(self)
+            # mysqlx_wait_timeout is only available on MySQL 8
+            ver = cnx.sql('show variables like "version"'
+                         ).execute().fetch_all()[0][1]
+            if tuple([int(n) for n in ver.split("-")[0].split(".")]) > (8, 10):
+                cnx.sql("set mysqlx_wait_timeout = {}".format(1)
+                       ).execute()
+            self._connections_openned.append(cnx)
+        else:
+            if not isinstance(cnx, PooledConnection):
+                raise PoolError(
+                    "Connection instance not subclass of PooledSession.")
+
+        self.queue_connection(cnx)
+
+    def queue_connection(self, cnx):
+        """Put connection back in the queue:
+
+        This method is putting a connection back in the queue.
+        It will not acquire a lock as the methods using _queue_connection() will
+        have it set.
+
+        Args:
+            PooledConnection: The connection object.
+
+        Raises:
+            PoolError: On errors.
+        """
+        if not isinstance(cnx, PooledConnection):
+            raise PoolError(
+                "Connection instance not subclass of PooledSession.")
+
+        # Reset the connection
+        if self.reset_session:
+            cnx.reset_session()
+        try:
+            self.put(cnx, block=False)
+        except queue.Full:
+            PoolError("Failed adding connection; queue is full")
+
+    def track_connection(self, connection):
+        """Tracks connection in order of close it when client.close() is invoke.
+        """
+        self._connections_openned.append(connection)
+
+    def __str__(self):
+        return self.name
+
+    def close(self):
+        """Empty this ConnectionPool.
+        """
+        for cnx in self._connections_openned:
+            cnx.close_connection()
+
+
+class PoolsManager(object):
+    """Manages a pool of connections for a host or hosts in routers.
+
+    This class handles all the pools of Connections.
+
+    .. versionadded:: 8.0.13
+    """
+    __instance = None
+    __pools = {}
+
+    def __new__(cls):
+        if PoolsManager.__instance is None:
+            PoolsManager.__instance = object.__new__(cls)
+            PoolsManager.__pools = {}
+        return PoolsManager.__instance
+
+    def _pool_exists(self, client_id, pool_name):
+        """Verifies if a pool exists with the given name.
+
+        Args:
+            client_id (str): The client id.
+            pool_name (str): The name of the pool.
+
+        Returns:
+            bool: Returns `True` if the pool exists otherwise `False`.
+        """
+        pools = self.__pools.get(client_id, [])
+        for pool in pools:
+            if pool.name == pool_name:
+                return True
+        return False
+
+    def _get_pools(self, settings):
+        """Retrieves a list of pools that shares the given settings.
+
+        Args:
+            settings (dict): the configuration of the pool.
+
+        Returns:
+            list: A list of pools that shares the given settings.
+        """
+        available_pools = []
+        pool_names = []
+        connections_settings = self._get_connections_settings(settings)
+
+        # Generate the names of the pools this settings can connect to
+        for router_name, _ in connections_settings:
+            pool_names.append(router_name)
+
+        # Generate the names of the pools this settings can connect to
+        for pool in self.__pools.get(settings.get("client_id", "No id"), []):
+            if pool.name in pool_names:
+                available_pools.append(pool)
+        return available_pools
+
+    def _get_connections_settings(self, settings):
+        """Generates a list of separated connection settings for each host.
+
+        Gets a list of connection settings for each host or router found in the
+        given settings.
+
+        Args:
+            settings (dict): The configuration for the connections.
+
+        Returns:
+            list: A list of connections settings
+        """
+        pool_settings = settings.copy()
+        routers = pool_settings.get("routers", [])
+        connections_settings = []
+        if "routers" in pool_settings:
+            pool_settings.pop("routers")
+        if "host" in pool_settings and "port" in pool_settings:
+            routers.append({"priority": 0,
+                            "host": pool_settings["host"],
+                            "port": pool_settings["port"]})
+        # Order routers
+        routers.sort(key=lambda x: x["priority"], reverse=True)
+        for router in routers:
+            connection_settings = pool_settings.copy()
+            connection_settings["host"] = router["host"]
+            connection_settings["port"] = router["port"]
+            connection_settings["priority"] = router["priority"]
+            connections_settings.append(
+                (generate_pool_name(**connection_settings),
+                 connection_settings))
+        return connections_settings
+
+    def create_pool(self, cnx_settings):
+        """Creates a `ConnectionPool` instance to hold the connections.
+
+        Creates a `ConnectionPool` instance to hold the connections only if
+        no other pool exists with the same configuration.
+
+        Args:
+            cnx_settings (dict): The configuration for the connections.
+        """
+        connections_settings = self._get_connections_settings(cnx_settings)
+
+        # Subscribe client if it does not exists
+        if cnx_settings.get("client_id", "No id") not in self.__pools:
+            self.__pools[cnx_settings.get("client_id", "No id")] = []
+
+        # Create a pool for each router
+        for router_name, settings in connections_settings:
+            if self._pool_exists(cnx_settings.get("client_id", "No id"),
+                                 router_name):
+                continue
+            else:
+                pool = self.__pools.get(cnx_settings.get("client_id", "No id"),
+                                        [])
+                pool.append(ConnectionPool(router_name, **settings))
+
+    def get_connection(self, settings):
+        """Get a connection from the pool.
+
+        This method returns an `PooledConnection` instance which has a reference
+        to the pool that created it, and can be used as a normal Connection.
+
+        When the MySQL connection is not connected, a reconnect is attempted.
+
+        Raises:
+            :class:`PoolError`: On errors.
+
+        Returns:
+            PooledConnection: A pooled connection object.
+        """
+        pools = self._get_pools(settings)
+        # Pools are stored by router priority
+        num_pools = len(pools)
+        for pool_number in range(num_pools):
+            pool = pools[pool_number]
+            try:
+                # Check connections aviability in this pool
+                if pool.qsize() > 0:
+                    # We have connections in pool, try to return a working one
+                    with threading.RLock():
+                        try:
+                            cnx = pool.get(block=True,
+                                           timeout=pool.queue_timeout)
+                        except queue.Empty:
+                            raise PoolError(
+                                "Failed getting connection; pool exhausted")
+                        cnx.reset()
+                        # mysqlx_wait_timeout is only available on MySQL 8
+                        ver = cnx.sql('show variables like "version"'
+                                     ).execute().fetch_all()[0][1]
+                        if tuple([int(n) for n in
+                                  ver.split("-")[0].split(".")]) > (8, 10):
+                            cnx.sql("set mysqlx_wait_timeout = {}".format(1)
+                                   ).execute()
+                        return cnx
+                elif pool.open_connections < pool.pool_max_size:
+                    # No connections in pool, but we can open a new one
+                    cnx = PooledConnection(pool)
+                    pool.track_connection(cnx)
+                    cnx.connect()
+                    # mysqlx_wait_timeout is only available on MySQL 8
+                    ver = cnx.sql('show variables like "version"'
+                                 ).execute().fetch_all()[0][1]
+                    if tuple([int(n) for n in
+                              ver.split("-")[0].split(".")]) > (8, 10):
+                        cnx.sql("set mysqlx_wait_timeout = {}".format(1)
+                               ).execute()
+                    return cnx
+                else:
+                    # Pool is exaust so the client needs to wait
+                    with threading.RLock():
+                        try:
+                            cnx = pool.get(block=True,
+                                           timeout=pool.queue_timeout)
+                            cnx.reset()
+                            # mysqlx_wait_timeout is only available on MySQL 8
+                            ver = cnx.sql('show variables like "version"'
+                                         ).execute().fetch_all()[0][1]
+                            if tuple([int(n) for n in
+                                      ver.split("-")[0].split(".")]) > (8, 10):
+                                cnx.sql("set mysqlx_wait_timeout = {}".format(1)
+                                       ).execute()
+                            return cnx
+                        except queue.Empty:
+                            raise PoolError("pool max size has been reached")
+            except (InterfaceError, TimeoutError):
+                if pool_number == num_pools - 1:
+                    raise
+                else:
+                    continue
+
+    def close_pool(self, cnx_settings):
+        """Closes the connections in the pools
+
+        Returns:
+            int: The number of closed pools
+        """
+        pools = self._get_pools(cnx_settings)
+        for pool in pools:
+            pool.close()
+            # Remove the pool
+            if cnx_settings.get("client_id", None) is not None:
+                client_pools = self.__pools.get(cnx_settings.get("client_id"))
+                if pool in client_pools:
+                    client_pools.remove(pool)
+        return len(pools)
 
 
 class Session(object):
@@ -719,8 +1204,16 @@ class Session(object):
     def __init__(self, settings):
         self.use_pure = settings.get("use-pure", Protobuf.use_pure)
         self._settings = settings
-        self._connection = Connection(self._settings)
-        self._connection.connect()
+        if "pooling" in settings and settings["pooling"]:
+            # Create pool and retrieve a Connection instance
+            PoolsManager().create_pool(settings)
+            self._connection = PoolsManager().get_connection(settings)
+            if self._connection is None:
+                raise PoolError("connection could not be retrieve from pool. %s",
+                                values=settings)
+        else:
+            self._connection = Connection(self._settings)
+            self._connection.connect()
 
     @property
     def use_pure(self):
@@ -877,3 +1370,140 @@ class Session(object):
     def close(self):
         """Closes the session."""
         self._connection.close_session()
+        # Set an unconnected connection
+        self._connection = Connection(self._settings)
+
+    def close_connections(self):
+        """Closes all underliying connections as pooled connections"""
+        self._connection.close_connection()
+
+
+class Client(object):
+    """Class defining a client, it stores a connection configuration.
+
+       Args:
+           connection_dict (dict): The connection information to connect to a
+                                   MySQL server.
+           options_dict (dict): The options to configure this client.
+
+       .. versionadded:: 8.0.13
+    """
+    def __init__(self, connection_dict, options_dict=None):
+        self.settings = connection_dict
+        if options_dict is None:
+            options_dict = {}
+
+        self.sessions = []
+        self.client_id = uuid.uuid4()
+
+        self._set_pool_size(options_dict.get("max_size", 25))
+        self._set_max_idle_time(options_dict.get("max_idle_time", 0))
+        self._set_queue_timeout(options_dict.get("queue_timeout", 0))
+        self._set_pool_enabled(options_dict.get("enabled", True))
+
+        self.settings["pooling"] = self.pooling_enabled
+        self.settings["max_size"] = self.max_size
+        self.settings["client_id"] = self.client_id
+
+    def _set_pool_size(self, pool_size):
+        """Set the size of the pool.
+
+        This method sets the size of the pool but it will not resize the pool.
+
+        Args:
+            pool_size (int): An integer equal or greater than 0 indicating
+                             the pool size.
+
+        Raises:
+            :class:`AttributeError`: If the pool_size value is not an integer
+                                     greater or equal to 0.
+        """
+        if isinstance(pool_size, bool) or not isinstance(pool_size, int) or \
+           not pool_size > 0:
+            raise AttributeError("Pool max_size value must be an integer "
+                                 "greater than 0, the given value {} "
+                                 "is not valid.".format(pool_size))
+
+        self.max_size = _CNX_POOL_MAXSIZE if pool_size == 0 else pool_size
+
+    def _set_max_idle_time(self, max_idle_time):
+        """Set the max idle time.
+
+        This method sets the max idle time.
+
+        Args:
+            max_idle_time (int): An integer equal or greater than 0 indicating
+                                 the max idle time.
+
+        Raises:
+            :class:`AttributeError`: If the max_idle_time value is not an
+                                     integer greater or equal to 0.
+        """
+        if isinstance(max_idle_time, bool) or \
+           not isinstance(max_idle_time, int) or not max_idle_time > -1:
+            raise AttributeError("Connection max_idle_time value must be an "
+                                 "integer greater or equal to 0, the given "
+                                 "value {} is not valid.".format(max_idle_time))
+
+        self.max_idle_time = max_idle_time
+        self.settings["max_idle_time"] = _CNX_POOL_MAX_IDLE_TIME \
+            if max_idle_time == 0 else int(max_idle_time / 1000)
+
+    def _set_pool_enabled(self, enabled):
+        """Set if the pool is enabled.
+
+        This method sets if the pool is enabled.
+
+        Args:
+            enabled (bool): True if to enabling the pool.
+
+        Raises:
+            :class:`AttributeError`: If the value of enabled is not a bool type.
+        """
+        if not isinstance(enabled, bool):
+            raise AttributeError("The enabled value should be True or False.")
+        self.pooling_enabled = enabled
+
+    def _set_queue_timeout(self, queue_timeout):
+        """Set the queue timeout.
+
+        This method sets the queue timeout.
+
+        Args:
+            queue_timeout (int): An integer equal or greater than 0 indicating
+                                 the queue timeout.
+
+        Raises:
+            :class:`AttributeError`: If the queue_timeout value is not an
+                                     integer greater or equal to 0.
+        """
+        if isinstance(queue_timeout, bool) or \
+           not isinstance(queue_timeout, int) or not queue_timeout > -1:
+            raise AttributeError("Connection queue_timeout value must be an "
+                                 "integer greater or equal to 0, the given "
+                                 "value {} is not valid.".format(queue_timeout))
+
+        self.queue_timeout = queue_timeout
+        self.settings["queue_timeout"] = _CNX_POOL_QUEUE_TIMEOUT \
+            if queue_timeout == 0 else int(queue_timeout / 1000)
+        # To avoid a connection stall waiting for the server, if the
+        # connect-timeout is not given, use the queue_timeout
+        if not "connect-timeout" in self.settings:
+            self.settings["connect-timeout"] = self.queue_timeout
+
+    def get_session(self):
+        """Creates a Session instance using the provided connection data.
+
+        Returns:
+            Session: Session object.
+        """
+        session = Session(self.settings)
+        self.sessions.append(session)
+        return session
+
+    def close(self):
+        """Closes the sessions opened by this client.
+        """
+        PoolsManager().close_pool(self.settings)
+        for session in self.sessions:
+            session.close_connections()

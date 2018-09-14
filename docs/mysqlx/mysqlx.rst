@@ -7,7 +7,9 @@ Connection
 .. toctree::
    :maxdepth: 4
 
+   mysqlx.get_client
    mysqlx.get_session
+   mysqlx.Client
    mysqlx.Session
 
 CRUD

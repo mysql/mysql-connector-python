@@ -588,9 +588,10 @@ class Protocol(object):
         """
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
-            raise InterfaceError(msg["msg"])
+            raise InterfaceError("Mysqlx.Error: {}".format(msg["msg"]))
         if msg.type != "Mysqlx.Ok":
-            raise InterfaceError("Unexpected message encountered")
+            raise InterfaceError("Unexpected message encountered: {}"
+                                 "".format(msg["msg"]))
 
     def send_connection_close(self):
         """Send connection close."""
@@ -603,3 +604,9 @@ class Protocol(object):
         msg = Message("Mysqlx.Session.Close")
         self._writer.write_message(mysqlxpb_enum(
             "Mysqlx.ClientMessages.Type.SESS_CLOSE"), msg)
+
+    def send_reset(self):
+        """Send reset."""
+        msg = Message("Mysqlx.Session.Reset")
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ClientMessages.Type.SESS_RESET"), msg)

@@ -129,7 +129,7 @@ class PoolError(Error):
     """Exception for errors relating to connection pooling."""
     pass
 
-
+# pylint: disable=W0622
 class TimeoutError(Error):
     """Exception for errors relating to connection timeout."""
     pass
