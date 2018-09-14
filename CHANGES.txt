@@ -8,6 +8,15 @@ Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.13
+=======
+- WL#12239: Add support for Python 3.7
+- WL#12226: Implement connect timeout
+- WL#11897: Implement connection pooling for xprotocol
+- BUG#28278352: C extension mysqlx Collection.add() leaks memory in sequential calls
+- BUG#28037275: Missing bind parameters causes segfault or unclear error message
+- BUG#27528819: Support special characters in the user and password using URI
+
 v8.0.12
 =======
 
