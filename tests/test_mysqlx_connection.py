@@ -37,6 +37,7 @@ import unittest
 import sys
 import tests
 import time
+import socket
 import mysqlx
 
 from mysqlx.errors import InterfaceError, ProgrammingError
@@ -187,6 +188,25 @@ def build_uri(**kwargs):
 
     return uri
 
+
+def skip_timeout():
+    params = ("198.51.100.255", "3306")
+    try:
+        _socket = socket.create_connection(params, 1)
+    except ValueError:
+        try:
+            _socket = socket.socket(socket.AF_UNIX)
+            _socket.settimeout(1)
+            _socket.connect(("198.51.100.255", "3306"))
+        except socket.timeout:
+            return False
+        except socket.error:
+            return True
+    except socket.timeout:
+        return False
+    except socket.error:
+        return True
+    return False
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxSessionTests(tests.MySQLxTests):
@@ -429,6 +449,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             except mysqlx.Error:
                 self.assertEqual(res, None)
 
+    @unittest.skipIf(skip_timeout(), "Skipped due to No route to host error")
     def test_connect_timeout(self):
         config = self.connect_kwargs.copy()
         # 0 ms disables timouts on socket connections

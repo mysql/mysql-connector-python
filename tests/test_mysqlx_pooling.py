@@ -240,8 +240,8 @@ class MySQLxClientTests(tests.MySQLxTests):
         sessions[5].close()
         sessions[9].close()
         connections = get_current_connections(old_session)
-        self.assertEqual(len(connections[self.users[0][0]]),
-                         total_connections - 2)
+        self.assertTrue(len(connections[self.users[0][0]]) >=
+                        (total_connections - 2))
 
         connections = get_current_connections(old_session)
         # At far the send reset message requires the user to re-authentificate
@@ -487,6 +487,6 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
         # At far the send reset message requires the user to re-authentificate
         # the connection user stays in unauthenticated user
         open_connections = connections.get("unauthenticated user", [])
-        self.assertEqual(len(open_connections), 1)
+        self.assertTrue(len(open_connections) >= 1)
 
         client.close()

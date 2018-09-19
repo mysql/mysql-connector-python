@@ -166,9 +166,12 @@ class SocketStream(object):
         """Close the socket."""
         if not self._socket:
             return
-
-        self._socket.shutdown(socket.SHUT_RDWR)
-        self._socket.close()
+        try:
+            self._socket.shutdown(socket.SHUT_RDWR)
+            self._socket.close()
+        except socket.error:
+            # On [Errno 107] Transport endpoint is not connected
+            pass
         self._socket = None
 
     def __del__(self):
