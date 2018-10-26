@@ -2688,10 +2688,18 @@ class BugOra18415927(tests.MySQLConnectorTests):
         config['user'] = self.user['username']
         config['password'] = self.user['password']
         config['client_flags'] = [-constants.ClientFlag.SECURE_CONNECTION]
-        try:
-            cnx = connection.MySQLConnection(**config)
-        except Exception as exc:
-            self.fail("Connection failed: {0}".format(exc))
+        failures = []
+        max_failures = 2
+        for n in range(1000):
+            try:
+                _ = connection.MySQLConnection(**config)
+            except Exception as err:
+                failures.append(err)
+                if n > max_failures:
+                    break
+        if len(failures) > max_failures:
+            self.fail("Connection failed at {}/{} times. First error found: {}"
+                      "".format(len(failures), n, failures[0]))
 
 
 class BugOra18527437(tests.MySQLConnectorTests):

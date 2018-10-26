@@ -128,7 +128,9 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
         except Exception as exc:
             raise errors.InterfaceError(
                 "Failed scrambling password; {0}".format(exc))
-
+        if b'\x00' in hash4:
+            # Server uses it as separator which cause authentification fail
+            raise errors.HashError("Hashed authentication data is invalid")
         return hash4
 
 

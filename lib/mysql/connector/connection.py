@@ -52,6 +52,8 @@ from .protocol import MySQLProtocol
 from .utils import int4store
 from .abstracts import MySQLConnectionAbstract
 
+MAX_CONNECTION_ATTEMPTS = 3
+
 
 class MySQLConnection(MySQLConnectionAbstract):
     """Connection to a MySQL Server"""
@@ -241,20 +243,29 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         self._protocol = MySQLProtocol()
         self._socket = self._get_connection()
-        try:
-            self._socket.open_connection()
-            self._do_handshake()
-            self._do_auth(self._user, self._password,
-                          self._database, self._client_flags, self._charset_id,
-                          self._ssl)
-            self.set_converter_class(self._converter_class)
-            if self._client_flags & ClientFlag.COMPRESS:
-                self._socket.recv = self._socket.recv_compressed
-                self._socket.send = self._socket.send_compressed
-        except:
-            # close socket
-            self.close()
-            raise
+        attempt = MAX_CONNECTION_ATTEMPTS
+        while attempt > 0:
+            attempt -= 1
+            try:
+                self._socket.open_connection()
+                self._do_handshake()
+                self._do_auth(self._user, self._password,
+                              self._database, self._client_flags, self._charset_id,
+                              self._ssl)
+                self.set_converter_class(self._converter_class)
+                if self._client_flags & ClientFlag.COMPRESS:
+                    self._socket.recv = self._socket.recv_compressed
+                    self._socket.send = self._socket.send_compressed
+                break
+            except errors.HashError:
+                # close socket
+                self.close()
+                if attempt == 0:
+                    raise
+            except:
+                # close socket
+                self.close()
+                raise
 
     def shutdown(self):
         """Shut down connection to MySQL Server.
