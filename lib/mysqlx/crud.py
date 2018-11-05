@@ -29,7 +29,8 @@
 """Implementation of the CRUD database objects."""
 
 from .dbdoc import DbDoc
-from .errors import ProgrammingError
+from .errorcode import ER_NO_SUCH_TABLE
+from .errors import OperationalError, ProgrammingError
 from .helpers import deprecated, escape, quote_identifier
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
@@ -366,7 +367,15 @@ class Collection(DatabaseObject):
         """
         sql = _COUNT_QUERY.format(quote_identifier(self._schema.name),
                                   quote_identifier(self._name))
-        return self._connection.execute_sql_scalar(sql)
+        try:
+            res = self._connection.execute_sql_scalar(sql)
+        except OperationalError as err:
+            if err.errno == ER_NO_SUCH_TABLE:
+                raise OperationalError(
+                    "Collection '{}' does not exist in schema '{}'"
+                    "".format(self._name, self._schema.name))
+            raise
+        return res
 
     def create_index(self, index_name, fields_desc):
         """Creates a collection index.
@@ -514,7 +523,15 @@ class Table(DatabaseObject):
         """
         sql = _COUNT_QUERY.format(quote_identifier(self._schema.name),
                                   quote_identifier(self._name))
-        return self._connection.execute_sql_scalar(sql)
+        try:
+            res = self._connection.execute_sql_scalar(sql)
+        except OperationalError as err:
+            if err.errno == ER_NO_SUCH_TABLE:
+                raise OperationalError(
+                    "Table '{}' does not exist in schema '{}'"
+                    "".format(self._name, self._schema.name))
+            raise
+        return res
 
     def is_view(self):
         """Determine if the underlying object is a view or not.

@@ -1907,6 +1907,19 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    def test_count(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
+        ).execute()
+        self.assertEqual(4, collection.count())
+        self.schema.drop_collection(collection_name)
+        self.assertRaises(mysqlx.OperationalError, collection.count)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):
@@ -2152,6 +2165,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
         drop_table(self.schema, table_name)
+        self.assertRaises(mysqlx.OperationalError, table.count)
 
     def test_results(self):
         table_name = "{0}.test".format(self.schema_name)
@@ -2474,6 +2488,8 @@ class MySQLxViewTests(tests.MySQLxTests):
                                                      self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
+        drop_view(self.schema, self.view_name)
+        self.assertRaises(mysqlx.OperationalError, view.count)
 
     def test_results(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
