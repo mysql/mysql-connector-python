@@ -572,7 +572,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(1, collection.count())
 
-        # now add multiple dictionaries at once
+        # Adding multiple dictionaries at once
         result = collection.add(
             {"_id": 2, "name": "Wilma", "age": 33},
             {"_id": 3, "name": "Barney", "age": 42}
@@ -580,13 +580,24 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(3, collection.count())
 
-        # now let's try adding strings
+        # Adding JSON strings
         result = collection.add(
             '{"_id": 4, "name": "Bambam", "age": 8}',
             '{"_id": 5, "name": "Pebbles", "age": 8}'
         ).execute()
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
+
+        # All strings should be considered literal, for expressions
+        # mysqlx.expr() function must be used
+        collection.add(
+            {"_id": "6", "status": "Approved",
+             "email": "Fred (fred@example.com)"},
+            {"_id": "7", "status": "Rejected\n(ORA:Pending)",
+             "email": "Barney (barney@example.com)"},
+        ).execute()
+        result = collection.find().execute()
+        self.assertEqual(7, len(result.fetch_all()))
 
         if tests.MYSQL_VERSION > (8, 0, 4):
             # Following test are only possible on servers with id generetion.
@@ -1370,10 +1381,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "Rhaegal": "green with bronze markings"},
             doc.dragons)
 
-        # Test add new attribute using expresion (function call)
-        result = collection.modify('name == "Daenerys"').patch(
+        # Test add new attribute using expression
+        result = collection.modify('name == "Daenerys"').patch(mysqlx.expr(
             'JSON_OBJECT("dragons", JSON_OBJECT("count", 3))'
-        ).execute()
+        )).execute()
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
@@ -1382,11 +1393,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "count": 3},
             doc.dragons)
 
-        # Test update attribute value using expresion (function call)
-        result = collection.modify('name == "Daenerys"').patch(
+        # Test update attribute value using expression
+        result = collection.modify('name == "Daenerys"').patch(mysqlx.expr(
             'JSON_OBJECT("dragons",'
-            '    JSON_OBJECT("count", $.dragons.count - 1))'
-        ).execute()
+            '    JSON_OBJECT("count", $.dragons.count - 1))')).execute()
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
@@ -1395,10 +1405,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "count": 2},
             doc.dragons)
 
-        # Test update attribute value using expresion without JSON functions
-        result = collection.modify('TRUE').patch(
+        # Test update attribute value using expression without JSON functions
+        result = collection.modify('TRUE').patch(mysqlx.expr(
             '{"actors_bio": {"current": {"day_of_birth": CAST(SUBSTRING_INDEX('
-            '    $.actors_bio.bd, " ", - 1) AS DECIMAL)}}}').execute()
+            '    $.actors_bio.bd, " ", - 1) AS DECIMAL)}}}')).execute()
         self.assertEqual(8, result.get_affected_items_count())
 
         # Test update attribute value using mysqlx.expr
@@ -1436,9 +1446,9 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             doc.actors_bio)
 
         # test use of year funtion.
-        result = collection.modify('TRUE').patch(
+        result = collection.modify('TRUE').patch(mysqlx.expr(
             '{"actors_bio": {"current": {"last_update": Year(CURDATE())}}}'
-            ).execute()
+           )).execute()
         self.assertEqual(8, result.get_affected_items_count())
 
         # Collection.modify() is not allowed without a condition

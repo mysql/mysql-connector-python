@@ -387,7 +387,7 @@ def get_client(connection_string, options_string):
 
 __all__ = [
     # mysqlx.connection
-    "Client", "Session", "get_client", "get_session",
+    "Client", "Session", "get_client", "get_session", "expr",
 
     # mysqlx.constants
     "Auth", "LockContention", "SSLMode",

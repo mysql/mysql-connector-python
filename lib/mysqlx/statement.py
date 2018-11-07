@@ -753,14 +753,14 @@ class ModifyStatement(FilterableStatement):
         """
         if doc is None:
             doc = ''
-        if not isinstance(doc, (dict, DbDoc, str)):
+        if not isinstance(doc, (ExprParser, dict, DbDoc, str)):
             raise ProgrammingError(
                 "Invalid data for update operation on document collection "
                 "table")
         self._update_ops.append(
             UpdateSpec(mysqlxpb_enum(
                 "Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
-                       '', doc))
+                       '', doc.expr() if isinstance(doc, ExprParser) else doc))
         return self
 
     def execute(self):

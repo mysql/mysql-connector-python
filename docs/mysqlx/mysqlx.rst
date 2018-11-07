@@ -22,6 +22,7 @@ CRUD
    mysqlx.Collection
    mysqlx.Table
    mysqlx.View
+   mysqlx.expr
 
 Result
 ------

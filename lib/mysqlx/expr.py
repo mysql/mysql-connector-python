@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -297,11 +297,6 @@ def build_expr(value):
     elif isinstance(value, (list, tuple)):
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.ARRAY")
         msg["array"] = build_array(value).get_message()
-    # look for MySQL expressions
-    elif isinstance(value, STRING_TYPES) and \
-        (("(" in value and ")" in value) or ("{" in value and "}" in value)):
-        expr_parser = ExprParser(value, False)
-        return expr_parser.expr()
     else:
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.LITERAL")
         msg["literal"] = build_scalar(value).get_message()
@@ -422,6 +417,9 @@ class ExprParser(object):
         self.positional_placeholder_count = 0
         self.clean_expression()
         self.lex()
+
+    def __str__(self):
+        return "<mysqlx.ExprParser '{}'>".format(self.string)
 
     def clean_expression(self):
         """Removes the keywords that does not form part of the expression.

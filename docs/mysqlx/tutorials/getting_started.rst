@@ -257,12 +257,15 @@ This example uses the previews one to show how to remove of the nested field
 ``Viserion`` on ``dragons`` field and at the same time how to update the value of
 the ``count`` field with a new value based in the current one.
 
+.. note:: In the :func:`mysqlx.ModifyStatement.patch()` all strings are considered literals,
+          for expressions the usage of the :func:`mysqlx.expr()` is required.
+
 .. code-block:: python
 
-    collection.modify('name == "Daenerys"').patch('''
+    collection.modify('name == "Daenerys"').patch(mysqlx.expr('''
         JSON_OBJECT("dragons", JSON_OBJECT("count", $.dragons.count -1,
                                            "Viserion", Null))
-        ''').execute()
+        ''')).execute()
     doc = mys.collection.find("name = 'Daenerys'").execute().fetch_all()[0]
     assert(doc.dragons == {'count': 2,
                            'Rhaegal': 'green with bronze markings',
