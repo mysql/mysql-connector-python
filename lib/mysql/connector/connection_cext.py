@@ -169,6 +169,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 'ssl_cert': self._ssl.get('cert'),
                 'ssl_key': self._ssl.get('key'),
                 'ssl_verify_cert': self._ssl.get('verify_cert') or False,
+                'ssl_verify_identity':
+                    self._ssl.get('verify_identity') or False,
                 'ssl_disabled': self._ssl_disabled
             })
 

@@ -5511,3 +5511,50 @@ class BugOra28188883(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
         cur.close()
         self.cnx.close()
+
+
+@unittest.skipIf(sys.version_info < (2, 7, 9),
+                 "Python 2.7.9+ is required for SSL")
+class BugOra27434751(tests.MySQLConnectorTests):
+    """BUG#27434751: MYSQL.CONNECTOR HAS NO TLS/SSL OPTION TO VERIFY SERVER NAME
+    """
+    def setUp(self):
+        ssl_ca = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'))
+        ssl_cert = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'))
+        ssl_key = os.path.abspath(
+            os.path.join(tests.SSL_DIR, 'tests_client_key.pem'))
+        self.config = tests.get_mysql_config()
+        self.config.pop("unix_socket")
+        self.config["ssl_ca"] = ssl_ca
+        self.config["ssl_cert"] = ssl_cert
+        self.config["ssl_key"] = ssl_key
+        self.config["ssl_verify_cert"] = True
+
+    def _verify_server_name_cnx(self, use_pure=True):
+        config = self.config.copy()
+        config["use_pure"] = use_pure
+        # Setting an invalid host name against a server certificate
+        config["host"] = "127.0.0.1"
+
+        # Should connect with ssl_verify_identity=False
+        config["ssl_verify_identity"] = False
+        cnx = mysql.connector.connect(**config)
+        cnx.close()
+
+        # Should fail to connect with ssl_verify_identity=True
+        config["ssl_verify_identity"] = True
+        self.assertRaises(errors.InterfaceError, mysql.connector.connect,
+                          **config)
+
+        # Should connect with the correct host name and ssl_verify_identity=True
+        config["host"] = "localhost"
+        cnx = mysql.connector.connect(**config)
+        cnx.close()
+
+    def test_verify_server_name_cext_cnx(self):
+        self._verify_server_name_cnx(use_pure=False)
+
+    def test_verify_server_name_pure_cnx(self):
+        self._verify_server_name_cnx(use_pure=True)

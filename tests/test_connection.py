@@ -118,6 +118,7 @@ class ConnectionTests(object):
             'ssl_cert': None,
             'ssl_key': None,
             'ssl_verify_cert': False,
+            'ssl_verify_identity': False,
             'passwd': None,
             'db': None,
             'connect_timeout': None,
@@ -818,7 +819,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._handshake['auth_plugin'] = 'caching_sha2_password'
         self.cnx._handshake['auth_data'] = b'h4i6oP!OLng9&PD@WrYH'
         self.cnx._socket.switch_to_ssl = \
-            lambda ca, cert, key, verify_cert, cipher, ssl_version: None
+            lambda ca, cert, key, verify_cert, verify_identity, cipher, \
+                ssl_version: None
 
         # Test perform_full_authentication
         # Exchange:
@@ -917,7 +919,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 ssl_enabled=True),
         ]
         self.cnx._socket.switch_to_ssl = \
-            lambda ca, cert, key, verify_cert, cipher, ssl_version: None
+            lambda ca, cert, key, verify_cert, verify_identity, cipher, \
+                ssl_version: None
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
             bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00'),
@@ -947,7 +950,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'ssl_ca': 'CACert',
             'ssl_cert': 'ServerCert',
             'ssl_key': 'ServerKey',
-            'ssl_verify_cert': False
+            'ssl_verify_cert': False,
+            'ssl_verify_identity': False
         })
         default_config['converter_class'] = MySQLConverter
         try:
@@ -1062,7 +1066,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'ca': 'CACert',
             'cert': 'ServerCert',
             'key': 'ServerKey',
-            'verify_cert': False
+            'verify_cert': False,
+            'verify_identity': False
         }
         cnx.config(ssl_ca=exp['ca'], ssl_cert=exp['cert'], ssl_key=exp['key'])
         self.assertEqual(exp, cnx._ssl)
@@ -1070,7 +1075,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp['verify_cert'] = True
 
         cnx.config(ssl_ca=exp['ca'], ssl_cert=exp['cert'],
-                   ssl_key=exp['key'], ssl_verify_cert=exp['verify_cert'])
+                   ssl_key=exp['key'], ssl_verify_cert=exp['verify_cert'],
+                   ssl_verify_identity=exp['verify_identity'])
         self.assertEqual(exp, cnx._ssl)
 
         # Missing SSL configuration should raise an AttributeError

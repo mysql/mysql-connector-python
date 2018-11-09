@@ -339,6 +339,9 @@ class MySQLConnectionAbstract(object):
             if 'verify_cert' not in self._ssl:
                 self._ssl['verify_cert'] = \
                     DEFAULT_CONFIGURATION['ssl_verify_cert']
+            if 'verify_identity' not in self._ssl:
+                self._ssl['verify_identity'] = \
+                    DEFAULT_CONFIGURATION['ssl_verify_identity']
             # Make sure both ssl_key/ssl_cert are set, or neither (XOR)
             if 'ca' not in self._ssl or self._ssl['ca'] is None:
                 raise AttributeError(

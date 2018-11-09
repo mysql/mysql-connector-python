@@ -61,6 +61,7 @@ DEFAULT_CONFIGURATION = {
     'ssl_cert': None,
     'ssl_key': None,
     'ssl_verify_cert': False,
+    'ssl_verify_identity': False,
     'ssl_cipher': None,
     'ssl_disabled': False,
     'ssl_version': None,

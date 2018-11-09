@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -1039,7 +1039,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
 	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
-	PyObject *charset_name, *compress, *ssl_verify_cert, *password, *ssl_disabled;
+	PyObject *charset_name, *compress, *ssl_verify_cert, *ssl_verify_identity, *password, *ssl_disabled;
 	const char* auth_plugin;
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
@@ -1060,21 +1060,22 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 	{
 	    "host", "user", "password", "database",
 		"port", "unix_socket", "client_flags",
-		"ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert", "ssl_disabled",
+		"ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert", "ssl_verify_identity", "ssl_disabled",
 		"compress",
 		NULL
     };
 
 #ifdef PY3
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!O!O!", kwlist,
 #else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!O!O!", kwlist,
 #endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
                                      &ssl_ca, &ssl_cert, &ssl_key,
                                      &PyBool_Type, &ssl_verify_cert,
+                                     &PyBool_Type, &ssl_verify_identity,
                                      &PyBool_Type, &ssl_disabled,
                                      &PyBool_Type, &compress))
     {
@@ -1136,8 +1137,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         if (ssl_verify_cert && ssl_verify_cert == Py_True)
         {
 #if MYSQL_VERSION_ID >= 50711
-            ssl_mode= SSL_MODE_VERIFY_IDENTITY;
-            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
+            if (ssl_verify_identity && ssl_verify_identity == Py_True) {
+                ssl_mode= SSL_MODE_VERIFY_IDENTITY;
+                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
+            }
 #else
             abool= 1;
 #if MYSQL_VERSION_ID > 50703
@@ -1147,7 +1150,13 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                           MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
 #endif
         } else {
-          ssl_ca= NULL;
+#if MYSQL_VERSION_ID >= 50711
+            if (ssl_verify_identity && ssl_verify_identity == Py_True) {
+                ssl_mode= SSL_MODE_VERIFY_IDENTITY;
+                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
+            }
+#endif
+            ssl_ca= NULL;
         }
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
     } else {

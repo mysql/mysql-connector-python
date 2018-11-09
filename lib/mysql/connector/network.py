@@ -410,9 +410,9 @@ class BaseMySQLSocket(object):
         """Set the connection timeout"""
         self._connection_timeout = timeout
 
-    # pylint: disable=C0103
-    def switch_to_ssl(self, ca, cert, key, verify_cert=False, cipher=None,
-                      ssl_version=None):
+    # pylint: disable=C0103,E1101
+    def switch_to_ssl(self, ca, cert, key, verify_cert=False,
+                      verify_identity=False, cipher=None, ssl_version=None):
         """Switch the socket to use SSL"""
         if not self.sock:
             raise errors.InterfaceError(errno=2048)
@@ -434,17 +434,21 @@ class BaseMySQLSocket(object):
                     cert_reqs=cert_reqs, do_handshake_on_connect=False,
                     ssl_version=ssl_version, ciphers=cipher)
             self.sock.do_handshake()
+            if verify_identity:
+                ssl.match_hostname(self.sock.getpeercert(), self.server_host)
         except NameError:
             raise errors.NotSupportedError(
                 "Python installation has no SSL support")
         except (ssl.SSLError, IOError) as err:
             raise errors.InterfaceError(
                 errno=2055, values=(self.get_address(), _strioerror(err)))
+        except ssl.CertificateError as err:
+            raise errors.InterfaceError(str(err))
         except NotImplementedError as err:
             raise errors.InterfaceError(str(err))
 
 
-# pylint: enable=C0103
+# pylint: enable=C0103,E1101
 
 
 class MySQLUnixSocket(BaseMySQLSocket):
