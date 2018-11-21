@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -45,12 +45,15 @@ LOGGER = logging.getLogger(tests.LOGGER_NAME)
 _CREATE_TEST_TABLE_QUERY = "CREATE TABLE `{0}`.`{1}` (id INT)"
 _INSERT_TEST_TABLE_QUERY = "INSERT INTO `{0}`.`{1}` VALUES ({2})"
 _CREATE_TEST_VIEW_QUERY = ("CREATE VIEW `{0}`.`{1}` AS SELECT * "
-                           "FROM `{2}`.`{3}`;")
-_COUNT_TABLES_QUERY = ("SELECT COUNT(*) FROM information_schema.tables "
-                       "WHERE table_schema = '{0}' AND table_name = '{1}'")
+                           "FROM `{2}`.`{3}`")
 _CREATE_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS {2}"
 _DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
 _DROP_VIEW_QUERY = "DROP VIEW IF EXISTS `{0}`.`{1}`"
+_PREP_STMT_QUERY = (
+    "SELECT p.sql_text, p.count_execute "
+    "FROM performance_schema.prepared_statements_instances AS p "
+    "JOIN performance_schema.threads AS t ON p.owner_thread_id = t.thread_id "
+    "AND t.processlist_id = @@pseudo_thread_id")
 
 
 def create_view(schema, view_name, defined_as):
@@ -1151,6 +1154,43 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
+    def test_bind(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
+        ).execute()
+
+        # Empty bind should not be allowed
+        find = collection.find("$.age == :age")
+        self.assertRaises(mysqlx.ProgrammingError, find.bind)
+
+        # Invalid arguments to bind
+        find = collection.find("$.age == :age")
+        self.assertRaises(mysqlx.ProgrammingError, find.bind, 21, 28, 42)
+
+        # Bind with a dictionary
+        result = collection.find("$.age == :age").bind({"age": 67}).execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual("Betty", docs[0]["name"])
+
+        # Bind with a JSON string
+        result = collection.find("$.age == :age").bind('{"age": 42}').execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual("Wilma", docs[0]["name"])
+
+        result = collection.find("$.age == :age").bind("age", 28).execute()
+        docs = result.fetch_all()
+        self.assertEqual(1, len(docs))
+        self.assertEqual("Barney", docs[0]["name"])
+
+        self.schema.drop_collection(collection_name)
+
     def test_find(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
@@ -1895,20 +1935,48 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         docs = collection.find("$._id == 2").execute().fetch_all()
         self.assertEqual([1, 2, 3, 4], docs[0]["cards"])
 
+        # Test binding
+        modify = collection.modify("$._id == :id").array_insert("$.cards[0]", 0)
+        modify.bind("id", 1).execute()
+        doc = collection.get_one(1)
+        self.assertEqual([0], doc["cards"])
+
+        modify.bind("id", 2).execute()
+        doc = collection.get_one(2)
+        self.assertEqual([0, 1, 2, 3, 4], doc["cards"])
+
+        modify.bind("id", 3).execute()
+        doc = collection.get_one(3)
+        self.assertEqual([0], doc["cards"])
+
         self.schema.drop_collection(collection_name)
 
     def test_array_append(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
         collection.add(
-            {"_id": 1, "name": "Fred", "cards": []},
+            {"_id": 1, "name": "Fred", "cards": [1]},
             {"_id": 2, "name": "Barney", "cards": [1, 2, 4]},
-            {"_id": 3, "name": "Wilma", "cards": []},
+            {"_id": 3, "name": "Wilma", "cards": [1, 2]},
             {"_id": 4, "name": "Betty", "cards": []},
         ).execute()
         collection.modify("$._id == 2").array_append("$.cards[1]", 3).execute()
         docs = collection.find("$._id == 2").execute().fetch_all()
         self.assertEqual([1, [2, 3], 4], docs[0]["cards"])
+
+        # Test binding
+        modify = collection.modify("$._id == :id").array_append("$.cards[0]", 5)
+        modify.bind("id", 1).execute()
+        doc = collection.get_one(1)
+        self.assertEqual([[1, 5]], doc["cards"])
+
+        modify.bind("id", 2).execute()
+        doc = collection.get_one(2)
+        self.assertEqual([[1, 5], [2, 3], 4], doc["cards"])
+
+        modify.bind("id", 3).execute()
+        doc = collection.get_one(3)
+        self.assertEqual([[1, 5], 2], doc["cards"])
 
         self.schema.drop_collection(collection_name)
 
@@ -1924,6 +1992,164 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(4, collection.count())
         self.schema.drop_collection(collection_name)
         self.assertRaises(mysqlx.OperationalError, collection.count)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 14),
+                     "Prepared statements not supported")
+    def test_prepared_statements(self):
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+        expected_stmt_attrs = \
+            lambda stmt, changed, prepared, repeated, exec_counter: \
+            stmt.changed == changed and stmt.prepared == prepared and \
+            stmt.repeated == repeated and stmt.exec_counter == exec_counter
+
+        collection_name = "prepared_collection_test"
+        collection = schema.create_collection(collection_name)
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
+            {"_id": "5", "name": "Bob", "age": 75},
+        ).execute()
+
+        # FindStatement
+
+        find = collection.find("$.age == :age")
+        self.assertTrue(expected_stmt_attrs(find, True, False, False, 0))
+
+        # On the first call should: Crud::Find (without prepared statement)
+        find.bind("age", 21).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        find.bind("age", 28).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        find.bind("age", 42).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, True, True, 3))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[0]
+        expected_sql_text = ("SELECT doc FROM `{}`.`{}` "
+                             "WHERE (JSON_EXTRACT(doc,'$.age') = ?)"
+                             "".format(self.schema_name, collection_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], find.exec_counter - 1)
+
+        # Using sort() should deallocate the prepared statement:
+        # Prepare::Deallocate + Crud::Find
+        find.bind("age", 21).sort("age").execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        find.bind("age", 42).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, True, True, 2))
+
+        # The previous statement should be closed since it had no limit/offset
+        # Prepare::Deallocate + Prepare::Prepare + Prepare::Execute
+        find.bind("age", 67).limit(1).offset(0).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, True, False, 1))
+
+        # On the second call should: Prepare::Execute
+        find.bind("age", 75).limit(1).offset(0).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(find, False, True, True, 2))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[0]
+        expected_sql_text = ("SELECT doc FROM `{}`.`{}` "
+                             "WHERE (JSON_EXTRACT(doc,'$.age') = ?) "
+                             "ORDER BY JSON_EXTRACT(doc,'$.age') LIMIT ?, ?"
+                             "".format(self.schema_name, collection_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], find.exec_counter)
+
+        # ModifyStatement
+
+        modify = collection.modify("$._id == :id").set("age", 18)
+        self.assertTrue(expected_stmt_attrs(modify, True, False, False, 0))
+
+        # On the first call should: Crud::Modify (without prepared statement)
+        res = modify.bind("id", "1").execute()
+        self.assertTrue(expected_stmt_attrs(modify, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        res = modify.bind("id", "2").execute()
+        self.assertTrue(expected_stmt_attrs(modify, False, True, True, 2))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[1]
+        expected_sql_text = ("UPDATE `{}`.`{}` "
+                             "SET doc=JSON_SET(JSON_SET(doc,'$.age',18),"
+                             "'$._id',JSON_EXTRACT(`doc`,'$._id')) "
+                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?)"
+                             "".format(self.schema_name, collection_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], modify.exec_counter - 1)
+
+        # Using set() should deallocate the prepared statement:
+        # Prepare::Deallocate + Crud::Modify
+        res = modify.bind("id", "3").set("age", 92).execute()
+        self.assertTrue(expected_stmt_attrs(modify, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        res = modify.bind("id", "4").execute()
+        self.assertTrue(expected_stmt_attrs(modify, False, True, True, 2))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[1]
+        expected_sql_text = ("UPDATE `{}`.`{}` "
+                             "SET doc=JSON_SET(JSON_SET(doc,'$.age',92),'$._id'"
+                             ",JSON_EXTRACT(`doc`,'$._id')) "
+                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?)"
+                             "".format(self.schema_name, collection_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], modify.exec_counter - 1)
+
+        # RemoveStatement
+
+        remove = collection.remove("$._id == :id").limit(2)
+        self.assertTrue(expected_stmt_attrs(remove, True, False, False, 0))
+
+        # On the first call should: Crud::Remove (without prepared statement)
+        remove.bind("id", "1").execute()
+        self.assertTrue(expected_stmt_attrs(remove, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        remove.bind("id", "2").execute()
+        self.assertTrue(expected_stmt_attrs(remove, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        remove.bind("id", "3").execute()
+        self.assertTrue(expected_stmt_attrs(remove, False, True, True, 3))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[2]
+        expected_sql_text = ("DELETE FROM `{}`.`{}` "
+                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?) LIMIT ?"
+                             "".format(self.schema_name, collection_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], remove.exec_counter - 1)
+
+        # Using sort() should deallocate the prepared statement:
+        # Prepare::Deallocate + Crud::Remove
+        remove.bind("id", "3").sort("_id ASC").execute()
+        self.assertTrue(expected_stmt_attrs(remove, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        remove.bind("id", "4").execute()
+        self.assertTrue(expected_stmt_attrs(remove, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        remove.bind("id", "5").execute()
+        self.assertTrue(expected_stmt_attrs(remove, False, True, True, 3))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[2]
+        expected_sql_text = ("DELETE FROM `{}`.`{}` "
+                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?) "
+                             "ORDER BY JSON_EXTRACT(doc,'$._id') LIMIT ?"
+                             "".format(self.schema_name, collection_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], remove.exec_counter - 1)
+
+        schema.drop_collection(collection_name)
+        session.close()
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -2339,6 +2565,160 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         drop_table(self.schema, table_name)
         drop_view(self.schema, view_name)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 14),
+                     "Prepared statements not supported")
+    def test_prepared_statements(self):
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+        expected_stmt_attrs = \
+            lambda stmt, changed, prepared, repeated, exec_counter: \
+            stmt.changed == changed and stmt.prepared == prepared and \
+            stmt.repeated == repeated and stmt.exec_counter == exec_counter
+
+        table_name = "prepared_table_test"
+        session.sql("CREATE TABLE {}.{}(id INT KEY AUTO_INCREMENT, "
+                    "name VARCHAR(50), age INT)"
+                    "".format(self.schema_name, table_name)).execute()
+        table = schema.get_table(table_name)
+        table.insert("name", "age") \
+            .values("Fred", 21) \
+            .values("Barney", 28) \
+            .values("Wilma", 42) \
+            .values("Betty", 67) \
+            .values("Bob", 75).execute()
+
+        # SelectStatement
+
+        select = table.select().where("age == :age")
+        self.assertTrue(expected_stmt_attrs(select, True, False, False, 0))
+
+        # On the first call should: Crud::Select (without prepared statement)
+        select.bind("age", 21).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        select.bind("age", 28).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        select.bind("age", 42).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, True, True, 3))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[0]
+        expected_sql_text = ("SELECT * FROM `{}`.`{}` "
+                             "WHERE (`age` = ?)"
+                             "".format(self.schema_name, table_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], select.exec_counter - 1)
+
+        # Using sort() should deallocate the prepared statement:
+        # Prepare::Deallocate + Crud::Select
+        select.bind("age", 21).order_by("age").execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        select.bind("age", 42).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, True, True, 2))
+
+        # The previous statement should be closed since it had no limit/offset
+        # Prepare::Deallocate + Crud::Find
+        select.bind("age", 67).limit(1).offset(0).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, True, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        select.bind("age", 75).limit(1).offset(0).execute().fetch_all()
+        self.assertTrue(expected_stmt_attrs(select, False, True, True, 2))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[0]
+        expected_sql_text = ("SELECT * FROM `{}`.`{}` "
+                             "WHERE (`age` = ?) ORDER BY `age` LIMIT ?, ?"
+                             "".format(self.schema_name, table_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], select.exec_counter)
+
+        # UpdateStatement
+
+        update = table.update().where("id == :id").set("age", 18)
+        self.assertTrue(expected_stmt_attrs(update, True, False, False, 0))
+
+        # On the first call should: Crud::Update (without prepared statement)
+        update.bind("id", 1).execute()
+        self.assertTrue(expected_stmt_attrs(update, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        update.bind("id", 2).execute()
+        self.assertTrue(expected_stmt_attrs(update, False, True, True, 2))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[1]
+        expected_sql_text = ("UPDATE `{}`.`{}` SET `age`=18 "
+                             "WHERE (`id` = ?)"
+                             "".format(self.schema_name, table_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], update.exec_counter - 1)
+
+        # Using set() should deallocate the prepared statement:
+        # Prepare::Deallocate + Crud::Update
+        update.bind("id", "3").set("age", 92).execute()
+        self.assertTrue(expected_stmt_attrs(update, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        update.bind("id", "4").execute()
+        self.assertTrue(expected_stmt_attrs(update, False, True, True, 2))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[1]
+        expected_sql_text = ("UPDATE `{}`.`{}` "
+                             "SET `age`=92 WHERE (`id` = ?)"
+                             "".format(self.schema_name, table_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], update.exec_counter - 1)
+
+        # DeleteStatement
+
+        delete = table.delete().where("id == :id")
+        self.assertTrue(expected_stmt_attrs(delete, True, False, False, 0))
+
+        # On the first call should: Crud::Delete (without prepared statement)
+        delete.bind("id", 1).execute()
+        self.assertTrue(expected_stmt_attrs(delete, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        delete.bind("id", 2).execute()
+        self.assertTrue(expected_stmt_attrs(delete, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        delete.bind("id", 3).execute()
+        self.assertTrue(expected_stmt_attrs(delete, False, True, True, 3))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[2]
+        expected_sql_text = ("DELETE FROM `{}`.`{}` "
+                             "WHERE (`id` = ?)"
+                             "".format(self.schema_name, table_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], delete.exec_counter - 1)
+
+        # Using sort() should deallocate the prepared statement:
+        # Prepare::Deallocate + Crud::Delete
+        delete.bind("id", 3).sort("age ASC").execute()
+        self.assertTrue(expected_stmt_attrs(delete, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        delete.bind("id", 4).execute()
+        self.assertTrue(expected_stmt_attrs(delete, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        delete.bind("id", 5).execute()
+        self.assertTrue(expected_stmt_attrs(delete, False, True, True, 3))
+
+        row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[2]
+        expected_sql_text = ("DELETE FROM `{}`.`{}` "
+                             "WHERE (`id` = ?) ORDER BY `age`"
+                             "".format(self.schema_name, table_name))
+        self.assertEqual(row[0], expected_sql_text)
+        self.assertEqual(row[1], delete.exec_counter - 1)
+
+        drop_table(schema, table_name)
+        session.close()
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")

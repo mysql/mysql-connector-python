@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -290,7 +290,7 @@ def build_expr(value):
     if isinstance(value, (Message)):
         return value
     elif isinstance(value, (ExprParser)):
-        return value.expr()
+        return value.expr(reparse=True)
     elif isinstance(value, (dict, DbDoc)):
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OBJECT")
         msg["object"] = build_object(value).get_message()
@@ -1168,7 +1168,13 @@ class ExprParser(object):
         return self.parse_left_assoc_binary_op_expr(
             set([TokenType.OR, TokenType.OROR]), self.xor_expr)
 
-    def expr(self):
+    def expr(self, reparse=False):
+        if reparse:
+            self.tokens = []
+            self.pos = 0
+            self.placeholder_name_to_position = {}
+            self.positional_placeholder_count = 0
+            self.lex()
         return self.or_expr()
 
     def parse_table_insert_field(self):

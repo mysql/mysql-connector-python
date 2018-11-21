@@ -19,8 +19,7 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_resultset.proto',
   package='Mysqlx.Resultset',
-  syntax='proto2',
-  serialized_pb=_b('\n\x16mysqlx_resultset.proto\x12\x10Mysqlx.Resultset\"\x18\n\x16\x46\x65tchDoneMoreOutParams\"\x19\n\x17\x46\x65tchDoneMoreResultsets\"\x0b\n\tFetchDone\"\x9f\x03\n\x0e\x43olumnMetaData\x12\x38\n\x04type\x18\x01 \x02(\x0e\x32*.Mysqlx.Resultset.ColumnMetaData.FieldType\x12\x0c\n\x04name\x18\x02 \x01(\x0c\x12\x15\n\roriginal_name\x18\x03 \x01(\x0c\x12\r\n\x05table\x18\x04 \x01(\x0c\x12\x16\n\x0eoriginal_table\x18\x05 \x01(\x0c\x12\x0e\n\x06schema\x18\x06 \x01(\x0c\x12\x0f\n\x07\x63\x61talog\x18\x07 \x01(\x0c\x12\x11\n\tcollation\x18\x08 \x01(\x04\x12\x19\n\x11\x66ractional_digits\x18\t \x01(\r\x12\x0e\n\x06length\x18\n \x01(\r\x12\r\n\x05\x66lags\x18\x0b \x01(\r\x12\x14\n\x0c\x63ontent_type\x18\x0c \x01(\r\"\x82\x01\n\tFieldType\x12\x08\n\x04SINT\x10\x01\x12\x08\n\x04UINT\x10\x02\x12\n\n\x06\x44OUBLE\x10\x05\x12\t\n\x05\x46LOAT\x10\x06\x12\t\n\x05\x42YTES\x10\x07\x12\x08\n\x04TIME\x10\n\x12\x0c\n\x08\x44\x41TETIME\x10\x0c\x12\x07\n\x03SET\x10\x0f\x12\x08\n\x04\x45NUM\x10\x10\x12\x07\n\x03\x42IT\x10\x11\x12\x0b\n\x07\x44\x45\x43IMAL\x10\x12\"\x14\n\x03Row\x12\r\n\x05\x66ield\x18\x01 \x03(\x0c*4\n\x11\x43ontentType_BYTES\x12\x0c\n\x08GEOMETRY\x10\x01\x12\x08\n\x04JSON\x10\x02\x12\x07\n\x03XML\x10\x03*.\n\x14\x43ontentType_DATETIME\x12\x08\n\x04\x44\x41TE\x10\x01\x12\x0c\n\x08\x44\x41TETIME\x10\x02\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
+  serialized_pb=_b('\n\x16mysqlx_resultset.proto\x12\x10Mysqlx.Resultset\"\x18\n\x16\x46\x65tchDoneMoreOutParams\"\x19\n\x17\x46\x65tchDoneMoreResultsets\"\x0b\n\tFetchDone\"\x10\n\x0e\x46\x65tchSuspended\"\x9f\x03\n\x0e\x43olumnMetaData\x12\x38\n\x04type\x18\x01 \x02(\x0e\x32*.Mysqlx.Resultset.ColumnMetaData.FieldType\x12\x0c\n\x04name\x18\x02 \x01(\x0c\x12\x15\n\roriginal_name\x18\x03 \x01(\x0c\x12\r\n\x05table\x18\x04 \x01(\x0c\x12\x16\n\x0eoriginal_table\x18\x05 \x01(\x0c\x12\x0e\n\x06schema\x18\x06 \x01(\x0c\x12\x0f\n\x07\x63\x61talog\x18\x07 \x01(\x0c\x12\x11\n\tcollation\x18\x08 \x01(\x04\x12\x19\n\x11\x66ractional_digits\x18\t \x01(\r\x12\x0e\n\x06length\x18\n \x01(\r\x12\r\n\x05\x66lags\x18\x0b \x01(\r\x12\x14\n\x0c\x63ontent_type\x18\x0c \x01(\r\"\x82\x01\n\tFieldType\x12\x08\n\x04SINT\x10\x01\x12\x08\n\x04UINT\x10\x02\x12\n\n\x06\x44OUBLE\x10\x05\x12\t\n\x05\x46LOAT\x10\x06\x12\t\n\x05\x42YTES\x10\x07\x12\x08\n\x04TIME\x10\n\x12\x0c\n\x08\x44\x41TETIME\x10\x0c\x12\x07\n\x03SET\x10\x0f\x12\x08\n\x04\x45NUM\x10\x10\x12\x07\n\x03\x42IT\x10\x11\x12\x0b\n\x07\x44\x45\x43IMAL\x10\x12\"\x14\n\x03Row\x12\r\n\x05\x66ield\x18\x01 \x03(\x0c*4\n\x11\x43ontentType_BYTES\x12\x0c\n\x08GEOMETRY\x10\x01\x12\x08\n\x04JSON\x10\x02\x12\x07\n\x03XML\x10\x03*.\n\x14\x43ontentType_DATETIME\x12\x08\n\x04\x44\x41TE\x10\x01\x12\x0c\n\x08\x44\x41TETIME\x10\x02\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -45,8 +44,8 @@ _CONTENTTYPE_BYTES = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=550,
-  serialized_end=602,
+  serialized_start=568,
+  serialized_end=620,
 )
 _sym_db.RegisterEnumDescriptor(_CONTENTTYPE_BYTES)
 
@@ -68,8 +67,8 @@ _CONTENTTYPE_DATETIME = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=604,
-  serialized_end=650,
+  serialized_start=622,
+  serialized_end=668,
 )
 _sym_db.RegisterEnumDescriptor(_CONTENTTYPE_DATETIME)
 
@@ -134,8 +133,8 @@ _COLUMNMETADATA_FIELDTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=396,
-  serialized_end=526,
+  serialized_start=414,
+  serialized_end=544,
 )
 _sym_db.RegisterEnumDescriptor(_COLUMNMETADATA_FIELDTYPE)
 
@@ -155,7 +154,6 @@ _FETCHDONEMOREOUTPARAMS = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -179,7 +177,6 @@ _FETCHDONEMORERESULTSETS = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -203,12 +200,34 @@ _FETCHDONE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
   serialized_start=97,
   serialized_end=108,
+)
+
+
+_FETCHSUSPENDED = _descriptor.Descriptor(
+  name='FetchSuspended',
+  full_name='Mysqlx.Resultset.FetchSuspended',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=110,
+  serialized_end=126,
 )
 
 
@@ -312,12 +331,11 @@ _COLUMNMETADATA = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=111,
-  serialized_end=526,
+  serialized_start=129,
+  serialized_end=544,
 )
 
 
@@ -343,12 +361,11 @@ _ROW = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=528,
-  serialized_end=548,
+  serialized_start=546,
+  serialized_end=566,
 )
 
 _COLUMNMETADATA.fields_by_name['type'].enum_type = _COLUMNMETADATA_FIELDTYPE
@@ -356,6 +373,7 @@ _COLUMNMETADATA_FIELDTYPE.containing_type = _COLUMNMETADATA
 DESCRIPTOR.message_types_by_name['FetchDoneMoreOutParams'] = _FETCHDONEMOREOUTPARAMS
 DESCRIPTOR.message_types_by_name['FetchDoneMoreResultsets'] = _FETCHDONEMORERESULTSETS
 DESCRIPTOR.message_types_by_name['FetchDone'] = _FETCHDONE
+DESCRIPTOR.message_types_by_name['FetchSuspended'] = _FETCHSUSPENDED
 DESCRIPTOR.message_types_by_name['ColumnMetaData'] = _COLUMNMETADATA
 DESCRIPTOR.message_types_by_name['Row'] = _ROW
 DESCRIPTOR.enum_types_by_name['ContentType_BYTES'] = _CONTENTTYPE_BYTES
@@ -381,6 +399,13 @@ FetchDone = _reflection.GeneratedProtocolMessageType('FetchDone', (_message.Mess
   # @@protoc_insertion_point(class_scope:Mysqlx.Resultset.FetchDone)
   ))
 _sym_db.RegisterMessage(FetchDone)
+
+FetchSuspended = _reflection.GeneratedProtocolMessageType('FetchSuspended', (_message.Message,), dict(
+  DESCRIPTOR = _FETCHSUSPENDED,
+  __module__ = 'mysqlx_resultset_pb2'
+  # @@protoc_insertion_point(class_scope:Mysqlx.Resultset.FetchSuspended)
+  ))
+_sym_db.RegisterMessage(FetchSuspended)
 
 ColumnMetaData = _reflection.GeneratedProtocolMessageType('ColumnMetaData', (_message.Message,), dict(
   DESCRIPTOR = _COLUMNMETADATA,

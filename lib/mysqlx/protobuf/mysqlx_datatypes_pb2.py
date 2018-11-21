@@ -18,7 +18,6 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_datatypes.proto',
   package='Mysqlx.Datatypes',
-  syntax='proto2',
   serialized_pb=_b('\n\x16mysqlx_datatypes.proto\x12\x10Mysqlx.Datatypes\"\xc6\x03\n\x06Scalar\x12+\n\x04type\x18\x01 \x02(\x0e\x32\x1d.Mysqlx.Datatypes.Scalar.Type\x12\x14\n\x0cv_signed_int\x18\x02 \x01(\x12\x12\x16\n\x0ev_unsigned_int\x18\x03 \x01(\x04\x12\x31\n\x08v_octets\x18\x05 \x01(\x0b\x32\x1f.Mysqlx.Datatypes.Scalar.Octets\x12\x10\n\x08v_double\x18\x06 \x01(\x01\x12\x0f\n\x07v_float\x18\x07 \x01(\x02\x12\x0e\n\x06v_bool\x18\x08 \x01(\x08\x12\x31\n\x08v_string\x18\t \x01(\x0b\x32\x1f.Mysqlx.Datatypes.Scalar.String\x1a*\n\x06String\x12\r\n\x05value\x18\x01 \x02(\x0c\x12\x11\n\tcollation\x18\x02 \x01(\x04\x1a-\n\x06Octets\x12\r\n\x05value\x18\x01 \x02(\x0c\x12\x14\n\x0c\x63ontent_type\x18\x02 \x01(\r\"m\n\x04Type\x12\n\n\x06V_SINT\x10\x01\x12\n\n\x06V_UINT\x10\x02\x12\n\n\x06V_NULL\x10\x03\x12\x0c\n\x08V_OCTETS\x10\x04\x12\x0c\n\x08V_DOUBLE\x10\x05\x12\x0b\n\x07V_FLOAT\x10\x06\x12\n\n\x06V_BOOL\x10\x07\x12\x0c\n\x08V_STRING\x10\x08\"}\n\x06Object\x12\x31\n\x03\x66ld\x18\x01 \x03(\x0b\x32$.Mysqlx.Datatypes.Object.ObjectField\x1a@\n\x0bObjectField\x12\x0b\n\x03key\x18\x01 \x02(\t\x12$\n\x05value\x18\x02 \x02(\x0b\x32\x15.Mysqlx.Datatypes.Any\"-\n\x05\x41rray\x12$\n\x05value\x18\x01 \x03(\x0b\x32\x15.Mysqlx.Datatypes.Any\"\xd3\x01\n\x03\x41ny\x12(\n\x04type\x18\x01 \x02(\x0e\x32\x1a.Mysqlx.Datatypes.Any.Type\x12(\n\x06scalar\x18\x02 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12%\n\x03obj\x18\x03 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Object\x12&\n\x05\x61rray\x18\x04 \x01(\x0b\x32\x17.Mysqlx.Datatypes.Array\")\n\x04Type\x12\n\n\x06SCALAR\x10\x01\x12\n\n\x06OBJECT\x10\x02\x12\t\n\x05\x41RRAY\x10\x03\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -127,7 +126,6 @@ _SCALAR_STRING = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -164,7 +162,6 @@ _SCALAR_OCTETS = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -210,14 +207,14 @@ _SCALAR = _descriptor.Descriptor(
     _descriptor.FieldDescriptor(
       name='v_double', full_name='Mysqlx.Datatypes.Scalar.v_double', index=4,
       number=6, type=1, cpp_type=5, label=1,
-      has_default_value=False, default_value=float(0),
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='v_float', full_name='Mysqlx.Datatypes.Scalar.v_float', index=5,
       number=7, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -244,7 +241,6 @@ _SCALAR = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -282,7 +278,6 @@ _OBJECT_OBJECTFIELD = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -312,7 +307,6 @@ _OBJECT = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -343,7 +337,6 @@ _ARRAY = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -396,7 +389,6 @@ _ANY = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],

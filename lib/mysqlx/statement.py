@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -38,7 +38,7 @@ from .compat import INT_TYPES, STRING_TYPES
 from .constants import LockContention
 from .dbdoc import DbDoc
 from .helpers import deprecated
-from .result import SqlResult, Result
+from .result import Result
 from .protobuf import mysqlxpb_enum
 
 ERR_INVALID_INDEX_NAME = 'The given index name "{}" is not valid'
@@ -135,6 +135,11 @@ class Statement(object):
         self._target = target
         self._doc_based = doc_based
         self._connection = target.get_connection() if target else None
+        self._stmt_id = None
+        self._exec_counter = 0
+        self._changed = True
+        self._prepared = False
+        self._deallocate_prepare_execute = False
 
     @property
     def target(self):
@@ -146,6 +151,58 @@ class Statement(object):
         """:class:`mysqlx.Schema`: The Schema object."""
         return self._target.schema
 
+    @property
+    def stmt_id(self):
+        """Returns this statement ID.
+
+        Returns:
+            int: The statement ID.
+        """
+        return self._stmt_id
+
+    @stmt_id.setter
+    def stmt_id(self, value):
+        self._stmt_id = value
+
+    @property
+    def exec_counter(self):
+        """int: The number of times this statement was executed."""
+        return self._exec_counter
+
+    @property
+    def changed(self):
+        """bool: `True` if this statement has changes."""
+        return self._changed
+
+    @changed.setter
+    def changed(self, value):
+        self._changed = value
+
+    @property
+    def prepared(self):
+        """bool: `True` if this statement has been prepared."""
+        return self._prepared
+
+    @prepared.setter
+    def prepared(self, value):
+        self._prepared = value
+
+    @property
+    def repeated(self):
+        """bool: `True` if this statement was executed more than once.
+        """
+        return self._exec_counter > 1
+
+    @property
+    def deallocate_prepare_execute(self):
+        """bool: `True` to deallocate + prepare + execute statement.
+        """
+        return self._deallocate_prepare_execute
+
+    @deallocate_prepare_execute.setter
+    def deallocate_prepare_execute(self, value):
+        self._deallocate_prepare_execute = value
+
     def is_doc_based(self):
         """Check if it is document based.
 
@@ -153,6 +210,14 @@ class Statement(object):
             bool: `True` if it is document based.
         """
         return self._doc_based
+
+    def increment_exec_counter(self):
+        """Increments the number of times this statement has been executed."""
+        self._exec_counter += 1
+
+    def reset_exec_counter(self):
+        """Resets the number of times this statement has been executed."""
+        self._exec_counter = 0
 
     def execute(self):
         """Execute the statement.
@@ -178,12 +243,12 @@ class FilterableStatement(Statement):
         super(FilterableStatement, self).__init__(target=target,
                                                   doc_based=doc_based)
         self._binding_map = {}
-        self._bindings = []
+        self._bindings = {}
         self._having = None
         self._grouping_str = ""
         self._grouping = None
         self._limit_offset = 0
-        self._limit_row_count = 0
+        self._limit_row_count = None
         self._projection_str = ""
         self._projection_expr = None
         self._sort_str = ""
@@ -204,14 +269,16 @@ class FilterableStatement(Statement):
         """Bind single object.
 
         Args:
-            obj(:class:`mysqlx.DbDoc` or str): DbDoc or JSON string object.
+            obj (:class:`mysqlx.DbDoc` or str): DbDoc or JSON string object.
 
         Raises:
             :class:`mysqlx.ProgrammingError`: If invalid JSON string to bind.
             ValueError: If JSON loaded is not a dictionary.
         """
-        if isinstance(obj, DbDoc):
-            self.bind(str(obj))
+        if isinstance(obj, dict):
+            self.bind(DbDoc(obj).as_str())
+        elif isinstance(obj, DbDoc):
+            self.bind(obj.as_str())
         elif isinstance(obj, STRING_TYPES):
             try:
                 res = json.loads(obj)
@@ -237,6 +304,7 @@ class FilterableStatement(Statement):
         self._sort_str = ",".join(flexible_params(*clauses))
         self._sort_expr = ExprParser(self._sort_str,
                                      not self._doc_based).parse_order_spec()
+        self._changed = True
         return self
 
     def _set_where(self, condition):
@@ -257,6 +325,7 @@ class FilterableStatement(Statement):
         except ValueError:
             raise ProgrammingError("Invalid condition")
         self._binding_map = expr.placeholder_name_to_position
+        self._changed = True
         return self
 
     def _set_group_by(self, *fields):
@@ -270,6 +339,7 @@ class FilterableStatement(Statement):
         self._grouping_str = ",".join(fields)
         self._grouping = ExprParser(self._grouping_str,
                                     not self._doc_based).parse_expr_list()
+        self._changed = True
 
     def _set_having(self, condition):
         """Set having.
@@ -279,6 +349,7 @@ class FilterableStatement(Statement):
         """
         self.has_having = True
         self._having = ExprParser(condition, not self._doc_based).expr()
+        self._changed = True
 
     def _set_projection(self, *fields):
         """Set the projection.
@@ -295,6 +366,7 @@ class FilterableStatement(Statement):
         self._projection_expr = ExprParser(
             self._projection_str,
             not self._doc_based).parse_table_select_projection()
+        self._changed = True
         return self
 
     def get_binding_map(self):
@@ -415,8 +487,12 @@ class FilterableStatement(Statement):
         """
         if not isinstance(row_count, INT_TYPES) or row_count < 0:
             raise ValueError("The 'row_count' value must be a positive integer")
-        self.has_limit = True
+        if not self.has_limit:
+            self._changed = bool(self._exec_counter == 0)
+            self._deallocate_prepare_execute = bool(not self._exec_counter == 0)
+
         self._limit_row_count = row_count
+        self.has_limit = True
         if offset:
             self.offset(offset)
             warnings.warn("'limit(row_count, offset)' is deprecated, please "
@@ -444,7 +520,7 @@ class FilterableStatement(Statement):
         return self
 
     def bind(self, *args):
-        """Binds a value to a specific placeholder.
+        """Binds value(s) to a specific placeholder(s).
 
         Args:
             *args: The name of the placeholder and the value to bind.
@@ -461,10 +537,10 @@ class FilterableStatement(Statement):
         count = len(args)
         if count == 1:
             self._bind_single(args[0])
-        elif count > 2:
-            raise ProgrammingError("Invalid number of arguments to bind")
+        elif count == 2:
+            self._bindings[args[0]] = args[1]
         else:
-            self._bindings.append({"name": args[0], "value": args[1]})
+            raise ProgrammingError("Invalid number of arguments to bind")
         return self
 
     def execute(self):
@@ -487,6 +563,50 @@ class SqlStatement(Statement):
         super(SqlStatement, self).__init__(target=None, doc_based=False)
         self._connection = connection
         self._sql = sql
+        self._binding_map = None
+        self._bindings = []
+        self.has_bindings = False
+        self.has_limit = False
+
+    @property
+    def sql(self):
+        """string: The SQL text statement."""
+        return self._sql
+
+    def get_binding_map(self):
+        """Returns the binding map dictionary.
+
+        Returns:
+            dict: The binding map dictionary.
+        """
+        return self._binding_map
+
+    def get_bindings(self):
+        """Returns the bindings list.
+
+        Returns:
+            `list`: The bindings list.
+        """
+        return self._bindings
+
+    def bind(self, *args):
+        """Binds value(s) to a specific placeholder(s).
+
+        Args:
+            *args: The value(s) to bind.
+
+        Returns:
+            mysqlx.SqlStatement: SqlStatement object.
+        """
+        if len(args) == 0:
+            raise ProgrammingError("Invalid number of arguments to bind")
+        self.has_bindings = True
+        bindings = flexible_params(*args)
+        if isinstance(bindings, (list, tuple)):
+            self._bindings = bindings
+        else:
+            self._bindings.append(bindings)
+        return self
 
     def execute(self):
         """Execute the statement.
@@ -494,8 +614,7 @@ class SqlStatement(Statement):
         Returns:
             mysqlx.SqlResult: SqlResult object.
         """
-        self._connection.send_sql(self._sql)
-        return SqlResult(self._connection)
+        return self._connection.send_sql(self)
 
 
 class WriteStatement(Statement):
@@ -628,7 +747,7 @@ class ModifyStatement(FilterableStatement):
     def __init__(self, collection, condition):
         super(ModifyStatement, self).__init__(target=collection,
                                               condition=condition)
-        self._update_ops = []
+        self._update_ops = {}
 
     def sort(self, *clauses):
         """Sets the sorting criteria.
@@ -659,9 +778,10 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(UpdateSpec(mysqlxpb_enum(
+        self._update_ops[doc_path] = UpdateSpec(mysqlxpb_enum(
             "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_SET"),
-                                           doc_path, value))
+                                                doc_path, value)
+        self._changed = True
         return self
 
     @deprecated("8.0.12")
@@ -678,25 +798,26 @@ class ModifyStatement(FilterableStatement):
 
         .. deprecated:: 8.0.12
         """
-        self._update_ops.append(UpdateSpec(mysqlxpb_enum(
+        self._update_ops[doc_path] = UpdateSpec(mysqlxpb_enum(
             "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"),
-                                           doc_path, value))
+                                                doc_path, value)
+        self._changed = True
         return self
 
     def unset(self, *doc_paths):
         """Removes attributes from documents in a collection.
 
         Args:
-            doc_path (string): The document path of the attribute to be
-                               removed.
+            doc_paths (list): The list of document paths of the attributes to be
+                              removed.
 
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.extend([
-            UpdateSpec(mysqlxpb_enum(
+        for item in flexible_params(*doc_paths):
+            self._update_ops[item] = UpdateSpec(mysqlxpb_enum(
                 "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REMOVE"), item)
-            for item in flexible_params(*doc_paths)])
+        self._changed = True
         return self
 
     def array_insert(self, field, value):
@@ -711,10 +832,10 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(
-            UpdateSpec(mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"),
-                       field, value))
+        self._update_ops[field] = UpdateSpec(mysqlxpb_enum(
+            "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"),
+                                             field, value)
+        self._changed = True
         return self
 
     def array_append(self, doc_path, value):
@@ -730,10 +851,10 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops.append(
-            UpdateSpec(mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"),
-                       doc_path, value))
+        self._update_ops[doc_path] = UpdateSpec(mysqlxpb_enum(
+            "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"),
+                                                doc_path, value)
+        self._changed = True
         return self
 
     def patch(self, doc):
@@ -754,10 +875,10 @@ class ModifyStatement(FilterableStatement):
             raise ProgrammingError(
                 "Invalid data for update operation on document collection "
                 "table")
-        self._update_ops.append(
-            UpdateSpec(mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
-                       '', doc.expr() if isinstance(doc, ExprParser) else doc))
+        self._update_ops["patch"] = UpdateSpec(
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
+            '', doc.expr() if isinstance(doc, ExprParser) else doc)
+        self._changed = True
         return self
 
     def execute(self):
@@ -771,7 +892,7 @@ class ModifyStatement(FilterableStatement):
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for modify")
-        return self._connection.update(self)
+        return self._connection.send_update(self)
 
 
 class ReadStatement(FilterableStatement):
@@ -885,7 +1006,7 @@ class ReadStatement(FilterableStatement):
         Returns:
             mysqlx.Result: Result object.
         """
-        return self._connection.find(self)
+        return self._connection.send_find(self)
 
 
 class FindStatement(ReadStatement):
@@ -935,7 +1056,6 @@ class SelectStatement(ReadStatement):
     def __init__(self, table, *fields):
         super(SelectStatement, self).__init__(table, False)
         self._set_projection(*fields)
-
 
     def where(self, condition):
         """Sets the search condition to filter.
@@ -1026,7 +1146,7 @@ class UpdateStatement(FilterableStatement):
     """
     def __init__(self, table):
         super(UpdateStatement, self).__init__(target=table, doc_based=False)
-        self._update_ops = []
+        self._update_ops = {}
 
     def where(self, condition):
         """Sets the search condition to filter.
@@ -1068,9 +1188,9 @@ class UpdateStatement(FilterableStatement):
         Returns:
             mysqlx.UpdateStatement: UpdateStatement object.
         """
-        self._update_ops.append(
-            UpdateSpec(mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.SET"), field, value))
+        self._update_ops[field] = UpdateSpec(mysqlxpb_enum(
+            "Mysqlx.Crud.UpdateOperation.UpdateType.SET"), field, value)
+        self._changed = True
         return self
 
     def execute(self):
@@ -1084,7 +1204,7 @@ class UpdateStatement(FilterableStatement):
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for update")
-        return self._connection.update(self)
+        return self._connection.send_update(self)
 
 
 class RemoveStatement(FilterableStatement):
@@ -1124,7 +1244,7 @@ class RemoveStatement(FilterableStatement):
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for remove")
-        return self._connection.delete(self)
+        return self._connection.send_delete(self)
 
 
 class DeleteStatement(FilterableStatement):
@@ -1172,7 +1292,7 @@ class DeleteStatement(FilterableStatement):
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for delete")
-        return self._connection.delete(self)
+        return self._connection.send_delete(self)
 
 
 class CreateCollectionIndexStatement(Statement):

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -48,14 +48,14 @@ from functools import wraps
 from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
                              Sha256MemoryAuthPlugin)
 # pylint: disable=W0622
-from .errors import (InterfaceError, OperationalError, PoolError,
-                     ProgrammingError, TimeoutError)
+from .errors import (InterfaceError, NotSupportedError, OperationalError,
+                     PoolError, ProgrammingError, TimeoutError)
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
 from .constants import SSLMode, Auth
 from .helpers import escape, get_item_or_attr
 from .protocol import Protocol, MessageReaderWriter
-from .result import Result, RowResult, DocResult
+from .result import Result, RowResult, SqlResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
 
@@ -334,6 +334,10 @@ class Connection(object):
             # on socket operations
             self._connect_timeout = None
 
+        self._stmt_counter = 0
+        self._prepared_stmt_ids = []
+        self._prepared_stmt_supported = True
+
     def fetch_active_result(self):
         """Fetch active result."""
         if self._active_result is not None:
@@ -544,8 +548,85 @@ class Connection(object):
         self.protocol.send_auth_continue(plugin.auth_data(extra_data))
         self.protocol.read_auth_ok()
 
+    def _deallocate_statement(self, statement):
+        """Deallocates statement.
+
+        Args:
+            statement (Statement): A `Statement` based type object.
+        """
+        if statement.prepared:
+            self.protocol.send_prepare_deallocate(statement.stmt_id)
+            self._prepared_stmt_ids.remove(statement.stmt_id)
+            statement.prepared = False
+
+    def _prepare_statement(self, msg_type, msg, statement):
+        """Prepares a statement.
+
+        Args:
+            msg_type (str): Message ID string.
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+            statement (Statement): A `Statement` based type object.
+        """
+        try:
+            self.protocol.send_prepare_prepare(msg_type, msg, statement)
+        except NotSupportedError:
+            self._prepared_stmt_supported = False
+            return
+        self._prepared_stmt_ids.append(statement.stmt_id)
+        statement.prepared = True
+
+    def _execute_prepared_pipeline(self, msg_type, msg, statement):
+        """Executes the prepared statement pipeline.
+
+        Args:
+            msg_type (str): Message ID string.
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+            statement (Statement): A `Statement` based type object.
+        """
+        # For old servers without prepared statement support
+        if not self._prepared_stmt_supported:
+            # Crud::<Operation>
+            self.protocol.send_msg_without_ps(msg_type, msg, statement)
+            return
+
+        if statement.deallocate_prepare_execute:
+            # Prepare::Deallocate + Prepare::Prepare + Prepare::Execute
+            self._deallocate_statement(statement)
+            self._prepare_statement(msg_type, msg, statement)
+            if not self._prepared_stmt_supported:
+                self.protocol.send_msg_without_ps(msg_type, msg, statement)
+                return
+            self.protocol.send_prepare_execute(msg_type, msg, statement)
+            statement.deallocate_prepare_execute = False
+            statement.reset_exec_counter()
+        elif statement.prepared and not statement.changed:
+            # Prepare::Execute
+            self.protocol.send_prepare_execute(msg_type, msg, statement)
+        elif statement.changed and not statement.repeated:
+            # Crud::<Operation>
+            self._deallocate_statement(statement)
+            self.protocol.send_msg_without_ps(msg_type, msg, statement)
+            statement.changed = False
+            statement.reset_exec_counter()
+        elif not statement.changed and not statement.repeated:
+            # Prepare::Prepare + Prepare::Execute
+            if not statement.prepared:
+                self._prepare_statement(msg_type, msg, statement)
+            if not self._prepared_stmt_supported:
+                self.protocol.send_msg_without_ps(msg_type, msg, statement)
+                return
+            self.protocol.send_prepare_execute(msg_type, msg, statement)
+        elif statement.changed and statement.repeated:
+            # Prepare::Deallocate + Crud::<Operation>
+            self._deallocate_statement(statement)
+            self.protocol.send_msg_without_ps(msg_type, msg, statement)
+            statement.changed = False
+            statement.reset_exec_counter()
+
+        statement.increment_exec_counter()
+
     @catch_network_exception
-    def send_sql(self, sql, *args):
+    def send_sql(self, statement, *args):
         """Execute a SQL statement.
 
         Args:
@@ -556,15 +637,19 @@ class Connection(object):
             :class:`mysqlx.ProgrammingError`: If the SQL statement is not a
                                               valid string.
         """
+        sql = statement.sql
         if self.protocol is None:
             raise OperationalError("MySQLx Connection not available")
         if not isinstance(sql, STRING_TYPES):
             raise ProgrammingError("The SQL statement is not a valid string")
-        elif not PY3 and isinstance(sql, UNICODE_TYPES):
-            self.protocol.send_execute_statement(
+        if not PY3 and isinstance(sql, UNICODE_TYPES):
+            msg_type, msg = self.protocol.build_execute_statement(
                 "sql", bytes(bytearray(sql, "utf-8")), args)
         else:
-            self.protocol.send_execute_statement("sql", sql, args)
+            msg_type, msg = self.protocol.build_execute_statement(
+                "sql", sql, args)
+        self.protocol.send_msg_without_ps(msg_type, msg, statement)
+        return SqlResult(self)
 
     @catch_network_exception
     def send_insert(self, statement):
@@ -579,29 +664,31 @@ class Connection(object):
         """
         if self.protocol is None:
             raise OperationalError("MySQLx Connection not available")
-        self.protocol.send_insert(statement)
+        msg_type, msg = self.protocol.build_insert(statement)
+        self.protocol.send_msg(msg_type, msg)
         ids = None
         if isinstance(statement, AddStatement):
             ids = statement.ids
         return Result(self, ids)
 
     @catch_network_exception
-    def find(self, statement):
+    def send_find(self, statement):
         """Send an find statement.
 
         Args:
-            statement (`Statement`): It can be :class:`mysqlx.ReadStatement`
+            statement (`Statement`): It can be :class:`mysqlx.SelectStatement`
                                      or :class:`mysqlx.FindStatement`.
 
         Returns:
             `Result`: It can be class:`mysqlx.DocResult` or
                       :class:`mysqlx.RowResult`.
         """
-        self.protocol.send_find(statement)
+        msg_type, msg = self.protocol.build_find(statement)
+        self._execute_prepared_pipeline(msg_type, msg, statement)
         return DocResult(self) if statement.is_doc_based() else RowResult(self)
 
     @catch_network_exception
-    def delete(self, statement):
+    def send_delete(self, statement):
         """Send an delete statement.
 
         Args:
@@ -611,11 +698,12 @@ class Connection(object):
         Returns:
             :class:`mysqlx.Result`: The result object.
         """
-        self.protocol.send_delete(statement)
+        msg_type, msg = self.protocol.build_delete(statement)
+        self._execute_prepared_pipeline(msg_type, msg, statement)
         return Result(self)
 
     @catch_network_exception
-    def update(self, statement):
+    def send_update(self, statement):
         """Send an delete statement.
 
         Args:
@@ -625,7 +713,8 @@ class Connection(object):
         Returns:
             :class:`mysqlx.Result`: The result object.
         """
-        self.protocol.send_update(statement)
+        msg_type, msg = self.protocol.build_update(statement)
+        self._execute_prepared_pipeline(msg_type, msg, statement)
         return Result(self)
 
     @catch_network_exception
@@ -645,7 +734,9 @@ class Connection(object):
             :class:`mysqlx.Result`: The result object.
         """
         try:
-            self.protocol.send_execute_statement(namespace, cmd, args)
+            msg_type, msg = \
+                self.protocol.build_execute_statement(namespace, cmd, args)
+            self.protocol.send_msg(msg_type, msg)
             return Result(self)
         except OperationalError:
             if raise_on_fail:
@@ -665,7 +756,8 @@ class Connection(object):
         Returns:
             :class:`mysqlx.Result`: The result.
         """
-        self.protocol.send_execute_statement("sql", sql, args)
+        msg_type, msg = self.protocol.build_execute_statement("sql", sql, args)
+        self.protocol.send_msg(msg_type, msg)
         result = RowResult(self)
         result.fetch_all()
         if result.count == 0:
@@ -683,7 +775,9 @@ class Connection(object):
         Returns:
             :class:`mysqlx.RowResult`: The result object.
         """
-        self.protocol.send_execute_statement("xplugin", cmd, args)
+        msg_type, msg = \
+            self.protocol.build_execute_statement("xplugin", cmd, args)
+        self.protocol.send_msg(msg_type, msg)
         return RowResult(self)
 
     @catch_network_exception
@@ -713,6 +807,17 @@ class Connection(object):
         """
         return self.protocol.get_column_metadata(result)
 
+    def get_next_statement_id(self):
+        """Returns the next statement ID.
+
+        Returns:
+            int: A statement ID.
+
+        .. versionadded:: 8.0.16
+        """
+        self._stmt_counter += 1
+        return self._stmt_counter
+
     def is_open(self):
         """Check if connection is open.
 
@@ -731,6 +836,13 @@ class Connection(object):
         """Close a sucessfully authenticated session."""
         if not self.is_open():
             return
+
+        # Deallocate all prepared statements
+        if self._prepared_stmt_supported:
+            for stmt_id in self._prepared_stmt_ids:
+                self.protocol.send_prepare_deallocate(stmt_id)
+            self._stmt_counter = 0
+
         try:
             if self._active_result is not None:
                 self._active_result.fetch_all()
@@ -829,14 +941,17 @@ class PooledConnection(Connection):
         """
         self.reconnect()
 
-    def sql(self, sql_statement):
+    def sql(self, sql):
         """Creates a :class:`mysqlx.SqlStatement` object to allow running the
         SQL statement on the target MySQL Server.
 
+        Args:
+            sql (string): The SQL statement to be executed.
+
         Returns:
-            :class:`mysqlx.SqlStatement`: The sql statement object.
+            mysqlx.SqlStatement: SqlStatement object.
         """
-        return SqlStatement(self, sql_statement)
+        return SqlStatement(self, sql)
 
 
 class ConnectionPool(queue.Queue):
@@ -1253,6 +1368,12 @@ class Session(object):
     def sql(self, sql):
         """Creates a :class:`mysqlx.SqlStatement` object to allow running the
         SQL statement on the target MySQL Server.
+
+        Args:
+            sql (string): The SQL statement to be executed.
+
+        Returns:
+            mysqlx.SqlStatement: SqlStatement object.
         """
         return SqlStatement(self._connection, sql)
 

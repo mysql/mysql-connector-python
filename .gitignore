@@ -10,6 +10,7 @@ commit.txt
 *.egg-info/
 dist/
 build/
+mysql-vendor/
 venv/
 venv2/
 venv3/

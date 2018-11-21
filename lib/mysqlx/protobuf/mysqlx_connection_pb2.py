@@ -13,16 +13,15 @@ from google.protobuf import descriptor_pb2
 _sym_db = _symbol_database.Default()
 
 
-from mysqlx.protobuf import mysqlx_datatypes_pb2 as mysqlx__datatypes__pb2
+from mysqlx.protobuf import mysqlx_datatypes_pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_connection.proto',
   package='Mysqlx.Connection',
-  syntax='proto2',
   serialized_pb=_b('\n\x17mysqlx_connection.proto\x12\x11Mysqlx.Connection\x1a\x16mysqlx_datatypes.proto\"@\n\nCapability\x12\x0c\n\x04name\x18\x01 \x02(\t\x12$\n\x05value\x18\x02 \x02(\x0b\x32\x15.Mysqlx.Datatypes.Any\"C\n\x0c\x43\x61pabilities\x12\x33\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32\x1d.Mysqlx.Connection.Capability\"\x11\n\x0f\x43\x61pabilitiesGet\"H\n\x0f\x43\x61pabilitiesSet\x12\x35\n\x0c\x63\x61pabilities\x18\x01 \x02(\x0b\x32\x1f.Mysqlx.Connection.Capabilities\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
-  dependencies=[mysqlx__datatypes__pb2.DESCRIPTOR,])
+  dependencies=[mysqlx_datatypes_pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
@@ -57,7 +56,6 @@ _CAPABILITY = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -88,7 +86,6 @@ _CAPABILITIES = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -112,7 +109,6 @@ _CAPABILITIESGET = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -143,7 +139,6 @@ _CAPABILITIESSET = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -167,7 +162,6 @@ _CLOSE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -175,7 +169,7 @@ _CLOSE = _descriptor.Descriptor(
   serialized_end=305,
 )
 
-_CAPABILITY.fields_by_name['value'].message_type = mysqlx__datatypes__pb2._ANY
+_CAPABILITY.fields_by_name['value'].message_type = mysqlx_datatypes_pb2._ANY
 _CAPABILITIES.fields_by_name['capabilities'].message_type = _CAPABILITY
 _CAPABILITIESSET.fields_by_name['capabilities'].message_type = _CAPABILITIES
 DESCRIPTOR.message_types_by_name['Capability'] = _CAPABILITY

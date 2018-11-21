@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -58,8 +58,7 @@ if PY3:
     UNICODE_TYPES = (str,)
     STRING_TYPES = (str,)
     BYTE_TYPES = (bytearray, bytes,)
-
-
+    MAX_INT = sys.maxsize
 else:
     import Queue as queue
     from urlparse import urlparse, unquote, parse_qsl
@@ -80,4 +79,5 @@ else:
     UNICODE_TYPES = (unicode,)
     STRING_TYPES = (str, unicode,)
     BYTE_TYPES = (bytearray,)
+    MAX_INT = sys.maxint
     JSONDecodeError = ValueError

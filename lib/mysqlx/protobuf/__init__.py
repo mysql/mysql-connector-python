@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -79,6 +79,7 @@ try:
     from . import mysqlx_expr_pb2
     from . import mysqlx_notice_pb2
     from . import mysqlx_pb2
+    from . import mysqlx_prepare_pb2
     from . import mysqlx_resultset_pb2
     from . import mysqlx_session_pb2
     from . import mysqlx_sql_pb2
@@ -147,6 +148,11 @@ try:
         _MESSAGES["Mysqlx.Notice.SessionStateChanged.Parameter.{0}"
                   "".format(key)] = val
 
+    # Mysql.Prepare
+    for key, val in mysqlx_prepare_pb2.Prepare.OneOfMessage.Type.items():
+        _MESSAGES["Mysqlx.Prepare.Prepare.OneOfMessage.Type.{0}"
+                  "".format(key)] = val
+
     # Mysql.Resultset
     for key, val in mysqlx_resultset_pb2.ColumnMetaData.FieldType.items():
         _MESSAGES["Mysqlx.Resultset.ColumnMetaData.FieldType.{0}".format(key)] = val
@@ -169,6 +175,8 @@ try:
         mysqlx_notice_pb2.DESCRIPTOR.serialized_pb))
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
         mysqlx_pb2.DESCRIPTOR.serialized_pb))
+    _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
+        mysqlx_prepare_pb2.DESCRIPTOR.serialized_pb))
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
         mysqlx_resultset_pb2.DESCRIPTOR.serialized_pb))
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
@@ -220,6 +228,19 @@ except ImportError:
     HAVE_PROTOBUF = False
     if not HAVE_MYSQLXPB_CEXT:
         raise ImportError("Protobuf is not available")
+
+CRUD_PREPARE_MAPPING = {
+    "Mysqlx.ClientMessages.Type.CRUD_FIND": (
+        "Mysqlx.Prepare.Prepare.OneOfMessage.Type.FIND", "find"),
+    "Mysqlx.ClientMessages.Type.CRUD_INSERT": (
+        "Mysqlx.Prepare.Prepare.OneOfMessage.Type.INSERT", "insert"),
+    "Mysqlx.ClientMessages.Type.CRUD_UPDATE": (
+        "Mysqlx.Prepare.Prepare.OneOfMessage.Type.UPDATE", "update"),
+    "Mysqlx.ClientMessages.Type.CRUD_DELETE": (
+        "Mysqlx.Prepare.Prepare.OneOfMessage.Type.DELETE", "delete"),
+    "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE": (
+        "Mysqlx.Prepare.Prepare.OneOfMessage.Type.STMT", "stmt_execute")
+}
 
 
 class Protobuf(object):

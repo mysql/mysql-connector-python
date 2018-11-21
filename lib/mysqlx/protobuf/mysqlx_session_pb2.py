@@ -18,7 +18,6 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_session.proto',
   package='Mysqlx.Session',
-  syntax='proto2',
   serialized_pb=_b('\n\x14mysqlx_session.proto\x12\x0eMysqlx.Session\"S\n\x11\x41uthenticateStart\x12\x11\n\tmech_name\x18\x01 \x02(\t\x12\x11\n\tauth_data\x18\x02 \x01(\x0c\x12\x18\n\x10initial_response\x18\x03 \x01(\x0c\")\n\x14\x41uthenticateContinue\x12\x11\n\tauth_data\x18\x01 \x02(\x0c\"#\n\x0e\x41uthenticateOk\x12\x11\n\tauth_data\x18\x01 \x01(\x0c\"\x07\n\x05Reset\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -62,7 +61,6 @@ _AUTHENTICATESTART = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -93,7 +91,6 @@ _AUTHENTICATECONTINUE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -124,7 +121,6 @@ _AUTHENTICATEOK = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -148,7 +144,6 @@ _RESET = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -172,7 +167,6 @@ _CLOSE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],

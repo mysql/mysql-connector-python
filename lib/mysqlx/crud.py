@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -315,7 +315,9 @@ class Collection(DatabaseObject):
             condition (Optional[str]): The string with the filter expression of
                                        the documents to be retrieved.
         """
-        return FindStatement(self, condition)
+        stmt = FindStatement(self, condition)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def add(self, *values):
         """Adds a list of documents to a collection.
@@ -342,7 +344,9 @@ class Collection(DatabaseObject):
         .. versionchanged:: 8.0.12
            The ``condition`` parameter is now mandatory.
         """
-        return RemoveStatement(self, condition)
+        stmt = RemoveStatement(self, condition)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def modify(self, condition):
         """Modifies documents based on the ``condition``.
@@ -357,7 +361,9 @@ class Collection(DatabaseObject):
         .. versionchanged:: 8.0.12
            The ``condition`` parameter is now mandatory.
         """
-        return ModifyStatement(self, condition)
+        stmt = ModifyStatement(self, condition)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def count(self):
         """Counts the documents in the collection.
@@ -416,7 +422,7 @@ class Collection(DatabaseObject):
 
         Args:
             doc_id (str): Document ID
-            doc (DbDoc/dict): New Document
+            doc (:class:`mysqlx.DbDoc` or `dict`): New Document
         """
         return self.modify("_id = :id").set("$", doc) \
                    .bind("id", doc_id).execute()
@@ -427,7 +433,7 @@ class Collection(DatabaseObject):
 
         Args:
             doc_id (str): Document ID
-            doc (DbDoc/dict): New Document
+            doc (:class:`mysqlx.DbDoc` or dict): New Document
         """
         if not isinstance(doc, DbDoc):
             doc = DbDoc(doc)
@@ -438,8 +444,14 @@ class Collection(DatabaseObject):
 
         Args:
             doc_id (str): Document ID
+
+        Returns:
+            mysqlx.DbDoc: The Document matching the Document ID.
         """
-        return self.find("_id = :id").bind("id", doc_id).execute().fetch_one()
+        result = self.find("_id = :id").bind("id", doc_id).execute()
+        doc = result.fetch_one()
+        self._connection.fetch_active_result()
+        return doc
 
     def remove_one(self, doc_id):
         """Removes a Document matching the Document ID.
@@ -483,7 +495,9 @@ class Table(DatabaseObject):
         Returns:
             mysqlx.SelectStatement: SelectStatement object
         """
-        return SelectStatement(self, *fields)
+        stmt = SelectStatement(self, *fields)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def insert(self, *fields):
         """Creates a new :class:`mysqlx.InsertStatement` object.
@@ -494,7 +508,9 @@ class Table(DatabaseObject):
         Returns:
             mysqlx.InsertStatement: InsertStatement object
         """
-        return InsertStatement(self, *fields)
+        stmt = InsertStatement(self, *fields)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def update(self):
         """Creates a new :class:`mysqlx.UpdateStatement` object.
@@ -502,7 +518,9 @@ class Table(DatabaseObject):
         Returns:
             mysqlx.UpdateStatement: UpdateStatement object
         """
-        return UpdateStatement(self)
+        stmt = UpdateStatement(self)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def delete(self):
         """Creates a new :class:`mysqlx.DeleteStatement` object.
@@ -513,7 +531,9 @@ class Table(DatabaseObject):
         .. versionchanged:: 8.0.12
            The ``condition`` parameter was removed.
         """
-        return DeleteStatement(self)
+        stmt = DeleteStatement(self)
+        stmt.stmt_id = self._connection.get_next_statement_id()
+        return stmt
 
     def count(self):
         """Counts the rows in the table.

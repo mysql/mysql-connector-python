@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -62,7 +62,7 @@ class DbDoc(object):
             raise ValueError("Unable to handle type: {0}".format(type(value)))
 
     def __str__(self):
-        return json.dumps(self.__dict__, cls=ExprJSONEncoder)
+        return self.as_str()
 
     def __repr__(self):
         return repr(self.__dict__)
@@ -100,3 +100,13 @@ class DbDoc(object):
             `list`: The keys.
         """
         return self.__dict__.keys()
+
+    def as_str(self):
+        """Serialize :class:`mysqlx.DbDoc` to a JSON formatted ``str``.
+
+        Returns:
+            str: A JSON formatted ``str`` representation of the document.
+
+        .. versionadded:: 8.0.16
+        """
+        return json.dumps(self.__dict__, cls=ExprJSONEncoder)

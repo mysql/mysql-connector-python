@@ -13,16 +13,15 @@ from google.protobuf import descriptor_pb2
 _sym_db = _symbol_database.Default()
 
 
-from mysqlx.protobuf import mysqlx_datatypes_pb2 as mysqlx__datatypes__pb2
+from mysqlx.protobuf import mysqlx_datatypes_pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_expr.proto',
   package='Mysqlx.Expr',
-  syntax='proto2',
   serialized_pb=_b('\n\x11mysqlx_expr.proto\x12\x0bMysqlx.Expr\x1a\x16mysqlx_datatypes.proto\"\xc4\x03\n\x04\x45xpr\x12$\n\x04type\x18\x01 \x02(\x0e\x32\x16.Mysqlx.Expr.Expr.Type\x12\x31\n\nidentifier\x18\x02 \x01(\x0b\x32\x1d.Mysqlx.Expr.ColumnIdentifier\x12\x10\n\x08variable\x18\x03 \x01(\t\x12)\n\x07literal\x18\x04 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12\x30\n\rfunction_call\x18\x05 \x01(\x0b\x32\x19.Mysqlx.Expr.FunctionCall\x12\'\n\x08operator\x18\x06 \x01(\x0b\x32\x15.Mysqlx.Expr.Operator\x12\x10\n\x08position\x18\x07 \x01(\r\x12#\n\x06object\x18\x08 \x01(\x0b\x32\x13.Mysqlx.Expr.Object\x12!\n\x05\x61rray\x18\t \x01(\x0b\x32\x12.Mysqlx.Expr.Array\"q\n\x04Type\x12\t\n\x05IDENT\x10\x01\x12\x0b\n\x07LITERAL\x10\x02\x12\x0c\n\x08VARIABLE\x10\x03\x12\r\n\tFUNC_CALL\x10\x04\x12\x0c\n\x08OPERATOR\x10\x05\x12\x0f\n\x0bPLACEHOLDER\x10\x06\x12\n\n\x06OBJECT\x10\x07\x12\t\n\x05\x41RRAY\x10\x08\"/\n\nIdentifier\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x13\n\x0bschema_name\x18\x02 \x01(\t\"\xcb\x01\n\x10\x44ocumentPathItem\x12\x30\n\x04type\x18\x01 \x02(\x0e\x32\".Mysqlx.Expr.DocumentPathItem.Type\x12\r\n\x05value\x18\x02 \x01(\t\x12\r\n\x05index\x18\x03 \x01(\r\"g\n\x04Type\x12\n\n\x06MEMBER\x10\x01\x12\x13\n\x0fMEMBER_ASTERISK\x10\x02\x12\x0f\n\x0b\x41RRAY_INDEX\x10\x03\x12\x18\n\x14\x41RRAY_INDEX_ASTERISK\x10\x04\x12\x13\n\x0f\x44OUBLE_ASTERISK\x10\x05\"\x7f\n\x10\x43olumnIdentifier\x12\x34\n\rdocument_path\x18\x01 \x03(\x0b\x32\x1d.Mysqlx.Expr.DocumentPathItem\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x12\n\ntable_name\x18\x03 \x01(\t\x12\x13\n\x0bschema_name\x18\x04 \x01(\t\"W\n\x0c\x46unctionCall\x12%\n\x04name\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Expr.Identifier\x12 \n\x05param\x18\x02 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\":\n\x08Operator\x12\x0c\n\x04name\x18\x01 \x02(\t\x12 \n\x05param\x18\x02 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\"t\n\x06Object\x12,\n\x03\x66ld\x18\x01 \x03(\x0b\x32\x1f.Mysqlx.Expr.Object.ObjectField\x1a<\n\x0bObjectField\x12\x0b\n\x03key\x18\x01 \x02(\t\x12 \n\x05value\x18\x02 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\")\n\x05\x41rray\x12 \n\x05value\x18\x01 \x03(\x0b\x32\x11.Mysqlx.Expr.ExprB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
-  dependencies=[mysqlx__datatypes__pb2.DESCRIPTOR,])
+  dependencies=[mysqlx_datatypes_pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
@@ -187,7 +186,6 @@ _EXPR = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -225,7 +223,6 @@ _IDENTIFIER = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -271,7 +268,6 @@ _DOCUMENTPATHITEM = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -323,7 +319,6 @@ _COLUMNIDENTIFIER = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -361,7 +356,6 @@ _FUNCTIONCALL = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -399,7 +393,6 @@ _OPERATOR = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -437,7 +430,6 @@ _OBJECT_OBJECTFIELD = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -467,7 +459,6 @@ _OBJECT = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -498,7 +489,6 @@ _ARRAY = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -508,7 +498,7 @@ _ARRAY = _descriptor.Descriptor(
 
 _EXPR.fields_by_name['type'].enum_type = _EXPR_TYPE
 _EXPR.fields_by_name['identifier'].message_type = _COLUMNIDENTIFIER
-_EXPR.fields_by_name['literal'].message_type = mysqlx__datatypes__pb2._SCALAR
+_EXPR.fields_by_name['literal'].message_type = mysqlx_datatypes_pb2._SCALAR
 _EXPR.fields_by_name['function_call'].message_type = _FUNCTIONCALL
 _EXPR.fields_by_name['operator'].message_type = _OPERATOR
 _EXPR.fields_by_name['object'].message_type = _OBJECT

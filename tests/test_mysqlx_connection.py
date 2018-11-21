@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -139,6 +139,13 @@ _ROUTER_LIST_RESULTS = (  # (uri, result)
      "port": 33060, "priority": 99}, {"host": "localhost", "port": 33060,
      "priority": 98}], "password": "password", "user": "user"}),
 )
+
+_PREP_STMT_QUERY = (
+    "SELECT p.sql_text, p.count_execute "
+    "FROM performance_schema.prepared_statements_instances AS p "
+    "JOIN performance_schema.threads AS t ON p.owner_thread_id = t.thread_id "
+    "AND t.processlist_id = @@pseudo_thread_id")
+
 
 def file_uri(path, brackets=True):
     if brackets:
@@ -687,13 +694,13 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     def test_sql(self):
         statement = self.session.sql("SELECT VERSION()")
-        self.assertTrue(isinstance(statement, mysqlx.statement.Statement))
+        self.assertTrue(isinstance(statement, mysqlx.Statement))
         # SQL statements should be strings
         statement = self.session.sql(123)
         self.assertRaises(mysqlx.ProgrammingError, statement.execute)
         # Test unicode statements
         statement = self.session.sql(u"SELECT VERSION()").execute()
-        self.assertTrue(isinstance(statement, mysqlx.statement.SqlResult))
+        self.assertTrue(isinstance(statement, mysqlx.SqlResult))
 
     def test_rollback(self):
         table_name = "t2"
@@ -925,6 +932,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # 'use_pure' should be a bool type
         self.assertRaises(ProgrammingError, setattr, session, "use_pure", -1)
         session.close()
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxInnitialNoticeTests(tests.MySQLxTests):

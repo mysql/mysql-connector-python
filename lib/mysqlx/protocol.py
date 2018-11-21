@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,13 +31,14 @@
 import struct
 
 from .compat import STRING_TYPES, INT_TYPES
-from .errors import InterfaceError, OperationalError, ProgrammingError
+from .errors import (InterfaceError, NotSupportedError, OperationalError,
+                     ProgrammingError)
 from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
                    build_int_scalar, build_unsigned_int_scalar)
 from .helpers import encode_to_bytes, get_item_or_attr
 from .result import Column
-from .protobuf import (SERVER_MESSAGES, PROTOBUF_REPEATED_TYPES, Message,
-                       mysqlxpb_enum)
+from .protobuf import (CRUD_PREPARE_MAPPING, SERVER_MESSAGES,
+                       PROTOBUF_REPEATED_TYPES, Message, mysqlxpb_enum)
 
 
 class MessageReaderWriter(object):
@@ -139,13 +140,6 @@ class Protocol(object):
         """
         if stmt.has_where:
             msg["criteria"] = stmt.get_where_expr()
-        if stmt.has_bindings:
-            msg["args"].extend(self.get_binding_scalars(stmt))
-        if stmt.has_limit:
-            msg["limit"] = Message(
-                "Mysqlx.Crud.Limit",
-                row_count=stmt.get_limit_row_count(),
-                offset=stmt.get_limit_offset())
         if stmt.has_sort:
             msg["order"].extend(stmt.get_sort_expr())
         if stmt.has_group_by:
@@ -203,6 +197,42 @@ class Protocol(object):
             return Message("Mysqlx.Datatypes.Any", type=3, array=msg)
 
         return None
+
+    def _get_binding_args(self, stmt, is_scalar=True):
+        """Returns the binding any/scalar.
+
+        Args:
+            stmt (Statement): A `Statement` based type object.
+            is_scalar (bool): `True` to return scalar values.
+
+        Raises:
+            :class:`mysqlx.ProgrammingError`: If unable to find placeholder for
+                                              parameter.
+
+        Returns:
+            list: A list of ``Any`` or ``Scalar`` objects.
+        """
+        build_value = lambda value: build_scalar(value).get_message() \
+            if is_scalar else self._create_any(value).get_message()
+        bindings = stmt.get_bindings()
+        binding_map = stmt.get_binding_map()
+
+        # If binding_map is None it's a SqlStatement object
+        if binding_map is None:
+            return [build_value(value) for value in bindings]
+
+        count = len(binding_map)
+        args = count * [None]
+        if count != len(bindings):
+            raise ProgrammingError("The number of bind parameters and "
+                                   "placeholders do not match")
+        for name, value in bindings.items():
+            if name not in binding_map:
+                raise ProgrammingError("Unable to find placeholder for "
+                                       "parameter: {0}".format(name))
+            pos = binding_map[name]
+            args[pos] = build_value(value)
+        return args
 
     def _process_frame(self, msg, result):
         """Process frame.
@@ -368,38 +398,160 @@ class Protocol(object):
             if msg.type == "Mysqlx.Error":
                 raise InterfaceError(msg.msg)
 
-    def get_binding_scalars(self, stmt):
-        """Returns the binding scalars.
+    def send_prepare_prepare(self, msg_type, msg, stmt):
+        """
+        Send prepare statement.
+
+        Args:
+            msg_type (str): Message ID string.
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+            stmt (Statement): A `Statement` based type object.
 
         Raises:
-            :class:`mysqlx.ProgrammingError`: If unable to find placeholder for
-                                              parameter.
+            :class:`mysqlx.NotSupportedError`: If prepared statements are not
+                                               supported.
 
-        Returns:
-            list: A list of ``mysqlx.protobuf.Message`` objects.
+        .. versionadded:: 8.0.16
         """
-        bindings = stmt.get_bindings()
-        binding_map = stmt.get_binding_map()
-        count = len(binding_map)
-        scalars = count * [None]
-        if count != len(bindings):
-            raise ProgrammingError("The number of bind parameters and "
-                                   "placeholders do not match")
-        for binding in bindings:
-            name = binding["name"]
-            if name not in binding_map:
-                raise ProgrammingError("Unable to find placeholder for "
-                                       "parameter: {0}".format(name))
-            pos = binding_map[name]
-            scalars[pos] = build_scalar(binding["value"]).get_message()
-        return scalars
+        if stmt.has_limit and msg.type != "Mysqlx.Crud.Insert":
+            # Remove 'limit' from message by building a new one
+            if msg.type == "Mysqlx.Crud.Find":
+                _, msg = self.build_find(stmt)
+            elif msg.type == "Mysqlx.Crud.Update":
+                _, msg = self.build_update(stmt)
+            elif msg.type == "Mysqlx.Crud.Delete":
+                _, msg = self.build_delete(stmt)
+            else:
+                raise ValueError("Invalid message type: {}".format(msg_type))
+            # Build 'limit_expr' message
+            position = len(stmt.get_bindings())
+            placeholder = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.PLACEHOLDER")
+            msg_limit_expr = Message("Mysqlx.Crud.LimitExpr")
+            msg_limit_expr["row_count"] = Message("Mysqlx.Expr.Expr",
+                                                  type=placeholder,
+                                                  position=position)
+            if msg.type == "Mysqlx.Crud.Find":
+                msg_limit_expr["offset"] = Message("Mysqlx.Expr.Expr",
+                                                   type=placeholder,
+                                                   position=position + 1)
+            msg["limit_expr"] = msg_limit_expr
 
-    def send_find(self, stmt):
-        """Send find.
+        oneof_type, oneof_op = CRUD_PREPARE_MAPPING[msg_type]
+        msg_oneof = Message("Mysqlx.Prepare.Prepare.OneOfMessage")
+        msg_oneof["type"] = mysqlxpb_enum(oneof_type)
+        msg_oneof[oneof_op] = msg
+        msg_prepare = Message("Mysqlx.Prepare.Prepare")
+        msg_prepare["stmt_id"] = stmt.stmt_id
+        msg_prepare["stmt"] = msg_oneof
+
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.PREPARE_PREPARE"),
+            msg_prepare)
+
+        try:
+            self.read_ok()
+        except InterfaceError:
+            raise NotSupportedError
+
+    def send_prepare_execute(self, msg_type, msg, stmt):
+        """
+        Send execute statement.
+
+        Args:
+            msg_type (str): Message ID string.
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+            stmt (Statement): A `Statement` based type object.
+
+        .. versionadded:: 8.0.16
+        """
+        oneof_type, oneof_op = CRUD_PREPARE_MAPPING[msg_type]
+        msg_oneof = Message("Mysqlx.Prepare.Prepare.OneOfMessage")
+        msg_oneof["type"] = mysqlxpb_enum(oneof_type)
+        msg_oneof[oneof_op] = msg
+        msg_execute = Message("Mysqlx.Prepare.Execute")
+        msg_execute["stmt_id"] = stmt.stmt_id
+
+        args = self._get_binding_args(stmt, is_scalar=False)
+        if args:
+            msg_execute["args"].extend(args)
+
+        if stmt.has_limit:
+            msg_execute["args"].extend([
+                self._create_any(stmt.get_limit_row_count()).get_message(),
+                self._create_any(stmt.get_limit_offset()).get_message()
+            ])
+
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.PREPARE_EXECUTE"),
+            msg_execute)
+
+    def send_prepare_deallocate(self, stmt_id):
+        """
+        Send prepare deallocate statement.
+
+        Args:
+            stmt_id (int): Statement ID.
+
+        .. versionadded:: 8.0.16
+        """
+        msg_dealloc = Message("Mysqlx.Prepare.Deallocate")
+        msg_dealloc["stmt_id"] = stmt_id
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.PREPARE_DEALLOCATE"),
+            msg_dealloc)
+        self.read_ok()
+
+    def send_msg_without_ps(self, msg_type, msg, stmt):
+        """
+        Send a message without prepared statements support.
+
+        Args:
+            msg_type (str): Message ID string.
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+            stmt (Statement): A `Statement` based type object.
+
+        .. versionadded:: 8.0.16
+        """
+        if stmt.has_limit:
+            msg_limit = Message("Mysqlx.Crud.Limit")
+            msg_limit["row_count"] = stmt.get_limit_row_count()
+            if msg.type == "Mysqlx.Crud.Find":
+                msg_limit["offset"] = stmt.get_limit_offset()
+            msg["limit"] = msg_limit
+        is_scalar = False \
+            if msg_type == "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE" \
+               else True
+        args = self._get_binding_args(stmt, is_scalar=is_scalar)
+        if args:
+            msg["args"].extend(args)
+        self.send_msg(msg_type, msg)
+
+    def send_msg(self, msg_type, msg):
+        """
+        Send a message.
+
+        Args:
+            msg_type (str): Message ID string.
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+
+        .. versionadded:: 8.0.16
+        """
+        self._writer.write_message(mysqlxpb_enum(msg_type), msg)
+
+    def build_find(self, stmt):
+        """Build find/read message.
 
         Args:
             stmt (Statement): A :class:`mysqlx.ReadStatement` or
                               :class:`mysqlx.FindStatement` object.
+
+        Returns:
+            (tuple): Tuple containing:
+
+                * `str`: Message ID string.
+                * :class:`mysqlx.protobuf.Message`: MySQL X Protobuf Message.
+
+        .. versionadded:: 8.0.16
         """
         data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
                                    if stmt.is_doc_based() else
@@ -423,15 +575,22 @@ class Protocol(object):
         if stmt.lock_contention > 0:
             msg["locking_options"] = stmt.lock_contention
 
-        self._writer.write_message(
-            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_FIND"), msg)
+        return "Mysqlx.ClientMessages.Type.CRUD_FIND", msg
 
-    def send_update(self, stmt):
-        """Send update.
+    def build_update(self, stmt):
+        """Build update message.
 
         Args:
             stmt (Statement): A :class:`mysqlx.ModifyStatement` or
                               :class:`mysqlx.UpdateStatement` object.
+
+        Returns:
+            (tuple): Tuple containing:
+
+                * `str`: Message ID string.
+                * :class:`mysqlx.protobuf.Message`: MySQL X Protobuf Message.
+
+        .. versionadded:: 8.0.16
         """
         data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
                                    if stmt.is_doc_based() else
@@ -442,7 +601,7 @@ class Protocol(object):
         msg = Message("Mysqlx.Crud.Update", data_model=data_model,
                       collection=collection)
         self._apply_filter(msg, stmt)
-        for update_op in stmt.get_update_ops():
+        for _, update_op in stmt.get_update_ops().items():
             operation = Message("Mysqlx.Crud.UpdateOperation")
             operation["operation"] = update_op.update_type
             operation["source"] = update_op.source
@@ -450,15 +609,22 @@ class Protocol(object):
                 operation["value"] = build_expr(update_op.value)
             msg["operation"].extend([operation.get_message()])
 
-        self._writer.write_message(
-            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_UPDATE"), msg)
+        return "Mysqlx.ClientMessages.Type.CRUD_UPDATE", msg
 
-    def send_delete(self, stmt):
-        """Send delete.
+    def build_delete(self, stmt):
+        """Build delete message.
 
         Args:
             stmt (Statement): A :class:`mysqlx.DeleteStatement` or
                               :class:`mysqlx.RemoveStatement` object.
+
+        Returns:
+            (tuple): Tuple containing:
+
+                * `str`: Message ID string.
+                * :class:`mysqlx.protobuf.Message`: MySQL X Protobuf Message.
+
+        .. versionadded:: 8.0.16
         """
         data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
                                    if stmt.is_doc_based() else
@@ -468,16 +634,23 @@ class Protocol(object):
         msg = Message("Mysqlx.Crud.Delete", data_model=data_model,
                       collection=collection)
         self._apply_filter(msg, stmt)
-        self._writer.write_message(
-            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_DELETE"), msg)
+        return "Mysqlx.ClientMessages.Type.CRUD_DELETE", msg
 
-    def send_execute_statement(self, namespace, stmt, args):
-        """Send execute statement.
+    def build_execute_statement(self, namespace, stmt, args):
+        """Build execute statement.
 
         Args:
             namespace (str): The namespace.
             stmt (Statement): A `Statement` based type object.
             args (iterable): An iterable object.
+
+        Returns:
+            (tuple): Tuple containing:
+
+                * `str`: Message ID string.
+                * :class:`mysqlx.protobuf.Message`: MySQL X Protobuf Message.
+
+        .. versionadded:: 8.0.16
         """
         msg = Message("Mysqlx.Sql.StmtExecute", namespace=namespace, stmt=stmt,
                       compact_metadata=False)
@@ -500,15 +673,22 @@ class Protocol(object):
                 value = self._create_any(arg)
                 msg["args"].extend([value.get_message()])
 
-        self._writer.write_message(
-            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"), msg)
+        return "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE", msg
 
-    def send_insert(self, stmt):
-        """Send insert.
+    def build_insert(self, stmt):
+        """Build insert statement.
 
         Args:
             stmt (Statement): A :class:`mysqlx.AddStatement` or
                               :class:`mysqlx.InsertStatement` object.
+
+        Returns:
+            (tuple): Tuple containing:
+
+                * `str`: Message ID string.
+                * :class:`mysqlx.protobuf.Message`: MySQL X Protobuf Message.
+
+        .. versionadded:: 8.0.16
         """
         data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
                                    if stmt.is_doc_based() else
@@ -536,8 +716,8 @@ class Protocol(object):
 
         if hasattr(stmt, "is_upsert"):
             msg["upsert"] = stmt.is_upsert()
-        self._writer.write_message(
-            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CRUD_INSERT"), msg)
+
+        return "Mysqlx.ClientMessages.Type.CRUD_INSERT", msg
 
     def close_result(self, result):
         """Close the result.

@@ -18,7 +18,6 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_expect.proto',
   package='Mysqlx.Expect',
-  syntax='proto2',
   serialized_pb=_b('\n\x13mysqlx_expect.proto\x12\rMysqlx.Expect\"\xd0\x03\n\x04Open\x12\x42\n\x02op\x18\x01 \x01(\x0e\x32 .Mysqlx.Expect.Open.CtxOperation:\x14\x45XPECT_CTX_COPY_PREV\x12+\n\x04\x63ond\x18\x02 \x03(\x0b\x32\x1d.Mysqlx.Expect.Open.Condition\x1a\x96\x02\n\tCondition\x12\x15\n\rcondition_key\x18\x01 \x02(\r\x12\x17\n\x0f\x63ondition_value\x18\x02 \x01(\x0c\x12K\n\x02op\x18\x03 \x01(\x0e\x32\x30.Mysqlx.Expect.Open.Condition.ConditionOperation:\rEXPECT_OP_SET\"N\n\x03Key\x12\x13\n\x0f\x45XPECT_NO_ERROR\x10\x01\x12\x16\n\x12\x45XPECT_FIELD_EXIST\x10\x02\x12\x1a\n\x16\x45XPECT_DOCID_GENERATED\x10\x03\"<\n\x12\x43onditionOperation\x12\x11\n\rEXPECT_OP_SET\x10\x00\x12\x13\n\x0f\x45XPECT_OP_UNSET\x10\x01\">\n\x0c\x43txOperation\x12\x18\n\x14\x45XPECT_CTX_COPY_PREV\x10\x00\x12\x14\n\x10\x45XPECT_CTX_EMPTY\x10\x01\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -134,7 +133,6 @@ _OPEN_CONDITION = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -172,7 +170,6 @@ _OPEN = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -196,7 +193,6 @@ _CLOSE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
