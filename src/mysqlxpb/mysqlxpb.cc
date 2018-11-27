@@ -423,8 +423,12 @@ static void AddPyListToMessageRepeatedMessage(
   if (list_size > 0) {
     mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      mutable_field->AddAllocated(
-        CreateMessage(PyList_GetItem(list, idx), factory));
+      google::protobuf::Message* msg = CreateMessage(PyList_GetItem(list, idx), factory);
+      if (!msg) {
+        // CreateMessage already reported an error, we can leave quietly
+        return;
+      }
+      mutable_field->AddAllocated(msg);
     }
   }
 }

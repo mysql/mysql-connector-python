@@ -133,6 +133,15 @@ std::string python_cast<std::string>(PyObject* obj) {
   } else if (PyBytes_CheckExact(obj)) {
     return std::string(PyBytes_AsString(obj), PyBytes_Size(obj));
   }
+#else
+  else if (PyUnicode_CheckExact(obj)) {
+    PyObject* pystring = PyUnicode_AsUTF8String(obj);
+    if (pystring) {
+      std::string result(PyString_AsString(pystring), PyString_Size(pystring));
+      Py_DECREF(pystring);
+      return result;
+    }
+  }
 #endif
 
   THROW_BAD_PYTHON_CAST(std::string);
