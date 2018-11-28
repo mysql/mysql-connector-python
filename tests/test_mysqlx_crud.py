@@ -1431,12 +1431,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.modify('TRUE').patch(
             {"actors_bio": {"current": {
                 "age": mysqlx.expr(
-                    'CAST(SUBSTRING_INDEX($.actors_bio.bd, " ", 1)'
-                    ' AS DECIMAL) - Year(CURDATE())')}}
+                    'CAST(Year(CURDATE()) - '
+                    'SUBSTRING_INDEX($.actors_bio.bd, " ", 1) AS DECIMAL)')}}
             }).execute()
         self.assertEqual(8, result.get_affected_items_count())
-        res = self.session.sql("select 1997 - Year(CURDATE())").execute()
-        age = res.fetch_all()[0]["1997 - Year(CURDATE())"]
+        res = self.session.sql("select Year(CURDATE()) - 1997").execute()
+        age = res.fetch_all()[0]["Year(CURDATE()) - 1997"]
         doc = collection.find(
             "actors_bio.rn = 'Maisie Williams'").execute().fetch_all()[0]
         self.assertEqual(
