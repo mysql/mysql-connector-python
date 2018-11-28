@@ -38,7 +38,9 @@ from .constants import (
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
-from .errors import get_exception
+from .errors import DatabaseError, get_exception
+
+PROTOCOL_VERSION = 10
 
 
 class MySQLProtocol(object):
@@ -172,6 +174,10 @@ class MySQLProtocol(object):
         """Parse a MySQL Handshake-packet"""
         res = {}
         res['protocol'] = struct_unpack('<xxxxB', packet[0:5])[0]
+        if res["protocol"] != PROTOCOL_VERSION:
+            raise DatabaseError("Protocol mismatch; server version = {}, "
+                                "client version = {}".format(res["protocol"],
+                                                             PROTOCOL_VERSION))
         (packet, res['server_version_original']) = utils.read_string(
             packet[5:], end=b'\x00')
 

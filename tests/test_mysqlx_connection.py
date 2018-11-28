@@ -38,12 +38,16 @@ import sys
 import tests
 import time
 import socket
+import struct
 import mysqlx
 
-from mysqlx.errors import InterfaceError, ProgrammingError
-from mysqlx.protobuf import Protobuf
+from threading import Thread
+from time import sleep
 
-from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT
+from mysqlx.connection import SocketStream
+from mysqlx.errors import InterfaceError, ProgrammingError
+from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
+from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, mysqlxpb_enum, Protobuf
 
 if mysqlx.compat.PY3:
     from urllib.parse import quote_plus, quote
@@ -207,6 +211,54 @@ def skip_timeout():
     except socket.error:
         return True
     return False
+
+
+class ServerSocketStream(SocketStream):
+    def __init__(self):
+        self._socket = None
+
+    def start_receive(self, host, port):
+        """Opens a sokect to comunicate to the given host, port
+
+        Args:
+            host (str): host name.
+            port (int): host port.
+        Returns:
+            address of the communication channel
+        """
+        my_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        my_sock.bind((host, port))
+        # Starting receiving...
+        if sys.version_info > (3, 4):
+            my_sock.listen()
+        else:
+            my_sock.listen(1)
+        self._socket, addr = my_sock.accept()
+        return addr
+
+
+class ServerProtocol(Protocol):
+    def __init__(self, reader_writer):
+        super(ServerProtocol, self).__init__(reader_writer)
+
+    def send_auth_continue_server(self, auth_data):
+        """Send Server authenticate continue.
+
+        Args:
+            auth_data (str): Authentication data.
+        """
+        msg = Message("Mysqlx.Session.AuthenticateContinue",
+                      auth_data=auth_data)
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_CONTINUE"), msg)
+
+    def send_auth_ok(self):
+        """Send authenticate OK.
+        """
+        msg = Message("Mysqlx.Session.AuthenticateOk")
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_OK"), msg)
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxSessionTests(tests.MySQLxTests):
@@ -795,4 +847,174 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual(Protobuf.mysqlxpb.__name__, "_mysqlxpb_pure")
         # 'use_pure' should be a bool type
         self.assertRaises(ProgrammingError, setattr, session, "use_pure", -1)
+        session.close()
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+class MySQLxInnitialNoticeTests(tests.MySQLxTests):
+
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.connection_string = {
+            'user': 'root',
+            'password': '',
+            'host': 'localhost',
+            "ssl-mode": 'disabled',
+            "use_pure": True
+        }
+
+    def _server_thread(self, host='localhost', port=33061, notice=1):
+            stream = ServerSocketStream()
+            stream.start_receive(host, port)
+            reader_writer = MessageReaderWriter(stream)
+            protocol = ServerProtocol(reader_writer)
+            # Read message header
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 4)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            # send handshake
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b'\x01\x00\x00\x00\x0b')
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+                #stream.sendall(b'\x01\x00\x00\x00\x0b')
+            # send auth start")
+            protocol.send_auth_continue_server("00000000000000000000")
+            # Capabilities are not check for ssl-mode: disabled
+            # Reading auth_continue from client
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 5)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            # Send auth_ok
+            protocol.send_auth_ok()
+
+            # Read message
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 12)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            # send empty notice
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b'\x01\x00\x00\x00\x0b')
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+
+            # msg_type: 12 Mysqlx.Resultset.ColumnMetaData
+            stream.sendall(b'\x31\x00\x00\x00\x0c'
+                           b'\x08\x07\x12\x08\x44\x61\x74\x61\x62\x61\x73'
+                           b'\x65\x1a\x08\x44\x61\x74\x61\x62\x61\x73\x65'
+                           b'\x22\x08\x53\x43\x48\x45\x4d\x41\x54\x41\x2a'
+                           b'\x00\x32\x00\x3a\x03\x64\x65\x66\x40\x4c\x50'
+                           b'\xc0\x01\x58\x10')
+
+            # send unexpected notice
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b'\x01\x00\x00\x00\x0b')
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+
+            # msg_type: 13 Mysqlx.Resultset.Row
+            stream.sendall(b'\x16\x00\x00\x00\x0d'
+                           b'\x0a\x13\x69\x6e\x66\x6f\x72\x6d\x61\x74\x69'
+                           b'\x6f\x6e\x5f\x73\x63\x68\x65\x6d\x61\x00')
+            # msg_type: 14 Mysqlx.Resultset.FetchDone
+            stream.sendall(b'\x01\x00\x00\x00\x0e')
+            # msg_type: 11 Mysqlx.Notice.Frame
+            stream.sendall(b'\x0f\x00\x00\x00\x0b'
+                           b'\x08\x03\x10\x02\x1a\x08\x08\x04\x12\x04\x08\x02\x18\x00')
+
+            # send unexpected notice
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b'\x01\x00\x00\x00\x0b')
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+
+            # msg_type: 17 Mysqlx.Sql.StmtExecuteOk
+            stream.sendall(b'\x01\x00\x00\x00\x11')
+
+            # Read message
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 7)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            stream.sendall(b'\x07\x00\x00\x00\x00\n\x04bye!')
+
+            # Close socket
+            stream.close()
+
+    def test_innitial_empty_notice(self):
+        _server_thread_l = self._server_thread
+
+        # Tests empty notice at innitial connection
+        settings = self.connect_kwargs.copy()
+        host = 'localhost'
+        port = settings["port"] + 10
+        worker1 = Thread(target=_server_thread_l, args=[host, port, 1])
+        worker1.daemon = True
+        worker1.start()
+        sleep(1)
+        connection_string = self.connection_string.copy()
+        connection_string['port'] = port
+        connection_string['use_pure'] = False
+        session = mysqlx.get_session(connection_string)
+        rows = session.sql('show databases').execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+        # Tests empty notice at innitial connection
+        port += 20
+        worker2 = Thread(target=_server_thread_l, args=[host, port, 1])
+        worker2.daemon = True
+        worker2.start()
+        sleep(2)
+        connection_string = self.connection_string.copy()
+        connection_string['port'] = port
+        connection_string['use_pure'] = True
+        session = mysqlx.get_session(connection_string)
+        rows = session.sql('show databases').execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+    def test_innitial_notice(self):
+        _server_thread_l = self._server_thread
+        # Tests empty notice at innitial connection
+        settings = self.connect_kwargs.copy()
+        host = 'localhost'
+        port = settings['port'] + 11
+        worker1 = Thread(target=_server_thread_l, args=[host, port, 2])
+        worker1.daemon = True
+        worker1.start()
+        sleep(1)
+        connection_string = self.connection_string.copy()
+        connection_string['port'] = port
+        connection_string['use_pure'] = False
+        session = mysqlx.get_session(connection_string)
+        rows = session.sql('show databases').execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+        # Tests empty notice at innitial connection
+        port += 21
+        worker2 = Thread(target=_server_thread_l, args=[host, port, 2])
+        worker2.daemon = True
+        worker2.start()
+        sleep(2)
+        connection_string = self.connection_string.copy()
+        connection_string['port'] = port
+        connection_string['use_pure'] = True
+        session = mysqlx.get_session(connection_string)
+        rows = session.sql('show databases').execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
         session.close()

@@ -118,8 +118,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         try:
             handshake = self._protocol.parse_handshake(packet)
         except Exception as err:
-            raise errors.InterfaceError(
-                'Failed parsing handshake; {0}'.format(err))
+            raise errors.get_mysql_exception(msg=err.msg, errno=err.errno,
+                                             sqlstate=err.sqlstate)
 
         self._server_version = self._check_server_version(
             handshake['server_version_original'])

@@ -65,12 +65,16 @@ class MessageReaderWriter(object):
         msg_len, msg_type = struct.unpack("<LB", hdr)
         if msg_type == 10:
             raise ProgrammingError("The connected server does not have the "
-                                   "MySQL X protocol plugin enabled")
+                                   "MySQL X protocol plugin enabled or protocol"
+                                   "mismatch")
         payload = self._stream.read(msg_len - 1)
         msg_type_name = SERVER_MESSAGES.get(msg_type)
         if not msg_type_name:
             raise ValueError("Unknown msg_type: {0}".format(msg_type))
-        msg = Message.from_server_message(msg_type, payload)
+        try:
+            msg = Message.from_server_message(msg_type, payload)
+        except RuntimeError:
+            return self._read_message()
         return msg
 
     def read_message(self):
@@ -247,7 +251,10 @@ class Protocol(object):
             if msg.type == "Mysqlx.Error":
                 raise OperationalError(msg["msg"])
             elif msg.type == "Mysqlx.Notice.Frame":
-                self._process_frame(msg, result)
+                try:
+                    self._process_frame(msg, result)
+                except:
+                    continue
             elif msg.type == "Mysqlx.Sql.StmtExecuteOk":
                 return None
             elif msg.type == "Mysqlx.Resultset.FetchDone":
@@ -271,7 +278,10 @@ class Protocol(object):
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_GET"),
             msg)
-        return self._reader.read_message()
+        msg = self._reader.read_message()
+        while msg.type == "Mysqlx.Notice.Frame":
+            msg = self._reader.read_message()
+        return msg
 
     def set_capabilities(self, **kwargs):
         """Set capabilities.
@@ -323,6 +333,8 @@ class Protocol(object):
             str: The authentication data.
         """
         msg = self._reader.read_message()
+        while msg.type == "Mysqlx.Notice.Frame":
+            msg = self._reader.read_message()
         if msg.type != "Mysqlx.Session.AuthenticateContinue":
             raise InterfaceError("Unexpected message encountered during "
                                  "authentication handshake")
