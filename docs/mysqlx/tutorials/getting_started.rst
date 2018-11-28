@@ -107,6 +107,34 @@ This object chain is equivalent to the following, with the difference that the i
    session = mysqlx.get_session()
    schema = session.get_schema('test')
 
+The connection settings accepts a default schema option ``schema``, which should be a valid name for a preexisting schema in the server.
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060/my_schema')
+   # or
+   session = mysqlx.get_session({
+       'host': 'localhost',
+       'port': 33060,
+       'user': 'root',
+       'password': '',
+       'schema': 'my_schema'
+   })
+
+.. Note:: The default schema provided must exists in the server otherwise it will raise an error at connection time.
+
+This way the session will use the given schema as the default schema, which can be retrieved by :func:`mysqlx.Session.get_default_schema()` and also allows to run SQL statements without specifying the schema name:
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060/my_schema')
+   my_schema = session.get_default_schema()
+   assert my_test_schema.get_name() == 'my_schema'
+   session.sql('CREATE TABLE Pets(name VARCHAR(20))').execute()
+   # instead of 'CREATE TABLE my_schema.Pets(name VARCHAR(20))'
+   res = session.sql('SELECT * FROM Pets').execute().fetch_all()
+   # instead of 'SELECT * FROM my_schema.Pets'
+
 In the following example, the :func:`mysqlx.get_session()` function is used to open a session. We then get the reference to ``test`` schema and create a collection using the :func:`mysqlx.Schema.create_collection()` method of the :class:`mysqlx.Schema` object.
 
 .. code-block:: python

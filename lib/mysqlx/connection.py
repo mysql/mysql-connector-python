@@ -53,7 +53,7 @@ from .errors import (InterfaceError, OperationalError, PoolError,
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
 from .constants import SSLMode, Auth
-from .helpers import get_item_or_attr
+from .helpers import escape, get_item_or_attr
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
@@ -61,8 +61,10 @@ from .protobuf import Protobuf
 
 
 _CONNECT_TIMEOUT = 10000  # Default connect timeout in milliseconds
-_DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS `{0}`"
-_CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS `{0}`"
+_DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS {0}"
+_CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS {0}"
+_SELECT_SCHEMA_NAME_QUERY = ("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA."
+                             "SCHEMATA WHERE SCHEMA_NAME = '{}'")
 
 _CNX_POOL_MAXSIZE = 99
 _CNX_POOL_MAX_NAME_SIZE = 120
@@ -1217,6 +1219,16 @@ class Session(object):
         else:
             self._connection = Connection(self._settings)
             self._connection.connect()
+        # Set default schema
+        schema = self._settings.get("schema")
+        if schema:
+            try:
+                self.sql("USE {}".format(quote_identifier(schema))).execute()
+            except OperationalError as err:
+                # Access denied for user will raise err.errno = 1044
+                errmsg = err.msg if err.errno == 1044 \
+                    else "Default schema '{}' does not exists".format(schema)
+                raise InterfaceError(errmsg, err.errno)
 
     @property
     def use_pure(self):
@@ -1281,13 +1293,25 @@ class Session(object):
         Returns:
             mysqlx.Schema: The Schema object with the given name at connect
                            time.
+            None: In case the default schema was not provided with the
+                  initialization data.
 
         Raises:
-            :class:`mysqlx.ProgrammingError`: If default schema not provided.
+            :class:`mysqlx.ProgrammingError`: If the provided default schema
+                                              does not exists.
         """
-        if self._connection.settings.get("schema"):
-            return Schema(self, self._connection.settings["schema"])
-        raise ProgrammingError("Default schema not provided")
+        schema = self._connection.settings.get("schema")
+        if schema:
+            res = self.sql(
+                _SELECT_SCHEMA_NAME_QUERY.format(escape(schema))
+            ).execute().fetch_all()
+            try:
+                if res[0][0] == schema:
+                    return Schema(self, schema)
+            except IndexError:
+                raise ProgrammingError(
+                    "Default schema '{}' does not exists".format(schema))
+        return None
 
     def drop_schema(self, name):
         """Drops the schema with the specified name.
@@ -1296,7 +1320,7 @@ class Session(object):
             name (string): The name of the Schema object to be retrieved.
         """
         self._connection.execute_nonquery(
-            "sql", _DROP_DATABASE_QUERY.format(name), True)
+            "sql", _DROP_DATABASE_QUERY.format(quote_identifier(name)), True)
 
     def create_schema(self, name):
         """Creates a schema on the database and returns the corresponding
@@ -1306,7 +1330,7 @@ class Session(object):
             name (string): A string value indicating the schema name.
         """
         self._connection.execute_nonquery(
-            "sql", _CREATE_DATABASE_QUERY.format(name), True)
+            "sql", _CREATE_DATABASE_QUERY.format(quote_identifier(name)), True)
         return Schema(self, name)
 
     def start_transaction(self):

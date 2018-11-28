@@ -45,7 +45,7 @@ from threading import Thread
 from time import sleep
 
 from mysqlx.connection import SocketStream
-from mysqlx.errors import InterfaceError, ProgrammingError
+from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
 from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, mysqlxpb_enum, Protobuf
 
@@ -589,13 +589,73 @@ class MySQLxSessionTests(tests.MySQLxTests):
         schema = self.session.get_default_schema()
         self.assertTrue(schema, mysqlx.Schema)
         self.assertEqual(schema.get_name(), self.connect_kwargs["schema"])
+        self.assertTrue(schema.exists_in_database())
 
-        # Test without default schema configured at connect time
+        # Test None value is returned if no schema name is specified
         settings = self.connect_kwargs.copy()
-        settings["schema"] = None
+        settings.pop("schema")
         session = mysqlx.get_session(settings)
+        schema = session.get_default_schema()
+        self.assertIsNone(schema,
+                          "None value was expected but got '{}'".format(schema))
+        session.close()
+
+        # Test SQL statements not fully qualified, which must not raise error:
+        #     mysqlx.errors.OperationalError: No database selected
+        self.session.sql('CREATE DATABASE my_test_schema').execute()
+        self.session.sql('CREATE TABLE my_test_schema.pets(name VARCHAR(20))'
+                         ).execute()
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = "my_test_schema"
+        session = mysqlx.get_session(settings)
+        schema = session.get_default_schema()
+        self.assertTrue(schema, mysqlx.Schema)
+        self.assertEqual(schema.get_name(),
+                         "my_test_schema")
+        result = session.sql('SHOW TABLES').execute().fetch_all()
+        self.assertEqual("pets", result[0][0])
+        self.session.sql('DROP DATABASE my_test_schema').execute()
+        self.assertFalse(schema.exists_in_database())
         self.assertRaises(mysqlx.ProgrammingError, session.get_default_schema)
         session.close()
+
+        # Test without default schema configured at connect time (passing None)
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = None
+        build_uri(**settings)
+        session = mysqlx.get_session(settings)
+        schema = session.get_default_schema()
+        self.assertIsNone(schema,
+                          "None value was expected but got '{}'".format(schema))
+        session.close()
+
+        # Test not existing default schema at get_session raise error
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = "nonexistent"
+        self.assertRaises(InterfaceError, mysqlx.get_session, settings)
+
+        # Test BUG#28942938: 'ACCESS DENIED' error for unauthorized user tries
+        # to use the default schema if not exists at get_session
+        self.session.sql("DROP USER IF EXISTS 'def_schema'@'%'").execute()
+        self.session.sql("CREATE USER 'def_schema'@'%' IDENTIFIED WITH "
+                         "mysql_native_password BY 'test'").execute()
+        settings = self.connect_kwargs.copy()
+        settings['user'] = 'def_schema'
+        settings['password'] = 'test'
+        settings["schema"] = "nonexistent"
+        # a) Test with no Granted privileges
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        # Access denied for this user
+        self.assertEqual(1044, context.exception.errno)
+
+        # Grant privilege to one unrelated schema
+        self.session.sql("GRANT ALL PRIVILEGES ON nonexistent.* TO "
+                         "'def_schema'@'%'").execute()
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        # Schema does not exist
+        self.assertNotEqual(1044, context.exception.errno)
 
     def test_drop_schema(self):
         test_schema = 'mysql_session_test_drop_schema'

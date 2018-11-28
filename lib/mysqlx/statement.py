@@ -75,8 +75,7 @@ def is_quoted_identifier(identifier, sql_mode=""):
 
 def quote_identifier(identifier, sql_mode=""):
     """Quote the given identifier with backticks, converting backticks (`) in
-    the identifier name with the correct escape sequence (``) unless the
-    identifier is quoted (") as in sql_mode set to ANSI_QUOTES.
+    the identifier name with the correct escape sequence (``).
 
     Args:
         identifier (string): Identifier to quote.
@@ -87,8 +86,6 @@ def quote_identifier(identifier, sql_mode=""):
     """
     if len(identifier) == 0:
         return "``"
-    elif is_quoted_identifier(identifier, sql_mode):
-        return identifier
     if "ANSI_QUOTES" in sql_mode:
         return '"{0}"'.format(identifier.replace('"', '""'))
     return "`{0}`".format(identifier.replace("`", "``"))

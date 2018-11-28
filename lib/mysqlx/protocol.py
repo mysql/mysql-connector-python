@@ -249,7 +249,7 @@ class Protocol(object):
         while True:
             msg = self._reader.read_message()
             if msg.type == "Mysqlx.Error":
-                raise OperationalError(msg["msg"])
+                raise OperationalError(msg["msg"], msg["code"])
             elif msg.type == "Mysqlx.Notice.Frame":
                 try:
                     self._process_frame(msg, result)

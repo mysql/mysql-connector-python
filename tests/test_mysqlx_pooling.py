@@ -490,3 +490,63 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
         self.assertTrue(len(open_connections) >= 1)
 
         client.close()
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+class MySQLxPoolingSessionTests(tests.MySQLxTests):
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.session = mysqlx.get_session(self.connect_kwargs)
+        self.session.sql('DROP DATABASE IF EXISTS my_test_schema').execute()
+
+    def test_get_default_schema(self):
+        pooling_dict = {"max_size": 1, "max_idle_time": 3000,
+                        "queue_timeout": 10}
+        # Test None value is returned if no schema name is specified
+        settings = self.connect_kwargs.copy()
+        settings.pop("schema")
+        client = mysqlx.get_client(settings, pooling_dict)
+        session = client.get_session()
+        schema = session.get_default_schema()
+        self.assertIsNone(schema,
+                          "None value was expected but got '{}'".format(schema))
+        session.close()
+
+        # Test SQL statements not fully qualified, which must not raise error:
+        #     mysqlx.errors.OperationalError: No database selected
+        self.session.sql('CREATE DATABASE my_test_schema').execute()
+        self.session.sql('CREATE TABLE my_test_schema.pets(name VARCHAR(20))'
+                         ).execute()
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = "my_test_schema"
+
+        client = mysqlx.get_client(settings, pooling_dict)
+        session = client.get_session()
+        schema = session.get_default_schema()
+        self.assertTrue(schema, mysqlx.Schema)
+        self.assertEqual(schema.get_name(),
+                         "my_test_schema")
+        result = session.sql('SHOW TABLES').execute().fetch_all()
+        self.assertEqual("pets", result[0][0])
+        self.session.sql('DROP DATABASE my_test_schema').execute()
+        self.assertFalse(schema.exists_in_database())
+        self.assertRaises(mysqlx.ProgrammingError, session.get_default_schema)
+        session.close()
+        client.close()
+
+        # Test without default schema configured at connect time (passing None)
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = None
+        client = mysqlx.get_client(settings, pooling_dict)
+        session = client.get_session()
+        schema = session.get_default_schema()
+        self.assertIsNone(schema,
+                          "None value was expected but got '{}'".format(schema))
+        session.close()
+        client.close()
+
+        # Test not existing default schema at get_session raise error
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = "nonexistent"
+        client = mysqlx.get_client(settings, pooling_dict)
+        self.assertRaises(InterfaceError, client.get_session)
