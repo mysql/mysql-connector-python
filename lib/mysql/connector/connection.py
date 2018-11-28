@@ -118,6 +118,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         try:
             handshake = self._protocol.parse_handshake(packet)
         except Exception as err:
+            # pylint: disable=E1101
             raise errors.get_mysql_exception(msg=err.msg, errno=err.errno,
                                              sqlstate=err.sqlstate)
 
