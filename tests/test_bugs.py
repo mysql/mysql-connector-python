@@ -4940,10 +4940,20 @@ class Bug26484601(tests.MySQLConnectorTests):
         cur = cnx.cursor()
         cur.execute(query)
         res = cur.fetchall()
-        msg = ("Not using the expected TLS version: {}, instead the "
-               "connection used: {}.")
-        self.assertEqual(res[0][1], expected_ssl_version,
-                         msg.format(expected_ssl_version, res))
+        
+        if isinstance(expected_ssl_version, tuple):
+            msg = ("Not using the expected or greater TLS version: {}, instead"
+                   " the connection used: {}.")
+            # Get the version as tuple
+            server_tls = tuple([int(d) for d in
+                                (res[0][1].split('v')[1].split("."))])
+            self.assertGreaterEqual(server_tls, expected_ssl_version,
+                                    msg.format(expected_ssl_version, res))
+        else:
+            msg = ("Not using the expected TLS version: {}, instead the "
+                   "connection used: {}.")
+            self.assertEqual(res[0][1], expected_ssl_version,
+                             msg.format(expected_ssl_version, res))
 
     def test_get_connection_using_given_TLS_version(self):
         """Test connect using the given TLS version
@@ -5001,9 +5011,9 @@ class Bug26484601(tests.MySQLConnectorTests):
         """
         # The default value for the connector 'ssl_version' is None
         # For the expected version, the server will use the latest version of
-        # TLS available "TLSv1.2".
+        # TLS available "TLSv1.2" or newer.
         tls_version = None
-        self.try_connect(tls_version, "TLSv1.2")
+        self.try_connect(tls_version, (1, 2))
 
 
 @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
