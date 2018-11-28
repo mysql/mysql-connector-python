@@ -160,13 +160,13 @@ def connect(*args, **kwargs):
         # No pooling
         pass
 
-    use_pure = kwargs.setdefault('use_pure', False)
-
-    try:
-        del kwargs['use_pure']
-    except KeyError:
-        # Just making sure 'use_pure' is not kwargs
-        pass
+    # Use C Extension by default
+    use_pure = kwargs.get('use_pure', False)
+    if 'use_pure' in kwargs:
+        del kwargs['use_pure']  # Remove 'use_pure' from kwargs
+        if not use_pure and not HAVE_CEXT:
+            raise ImportError("MySQL Connector/Python C Extension not "
+                              "available")
 
     if HAVE_CEXT and not use_pure:
         return CMySQLConnection(*args, **kwargs)

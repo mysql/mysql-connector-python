@@ -4345,6 +4345,7 @@ class BugOra25397650(tests.MySQLConnectorTests):
 
         self._verify_cert(config)
 
+    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
     def test_cext_verify_server_certifcate(self):
         config = self.config.copy()
         config['use_pure'] = False
@@ -4495,6 +4496,7 @@ class BugOra21947091(tests.MySQLConnectorTests):
         self.config['use_pure'] = True
         self._test_ssl_modes()
 
+    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
     def test_ssl_disabled_cext(self):
         self.config['use_pure'] = False
         self._test_ssl_modes()
@@ -4940,7 +4942,7 @@ class Bug26484601(tests.MySQLConnectorTests):
         cur = cnx.cursor()
         cur.execute(query)
         res = cur.fetchall()
-        
+
         if isinstance(expected_ssl_version, tuple):
             msg = ("Not using the expected or greater TLS version: {}, instead"
                    " the connection used: {}.")
@@ -5553,8 +5555,26 @@ class BugOra27434751(tests.MySQLConnectorTests):
         cnx = mysql.connector.connect(**config)
         cnx.close()
 
+    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
     def test_verify_server_name_cext_cnx(self):
         self._verify_server_name_cnx(use_pure=False)
 
     def test_verify_server_name_pure_cnx(self):
         self._verify_server_name_cnx(use_pure=True)
+
+
+@unittest.skipIf(CMySQLConnection, "Test only available without C Extension")
+class BugOra27794178(tests.MySQLConnectorTests):
+    """BUG#27794178: USING USE_PURE=FALSE SHOULD RAISE AN ERROR WHEN CEXT IS NOT
+    AVAILABLE
+    """
+    def test_connection_use_pure(self):
+        config = tests.get_mysql_config().copy()
+        if "use_pure" in config:
+            del config["use_pure"]
+        cnx = mysql.connector.connect(**config)
+        cnx.close()
+
+        # Force using C Extension should fail if not available
+        config["use_pure"] = False
+        self.assertRaises(ImportError, mysql.connector.connect, **config)

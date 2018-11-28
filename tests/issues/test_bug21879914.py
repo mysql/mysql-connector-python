@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -52,6 +52,8 @@ TEST_SSL = {
 
 OPTION_FILE = os.path.join('tests', 'data', 'option_files', 'my.cnf')
 
+
+@unittest.skipIf(not CMySQLConnection, "C Extension not available")
 class Bug21879914(tests.MySQLConnectorTests):
 
     def test_ssl_cipher_in_option_file(self):
