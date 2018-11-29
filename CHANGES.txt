@@ -8,8 +8,20 @@ Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.14
+=======
+
+- WL#12607: Handling of Default Schema
+- WL#12492: Be prepared for initial notice on connection
+- WL#12412: Standardize count method
+- BUG#28646344: Remove expression parsing on values
+- BUG#28280321: Fix segmentation fault when using unicode characters in tables
+- BUG#27794178: Using use_pure=False should raise an error if cext is not available
+- BUG#27434751: Add a TLS/SSL option to verify server name
+
 v8.0.13
 =======
+
 - WL#12239: Add support for Python 3.7
 - WL#12226: Implement connect timeout
 - WL#11897: Implement connection pooling for xprotocol
