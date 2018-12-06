@@ -335,11 +335,11 @@ class BuildExtDynamic(build_ext):
         log.info("Copying vendor files (dll libraries)")
         data_files = []
         vendor_libs = []
+        vendor_folder = ""
 
         if os.name == "nt":
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
             vendor_libs.append((mysql_capi, ["ssleay32.dll", "libeay32.dll"]))
-            vendor_folder = ""
             # Bundle libmysql.dll
             src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
             dst = os.getcwd()
@@ -347,9 +347,12 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         else:
-            mysql_capi = os.path.join(self.with_mysql_capi, "lib")
-            vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
-            vendor_folder = "mysql-vendor"
+            myc_info = get_mysql_config_info(
+                os.path.join(self.with_mysql_capi, "bin", "mysql_config"))
+            if myc_info["version"] > (8, 0, 5):
+                mysql_capi = os.path.join(self.with_mysql_capi, "lib")
+                vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
+                vendor_folder = "mysql-vendor"
 
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
@@ -642,7 +645,14 @@ class BuildExtDynamic(build_ext):
                 self.run_protoc()
             self.real_build_extensions()
 
-            if platform.system() == "Darwin":
+            use_openssl_libs = False
+            if self.with_mysql_capi:
+                mysql_config = os.path.join(self.with_mysql_capi, "bin",
+                                            "mysql_config")
+                myc_info = get_mysql_config_info(mysql_config)
+                use_openssl_libs = myc_info["version"] > (8, 0, 5)
+
+            if platform.system() == "Darwin" and use_openssl_libs:
                 libssl, libcrypto = self._get_posix_openssl_libs()
                 cmd_libssl = [
                     "install_name_tool", "-change", libssl,

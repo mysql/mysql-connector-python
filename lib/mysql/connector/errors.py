@@ -251,11 +251,6 @@ class DataError(DatabaseError):
     pass
 
 
-class HashError(DatabaseError):
-    """Exception for errors reporting problems with hashing"""
-    pass
-
-
 class NotSupportedError(DatabaseError):
     """Exception for errors when an unsupported database feature was used"""
     pass

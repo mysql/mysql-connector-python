@@ -1039,7 +1039,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
 	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
-	PyObject *charset_name, *compress, *ssl_verify_cert, *ssl_verify_identity, *password, *ssl_disabled;
+	PyObject *charset_name= NULL, *compress= NULL, *ssl_verify_cert= NULL,
+	        *ssl_verify_identity= NULL, *password= NULL, *ssl_disabled= NULL;
 	const char* auth_plugin;
 	unsigned long client_flags= 0;
 	unsigned int port= 3306, tmp_uint;
@@ -1131,7 +1132,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     mysql_options(&self->session, MYSQL_OPT_READ_TIMEOUT, (char*)&tmp_uint);
     mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, (char*)&tmp_uint);
 
-    if (ssl_disabled && ssl_disabled == Py_False) {
+    if (ssl_disabled  != NULL && (PyBool_Check(ssl_disabled) && ssl_disabled  == Py_False)) {
         ssl_enabled= 1;
         client_flags |= CLIENT_SSL;
         if (ssl_verify_cert && ssl_verify_cert == Py_True)

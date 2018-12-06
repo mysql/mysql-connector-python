@@ -160,7 +160,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
             'port': self._port,
             'client_flags': self._client_flags,
             'unix_socket': self._unix_socket,
-            'compress': self.isset_client_flag(ClientFlag.COMPRESS)
+            'compress': self.isset_client_flag(ClientFlag.COMPRESS),
+            'ssl_disabled': True
         }
 
         if not self._ssl_disabled:

@@ -2688,18 +2688,10 @@ class BugOra18415927(tests.MySQLConnectorTests):
         config['user'] = self.user['username']
         config['password'] = self.user['password']
         config['client_flags'] = [-constants.ClientFlag.SECURE_CONNECTION]
-        failures = []
-        max_failures = 2
-        for n in range(1000):
-            try:
-                _ = connection.MySQLConnection(**config)
-            except Exception as err:
-                failures.append(err)
-                if n > max_failures:
-                    break
-        if len(failures) > max_failures:
-            self.fail("Connection failed at {}/{} times. First error found: {}"
-                      "".format(len(failures), n, failures[0]))
+        try:
+            cnx = connection.MySQLConnection(**config)
+        except Exception as exc:
+            self.fail("Connection failed: {0}".format(exc))
 
 
 class BugOra18527437(tests.MySQLConnectorTests):
@@ -4822,6 +4814,7 @@ class BugOra24948186(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_retrieve_mysql_json_integer(self):
+        arch64bit = sys.maxsize > 2**32
         stm = ("SELECT j->>'$.foo', JSON_TYPE(j->>'$.foo')"
                "FROM (SELECT json_object('foo', {value}) AS j) jdata")
         test_values = [-2147483648, -1, 0, 1, 2147483647]
@@ -4834,7 +4827,7 @@ class BugOra24948186(tests.MySQLConnectorTests):
         test_values = [-9223372036854775808]
         expected_values = test_values
         mysql_type = "INTEGER"
-        if PY2 and os.name == 'nt':
+        if PY2 and (os.name == "nt" or not arch64bit):
             expected_type = long
         else:
             expected_type = int
@@ -4844,7 +4837,7 @@ class BugOra24948186(tests.MySQLConnectorTests):
         test_values = [92233720368547760]
         expected_values = test_values
         mysql_type = "UNSIGNED INTEGER"
-        if PY2 and os.name == 'nt':
+        if PY2 and (os.name == "nt" or not arch64bit):
             expected_type = long
         else:
             expected_type = int
@@ -5515,6 +5508,8 @@ class BugOra28188883(tests.MySQLConnectorTests):
         self.cnx.close()
 
 
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 23),
+                 "MySQL 5.7.23+ is required for VERIFY_IDENTITY")
 @unittest.skipIf(sys.version_info < (2, 7, 9),
                  "Python 2.7.9+ is required for SSL")
 class BugOra27434751(tests.MySQLConnectorTests):

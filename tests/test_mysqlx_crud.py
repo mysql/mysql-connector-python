@@ -600,7 +600,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(7, len(result.fetch_all()))
 
         # test unicode
-        result = collection.add({"age": 1, "name": u"😀"}).execute()
+        result = collection.add({"_id": "8", "age": 1, "name": u"😀"}).execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(8, collection.count())
 

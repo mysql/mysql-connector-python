@@ -193,26 +193,6 @@ def build_uri(**kwargs):
     return uri
 
 
-def skip_timeout():
-    params = ("198.51.100.255", "3306")
-    try:
-        _socket = socket.create_connection(params, 1)
-    except ValueError:
-        try:
-            _socket = socket.socket(socket.AF_UNIX)
-            _socket.settimeout(1)
-            _socket.connect(("198.51.100.255", "3306"))
-        except socket.timeout:
-            return False
-        except socket.error:
-            return True
-    except socket.timeout:
-        return False
-    except socket.error:
-        return True
-    return False
-
-
 class ServerSocketStream(SocketStream):
     def __init__(self):
         self._socket = None
@@ -501,7 +481,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
             except mysqlx.Error:
                 self.assertEqual(res, None)
 
-    @unittest.skipIf(skip_timeout(), "Skipped due to No route to host error")
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 13),
+                 "MySQL 8.0.13+ is required for connect timeout")
     def test_connect_timeout(self):
         config = self.connect_kwargs.copy()
         # 0 ms disables timouts on socket connections
@@ -520,14 +501,48 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Timeout for an unreachable host
         # https://en.wikipedia.org/wiki/IPv4#Special-use_addresses
-        config["host"] = "198.51.100.255"
+        hosts = [
+            "198.51.100.255",
+            "192.0.2.255",
+            "10.255.255.1",
+            "192.0.2.0",
+            "203.0.113.255",
+            "10.255.255.255",
+            "192.168.255.255",
+            "203.0.113.4",
+            "192.168.0.0",
+            "172.16.0.0",
+            "10.255.255.251",
+            "172.31.255.255",
+            "198.51.100.23",
+            "172.16.255.255",
+            "198.51.100.8",
+            "192.0.2.254",
+        ]
+        unreach_hosts = []
         config["connect-timeout"] = 2000
-        self.assertRaises(mysqlx.TimeoutError, mysqlx.get_session, config)
+
+        # Find two unreachable hosts for testing
+        for host in hosts:
+            try:
+                config["host"] = host
+                mysqlx.get_session(config)
+            except mysqlx.TimeoutError:
+                unreach_hosts.append(host)
+                if len(unreach_hosts) == 2:
+                    break  # We just need 2 unreachable hosts
+            except:
+                pass
+
+        total_unreach_hosts = len(unreach_hosts)
+        self.assertEqual(total_unreach_hosts, 2,
+                         "Two unreachable hosts are needed, {0} found"
+                         "".format(total_unreach_hosts))
 
         # Multi-host scenarios
         # Connect to a secondary host if the primary fails
         routers = [
-            {"host": "198.51.100.255", "port": config["port"], "priority": 100},
+            {"host": unreach_hosts[0], "port": config["port"], "priority": 100},
             {"host": "127.0.0.1", "port": config["port"], "priority": 90}
         ]
         uri = build_uri(user=config["user"], password=config["password"],
@@ -537,8 +552,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Fail to connect to all hosts
         routers = [
-            {"host": "198.51.100.255", "port": config["port"], "priority": 100},
-            {"host": "192.0.2.255", "port": config["port"], "priority": 90}
+            {"host": unreach_hosts[0], "port": config["port"], "priority": 100},
+            {"host": unreach_hosts[1], "port": config["port"], "priority": 90}
         ]
         uri = build_uri(user=config["user"], password=config["password"],
                         connect_timeout=2000, routers=routers)
@@ -550,6 +565,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
                              "All server connection attempts were aborted. "
                              "Timeout of 2000 ms was exceeded for each "
                              "selected server")
+        except mysqlx.InterfaceError as err:
+            self.assertEqual(err.msg, "Failed to connect to any of the routers")
 
         # Trying to establish a connection with a wrong password should not
         # wait for timeout
@@ -914,15 +931,15 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
 
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
-        self.connection_string = {
-            'user': 'root',
-            'password': '',
-            'host': 'localhost',
-            "ssl-mode": 'disabled',
+        self.settings = {
+            "user": "root",
+            "password": "",
+            "host": "localhost",
+            "ssl-mode": "disabled",
             "use_pure": True
         }
 
-    def _server_thread(self, host='localhost', port=33061, notice=1):
+    def _server_thread(self, host="localhost", port=33061, notice=1):
             stream = ServerSocketStream()
             stream.start_receive(host, port)
             reader_writer = MessageReaderWriter(stream)
@@ -936,11 +953,11 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             # send handshake
             if notice == 1:
                 # send empty notice
-                stream.sendall(b'\x01\x00\x00\x00\x0b')
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
             else:
                 # send notice frame with explicit default
-                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
-                #stream.sendall(b'\x01\x00\x00\x00\x0b')
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
+                #stream.sendall(b"\x01\x00\x00\x00\x0b")
             # send auth start")
             protocol.send_auth_continue_server("00000000000000000000")
             # Capabilities are not check for ssl-mode: disabled
@@ -962,47 +979,47 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             # send empty notice
             if notice == 1:
                 # send empty notice
-                stream.sendall(b'\x01\x00\x00\x00\x0b')
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
             else:
                 # send notice frame with explicit default
-                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
 
             # msg_type: 12 Mysqlx.Resultset.ColumnMetaData
-            stream.sendall(b'\x31\x00\x00\x00\x0c'
-                           b'\x08\x07\x12\x08\x44\x61\x74\x61\x62\x61\x73'
-                           b'\x65\x1a\x08\x44\x61\x74\x61\x62\x61\x73\x65'
-                           b'\x22\x08\x53\x43\x48\x45\x4d\x41\x54\x41\x2a'
-                           b'\x00\x32\x00\x3a\x03\x64\x65\x66\x40\x4c\x50'
-                           b'\xc0\x01\x58\x10')
+            stream.sendall(b"\x31\x00\x00\x00\x0c"
+                           b"\x08\x07\x12\x08\x44\x61\x74\x61\x62\x61\x73"
+                           b"\x65\x1a\x08\x44\x61\x74\x61\x62\x61\x73\x65"
+                           b"\x22\x08\x53\x43\x48\x45\x4d\x41\x54\x41\x2a"
+                           b"\x00\x32\x00\x3a\x03\x64\x65\x66\x40\x4c\x50"
+                           b"\xc0\x01\x58\x10")
 
             # send unexpected notice
             if notice == 1:
                 # send empty notice
-                stream.sendall(b'\x01\x00\x00\x00\x0b')
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
             else:
                 # send notice frame with explicit default
-                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
 
             # msg_type: 13 Mysqlx.Resultset.Row
-            stream.sendall(b'\x16\x00\x00\x00\x0d'
-                           b'\x0a\x13\x69\x6e\x66\x6f\x72\x6d\x61\x74\x69'
-                           b'\x6f\x6e\x5f\x73\x63\x68\x65\x6d\x61\x00')
+            stream.sendall(b"\x16\x00\x00\x00\x0d"
+                           b"\x0a\x13\x69\x6e\x66\x6f\x72\x6d\x61\x74\x69"
+                           b"\x6f\x6e\x5f\x73\x63\x68\x65\x6d\x61\x00")
             # msg_type: 14 Mysqlx.Resultset.FetchDone
-            stream.sendall(b'\x01\x00\x00\x00\x0e')
+            stream.sendall(b"\x01\x00\x00\x00\x0e")
             # msg_type: 11 Mysqlx.Notice.Frame
-            stream.sendall(b'\x0f\x00\x00\x00\x0b'
-                           b'\x08\x03\x10\x02\x1a\x08\x08\x04\x12\x04\x08\x02\x18\x00')
+            stream.sendall(b"\x0f\x00\x00\x00\x0b\x08\x03\x10\x02\x1a\x08\x08"
+                           b"\x04\x12\x04\x08\x02\x18\x00")
 
             # send unexpected notice
             if notice == 1:
                 # send empty notice
-                stream.sendall(b'\x01\x00\x00\x00\x0b')
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
             else:
                 # send notice frame with explicit default
-                stream.sendall(b'\x03\x00\x00\x00\x0b\x08\x01')
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
 
             # msg_type: 17 Mysqlx.Sql.StmtExecuteOk
-            stream.sendall(b'\x01\x00\x00\x00\x11')
+            stream.sendall(b"\x01\x00\x00\x00\x11")
 
             # Read message
             hdr = stream.read(5)
@@ -1010,71 +1027,73 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             self.assertEqual(msg_type, 7)
             # Read payload
             _ = stream.read(msg_len - 1)
-            stream.sendall(b'\x07\x00\x00\x00\x00\n\x04bye!')
+            stream.sendall(b"\x07\x00\x00\x00\x00\n\x04bye!")
 
             # Close socket
             stream.close()
 
-    def test_innitial_empty_notice(self):
-        _server_thread_l = self._server_thread
-
-        # Tests empty notice at innitial connection
-        settings = self.connect_kwargs.copy()
-        host = 'localhost'
-        port = settings["port"] + 10
-        worker1 = Thread(target=_server_thread_l, args=[host, port, 1])
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
+    def test_initial_empty_notice_cext(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 10
+        worker1 = Thread(target=self._server_thread, args=[host, port, 1])
         worker1.daemon = True
         worker1.start()
         sleep(1)
-        connection_string = self.connection_string.copy()
-        connection_string['port'] = port
-        connection_string['use_pure'] = False
-        session = mysqlx.get_session(connection_string)
-        rows = session.sql('show databases').execute().fetch_all()
-        self.assertEqual(rows[0][0], "information_schema")
-        session.close()
-        # Tests empty notice at innitial connection
-        port += 20
-        worker2 = Thread(target=_server_thread_l, args=[host, port, 1])
-        worker2.daemon = True
-        worker2.start()
-        sleep(2)
-        connection_string = self.connection_string.copy()
-        connection_string['port'] = port
-        connection_string['use_pure'] = True
-        session = mysqlx.get_session(connection_string)
-        rows = session.sql('show databases').execute().fetch_all()
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = False
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
         self.assertEqual(rows[0][0], "information_schema")
         session.close()
 
-    def test_innitial_notice(self):
-        _server_thread_l = self._server_thread
-        # Tests empty notice at innitial connection
-        settings = self.connect_kwargs.copy()
-        host = 'localhost'
-        port = settings['port'] + 11
-        worker1 = Thread(target=_server_thread_l, args=[host, port, 2])
+    def test_initial_empty_notice_pure(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 20
+        worker2 = Thread(target=self._server_thread, args=[host, port, 1])
+        worker2.daemon = True
+        worker2.start()
+        sleep(2)
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = True
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
+    def test_initial_notice_cext(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 11
+        worker1 = Thread(target=self._server_thread, args=[host, port, 2])
         worker1.daemon = True
         worker1.start()
         sleep(1)
-        connection_string = self.connection_string.copy()
-        connection_string['port'] = port
-        connection_string['use_pure'] = False
-        session = mysqlx.get_session(connection_string)
-        rows = session.sql('show databases').execute().fetch_all()
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = False
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
         self.assertEqual(rows[0][0], "information_schema")
         session.close()
 
-        # Tests empty notice at innitial connection
-        port += 21
-        worker2 = Thread(target=_server_thread_l, args=[host, port, 2])
+    def test_initial_notice_pure(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 21
+        worker2 = Thread(target=self._server_thread, args=[host, port, 2])
         worker2.daemon = True
         worker2.start()
         sleep(2)
-        connection_string = self.connection_string.copy()
-        connection_string['port'] = port
-        connection_string['use_pure'] = True
-        session = mysqlx.get_session(connection_string)
-        rows = session.sql('show databases').execute().fetch_all()
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = True
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
         self.assertEqual(rows[0][0], "information_schema")
         session.close()

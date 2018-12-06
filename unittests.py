@@ -63,6 +63,8 @@ unittests.py has exit status 0 when tests were ran successfully, 1 otherwise.
 """
 import os
 import sys
+import shutil
+import platform
 import time
 import unittest
 try:
@@ -135,7 +137,10 @@ general_log = ON
 language = {lc_messages_dir}/english
 
 [mysqld]
-max_allowed_packet=26777216
+max_allowed_packet = 26777216
+net_read_timeout = 120
+net_write_timeout = 120
+connect_timeout = 60
 basedir = {basedir}
 datadir = {datadir}
 tmpdir = {tmpdir}
@@ -728,7 +733,7 @@ def init_mysql_server(port, options):
         'user': 'root',
         'password': '',
         'database': 'myconnpy',
-        'connection_timeout': 10,
+        'connection_timeout': 60,
     }
 
     mysql_server.xplugin_config = {
@@ -843,6 +848,10 @@ def main():
                                 options.mysql_capi,
                                 options.extra_compile_args,
                                 options.extra_link_args, options.debug)
+
+        if platform.system() == "Darwin" and tests.MYSQL_VERSION > (8, 0, 5):
+            shutil.copytree(os.path.join(_TOPDIR, "mysql-vendor"),
+                            os.path.join(tests.TEST_BUILD_DIR, "mysql-vendor"))
 
     # Which tests cases to run
     testcases = []

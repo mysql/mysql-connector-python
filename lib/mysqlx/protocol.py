@@ -71,10 +71,14 @@ class MessageReaderWriter(object):
         msg_type_name = SERVER_MESSAGES.get(msg_type)
         if not msg_type_name:
             raise ValueError("Unknown msg_type: {0}".format(msg_type))
-        try:
-            msg = Message.from_server_message(msg_type, payload)
-        except RuntimeError:
+        # Do not parse empty notices, Message requires a type in payload.
+        if msg_type == 11 and payload == b"":
             return self._read_message()
+        else:
+            try:
+                msg = Message.from_server_message(msg_type, payload)
+            except RuntimeError:
+                return self._read_message()
         return msg
 
     def read_message(self):
