@@ -524,7 +524,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                 session.rollback()
 
             waiting.set()
-            time.sleep(2)
+            time.sleep(4)
 
             session.start_transaction()
             result.execute()

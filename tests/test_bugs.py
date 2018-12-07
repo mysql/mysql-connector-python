@@ -2687,7 +2687,8 @@ class BugOra18415927(tests.MySQLConnectorTests):
         config['unix_socket'] = None
         config['user'] = self.user['username']
         config['password'] = self.user['password']
-        config['client_flags'] = [-constants.ClientFlag.SECURE_CONNECTION]
+        config['client_flags'] = [-constants.ClientFlag.SECURE_CONNECTION,
+                                  -constants.ClientFlag.CONNECT_WITH_DB]
         try:
             cnx = connection.MySQLConnection(**config)
         except Exception as exc:

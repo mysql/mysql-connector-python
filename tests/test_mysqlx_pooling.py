@@ -235,7 +235,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             session = client.get_session()
             self.assertTrue(isinstance(session, mysqlx.connection.Session))
             sessions.append(session)
-
+        sleep(0.5)
         # Verify the number of connections open in the server
         connections = get_current_connections(old_session)
         self.assertEqual(len(connections[self.users[0][0]]), total_connections)
@@ -244,6 +244,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         # to the pool instead of being closed
         sessions[5].close()
         sessions[9].close()
+        sleep(0.5)
         connections = get_current_connections(old_session)
         self.assertTrue(len(connections[self.users[0][0]]) >=
                         (total_connections - 2))
@@ -347,7 +348,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         conn_id1 = session1.sql("select connection_id()"
                                ).execute().fetch_all()[0][0]
         session1.close()
-        # Verify that new session is has the same id from previews one
+        # Verify that new session is has the same id from previous one
         session2 = client.get_session()
         conn_id2 = session2.sql("select connection_id()"
                                ).execute().fetch_all()[0][0]
@@ -384,9 +385,9 @@ class MySQLxClientTests(tests.MySQLxTests):
                          "The connection id was not greater")
 
         session1.close()
-        # Verify that new session does not has the same id from previews one
+        # Verify that new session does not has the same id from previous one
         # goint to sleep 2 sec just above the max idle time
-        sleep(2)
+        sleep(4)
         # Getting session 2
         session2 = client.get_session()
         conn_id2 = session2.sql("select connection_id()"
