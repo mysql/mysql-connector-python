@@ -399,6 +399,11 @@ class BuildExtDynamic(build_ext):
         vendor_libs = []
         vendor_folder = ""
 
+        mysql_config = self.with_mysql_capi \
+            if not os.path.isdir(self.with_mysql_capi) \
+            else os.path.join(self.with_mysql_capi, "bin", "mysql_config")
+        mysql_info = mysql_c_api_info(mysql_config)
+
         if os.name == "nt":
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
             vendor_libs.append((mysql_capi, ["ssleay32.dll", "libeay32.dll"]))
@@ -408,12 +413,7 @@ class BuildExtDynamic(build_ext):
             log.info("copying {0} -> {1}".format(src, dst))
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
-        else:
-            mysql_config = self.with_mysql_capi \
-                if not os.path.isdir(self.with_mysql_capi) \
-                else os.path.join(self.with_mysql_capi, "bin", "mysql_config")
-            mysql_info = mysql_c_api_info(mysql_config)
-            if mysql_info["version"] >= (8, 0, 6):
+        elif mysql_info["version"] >= (8, 0, 6):
                 mysql_capi = os.path.join(self.with_mysql_capi, "lib")
                 vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
                 vendor_folder = "mysql-vendor"
