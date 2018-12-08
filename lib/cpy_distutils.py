@@ -414,9 +414,9 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         elif mysql_info["version"] >= (8, 0, 6):
-                mysql_capi = os.path.join(self.with_mysql_capi, "lib")
-                vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
-                vendor_folder = "mysql-vendor"
+            mysql_capi = os.path.join(self.with_mysql_capi, "lib")
+            vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
+            vendor_folder = "mysql-vendor"
 
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
