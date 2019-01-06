@@ -719,14 +719,22 @@ class BuildExtStatic(BuildExtDynamic):
             self._finalize_protobuf()
 
     def _finalize_connector_c(self, connc_loc):
-        if not os.path.isdir(connc_loc):
-            log.error("MySQL C API should be a directory")
+        if os.path.isfile(connc_loc):
+            myc_info = get_mysql_config_info(connc_loc)
+            log.info(myc_info)
+            _libs = myc_info['lib_dir']
+            _inc = myc_info['include'][0]
+        elif os.path.isdir(connc_loc):
+            _libs = os.path.join(connc_loc, 'lib')
+            _inc = os.path.join(connc_loc, 'include')
+        else:
+            log.error("MySQL C API should be a directory or a full path to mysql_config")
             sys.exit(1)
 
         log.info("Copying MySQL libraries")
-        copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
+        copy_tree(_libs, self.connc_lib)
         log.info("Copying MySQL header files")
-        copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
+        copy_tree(_inc, self.connc_include)
 
         # Remove all but static libraries to force static linking
         if os.name == 'posix':
