@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,8 +34,13 @@
 import unittest
 import tests
 import mysqlx
+import os
+import platform
+import socket
 
-from mysqlx.errors import InterfaceError
+from mysqlx.errors import InterfaceError, ProgrammingError
+from mysql.connector.version import VERSION, LICENSE
+from .test_mysqlx_connection import build_uri
 from time import sleep
 from threading import Thread
 
@@ -490,6 +495,152 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
         self.assertTrue(len(open_connections) >= 1)
 
         client.close()
+
+
+class MySQLxClientConnectionAttributesTests(tests.MySQLConnectorTests):
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.schema_name = self.connect_kwargs["schema"]
+        try:
+            self.client = mysqlx.get_client(self.connect_kwargs, "{}")
+            self.session = self.client.get_session()
+        except mysqlx.Error as err:
+            self.fail("{0}".format(err))
+
+        if os.name == "nt":
+            if "64" in platform.architecture()[0]:
+                self.platform_arch = "x86_64"
+            elif "32" in platform.architecture()[0]:
+                self.platform_arch = "i386"
+            else:
+                self.platform_arch = platform.architecture()
+            self.os_ver = "Windows-{}".format(platform.win32_ver()[1])
+        else:
+            self.platform_arch = platform.machine()
+            self.os_ver = "-".join(platform.linux_distribution()[0:2])
+
+        license_chunks = LICENSE.split(" ")
+        if license_chunks[0] == "GPLv2":
+            self.client_license = "GPL-2.0"
+        else:
+            self.client_license = "Commercial"
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "XPlugin not compatible")
+    def test_connection_attributes(self):
+        # Validate an error is raised if URL user defined connection attributes
+        # through a connection URL name is duplicate
+        connection_attributes = {
+            "foo": "bar",
+            "repeated": "attribute",
+            "baz": "zoom",
+        }
+        uri = build_uri(user=self.connect_kwargs["user"],
+                        password=self.connect_kwargs["password"],
+                        host=self.connect_kwargs["host"],
+                        port=self.connect_kwargs["port"],
+                        schema=self.connect_kwargs["schema"],
+                        connection_attributes=connection_attributes)
+        uri = "{},repeated=duplicate_attribute]".format(uri[0:-1])
+
+        with self.assertRaises(InterfaceError) as context:
+            my_client = mysqlx.get_client(uri, "{}")
+            _ = my_client.get_session()
+
+        self.assertTrue('Duplicate key ' in context.exception.msg,
+                        "error found: {}".format(context.exception.msg))
+
+        # Test error is raised for attribute name starting with '_'
+        connection_attributes = [
+            {"foo": "bar", "_baz": "zoom"},
+            {"_baz": "zoom"},
+            {"foo": "bar", "_baz": "zoom", "puuuuum": "kaplot"}
+        ]
+        for conn_attr in connection_attributes:
+            connect_kwargs = self.connect_kwargs.copy()
+            connect_kwargs["connection_attributes"] = conn_attr
+            with self.assertRaises(InterfaceError) as context:
+                my_client = mysqlx.get_client(connect_kwargs, "{}")
+                _ = my_client.get_session()
+
+            self.assertTrue("connection-attributes" in
+                            context.exception.msg)
+            self.assertTrue("cannot start with '_'" in context.exception.msg)
+
+        # Test error is raised for attribute name size exceeds 32 characters
+        connection_attributes = [
+            {"foo": "bar", "p{}w".format("o"*31): "kaplot"},
+            {"p{}w".format("o"*31): "kaplot"},
+            {"baz": "zoom", "p{}w".format("o"*31): "kaplot", "a": "b"}
+        ]
+        for conn_attr in connection_attributes:
+            connect_kwargs = self.connect_kwargs.copy()
+            connect_kwargs["connection_attributes"] = conn_attr
+            with self.assertRaises(InterfaceError) as context:
+                my_client = mysqlx.get_client(connect_kwargs, "{}")
+                _ = my_client.get_session()
+
+            self.assertTrue("exceeds 32 characters limit size" in
+                            context.exception.msg)
+
+        # Test error is raised for attribute value size exceeds 1024 characters
+        connection_attributes = [
+            {"foo": "bar", "pum": "kr{}nk".format("u"*1024)},
+            {"pum": "kr{}nk".format("u"*1024)},
+            {"baz": "zoom", "pum": "kr{}nk".format("u"*1024), "a": "b"}
+        ]
+        for conn_attr in connection_attributes:
+            connect_kwargs = self.connect_kwargs.copy()
+            connect_kwargs["connection-attributes"] = conn_attr
+            with self.assertRaises(InterfaceError) as context:
+                my_client = mysqlx.get_client(connect_kwargs, "{}")
+                _ = my_client.get_session()
+
+            self.assertTrue("exceeds 1024 characters limit size" in
+                            context.exception.msg)
+
+        # Validate the user defined attributes are created in the server
+        # Test user defined connection attributes through a connection URL
+        connection_attributes = {
+            "foo": "bar",
+            "baz": "zoom",
+            "quash": "",
+            "puuuuum": "kaplot"
+        }
+        uri = build_uri(user=self.connect_kwargs["user"],
+                        password=self.connect_kwargs["password"],
+                        host=self.connect_kwargs["host"],
+                        port=self.connect_kwargs["port"],
+                        schema=self.connect_kwargs["schema"],
+                        connection_attributes=connection_attributes)
+
+        # Verify user defined session-connection-attributes are in the server
+        my_session = mysqlx.get_session(uri)
+        row = my_session.sql("SHOW VARIABLES LIKE \"pseudo_thread_id\"").\
+            execute().fetch_all()[0]
+        get_attrs = ("SELECT ATTR_NAME, ATTR_VALUE FROM "
+                    "performance_schema.session_account_connect_attrs "
+                    "where PROCESSLIST_ID = \"{}\"")
+        rows = my_session.sql(get_attrs.format(row.get_string('Value'))).\
+            execute().fetch_all()
+        expected_attrs = connection_attributes.copy()
+        expected_attrs.update({
+            "_pid": str(os.getpid()),
+            "_platform": self.platform_arch,
+            "_source_host": socket.gethostname(),
+            "_client_name": "mysql-connector-python",
+            "_client_license": self.client_license,
+            "_client_version": ".".join([str(x) for x in VERSION[0:3]]),
+            "_os": self.os_ver
+        })
+        # Note that for an empty string "" value the server stores a Null value
+        expected_attrs["quash"] = "None"
+        for row in rows:
+            self.assertEqual(expected_attrs[row.get_string('ATTR_NAME')],
+                             row.get_string('ATTR_VALUE'),
+                             "Attribute {} with value {} differs of {}".format(
+                                 row.get_string('ATTR_NAME'),
+                                 row.get_string('ATTR_VALUE'),
+                                 expected_attrs[row.get_string('ATTR_NAME')]))
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")

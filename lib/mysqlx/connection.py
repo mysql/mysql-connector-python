@@ -59,6 +59,10 @@ from .result import Result, RowResult, SqlResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
 
+# pylint: disable=C0411,C0413
+sys.path.append("..")
+from mysql.connector.version import VERSION, LICENSE
+
 
 _CONNECT_TIMEOUT = 10000  # Default connect timeout in milliseconds
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS {0}"
@@ -492,6 +496,9 @@ class Connection(object):
                             self.settings.get("ssl-crl"),
                             self.settings.get("ssl-cert"),
                             self.settings.get("ssl-key"))
+        if "attributes" in self.settings:
+            conn_attrs = self.settings["attributes"]
+            self.protocol.set_capabilities(session_connect_attrs=conn_attrs)
 
     def _authenticate(self):
         """Authenticate with the MySQL server."""
@@ -1321,9 +1328,16 @@ class Session(object):
     Args:
         settings (dict): Connection data used to connect to the database.
     """
+
     def __init__(self, settings):
         self.use_pure = settings.get("use-pure", Protobuf.use_pure)
         self._settings = settings
+
+        if "connection-attributes" not in self._settings or \
+           self._settings["connection-attributes"] != False:
+            self._settings["attributes"] = {}
+            self._init_attributes()
+
         if "pooling" in settings and settings["pooling"]:
             # Create pool and retrieve a Connection instance
             PoolsManager().create_pool(settings)
@@ -1344,6 +1358,76 @@ class Session(object):
                 errmsg = err.msg if err.errno == 1044 \
                     else "Default schema '{}' does not exists".format(schema)
                 raise InterfaceError(errmsg, err.errno)
+
+    def _init_attributes(self):
+        """Setup default and user defined connection-attributes."""
+        if os.name == "nt":
+            if "64" in platform.architecture()[0]:
+                platform_arch = 'x86_64'
+            elif "32" in platform.architecture()[0]:
+                platform_arch = 'i386'
+            else:
+                platform_arch = platform.architecture()
+            os_ver = "Windows-{}".format(platform.win32_ver()[1])
+        else:
+            platform_arch = platform.machine()
+            # pylint: disable=W1505
+            os_ver = "-".join(platform.linux_distribution()[0:2])
+
+        license_chunks = LICENSE.split(' ')
+        if license_chunks[0] == "GPLv2":
+            client_license = "GPL-2.0"
+        else:
+            client_license = "Commercial"
+
+        default_attributes = {
+            # Process id
+            "_pid": str(os.getpid()),
+            # Platform architecture
+            "_platform": platform_arch,
+            # OS version
+            "_os": os_ver,
+            # Hostname of the local machine
+            "_source_host": socket.gethostname(),
+            # Client's name
+            "_client_name": "mysql-connector-python",
+            # Client's version
+            "_client_version": ".".join([str(x) for x in VERSION[0:3]]),
+            # Client's License identifier
+            "_client_license": client_license
+        }
+        self._settings["attributes"].update(default_attributes)
+
+        if "connection-attributes" in self._settings:
+            for attr_name in self._settings["connection-attributes"]:
+                attr_value = self._settings["connection-attributes"][attr_name]
+                # Validate name type
+                if not isinstance(attr_name, STRING_TYPES):
+                    raise InterfaceError("Attribute name '{}' must be a string "
+                                         "type".format(attr_name))
+                # Validate attribute name limit 32 characters
+                if len(attr_name) > 32:
+                    raise InterfaceError("Attribute name '{}' exceeds 32 "
+                                         "characters limit size"
+                                         "".format(attr_name))
+                # Validate names in connection-attributes cannot start with "_"
+                if attr_name.startswith("_"):
+                    raise InterfaceError("Key names in 'session-connect-"
+                                         "attributes' cannot start with '_', "
+                                         "found: {}".format(attr_name))
+                # Validate value type
+                if not isinstance(attr_value, STRING_TYPES):
+                    raise InterfaceError("Attribute name '{}' value '{}' must "
+                                         "be a string type"
+                                         "".format(attr_name, attr_value))
+
+                # Validate attribute value limit 1024 characters
+                if len(attr_value) > 1024:
+                    raise InterfaceError("Attribute name '{}' value: '{}' "
+                                         "exceeds 1024 characters limit size"
+                                         "".format(attr_name, attr_value))
+
+                self._settings["attributes"][attr_name] = attr_value
 
     @property
     def use_pure(self):

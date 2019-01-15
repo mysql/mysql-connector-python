@@ -330,10 +330,53 @@ class Protocol(object):
         for key, value in kwargs.items():
             capability = Message("Mysqlx.Connection.Capability")
             capability["name"] = key
-            capability["value"] = self._create_any(value)
+            if isinstance(value, dict):
+                items = value
+                obj_flds = []
+                for item in items:
+                    obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
+                                      key=item,
+                                      value=self._create_any(items[item]))
+                    obj_flds.append(obj_fld.get_message())
+                msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
+                msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
+                capability["value"] = msg_any.get_message()
+            else:
+                capability["value"] = self._create_any(value)
+
             capabilities["capabilities"].extend([capability.get_message()])
         msg = Message("Mysqlx.Connection.CapabilitiesSet")
         msg["capabilities"] = capabilities
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_SET"),
+            msg)
+
+        try:
+            return self.read_ok()
+        except InterfaceError as err:
+            # Skip capability "session_connect_attrs" error since
+            # is only available on version >= 8.0.16
+            if err.errno != 5002:
+                raise
+        return None
+
+    def set_session_capabilities(self, **kwargs):
+        """Set capabilities.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            mysqlx.protobuf.Message: MySQL X Protobuf Message.
+        """
+        capabilities = Message("Mysqlx.Connection.Capabilities")
+        for key, value in kwargs.items():
+            capability = Message("Mysqlx.Connection.Capability")
+            capability["name"] = key
+            capability["value"] = self._create_any(value)
+            capabilities["capabilities"].extend([capability.get_message()])
+        msg = Message("Mysqlx.Connection.CapabilitiesSet")
+        msg["session_connect_attrs"] = capabilities
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_SET"),
             msg)
@@ -784,7 +827,8 @@ class Protocol(object):
         """
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
-            raise InterfaceError("Mysqlx.Error: {}".format(msg["msg"]))
+            raise InterfaceError("Mysqlx.Error: {}".format(msg["msg"]),
+                                 errno=msg["code"])
         if msg.type != "Mysqlx.Ok":
             raise InterfaceError("Unexpected message encountered: {}"
                                  "".format(msg["msg"]))

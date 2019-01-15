@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -58,7 +58,7 @@ _PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
 _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
                           "routers", "socket", "ssl-mode", "auth", "use-pure",
-                          "connect-timeout"]
+                          "connect-timeout", "connection-attributes"]
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs
@@ -197,6 +197,9 @@ def _validate_settings(settings):
         except (AttributeError, ValueError):
             raise InterfaceError("Invalid Auth '{0}'".format(settings["auth"]))
 
+    if "connection-attributes" in settings:
+        validate_connection_attributes(settings)
+
 
 def _validate_hosts(settings):
     """Validate hosts.
@@ -220,6 +223,115 @@ def _validate_hosts(settings):
             raise InterfaceError("Invalid port")
     elif "host" in settings:
         settings["port"] = 33060
+
+
+def validate_connection_attributes(settings):
+    """Validate connection-attributes.
+
+    Args:
+        settings (dict): Settings dictionary.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: If attribute name or value exceeds size.
+    """
+    attributes = {}
+    if "connection-attributes" not in settings:
+        return
+
+    conn_attrs = settings["connection-attributes"]
+
+    if isinstance(conn_attrs, STRING_TYPES):
+        if conn_attrs == "":
+            settings["connection-attributes"] = {}
+            return
+        if not (conn_attrs.startswith("[") and conn_attrs.endswith("]")) and \
+           not conn_attrs in ['False', "false", "True", "true"]:
+            raise InterfaceError("connection-attributes must be Boolean or a "
+                                 "list of key-value pairs, found: '{}'"
+                                 "".format(conn_attrs))
+        elif conn_attrs in ['False', "false", "True", "true"]:
+            if conn_attrs in ['False', "false"]:
+                settings["connection-attributes"] = False
+            else:
+                settings["connection-attributes"] = {}
+            return
+        else:
+            conn_attributes = conn_attrs[1:-1].split(",")
+            for attr in conn_attributes:
+                if attr == "":
+                    continue
+                attr_name_val = attr.split('=')
+                attr_name = attr_name_val[0]
+                attr_val = attr_name_val[1] if len(attr_name_val) > 1 else ""
+                if attr_name in attributes:
+                    raise InterfaceError("Duplicate key '{}' used in "
+                                         "connection-attributes"
+                                         "".format(attr_name))
+                else:
+                    attributes[attr_name] = attr_val
+    elif isinstance(conn_attrs, dict):
+        for attr_name in conn_attrs:
+            attr_value = conn_attrs[attr_name]
+            if not isinstance(attr_value, STRING_TYPES):
+                attr_value = repr(attr_value)
+            attributes[attr_name] = attr_value
+    elif isinstance(conn_attrs, bool) or conn_attrs in [0, 1]:
+        if conn_attrs:
+            settings["connection-attributes"] = {}
+        else:
+            settings["connection-attributes"] = False
+        return
+    elif isinstance(conn_attrs, set):
+        for attr_name in conn_attrs:
+            attributes[attr_name] = ""
+    elif isinstance(conn_attrs, list):
+        for attr in conn_attrs:
+            if attr == "":
+                continue
+            attr_name_val = attr.split('=')
+            attr_name = attr_name_val[0]
+            attr_val = attr_name_val[1] if len(attr_name_val) > 1 else ""
+            if attr_name in attributes:
+                raise InterfaceError("Duplicate key '{}' used in "
+                                     "connection-attributes"
+                                     "".format(attr_name))
+            else:
+                attributes[attr_name] = attr_val
+    elif not isinstance(conn_attrs, bool):
+        raise InterfaceError("connection-attributes must be Boolean or a list "
+                             "of key-value pairs, found: '{}'"
+                             "".format(conn_attrs))
+
+    if attributes:
+        for attr_name in attributes:
+            attr_value = attributes[attr_name]
+
+            # Validate name type
+            if not isinstance(attr_name, STRING_TYPES):
+                raise InterfaceError("Attribute name '{}' must be a string"
+                                     "type".format(attr_name))
+            # Validate attribute name limit 32 characters
+            if len(attr_name) > 32:
+                raise InterfaceError("Attribute name '{}' exceeds 32 "
+                                     "characters limit size.".format(attr_name))
+            # Validate names in connection-attributes cannot start with "_"
+            if attr_name.startswith("_"):
+                raise InterfaceError("Key names in connection-attributes "
+                                     "cannot start with '_', found: '{}'"
+                                     "".format(attr_name))
+
+            # Validate value type
+            if not isinstance(attr_value, STRING_TYPES):
+                raise InterfaceError("Attribute '{}' value: '{}' must "
+                                     "be a string type."
+                                     "".format(attr_name, attr_value))
+            # Validate attribute value limit 1024 characters
+            if len(attr_value) > 1024:
+                raise InterfaceError("Attribute '{}' value: '{}' "
+                                     "exceeds 1024 characters limit size"
+                                     "".format(attr_name, attr_value))
+
+    settings["connection-attributes"] = attributes
 
 
 def _get_connection_settings(*args, **kwargs):
