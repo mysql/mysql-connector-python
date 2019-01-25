@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1794,7 +1794,7 @@ class BugOra16369511(tests.MySQLConnectorTests):
         cnx.cmd_query("DROP TABLE IF EXISTS local_data")
         cnx.close()
 
-    @foreach_cnx()
+    @foreach_cnx(allow_local_infile=True)
     def test_load_csv(self):
         self._setup()
         cur = self.cnx.cursor()
@@ -1809,7 +1809,7 @@ class BugOra16369511(tests.MySQLConnectorTests):
 
         self.assertEqual(exp, cur.fetchall())
 
-    @cnx_config(compress=True)
+    @cnx_config(compress=True, allow_local_infile=True)
     @foreach_cnx()
     def test_load_csv_with_compress(self):
         self._setup()
@@ -1824,7 +1824,7 @@ class BugOra16369511(tests.MySQLConnectorTests):
             (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, cur.fetchall())
 
-    @foreach_cnx()
+    @foreach_cnx(allow_local_infile=True)
     def test_filenotfound(self):
         self._setup()
         cur = self.cnx.cursor()
@@ -1869,7 +1869,7 @@ class BugOra17002411(tests.MySQLConnectorTests):
         os.unlink(self.data_file)
         cnx.close()
 
-    @foreach_cnx()
+    @foreach_cnx(allow_local_infile=True)
     def test_load_csv(self):
         self._setup()
         cur = self.cnx.cursor()

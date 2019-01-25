@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -226,11 +226,12 @@ class MySQLConnectionAbstract(object):
         except KeyError:
             pass  # Missing compress argument is OK
 
-        try:
-            if not config['allow_local_infile']:
-                self.set_client_flags([-ClientFlag.LOCAL_FILES])
-        except KeyError:
-            pass  # Missing allow_local_infile argument is OK
+        allow_local_infile = config.get(
+            'allow_local_infile', DEFAULT_CONFIGURATION['allow_local_infile'])
+        if allow_local_infile:
+            self.set_client_flags([ClientFlag.LOCAL_FILES])
+        else:
+            self.set_client_flags([-ClientFlag.LOCAL_FILES])
 
         try:
             if not config['consume_results']:

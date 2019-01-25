@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -50,7 +50,7 @@ class Bug21449996(tests.MySQLConnectorTests):
         cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.table_name)
         cnx.close()
 
-    @foreach_cnx()
+    @foreach_cnx(allow_local_infile=True)
     def test_load_data_compressed(self):
         try:
             cur = self.cnx.cursor()

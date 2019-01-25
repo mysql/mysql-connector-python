@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1754,58 +1754,37 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur.close()
         cnx.close()
 
-
-class WL7937(tests.MySQLConnectorTests):
-    """Allow 'LOAD DATA LOCAL INFILE' by default
-    """
-    def setUp(self):
-        config = tests.get_mysql_config()
-        self.cnx = connection.MySQLConnection(**config)
-        self.cur = self.cnx.cursor()
-
-        self.data_file = os.path.join('tests', 'data', 'local_data.csv')
-
-        self.cur.execute("DROP TABLE IF EXISTS local_data")
-        self.cur.execute(
-            "CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
-
-    def tearDown(self):
-        try:
-            self.cur.execute("DROP TABLE IF EXISTS local_data")
-            self.cur.close()
-            self.cnx.close()
-        except:
-            pass
-
-    def test_load_local_infile(self):
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 0),
+                     "The local_infile option is disabled only in MySQL 8.0.")
+    @tests.foreach_cnx()
+    def test_default_allow_local_infile(self):
+        cur = self.cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS local_data")
+        cur.execute("CREATE TABLE local_data "
+                    "(id int, c1 VARCHAR(6), c2 VARCHAR(6))")
+        data_file = os.path.join("tests", "data", "local_data.csv")
+        cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
-        self.cur.execute(sql, (self.data_file, ))
-        self.cur.execute("SELECT * FROM local_data")
+        self.assertRaises(errors.ProgrammingError,
+                          cur.execute, sql, (data_file,))
+        cur.execute("DROP TABLE IF EXISTS local_data")
+        cur.close()
 
-        exp = [
-            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
-        self.assertEqual(exp, self.cur.fetchall())
-
-    def test_without_load_local_infile(self):
-        config = tests.get_mysql_config()
-        config['allow_local_infile'] = False
-
-        self.cnx = connection.MySQLConnection(**config)
-        self.cur = self.cnx.cursor()
-
+    @tests.foreach_cnx(allow_local_infile=True)
+    def test_allow_local_infile(self):
+        cur = self.cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS local_data")
+        cur.execute("CREATE TABLE local_data "
+                    "(id int, c1 VARCHAR(6), c2 VARCHAR(6))")
+        data_file = os.path.join("tests", "data", "local_data.csv")
+        cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
-        self.assertRaises(errors.ProgrammingError, self.cur.execute, sql,
-                          (self.data_file, ))
+        cur.execute(sql, (data_file, ))
+        cur.execute("SELECT * FROM local_data")
 
-    @unittest.skipIf(HAVE_CMYSQL == False, "C Extension not available")
-    def test_use_pure(self):
-        config = tests.get_mysql_config()
-        cnx = connect(**config)
-        self.assertIsInstance(cnx, CMySQLConnection)
-        cnx.close()
-        config["use_pure"] = True
-        cnx = connect(**config)
-        self.assertIsInstance(cnx, connection.MySQLConnection)
-        cnx.close()
+        exp = [(1, "c1_1", "c2_1"), (2, "c1_2", "c2_2"),
+               (3, "c1_3", "c2_3"), (4, "c1_4", "c2_4"),
+               (5, "c1_5", "c2_5"), (6, "c1_6", "c2_6")]
+        self.assertEqual(exp, cur.fetchall())
+        cur.execute("DROP TABLE IF EXISTS local_data")
+        cur.close()
