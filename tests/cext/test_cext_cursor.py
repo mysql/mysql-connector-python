@@ -66,7 +66,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
     def test___init__(self):
         self.assertRaises(errors.InterfaceError, CMySQLCursor, connection='ham')
         cur = self._get_cursor(self.cnx)
-        self.assertTrue(hex(id(self.cnx)).upper()[2:]
+        self.assertTrue(hex(id(self.cnx)).upper()[2:-1]
                         in repr(cur._cnx).upper())
 
     def test_lastrowid(self):
@@ -125,7 +125,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         self.cnx.get_warnings = False
 
         cur.execute("SELECT BINARY 'ham'")
-        exp = [(b'ham',)]
+        exp = [('ham',)]
         self.assertEqual(exp, cur.fetchall())
         cur.close()
 
@@ -346,7 +346,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
 
         cur = self.cnx.cursor()
         cur.execute("SELECT BINARY 'ham'")
-        exp = (b'ham',)
+        exp = ('ham',)
         self.assertEqual(exp, cur.fetchone())
         self.assertEqual(None, cur.fetchone())
         cur.close()
@@ -384,6 +384,15 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         self.assertTrue(tests.cmp_result(exp, rows),
                         "Fetching next 3 rows test failed.")
         self.assertEqual([], cur.fetchmany())
+
+        # Fetch more than we have.
+        cur.execute(stmt_select)
+        rows = cur.fetchmany(100)
+        exp = [(10, '1000'), (9, '900'), (8, '800'), (7, '700'),
+               (6, '600'), (5, '500'), (4, '400'),
+               (3, '300'), (2, '200'), (1, '100')]
+        self.assertTrue(tests.cmp_result(exp, rows),
+                        "Fetching next 3 rows test failed.")
 
         cur.close()
 
@@ -445,7 +454,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
     def test_column_names(self):
         cur = self._get_cursor(self.cnx)
         stmt = "SELECT NOW() as now, 'The time' as label, 123 FROM dual"
-        exp = (b'now', 'label', b'123')
+        exp = ('now', 'label', '123')
         cur.execute(stmt)
         cur.fetchone()
         self.assertEqual(exp, cur.column_names)
@@ -559,7 +568,7 @@ class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
                           connection='ham')
 
         cur = self._get_cursor(self.cnx)
-        self.assertTrue(hex(id(self.cnx)).upper()[2:]
+        self.assertTrue(hex(id(self.cnx)).upper()[2:-1]
                         in repr(cur._cnx).upper())
 
     def test_execute(self):

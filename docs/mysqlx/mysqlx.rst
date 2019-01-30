@@ -7,7 +7,9 @@ Connection
 .. toctree::
    :maxdepth: 4
 
+   mysqlx.get_client
    mysqlx.get_session
+   mysqlx.Client
    mysqlx.Session
 
 CRUD
@@ -20,6 +22,7 @@ CRUD
    mysqlx.Collection
    mysqlx.Table
    mysqlx.View
+   mysqlx.expr
 
 Result
 ------
@@ -27,7 +30,7 @@ Result
 .. toctree::
    :maxdepth: 4
 
-   mysqlx.ColumnMetaData
+   mysqlx.Column
    mysqlx.Row
    mysqlx.Result
    mysqlx.BufferingResult
@@ -73,3 +76,4 @@ Errors
    mysqlx.OperationalError
    mysqlx.PoolError
    mysqlx.ProgrammingError
+   mysqlx.TimeoutError

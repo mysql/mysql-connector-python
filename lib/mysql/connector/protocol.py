@@ -38,7 +38,9 @@ from .constants import (
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .catch23 import PY2, struct_unpack
-from .errors import get_exception
+from .errors import DatabaseError, get_exception
+
+PROTOCOL_VERSION = 10
 
 
 class MySQLProtocol(object):
@@ -77,7 +79,7 @@ class MySQLProtocol(object):
         return auth_response
 
     def make_auth(self, handshake, username=None, password=None, database=None,
-                  charset=33, client_flags=0,
+                  charset=45, client_flags=0,
                   max_allowed_packet=1073741824, ssl_enabled=False,
                   auth_plugin=None):
         """Make a MySQL Authentication packet"""
@@ -113,7 +115,7 @@ class MySQLProtocol(object):
 
         return packet
 
-    def make_auth_ssl(self, charset=33, client_flags=0,
+    def make_auth_ssl(self, charset=45, client_flags=0,
                       max_allowed_packet=1073741824):
         """Make a SSL authentication packet"""
         return utils.int4store(client_flags) + \
@@ -133,7 +135,7 @@ class MySQLProtocol(object):
         return utils.int4store(statement_id) + utils.int4store(rows)
 
     def make_change_user(self, handshake, username=None, password=None,
-                         database=None, charset=33, client_flags=0,
+                         database=None, charset=45, client_flags=0,
                          ssl_enabled=False, auth_plugin=None):
         """Make a MySQL packet with the Change User command"""
 
@@ -172,6 +174,10 @@ class MySQLProtocol(object):
         """Parse a MySQL Handshake-packet"""
         res = {}
         res['protocol'] = struct_unpack('<xxxxB', packet[0:5])[0]
+        if res["protocol"] != PROTOCOL_VERSION:
+            raise DatabaseError("Protocol mismatch; server version = {}, "
+                                "client version = {}".format(res["protocol"],
+                                                             PROTOCOL_VERSION))
         (packet, res['server_version_original']) = utils.read_string(
             packet[5:], end=b'\x00')
 

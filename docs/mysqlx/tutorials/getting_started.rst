@@ -66,6 +66,12 @@ If ``ssl-ca`` option is set, only the following SSL Modes are allowed:
        'ssl-ca': '/path/to/ca.cert'
    })
 
+The connection settings accepts a connect timeout option ``connect-timeout``, which should be a non-negative integer that defines a time frame in milliseconds. The timeout will assume a default value of 10000 ms (10s) if a value is not provided. And can be disabled if it's value is set to 0, and in that case, the client will wait until the underlying socket (platform-dependent) times-out.
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060?connect-timeout=5000')
+
 Connector/Python has a C extension for `Protobuf <https://developers.google.com/protocol-buffers/>`_ message serialization, this C extension is enabled by default if available. It can be disabled by setting the ``use-pure`` option to :data:`True`.
 
 .. code-block:: python
@@ -80,7 +86,15 @@ Connector/Python has a C extension for `Protobuf <https://developers.google.com/
        'use-pure': True
    })
 
-The :func:`mysqlx.Schema.get_schema()` method returns a :class:`mysqlx.Schema` object. We can use this :class:`mysqlx.Schema` object to access collections and tables. X DevAPI's ability to chain all object constructions, enables you to get to the schema object in one line. For example:
+.. note:: The `urllib.parse.quote <https://docs.python.org/3/library/urllib.parse.html#urllib.parse.quote>`_ function should be used to quote special characters for user and password when using a connection string in the :func:`mysqlx.get_session()` function.
+
+.. code-block:: python
+
+   from urllib.parse import quote
+   session = mysqlx.get_session('mysqlx://root:{0}@localhost:33060?use-pure=true'
+                                ''.format(quote('pass?!#%@/')))
+
+The :func:`mysqlx.Session.get_schema()` method returns a :class:`mysqlx.Schema` object. We can use this :class:`mysqlx.Schema` object to access collections and tables. X DevAPI's ability to chain all object constructions, enables you to get to the schema object in one line. For example:
 
 .. code-block:: python
 
@@ -92,6 +106,34 @@ This object chain is equivalent to the following, with the difference that the i
 
    session = mysqlx.get_session()
    schema = session.get_schema('test')
+
+The connection settings accepts a default schema option ``schema``, which should be a valid name for a preexisting schema in the server.
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060/my_schema')
+   # or
+   session = mysqlx.get_session({
+       'host': 'localhost',
+       'port': 33060,
+       'user': 'root',
+       'password': '',
+       'schema': 'my_schema'
+   })
+
+.. Note:: The default schema provided must exists in the server otherwise it will raise an error at connection time.
+
+This way the session will use the given schema as the default schema, which can be retrieved by :func:`mysqlx.Session.get_default_schema()` and also allows to run SQL statements without specifying the schema name:
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@localhost:33060/my_schema')
+   my_schema = session.get_default_schema()
+   assert my_test_schema.get_name() == 'my_schema'
+   session.sql('CREATE TABLE Pets(name VARCHAR(20))').execute()
+   # instead of 'CREATE TABLE my_schema.Pets(name VARCHAR(20))'
+   res = session.sql('SELECT * FROM Pets').execute().fetch_all()
+   # instead of 'SELECT * FROM my_schema.Pets'
 
 In the following example, the :func:`mysqlx.get_session()` function is used to open a session. We then get the reference to ``test`` schema and create a collection using the :func:`mysqlx.Schema.create_collection()` method of the :class:`mysqlx.Schema` object.
 
@@ -243,12 +285,15 @@ This example uses the previews one to show how to remove of the nested field
 ``Viserion`` on ``dragons`` field and at the same time how to update the value of
 the ``count`` field with a new value based in the current one.
 
+.. note:: In the :func:`mysqlx.ModifyStatement.patch()` all strings are considered literals,
+          for expressions the usage of the :func:`mysqlx.expr()` is required.
+
 .. code-block:: python
 
-    collection.modify('name == "Daenerys"').patch('''
+    collection.modify('name == "Daenerys"').patch(mysqlx.expr('''
         JSON_OBJECT("dragons", JSON_OBJECT("count", $.dragons.count -1,
                                            "Viserion", Null))
-        ''').execute()
+        ''')).execute()
     doc = mys.collection.find("name = 'Daenerys'").execute().fetch_all()[0]
     assert(doc.dragons == {'count': 2,
                            'Rhaegal': 'green with bronze markings',

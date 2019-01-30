@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import errno
 import traceback
+from distutils.dist import Distribution
 from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
@@ -119,7 +120,6 @@ TEST_BUILD_DIR = None
 MYSQL_CAPI = None
 
 DJANGO_VERSION = None
-FABRIC_CONFIG = None
 
 __all__ = [
     'MySQLConnectorTests',
@@ -229,7 +229,6 @@ def get_test_modules():
     for finder, name, is_pkg in walk_packages(__path__, prefix=__name__+'.'):
         if ('.test_' not in name or
                 ('django' in name and not DJANGO_VERSION) or
-                ('fabric' in name and not FABRIC_CONFIG) or
                 ('cext' in name and not MYSQL_CAPI)):
             continue
 
@@ -806,7 +805,8 @@ def setup_logger(logger, debug=False, logfile=None):
 
 def install_connector(root_dir, install_dir, protobuf_include_dir,
                       protobuf_lib_dir, protoc, connc_location=None,
-                      extra_compile_args=None, extra_link_args=None):
+                      extra_compile_args=None, extra_link_args=None,
+                      debug=False):
     """Install Connector/Python in working directory
     """
     logfile = 'myconnpy_install.log'
@@ -826,12 +826,21 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
         'clean', '--all',  # necessary for removing the build/
     ]
 
+    dist = Distribution()
+    cmd_build = dist.get_command_obj('build')
+    cmd_build.ensure_finalized()
+
     cmd.extend([
         'install',
         '--root', install_dir,
         '--install-lib', '.',
         '--static',
+        '--is-wheel'
     ])
+    if os.name == 'nt':
+        cmd.extend([
+            '--install-data', cmd_build.build_platlib
+        ])
 
     if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
         cmd.extend([
@@ -849,6 +858,7 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
     if extra_link_args:
         cmd.extend(['--extra-link-args', extra_link_args])
 
+    LOGGER.debug("Installing command: {0}".format(cmd))
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                            cwd=root_dir)
@@ -858,6 +868,9 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
             logfp.write(stdout)
         LOGGER.error("Failed installing Connector/Python, see {log}".format(
             log=logfile))
+        if debug:
+            with open(logfile) as logfr:
+                print(logfr.read())
         sys.exit(1)
 
 

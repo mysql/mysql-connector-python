@@ -29,8 +29,9 @@
 """Implementation of the CRUD database objects."""
 
 from .dbdoc import DbDoc
-from .errors import ProgrammingError
-from .helpers import escape, quote_identifier
+from .errorcode import ER_NO_SUCH_TABLE
+from .errors import OperationalError, ProgrammingError
+from .helpers import deprecated, escape, quote_identifier
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
                         DeleteStatement, UpdateStatement,
@@ -57,7 +58,14 @@ class DatabaseObject(object):
     def __init__(self, schema, name):
         self._schema = schema
         self._name = name
-        self._connection = self._schema.get_session().get_connection()
+        self._session = self._schema.get_session()
+        self._connection = self._session.get_connection()
+
+    @property
+    def session(self):
+        """:class:`mysqlx.Session`: The Session object.
+        """
+        return self._session
 
     @property
     def schema(self):
@@ -78,6 +86,14 @@ class DatabaseObject(object):
             mysqlx.connection.Connection: The connection object.
         """
         return self._connection
+
+    def get_session(self):
+        """Returns the session of this database object.
+
+        Returns:
+            mysqlx.Session: The Session object.
+        """
+        return self._session
 
     def get_schema(self):
         """Returns the Schema object of this database object.
@@ -106,6 +122,7 @@ class DatabaseObject(object):
         """
         raise NotImplementedError
 
+    @deprecated("8.0.12", "Use 'exists_in_database()' method instead")
     def am_i_real(self):
         """Verifies if this object exists in the database.
 
@@ -114,14 +131,21 @@ class DatabaseObject(object):
 
         Raises:
            NotImplementedError: This method must be implemented.
+
+        .. deprecated:: 8.0.12
+           Use ``exists_in_database()`` method instead.
         """
         return self.exists_in_database()
 
+    @deprecated("8.0.12", "Use 'get_name()' method instead")
     def who_am_i(self):
         """Returns the name of this database object.
 
         Returns:
             str: The name of this database object.
+
+        .. deprecated:: 8.0.12
+           Use ``get_name()`` method instead.
         """
         return self.get_name()
 
@@ -147,14 +171,6 @@ class Schema(DatabaseObject):
         sql = _COUNT_SCHEMAS_QUERY.format(escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
-    def get_session(self):
-        """Returns the session of this Schema object.
-
-        Returns:
-            mysqlx.Session: The Session object.
-        """
-        return self._session
-
     def get_collections(self):
         """Returns a list of collections for this schema.
 
@@ -165,12 +181,12 @@ class Schema(DatabaseObject):
         rows.fetch_all()
         collections = []
         for row in rows:
-            if row.get_string("type") != "COLLECTION":
+            if row["type"] != "COLLECTION":
                 continue
             try:
-                collection = Collection(self, row.get_string("TABLE_NAME"))
+                collection = Collection(self, row["TABLE_NAME"])
             except ValueError:
-                collection = Collection(self, row.get_string("name"))
+                collection = Collection(self, row["name"])
             collections.append(collection)
         return collections
 
@@ -194,11 +210,11 @@ class Schema(DatabaseObject):
         tables = []
         object_types = ("TABLE", "VIEW",)
         for row in rows:
-            if row.get_string("type") in object_types:
+            if row["type"] in object_types:
                 try:
-                    table = Table(self, row.get_string("TABLE_NAME"))
+                    table = Table(self, row["TABLE_NAME"])
                 except ValueError:
-                    table = Table(self, row.get_string("name"))
+                    table = Table(self, row["name"])
                 tables.append(table)
         return tables
 
@@ -313,30 +329,33 @@ class Collection(DatabaseObject):
         return AddStatement(self).add(*values)
 
 
-    def remove(self, condition=None):
+    def remove(self, condition):
         """Removes documents based on the ``condition``.
 
         Args:
-            condition (Optional[str]): The string with the filter expression of
-                                       the documents to be removed.
+            condition (str): The string with the filter expression of the
+                             documents to be removed.
 
         Returns:
             mysqlx.RemoveStatement: RemoveStatement object.
-        """
-        stmt = RemoveStatement(self)
-        if condition:
-            stmt.where(condition)
-        return stmt
 
-    def modify(self, condition=None):
+        .. versionchanged:: 8.0.12
+           The ``condition`` parameter is now mandatory.
+        """
+        return RemoveStatement(self, condition)
+
+    def modify(self, condition):
         """Modifies documents based on the ``condition``.
 
         Args:
-            condition (Optional[str]): The string with the filter expression of
-                                       the documents to be modified.
+            condition (str): The string with the filter expression of the
+                             documents to be modified.
 
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
+
+        .. versionchanged:: 8.0.12
+           The ``condition`` parameter is now mandatory.
         """
         return ModifyStatement(self, condition)
 
@@ -348,7 +367,15 @@ class Collection(DatabaseObject):
         """
         sql = _COUNT_QUERY.format(quote_identifier(self._schema.name),
                                   quote_identifier(self._name))
-        return self._connection.execute_sql_scalar(sql)
+        try:
+            res = self._connection.execute_sql_scalar(sql)
+        except OperationalError as err:
+            if err.errno == ER_NO_SUCH_TABLE:
+                raise OperationalError(
+                    "Collection '{}' does not exist in schema '{}'"
+                    "".format(self._name, self._schema.name))
+            raise
+        return res
 
     def create_index(self, index_name, fields_desc):
         """Creates a collection index.
@@ -384,8 +411,8 @@ class Collection(DatabaseObject):
                                           index_name)
 
     def replace_one(self, doc_id, doc):
-        """Replaces the Document matching the document ID with a
-           new document provided.
+        """Replaces the Document matching the document ID with a new document
+        provided.
 
         Args:
             doc_id (str): Document ID
@@ -395,8 +422,8 @@ class Collection(DatabaseObject):
                    .bind("id", doc_id).execute()
 
     def add_or_replace_one(self, doc_id, doc):
-        """Upserts the Document matching the document ID with a
-           new document provided.
+        """Upserts the Document matching the document ID with a new document
+        provided.
 
         Args:
             doc_id (str): Document ID
@@ -472,25 +499,21 @@ class Table(DatabaseObject):
     def update(self):
         """Creates a new :class:`mysqlx.UpdateStatement` object.
 
-        Args:
-            *fields: The fields to update.
-
         Returns:
             mysqlx.UpdateStatement: UpdateStatement object
         """
         return UpdateStatement(self)
 
-    def delete(self, condition=None):
+    def delete(self):
         """Creates a new :class:`mysqlx.DeleteStatement` object.
-
-        Args:
-            condition (Optional[str]): The string with the filter expression of
-                                       the rows to be deleted.
 
         Returns:
             mysqlx.DeleteStatement: DeleteStatement object
+
+        .. versionchanged:: 8.0.12
+           The ``condition`` parameter was removed.
         """
-        return DeleteStatement(self, condition)
+        return DeleteStatement(self)
 
     def count(self):
         """Counts the rows in the table.
@@ -500,7 +523,15 @@ class Table(DatabaseObject):
         """
         sql = _COUNT_QUERY.format(quote_identifier(self._schema.name),
                                   quote_identifier(self._name))
-        return self._connection.execute_sql_scalar(sql)
+        try:
+            res = self._connection.execute_sql_scalar(sql)
+        except OperationalError as err:
+            if err.errno == ER_NO_SUCH_TABLE:
+                raise OperationalError(
+                    "Table '{}' does not exist in schema '{}'"
+                    "".format(self._name, self._schema.name))
+            raise
+        return res
 
     def is_view(self):
         """Determine if the underlying object is a view or not.

@@ -43,7 +43,7 @@ def create_enum(name, fields, values=None):
     Returns:
         namedtuple: A namedtuple object.
     """
-    Enum = namedtuple(name, fields, verbose=False)
+    Enum = namedtuple(name, fields)
     if values is None:
         return Enum(*fields)
     return Enum(*values)

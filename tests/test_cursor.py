@@ -1032,7 +1032,7 @@ class MySQLCursorBufferedTests(tests.TestsCursor):
                          isinstance(self.cur, cursor.MySQLCursorBuffered))
 
         self.cur.execute("SELECT 1")
-        self.assertEqual([(b'1',)], self.cur._rows)
+        self.assertEqual([(1,)], self.cur._rows)
 
     def test_raise_on_warning(self):
         config = tests.get_mysql_config()
@@ -1133,7 +1133,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         cur._description = [('c1', 5, None, None, None, None, 1, 128)]
 
         # Monkey patch the get_row method of the connection for testing
-        def _get_row(binary, columns):  # pylint: disable=W0613
+        def _get_row(binary, columns, raw):  # pylint: disable=W0613
             try:
                 row = self.cnx._test_fetch_row[0]
                 self.cnx._test_fetch_row = self.cnx._test_fetch_row[1:]

@@ -64,7 +64,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._converter_class = MySQLConverter
 
         self._client_flags = ClientFlag.get_default()
-        self._charset_id = 33
+        self._charset_id = 45
         self._sql_mode = None
         self._time_zone = None
         self._autocommit = False
@@ -95,6 +95,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._auth_plugin = None
         self._pool_config_version = None
 
+        self._columns_desc = []
+
         if kwargs:
             try:
                 self.connect(**kwargs)
@@ -114,8 +116,9 @@ class MySQLConnection(MySQLConnectionAbstract):
         try:
             handshake = self._protocol.parse_handshake(packet)
         except Exception as err:
-            raise errors.InterfaceError(
-                'Failed parsing handshake; {0}'.format(err))
+            # pylint: disable=E1101
+            raise errors.get_mysql_exception(msg=err.msg, errno=err.errno,
+                                             sqlstate=err.sqlstate)
 
         self._server_version = self._check_server_version(
             handshake['server_version_original'])
@@ -134,7 +137,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._handshake = handshake
 
     def _do_auth(self, username=None, password=None, database=None,
-                 client_flags=0, charset=33, ssl_options=None):
+                 client_flags=0, charset=45, ssl_options=None):
         """Authenticate with the MySQL server
 
         Authentication happens in two parts. We first send a response to the
@@ -153,7 +156,10 @@ class MySQLConnection(MySQLConnectionAbstract):
                                        ssl_options.get('cert'),
                                        ssl_options.get('key'),
                                        ssl_options.get('verify_cert') or False,
-                                       ssl_options.get('cipher'))
+                                       ssl_options.get('verify_identity') or
+                                       False,
+                                       ssl_options.get('cipher'),
+                                       ssl_options.get('version', None))
             self._ssl_active = True
 
         packet = self._protocol.make_auth(
@@ -440,16 +446,16 @@ class MySQLConnection(MySQLConnectionAbstract):
         if not column_count or not isinstance(column_count, int):
             raise errors.InterfaceError('Illegal result set.')
 
-        columns = [None,] * column_count
+        self._columns_desc = [None,] * column_count
         for i in range(0, column_count):
-            columns[i] = self._protocol.parse_column(
+            self._columns_desc[i] = self._protocol.parse_column(
                 self._socket.recv(), self.python_charset)
 
         eof = self._handle_eof(self._socket.recv())
         self.unread_result = True
-        return {'columns': columns, 'eof': eof}
+        return {'columns': self._columns_desc, 'eof': eof}
 
-    def get_row(self, binary=False, columns=None):
+    def get_row(self, binary=False, columns=None, raw=None):
         """Get the next rows returned by the MySQL server
 
         This method gets one row from the result set after sending, for
@@ -459,12 +465,13 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a tuple.
         """
-        (rows, eof) = self.get_rows(count=1, binary=binary, columns=columns)
+        (rows, eof) = self.get_rows(count=1, binary=binary, columns=columns,
+                                    raw=raw)
         if rows:
             return (rows[0], eof)
         return (None, eof)
 
-    def get_rows(self, count=None, binary=False, columns=None):
+    def get_rows(self, count=None, binary=False, columns=None, raw=None):
         """Get all rows returned by the MySQL server
 
         This method gets all rows returned by the MySQL server after sending,
@@ -473,6 +480,9 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a tuple()
         """
+        if raw is None:
+            raw = self._raw
+
         if not self.unread_result:
             raise errors.InternalError("No result set available.")
 
@@ -491,13 +501,19 @@ class MySQLConnection(MySQLConnectionAbstract):
             self.unread_result = False
             raise err
 
-        if rows[-1] is not None:
-            row = rows[-1]  # OK or EOF
-            self._handle_server_status(row['status_flag'] if 'status_flag' in
-                                       row else row['server_status'])
+        rows, eof_p = rows
+
+        if not (binary or raw) and self._columns_desc is not None and rows \
+           and hasattr(self, 'converter'):
+            row_to_python = self.converter.row_to_python
+            rows = [row_to_python(row, self._columns_desc) for row in rows]
+
+        if eof_p is not None:
+            self._handle_server_status(eof_p['status_flag'] if 'status_flag' in
+                                       eof_p else eof_p['server_status'])
             self.unread_result = False
 
-        return rows
+        return rows, eof_p
 
     def consume_results(self):
         """Consume results
@@ -674,7 +690,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         return self._handle_ok(self._send_cmd(ServerCmd.PING))
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=33):
+                        charset=45):
         """Change the current logged in user
 
         This method allows to change the current logged in user information.

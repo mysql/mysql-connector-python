@@ -44,7 +44,7 @@ DEFAULT_CONFIGURATION = {
     'port': 3306,
     'unix_socket': None,
     'use_unicode': True,
-    'charset': 'utf8',
+    'charset': 'utf8mb4',
     'collation': None,
     'converter_class': None,
     'autocommit': False,
@@ -61,8 +61,10 @@ DEFAULT_CONFIGURATION = {
     'ssl_cert': None,
     'ssl_key': None,
     'ssl_verify_cert': False,
+    'ssl_verify_identity': False,
     'ssl_cipher': None,
     'ssl_disabled': False,
+    'ssl_version': None,
     'passwd': None,
     'db': None,
     'connect_timeout': None,
@@ -74,11 +76,6 @@ DEFAULT_CONFIGURATION = {
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
-CNX_FABRIC_ARGS = ['fabric_host', 'fabric_username', 'fabric_password',
-                   'fabric_port', 'fabric_connect_attempts',
-                   'fabric_connect_delay', 'fabric_report_errors',
-                   'fabric_ssl_ca', 'fabric_ssl_key', 'fabric_ssl_cert',
-                   'fabric_user']
 
 def flag_is_set(flag, flags):
     """Checks if the flag is set
@@ -704,8 +701,8 @@ class CharacterSet(_Constants):
                     continue
                 if info[0] == charset and info[1] == collation:
                     return (cid, info[0], info[1])
-            raise ProgrammingError("Character set '{0}' unknown.".format(
-                charset))
+            _ = cls.get_default_collation(charset)
+            raise ProgrammingError("Collation '{0}' unknown.".format(collation))
 
     @classmethod
     def get_supported(cls):

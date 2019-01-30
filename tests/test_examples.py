@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -33,10 +33,17 @@
 
 from hashlib import md5
 import sys
-
+import unittest
 import tests
+
 from . import PY2
 import mysql.connector
+
+try:
+    from mysql.connector.connection_cext import CMySQLConnection
+except ImportError:
+    # Test without C Extension
+    CMySQLConnection = None
 
 
 class TestExamples(tests.MySQLConnectorTests):
@@ -217,6 +224,7 @@ class TestExamples(tests.MySQLConnectorTests):
         sys.modules.pop('examples.prepared_statements', None)
 
 
+@unittest.skipIf(not CMySQLConnection, "C Extension not available")
 class TestExamplesCExt(TestExamples):
 
     def setUp(self):

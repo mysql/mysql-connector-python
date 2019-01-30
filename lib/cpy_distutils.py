@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,7 +36,7 @@ from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
 from distutils.version import LooseVersion
 from distutils.dir_util import copy_tree, mkpath
-from distutils.sysconfig import get_python_lib
+from distutils.sysconfig import get_python_lib, get_python_version
 from distutils import log
 from glob import glob
 import os
@@ -74,6 +74,8 @@ CEXT_STATIC_OPTIONS = [
 INSTALL_OPTIONS = [
     ('byte-code-only=', None,
      "Remove Python .py files; leave byte code .pyc only"),
+    ('is-wheel', None,
+     "Install beehaves as wheel package requires"),
 ]
 
 
@@ -330,13 +332,14 @@ class BuildExtDynamic(build_ext):
         if not self.with_mysql_capi or not is_wheel:
             return
 
+        log.info("Copying vendor files (dll libraries)")
         data_files = []
         vendor_libs = []
+        vendor_folder = ""
 
         if os.name == "nt":
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
             vendor_libs.append((mysql_capi, ["ssleay32.dll", "libeay32.dll"]))
-            vendor_folder = ""
             # Bundle libmysql.dll
             src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
             dst = os.getcwd()
@@ -344,9 +347,12 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         else:
-            mysql_capi = os.path.join(self.with_mysql_capi, "lib")
-            vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
-            vendor_folder = "mysql-vendor"
+            myc_info = get_mysql_config_info(
+                os.path.join(self.with_mysql_capi, "bin", "mysql_config"))
+            if myc_info["version"] > (8, 0, 5):
+                mysql_capi = os.path.join(self.with_mysql_capi, "lib")
+                vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
+                vendor_folder = "mysql-vendor"
 
         if vendor_folder:
             mkpath(os.path.join(os.getcwd(), vendor_folder))
@@ -639,7 +645,14 @@ class BuildExtDynamic(build_ext):
                 self.run_protoc()
             self.real_build_extensions()
 
-            if platform.system() == "Darwin":
+            use_openssl_libs = False
+            if self.with_mysql_capi:
+                mysql_config = os.path.join(self.with_mysql_capi, "bin",
+                                            "mysql_config")
+                myc_info = get_mysql_config_info(mysql_config)
+                use_openssl_libs = myc_info["version"] > (8, 0, 5)
+
+            if platform.system() == "Darwin" and use_openssl_libs:
                 libssl, libcrypto = self._get_posix_openssl_libs()
                 cmd_libssl = [
                     "install_name_tool", "-change", libssl,
@@ -866,6 +879,16 @@ class InstallLib(install_lib):
             self.byte_compile(outfiles)
 
         if self.byte_code_only:
+            if get_python_version().startswith("3"):
+                for base, _, files in os.walk(self.install_dir):
+                    for filename in files:
+                        if filename.endswith(".pyc"):
+                            new_name = "{0}.pyc".format(filename.split(".")[0])
+                            os.rename(os.path.join(base, filename),
+                                      os.path.join(base, "..", new_name))
+                for base, _, files in os.walk(self.install_dir):
+                    if base.endswith("__pycache__"):
+                        os.rmdir(base)
             for source_file in outfiles:
                 log.info("Removing %s", source_file)
                 os.remove(source_file)
@@ -880,7 +903,7 @@ class Install(install):
     user_options = install.user_options + CEXT_OPTIONS + INSTALL_OPTIONS + \
                    CEXT_STATIC_OPTIONS
 
-    boolean_options = ['byte-code-only', 'static']
+    boolean_options = ['byte-code-only', 'static', 'is-wheel']
     need_ext = False
 
     def initialize_options(self):

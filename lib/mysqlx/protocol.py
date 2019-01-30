@@ -35,7 +35,7 @@ from .errors import InterfaceError, OperationalError, ProgrammingError
 from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
                    build_int_scalar, build_unsigned_int_scalar)
 from .helpers import encode_to_bytes, get_item_or_attr
-from .result import ColumnMetaData
+from .result import Column
 from .protobuf import (SERVER_MESSAGES, PROTOBUF_REPEATED_TYPES, Message,
                        mysqlxpb_enum)
 
@@ -65,12 +65,20 @@ class MessageReaderWriter(object):
         msg_len, msg_type = struct.unpack("<LB", hdr)
         if msg_type == 10:
             raise ProgrammingError("The connected server does not have the "
-                                   "MySQL X protocol plugin enabled")
+                                   "MySQL X protocol plugin enabled or protocol"
+                                   "mismatch")
         payload = self._stream.read(msg_len - 1)
         msg_type_name = SERVER_MESSAGES.get(msg_type)
         if not msg_type_name:
             raise ValueError("Unknown msg_type: {0}".format(msg_type))
-        msg = Message.from_server_message(msg_type, payload)
+        # Do not parse empty notices, Message requires a type in payload.
+        if msg_type == 11 and payload == b"":
+            return self._read_message()
+        else:
+            try:
+                msg = Message.from_server_message(msg_type, payload)
+            except RuntimeError:
+                return self._read_message()
         return msg
 
     def read_message(self):
@@ -245,15 +253,21 @@ class Protocol(object):
         while True:
             msg = self._reader.read_message()
             if msg.type == "Mysqlx.Error":
-                raise OperationalError(msg["msg"])
+                raise OperationalError(msg["msg"], msg["code"])
             elif msg.type == "Mysqlx.Notice.Frame":
-                self._process_frame(msg, result)
+                try:
+                    self._process_frame(msg, result)
+                except:
+                    continue
             elif msg.type == "Mysqlx.Sql.StmtExecuteOk":
                 return None
             elif msg.type == "Mysqlx.Resultset.FetchDone":
                 result.set_closed(True)
             elif msg.type == "Mysqlx.Resultset.FetchDoneMoreResultsets":
                 result.set_has_more_results(True)
+            elif msg.type == "Mysqlx.Resultset.Row":
+                result.set_has_data(True)
+                break
             else:
                 break
         return msg
@@ -268,7 +282,10 @@ class Protocol(object):
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_GET"),
             msg)
-        return self._reader.read_message()
+        msg = self._reader.read_message()
+        while msg.type == "Mysqlx.Notice.Frame":
+            msg = self._reader.read_message()
+        return msg
 
     def set_capabilities(self, **kwargs):
         """Set capabilities.
@@ -320,6 +337,8 @@ class Protocol(object):
             str: The authentication data.
         """
         msg = self._reader.read_message()
+        while msg.type == "Mysqlx.Notice.Frame":
+            msg = self._reader.read_message()
         if msg.type != "Mysqlx.Session.AuthenticateContinue":
             raise InterfaceError("Unexpected message encountered during "
                                  "authentication handshake")
@@ -359,10 +378,14 @@ class Protocol(object):
         Returns:
             list: A list of ``mysqlx.protobuf.Message`` objects.
         """
-        count = len(stmt.get_binding_map())
-        scalars = count * [None]
+        bindings = stmt.get_bindings()
         binding_map = stmt.get_binding_map()
-        for binding in stmt.get_bindings():
+        count = len(binding_map)
+        scalars = count * [None]
+        if count != len(bindings):
+            raise ProgrammingError("The number of bind parameters and "
+                                   "placeholders do not match")
+        for binding in bindings:
             name = binding["name"]
             if name not in binding_map:
                 raise ProgrammingError("Unable to find placeholder for "
@@ -562,14 +585,14 @@ class Protocol(object):
                 break
             if msg.type != "Mysqlx.Resultset.ColumnMetaData":
                 raise InterfaceError("Unexpected msg type")
-            col = ColumnMetaData(msg["type"], msg["catalog"], msg["schema"],
-                                 msg["table"], msg["original_table"],
-                                 msg["name"], msg["original_name"],
-                                 msg.get("length", 21),
-                                 msg.get("collation", 0),
-                                 msg.get("fractional_digits", 0),
-                                 msg.get("flags", 16),
-                                 msg.get("content_type"))
+            col = Column(msg["type"], msg["catalog"], msg["schema"],
+                         msg["table"], msg["original_table"],
+                         msg["name"], msg["original_name"],
+                         msg.get("length", 21),
+                         msg.get("collation", 0),
+                         msg.get("fractional_digits", 0),
+                         msg.get("flags", 16),
+                         msg.get("content_type"))
             columns.append(col)
         return columns
 
@@ -581,9 +604,10 @@ class Protocol(object):
         """
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
-            raise InterfaceError(msg["msg"])
+            raise InterfaceError("Mysqlx.Error: {}".format(msg["msg"]))
         if msg.type != "Mysqlx.Ok":
-            raise InterfaceError("Unexpected message encountered")
+            raise InterfaceError("Unexpected message encountered: {}"
+                                 "".format(msg["msg"]))
 
     def send_connection_close(self):
         """Send connection close."""
@@ -596,3 +620,9 @@ class Protocol(object):
         msg = Message("Mysqlx.Session.Close")
         self._writer.write_message(mysqlxpb_enum(
             "Mysqlx.ClientMessages.Type.SESS_CLOSE"), msg)
+
+    def send_reset(self):
+        """Send reset."""
+        msg = Message("Mysqlx.Session.Reset")
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ClientMessages.Type.SESS_RESET"), msg)

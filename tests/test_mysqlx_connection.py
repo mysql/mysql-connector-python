@@ -36,15 +36,23 @@ import os
 import unittest
 import sys
 import tests
+import time
+import socket
+import struct
 import mysqlx
 
-from mysqlx.errors import InterfaceError, ProgrammingError
-from mysqlx.protobuf import Protobuf
+from threading import Thread
+from time import sleep
+
+from mysqlx.connection import SocketStream
+from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
+from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
+from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, mysqlxpb_enum, Protobuf
 
 if mysqlx.compat.PY3:
-    from urllib.parse import quote_plus
+    from urllib.parse import quote_plus, quote
 else:
-    from urllib import quote_plus
+    from urllib import quote_plus, quote
 
 from .test_mysqlx_crud import drop_table
 
@@ -71,6 +79,11 @@ _URI_TEST_RESULTS = (  # (uri, result)
                                               "password": "", "port": 33060,
                                               "user": "user",
                                               "use-pure": True}),
+    ("user{0}:password{0}@127.0.0.1/schema?use_pure=true"
+     "".format(quote("?!@#$%/:")), {"schema": "schema", "host": "127.0.0.1",
+                                    "port": 33060, "user": "user?!@#$%/:",
+                                    "password": "password?!@#$%/:",
+                                    "use-pure": True}),
     ("mysqlx://user:@127.0.0.1", {"schema": "", "host": "127.0.0.1",
                                   "password": "", "port": 33060,
                                   "user": "user"}),
@@ -171,11 +184,60 @@ def build_uri(**kwargs):
         query.append("ssl-key={0}".format(kwargs["ssl_key"]))
     if "use_pure" in kwargs:
         query.append("use-pure={0}".format(kwargs["use_pure"]))
+    if "connect_timeout" in kwargs:
+        query.append("connect-timeout={0}".format(kwargs["connect_timeout"]))
 
     if len(query) > 0:
         uri = "{0}?{1}".format(uri, "&".join(query))
 
     return uri
+
+
+class ServerSocketStream(SocketStream):
+    def __init__(self):
+        self._socket = None
+
+    def start_receive(self, host, port):
+        """Opens a sokect to comunicate to the given host, port
+
+        Args:
+            host (str): host name.
+            port (int): host port.
+        Returns:
+            address of the communication channel
+        """
+        my_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        my_sock.bind((host, port))
+        # Starting receiving...
+        if sys.version_info > (3, 4):
+            my_sock.listen()
+        else:
+            my_sock.listen(1)
+        self._socket, addr = my_sock.accept()
+        return addr
+
+
+class ServerProtocol(Protocol):
+    def __init__(self, reader_writer):
+        super(ServerProtocol, self).__init__(reader_writer)
+
+    def send_auth_continue_server(self, auth_data):
+        """Send Server authenticate continue.
+
+        Args:
+            auth_data (str): Authentication data.
+        """
+        msg = Message("Mysqlx.Session.AuthenticateContinue",
+                      auth_data=auth_data)
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_CONTINUE"), msg)
+
+    def send_auth_ok(self):
+        """Send authenticate OK.
+        """
+        msg = Message("Mysqlx.Session.AuthenticateOk")
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_OK"), msg)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -392,7 +454,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual("../path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
     def test_connection_uri(self):
         uri = build_uri(user=self.connect_kwargs["user"],
                         password=self.connect_kwargs["password"],
@@ -419,6 +481,122 @@ class MySQLxSessionTests(tests.MySQLxTests):
             except mysqlx.Error:
                 self.assertEqual(res, None)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 13),
+                 "MySQL 8.0.13+ is required for connect timeout")
+    def test_connect_timeout(self):
+        config = self.connect_kwargs.copy()
+        # 0 ms disables timouts on socket connections
+        config["connect-timeout"] = 0
+        session = mysqlx.get_session(config)
+        session.close()
+
+        # 10000 ms should be time enough to connect
+        config["connect-timeout"] = 10000
+        session = mysqlx.get_session(config)
+        session.close()
+
+        # Use connect timeout in URI
+        session = mysqlx.get_session(build_uri(**config))
+        session.close()
+
+        # Timeout for an unreachable host
+        # https://en.wikipedia.org/wiki/IPv4#Special-use_addresses
+        hosts = [
+            "198.51.100.255",
+            "192.0.2.255",
+            "10.255.255.1",
+            "192.0.2.0",
+            "203.0.113.255",
+            "10.255.255.255",
+            "192.168.255.255",
+            "203.0.113.4",
+            "192.168.0.0",
+            "172.16.0.0",
+            "10.255.255.251",
+            "172.31.255.255",
+            "198.51.100.23",
+            "172.16.255.255",
+            "198.51.100.8",
+            "192.0.2.254",
+        ]
+        unreach_hosts = []
+        config["connect-timeout"] = 2000
+
+        # Find two unreachable hosts for testing
+        for host in hosts:
+            try:
+                config["host"] = host
+                mysqlx.get_session(config)
+            except mysqlx.TimeoutError:
+                unreach_hosts.append(host)
+                if len(unreach_hosts) == 2:
+                    break  # We just need 2 unreachable hosts
+            except:
+                pass
+
+        total_unreach_hosts = len(unreach_hosts)
+        self.assertEqual(total_unreach_hosts, 2,
+                         "Two unreachable hosts are needed, {0} found"
+                         "".format(total_unreach_hosts))
+
+        # Multi-host scenarios
+        # Connect to a secondary host if the primary fails
+        routers = [
+            {"host": unreach_hosts[0], "port": config["port"], "priority": 100},
+            {"host": "127.0.0.1", "port": config["port"], "priority": 90}
+        ]
+        uri = build_uri(user=config["user"], password=config["password"],
+                        connect_timeout=2000, routers=routers)
+        session = mysqlx.get_session(uri)
+        session.close()
+
+        # Fail to connect to all hosts
+        routers = [
+            {"host": unreach_hosts[0], "port": config["port"], "priority": 100},
+            {"host": unreach_hosts[1], "port": config["port"], "priority": 90}
+        ]
+        uri = build_uri(user=config["user"], password=config["password"],
+                        connect_timeout=2000, routers=routers)
+        try:
+            mysqlx.get_session(uri)
+            self.fail("It should not connect to any unreachable host")
+        except mysqlx.TimeoutError as err:
+            self.assertEqual(err.msg,
+                             "All server connection attempts were aborted. "
+                             "Timeout of 2000 ms was exceeded for each "
+                             "selected server")
+        except mysqlx.InterfaceError as err:
+            self.assertEqual(err.msg, "Failed to connect to any of the routers")
+
+        # Trying to establish a connection with a wrong password should not
+        # wait for timeout
+        config["host"] = "127.0.0.1"
+        config["password"] = "invalid_password"
+        config["connect-timeout"] = 2000
+        time_start = time.time()
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+        time_elapsed = time.time() - time_start
+        session.close()
+        if time_elapsed >= config["connect-timeout"]:
+            self.fail("Trying to establish a connection with a wrong password "
+                      "should not wait for timeout")
+
+        # The connection timeout value must be a positive integer
+        config["connect-timeout"] = -1
+        self.assertRaises(TypeError, mysqlx.get_session, config)
+        config["connect-timeout"] = 10.0983
+        self.assertRaises(TypeError, mysqlx.get_session, config)
+        config["connect-timeout"] = "abc"
+        self.assertRaises(TypeError, mysqlx.get_session, config)
+
+    def test_get_schemas(self):
+        schema_name = "test_get_schemas"
+        self.session.create_schema(schema_name)
+        schemas = self.session.get_schemas()
+        self.assertIsInstance(schemas, list)
+        self.assertTrue(schema_name in schemas)
+        self.session.drop_schema(schema_name)
+
     def test_get_schema(self):
         schema = self.session.get_schema(self.schema_name)
         self.assertTrue(schema, mysqlx.Schema)
@@ -428,13 +606,73 @@ class MySQLxSessionTests(tests.MySQLxTests):
         schema = self.session.get_default_schema()
         self.assertTrue(schema, mysqlx.Schema)
         self.assertEqual(schema.get_name(), self.connect_kwargs["schema"])
+        self.assertTrue(schema.exists_in_database())
 
-        # Test without default schema configured at connect time
+        # Test None value is returned if no schema name is specified
         settings = self.connect_kwargs.copy()
-        settings["schema"] = None
+        settings.pop("schema")
         session = mysqlx.get_session(settings)
+        schema = session.get_default_schema()
+        self.assertIsNone(schema,
+                          "None value was expected but got '{}'".format(schema))
+        session.close()
+
+        # Test SQL statements not fully qualified, which must not raise error:
+        #     mysqlx.errors.OperationalError: No database selected
+        self.session.sql('CREATE DATABASE my_test_schema').execute()
+        self.session.sql('CREATE TABLE my_test_schema.pets(name VARCHAR(20))'
+                         ).execute()
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = "my_test_schema"
+        session = mysqlx.get_session(settings)
+        schema = session.get_default_schema()
+        self.assertTrue(schema, mysqlx.Schema)
+        self.assertEqual(schema.get_name(),
+                         "my_test_schema")
+        result = session.sql('SHOW TABLES').execute().fetch_all()
+        self.assertEqual("pets", result[0][0])
+        self.session.sql('DROP DATABASE my_test_schema').execute()
+        self.assertFalse(schema.exists_in_database())
         self.assertRaises(mysqlx.ProgrammingError, session.get_default_schema)
         session.close()
+
+        # Test without default schema configured at connect time (passing None)
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = None
+        build_uri(**settings)
+        session = mysqlx.get_session(settings)
+        schema = session.get_default_schema()
+        self.assertIsNone(schema,
+                          "None value was expected but got '{}'".format(schema))
+        session.close()
+
+        # Test not existing default schema at get_session raise error
+        settings = self.connect_kwargs.copy()
+        settings["schema"] = "nonexistent"
+        self.assertRaises(InterfaceError, mysqlx.get_session, settings)
+
+        # Test BUG#28942938: 'ACCESS DENIED' error for unauthorized user tries
+        # to use the default schema if not exists at get_session
+        self.session.sql("DROP USER IF EXISTS 'def_schema'@'%'").execute()
+        self.session.sql("CREATE USER 'def_schema'@'%' IDENTIFIED WITH "
+                         "mysql_native_password BY 'test'").execute()
+        settings = self.connect_kwargs.copy()
+        settings['user'] = 'def_schema'
+        settings['password'] = 'test'
+        settings["schema"] = "nonexistent"
+        # a) Test with no Granted privileges
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        # Access denied for this user
+        self.assertEqual(1044, context.exception.errno)
+
+        # Grant privilege to one unrelated schema
+        self.session.sql("GRANT ALL PRIVILEGES ON nonexistent.* TO "
+                         "'def_schema'@'%'").execute()
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        # Schema does not exist
+        self.assertNotEqual(1044, context.exception.errno)
 
     def test_drop_schema(self):
         test_schema = 'mysql_session_test_drop_schema'
@@ -674,6 +912,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         session.close()
         self.assertRaises(ProgrammingError, mysqlx.get_session, settings)
 
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
     def test_use_pure(self):
         settings = self.connect_kwargs.copy()
         settings["use-pure"] = False
@@ -685,4 +924,176 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual(Protobuf.mysqlxpb.__name__, "_mysqlxpb_pure")
         # 'use_pure' should be a bool type
         self.assertRaises(ProgrammingError, setattr, session, "use_pure", -1)
+        session.close()
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+class MySQLxInnitialNoticeTests(tests.MySQLxTests):
+
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.settings = {
+            "user": "root",
+            "password": "",
+            "host": "localhost",
+            "ssl-mode": "disabled",
+            "use_pure": True
+        }
+
+    def _server_thread(self, host="localhost", port=33061, notice=1):
+            stream = ServerSocketStream()
+            stream.start_receive(host, port)
+            reader_writer = MessageReaderWriter(stream)
+            protocol = ServerProtocol(reader_writer)
+            # Read message header
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 4)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            # send handshake
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
+                #stream.sendall(b"\x01\x00\x00\x00\x0b")
+            # send auth start")
+            protocol.send_auth_continue_server("00000000000000000000")
+            # Capabilities are not check for ssl-mode: disabled
+            # Reading auth_continue from client
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 5)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            # Send auth_ok
+            protocol.send_auth_ok()
+
+            # Read message
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 12)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            # send empty notice
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
+
+            # msg_type: 12 Mysqlx.Resultset.ColumnMetaData
+            stream.sendall(b"\x31\x00\x00\x00\x0c"
+                           b"\x08\x07\x12\x08\x44\x61\x74\x61\x62\x61\x73"
+                           b"\x65\x1a\x08\x44\x61\x74\x61\x62\x61\x73\x65"
+                           b"\x22\x08\x53\x43\x48\x45\x4d\x41\x54\x41\x2a"
+                           b"\x00\x32\x00\x3a\x03\x64\x65\x66\x40\x4c\x50"
+                           b"\xc0\x01\x58\x10")
+
+            # send unexpected notice
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
+
+            # msg_type: 13 Mysqlx.Resultset.Row
+            stream.sendall(b"\x16\x00\x00\x00\x0d"
+                           b"\x0a\x13\x69\x6e\x66\x6f\x72\x6d\x61\x74\x69"
+                           b"\x6f\x6e\x5f\x73\x63\x68\x65\x6d\x61\x00")
+            # msg_type: 14 Mysqlx.Resultset.FetchDone
+            stream.sendall(b"\x01\x00\x00\x00\x0e")
+            # msg_type: 11 Mysqlx.Notice.Frame
+            stream.sendall(b"\x0f\x00\x00\x00\x0b\x08\x03\x10\x02\x1a\x08\x08"
+                           b"\x04\x12\x04\x08\x02\x18\x00")
+
+            # send unexpected notice
+            if notice == 1:
+                # send empty notice
+                stream.sendall(b"\x01\x00\x00\x00\x0b")
+            else:
+                # send notice frame with explicit default
+                stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
+
+            # msg_type: 17 Mysqlx.Sql.StmtExecuteOk
+            stream.sendall(b"\x01\x00\x00\x00\x11")
+
+            # Read message
+            hdr = stream.read(5)
+            msg_len, msg_type = struct.unpack("<LB", hdr)
+            self.assertEqual(msg_type, 7)
+            # Read payload
+            _ = stream.read(msg_len - 1)
+            stream.sendall(b"\x07\x00\x00\x00\x00\n\x04bye!")
+
+            # Close socket
+            stream.close()
+
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
+    def test_initial_empty_notice_cext(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 10
+        worker1 = Thread(target=self._server_thread, args=[host, port, 1])
+        worker1.daemon = True
+        worker1.start()
+        sleep(1)
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = False
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+    def test_initial_empty_notice_pure(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 20
+        worker2 = Thread(target=self._server_thread, args=[host, port, 1])
+        worker2.daemon = True
+        worker2.start()
+        sleep(2)
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = True
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+    @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
+    def test_initial_notice_cext(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 11
+        worker1 = Thread(target=self._server_thread, args=[host, port, 2])
+        worker1.daemon = True
+        worker1.start()
+        sleep(1)
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = False
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+    def test_initial_notice_pure(self):
+        connect_kwargs = self.connect_kwargs.copy()
+        host = "localhost"
+        port = connect_kwargs["port"] + 21
+        worker2 = Thread(target=self._server_thread, args=[host, port, 2])
+        worker2.daemon = True
+        worker2.start()
+        sleep(2)
+        settings = self.settings.copy()
+        settings["port"] = port
+        settings["use_pure"] = True
+        session = mysqlx.get_session(settings)
+        rows = session.sql("show databases").execute().fetch_all()
+        self.assertEqual(rows[0][0], "information_schema")
         session.close()

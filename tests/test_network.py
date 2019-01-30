@@ -423,7 +423,8 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
 
         # Handshake failure
         (family, socktype, proto, _,
-         sockaddr) = socket.getaddrinfo(self._host, self._port)[0]
+         sockaddr) = socket.getaddrinfo(self._host, self._port,
+                                        socket.AF_INET, socket.SOCK_STREAM)[0]
         sock = socket.socket(family, socktype, proto)
         sock.settimeout(4)
         sock.connect(sockaddr)

@@ -34,6 +34,16 @@ from .compat import STRING_TYPES
 from .errors import ProgrammingError
 
 
+class ExprJSONEncoder(json.JSONEncoder):
+    """A :class:`json.JSONEncoder` subclass, which enables encoding of
+    :class:`mysqlx.ExprParser` objects."""
+    def default(self, o):  # pylint: disable=E0202
+        if hasattr(o, "expr"):
+            return "{0}".format(o)
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, o)
+
+
 class DbDoc(object):
     """Represents a generic document in JSON format.
 
@@ -52,7 +62,7 @@ class DbDoc(object):
             raise ValueError("Unable to handle type: {0}".format(type(value)))
 
     def __str__(self):
-        return json.dumps(self.__dict__)
+        return json.dumps(self.__dict__, cls=ExprJSONEncoder)
 
     def __repr__(self):
         return repr(self.__dict__)

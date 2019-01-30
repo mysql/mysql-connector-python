@@ -261,9 +261,6 @@ class PoolError(Error):
     pass
 
 
-class MySQLFabricError(Error):
-    """Exception for errors relating to MySQL Fabric"""
-
 _SQLSTATE_CLASS_EXCEPTION = {
     '02': DataError,  # no data
     '07': DatabaseError,  # dynamic SQL error

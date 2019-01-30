@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -67,8 +67,9 @@ public:
   }
 };
 
-const char* kMessageTypeKey = "_mysqlxpb_type_name";
+static const char* kMessageTypeKey = "_mysqlxpb_type_name";
 
+static const google::protobuf::DescriptorPool* protobuf_description_pool;
 
 static PyObject* CreateMessage(const google::protobuf::Message& message);
 static google::protobuf::Message* CreateMessage(PyObject* dict,
@@ -422,8 +423,12 @@ static void AddPyListToMessageRepeatedMessage(
   if (list_size > 0) {
     mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      mutable_field->AddAllocated(
-        CreateMessage(PyList_GetItem(list, idx), factory));
+      google::protobuf::Message* msg = CreateMessage(PyList_GetItem(list, idx), factory);
+      if (!msg) {
+        // CreateMessage already reported an error, we can leave quietly
+        return;
+      }
+      mutable_field->AddAllocated(msg);
     }
   }
 }
@@ -579,8 +584,7 @@ static void ConvertPyToPbRepeated(
 
 static const google::protobuf::Descriptor* MessageDescriptorByName(
     const char* name) {
-  return google::protobuf::DescriptorPool::generated_pool()->
-      FindMessageTypeByName(name);
+  return protobuf_description_pool->FindMessageTypeByName(name);
 }
 
 
@@ -596,6 +600,7 @@ static void PythonAddDict(PyObject* dict,
   }
 
   PyDict_SetItemString(dict, field.name().c_str(), obj);
+  Py_CLEAR(obj);
 }
 
 
@@ -643,16 +648,16 @@ static PyObject* CreateMessage(const google::protobuf::Message& message) {
           for (int idx = 0; idx < listSize; ++idx)
             PythonAddList(list, idx, message, *field);
           PyDict_SetItemString(dict, field->name().c_str(), list);
+          Py_CLEAR(list);
           break;
         }
       }
     }
   } catch(std::exception& e) {
-    Py_DECREF(dict);
+    Py_CLEAR(dict);
     dict = NULL;
     PyErr_SetString(PyExc_RuntimeError, e.what());
   }
-
   return dict;
 }
 
@@ -666,7 +671,7 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
     PyObject* type_name_obj = PyDict_GetItemString(dict, kMessageTypeKey);
 
     if (type_name_obj && PyString_CheckExact(type_name_obj)) {
-      char* type_name = PyString_AsString(type_name_obj);
+      const char* type_name = PyString_AsString(type_name_obj);
       const google::protobuf::Descriptor* descriptor =
           MessageDescriptorByName(type_name);
 
@@ -681,7 +686,7 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
 
             while (PyDict_Next(dict, &pos, &key, &value)) {
               if (key && PyString_CheckExact(key)) {
-                char* key_name = PyString_AsString(key);
+                const char* key_name = PyString_AsString(key);
 
                 if (::strcmp(key_name, kMessageTypeKey) == 0)
                   continue;
@@ -726,7 +731,6 @@ static google::protobuf::Message* CreateMessage(PyObject* dict,
   } else {
     PyErr_SetString(PyExc_TypeError, "Dictionary type expected.");
   }
-
   return message;
 }
 
@@ -782,6 +786,7 @@ static PyObject* ParseMessageImpl(const char* type_name,
       PyErr_Format(PyExc_RuntimeError, "Failed to create message: %s",
                    type_name);
     }
+
   } else {
     PyErr_Format(PyExc_RuntimeError, "Unknown message type: %s", type_name);
   }
@@ -884,7 +889,6 @@ static PyObject* SerializeMessage(PyObject* self, PyObject* args) {
 #endif
     }
   }
-
   return result;
 }
 
@@ -901,8 +905,7 @@ static PyObject* EnumValue(PyObject* self, PyObject* args) {
       std::string enum_value_name(last_dot + 1);
 
       const google::protobuf::EnumDescriptor* enum_type =
-          google::protobuf::DescriptorPool::generated_pool()->
-          FindEnumTypeByName(enum_type_name);
+          protobuf_description_pool->FindEnumTypeByName(enum_type_name);
 
       if (enum_type) {
         const google::protobuf::EnumValueDescriptor* enum_value =
@@ -927,6 +930,11 @@ static PyObject* EnumValue(PyObject* self, PyObject* args) {
   return result;
 }
 
+#ifdef PY3
+static void MyFree(void *) {
+  google::protobuf::ShutdownProtobufLibrary();
+}
+#endif
 
 PyMODINIT_FUNC
 #ifdef PY3
@@ -947,13 +955,20 @@ init_mysqlxpb() {
     { NULL, NULL, 0, NULL }
   };
 
+  protobuf_description_pool =
+      google::protobuf::DescriptorPool::generated_pool();
+
 #ifdef PY3
   static PyModuleDef module_definition = {
     PyModuleDef_HEAD_INIT,
     kModuleName,
     NULL,
     -1,
-    methods_definition
+    methods_definition,
+    NULL,
+    NULL,
+    NULL,
+    MyFree
   };
 
   return PyModule_Create(&module_definition);

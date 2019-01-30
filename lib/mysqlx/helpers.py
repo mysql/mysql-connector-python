@@ -28,6 +28,10 @@
 
 """This module contains helper functions."""
 
+import functools
+import inspect
+import warnings
+
 from .compat import NUMERIC_TYPES
 
 
@@ -120,3 +124,45 @@ def quote_identifier(identifier, sql_mode=""):
     if sql_mode == "ANSI_QUOTES":
         return '"{0}"'.format(identifier.replace('"', '""'))
     return "`{0}`".format(identifier.replace("`", "``"))
+
+
+def deprecated(version=None, reason=None):
+    """This is a decorator used to mark functions as deprecated.
+
+    Args:
+        version (Optional[string]): Version when was deprecated.
+        reason (Optional[string]): Reason or extra information to be shown.
+
+    Usage:
+
+    .. code-block:: python
+
+       from mysqlx.helpers import deprecated
+
+       @deprecated('8.0.12', 'Please use other_function() instead')
+       def deprecated_function(x, y):
+           return x + y
+    """
+    def decorate(func):
+        """Decorate function."""
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            """Wrapper function.
+
+            Args:
+                *args: Variable length argument list.
+                **kwargs: Arbitrary keyword arguments.
+            """
+            message = ["'{}' is deprecated".format(func.__name__)]
+            if version:
+                message.append(" since version {}".format(version))
+            if reason:
+                message.append(". {}".format(reason))
+            frame = inspect.currentframe().f_back
+            warnings.warn_explicit("".join(message),
+                                   category=DeprecationWarning,
+                                   filename=inspect.getfile(frame.f_code),
+                                   lineno=frame.f_lineno)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorate

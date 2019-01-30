@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -138,7 +138,7 @@ class SetupInfoTests(tests.MySQLConnectorTests):
             if 'Programming Language :: Python' in clsfr:
                 ver = clsfr.replace('Programming Language :: Python :: ', '')
                 if ver not in ('2.6', '2.7', '3', '3.1', '3.2', '3.3', '3.4',
-                               '3.5', '3.6'):
+                               '3.5', '3.6', '3.7'):
                     self.fail('Unsupported version in classifiers')
             if 'Development Status ::' in clsfr:
                 status = clsfr.replace('Development Status :: ', '')

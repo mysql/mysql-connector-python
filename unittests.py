@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -63,6 +63,8 @@ unittests.py has exit status 0 when tests were ran successfully, 1 otherwise.
 """
 import os
 import sys
+import shutil
+import platform
 import time
 import unittest
 try:
@@ -135,7 +137,10 @@ general_log = ON
 language = {lc_messages_dir}/english
 
 [mysqld]
-max_allowed_packet=26777216
+max_allowed_packet = 26777216
+net_read_timeout = 120
+net_write_timeout = 120
+connect_timeout = 60
 basedir = {basedir}
 datadir = {datadir}
 tmpdir = {tmpdir}
@@ -153,6 +158,7 @@ local_infile = 1
 innodb_flush_log_at_trx_commit = 2
 innodb_log_file_size = 1Gb
 general_log_file = general_{name}.log
+{secure_file_priv}
 """
 
 # Platform specifics
@@ -282,6 +288,13 @@ _UNITTESTS_CMD_ARGS = {
             "(default {default})").format(default=MYSQL_DEFAULT_TOPDIR)
     },
 
+    ('', '--secure-file-priv'): {
+        'dest': 'secure_file_priv', 'metavar': 'DIRECTORY',
+        'default': None,
+        'help': (
+            "MySQL server option, can be empty to disable")
+    },
+
     ('', '--bind-address'): {
         'dest': 'bind_address', 'metavar': 'NAME', 'default': '127.0.0.1',
         'help': 'IP address to bind to'
@@ -357,18 +370,6 @@ _UNITTESTS_CMD_ARGS = {
         'dest': 'protoc', 'metavar': 'NAME',
         'default': None,
         'help': ("Location of Protobuf protoc binary")
-    },
-
-    ('', '--with-fabric'): {
-        'dest': 'fabric_config', 'metavar': 'NAME',
-        'default': None,
-        'help': ("Fabric configuration as URI fabric://user:pass@server:port")
-    },
-
-    ('', '--with-fabric-protocol'): {
-        'dest': 'fabric_protocol', 'metavar': 'NAME',
-        'default': 'xmlrpc',
-        'help': ("Protocol to talk to MySQL Fabric")
     },
 
     ('', '--extra-compile-args'): {
@@ -572,6 +573,12 @@ class BasicTestResult(TextTestResult):
 
     def addSkip(self, test, reason):
         """Save skipped reasons"""
+        if self.showAll:
+            self.stream.writeln("skipped")
+        elif self.dots:
+            self.stream.write("s")
+            self.stream.flush()
+
         tests.MESSAGES['SKIPPED'].append(reason)
 
 
@@ -651,6 +658,17 @@ def init_mysql_server(port, options):
                     if tests.IPV6_AVAILABLE else "0.0.0.0")}
     }]
 
+    if options.secure_file_priv is not None:
+        extra_args += [{
+            "version": (5, 5, 53),
+            "options": {"secure_file_priv": "secure_file_priv = %s" % options.secure_file_priv}
+        }]
+    else:
+        extra_args += [{
+            "version": (5, 5, 53),
+            "options": {"secure_file_priv": ""}
+        }]
+
     try:
         mysql_server = mysqld.MySQLServer(
             basedir=options.mysql_basedir,
@@ -715,7 +733,7 @@ def init_mysql_server(port, options):
         'user': 'root',
         'password': '',
         'database': 'myconnpy',
-        'connection_timeout': 10,
+        'connection_timeout': 60,
     }
 
     mysql_server.xplugin_config = {
@@ -803,26 +821,6 @@ def main():
             LOGGER.error("Django older than v1.5 will not work with Python 3")
             sys.exit(1)
 
-    if options.fabric_config:
-        # URL example: fabric://user:pass@mysqlfabric.example.com:32274
-        fab = urlsplit(options.fabric_config)
-        tests.FABRIC_CONFIG = {}
-        default_ports = {
-            'xmlrpc': 32274,
-            'mysql': 32275
-        }
-        if options.fabric_protocol:
-            tests.FABRIC_CONFIG['protocol'] = options.fabric_protocol
-        else:
-            tests.FABRIC_CONFIG['protocol'] = 'xmlrpc'
-        LOGGER.info("Fabric will be tested using the '{}' protocol".format(
-            tests.FABRIC_CONFIG['protocol'].upper()))
-        tests.FABRIC_CONFIG = {
-            'host': fab.hostname,
-            'port': fab.port or default_ports[tests.FABRIC_CONFIG['protocol']],
-            'user': fab.username,
-            'password': fab.password,
-        }
     # We have to at least run 1 MySQL server
     init_mysql_server(port=(options.port), options=options)
 
@@ -849,7 +847,11 @@ def main():
                                 protoc,
                                 options.mysql_capi,
                                 options.extra_compile_args,
-                                options.extra_link_args)
+                                options.extra_link_args, options.debug)
+
+        if platform.system() == "Darwin" and tests.MYSQL_VERSION > (8, 0, 5):
+            shutil.copytree(os.path.join(_TOPDIR, "mysql-vendor"),
+                            os.path.join(tests.TEST_BUILD_DIR, "mysql-vendor"))
 
     # Which tests cases to run
     testcases = []

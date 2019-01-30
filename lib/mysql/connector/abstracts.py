@@ -49,7 +49,7 @@ class MySQLConnectionAbstract(object):
     def __init__(self, **kwargs):
         """Initialize"""
         self._client_flags = ClientFlag.get_default()
-        self._charset_id = 33
+        self._charset_id = 45
         self._sql_mode = None
         self._time_zone = None
         self._autocommit = False
@@ -339,6 +339,9 @@ class MySQLConnectionAbstract(object):
             if 'verify_cert' not in self._ssl:
                 self._ssl['verify_cert'] = \
                     DEFAULT_CONFIGURATION['ssl_verify_cert']
+            if 'verify_identity' not in self._ssl:
+                self._ssl['verify_identity'] = \
+                    DEFAULT_CONFIGURATION['ssl_verify_identity']
             # Make sure both ssl_key/ssl_cert are set, or neither (XOR)
             if 'ca' not in self._ssl or self._ssl['ca'] is None:
                 raise AttributeError(
@@ -380,12 +383,7 @@ class MySQLConnectionAbstract(object):
             raise errors.InterfaceError("Failed parsing MySQL version")
 
         version = tuple([int(v) for v in match.groups()[0:3]])
-        if 'fabric' in match.group(4).lower():
-            if version < (1, 5):
-                raise errors.InterfaceError(
-                    "MySQL Fabric '{0}' is not supported".format(
-                        server_version))
-        elif version < (4, 1):
+        if version < (4, 1):
             raise errors.InterfaceError(
                 "MySQL Version '{0}' is not supported.".format(server_version))
 
@@ -902,7 +900,7 @@ class MySQLConnectionAbstract(object):
                             "of conversion.MySQLConverterBase.")
 
     @abstractmethod
-    def get_rows(self, count=None, binary=False, columns=None):
+    def get_rows(self, count=None, binary=False, columns=None, raw=None):
         """Get all rows returned by the MySQL server"""
         pass
 
@@ -960,7 +958,7 @@ class MySQLConnectionAbstract(object):
         raise NotImplementedError
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=33):
+                        charset=45):
         """Change the current logged in user"""
         raise NotImplementedError
 

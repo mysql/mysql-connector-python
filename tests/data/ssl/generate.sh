@@ -72,7 +72,7 @@ certificate = $dir/ca.crt
 private_key = $dir/ca.key
 default_days = 365
 default_crl_days = 30
-default_md = md5
+default_md = sha256
 preserve = no
 policy = generic_policy
 [ generic_policy ]

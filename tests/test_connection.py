@@ -40,7 +40,13 @@ import socket
 import tests
 from . import PY2
 
-from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+try:
+    from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+except ImportError:
+    # Test without C Extension
+    CMySQLConnection = None
+    HAVE_CMYSQL = False
+
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
@@ -112,6 +118,7 @@ class ConnectionTests(object):
             'ssl_cert': None,
             'ssl_key': None,
             'ssl_verify_cert': False,
+            'ssl_verify_identity': False,
             'passwd': None,
             'db': None,
             'connect_timeout': None,
@@ -142,7 +149,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'converter': None,
             '_converter_class': MySQLConverter,
             '_client_flags': constants.ClientFlag.get_default(),
-            '_charset_id': 33,
+            '_charset_id': 45,
             '_user': '',
             '_password': '',
             '_database': '',
@@ -291,27 +298,15 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'status_flag': 1, 'affected_rows': 6}
         self.assertEqual(exp, self.cnx._handle_result(packet))
 
-        if os.name != 'nt':
-            exp = [
-                bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
-                          b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
-                          b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
-                          b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
-                          b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
-                          b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
-                bytearray(b'\x00\x00\x00\x05')
-            ]
-        else:
-            exp = [
-                bytearray(b'\x4c\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63'
-                          b'\x32\x5f\x31\x0d\x0a\x32\x09\x63\x31\x5f\x32\x09'
-                          b'\x63\x32\x5f\x32\x0d\x0a\x33\x09\x63\x31\x5f\x33'
-                          b'\x09\x63\x32\x5f\x33\x0d\x0a\x34\x09\x63\x31\x5f'
-                          b'\x34\x09\x63\x32\x5f\x34\x0d\x0a\x35\x09\x63\x31'
-                          b'\x5f\x35\x09\x63\x32\x5f\x35\x0d\x0a\x36\x09\x63'
-                          b'\x31\x5f\x36\x09\x63\x32\x5f\x36'),
-                bytearray(b'\x00\x00\x00\x05')
-            ]
+        exp = [
+            bytearray(b'\x47\x00\x00\x04\x31\x09\x63\x31\x5f\x31\x09\x63\x32'
+                      b'\x5f\x31\x0a\x32\x09\x63\x31\x5f\x32\x09\x63\x32\x5f'
+                      b'\x32\x0a\x33\x09\x63\x31\x5f\x33\x09\x63\x32\x5f\x33'
+                      b'\x0a\x34\x09\x63\x31\x5f\x34\x09\x63\x32\x5f\x34\x0a'
+                      b'\x35\x09\x63\x31\x5f\x35\x09\x63\x32\x5f\x35\x0a\x36'
+                      b'\x09\x63\x31\x5f\x36\x09\x63\x32\x5f\x36'),
+            bytearray(b'\x00\x00\x00\x05')
+        ]
         self.assertEqual(exp, self.cnx._socket.sock._client_sends)
 
         # Column count is invalid ( more than 4096)
@@ -363,7 +358,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
              (b'MEMORY',), (b'FEDERATED',), (b'ARCHIVE',), (b'MRG_MYISAM',)],
             {'status_flag': 32, 'warning_count': 0}
         )
-        res = self.cnx.get_rows()
+        res = self.cnx.get_rows(raw=True)
         self.assertEqual(exp, res)
 
         self.__helper_get_rows_buffer()
@@ -371,11 +366,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         i = 0
         while i < len(rows):
             exp = (rows[i:i + 2], None)
-            res = self.cnx.get_rows(2)
+            res = self.cnx.get_rows(count=2, raw=True)
             self.assertEqual(exp, res)
             i += 2
         exp = ([], {'status_flag': 32, 'warning_count': 0})
-        self.assertEqual(exp, self.cnx.get_rows())
+        self.assertEqual(exp, self.cnx.get_rows(raw=True))
 
         # Test unread results
         self.cnx.unread_result = False
@@ -385,7 +380,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._have_next_results = False
         self.__helper_get_rows_buffer(toggle_next_result=True)
         exp = {'status_flag': 8, 'warning_count': 0}
-        self.assertEqual(exp, self.cnx.get_rows()[-1])
+        self.assertEqual(exp, self.cnx.get_rows(raw=True)[-1])
         self.assertTrue(self.cnx._have_next_result)
 
     def test_get_row(self):
@@ -400,11 +395,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         rows = expall[0]
         for row in rows:
-            res = self.cnx.get_row()
+            res = self.cnx.get_row(raw=True)
             exp = (row, None)
             self.assertEqual(exp, res)
         exp = ([], {'status_flag': 32, 'warning_count': 0})
-        self.assertEqual(exp, self.cnx.get_rows())
+        self.assertEqual(exp, self.cnx.get_rows(raw=True))
 
     def test_cmd_init_db(self):
         """Send the Init_db-command to MySQL"""
@@ -481,7 +476,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp = [
             {'columns': [('1', 8, None, None, None, None, 0, 129)],
              'eof': {'status_flag': 8, 'warning_count': 0}},
-            ([(b'1',)], {'status_flag': 8, 'warning_count': 0}),
+            ([(1,)], {'status_flag': 8, 'warning_count': 0}),
             {'affected_rows': 1,
              'field_count': 0,
              'insert_id': 0,
@@ -489,7 +484,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
              'warning_count': 0},
             {'columns': [('2', 8, None, None, None, None, 0, 129)],
              'eof': {'status_flag': 0, 'warning_count': 0}},
-            ([(b'2',)], {'status_flag': 0, 'warning_count': 0}),
+            ([(2,)], {'status_flag': 0, 'warning_count': 0}),
         ]
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets(packets)
@@ -766,7 +761,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'username': 'ham',
             'password': 'spam',
             'database': 'test',
-            'charset': 33,
+            'charset': 45,
             'client_flags': flags,
         }
 
@@ -812,7 +807,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'username': 'ham',
             'password': 'spam',
             'database': 'test',
-            'charset': 33,
+            'charset': 45,
             'client_flags': flags,
             'ssl_options': {
                 'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
@@ -824,7 +819,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._handshake['auth_plugin'] = 'caching_sha2_password'
         self.cnx._handshake['auth_data'] = b'h4i6oP!OLng9&PD@WrYH'
         self.cnx._socket.switch_to_ssl = \
-            lambda ca, cert, key, verify_cert, cipher: None
+            lambda ca, cert, key, verify_cert, verify_identity, cipher, \
+                ssl_version: None
 
         # Test perform_full_authentication
         # Exchange:
@@ -898,7 +894,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'username': 'ham',
             'password': 'spam',
             'database': 'test',
-            'charset': 33,
+            'charset': 45,
             'client_flags': flags,
             'ssl_options': {
                 'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
@@ -923,7 +919,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 ssl_enabled=True),
         ]
         self.cnx._socket.switch_to_ssl = \
-            lambda ca, cert, key, verify_cert, cipher: None
+            lambda ca, cert, key, verify_cert, verify_identity, cipher, \
+                ssl_version: None
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets([
             bytearray(b'\x07\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00'),
@@ -953,7 +950,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'ssl_ca': 'CACert',
             'ssl_cert': 'ServerCert',
             'ssl_key': 'ServerKey',
-            'ssl_verify_cert': False
+            'ssl_verify_cert': False,
+            'ssl_verify_identity': False
         })
         default_config['converter_class'] = MySQLConverter
         try:
@@ -1036,8 +1034,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                               constants.ClientFlag.COMPRESS)
 
         # Test character set
-        # utf8 is default, which is mapped to 33
-        self.assertEqual(33, cnx._charset_id)
+        # utf8mb4 is default, which is mapped to 45
+        self.assertEqual(45, cnx._charset_id)
         cnx.config(charset='latin1')
         self.assertEqual(8, cnx._charset_id)
         cnx.config(charset='latin1', collation='latin1_general_ci')
@@ -1068,7 +1066,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'ca': 'CACert',
             'cert': 'ServerCert',
             'key': 'ServerKey',
-            'verify_cert': False
+            'verify_cert': False,
+            'verify_identity': False
         }
         cnx.config(ssl_ca=exp['ca'], ssl_cert=exp['cert'], ssl_key=exp['key'])
         self.assertEqual(exp, cnx._ssl)
@@ -1076,7 +1075,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp['verify_cert'] = True
 
         cnx.config(ssl_ca=exp['ca'], ssl_cert=exp['cert'],
-                   ssl_key=exp['key'], ssl_verify_cert=exp['verify_cert'])
+                   ssl_key=exp['key'], ssl_verify_cert=exp['verify_cert'],
+                   ssl_verify_identity=exp['verify_identity'])
         self.assertEqual(exp, cnx._ssl)
 
         # Missing SSL configuration should raise an AttributeError
@@ -1156,12 +1156,12 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test__post_connection(self):
         """Executes commands after connection has been established"""
-        self.cnx._charset_id = 33
+        self.cnx._charset_id = 45
         self.cnx._autocommit = True
         self.cnx._time_zone = "-09:00"
         self.cnx._sql_mode = "STRICT_ALL_TABLES"
         self.cnx._post_connection()
-        self.assertEqual('utf8', self.cnx.charset)
+        self.assertEqual('utf8mb4', self.cnx.charset)
         self.assertEqual(self.cnx._autocommit, self.cnx.autocommit)
         self.assertEqual(self.cnx._time_zone, self.cnx.time_zone)
         self.assertEqual(self.cnx._sql_mode, self.cnx.sql_mode)
@@ -1707,6 +1707,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             else:
                 self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
 
+    @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1), "Shutdown CMD "
+                     "not tested with MySQL version 5.6 (BugOra17422299)")
     def test_shutdown(self):
         """Shutting down a connection"""
         config = tests.get_mysql_config()
@@ -1780,16 +1782,10 @@ class WL7937(tests.MySQLConnectorTests):
         self.cur.execute(sql, (self.data_file, ))
         self.cur.execute("SELECT * FROM local_data")
 
-        if os.name != 'nt':
-            exp = [
-                (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
-                (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
-                (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
-        else:
-            exp = [
-                (1, 'c1_1', 'c2_1\r'), (2, 'c1_2', 'c2_2\r'),
-                (3, 'c1_3', 'c2_3\r'), (4, 'c1_4', 'c2_4\r'),
-                (5, 'c1_5', 'c2_5\r'), (6, 'c1_6', 'c2_6')]
+        exp = [
+            (1, 'c1_1', 'c2_1'), (2, 'c1_2', 'c2_2'),
+            (3, 'c1_3', 'c2_3'), (4, 'c1_4', 'c2_4'),
+            (5, 'c1_5', 'c2_5'), (6, 'c1_6', 'c2_6')]
         self.assertEqual(exp, self.cur.fetchall())
 
     def test_without_load_local_infile(self):

@@ -90,7 +90,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         self._warnings = None
         self._affected_rows = -1
         self._rowcount = -1
-        self._nextrow = None
+        self._nextrow = (None, None)
         self._executed = None
         self._executed_list = []
         self._stored_results = []
@@ -136,7 +136,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             # force freeing result
             self._cnx.consume_results()
             _ = self._cnx.cmd_query("SHOW WARNINGS")
-            warnings = self._cnx.get_rows()
+            warnings = self._cnx.get_rows()[0]
             self._cnx.consume_results()
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
@@ -205,11 +205,13 @@ class CMySQLCursor(MySQLCursorAbstract):
         while True:
             try:
                 if not self.nextset():
-                    raise StopIteration  # pylint: disable=R1708
+                    raise StopIteration
             except errors.InterfaceError as exc:
                 # Result without result set
                 if exc.errno != CR_NO_RESULT_SET:
                     raise
+            except StopIteration:
+                return
             i += 1
             try:
                 self._executed = executed_list[i].strip()
@@ -296,11 +298,11 @@ class CMySQLCursor(MySQLCursorAbstract):
                 "Failed rewriting statement for multi-row INSERT. "
                 "Check SQL syntax."
             )
-        fmt = matches.group(1).encode(self._cnx.charset)
+        fmt = matches.group(1).encode(self._cnx.python_charset)
         values = []
 
         try:
-            stmt = operation.encode(self._cnx.charset)
+            stmt = operation.encode(self._cnx.python_charset)
             for params in seq_params:
                 tmp = fmt
                 prepared = self._cnx.prepare_for_mysql(params)
@@ -356,7 +358,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                 try:
                     while True:
                         if self._description:
-                            rowcnt += len(self._cnx.get_rows())
+                            rowcnt += len(self._cnx.get_rows()[0])
                         else:
                             rowcnt += self._affected_rows
                         if not self.nextset():
@@ -413,7 +415,6 @@ class CMySQLCursor(MySQLCursorAbstract):
         argfmt = "@_{name}_arg{index}"
         self._stored_results = []
 
-        results = []
         try:
             argnames = []
             argtypes = []
@@ -487,31 +488,33 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not self._cnx.unread_result:
             raise errors.InterfaceError("No result set to fetch from.")
         rows = self._cnx.get_rows()
-        if self._nextrow:
-            rows.insert(0, self._nextrow)
+        if self._nextrow and self._nextrow[0]:
+            rows[0].insert(0, self._nextrow[0])
 
-        if not rows:
+        if not rows[0]:
             self._handle_eof()
             return []
 
-        self._rowcount += len(rows)
+        self._rowcount += len(rows[0])
         self._handle_eof()
-        return rows
+        #self._cnx.handle_unread_result()
+        return rows[0]
 
     def fetchmany(self, size=1):
         """Returns the next set of rows of a result set"""
-        if self._nextrow:
-            rows = [self._nextrow]
+        if self._nextrow and self._nextrow[0]:
+            rows = [self._nextrow[0]]
             size -= 1
         else:
             rows = []
 
         if size and self._cnx.unread_result:
-            rows.extend(self._cnx.get_rows(size))
+            rows.extend(self._cnx.get_rows(size)[0])
 
-        if rows:
+        if size and self._cnx.unread_result:
             self._nextrow = self._cnx.get_row()
-            if not self._nextrow and not self._cnx.more_results:
+            if self._nextrow and not self._nextrow[0] and \
+               not self._cnx.more_results:
                 self._cnx.free_result()
 
         if not rows:
@@ -527,15 +530,15 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not row and self._cnx.unread_result:
             row = self._cnx.get_row()
 
-        if row:
+        if row and row[0]:
             self._nextrow = self._cnx.get_row()
-            if not self._nextrow and not self._cnx.more_results:
+            if not self._nextrow[0] and not self._cnx.more_results:
                 self._cnx.free_result()
         else:
             self._handle_eof()
             return None
         self._rowcount += 1
-        return row
+        return row[0]
 
     def __iter__(self):
         """Iteration over the result set
@@ -645,7 +648,7 @@ class CMySQLCursorBuffered(CMySQLCursor):
 
     def _handle_resultset(self):
         """Handle a result set"""
-        self._rows = self._cnx.get_rows()
+        self._rows = self._cnx.get_rows()[0]
         self._next_row = 0
         self._rowcount = len(self._rows)
         self._handle_eof()
@@ -777,7 +780,7 @@ class CMySQLCursorNamedTuple(CMySQLCursor):
     def fetchmany(self, size=1):
         """Returns next set of rows as list of named tuples"""
         res = super(CMySQLCursorNamedTuple, self).fetchmany(size=size)
-        return [self.named_tuple(*row) for row in res]
+        return [self.named_tuple(*res[0])]
 
     def fetchall(self):
         """Returns all rows of a query result set as list of named tuples"""

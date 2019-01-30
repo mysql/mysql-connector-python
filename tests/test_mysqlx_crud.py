@@ -31,6 +31,7 @@
 """Unittests for mysqlx.crud
 """
 
+import gc
 import logging
 import unittest
 import threading
@@ -571,7 +572,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(1, collection.count())
 
-        # now add multiple dictionaries at once
+        # Adding multiple dictionaries at once
         result = collection.add(
             {"_id": 2, "name": "Wilma", "age": 33},
             {"_id": 3, "name": "Barney", "age": 42}
@@ -579,13 +580,29 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(3, collection.count())
 
-        # now let's try adding strings
+        # Adding JSON strings
         result = collection.add(
             '{"_id": 4, "name": "Bambam", "age": 8}',
             '{"_id": 5, "name": "Pebbles", "age": 8}'
         ).execute()
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(5, collection.count())
+
+        # All strings should be considered literal, for expressions
+        # mysqlx.expr() function must be used
+        collection.add(
+            {"_id": "6", "status": "Approved",
+             "email": "Fred (fred@example.com)"},
+            {"_id": "7", "status": "Rejected\n(ORA:Pending)",
+             "email": "Barney (barney@example.com)"},
+        ).execute()
+        result = collection.find().execute()
+        self.assertEqual(7, len(result.fetch_all()))
+
+        # test unicode
+        result = collection.add({"_id": "8", "age": 1, "name": u"😀"}).execute()
+        self.assertEqual(result.get_affected_items_count(), 1)
+        self.assertEqual(8, collection.count())
 
         if tests.MYSQL_VERSION > (8, 0, 4):
             # Following test are only possible on servers with id generetion.
@@ -1086,11 +1103,51 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(2, collection.count())
 
         # Collection.remove() is not allowed without a condition
-        result = collection.remove()
+        result = collection.remove(None)
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         result = collection.remove("")
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         self.assertRaises(mysqlx.ProgrammingError, collection.remove, " ")
+
+        self.schema.drop_collection(collection_name)
+
+    def _assert_flat_line(self, samples, tolerance):
+        for sample in range(1, len(samples)):
+            self.assertLessEqual(samples[sample] - tolerance,
+                                 samples[sample - 1], "For sample {} Objects "
+                                 "{} overpass the tolerance () from previews "
+                                 "sample {}".format(sample, samples[sample],
+                                                    tolerance,
+                                                    samples[sample - 1]))
+
+    def _collect_samples(self, sample_size, funct, param):
+        samples = [0] * sample_size
+        for num in range(sample_size * 10):
+            _ = funct(eval(param)).execute()
+            if num % 10 == 0:
+                samples[int(num / 10)] = len(gc.get_objects())
+        return samples
+
+    def test_memory_use_in_sequential_calls(self):
+        "Tests the number of new open objects in sequential usage"
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+
+        sample_size = 100
+        param = '{"_id": "{}".format(num), "name": repr(num), "number": num}'
+        add_samples = self._collect_samples(sample_size, collection.add,
+                                            param)
+
+        param = '\'$.name == "{}"\'.format(num)'
+        find_samples = self._collect_samples(sample_size, collection.find,
+                                             param)
+
+        # The tolerance here is the number of new objects that can be created
+        # on each sequential method invocation without exceed memory usage.
+        tolerance = 12
+
+        self._assert_flat_line(add_samples, tolerance)
+        self._assert_flat_line(find_samples, tolerance)
 
         self.schema.drop_collection(collection_name)
 
@@ -1155,7 +1212,16 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # tests comma seperated fields
         result = collection.find("$.age = 21").fields("$.age, $.name").execute()
         docs = result.fetch_all()
-        self.assertEqual("Fred", docs[0]['$.name'])
+        self.assertEqual("Fred", docs[0]["$.name"])
+
+        # test limit and offset
+        result = collection.find().fields("$.name").limit(2).offset(2).execute()
+        docs = result.fetch_all()
+        self.assertEqual(2, len(docs))
+        self.assertEqual("Wilma", docs[0]["$.name"])
+        self.assertEqual("Betty", docs[1]["$.name"])
+        self.assertRaises(ValueError, collection.find().limit, -1)
+        self.assertRaises(ValueError, collection.find().limit(1).offset, -1)
 
         self.schema.drop_collection(collection_name)
 
@@ -1190,7 +1256,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, result.get_affected_items_count())
 
         # Collection.modify() is not allowed without a condition
-        result = collection.modify().unset(["young"])
+        result = collection.modify(None).unset(["young"])
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         result = collection.modify("").unset(["young"])
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
@@ -1320,10 +1386,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "Rhaegal": "green with bronze markings"},
             doc.dragons)
 
-        # Test add new attribute using expresion (function call)
-        result = collection.modify('name == "Daenerys"').patch(
+        # Test add new attribute using expression
+        result = collection.modify('name == "Daenerys"').patch(mysqlx.expr(
             'JSON_OBJECT("dragons", JSON_OBJECT("count", 3))'
-        ).execute()
+        )).execute()
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
@@ -1332,11 +1398,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "count": 3},
             doc.dragons)
 
-        # Test update attribute value using expresion (function call)
-        result = collection.modify('name == "Daenerys"').patch(
+        # Test update attribute value using expression
+        result = collection.modify('name == "Daenerys"').patch(mysqlx.expr(
             'JSON_OBJECT("dragons",'
-            '    JSON_OBJECT("count", $.dragons.count - 1))'
-        ).execute()
+            '    JSON_OBJECT("count", $.dragons.count - 1))')).execute()
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
@@ -1345,10 +1410,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "count": 2},
             doc.dragons)
 
-        # Test update attribute value using expresion without JSON functions
-        result = collection.modify('TRUE').patch(
+        # Test update attribute value using expression without JSON functions
+        result = collection.modify('TRUE').patch(mysqlx.expr(
             '{"actors_bio": {"current": {"day_of_birth": CAST(SUBSTRING_INDEX('
-            '    $.actors_bio.bd, " ", - 1) AS DECIMAL)}}}').execute()
+            '    $.actors_bio.bd, " ", - 1) AS DECIMAL)}}}')).execute()
         self.assertEqual(8, result.get_affected_items_count())
 
         # Test update attribute value using mysqlx.expr
@@ -1371,12 +1436,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.modify('TRUE').patch(
             {"actors_bio": {"current": {
                 "age": mysqlx.expr(
-                    'CAST(SUBSTRING_INDEX($.actors_bio.bd, " ", 1)'
-                    ' AS DECIMAL) - Year(CURDATE())')}}
+                    'CAST(Year(CURDATE()) - '
+                    'SUBSTRING_INDEX($.actors_bio.bd, " ", 1) AS DECIMAL)')}}
             }).execute()
         self.assertEqual(8, result.get_affected_items_count())
-        res = self.session.sql("select 1997 - Year(CURDATE())").execute()
-        age = res.fetch_all()[0]["1997 - Year(CURDATE())"]
+        res = self.session.sql("select Year(CURDATE()) - 1997").execute()
+        age = res.fetch_all()[0]["Year(CURDATE()) - 1997"]
         doc = collection.find(
             "actors_bio.rn = 'Maisie Williams'").execute().fetch_all()[0]
         self.assertEqual(
@@ -1386,13 +1451,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             doc.actors_bio)
 
         # test use of year funtion.
-        result = collection.modify('TRUE').patch(
+        result = collection.modify('TRUE').patch(mysqlx.expr(
             '{"actors_bio": {"current": {"last_update": Year(CURDATE())}}}'
-            ).execute()
+           )).execute()
         self.assertEqual(8, result.get_affected_items_count())
 
         # Collection.modify() is not allowed without a condition
-        result = collection.modify().patch('{"status":"alive"}')
+        result = collection.modify(None).patch('{"status":"alive"}')
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
         result = collection.modify("").patch('{"status":"alive"}')
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
@@ -1784,6 +1849,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Wilma", docs[0]["name"])
 
+        # The number of bind parameters and placeholders do not match
+        self.assertRaises(mysqlx.ProgrammingError,
+                          collection.find("$.age = ? and $.name = ?").bind, 42)
+
         # Binding anonymous parameters are not allowed in crud operations
         self.assertRaises(mysqlx.ProgrammingError,
                           collection.find("$.age = ?").bind, 42)
@@ -1842,6 +1911,19 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual([1, [2, 3], 4], docs[0]["cards"])
 
         self.schema.drop_collection(collection_name)
+
+    def test_count(self):
+        collection_name = "collection_test"
+        collection = self.schema.create_collection(collection_name)
+        collection.add(
+            {"_id": "1", "name": "Fred", "age": 21},
+            {"_id": "2", "name": "Barney", "age": 28},
+            {"_id": "3", "name": "Wilma", "age": 42},
+            {"_id": "4", "name": "Betty", "age": 67},
+        ).execute()
+        self.assertEqual(4, collection.count())
+        self.schema.drop_collection(collection_name)
+        self.assertRaises(mysqlx.OperationalError, collection.count)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
@@ -2033,6 +2115,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(6, len(rows))
 
+        # test unicode
+        table.insert("age", "name").values(1, u"😀").execute()
+        result = table.select().execute()
+        rows = result.fetch_all()
+        self.assertEqual(7, len(rows))
+
         drop_table(self.schema, "test")
 
     def test_update(self):
@@ -2069,15 +2157,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         table = self.schema.get_table(table_name)
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 3)
-        table.delete("id = 1").execute()
+        table.delete().where("id = 1").execute()
         self.assertEqual(table.count(), 2)
 
         # Table.delete() is not allowed without a condition
         result = table.delete()
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
-        result = table.delete("")
-        self.assertRaises(mysqlx.ProgrammingError, result.execute)
-        self.assertRaises(mysqlx.ProgrammingError, table.delete, " ")
 
         drop_table(self.schema, table_name)
 
@@ -2091,22 +2176,52 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertTrue(table.exists_in_database())
         self.assertEqual(table.count(), 1)
         drop_table(self.schema, table_name)
+        self.assertRaises(mysqlx.OperationalError, table.count)
 
     def test_results(self):
         table_name = "{0}.test".format(self.schema_name)
 
         self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
                          "".format(table_name)).execute()
+
+        # Test if result has no data
+        result = self.session.sql("SELECT age, name FROM {0}"
+                                  "".format(table_name)).execute()
+        self.assertFalse(result.has_data())
+        rows = result.fetch_all()
+        self.assertEqual(len(rows), 0)
+
+        # Insert data
         self.session.sql("INSERT INTO {0} VALUES (21, 'Fred')"
                          "".format(table_name)).execute()
         self.session.sql("INSERT INTO {0} VALUES (28, 'Barney')"
                          "".format(table_name)).execute()
 
+        # Test if result has data
+        result = self.session.sql("SELECT age, name FROM {0}"
+                                  "".format(table_name)).execute()
+        self.assertTrue(result.has_data())
+        rows = result.fetch_all()
+        self.assertEqual(len(rows), 2)
+
         table = self.schema.get_table("test")
         result = table.select().execute()
 
-        self.assertEqual("Fred", result.fetch_one()["name"])
-        self.assertEqual("Barney", result.fetch_one()["name"])
+        row = result.fetch_one()
+        # Test access by column name and index
+        self.assertEqual("Fred", row["name"])
+        self.assertEqual("Fred", row[1])
+        # Test if error is raised with negative indexes and out of bounds
+        self.assertRaises(IndexError, row.__getitem__, -1)
+        self.assertRaises(IndexError, row.__getitem__, -2)
+        self.assertRaises(IndexError, row.__getitem__, -3)
+        self.assertRaises(IndexError, row.__getitem__, 3)
+        # Test if error is raised with an invalid column name
+        self.assertRaises(ValueError, row.__getitem__, "last_name")
+
+        row = result.fetch_one()
+        self.assertEqual("Barney", row["name"])
+        self.assertEqual("Barney", row[1])
         self.assertEqual(None, result.fetch_one())
 
         drop_table(self.schema, "test")
@@ -2201,6 +2316,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("active", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())
+
+        self.assertEqual(result.columns, result.get_columns())
 
         drop_table(self.schema, "test")
 
@@ -2369,7 +2486,7 @@ class MySQLxViewTests(tests.MySQLxTests):
                                                      self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
-        view.delete("id = 1").execute()
+        view.delete().where("id = 1").execute()
         self.assertEqual(view.count(), 0)
 
     def test_count(self):
@@ -2382,6 +2499,8 @@ class MySQLxViewTests(tests.MySQLxTests):
                                                      self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
+        drop_view(self.schema, self.view_name)
+        self.assertRaises(mysqlx.OperationalError, view.count)
 
     def test_results(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)

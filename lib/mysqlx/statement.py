@@ -30,12 +30,14 @@
 
 import copy
 import json
+import warnings
 
 from .errors import ProgrammingError, NotSupportedError
 from .expr import ExprParser
-from .compat import STRING_TYPES
+from .compat import INT_TYPES, STRING_TYPES
 from .constants import LockContention
 from .dbdoc import DbDoc
+from .helpers import deprecated
 from .result import SqlResult, Result
 from .protobuf import mysqlxpb_enum
 
@@ -73,8 +75,7 @@ def is_quoted_identifier(identifier, sql_mode=""):
 
 def quote_identifier(identifier, sql_mode=""):
     """Quote the given identifier with backticks, converting backticks (`) in
-    the identifier name with the correct escape sequence (``) unless the
-    identifier is quoted (") as in sql_mode set to ANSI_QUOTES.
+    the identifier name with the correct escape sequence (``).
 
     Args:
         identifier (string): Identifier to quote.
@@ -85,8 +86,6 @@ def quote_identifier(identifier, sql_mode=""):
     """
     if len(identifier) == 0:
         return "``"
-    elif is_quoted_identifier(identifier, sql_mode):
-        return identifier
     if "ANSI_QUOTES" in sql_mode:
         return '"{0}"'.format(identifier.replace('"', '""'))
     return "`{0}`".format(identifier.replace("`", "``"))
@@ -189,6 +188,8 @@ class FilterableStatement(Statement):
         self._projection_expr = None
         self._sort_str = ""
         self._sort_expr = None
+        self._where_str = ""
+        self._where_expr = None
         self.has_bindings = False
         self.has_limit = False
         self.has_group_by = False
@@ -197,7 +198,7 @@ class FilterableStatement(Statement):
         self.has_sort = False
         self.has_where = False
         if condition:
-            self.where(condition)
+            self._set_where(condition)
 
     def _bind_single(self, obj):
         """Bind single object.
@@ -222,6 +223,41 @@ class FilterableStatement(Statement):
                 self.bind(key, res[key])
         else:
             raise ProgrammingError("Invalid JSON string or object to bind")
+
+    def _sort(self, *clauses):
+        """Sets the sorting criteria.
+
+        Args:
+            *clauses: The expression strings defining the sort criteria.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
+        """
+        self.has_sort = True
+        self._sort_str = ",".join(flexible_params(*clauses))
+        self._sort_expr = ExprParser(self._sort_str,
+                                     not self._doc_based).parse_order_spec()
+        return self
+
+    def _set_where(self, condition):
+        """Sets the search condition to filter.
+
+        Args:
+            condition (str): Sets the search condition to filter documents or
+                             records.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
+        """
+        self.has_where = True
+        self._where_str = condition
+        try:
+            expr = ExprParser(condition, not self._doc_based)
+            self._where_expr = expr.expr()
+        except ValueError:
+            raise ProgrammingError("Invalid condition")
+        self._binding_map = expr.placeholder_name_to_position
+        return self
 
     def _set_group_by(self, *fields):
         """Set group by.
@@ -333,6 +369,7 @@ class FilterableStatement(Statement):
         """
         return self._sort_expr
 
+    @deprecated("8.0.12")
     def where(self, condition):
         """Sets the search condition to filter.
 
@@ -342,46 +379,68 @@ class FilterableStatement(Statement):
 
         Returns:
             mysqlx.FilterableStatement: FilterableStatement object.
+
+        .. deprecated:: 8.0.12
         """
-        self.has_where = True
-        self._where = condition
-        try:
-            expr = ExprParser(condition, not self._doc_based)
-            self._where_expr = expr.expr()
-        except ValueError:
-            raise ProgrammingError("Invalid condition")
-        self._binding_map = expr.placeholder_name_to_position
-        return self
+        return self._set_where(condition)
 
-    def limit(self, row_count, offset=0):
-        """Sets the maximum number of records or documents to be returned.
-
-        Args:
-            row_count (int): The maximum number of records or documents.
-            offset (Optional[int]) The number of records or documents to skip.
-
-        Returns:
-            mysqlx.FilterableStatement: FilterableStatement object.
-        """
-        self.has_limit = True
-        self._limit_row_count = row_count
-        self._limit_offset = offset
-        return self
-
-    def sort(self, *sort_clauses):
+    @deprecated("8.0.12")
+    def sort(self, *clauses):
         """Sets the sorting criteria.
 
         Args:
-            *sort_clauses: The expression strings defining the sort criteria.
+            *clauses: The expression strings defining the sort criteria.
 
         Returns:
             mysqlx.FilterableStatement: FilterableStatement object.
+
+        .. deprecated:: 8.0.12
         """
-        sort_clauses = flexible_params(*sort_clauses)
-        self.has_sort = True
-        self._sort_str = ",".join(sort_clauses)
-        self._sort_expr = ExprParser(self._sort_str,
-                                     not self._doc_based).parse_order_spec()
+        return self._sort(*clauses)
+
+    def limit(self, row_count, offset=None):
+        """Sets the maximum number of items to be returned.
+
+        Args:
+            row_count (int): The maximum number of items.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
+
+        Raises:
+            ValueError: If ``row_count`` is not a positive integer.
+
+        .. versionchanged:: 8.0.12
+           The usage of ``offset`` was deprecated.
+        """
+        if not isinstance(row_count, INT_TYPES) or row_count < 0:
+            raise ValueError("The 'row_count' value must be a positive integer")
+        self.has_limit = True
+        self._limit_row_count = row_count
+        if offset:
+            self.offset(offset)
+            warnings.warn("'limit(row_count, offset)' is deprecated, please "
+                          "use 'offset(offset)' to set the number of items to "
+                          "skip", category=DeprecationWarning)
+        return self
+
+    def offset(self, offset):
+        """Sets the number of items to skip.
+
+        Args:
+            offset (int): The number of items to skip.
+
+        Returns:
+            mysqlx.FilterableStatement: FilterableStatement object.
+
+        Raises:
+            ValueError: If ``offset`` is not a positive integer.
+
+        .. versionadded:: 8.0.12
+        """
+        if not isinstance(offset, INT_TYPES) or offset < 0:
+            raise ValueError("The 'offset' value must be a positive integer")
+        self._limit_offset = offset
         return self
 
     def bind(self, *args):
@@ -560,13 +619,27 @@ class ModifyStatement(FilterableStatement):
 
     Args:
         collection (mysqlx.Collection): The Collection object.
-        condition (Optional[str]): Sets the search condition to identify the
-                                   documents to be updated.
+        condition (str): Sets the search condition to identify the documents
+                         to be modified.
+
+    .. versionchanged:: 8.0.12
+       The ``condition`` parameter is now mandatory.
     """
-    def __init__(self, collection, condition=None):
+    def __init__(self, collection, condition):
         super(ModifyStatement, self).__init__(target=collection,
                                               condition=condition)
         self._update_ops = []
+
+    def sort(self, *clauses):
+        """Sets the sorting criteria.
+
+        Args:
+            *clauses: The expression strings defining the sort criteria.
+
+        Returns:
+            mysqlx.ModifyStatement: ModifyStatement object.
+        """
+        return self._sort(*clauses)
 
     def get_update_ops(self):
         """Returns the list of update operations.
@@ -591,6 +664,7 @@ class ModifyStatement(FilterableStatement):
                                            doc_path, value))
         return self
 
+    @deprecated("8.0.12")
     def change(self, doc_path, value):
         """Add an update to the statement setting the field, if it exists at
         the document path, to the given value.
@@ -601,6 +675,8 @@ class ModifyStatement(FilterableStatement):
 
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
+
+        .. deprecated:: 8.0.12
         """
         self._update_ops.append(UpdateSpec(mysqlxpb_enum(
             "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"),
@@ -661,8 +737,8 @@ class ModifyStatement(FilterableStatement):
         return self
 
     def patch(self, doc):
-        """Inserts a value into a specific position in an array attribute in
-        documents of a collection.
+        """Takes a :class:`mysqlx.DbDoc`, string JSON format or a dict with the
+        changes and applies it on all matching documents.
 
         Args:
             doc (object): A generic document (DbDoc), string in JSON format or
@@ -674,14 +750,14 @@ class ModifyStatement(FilterableStatement):
         """
         if doc is None:
             doc = ''
-        if not isinstance(doc, (dict, DbDoc, str)):
+        if not isinstance(doc, (ExprParser, dict, DbDoc, str)):
             raise ProgrammingError(
                 "Invalid data for update operation on document collection "
                 "table")
         self._update_ops.append(
             UpdateSpec(mysqlxpb_enum(
                 "Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
-                       '', doc))
+                       '', doc.expr() if isinstance(doc, ExprParser) else doc))
         return self
 
     def execute(self):
@@ -689,6 +765,9 @@ class ModifyStatement(FilterableStatement):
 
         Returns:
             mysqlx.Result: Result object.
+
+        Raises:
+            ProgrammingError: If condition was not set.
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for modify")
@@ -834,6 +913,17 @@ class FindStatement(ReadStatement):
         """
         return self._set_projection(*fields)
 
+    def sort(self, *clauses):
+        """Sets the sorting criteria.
+
+        Args:
+            *clauses: The expression strings defining the sort criteria.
+
+        Returns:
+            mysqlx.FindStatement: FindStatement object.
+        """
+        return self._sort(*clauses)
+
 
 class SelectStatement(ReadStatement):
     """A statement for record retrieval operations on a Table.
@@ -846,6 +936,18 @@ class SelectStatement(ReadStatement):
         super(SelectStatement, self).__init__(table, False)
         self._set_projection(*fields)
 
+
+    def where(self, condition):
+        """Sets the search condition to filter.
+
+        Args:
+            condition (str): Sets the search condition to filter records.
+
+        Returns:
+            mysqlx.SelectStatement: SelectStatement object.
+        """
+        return self._set_where(condition)
+
     def order_by(self, *clauses):
         """Sets the order by criteria.
 
@@ -855,8 +957,7 @@ class SelectStatement(ReadStatement):
         Returns:
             mysqlx.SelectStatement: SelectStatement object.
         """
-        self.sort(*clauses)
-        return self
+        return self._sort(*clauses)
 
     def get_sql(self):
         """Returns the generated SQL.
@@ -864,7 +965,7 @@ class SelectStatement(ReadStatement):
         Returns:
             str: The generated SQL.
         """
-        where = " WHERE {0}".format(self._where) if self.has_where else ""
+        where = " WHERE {0}".format(self._where_str) if self.has_where else ""
         group_by = " GROUP BY {0}".format(self._grouping_str) if \
             self.has_group_by else ""
         having = " HAVING {0}".format(self._having) if self.has_having else ""
@@ -919,11 +1020,35 @@ class UpdateStatement(FilterableStatement):
 
     Args:
         table (mysqlx.Table): The Table object.
-        *fields: The fields to be updated.
+
+    .. versionchanged:: 8.0.12
+       The ``fields`` parameters were removed.
     """
-    def __init__(self, table, *fields):
+    def __init__(self, table):
         super(UpdateStatement, self).__init__(target=table, doc_based=False)
         self._update_ops = []
+
+    def where(self, condition):
+        """Sets the search condition to filter.
+
+        Args:
+            condition (str): Sets the search condition to filter records.
+
+        Returns:
+            mysqlx.UpdateStatement: UpdateStatement object.
+        """
+        return self._set_where(condition)
+
+    def order_by(self, *clauses):
+        """Sets the order by criteria.
+
+        Args:
+            *clauses: The expression strings defining the order by criteria.
+
+        Returns:
+            mysqlx.UpdateStatement: UpdateStatement object.
+        """
+        return self._sort(*clauses)
 
     def get_update_ops(self):
         """Returns the list of update operations.
@@ -953,6 +1078,9 @@ class UpdateStatement(FilterableStatement):
 
         Returns:
             mysqlx.Result: Result object
+
+        Raises:
+            ProgrammingError: If condition was not set.
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for update")
@@ -964,15 +1092,35 @@ class RemoveStatement(FilterableStatement):
 
     Args:
         collection (mysqlx.Collection): The Collection object.
+        condition (str): Sets the search condition to identify the documents
+                         to be removed.
+
+    .. versionchanged:: 8.0.12
+       The ``condition`` parameter was added.
     """
-    def __init__(self, collection):
-        super(RemoveStatement, self).__init__(target=collection)
+    def __init__(self, collection, condition):
+        super(RemoveStatement, self).__init__(target=collection,
+                                              condition=condition)
+
+    def sort(self, *clauses):
+        """Sets the sorting criteria.
+
+        Args:
+            *clauses: The expression strings defining the sort criteria.
+
+        Returns:
+            mysqlx.FindStatement: FindStatement object.
+        """
+        return self._sort(*clauses)
 
     def execute(self):
         """Execute the statement.
 
         Returns:
             mysqlx.Result: Result object.
+
+        Raises:
+            ProgrammingError: If condition was not set.
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for remove")
@@ -984,19 +1132,43 @@ class DeleteStatement(FilterableStatement):
 
     Args:
         table (mysqlx.Table): The Table object.
-        condition (Optional[str]): The string with the filter expression of
-                                   the rows to be deleted.
+
+    .. versionchanged:: 8.0.12
+       The ``condition`` parameter was removed.
     """
-    def __init__(self, table, condition=None):
-        super(DeleteStatement, self).__init__(target=table,
-                                              condition=condition,
-                                              doc_based=False)
+    def __init__(self, table):
+        super(DeleteStatement, self).__init__(target=table, doc_based=False)
+
+    def where(self, condition):
+        """Sets the search condition to filter.
+
+        Args:
+            condition (str): Sets the search condition to filter records.
+
+        Returns:
+            mysqlx.DeleteStatement: DeleteStatement object.
+        """
+        return self._set_where(condition)
+
+    def order_by(self, *clauses):
+        """Sets the order by criteria.
+
+        Args:
+            *clauses: The expression strings defining the order by criteria.
+
+        Returns:
+            mysqlx.DeleteStatement: DeleteStatement object.
+        """
+        return self._sort(*clauses)
 
     def execute(self):
         """Execute the statement.
 
         Returns:
             mysqlx.Result: Result object.
+
+        Raises:
+            ProgrammingError: If condition was not set.
         """
         if not self.has_where:
             raise ProgrammingError("No condition was found for delete")

@@ -69,13 +69,13 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx.cmd_query(query)
         self.assertRaises(AttributeError, self.cnx.get_rows, 0)
         self.assertRaises(AttributeError, self.cnx.get_rows, -10)
-        self.assertEqual(2, len(self.cnx.get_rows()))
+        self.assertEqual(2, len(self.cnx.get_rows()[0]))
         self.cnx.free_result()
 
         self.cnx.cmd_query(query)
-        self.assertEqual(1, len(self.cnx.get_rows(count=1)))
-        self.assertEqual(1, len(self.cnx.get_rows(count=1)))
-        self.assertEqual([], self.cnx.get_rows(count=1))
+        self.assertEqual(1, len(self.cnx.get_rows(count=1)[0]))
+        self.assertEqual(1, len(self.cnx.get_rows(count=1)[0]))
+        self.assertEqual([], self.cnx.get_rows(count=1)[0])
         self.cnx.free_result()
 
     def test_cmd_init_db(self):
@@ -106,7 +106,7 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
         self.assertEqual(exp, info)
 
-        rows = self.cnx.get_rows()
+        rows = self.cnx.get_rows()[0]
         vars = [ row[0] for row in rows ]
         self.assertEqual(2, len(rows))
 

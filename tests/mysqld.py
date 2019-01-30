@@ -60,7 +60,6 @@ TCPServer.allow_reuse_address = True
 import tests
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
-DEVNULL = open(os.devnull, 'w')
 
 
 # MySQL Server executable name
@@ -106,7 +105,9 @@ def process_running(pid):
         for name, apid, _ in lines:
             name = name.decode('utf-8')
             if name == EXEC_MYSQLD and pid == int(apid):
+                LOGGER.debug("Process %d is running.", pid)
                 return True
+        LOGGER.debug("Process %d not running.", pid)
         return False
 
     # We are on a UNIX-like system
@@ -194,11 +195,21 @@ class MySQLServerBase(object):
                 if (afile == EXEC_MYSQLD and
                         os.access(os.path.join(root, afile), 0)):
                     self._sbindir = root
-                    files_to_find.remove(EXEC_MYSQLD)
+                    LOGGER.debug("Located {} in {}".format(
+                        EXEC_MYSQLD, self._sbindir))
+                    try:
+                        files_to_find.remove(EXEC_MYSQLD)
+                    except ValueError:
+                            pass
                 elif (afile == EXEC_MYSQL and
                         os.access(os.path.join(root, afile), 0)):
                     self._bindir = root
-                    files_to_find.remove(EXEC_MYSQL)
+                    LOGGER.debug("Located {} in {}".format(
+                        EXEC_MYSQL, self._bindir))
+                    try:
+                        files_to_find.remove(EXEC_MYSQLD)
+                    except ValueError:
+                            pass
 
                 if not files_to_find:
                     break
@@ -227,10 +238,13 @@ class MySQLServerBase(object):
                     self._lc_messages_dir = os.path.abspath(
                         os.path.join(root, os.pardir)
                     )
-                elif afile == 'mysql_system_tables.sql':
+                elif afile == 'mysql_system_tables.sql' or \
+                   afile == 'innodb_memcached_config.sql':
                     self._scriptdir = root
 
-        if not self._lc_messages_dir or not self._scriptdir:
+        version = self._get_version()
+        if not self._lc_messages_dir or (version < (8, 0, 13) and
+                                         not self._scriptdir):
             raise MySQLBootstrapError(
                 "errmsg.sys and mysql_system_tables.sql not found"
                 " under {0}".format(self._sharedir))
@@ -267,7 +281,7 @@ class MySQLServerBase(object):
             '--help', '--verbose'
         ]
 
-        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=DEVNULL)
+        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         help_verbose = prc.communicate()[0]
         regex = re.compile(needle)
         for help_line in help_verbose.splitlines():
@@ -292,7 +306,7 @@ class MySQLServerBase(object):
             '--version'
         ]
 
-        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=DEVNULL)
+        prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         verstr = str(prc.communicate()[0])
         matches = re.match(r'.*Ver (\d)\.(\d).(\d{1,2}).*', verstr)
         if matches:
@@ -313,17 +327,15 @@ class MySQLServerBase(object):
         """Start the MySQL server"""
         try:
             cmd = self._get_cmd()
-            self._process = subprocess.Popen(cmd, stdout=DEVNULL,
-                                             stderr=DEVNULL)
+            self._process = subprocess.Popen(cmd, stderr=subprocess.STDOUT)
         except (OSError, ValueError) as err:
             raise MySQLServerError(err)
 
-    def _stop_server(self):
+    def _stop_server(self, pid=None):
         """Stop the MySQL server"""
-        if not self._process:
-            return False
+        pid = pid if pid is not None else get_pid(self._pid_file)
         try:
-            process_terminate(self._process.pid)
+            process_terminate(pid)
         except (OSError, ValueError) as err:
             raise MySQLServerError(err)
 
@@ -446,7 +458,7 @@ class MySQLServer(MySQLServerBase):
                 '--lc-messages-dir={0}'.format(self._lc_messages_dir),
                 '--lc-messages=en_US'
             ])
-        if self._version[0:2] >= (5, 1):
+        if self._version[0:2] >= (5, 1) and self._version < (8, 0, 11):
             cmd.append('--loose-skip-ndbcluster')
 
         return cmd
@@ -476,7 +488,9 @@ class MySQLServer(MySQLServerBase):
             "CREATE DATABASE myconnpy;"
         ]
 
-        if self._version < (8, 0, 1) and self._version < (5, 7, 21):
+        if self._version > (5, 7, 5) and self._version < (5, 7, 21):
+            # Note: server is running with --skip-grant-tables
+            # (can not user 'CREATE USER' statements).
             defaults = ("'root'{0}, "
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
                         "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
@@ -513,6 +527,12 @@ class MySQLServer(MySQLServerBase):
                     "GRANT SELECT ON mysql.user TO mysqlxsys@localhost;",
                     "GRANT SUPER ON *.* TO mysqlxsys@localhost;"
                 ])
+        elif self._version[0:3] >= (5, 6, 39) and \
+             self._version[0:3] < (5, 7, 5):
+            # Following required user accounts are created by the server itself:
+            # 'root'@'127.0.0.1', 'root'@'localhost' and 'root'@'::1'
+            # Note: server is running with --skip-grant-tables.
+            pass
         else:
             extra_sql.extend([
                 "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
@@ -531,7 +551,7 @@ class MySQLServer(MySQLServerBase):
                 test_sql = open(self._init_sql, "w")
                 test_sql.write("\n".join(extra_sql))
                 test_sql.close()
-            else:
+            elif self._version < (8, 0, 13):
                 for filename in script_files:
                     full_path = os.path.join(self._scriptdir, filename)
                     LOGGER.debug("Reading SQL from '%s'", full_path)
@@ -628,6 +648,7 @@ class MySQLServer(MySQLServerBase):
             sys.exit(1)
 
     def start(self, **kwargs):
+        LOGGER.debug("Attempting to start MySQL server %s", self.name)
         if self.check_running():
             LOGGER.error("MySQL server '{name}' already running".format(
                 name=self.name))
@@ -673,23 +694,31 @@ class MySQLServer(MySQLServerBase):
         """
         pid = get_pid(self._pid_file)
         if not pid:
+            LOGGER.error("Process id not found, unable to stop MySQL server.")
             return
-        try:
-            if not self._stop_server():
-                process_terminate(pid)
-        except (MySQLServerError, OSError) as err:
-            if self._debug is True:
-                raise
-            LOGGER.error("Failed stopping MySQL server '{name}': "
-                         "{error}".format(error=str(err), name=self._name))
-            sys.exit(1)
-        else:
-            time.sleep(3)
+        LOGGER.debug("Attempting to stop MySQL server %s (pid=%s).",
+                     self._name, pid)
+        tries = 5
+        while tries > 0:
+            try:
+                self._stop_server(pid)
+            except (MySQLServerError, OSError) as err:
+                LOGGER.error("Failed stopping MySQL server '{name}': "
+                             "{error}".format(error=str(err), name=self._name))
+                if self._debug is True:
+                    raise
+                sys.exit(1)
+            else:
+                LOGGER.debug("Waiting for MySQL server to stop...")
+                time.sleep(1)
+                if not self.check_running(pid):
+                    LOGGER.debug("MySQL server stopped '{name}' "
+                                 "(pid={pid})".format(pid=pid, name=self._name))
+                    return True
+            tries =- 1
 
-        if self.check_running(pid):
-            LOGGER.debug("MySQL server stopped '{name}' "
-                        "(pid={pid})".format(pid=pid, name=self._name))
-            return True
+        LOGGER.error("Failed stopping MySQL server '{name}' (pid={pid})"
+                     "".format(name=self._name, pid=pid))
 
         return False
 
@@ -716,7 +745,7 @@ class MySQLServer(MySQLServerBase):
         """
         pid = pid or get_pid(self._pid_file)
         if pid:
-            LOGGER.debug("Got PID %d", pid)
+            LOGGER.debug("Checking PID %d", pid)
             return process_running(pid)
 
         return False
