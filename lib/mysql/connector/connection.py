@@ -471,7 +471,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             return (rows[0], eof)
         return (None, eof)
 
-    def get_rows(self, count=None, binary=False, columns=None, raw=None):
+    def get_rows(self, count=None, binary=False, columns=None, raw=None,
+                 prep_stmt=None):
         """Get all rows returned by the MySQL server
 
         This method gets all rows returned by the MySQL server after sending,

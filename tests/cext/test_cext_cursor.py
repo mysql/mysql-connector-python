@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,6 +31,9 @@
 """Testing the C Extension cursors
 """
 
+import sys
+import datetime
+import decimal
 import logging
 import unittest
 
@@ -50,9 +53,10 @@ else:
 
 from mysql.connector.connection_cext import CMySQLConnection
 from mysql.connector.cursor_cext import (
-    CMySQLCursor, CMySQLCursorBuffered, CMySQLCursorRaw
+    CMySQLCursor, CMySQLCursorBuffered, CMySQLCursorRaw, CMySQLCursorPrepared
 )
 
+ARCH_64BIT = sys.maxsize > 2**32 and sys.platform != "win32"
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
 @unittest.skipIf(HAVE_CMYSQL == False, "C Extension not available")
@@ -179,7 +183,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
     def test_executemany(self):
         tbl = 'myconnpy_cursor'
         self.setup_table(self.cnx, tbl)
-        
+
         stmt_insert = "INSERT INTO {0} (col1,col2) VALUES (%s,%s)".format(tbl)
         stmt_select = "SELECT col1,col2 FROM {0} ORDER BY col1".format(tbl)
 
@@ -439,7 +443,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         cur = self._get_cursor(self.cnx)
         self.assertEqual("CMySQLCursor: (Nothing executed yet)",
                          cur.__str__())
-        
+
         cur.execute("SELECT VERSION()")
         cur.fetchone()
         self.assertEqual("CMySQLCursor: SELECT VERSION()",
@@ -609,3 +613,156 @@ class CMySQLCursorRawTests(tests.CMySQLCursorTests):
         cur.execute("SELECT 1, 'string', MAKEDATE(2010,365), 2.5")
         exp = (b'1', b'string', b'2010-12-31', b'2.5')
         self.assertEqual(exp, cur.fetchone())
+
+
+class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
+
+    tbl = "prep_stmt"
+
+    create_table_stmt = (
+        "CREATE TABLE {0} ("
+        "my_null INT, "
+        "my_bit BIT(7), "
+        "my_tinyint TINYINT, "
+        "my_smallint SMALLINT, "
+        "my_mediumint MEDIUMINT, "
+        "my_int INT, "
+        "my_bigint BIGINT, "
+        "my_decimal DECIMAL(20,10), "
+        "my_float FLOAT, "
+        "my_double DOUBLE, "
+        "my_date DATE, "
+        "my_time TIME, "
+        "my_datetime DATETIME, "
+        "my_year YEAR, "
+        "my_char CHAR(100), "
+        "my_varchar VARCHAR(100), "
+        "my_enum ENUM('x-small', 'small', 'medium', 'large', 'x-large'), "
+        "my_geometry POINT, "
+        "my_blob BLOB)"
+    )
+
+    insert_stmt = (
+        "INSERT INTO {0} ("
+        "my_null, "
+        "my_bit, "
+        "my_tinyint, "
+        "my_smallint, "
+        "my_mediumint, "
+        "my_int, "
+        "my_bigint, "
+        "my_decimal, "
+        "my_float, "
+        "my_double, "
+        "my_date, "
+        "my_time, "
+        "my_datetime, "
+        "my_year, "
+        "my_char, "
+        "my_varchar, "
+        "my_enum, "
+        "my_geometry, "
+        "my_blob) "
+        "VALUES (?, B'1111100', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+        "POINT(21.2, 34.2), ?)"
+    )
+
+    data = (
+        None,
+        127,
+        32767,
+        8388607,
+        2147483647,
+        4294967295 if ARCH_64BIT else 2147483647,
+        decimal.Decimal("1.2"),
+        3.14,
+        4.28,
+        datetime.date(2018, 12, 31),
+        datetime.time(12, 13, 14),
+        datetime.datetime(2019, 2, 4, 10, 36, 00),
+        2019,
+        "abc",
+        u"MySQL 🐬",
+        "x-large",
+        "random blob data"
+    )
+
+    exp = (
+        None,
+        124,
+        127,
+        32767,
+        8388607,
+        2147483647,
+        4294967295 if ARCH_64BIT else 2147483647,
+        decimal.Decimal("1.2000000000"),
+        3.140000104904175,
+        4.28000020980835,
+        datetime.date(2018, 12, 31),
+        datetime.timedelta(0, 43994),
+        datetime.datetime(2019, 2, 4, 10, 36), 2019,
+        "abc",
+        u"MySQL \U0001f42c",
+        "x-large",
+        bytearray(b"\x00\x00\x00\x00\x01\x01\x00\x00\x003333335"
+                  b"@\x9a\x99\x99\x99\x99\x19A@"),
+        "random blob data"
+    )
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = CMySQLConnection(**config)
+        self.cur = self.cnx.cursor(prepared=True)
+        self.cur.execute(self.create_table_stmt.format(self.tbl))
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test___init__(self):
+        self.assertIsInstance(self.cur, CMySQLCursorPrepared)
+
+    def test_callproc(self):
+        self.assertRaises(errors.NotSupportedError, self.cur.callproc, None)
+
+    def test_close(self):
+        cur = self.cnx.cursor(prepared=True)
+        self.assertEqual(None, cur._stmt)
+        cur.close()
+
+    def test_fetchone(self):
+        self.cur.execute(self.insert_stmt.format(self.tbl), self.data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        row = self.cur.fetchone()
+        self.assertEqual(row, self.exp)
+        row = self.cur.fetchone()
+        self.assertIsNone(row)
+
+    def test_fetchall(self):
+        self.cur.execute(self.insert_stmt.format(self.tbl), self.data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        rows = self.cur.fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0], self.exp)
+
+    def test_fetchmany(self):
+        data = [self.data[:], self.data[:], self.data[:]]
+        self.cur.executemany(self.insert_stmt.format(self.tbl), data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        rows = self.cur.fetchmany(size=2)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], self.exp)
+        self.assertEqual(rows[1], self.exp)
+        rows = self.cur.fetchmany(1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0], self.exp)
+
+    def test_executemany(self):
+        data = [self.data[:], self.data[:]]
+        self.cur.executemany(self.insert_stmt.format(self.tbl), data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        rows = self.cur.fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], self.exp)
+        self.assertEqual(rows[1], self.exp)

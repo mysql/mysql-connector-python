@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -32,7 +32,16 @@
 #define MYCONNPY_MYSQL_CAPI_H
 
 #include <Python.h>
+#include <mysql.h>
 #include "structmember.h"
+
+#if MYSQL_VERSION_ID >= 80001
+typedef bool bool_;
+#else
+typedef my_bool bool_;
+#endif
+
+/* MySQL */
 
 typedef struct {
     PyObject_HEAD
@@ -223,5 +232,77 @@ MySQL_use_unicode(MySQL *self, PyObject *args);
 PyObject*
 MySQL_warning_count(MySQL *self);
 
+PyObject*
+MySQL_create_prep_stmt(MySQL *self);
+
+/* MySQLPrepStmt */
+
+struct MySQL_binding {
+    PyObject *str_value;
+    union {
+        long l;
+        float f;
+        MYSQL_TIME t;
+    } buffer;
+};
+
+struct column_info {
+    bool_ is_null;
+    bool_ is_error;
+    unsigned long length;
+    union {
+        long l;
+        float f;
+        double d;
+    } small_buffer;
+};
+
+typedef struct {
+    PyObject_HEAD
+    MYSQL_BIND *bind;
+    MYSQL_RES *res;
+    MYSQL_STMT *stmt;
+	const char *charset;
+    unsigned int use_unicode;
+    unsigned long param_count;
+    unsigned int column_count;
+    struct column_info *cols;
+    PyObject *have_result_set;
+    PyObject *fields;
+    MY_CHARSET_INFO cs;
+} MySQLPrepStmt;
+
+PyObject *
+MySQLPrepStmt_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+int
+MySQLPrepStmt_init(MySQLPrepStmt *self, PyObject *args, PyObject *kwds);
+
+void
+MySQLPrepStmt_dealloc(MySQLPrepStmt *self);
+
+PyObject*
+MySQL_stmt_prepare(MySQL *self, PyObject *stmt);
+
+PyObject*
+MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args);
+
+PyObject*
+MySQLPrepStmt_handle_result(MySQLPrepStmt *self);
+
+PyObject*
+MySQLPrepStmt_fetch_row(MySQLPrepStmt *self);
+
+PyObject*
+MySQLPrepStmt_fetch_fields(MySQLPrepStmt *self);
+
+PyObject*
+MySQLPrepStmt_reset(MySQLPrepStmt *self);
+
+PyObject*
+MySQLPrepStmt_close(MySQLPrepStmt *self);
+
+PyObject *
+MySQLPrepStmt_free_result(MySQLPrepStmt *self);
 
 #endif /* MYCONNPY_MYSQL_CAPI_H */

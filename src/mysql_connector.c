@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -194,6 +194,10 @@ static PyMethodDef MySQL_methods[]=
      METH_VARARGS | METH_KEYWORDS,
 	 "Execute the SQL statement"},
 
+    {"stmt_prepare", (PyCFunction)MySQL_stmt_prepare,
+     METH_VARARGS,
+	 "Prepare the SQL statement"},
+
     {"raw", (PyCFunction)MySQL_raw,
      METH_VARARGS,
      "Set and get current raw setting"},
@@ -295,6 +299,85 @@ PyTypeObject MySQLType=
     MySQL_new,                 /* tp_new */
 };
 
+/*
+ * class _mysql_connector.MySQLPrepStmt
+ */
+
+static PyMemberDef MySQLPrepStmt_members[]=
+{
+    {"have_result_set", T_OBJECT, offsetof(MySQLPrepStmt, have_result_set), 0,
+     "True if statement has result set"},
+    {"param_count", T_LONG, offsetof(MySQLPrepStmt, param_count), 1,
+     "Returns the number of parameter markers present in the prepared statement"},
+    {NULL}  /* Sentinel */
+};
+
+static PyMethodDef MySQLPrepStmt_methods[]=
+{
+    {"stmt_execute", (PyCFunction)MySQLPrepStmt_execute,
+     METH_VARARGS,
+	 "Executes the prepared statement"},
+    {"fetch_fields", (PyCFunction)MySQLPrepStmt_fetch_fields,
+     METH_VARARGS,
+	 "Fetch information about fields in result set"},
+    {"fetch_row", (PyCFunction)MySQLPrepStmt_fetch_row,
+     METH_VARARGS,
+	 "Returns the next row in the result set"},
+    {"stmt_close", (PyCFunction)MySQLPrepStmt_close,
+     METH_VARARGS,
+	 "Closes the prepared statement"},
+    {"stmt_reset", (PyCFunction)MySQLPrepStmt_reset,
+     METH_VARARGS,
+	 "Resets a prepared statement on client and server to state after prepare"},
+    {"free_result", (PyCFunction)MySQLPrepStmt_free_result,
+     METH_NOARGS,
+	 "Releases memory associated with the result set produced by execution of the prepared statement"},
+
+    {NULL}  /* Sentinel */
+};
+
+PyTypeObject MySQLPrepStmtType=
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "_mysql_connector.MySQLPrepStmt",   /* tp_name */
+    sizeof(MySQLPrepStmt),              /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)MySQLPrepStmt_dealloc,  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_compare */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "MySQLPrepStmt objects",            /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    MySQLPrepStmt_methods,              /* tp_methods */
+    MySQLPrepStmt_members,              /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)MySQLPrepStmt_init,       /* tp_init */
+    0,                                  /* tp_alloc */
+    MySQLPrepStmt_new,                  /* tp_new */
+};
+
 static PyMethodDef module_methods[]=
 {
     {"datetime_to_mysql", (PyCFunction)datetime_to_mysql,
@@ -322,6 +405,11 @@ MODULE_INIT
         return MODULE_ERROR_VALUE;
     }
 
+    if (PyType_Ready(&MySQLPrepStmtType) < 0)
+    {
+        return MODULE_ERROR_VALUE;
+    }
+
     MODULE_DEF(mod, "_mysql_connector", module_methods,
                "Python C Extension using MySQL Connector/C");
 
@@ -341,8 +429,9 @@ MODULE_INIT
     PyModule_AddObject(mod, "MySQLInterfaceError", MySQLInterfaceError);
 
     Py_INCREF(&MySQLType);
-    PyModule_AddObject(mod, "MySQL",
-                       (PyObject *)&MySQLType);
+    PyModule_AddObject(mod, "MySQL", (PyObject *)&MySQLType);
+    Py_INCREF(&MySQLPrepStmtType);
+    PyModule_AddObject(mod, "MySQLPrepStmt", (PyObject *)&MySQLPrepStmtType);
 
     return MODULE_SUCCESS_VALUE(mod);
 }

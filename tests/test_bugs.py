@@ -67,10 +67,12 @@ import mysql.connector
 import cpy_distutils
 
 try:
-    from mysql.connector.connection_cext import CMySQLConnection
+    from mysql.connector.connection_cext import (CMySQLConnection,
+                                                 MySQLInterfaceError)
 except ImportError:
     # Test without C Extension
     CMySQLConnection = None
+    MySQLInterfaceError = None
 
 ERR_NO_CEXT = "C Extension not available"
 if tests.SSL_AVAILABLE:
@@ -1539,7 +1541,7 @@ class BugOra16819486(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS BugOra16819486")
         cnx.close()
 
-    @foreach_cnx(connection.MySQLConnection)
+    @foreach_cnx()
     def test_error1210(self):
         cur = self.cnx.cursor(prepared=True)
         prep_stmt = "SELECT * FROM BugOra16819486 WHERE c1 = %s AND c2 = %s"
@@ -1550,11 +1552,6 @@ class BugOra16819486(tests.MySQLConnectorTests):
         exp = [(1, 10)]
         cur.execute(prep_stmt, (1, 10))
         self.assertEqual(exp, cur.fetchall())
-
-    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
-    @foreach_cnx(CMySQLConnection)
-    def test_prepared_argument(self):
-        self.assertRaises(NotImplementedError, self.cnx.cursor, prepared=True)
 
 
 class BugOra16656621(tests.MySQLConnectorTests):
@@ -1946,7 +1943,7 @@ class BugOra17215197(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**tests.get_mysql_config())
         cnx.cmd_query("DROP TABLE IF EXISTS BugOra17215197")
 
-    @foreach_cnx(connection.MySQLConnection)
+    @foreach_cnx()
     def test_prepared_argument(self):
         self._setup()
         cur = self.cnx.cursor(prepared=True)
@@ -1954,11 +1951,6 @@ class BugOra17215197(tests.MySQLConnectorTests):
         exp = [(1, 10)]
         cur.execute(prep_stmt, (1, 10))
         self.assertEqual(exp, cur.fetchall())
-
-    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
-    @foreach_cnx(CMySQLConnection)
-    def test_prepared_argument(self):
-        self.assertRaises(NotImplementedError, self.cnx.cursor, prepared=True)
 
 
 class BugOra17414258(tests.MySQLConnectorTests):
@@ -2561,7 +2553,7 @@ class BugOra18144971(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_cp1251))
 
     @cnx_config(use_unicode=True)
-    @foreach_cnx(connection.MySQLConnection)
+    @foreach_cnx()
     def test_prepared_statement(self):
         self._setup()
         cur = self.cnx.cursor(prepared=True)
@@ -2584,12 +2576,6 @@ class BugOra18144971(tests.MySQLConnectorTests):
         self.cnx.commit()
         cur.execute("SELECT * FROM {0}".format(self.table_cp1251))
         self.assertEqual(cur.fetchall(), [exp[1]])
-
-    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
-    @cnx_config(use_unicode=True)
-    @foreach_cnx(CMySQLConnection)
-    def test_prepared_argument(self):
-        self.assertRaises(NotImplementedError, self.cnx.cursor, prepared=True)
 
 
 class BugOra18389196(tests.MySQLConnectorTests):

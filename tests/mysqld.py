@@ -485,7 +485,7 @@ class MySQLServer(MySQLServerBase):
 
         # Extra SQL statements to execute after SQL scripts
         extra_sql = [
-            "CREATE DATABASE myconnpy;"
+            "CREATE DATABASE myconnpy CHARACTER SET utf8mb4;"
         ]
 
         if self._version > (5, 7, 5) and self._version < (5, 7, 21):

@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -259,9 +259,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return None
 
-    def get_rows(self, count=None, binary=False, columns=None, raw=None):
+    def get_rows(self, count=None, binary=False, columns=None, raw=None,
+                 prep_stmt=None):
         """Get all or a subset of rows returned by the MySQL server"""
-        if not (self._cmysql and self.unread_result):
+        unread_result = prep_stmt.have_result_set if prep_stmt \
+            else self.unread_result
+        if not (self._cmysql and unread_result):
             raise errors.InternalError("No result set available")
 
         if raw is None:
@@ -273,7 +276,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         counter = 0
         try:
-            row = self._cmysql.fetch_row()
+            row = prep_stmt.fetch_row() if prep_stmt \
+                else self._cmysql.fetch_row()
             while row:
                 if not self._raw and self.converter:
                     row = list(row)
@@ -286,24 +290,33 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 counter += 1
                 if count and counter == count:
                     break
-                row = self._cmysql.fetch_row()
+                row = prep_stmt.fetch_row() if prep_stmt \
+                        else self._cmysql.fetch_row()
             if not row:
-                _eof = self.fetch_eof_columns()['eof']
-                self.free_result()
+                _eof = self.fetch_eof_columns(prep_stmt)['eof']
+                if prep_stmt:
+                    prep_stmt.free_result()
+                    self._unread_result = False
+                else:
+                    self.free_result()
             else:
                 _eof = None
         except MySQLInterfaceError as exc:
-            self.free_result()
-            raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
-                                             sqlstate=exc.sqlstate)
+            if prep_stmt:
+                prep_stmt.free_result()
+                raise errors.InterfaceError(str(exc))
+            else:
+                self.free_result()
+                raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
+                                                 sqlstate=exc.sqlstate)
 
         return rows, _eof
 
-    def get_row(self, binary=False, columns=None, raw=None):
+    def get_row(self, binary=False, columns=None, raw=None, prep_stmt=None):
         """Get the next rows returned by the MySQL server"""
         try:
             rows, eof = self.get_rows(count=1, binary=binary, columns=columns,
-                                      raw=raw)
+                                      raw=raw, prep_stmt=prep_stmt)
             if rows:
                 return (rows[0], eof)
             return (None, eof)
@@ -342,12 +355,15 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
 
-    def fetch_eof_columns(self):
+    def fetch_eof_columns(self, prep_stmt=None):
         """Fetch EOF and column information"""
-        if not self._cmysql.have_result_set:
+        have_result_set = prep_stmt.have_result_set if prep_stmt \
+            else self._cmysql.have_result_set
+        if not have_result_set:
             raise errors.InterfaceError("No result set")
 
-        fields = self._cmysql.fetch_fields()
+        fields = prep_stmt.fetch_fields() if prep_stmt \
+            else self._cmysql.fetch_fields()
         self._columns = []
         for col in fields:
             self._columns.append((
@@ -381,6 +397,46 @@ class CMySQLConnection(MySQLConnectionAbstract):
             }
 
         return None
+
+    def cmd_stmt_prepare(self, statement):
+        """Prepares the SQL statement"""
+        if not self._cmysql:
+            raise errors.OperationalError("MySQL Connection not available")
+
+        try:
+            return self._cmysql.stmt_prepare(statement)
+        except MySQLInterfaceError as err:
+            raise errors.InterfaceError(str(err))
+
+    # pylint: disable=W0221
+    def cmd_stmt_execute(self, prep_stmt, *args):
+        """Executes the prepared statement"""
+        try:
+            prep_stmt.stmt_execute(*args)
+        except MySQLInterfaceError as err:
+            raise errors.InterfaceError(str(err))
+
+        self._columns = []
+        if not prep_stmt.have_result_set:
+            # No result
+            self._unread_result = False
+            return self.fetch_eof_status()
+
+        self._unread_result = True
+        return self.fetch_eof_columns(prep_stmt)
+
+    def cmd_stmt_close(self, prep_stmt):
+        """Closes the prepared statement"""
+        if self._unread_result:
+            raise errors.InternalError("Unread result found")
+        prep_stmt.stmt_close()
+
+    def cmd_stmt_reset(self, prep_stmt):
+        """Resets the prepared statement"""
+        if self._unread_result:
+            raise errors.InternalError("Unread result found")
+        prep_stmt.stmt_reset()
+    # pylint: enable=W0221
 
     def cmd_query(self, query, raw=None, buffered=False, raw_as_string=False):
         """Send a query to the MySQL server"""
@@ -442,7 +498,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         :return: Subclass of CMySQLCursor
         :rtype: CMySQLCursor or subclass
         """
-        self.handle_unread_result()
+        self.handle_unread_result(prepared)
         if not self.is_connected():
             raise errors.OperationalError("MySQL Connection not available.")
         if cursor_class is not None:
@@ -589,7 +645,6 @@ class CMySQLConnection(MySQLConnectionAbstract):
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
-
         self.close()
 
     def cmd_statistics(self):
@@ -609,9 +664,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise ValueError("MySQL PID must be int")
         self.info_query("KILL {0}".format(mysql_pid))
 
-    def handle_unread_result(self):
+    def handle_unread_result(self, prepared=False):
         """Check whether there is an unread result"""
+        unread_result = self._unread_result if prepared is True \
+            else self.unread_result
         if self.can_consume_results:
             self.consume_results()
-        elif self.unread_result:
+        elif unread_result:
             raise errors.InternalError("Unread result found")

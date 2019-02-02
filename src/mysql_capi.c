@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -37,6 +37,7 @@
 
 #ifdef MS_WINDOWS
 #include <windows.h>
+#define strtok_r strtok_s
 #endif
 #include <mysql.h>
 
@@ -336,7 +337,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
   MySQL instance initialization function. It handles the
   connection arguments passed as positional or keyword
   arguments.
-  
+
   Not all connection arguments are used with the initialization
   function. List of arguments which can be used:
     buffered, raw, charset_name,
@@ -1037,33 +1038,37 @@ MySQL_commit(MySQL *self)
 PyObject*
 MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
-	char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
-	char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
-	PyObject *charset_name= NULL, *compress= NULL, *ssl_verify_cert= NULL,
-	        *ssl_verify_identity= NULL, *password= NULL, *ssl_disabled= NULL;
-	const char* auth_plugin;
-	unsigned long client_flags= 0;
-	unsigned int port= 3306, tmp_uint;
-	unsigned int protocol= 0;
+    char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
+    char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
+    PyObject *charset_name= NULL, *compress= NULL, *ssl_verify_cert= NULL,
+             *ssl_verify_identity= NULL, *ssl_disabled= NULL;
+    const char* auth_plugin;
+    unsigned long client_flags= 0;
+    unsigned int port= 3306, tmp_uint;
+    unsigned int protocol= 0;
 #if MYSQL_VERSION_ID >= 50711
-	unsigned int ssl_mode;
+    unsigned int ssl_mode;
 #endif
 #if MYSQL_VERSION_ID >= 80001
-	bool abool;
-	bool ssl_enabled= 0;
+    bool abool;
+    bool ssl_enabled= 0;
 #else
-  my_bool abool;
-  my_bool ssl_enabled= 0;
+    my_bool abool;
+    my_bool ssl_enabled= 0;
 #endif
-	MYSQL *res;
+#ifdef PY3
+    char *password = NULL;
+#else
+    PyObject *password = NULL;
+#endif
+    MYSQL *res;
 
-	static char *kwlist[]=
-	{
-	    "host", "user", "password", "database",
-		"port", "unix_socket", "client_flags",
-		"ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert", "ssl_verify_identity", "ssl_disabled",
-		"compress",
-		NULL
+    static char *kwlist[]=
+    {
+        "host", "user", "password", "database",	"port", "unix_socket",
+        "client_flags", "ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert",
+        "ssl_verify_identity", "ssl_disabled", "compress",
+        NULL
     };
 
 #ifdef PY3
@@ -1114,7 +1119,9 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
 #ifdef PY3
+    Py_END_ALLOW_THREADS
     charset_name= PyUnicode_AsASCIIString(self->charset_name);
+    Py_BEGIN_ALLOW_THREADS
     if (NULL == charset_name)
     {
         return NULL;
@@ -1126,6 +1133,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     mysql_options(&self->session, MYSQL_OPT_PROTOCOL, (char*)&protocol);
     mysql_options(&self->session, MYSQL_SET_CHARSET_NAME,
                   PyBytesAsString(charset_name));
+
+#ifdef PY3
+    Py_DECREF(charset_name);
+#endif
 
     tmp_uint= self->connection_timeout;
     mysql_options(&self->session, MYSQL_OPT_CONNECT_TIMEOUT, (char*)&tmp_uint);
@@ -2702,4 +2713,928 @@ MySQL_stat(MySQL *self)
 #else
     return PyBytesFromString(stat);
 #endif
+}
+
+/**
+  Prepare a SQL statement.
+
+  Prepare a SQL statement using the current connection.
+
+  Raises MySQLInterfaceError for any MySQL error returned
+  by the MySQL server.
+
+  @param    self    MySQLPrepStmt instance
+  @param    args    SQL statement to be prepared
+
+  @return   PyTuple which contains all converted values.
+    @retval PyBool_type OK
+*/
+PyObject*
+MySQL_stmt_prepare(MySQL *self, PyObject *args)
+{
+    MYSQL *mysql= NULL;
+    MYSQL_STMT *mysql_stmt= NULL;
+    MYSQL_RES *mysql_res= NULL;
+    int res= 0;
+    const char *stmt_char= NULL;
+    unsigned int stmt_length= 0;
+    unsigned long param_count= 0;
+    PyObject *stmt;
+    PyObject *prep_stmt;
+
+    IS_CONNECTED(self);
+
+    if (!PyArg_ParseTuple(args, "O", &stmt))
+    {
+        return NULL;
+    }
+    stmt_char= PyBytesAsString(stmt);
+    stmt_length= strlen(stmt_char);
+
+    mysql= &self->session;
+
+    Py_BEGIN_ALLOW_THREADS
+    mysql_stmt= mysql_stmt_init(mysql);
+    Py_END_ALLOW_THREADS
+
+    if (!mysql_stmt)
+    {
+        goto error;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    res= mysql_stmt_prepare(mysql_stmt, stmt_char, stmt_length);
+    Py_END_ALLOW_THREADS
+
+    if (res)
+    {
+        goto error;
+    }
+
+    /* Get the parameter count from the statement */
+    Py_BEGIN_ALLOW_THREADS
+    param_count= mysql_stmt_param_count(mysql_stmt);
+    Py_END_ALLOW_THREADS
+
+    /* Create MySQLPrepStmt object */
+    prep_stmt= PyObject_CallObject((PyObject *) &MySQLPrepStmtType, NULL);
+    ((MySQLPrepStmt *) prep_stmt)->stmt= mysql_stmt;
+    ((MySQLPrepStmt *) prep_stmt)->res= mysql_res;
+    ((MySQLPrepStmt *) prep_stmt)->param_count= param_count;
+    ((MySQLPrepStmt *) prep_stmt)->use_unicode= self->use_unicode;
+    ((MySQLPrepStmt *) prep_stmt)->cs= self->cs;
+    ((MySQLPrepStmt *) prep_stmt)->charset= my2py_charset_name(mysql);
+
+    Py_INCREF(prep_stmt);
+
+    return prep_stmt;
+
+error:
+    Py_XDECREF(stmt);
+    Py_BEGIN_ALLOW_THREADS
+    mysql_stmt_close(mysql_stmt);
+    Py_END_ALLOW_THREADS
+    PyErr_SetString(MySQLInterfaceError, mysql_stmt_error(mysql_stmt));
+    return NULL;
+}
+
+/**
+  MySQLPrepStmt instance creation function.
+
+  MySQLPrepStmt instance creation function. It allocates the new
+  MySQLPrepStmt instance and sets default values private members.
+
+  @param    type    type of object being created
+  @param    args    positional arguments
+  @param    kwargs  keyword arguments
+
+  @return   Instance of MySQPrepStmt
+    @retval PyObject    OK
+    @retval NULL        Exception
+*/
+PyObject *
+MySQLPrepStmt_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    MySQLPrepStmt *self= (MySQLPrepStmt *)type->tp_alloc(type, 0);
+
+    if (!self)
+    {
+        return NULL;
+    }
+    self->bind= NULL;
+    self->res= NULL;
+    self->stmt= NULL;
+    self->charset= NULL;
+    self->param_count= 0;
+    self->column_count= 0;
+    self->cols= NULL;
+    self->fields= NULL;
+    self->have_result_set= Py_False;
+
+    return (PyObject *)self;
+}
+
+/**
+  MySQLPrepStmt instance initialization function.
+
+  @param    self    MySQLPrepStmt instance
+  @param    args    positional arguments
+  @param    kwargs  keyword arguments
+
+  @return   Instance of MySQLPrepStmt
+    @retval PyObject    OK
+    @retval NULL        Exception
+*/
+int
+MySQLPrepStmt_init(MySQLPrepStmt *self, PyObject *args, PyObject *kwds)
+{
+    return 0;
+}
+
+/**
+  MySQLPrepStmt instance destructor function.
+
+  MySQLPrepStmt instance destructor freeing result (if any) and
+  closing the statement.
+
+  @param    self    MySQLPrepStmt instance
+*/
+void
+MySQLPrepStmt_dealloc(MySQLPrepStmt *self)
+{
+    if (self)
+    {
+        MySQLPrepStmt_free_result(self);
+        MySQLPrepStmt_close(self);
+        Py_TYPE(self)->tp_free((PyObject*)self);
+    }
+}
+
+/**
+  Executes a prepared statement.
+
+  Binds the values of the prepared statement executes it.
+
+  Raises MySQLInterfaceError for any MySQL error returned
+  by the MySQL server.
+
+  @param    self    MySQLPrepStmt instance
+  @param    args    Python values to bind
+
+  @return   PyTuple which contains all converted values.
+    @retval PyBool_type OK
+*/
+PyObject*
+MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
+{
+    Py_ssize_t size= PyTuple_Size(args);
+    MYSQL_BIND *mbinds= calloc(size, sizeof(MYSQL_BIND));
+    struct MySQL_binding *bindings= calloc(size, sizeof(struct MySQL_binding));
+    PyObject *value;
+    PyObject *retval= NULL;
+    int i= 0, res= 0;
+
+
+    for (i= 0; i < size; i++)
+    {
+        struct MySQL_binding *pbind= &bindings[i];
+        MYSQL_BIND *mbind= &mbinds[i];
+        value= PyTuple_GetItem(args, i);
+
+        if (value == NULL)
+        {
+            goto cleanup;
+        }
+
+        /* None is SQL's NULL */
+        if (value == Py_None)
+        {
+            mbind->buffer_type= MYSQL_TYPE_NULL;
+            mbind->buffer= "NULL";
+            mbind->is_null= (bool_ *)1;
+            continue;
+        }
+
+        /* LONG */
+        if (PyIntLong_Check(value))
+        {
+            pbind->buffer.l= PyIntAsLong(value);
+            mbind->buffer= &pbind->buffer.l;
+#if LONG_MAX >= INT64_T_MAX
+            mbind->buffer_type= MYSQL_TYPE_LONGLONG;
+#else
+            mbind->buffer_type= MYSQL_TYPE_LONG;
+#endif
+            mbind->is_null= (bool_ *)0;
+            mbind->length= 0;
+            continue;
+        }
+
+        /* FLOAT */
+        if (PyFloat_Check(value))
+        {
+            pbind->buffer.f= (float)PyFloat_AsDouble(value);
+            mbind->buffer= &pbind->buffer.f;
+            mbind->buffer_type= MYSQL_TYPE_FLOAT;
+            mbind->is_null= (bool_ *)0;
+            mbind->length= 0;
+            continue;
+        }
+
+        /* STRING */
+        if (PyString_Check(value) || PyUnicode_Check(value) || PyBytes_Check(value))
+        {
+            pbind->str_value= value;
+            mbind->buffer_type= MYSQL_TYPE_STRING;
+        }
+        /* DATETIME */
+        else if (PyDateTime_Check(value))
+        {
+            MYSQL_TIME *datetime= &pbind->buffer.t;
+            datetime->year= PyDateTime_GET_YEAR(value);
+            datetime->month= PyDateTime_GET_MONTH(value);
+            datetime->day= PyDateTime_GET_DAY(value);
+            datetime->hour= PyDateTime_DATE_GET_HOUR(value);
+            datetime->minute= PyDateTime_DATE_GET_MINUTE(value);
+            datetime->second= PyDateTime_DATE_GET_SECOND(value);
+            if (PyDateTime_DATE_GET_MICROSECOND(value))
+            {
+                datetime->second_part= PyDateTime_DATE_GET_MICROSECOND(value);
+            }
+            else
+            {
+                datetime->second_part= 0;
+            }
+
+            mbind->buffer_type= MYSQL_TYPE_DATETIME;
+            mbind->buffer= datetime;
+            mbind->is_null= (bool_ *)0;
+            continue;
+        }
+        /* DATE */
+        else if (PyDate_CheckExact(value))
+        {
+            MYSQL_TIME *date= &pbind->buffer.t;
+            date->year= PyDateTime_GET_YEAR(value);
+            date->month= PyDateTime_GET_MONTH(value);
+            date->day=  PyDateTime_GET_DAY(value);
+
+            mbind->buffer_type= MYSQL_TYPE_DATE;
+            mbind->buffer= date;
+            mbind->is_null= (bool_ *)0;
+            continue;
+        }
+        /* TIME */
+        else if (PyTime_Check(value))
+        {
+            MYSQL_TIME *time= &pbind->buffer.t;
+            time->hour= PyDateTime_TIME_GET_HOUR(value);
+            time->minute= PyDateTime_TIME_GET_MINUTE(value);
+            time->second= PyDateTime_TIME_GET_SECOND(value);
+            if (PyDateTime_TIME_GET_MICROSECOND(value))
+            {
+                time->second_part= PyDateTime_TIME_GET_MICROSECOND(value);
+            }
+            else
+            {
+                time->second_part= 0;
+            }
+
+            mbind->buffer_type= MYSQL_TYPE_TIME;
+            mbind->buffer= time;
+            mbind->is_null= (bool_ *)0;
+            mbind->length= 0;
+            continue;
+        }
+        /* datetime.timedelta is TIME */
+        else if (PyDelta_CheckExact(value))
+        {
+            MYSQL_TIME *time= &pbind->buffer.t;
+            time->hour= PyDateTime_TIME_GET_HOUR(value);
+            time->minute= PyDateTime_TIME_GET_MINUTE(value);
+            time->second= PyDateTime_TIME_GET_SECOND(value);
+            if (PyDateTime_TIME_GET_MICROSECOND(value))
+            {
+                time->second_part= PyDateTime_TIME_GET_MICROSECOND(value);
+            }
+            else
+            {
+                time->second_part= 0;
+            }
+
+            mbind->buffer_type= MYSQL_TYPE_TIME;
+            mbind->buffer= time;
+            mbind->is_null= (bool_ *)0;
+            mbind->length= 0;
+            continue;
+        }
+        /* DECIMAL */
+#ifndef PY3
+        else if (strcmp((value)->ob_type->tp_name, "Decimal") == 0)
+#else
+        else if (strcmp((value)->ob_type->tp_name, "decimal.Decimal") == 0)
+#endif
+        {
+            pbind->str_value= pytomy_decimal(value);
+            mbind[i].buffer_type= MYSQL_TYPE_DECIMAL;
+        }
+        else
+        {
+            retval= PyErr_Format(MySQLInterfaceError,
+                                 (const char*)"Python type %s cannot be converted",
+                                 (value)->ob_type->tp_name);
+            goto cleanup;
+        }
+
+        if (!pbind->str_value)
+        {
+            retval= PyErr_Format(MySQLInterfaceError,
+                                 (const char*)"Failed converting Python '%s'",
+                                 (value)->ob_type->tp_name);
+            goto cleanup;
+        }
+
+        /* Some conversions could return None instead of raising errors */
+        if (pbind->str_value == Py_None)
+        {
+            mbind->buffer= "NULL";
+            mbind->buffer_type= MYSQL_TYPE_NULL;
+            mbind->is_null= (bool_ *)0;
+        }
+#ifdef PY3
+        else if (PyBytes_Check(pbind->str_value))
+        {
+            mbind->buffer= PyBytes_AsString(pbind->str_value);
+            mbind->buffer_length= (unsigned long)PyBytes_Size(pbind->str_value);
+            mbind->length= &mbind->buffer_length;
+            mbind->is_null= (bool_ *)0;
+        }
+#endif
+        else if (PyString_Check(pbind->str_value))
+        {
+#ifdef PY3
+            Py_ssize_t len;
+            mbind->buffer= PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
+            mbind->buffer_length= (unsigned long)len;
+#else
+            mbind->buffer= PyString_AsString(pbind->str_value);
+            mbind->buffer_length= (unsigned long)PyString_Size(pbind->str_value);
+#endif
+            mbind->length= &mbind->buffer_length;
+            mbind->is_null= (bool_ *)0;
+        }
+#ifndef PY3
+        else if (PyUnicode_Check(pbind->str_value))
+        {
+            PyObject *utf8_str= PyUnicode_AsUTF8String(pbind->str_value);
+            mbind->buffer= PyString_AsString(utf8_str);
+            mbind->buffer_length= (unsigned long)PyString_Size(utf8_str);
+        }
+#endif
+        else
+        {
+            PyErr_SetString(PyExc_ValueError,
+                            (const char*)"Failed to bind parameter");
+            goto cleanup;
+        }
+    }
+
+    if (mysql_stmt_bind_param(self->stmt, mbinds))
+    {
+        retval= PyErr_Format(MySQLInterfaceError,
+                             (const char*)"Bind the parameters: %s",
+                             mysql_stmt_error(self->stmt));
+        goto cleanup;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    res= mysql_stmt_execute(self->stmt);
+    Py_END_ALLOW_THREADS
+
+    if (res)
+    {
+        retval= PyErr_Format(MySQLInterfaceError,
+                             (const char*)"Error while executing statement: %s",
+                             mysql_stmt_error(self->stmt));
+        goto cleanup;
+    }
+
+    retval= MySQLPrepStmt_handle_result(self);
+    goto cleanup;
+
+cleanup:
+    for (i= 0; i < size; i++)
+    {
+        switch (mbinds[i].buffer_type)
+        {
+            case MYSQL_TYPE_DECIMAL:
+                Py_XDECREF(bindings[i].str_value);
+                break;
+            default:
+                // Nothing to do
+                break;
+        }
+    }
+    free(bindings);
+    free(mbinds);
+    return retval;
+}
+
+/**
+  Handles a prepared statement result.
+
+  Handles a result after executing a prepared statement. It will
+  either store or use the result.
+
+  Raises MySQLInterfaceError for any MySQL error returned
+  by the MySQL server.
+
+  @param    self    MySQLPrepStmt instance
+
+  @return   Boolean Object Py_True or Py_False
+    @retval Py_True OK
+    @retval NULL    Exception
+*/
+PyObject*
+MySQLPrepStmt_handle_result(MySQLPrepStmt *self)
+{
+    int i= 0;
+
+    Py_BEGIN_ALLOW_THREADS
+    self->res = mysql_stmt_result_metadata(self->stmt);
+    Py_END_ALLOW_THREADS
+
+    if (!self->res)
+    {
+        /* No result set */
+        self->have_result_set= Py_False;
+        Py_RETURN_TRUE;
+    }
+
+    self->have_result_set= Py_True;
+
+    Py_BEGIN_ALLOW_THREADS
+    self->column_count= mysql_num_fields(self->res);
+    self->bind= calloc(self->column_count, sizeof(MYSQL_BIND));
+    self->cols= calloc(self->column_count, sizeof(struct column_info));
+
+    for (i= 0; i < self->column_count; ++i)
+    {
+        MYSQL_FIELD *field= mysql_fetch_field(self->res);
+        switch (field->type)
+        {
+            case MYSQL_TYPE_NULL:
+                self->bind[i].buffer_type= MYSQL_TYPE_NULL;
+                self->bind[i].buffer= NULL;
+                self->bind[i].is_null= &self->cols[i].is_null;
+                break;
+            case MYSQL_TYPE_BIT:
+                self->bind[i].buffer_type= MYSQL_TYPE_BIT;
+                self->bind[i].buffer= NULL;
+                self->bind[i].buffer_length= 0;
+                break;
+            case MYSQL_TYPE_TINY:
+            case MYSQL_TYPE_SHORT:
+            case MYSQL_TYPE_LONG:
+            case MYSQL_TYPE_INT24:
+            case MYSQL_TYPE_YEAR:
+#if LONG_MAX >= INT64_T_MAX
+            case MYSQL_TYPE_LONGLONG:
+                self->bind[i].buffer_type= MYSQL_TYPE_LONGLONG;
+#else
+                self->bind[i].buffer_type= MYSQL_TYPE_LONG;
+#endif
+                self->bind[i].buffer= &self->cols[i].small_buffer.l;
+                self->bind[i].buffer_length= sizeof(long);
+                break;
+            case MYSQL_TYPE_FLOAT:
+                self->bind[i].buffer_type= MYSQL_TYPE_FLOAT;
+                self->bind[i].buffer= &self->cols[i].small_buffer.f;
+                self->bind[i].buffer_length= sizeof(float);
+                break;
+            case MYSQL_TYPE_DOUBLE:
+                self->bind[i].buffer_type= MYSQL_TYPE_DOUBLE;
+                self->bind[i].buffer= &self->cols[i].small_buffer.d;
+                self->bind[i].buffer_length= sizeof(double);
+                break;
+            default:
+                self->bind[i].buffer_type= MYSQL_TYPE_STRING;
+                self->bind[i].buffer= NULL;
+                self->bind[i].buffer_length= 0;
+                break;
+        }
+        self->bind[i].length= &self->cols[i].length;
+        self->bind[i].is_null= &self->cols[i].is_null;
+        self->bind[i].error= &self->cols[i].is_error;
+    }
+    Py_END_ALLOW_THREADS
+
+    if (mysql_stmt_bind_result(self->stmt, self->bind))
+    {
+        mysql_free_result(self->res);
+        free(self->cols);
+        free(self->bind);
+        PyErr_SetString(MySQLInterfaceError, mysql_stmt_error(self->stmt));
+        return NULL;
+    }
+
+    mysql_field_seek(self->res, 0);
+    self->fields= MySQLPrepStmt_fetch_fields(self);
+
+    Py_RETURN_TRUE;
+}
+
+/**
+  Fetch the next row from the active result.
+
+  Fetch the next row from the active result. The row is returned
+  as a tuple which contains the values converted to Python types,
+  unless raw was set.
+
+  The returned PyObject is a PyList which consists of
+  PyTuple objects.
+
+  Raises MySQLInterfaceError for any MySQL error returned
+  by the MySQL server.
+
+  @param    self    MySQLPrepStmt instance
+
+  @return   PyTuple with row values.
+    @retval PyTuple OK
+    @retval PyNone  No row available
+    @retval NULL    Exception
+*/
+PyObject*
+MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
+{
+    PyObject *obj;
+    PyObject *row;
+    PyObject *field_info;
+    PyObject *mod_decimal, *decimal, *dec_args;
+    unsigned long field_flags;
+    int i= 0, fetch= 0;
+
+    row= PyTuple_New(self->column_count);
+
+    mysql_field_seek(self->res, 0);
+    for (i= 0; i < self->column_count; ++i) {
+        MYSQL_FIELD *field= mysql_fetch_field(self->res);
+        switch (field->type) {
+            case MYSQL_TYPE_NULL:
+            case MYSQL_TYPE_TINY:
+            case MYSQL_TYPE_SHORT:
+            case MYSQL_TYPE_INT24:
+            case MYSQL_TYPE_LONG:
+            case MYSQL_TYPE_LONGLONG:
+            case MYSQL_TYPE_YEAR:
+            case MYSQL_TYPE_FLOAT:
+            case MYSQL_TYPE_DOUBLE:
+                break;
+            default:
+                self->bind[i].buffer= NULL;
+                self->bind[i].buffer_length= 0;
+                self->cols[i].length= 0;
+        }
+    }
+
+    /* Fetch to get real size */
+    Py_BEGIN_ALLOW_THREADS
+    fetch= mysql_stmt_fetch(self->stmt);
+    Py_END_ALLOW_THREADS
+
+    if (fetch == 1) {
+        PyErr_Format(MySQLInterfaceError,
+                     (const char*)"Error while fetching: %s",
+                     mysql_stmt_error(self->stmt));
+        goto cleanup;
+    } else if (fetch == MYSQL_NO_DATA) {
+        Py_XDECREF(row);
+        Py_RETURN_NONE;
+    }
+
+    mysql_field_seek(self->res, 0);
+    for (i= 0; i < self->column_count; ++i) {
+        MYSQL_FIELD *field;
+        Py_BEGIN_ALLOW_THREADS
+        field= mysql_fetch_field(self->res);
+        Py_END_ALLOW_THREADS
+
+        if (self->cols[i].is_null)
+        {
+            Py_INCREF(Py_None);
+            PyTuple_SET_ITEM(row, i, Py_None);
+            continue;
+        }
+
+        if (self->fields == NULL)
+        {
+            self->fields= MySQLPrepStmt_fetch_fields(self);
+        }
+
+        field_info= PyList_GetItem(self->fields, i);
+        if (!field_info)
+        {
+            PyErr_SetString(PyExc_ValueError,
+                (const char*)"Error while fetching field information");
+            goto cleanup;
+        }
+        field_flags= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 9));
+
+        switch (field->type) {
+            case MYSQL_TYPE_TINY:
+            case MYSQL_TYPE_SHORT:
+            case MYSQL_TYPE_INT24:
+            case MYSQL_TYPE_LONG:
+#if LONG_MAX >= INT64_T_MAX
+            case MYSQL_TYPE_LONGLONG:
+#endif
+            case MYSQL_TYPE_YEAR:
+                PyTuple_SET_ITEM(
+                    row, i, PyInt_FromLong(self->cols[i].small_buffer.l));
+                break;
+            case MYSQL_TYPE_FLOAT:
+                PyTuple_SET_ITEM(
+                    row, i, PyFloat_FromDouble(self->cols[i].small_buffer.f));
+                break;
+            case MYSQL_TYPE_DOUBLE:
+                PyTuple_SET_ITEM(
+                    row, i, PyFloat_FromDouble(self->cols[i].small_buffer.d));
+                break;
+            case MYSQL_TYPE_DATETIME:
+            case MYSQL_TYPE_TIMESTAMP:
+            case MYSQL_TYPE_DATE:
+            case MYSQL_TYPE_TIME:
+            case MYSQL_TYPE_DECIMAL:
+            case MYSQL_TYPE_NEWDECIMAL:
+                obj= BytesFromStringAndSize(NULL, self->cols[i].length);
+                self->bind[i].buffer= PyBytesAsString(obj);
+                self->bind[i].buffer_length= self->cols[i].length;
+
+                Py_BEGIN_ALLOW_THREADS
+                mysql_stmt_fetch_column(self->stmt, &self->bind[i], i, 0);
+                Py_END_ALLOW_THREADS
+
+                if (self->cols[i].is_error)
+                {
+                    PyErr_SetString(MySQLInterfaceError,
+                                    mysql_stmt_error(self->stmt));
+                    goto cleanup;
+                }
+
+                if (field->type == MYSQL_TYPE_DATE)
+                {
+                    PyTuple_SET_ITEM(row, i, mytopy_date(PyBytesAsString(obj)));
+                }
+                else if (field->type == MYSQL_TYPE_TIME)
+                {
+                    PyTuple_SET_ITEM(row, i,
+                        mytopy_time(PyBytesAsString(obj), self->cols[i].length));
+                }
+                else if (field->type == MYSQL_TYPE_DATETIME ||
+                         field->type == MYSQL_TYPE_TIMESTAMP)
+                {
+                    PyTuple_SET_ITEM( row, i,
+                        mytopy_datetime(PyBytesAsString(obj), self->cols[i].length));
+                }
+                else /* MYSQL_TYPE_DECIMAL or MYSQL_TYPE_NEWDECIMAL */
+                {
+                    mod_decimal= PyImport_ImportModule("decimal");
+                    if (mod_decimal)
+                    {
+                        dec_args= PyTuple_New(1);
+                        PyTuple_SET_ITEM(dec_args, 0,
+                            PyStringFromString(PyBytesAsString(obj)));
+                        decimal= PyObject_GetAttrString(mod_decimal, "Decimal");
+                        PyTuple_SET_ITEM(row, i,
+                            PyObject_Call(decimal, dec_args, NULL));
+                        Py_DECREF(dec_args);
+                        Py_DECREF(decimal);
+                    }
+                    Py_XDECREF(mod_decimal);
+                }
+                break;
+            /* MYSQL_TYPE_CHAR, MYSQL_TYPE_VARCHAR, MYSQL_TYPE_STRING, */
+            /* MYSQL_TYPE_VAR_STRING, MYSQL_TYPE_GEOMETRY, MYSQL_TYPE_BLOB */
+            /* MYSQL_TYPE_ENUM, MYSQL_TYPE_SET or MYSQL_TYPE_BIT */
+            default:
+                if (field_flags & SET_FLAG) /* MYSQL_TYPE_SET */
+                {
+                    char *rest= NULL;
+                    char *token;
+                    PyObject* set= PySet_New(NULL);
+
+                    obj= BytesFromStringAndSize(NULL, self->cols[i].length);
+                    self->bind[i].buffer= PyBytesAsString(obj);
+                    self->bind[i].buffer_length= self->cols[i].length;
+
+                    Py_BEGIN_ALLOW_THREADS
+                    mysql_stmt_fetch_column(self->stmt, &self->bind[i], i, 0);
+                    Py_END_ALLOW_THREADS
+
+                    if (self->cols[i].is_error)
+                    {
+                        PyErr_SetString(MySQLInterfaceError,
+                                        mysql_stmt_error(self->stmt));
+                        goto cleanup;
+                    }
+
+                    for (token= strtok_r(PyBytesAsString(obj), ",", &rest);
+                        token != NULL;
+                        token= strtok_r(NULL, ",", &rest))
+                    {
+                        PyObject *us= PyUnicode_FromString(token);
+                        PySet_Add(set, us);
+                        Py_DECREF(us);
+                    }
+                    PyTuple_SET_ITEM(row, i, set);
+                    Py_XDECREF(obj);
+                }
+                else if (field->type == MYSQL_TYPE_GEOMETRY)
+                {
+                    obj= PyByteArray_FromStringAndSize(NULL, self->cols[i].length);
+                    self->bind[i].buffer= PyByteArray_AsString(obj);
+                    self->bind[i].buffer_length= self->cols[i].length;
+
+                    Py_BEGIN_ALLOW_THREADS
+                    mysql_stmt_fetch_column(self->stmt, &self->bind[i], i, 0);
+                    Py_END_ALLOW_THREADS
+
+                    if (self->cols[i].is_error)
+                    {
+                        PyErr_SetString(MySQLInterfaceError,
+                                        mysql_stmt_error(self->stmt));
+                        goto cleanup;
+                    }
+
+                    PyTuple_SET_ITEM(row, i, obj);
+                }
+                else
+                {
+                    obj= BytesFromStringAndSize(NULL, self->cols[i].length);
+                    self->bind[i].buffer= PyBytesAsString(obj);
+                    self->bind[i].buffer_length= self->cols[i].length;
+
+                    Py_BEGIN_ALLOW_THREADS
+                    mysql_stmt_fetch_column(self->stmt, &self->bind[i], i, 0);
+                    Py_END_ALLOW_THREADS
+
+                    if (self->cols[i].is_error)
+                    {
+                        PyErr_SetString(MySQLInterfaceError,
+                                        mysql_stmt_error(self->stmt));
+                        goto cleanup;
+                    }
+
+                    if (field->type == MYSQL_TYPE_BIT)
+                    {
+                        PyTuple_SET_ITEM(row, i,
+                            mytopy_bit(PyBytesAsString(obj), self->cols[i].length));
+                    }
+                    else
+                    {
+                        PyTuple_SET_ITEM(row, i, PyUnicode_FromString(PyBytesAsString(obj)));
+                    }
+                    Py_XDECREF(obj);
+                }
+                break;
+        }
+    }
+
+    return row;
+
+cleanup:
+    Py_XDECREF(row);
+    return NULL;
+}
+
+/**
+  Fetch column information for active MySQL Statement result.
+
+  The returned PyObject is a PyList which consists of
+  PyTuple objects.
+
+  Raises MySQLInterfaceError for any MySQL error returned
+  by the MySQL server.
+
+  @param    self    MySQLPrepStmt instance
+
+  @return   PyList of PyTuple objects
+    @retval PyList  OK
+    @retval NULL    Exception
+*/
+PyObject*
+MySQLPrepStmt_fetch_fields(MySQLPrepStmt *self)
+{
+    unsigned int num_fields;
+
+    if (!self->res)
+    {
+        PyErr_SetString(MySQLInterfaceError, "No result");
+        return NULL;
+    }
+
+    if (self->fields)
+    {
+        Py_INCREF(self->fields);
+        return self->fields;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    num_fields= mysql_num_fields(self->res);
+    Py_END_ALLOW_THREADS
+
+    return fetch_fields(self->res, num_fields, &self->cs, self->use_unicode);
+}
+
+/**
+  Resets the prepared statement.
+
+  Resets a prepared statement on client and server to state after prepare.
+
+  @param    self    MySQLPrepStmt instance
+
+  @return   None
+    @retval Py_None OK
+*/
+PyObject*
+MySQLPrepStmt_reset(MySQLPrepStmt *self)
+{
+    int res= 0;
+
+    if (self->stmt)
+    {
+        Py_BEGIN_ALLOW_THREADS
+        res= mysql_stmt_reset(self->stmt);
+        Py_END_ALLOW_THREADS
+        if (res)
+        {
+            PyErr_SetString(MySQLInterfaceError, mysql_stmt_error(self->stmt));
+            return NULL;
+        }
+    }
+
+    Py_RETURN_NONE;
+}
+
+/**
+  Closes the prepared statement.
+
+  @param    self    MySQLPrepStmt instance
+
+  @return   None
+    @retval Py_None OK
+*/
+PyObject*
+MySQLPrepStmt_close(MySQLPrepStmt *self)
+{
+    int res= 0;
+
+    if (!self->stmt)
+    {
+        PyErr_SetString(MySQLInterfaceError, mysql_stmt_error(self->stmt));
+        return NULL;
+    }
+
+    MySQLPrepStmt_free_result(self);
+
+    Py_BEGIN_ALLOW_THREADS
+    res= mysql_stmt_close(self->stmt);
+    Py_END_ALLOW_THREADS
+
+    if (res)
+    {
+        PyErr_SetString(MySQLInterfaceError, mysql_stmt_error(self->stmt));
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+/**
+  Free stored result.
+
+  Releases memory associated with the result set produced by execution
+  of the prepared statement.
+
+  @param    self    MySQLPrepStmt instance
+
+  @return   None
+    @retval Py_None OK
+*/
+PyObject *
+MySQLPrepStmt_free_result(MySQLPrepStmt *self)
+{
+    if (self->res)
+    {
+        Py_BEGIN_ALLOW_THREADS
+        mysql_stmt_free_result(self->stmt);
+        Py_END_ALLOW_THREADS
+    }
+
+    Py_XDECREF(self->fields);
+    self->fields= NULL;
+    self->res= NULL;
+    self->have_result_set= Py_False;
+
+    Py_RETURN_NONE;
 }
