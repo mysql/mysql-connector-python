@@ -2450,6 +2450,14 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("Barney", row[1])
         self.assertEqual(None, result.fetch_one())
 
+        # Test result using column label
+        table = self.schema.get_table("test")
+        result = table.select("age AS the_age, name AS the_name") \
+                      .where("age = 21").execute()
+        row = result.fetch_one()
+        self.assertEqual(21, row["the_age"])
+        self.assertEqual("Fred", row["the_name"])
+
         drop_table(self.schema, "test")
 
     def test_multiple_resultsets(self):
