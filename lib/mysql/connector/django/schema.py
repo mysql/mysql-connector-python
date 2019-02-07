@@ -1,12 +1,7 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
-# New file added for Django 1.7
-
 import django
-if django.VERSION >= (1, 8):
-    from django.db.backends.base.schema import BaseDatabaseSchemaEditor
-else:
-    from django.db.backends.schema import BaseDatabaseSchemaEditor
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.models import NOT_PROVIDED
 
 
@@ -60,7 +55,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             }, [effective_default])
 
     def _model_indexes_sql(self, model):
-        # New in Django 1.8
         storage = self.connection.introspection.get_storage_engine(
             self.connection.cursor(), model._meta.db_table
         )
@@ -75,7 +69,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return super(DatabaseSchemaEditor, self)._model_indexes_sql(model)
 
     def _alter_column_type_sql(self, table, old_field, new_field, new_type):
-        # New in Django 1.8
         # Keep null property of old field, if it has changed, it will be
         # handled separately
         if old_field.null:

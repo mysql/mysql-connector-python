@@ -1,17 +1,12 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
-# New file added for Django 1.8
-
 from __future__ import unicode_literals
 
 import uuid
 
 import django
 from django.conf import settings
-if django.VERSION >= (1, 8):
-    from django.db.backends.base.operations import BaseDatabaseOperations
-else:
-    from django.db.backends import BaseDatabaseOperations
+from django.db.backends.base.operations import BaseDatabaseOperations
 from django.utils import six, timezone
 from django.utils.encoding import force_text
 
@@ -27,11 +22,10 @@ class DatabaseOperations(BaseDatabaseOperations):
     compiler_module = "mysql.connector.django.compiler"
 
     # MySQL stores positive fields as UNSIGNED ints.
-    if django.VERSION >= (1, 7):
-        integer_field_ranges = dict(BaseDatabaseOperations.integer_field_ranges,
-                                    PositiveSmallIntegerField=(0, 4294967295),
-                                    PositiveIntegerField=(
-                                        0, 18446744073709551615),)
+    integer_field_ranges = dict(BaseDatabaseOperations.integer_field_ranges,
+                                PositiveSmallIntegerField=(0, 4294967295),
+                                PositiveIntegerField=(
+                                    0, 18446744073709551615),)
 
     def date_extract_sql(self, lookup_type, field_name):
         # http://dev.mysql.com/doc/mysql/en/date-and-time-functions.html
@@ -67,7 +61,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         return sql
 
     def datetime_extract_sql(self, lookup_type, field_name, tzname):
-        # Django 1.6
         if settings.USE_TZ:
             field_name = "CONVERT_TZ({0}, 'UTC', %s)".format(field_name)
             params = [tzname]
@@ -85,7 +78,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         return sql, params
 
     def datetime_trunc_sql(self, lookup_type, field_name, tzname):
-        # Django 1.6
         if settings.USE_TZ:
             field_name = "CONVERT_TZ({0}, 'UTC', %s)".format(field_name)
             params = [tzname]
@@ -105,27 +97,11 @@ class DatabaseOperations(BaseDatabaseOperations):
                 field_name, format_str)
         return sql, params
 
-    if django.VERSION >= (1, 8):
-        def date_interval_sql(self, timedelta):
-            """Returns SQL for calculating date/time intervals
-            """
-            return "INTERVAL '%d 0:0:%d:%d' DAY_MICROSECOND" % (
-                timedelta.days, timedelta.seconds, timedelta.microseconds), []
-    else:
-        def date_interval_sql(self, sql, connector, timedelta):
-            """Returns SQL for calculating date/time intervals
-            """
-            fmt = (
-                "({sql} {connector} INTERVAL '{days} "
-                "0:0:{secs}:{msecs}' DAY_MICROSECOND)"
-            )
-            return fmt.format(
-                sql=sql,
-                connector=connector,
-                days=timedelta.days,
-                secs=timedelta.seconds,
-                msecs=timedelta.microseconds
-            )
+    def date_interval_sql(self, timedelta):
+        """Returns SQL for calculating date/time intervals
+        """
+        return "INTERVAL '%d 0:0:%d:%d' DAY_MICROSECOND" % (
+            timedelta.days, timedelta.seconds, timedelta.microseconds), []
 
     def format_for_duration_arithmetic(self, sql):
         if self.connection.features.supports_microsecond_precision:
@@ -142,10 +118,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         columns. If no ordering would otherwise be applied, we don't want any
         implicit sorting going on.
         """
-        if django.VERSION >= (1, 8):
-            return [(None, ("NULL", [], False))]
-        else:
-            return ["NULL"]
+        return [(None, ("NULL", [], False))]
 
     def fulltext_search_sql(self, field_name):
         return 'MATCH ({0}) AGAINST (%s IN BOOLEAN MODE)'.format(field_name)
@@ -185,9 +158,8 @@ class DatabaseOperations(BaseDatabaseOperations):
                              'value for AutoField.')
         return value
 
-    if django.VERSION > (1, 8):
-        def adapt_datetimefield_value(self, value):
-            return self.value_to_db_datetime(value)
+    def adapt_datetimefield_value(self, value):
+        return self.value_to_db_datetime(value)
 
     def value_to_db_datetime(self, value):
         if value is None:
@@ -206,9 +178,8 @@ class DatabaseOperations(BaseDatabaseOperations):
             return datetime_to_mysql(value)
         return self.connection.converter.to_mysql(value)
 
-    if django.VERSION > (1, 8):
-        def adapt_timefield_value(self, value):
-            return self.value_to_db_time(value)
+    def adapt_timefield_value(self, value):
+        return self.value_to_db_time(value)
 
     def value_to_db_time(self, value):
         if value is None:
@@ -226,59 +197,10 @@ class DatabaseOperations(BaseDatabaseOperations):
     def max_name_length(self):
         return 64
 
-    if django.VERSION < (1, 9):
-        def bulk_insert_sql(self, fields, num_values):
-            items_sql = "({0})".format(", ".join(["%s"] * len(fields)))
-            return "VALUES " + ", ".join([items_sql] * num_values)
-    else:
-        def bulk_insert_sql(self, fields, placeholder_rows):
-            placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
-            values_sql = ", ".join("({0})".format(sql) for sql in placeholder_rows_sql)
-            return "VALUES " + values_sql
-
-    if django.VERSION < (1, 8):
-        def year_lookup_bounds(self, value):
-            # Again, no microseconds
-            first = '{0}-01-01 00:00:00'
-            second = '{0}-12-31 23:59:59.999999'
-            return [first.format(value), second.format(value)]
-
-        def year_lookup_bounds_for_datetime_field(self, value):
-            # Django 1.6
-            # Again, no microseconds
-            first, second = super(DatabaseOperations,
-                self).year_lookup_bounds_for_datetime_field(value)
-            if self.connection.mysql_version >= (5, 6, 4):
-                return [first.replace(microsecond=0), second]
-            else:
-                return [first.replace(microsecond=0),
-                    second.replace(microsecond=0)]
-
-        def sequence_reset_by_name_sql(self, style, sequences):
-            # Truncate already resets the AUTO_INCREMENT field from
-            # MySQL version 5.0.13 onwards. Refs #16961.
-            res = []
-            if self.connection.mysql_version < (5, 0, 13):
-                fmt = "{alter} {table} {{tablename}} {auto_inc} {field};".format(
-                    alter=style.SQL_KEYWORD('ALTER'),
-                    table=style.SQL_KEYWORD('TABLE'),
-                    auto_inc=style.SQL_KEYWORD('AUTO_INCREMENT'),
-                    field=style.SQL_FIELD('= 1')
-                )
-                for sequence in sequences:
-                    tablename = style.SQL_TABLE(self.quote_name(sequence['table']))
-                    res.append(fmt.format(tablename=tablename))
-                return res
-            return res
-
-        def savepoint_create_sql(self, sid):
-            return "SAVEPOINT {0}".format(sid)
-
-        def savepoint_commit_sql(self, sid):
-            return "RELEASE SAVEPOINT {0}".format(sid)
-
-        def savepoint_rollback_sql(self, sid):
-            return "ROLLBACK TO SAVEPOINT {0}".format(sid)
+    def bulk_insert_sql(self, fields, placeholder_rows):
+        placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
+        values_sql = ", ".join("({0})".format(sql) for sql in placeholder_rows_sql)
+        return "VALUES " + values_sql
 
     def combine_expression(self, connector, sub_expressions):
         """
@@ -290,7 +212,6 @@ class DatabaseOperations(BaseDatabaseOperations):
             connector, sub_expressions)
 
     def get_db_converters(self, expression):
-        # New in Django 1.8
         converters = super(DatabaseOperations, self).get_db_converters(
             expression)
         internal_type = expression.output_field.get_internal_type()
@@ -304,19 +225,16 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def convert_booleanfield_value(self, value,
                                    expression, connection, context):
-        # New in Django 1.8
         if value in (0, 1):
             value = bool(value)
         return value
 
     def convert_uuidfield_value(self, value, expression, connection, context):
-        # New in Django 1.8
         if value is not None:
             value = uuid.UUID(value)
         return value
 
     def convert_textfield_value(self, value, expression, connection, context):
-        # New in Django 1.8
         if value is not None:
             value = force_text(value)
         return value

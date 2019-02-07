@@ -1,12 +1,7 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
-# New file added for Django 1.8
-
 import django
-if django.VERSION >= (1, 8):
-    from django.db.backends.base.features import BaseDatabaseFeatures
-else:
-    from django.db.backends import BaseDatabaseFeatures
+from django.db.backends.base.features import BaseDatabaseFeatures
 from django.utils.functional import cached_property
 from django.utils import six
 
@@ -44,11 +39,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     uses_savepoints = True
     atomic_transactions = False
     supports_column_check_constraints = False
-
-    if django.VERSION < (1, 8):
-        supports_long_model_names = False
-        supports_binary_field = six.PY2
-        can_introspect_boolean_field = False
 
     def __init__(self, connection):
         super(DatabaseFeatures, self).__init__(connection)
@@ -114,7 +104,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         the current time zone name will be an abbreviation. As a consequence,
         MySQL cannot perform time zone conversions reliably.
         """
-        # Django 1.6
         if not HAVE_PYTZ:
             return False
 
@@ -123,5 +112,4 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             return cursor.fetchall() != []
 
     def introspected_boolean_field_type(self, *args, **kwargs):
-        # New in Django 1.8
         return 'IntegerField'

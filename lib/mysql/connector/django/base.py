@@ -46,21 +46,14 @@ except ImportError:
 else:
     HAVE_CEXT = True
 
-if version < (1, 1):
+if version < (1, 11):
     raise ImproperlyConfigured(
-        "MySQL Connector/Python v1.1.0 or newer "
+        "MySQL Connector/Python v1.11.0 or newer "
         "is required; you have %s" % mysql.connector.__version__)
 
 from django.db import utils
-if django.VERSION < (1, 7):
-    from django.db.backends import util
-else:
-    from django.db.backends import utils as backend_utils
-if django.VERSION >= (1, 8):
-    from django.db.backends.base.base import BaseDatabaseWrapper
-else:
-    from django.db.backends import BaseDatabaseWrapper
-
+from django.db.backends import utils as backend_utils
+from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.signals import connection_created
 from django.utils import (six, timezone, dateparse)
 from django.conf import settings
@@ -71,8 +64,7 @@ from mysql.connector.django.introspection import DatabaseIntrospection
 from mysql.connector.django.validation import DatabaseValidation
 from mysql.connector.django.features import DatabaseFeatures
 from mysql.connector.django.operations import DatabaseOperations
-if django.VERSION >= (1, 7):
-    from mysql.connector.django.schema import DatabaseSchemaEditor
+from mysql.connector.django.schema import DatabaseSchemaEditor
 
 
 DatabaseError = mysql.connector.DatabaseError
@@ -255,7 +247,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     # be interpolated against the values of Field.__dict__ before being output.
     # If a column type is set to None, it won't be included in the output.
 
-    # Moved from DatabaseCreation class in Django v1.8
     _data_types = {
         'AutoField': 'integer AUTO_INCREMENT',
         'BinaryField': 'longblob',
@@ -331,13 +322,12 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     SchemaEditorClass = DatabaseSchemaEditor
     Database = mysql.connector
 
-    if django.VERSION >= (1, 11):
-        client_class = DatabaseClient
-        creation_class = DatabaseCreation
-        features_class = DatabaseFeatures
-        introspection_class = DatabaseIntrospection
-        ops_class = DatabaseOperations
-        validation_class = DatabaseValidation
+    client_class = DatabaseClient
+    creation_class = DatabaseCreation
+    features_class = DatabaseFeatures
+    introspection_class = DatabaseIntrospection
+    ops_class = DatabaseOperations
+    validation_class = DatabaseValidation
 
     def __init__(self, *args, **kwargs):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
@@ -351,13 +341,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             self.converter = DjangoCMySQLConverter()
         else:
             self.converter = DjangoMySQLConverter()
-        if django.VERSION < (1, 11):
-            self.ops = DatabaseOperations(self)
-            self.features = DatabaseFeatures(self)
-            self.client = DatabaseClient(self)
-            self.creation = DatabaseCreation(self)
-            self.introspection = DatabaseIntrospection(self)
-            self.validation = DatabaseValidation(self)
 
     def _valid_connection(self):
         if self.connection:
@@ -365,7 +348,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return False
 
     def get_connection_params(self):
-        # Django 1.6
         kwargs = {
             'charset': 'utf8',
             'use_unicode': True,
@@ -404,7 +386,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return kwargs
 
     def get_new_connection(self, conn_params):
-        # Django 1.6
         if not self.use_pure:
             conn_params['converter_class'] = DjangoCMySQLConverter
         else:
@@ -414,20 +395,17 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return cnx
 
     def init_connection_state(self):
-        # Django 1.6
         if self.mysql_version < (5, 5, 3):
             # See sysvar_sql_auto_is_null in MySQL Reference manual
             self.connection.cmd_query("SET SQL_AUTO_IS_NULL = 0")
 
         if 'AUTOCOMMIT' in self.settings_dict:
             try:
-                # Django 1.6
                 self.set_autocommit(self.settings_dict['AUTOCOMMIT'])
             except AttributeError:
                 self._set_autocommit(self.settings_dict['AUTOCOMMIT'])
 
     def create_cursor(self, name=None):
-        # Django 1.6
         cursor = self.connection.cursor()
         return CursorWrapper(cursor)
 
@@ -443,7 +421,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         Returns a CursorWrapper
         """
         try:
-            # Django 1.6
             return super(DatabaseWrapper, self)._cursor()
         except AttributeError:
             if not self.connection:
@@ -456,7 +433,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         Returns a tuple
         """
         try:
-            # Django 1.6
             self.ensure_connection()
         except AttributeError:
             if not self.connection:
@@ -483,13 +459,11 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         """
         # Override needs_rollback in case constraint_checks_disabled is
         # nested inside transaction.atomic.
-        if django.VERSION >= (1, 6):
-            self.needs_rollback, needs_rollback = False, self.needs_rollback
+        self.needs_rollback, needs_rollback = False, self.needs_rollback
         try:
             self.cursor().execute('SET @@session.foreign_key_checks = 1')
         finally:
-            if django.VERSION >= (1, 6):
-                self.needs_rollback = needs_rollback
+            self.needs_rollback = needs_rollback
 
     def check_constraints(self, table_names=None):
         """Check rows in tables for invalid foreign key references
@@ -548,17 +522,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             pass
 
     def _set_autocommit(self, autocommit):
-        # Django 1.6
         with self.wrap_database_errors:
             self.connection.autocommit = autocommit
 
     def schema_editor(self, *args, **kwargs):
         """Returns a new instance of this backend's SchemaEditor"""
-        # Django 1.7
         return DatabaseSchemaEditor(self, *args, **kwargs)
 
     def is_usable(self):
-        # Django 1.6
         return self.connection.is_connected()
 
     @cached_property

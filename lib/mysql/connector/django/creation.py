@@ -3,14 +3,8 @@
 import django
 from django.db import models
 
-if django.VERSION >= (1, 8):
-    from django.db.backends.base.creation import BaseDatabaseCreation
-else:
-    from django.db.backends.creation import BaseDatabaseCreation
-if django.VERSION < (1, 7):
-    from django.db.backends.util import truncate_name
-else:
-    from django.db.backends.utils import truncate_name
+from django.db.backends.base.creation import BaseDatabaseCreation
+from django.db.backends.utils import truncate_name
 
 class DatabaseCreation(BaseDatabaseCreation):
     """Maps Django Field object with MySQL data types
@@ -18,70 +12,20 @@ class DatabaseCreation(BaseDatabaseCreation):
     def __init__(self, connection):
         super(DatabaseCreation, self).__init__(connection)
 
-        if django.VERSION < (1, 8):
-            self.data_types = {
-                'AutoField': 'integer AUTO_INCREMENT',
-                'BinaryField': 'longblob',
-                'BooleanField': 'bool',
-                'CharField': 'varchar(%(max_length)s)',
-                'CommaSeparatedIntegerField': 'varchar(%(max_length)s)',
-                'DateField': 'date',
-                'DateTimeField': 'datetime',  # ms support set later
-                'DecimalField': 'numeric(%(max_digits)s, %(decimal_places)s)',
-                'FileField': 'varchar(%(max_length)s)',
-                'FilePathField': 'varchar(%(max_length)s)',
-                'FloatField': 'double precision',
-                'IntegerField': 'integer',
-                'BigIntegerField': 'bigint',
-                'IPAddressField': 'char(15)',
-
-                'GenericIPAddressField': 'char(39)',
-                'NullBooleanField': 'bool',
-                'OneToOneField': 'integer',
-                'PositiveIntegerField': 'integer UNSIGNED',
-                'PositiveSmallIntegerField': 'smallint UNSIGNED',
-                'SlugField': 'varchar(%(max_length)s)',
-                'SmallIntegerField': 'smallint',
-                'TextField': 'longtext',
-                'TimeField': 'time',  # ms support set later
-            }
-
-            # Support for microseconds
-            if self.connection.mysql_version >= (5, 6, 4):
-                self.data_types.update({
-                    'DateTimeField': 'datetime(6)',
-                    'TimeField': 'time(6)',
-                })
-
     def sql_table_creation_suffix(self):
         suffix = []
-        if django.VERSION < (1, 7):
-            if self.connection.settings_dict['TEST_CHARSET']:
-                suffix.append('CHARACTER SET {0}'.format(
-                    self.connection.settings_dict['TEST_CHARSET']))
-            if self.connection.settings_dict['TEST_COLLATION']:
-                suffix.append('COLLATE {0}'.format(
-                    self.connection.settings_dict['TEST_COLLATION']))
-
-        else:
-            test_settings = self.connection.settings_dict['TEST']
-            if test_settings['CHARSET']:
-                suffix.append('CHARACTER SET %s' % test_settings['CHARSET'])
-            if test_settings['COLLATION']:
-                suffix.append('COLLATE %s' % test_settings['COLLATION'])
+        test_settings = self.connection.settings_dict['TEST']
+        if test_settings['CHARSET']:
+            suffix.append('CHARACTER SET %s' % test_settings['CHARSET'])
+        if test_settings['COLLATION']:
+            suffix.append('COLLATE %s' % test_settings['COLLATION'])
 
         return ' '.join(suffix)
 
-    if django.VERSION < (1, 6):
-        def sql_for_inline_foreign_key_references(self, field, known_models,
-                                                  style):
-            "All inline references are pending under MySQL"
-            return [], True
-    else:
-        def sql_for_inline_foreign_key_references(self, model, field,
-                                                  known_models, style):
-            "All inline references are pending under MySQL"
-            return [], True
+    def sql_for_inline_foreign_key_references(self, model, field,
+                                              known_models, style):
+        "All inline references are pending under MySQL"
+        return [], True
 
     def sql_for_inline_many_to_many_references(self, model, field, style):
         opts = model._meta
@@ -112,7 +56,6 @@ class DatabaseCreation(BaseDatabaseCreation):
         return table_output, deferred
 
     def sql_destroy_indexes_for_fields(self, model, fields, style):
-        # Django 1.6
         if len(fields) == 1 and fields[0].db_tablespace:
             tablespace_sql = self.connection.ops.tablespace_sql(
                 fields[0].db_tablespace)
