@@ -5351,6 +5351,8 @@ class BugOra27802700(tests.MySQLConnectorTests):
                     "  time TIME,"
                     "  date DATE,"
                     "  datetime DATETIME,"
+                    "  var_char VARCHAR(50),"
+                    "  long_blob LONGBLOB,"
                     "  str TEXT) CHARACTER SET utf8"
                     "  COLLATE utf8_general_ci".format(self.table_name))
 
@@ -5386,8 +5388,8 @@ class BugOra27802700(tests.MySQLConnectorTests):
             self.assertTrue(isinstance(returned_val[0], expected_type),
                             u"value {} is not python type {},"
                             u"instead found a type {}"
-                            u"".format(returned_val, expected_type,
-                                       type(returned_val)))
+                            u"".format(returned_val[0], expected_type,
+                                       type(returned_val[0])))
 
         cur.close()
         cnx.close()
@@ -5411,7 +5413,31 @@ class BugOra27802700(tests.MySQLConnectorTests):
         column = "str"
         stm = self.insert_stmt.format(self.table_name, column)
         test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
-                       '"12345"']
+                       '\'"12345"\'']
+        expected_values = [' ', 'some text', u'データベース', '"12345"']
+        expected_type = STRING_TYPES
+
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)
+
+    @foreach_cnx()
+    def test_retrieve_stored_blob(self):
+        column = "long_blob"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
+                       "\"'12345'\""]
+        expected_values = [' ', 'some text', u'データベース', "'12345'"]
+        expected_type = STRING_TYPES
+
+        self.run_test_retrieve_stored_type(stm, test_values, expected_values,
+                                           column, expected_type)
+
+    @foreach_cnx()
+    def test_retrieve_stored_varchar(self):
+        column = "var_char"
+        stm = self.insert_stmt.format(self.table_name, column)
+        test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
+                       "'12345'"]
         expected_values = [' ', 'some text', u'データベース', "12345"]
         expected_type = STRING_TYPES
 
@@ -5573,3 +5599,58 @@ class BugOra27794178(tests.MySQLConnectorTests):
         # Force using C Extension should fail if not available
         config["use_pure"] = False
         self.assertRaises(ImportError, mysql.connector.connect, **config)
+
+
+class Bug27897881(tests.MySQLConnectorTests):
+    """BUG#27897881: Fix typo in BLOB data conversion
+    """
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**self.config)
+        cursor = cnx.cursor()
+
+        self.tbl = 'Bug27897881'
+        cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+        create = ('CREATE TABLE {0}(col1 INT NOT NULL, col2 LONGBLOB, '
+                  'PRIMARY KEY(col1))'.format(self.tbl))
+
+        cursor.execute(create)
+        cursor.close()
+        cnx.close()
+
+    def tearDown(self):
+        cnx = connection.MySQLConnection(**self.config)
+        cursor = cnx.cursor()
+        cursor.execute("DROP TABLE IF EXISTS {}".format(self.tbl))
+        cursor.close()
+        cnx.close()
+
+    @foreach_cnx()
+    def test_retrieve_from_LONGBLOB(self):
+        cnx_config = self.config.copy()
+        cnx_config['charset'] = "utf8"
+        cnx_config['use_unicode'] = True
+        cnx = connection.MySQLConnection(**cnx_config)
+        cur = cnx.cursor()
+
+        # Empty blob produces index error.
+        # "12345" handle as datetime in JSON produced index error.
+        # LONGBLOB can store big data
+        test_values = ["", "12345", '"54321"', "A"*(2**20)]
+        expected_values = ["", 12345, '"54321"', "A"*(2**20)]
+        stm = "INSERT INTO {} (col1, col2) VALUES ('{}', '{}')"
+
+        for num, test_value in zip(range(len(test_values)), test_values):
+            cur.execute(stm.format(self.tbl, num, test_value))
+
+        stm = "SELECT * FROM {} WHERE col1 like '{}'"
+
+        for num, expected_value in zip(range(len(test_values)), expected_values):
+            cur.execute(stm.format(self.tbl, num))
+            row = cur.fetchall()[0]
+            self.assertEqual(row[1], expected_value, "value {} is not "
+                             "the expected {}".format(row[1], expected_value))
+
+        cur.close()
+        cnx.close()

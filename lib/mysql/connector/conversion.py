@@ -37,6 +37,8 @@ from .constants import FieldType, FieldFlag, CharacterSet
 from .catch23 import PY2, NUMERIC_TYPES, struct_unpack
 from .custom_types import HexLiteral
 
+CONVERT_ERROR = "Could not convert '{value}' to python {pytype}"
+
 
 class MySQLConverterBase(object):
     """Base class for conversion classes
@@ -462,46 +464,63 @@ class MySQLConverter(MySQLConverterBase):
         return struct_unpack('>Q', int_val)[0]
 
     def _DATE_to_python(self, value, dsc=None):  # pylint: disable=C0103
-        """
+        """Converts TIME column MySQL to a python datetime.datetime type.
+
+        Raises ValueError if the value can not be converted.
+
         Returns DATE column type as datetime.date type.
         """
         if isinstance(value, datetime.date):
             return value
         try:
             parts = value.split(b'-')
-            return datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
-        except ValueError:
-            return None
+            if len(parts) != 3:
+                raise ValueError("invalid datetime format: {} len: {}"
+                                 "".format(parts, len(parts)))
+            try:
+                return datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+            except ValueError:
+                return None
+        except (IndexError, ValueError):
+            raise ValueError(
+                "Could not convert {0} to python datetime.timedelta".format(
+                    value))
 
     _NEWDATE_to_python = _DATE_to_python
 
     def _TIME_to_python(self, value, dsc=None):  # pylint: disable=C0103
+        """Converts TIME column value to python datetime.time value type.
+
+        Converts the TIME column MySQL type passed as bytes to a python
+        datetime.datetime type.
+
+        Raises ValueError if the value can not be converted.
+
+        Returns datetime.time type.
         """
-        Returns TIME column type as datetime.time type.
-        """
-        time_val = None
         try:
             (hms, mcs) = value.split(b'.')
             mcs = int(mcs.ljust(6, b'0'))
-        except ValueError:
+        except (TypeError, ValueError):
             hms = value
             mcs = 0
         try:
             (hours, mins, secs) = [int(d) for d in hms.split(b':')]
             if value[0] == 45 or value[0] == '-':  # if PY3 or PY2
                 mins, secs, mcs = -mins, -secs, -mcs
-            time_val = datetime.timedelta(hours=hours, minutes=mins,
-                                          seconds=secs, microseconds=mcs)
-        except ValueError:
-            raise ValueError(
-                "Could not convert {0} to python datetime.timedelta".format(
-                    value))
-        else:
-            return time_val
+            return datetime.timedelta(hours=hours, minutes=mins,
+                                      seconds=secs, microseconds=mcs)
+        except (IndexError, TypeError, ValueError):
+            raise ValueError(CONVERT_ERROR.format(value=value,
+                                                  pytype="datetime.timedelta"))
 
     def _DATETIME_to_python(self, value, dsc=None):  # pylint: disable=C0103
-        """
-        Returns DATETIME column type as datetime.datetime type.
+        """"Converts DATETIME column value to python datetime.time value type.
+
+        Converts the DATETIME column MySQL type passed as bytes to a python
+        datetime.datetime type.
+
+        Returns: datetime.datetime type.
         """
         if isinstance(value, datetime.datetime):
             return value
@@ -516,9 +535,21 @@ class MySQLConverter(MySQLConverterBase):
                 mcs = 0
             dtval = [int(i) for i in date_.split(b'-')] + \
                     [int(i) for i in hms.split(b':')] + [mcs, ]
-            datetime_val = datetime.datetime(*dtval)
-        except ValueError:
-            datetime_val = None
+            if len(dtval) < 6:
+                raise ValueError("invalid datetime format: {} len: {}"
+                                 "".format(dtval, len(dtval)))
+            else:
+                # Note that by default MySQL accepts invalid timestamps
+                # (this is also backward compatibility).
+                # Traditionaly C/py returns None for this well formed but
+                # invalid datetime for python like '0000-00-00 HH:MM:SS'.
+                try:
+                    datetime_val = datetime.datetime(*dtval)
+                except ValueError:
+                    return None
+        except (IndexError, TypeError):
+            raise ValueError(CONVERT_ERROR.format(value=value,
+                                                  pytype="datetime.timedelta"))
 
         return datetime_val
 
@@ -574,13 +605,18 @@ class MySQLConverter(MySQLConverterBase):
         if value[0] == 34 and value[-1] == 34:
             value_nq = value[1:-1]
 
-            value_datetime = self._DATETIME_to_python(value_nq)
-            if value_datetime is not None:
-                return value_datetime
-
-            value_date = self._DATE_to_python(value_nq)
-            if value_date is not None:
-                return value_date
+            try:
+                value_datetime = self._DATETIME_to_python(value_nq)
+                if value_datetime is not None:
+                    return value_datetime
+            except ValueError:
+                pass
+            try:
+                value_date = self._DATE_to_python(value_nq)
+                if value_date is not None:
+                    return value_date
+            except ValueError:
+                pass
             try:
                 value_time = self._TIME_to_python(value_nq)
                 if value_time is not None:
@@ -637,16 +673,13 @@ class MySQLConverter(MySQLConverterBase):
 
     def _BLOB_to_python(self, value, dsc=None):  # pylint: disable=C0103
         """Convert BLOB data type to Python"""
-        if dsc is not None:
-            if dsc[7] & FieldFlag.BINARY:
-                if PY2:
-                    return value
-                elif isinstance(value, str):
-                    return bytes(value, self.charset)
-                return bytes(value)
+        if not value:
+            # This is an empty BLOB
+            return ""
+        # JSON Values are stored in LONG BLOB, but the blob values recived
+        # from the server are not dilutable, check for JSON values.
+        return self._JSON_to_python(value, dsc)
 
-        return self._STRING_to_python(value, dsc)
-
-    _LONG_BLOB_to_python = _JSON_to_python
+    _LONG_BLOB_to_python = _BLOB_to_python
     _MEDIUM_BLOB_to_python = _BLOB_to_python
     _TINY_BLOB_to_python = _BLOB_to_python

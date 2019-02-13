@@ -412,10 +412,9 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
 
         self.assertEqual(exp, res)
 
-        res = self.cnv._DATE_to_python(b'0000-00-00')
-        self.assertEqual(None, res)
-        res = self.cnv._DATE_to_python(b'1000-00-00')
-        self.assertEqual(None, res)
+        self.assertEqual(None, self.cnv._DATE_to_python(b'0000-00-00'))
+
+        self.assertEqual(None, self.cnv._DATE_to_python(b'1000-00-00'))
 
     def test__TIME_to_python(self):
         """Convert a MySQL TIME to a Python datetime.time type"""
