@@ -845,8 +845,42 @@ class Protocol(object):
         self._writer.write_message(mysqlxpb_enum(
             "Mysqlx.ClientMessages.Type.SESS_CLOSE"), msg)
 
-    def send_reset(self):
-        """Send reset."""
+    def send_expect_open(self):
+        """Send expectation."""
+        cond_key = mysqlxpb_enum(
+            "Mysqlx.Expect.Open.Condition.Key.EXPECT_FIELD_EXIST")
+        msg_oc = Message("Mysqlx.Expect.Open.Condition")
+        msg_oc["condition_key"] = cond_key
+        msg_oc["condition_value"] = "6.1"
+
+        msg_eo = Message("Mysqlx.Expect.Open")
+        msg_eo['cond'] = [msg_oc.get_message()]
+
+        self._writer.write_message(mysqlxpb_enum(
+            "Mysqlx.ClientMessages.Type.EXPECT_OPEN"), msg_eo)
+
+    def send_reset(self, keep_open=None):
+        """Send reset session message.
+
+        Returns:
+            boolean: ``True`` if the server will keep the session open,
+                     otherwise ``False``.
+        """
         msg = Message("Mysqlx.Session.Reset")
+        if keep_open is None:
+            try:
+                # Send expectation: keep connection open
+                self.send_expect_open()
+                self.read_ok()
+                keep_open = True
+            except InterfaceError:
+                # Expectation is unkown by this version of the server
+                keep_open = False
+        if keep_open:
+            msg["keep_open"] = True
         self._writer.write_message(mysqlxpb_enum(
             "Mysqlx.ClientMessages.Type.SESS_RESET"), msg)
+        self.read_ok()
+        if keep_open:
+            return True
+        return False

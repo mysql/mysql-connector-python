@@ -130,6 +130,9 @@ try:
     for key, val in mysqlx_expect_pb2.Open.Condition.ConditionOperation.items():
         _MESSAGES["Mysqlx.Expect.Open.Condition.ConditionOperation.{0}"
                   "".format(key)] = val
+    for key, val in mysqlx_expect_pb2.Open.Condition.Key.items():
+        _MESSAGES["Mysqlx.Expect.Open.Condition.Key.{0}"
+                  "".format(key)] = val
     for key, val in mysqlx_expect_pb2.Open.CtxOperation.items():
         _MESSAGES["Mysqlx.Expect.Open.CtxOperation.{0}".format(key)] = val
 

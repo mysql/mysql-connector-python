@@ -315,6 +315,7 @@ class Connection(object):
         self.stream = SocketStream()
         self.reader_writer = None
         self.protocol = None
+        self.keep_open = None
         self._user = settings.get("user")
         self._password = settings.get("password")
         self._schema = settings.get("schema")
@@ -870,7 +871,7 @@ class Connection(object):
         if self._active_result is not None:
             self._active_result.fetch_all()
         try:
-            self.protocol.send_reset()
+            self.keep_open = self.protocol.send_reset(self.keep_open)
         except (InterfaceError, OperationalError) as err:
             _LOGGER.warning("Warning: An error occurred while attempting to "
                             "reset the session: {}".format(err))
@@ -1032,6 +1033,14 @@ class ConnectionPool(queue.Queue):
         """
         return len(self._connections_openned)
 
+    def remove_connection(self, cnx=None):
+        """Removes a connection to this pool.
+
+        Args:
+            cnx (PooledConnection): The connection object.
+        """
+        self._connections_openned.remove(cnx)
+
     def add_connection(self, cnx=None):
         """Adds a connection to this pool.
 
@@ -1059,9 +1068,10 @@ class ConnectionPool(queue.Queue):
             # mysqlx_wait_timeout is only available on MySQL 8
             ver = cnx.sql('show variables like "version"'
                          ).execute().fetch_all()[0][1]
-            if tuple([int(n) for n in ver.split("-")[0].split(".")]) > (8, 10):
-                cnx.sql("set mysqlx_wait_timeout = {}".format(1)
-                       ).execute()
+            if tuple([int(n) for n in ver.split("-")[0].split(".")]) > \
+                (8, 0, 10):
+                cnx.sql("set mysqlx_wait_timeout = {}"
+                        "".format(self.max_idle_time)).execute()
             self._connections_openned.append(cnx)
         else:
             if not isinstance(cnx, PooledConnection):
@@ -1253,14 +1263,31 @@ class PoolsManager(object):
                         except queue.Empty:
                             raise PoolError(
                                 "Failed getting connection; pool exhausted")
-                        cnx.reset()
+                        try:
+                            # Only reset the connection by reauthentification if
+                            # the connection was unnable to keep open by the server
+                            if not cnx.keep_open:
+                                cnx.reset()
+                            ver = cnx.sql('show variables like "version"'
+                                         ).execute().fetch_all()[0][1]
+                        except (RuntimeError, socket.error, InterfaceError):
+                            try:
+                                cnx.close_connection()
+                            except (RuntimeError, socket.error, InterfaceError):
+                                pass
+                            finally:
+                                pool.remove_connection(cnx)
+                            # Connection was closed by the server, create new
+                            cnx = PooledConnection(pool)
+                            pool.track_connection(cnx)
+                            cnx.connect()
+                            ver = cnx.sql('show variables like "version"'
+                                         ).execute().fetch_all()[0][1]
                         # mysqlx_wait_timeout is only available on MySQL 8
-                        ver = cnx.sql('show variables like "version"'
-                                     ).execute().fetch_all()[0][1]
                         if tuple([int(n) for n in
-                                  ver.split("-")[0].split(".")]) > (8, 10):
-                            cnx.sql("set mysqlx_wait_timeout = {}".format(1)
-                                   ).execute()
+                                  ver.split("-")[0].split(".")]) > (8, 0, 10):
+                            cnx.sql("set mysqlx_wait_timeout = {}"
+                                    "".format(pool.max_idle_time)).execute()
                         return cnx
                 elif pool.open_connections < pool.pool_max_size:
                     # No connections in pool, but we can open a new one
@@ -1271,9 +1298,9 @@ class PoolsManager(object):
                     ver = cnx.sql('show variables like "version"'
                                  ).execute().fetch_all()[0][1]
                     if tuple([int(n) for n in
-                              ver.split("-")[0].split(".")]) > (8, 10):
-                        cnx.sql("set mysqlx_wait_timeout = {}".format(1)
-                               ).execute()
+                              ver.split("-")[0].split(".")]) > (8, 0, 10):
+                        cnx.sql("set mysqlx_wait_timeout = {}"
+                                "".format(pool.max_idle_time)).execute()
                     return cnx
                 else:
                     # Pool is exaust so the client needs to wait
@@ -1286,8 +1313,10 @@ class PoolsManager(object):
                             ver = cnx.sql('show variables like "version"'
                                          ).execute().fetch_all()[0][1]
                             if tuple([int(n) for n in
-                                      ver.split("-")[0].split(".")]) > (8, 10):
-                                cnx.sql("set mysqlx_wait_timeout = {}".format(1)
+                                      ver.split("-")[0].split(".")]) > \
+                                      (8, 0, 10):
+                                cnx.sql("set mysqlx_wait_timeout = {}"
+                                        "".format(pool.max_idle_time)
                                        ).execute()
                             return cnx
                         except queue.Empty:

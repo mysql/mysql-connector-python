@@ -220,7 +220,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         old_session = mysqlx.get_session(self.connect_kwargs.copy())
         # Setup a client to get sessions from
         settings = self.connect_kwargs.copy()
-        pooling_dict = {"enabled": True, "max_idle_time":3}
+        pooling_dict = {"enabled": True, "max_idle_time":3000}
         cnx_options = {"pooling": pooling_dict}
         settings["user"] = self.users[0][0]
         settings["password"] = self.users[0][1]
@@ -249,10 +249,13 @@ class MySQLxClientTests(tests.MySQLxTests):
                         (total_connections - 2))
 
         connections = get_current_connections(old_session)
-        # At far the send reset message requires the user to re-authentificate
-        # the connection user stays in unauthenticated user
         open_connections = connections.get("unauthenticated user", [])
-        self.assertEqual(len(open_connections), 2)
+        if tests.MYSQL_VERSION < (8, 0, 16):
+            # Send reset message requires the user to re-authentificate
+            # the connection user stays in unauthenticated user
+            self.assertEqual(len(open_connections), 2)
+        else:
+            self.assertEqual(len(open_connections), 0)
 
         # Connections must be closed when client.close() is invoked
         # check len(pool) == total_connections
@@ -271,7 +274,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         settings = self.connect_kwargs.copy()
         pooling_dict = {
             "enabled": True,
-            "max_idle_time": 2,
+            "max_idle_time": 10000,
             "queue_timeout": 2000,
             "max_size": pool_limit,  # initial pool limit
         }
@@ -332,6 +335,91 @@ class MySQLxClientTests(tests.MySQLxTests):
         # Verify that clossing the client again does not raise eceptions
         client.close()
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "not reset compatible")
+    def test_reset_keeps_same_id(self):
+        """Test pooled Session keeps the same session id."""
+        settings = self.connect_kwargs.copy()
+        pooling_dict = {"enabled": True, "max_size":1}
+        cnx_options = {"pooling": pooling_dict}
+        client = mysqlx.get_client(settings, cnx_options)
+
+        session1 = client.get_session()
+        conn_id1 = session1.sql("select connection_id()"
+                               ).execute().fetch_all()[0][0]
+        session1.close()
+        # Verify that new session is has the same id from previews one
+        session2 = client.get_session()
+        conn_id2 = session2.sql("select connection_id()"
+                               ).execute().fetch_all()[0][0]
+        self.assertEqual(conn_id1, conn_id2,
+                         "The connection id was not the same")
+        session2.close()
+        client.close()
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "not reset compatible")
+    def test_reset_get_new_connection(self):
+        """Test connection is closed by max idle time."""
+        # Verify max_idle_time closses an idle session and so for the
+        # connection id must increase due to the pool which has created a
+        # new connection to the server to return a new session.
+        settings = self.connect_kwargs.copy()
+        pooling_dict = {"enabled": True, "max_idle_time": 2000, "max_size":3,
+                        "queue_timeout": 1000,}
+        cnx_options = {"pooling": pooling_dict}
+        client = mysqlx.get_client(settings, cnx_options)
+
+        # Getting session 0
+        session0 = client.get_session()
+        conn_id0 = session0.sql("select connection_id()"
+                               ).execute().fetch_all()[0][0]
+        # Closing session 0
+        session0.close()
+
+        # Getting session 1
+        session1 = client.get_session()
+        conn_id1 = session1.sql("select connection_id()"
+                               ).execute().fetch_all()[0][0]
+        # Closing session 1
+        self.assertEqual(conn_id1, conn_id0,
+                         "The connection id was not greater")
+
+        session1.close()
+        # Verify that new session does not has the same id from previews one
+        # goint to sleep 2 sec just above the max idle time
+        sleep(2)
+        # Getting session 2
+        session2 = client.get_session()
+        conn_id2 = session2.sql("select connection_id()"
+                               ).execute().fetch_all()[0][0]
+        self.assertNotEqual(conn_id0, conn_id2,
+                            "The connection id was the same from the old")
+        self.assertNotEqual(conn_id1, conn_id2,
+                            "The connection id was the same from the old")
+
+        # Verify pool integrity
+        # Open the 4th connection in client life time, when max size is 3
+        # Getting the max allowed connections
+        # Getting session 3
+        session3 = client.get_session()
+        conn_id3 = session3.sql("select connection_id()"
+                               ).execute().fetch_all()[0][0]
+        self.assertGreater(conn_id3, conn_id2,
+                           "The connection id was not greater")
+
+        # Getting session 4
+        session4 = client.get_session()
+        # Verify exception is raised if the pool is exausted
+        with self.assertRaises(mysqlx.errors.PoolError):
+            client.get_session()
+
+        # closing all connections
+        session2.close()
+        session3.close()
+        session4.close()
+        # No errors should raise by closing it again
+        session4.close()
+        # No errors should raise from closing client.
+        client.close()
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxClientPoolingTests(tests.MySQLxTests):
@@ -385,7 +473,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
 
     def test_pools_are_not_shared(self):
         settings = tests.get_mysqlx_config()
-        pooling_dict = {"max_size": 1, "max_idle_time": 0,}
+        pooling_dict = {"max_size": 1, "max_idle_time": 10000,}
         cnx_options = {"pooling": pooling_dict}
         uri = ("mysqlx://{user}:{pwd}@["
                " (address={host}:{port}, priority=50)]"
@@ -458,7 +546,7 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
     def test_pools_recycle(self):
         settings = tests.get_mysqlx_config()
         pooling_dict = {"max_size": 1, "max_idle_time": 3000,
-                        "queue_timeout": 10}
+                        "queue_timeout": 1000}
         cnx_options = {"pooling": pooling_dict}
         uri = ("mysqlx://{user}:{pwd}@["
                " (address={host}:{port}, priority=50)]?connect_timeout=20000"
@@ -489,10 +577,13 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
         worker2.join()
         # Verify the server connections
         connections = get_current_connections(self.session)
-        # At far the send reset message requires the user to re-authentificate
-        # the connection user stays in unauthenticated user
         open_connections = connections.get("unauthenticated user", [])
-        self.assertTrue(len(open_connections) >= 1)
+        if tests.MYSQL_VERSION < (8, 0, 16):
+            # Send reset message requires the user to re-authentificate
+            # the connection user stays in unauthenticated user
+            self.assertTrue(len(open_connections) >= 1)
+        else:
+            self.assertEqual(len(open_connections), 0)
 
         client.close()
 
@@ -652,7 +743,7 @@ class MySQLxPoolingSessionTests(tests.MySQLxTests):
 
     def test_get_default_schema(self):
         pooling_dict = {"max_size": 1, "max_idle_time": 3000,
-                        "queue_timeout": 10}
+                        "queue_timeout": 1000}
         # Test None value is returned if no schema name is specified
         settings = self.connect_kwargs.copy()
         settings.pop("schema")

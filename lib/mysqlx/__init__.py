@@ -30,6 +30,7 @@
 
 import re
 import json
+import logging
 
 from . import constants
 from .compat import (INT_TYPES, STRING_TYPES, JSONDecodeError, urlparse,
@@ -59,6 +60,9 @@ _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
                           "routers", "socket", "ssl-mode", "auth", "use-pure",
                           "connect-timeout", "connection-attributes"]
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
 
 def _parse_address_list(path):
     """Parses a list of host, port pairs

@@ -18,7 +18,7 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_session.proto',
   package='Mysqlx.Session',
-  serialized_pb=_b('\n\x14mysqlx_session.proto\x12\x0eMysqlx.Session\"S\n\x11\x41uthenticateStart\x12\x11\n\tmech_name\x18\x01 \x02(\t\x12\x11\n\tauth_data\x18\x02 \x01(\x0c\x12\x18\n\x10initial_response\x18\x03 \x01(\x0c\")\n\x14\x41uthenticateContinue\x12\x11\n\tauth_data\x18\x01 \x02(\x0c\"#\n\x0e\x41uthenticateOk\x12\x11\n\tauth_data\x18\x01 \x01(\x0c\"\x07\n\x05Reset\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
+  serialized_pb=_b('\n\x14mysqlx_session.proto\x12\x0eMysqlx.Session\"S\n\x11\x41uthenticateStart\x12\x11\n\tmech_name\x18\x01 \x02(\t\x12\x11\n\tauth_data\x18\x02 \x01(\x0c\x12\x18\n\x10initial_response\x18\x03 \x01(\x0c\")\n\x14\x41uthenticateContinue\x12\x11\n\tauth_data\x18\x01 \x02(\x0c\"#\n\x0e\x41uthenticateOk\x12\x11\n\tauth_data\x18\x01 \x01(\x0c\"!\n\x05Reset\x12\x18\n\tkeep_open\x18\x01 \x01(\x08:\x05\x66\x61lse\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -136,6 +136,13 @@ _RESET = _descriptor.Descriptor(
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
+    _descriptor.FieldDescriptor(
+      name='keep_open', full_name='Mysqlx.Session.Reset.keep_open', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=True, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -148,7 +155,7 @@ _RESET = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=205,
-  serialized_end=212,
+  serialized_end=238,
 )
 
 
@@ -170,8 +177,8 @@ _CLOSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=214,
-  serialized_end=221,
+  serialized_start=240,
+  serialized_end=247,
 )
 
 DESCRIPTOR.message_types_by_name['AuthenticateStart'] = _AUTHENTICATESTART
