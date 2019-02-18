@@ -33,8 +33,7 @@ Licensing Information
    a copy of which is reproduced below and can also be found along with
    its FAQ at http://oss.oracle.com/licenses/universal-foss-exception.
 
-   Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights
-   reserved.
+   Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
 
 Election of GPLv2
 

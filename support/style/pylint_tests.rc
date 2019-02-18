@@ -1,7 +1,7 @@
 [MASTER]
 #rcfile=
 #init-hook=
-ignore=.bzr, .bzr-mysql, __pycache__, data
+ignore=.git, __pycache__, data
 persistent=no
 load-plugins=
 
