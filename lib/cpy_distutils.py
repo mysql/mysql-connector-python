@@ -598,6 +598,8 @@ class BuildExtDynamic(build_ext):
                     ext.libraries.append("libprotobuf")
                 else:
                     ext.libraries.append("protobuf")
+                # Add -std=c++11 needed for Protobuf 3.6.1
+                ext.extra_compile_args.append("-std=c++11")
             # Add extra compile args
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
