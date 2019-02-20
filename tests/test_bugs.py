@@ -5626,3 +5626,30 @@ class Bug27897881(tests.MySQLConnectorTests):
 
         cur.close()
         cnx.close()
+
+
+class BugOra29324966(tests.MySQLConnectorTests):
+    """BUG#29324966: ADD MISSING USERNAME CONNECTION ARGUMENT FOR DRIVER
+    COMPATIBILITY.
+    """
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    @foreach_cnx()
+    def test_connection_args_compatibility(self):
+        config = self.config.copy()
+        config["username"] = config["user"]
+        config["passwd"] = config["password"]
+        config["db"] = config["database"]
+        config["connect_timeout"] = config["connection_timeout"]
+
+        config.pop("user")
+        config.pop("password")
+        config.pop("database")
+        config.pop("connection_timeout")
+
+        cnx = self.cnx.__class__(**config)
+        cnx.close()

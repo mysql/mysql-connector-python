@@ -276,6 +276,7 @@ class MySQLConnectionAbstract(object):
         compat_map = [
             # (<other driver argument>,<translates to>)
             ('db', 'database'),
+            ('username', 'user'),
             ('passwd', 'password'),
             ('connect_timeout', 'connection_timeout'),
         ]
