@@ -2284,6 +2284,7 @@ MySQL_fetch_fields(MySQL *self)
 
 	if (self->fields)
 	{
+        Py_INCREF(self->fields);
 	    return self->fields;
 	}
 
