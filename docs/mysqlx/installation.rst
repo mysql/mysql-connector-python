@@ -68,7 +68,7 @@ As of Connector/Python 2.2.3, source distributions include a C++ Extension, that
 To build Connector/Python C++ Extension for Protobuf, you must satisfy the following prerequisites:
 
 * A C/C++ compiler, such as ``gcc``
-* Protobuf C++ (version >= 2.6.0)
+* Protobuf C++ (version >= 3.6.1)
 * Python development files
 * MySQL Connector/C or MySQL Server installed, including development files to compile the optional C Extension that interfaces with the MySQL C client library
 
