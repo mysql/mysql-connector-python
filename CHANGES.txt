@@ -8,6 +8,21 @@ Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.16
+=======
+
+- WL#12864: Upgrade of Protobuf version to 3.6.1
+- WL#12863: Drop support for Django versions older than 1.11
+- WL#12488: Support for session-connect-attributes
+- WL#12297: Expose metadata about the source and binaries
+- WL#12225: Prepared statement support
+- BUG#29324966: Add missing username connection argument for driver compatibility
+- BUG#29278489: Fix wrong user and group for Solaris packages
+- BUG#29260128: Disable load data local infile by default
+- BUG#29001628: Fix access by column label in Table.select()
+- BUG#28479054: Fix Python interpreter crash due to memory corruption
+- BUG#27897881: Empty LONG BLOB throws an IndexError
+
 v8.0.15
 =======
 
