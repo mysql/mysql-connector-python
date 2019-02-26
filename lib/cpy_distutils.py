@@ -500,7 +500,7 @@ class BuildExtDynamic(build_ext):
                     libraries = ['libmysql']
                 else:
                     libraries = ['-lmysqlclient']
-                library_dirs = os.path.join(connc_loc, 'lib')
+                library_dirs = [os.path.join(connc_loc, 'lib')]
 
                 log.debug("# connc_64bit: {0}".format(connc_64bit))
                 if connc_64bit:
