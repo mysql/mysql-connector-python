@@ -608,7 +608,10 @@ class MySQLxClientConnectionAttributesTests(tests.MySQLConnectorTests):
             self.os_ver = "Windows-{}".format(platform.win32_ver()[1])
         else:
             self.platform_arch = platform.machine()
-            self.os_ver = "-".join(platform.linux_distribution()[0:2])
+            if platform.system() == "Darwin":
+                self.os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
+            else:
+                self.os_ver = "-".join(platform.linux_distribution()[0:2])
 
         license_chunks = LICENSE.split(" ")
         if license_chunks[0] == "GPLv2":

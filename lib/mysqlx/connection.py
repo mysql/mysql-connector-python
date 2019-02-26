@@ -1400,8 +1400,11 @@ class Session(object):
             os_ver = "Windows-{}".format(platform.win32_ver()[1])
         else:
             platform_arch = platform.machine()
-            # pylint: disable=W1505
-            os_ver = "-".join(platform.linux_distribution()[0:2])
+            if platform.system() == "Darwin":
+                os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
+            else:
+                os_ver = "-".join(
+                    platform.linux_distribution()[0:2]) # pylint: disable=W1505
 
         license_chunks = LICENSE.split(' ')
         if license_chunks[0] == "GPLv2":
