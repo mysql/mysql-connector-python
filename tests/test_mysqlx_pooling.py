@@ -235,7 +235,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             session = client.get_session()
             self.assertTrue(isinstance(session, mysqlx.connection.Session))
             sessions.append(session)
-
+        sleep(0.5)
         # Verify the number of connections open in the server
         connections = get_current_connections(old_session)
         self.assertEqual(len(connections[self.users[0][0]]), total_connections)
@@ -244,6 +244,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         # to the pool instead of being closed
         sessions[5].close()
         sessions[9].close()
+        sleep(0.5)
         connections = get_current_connections(old_session)
         self.assertTrue(len(connections[self.users[0][0]]) >=
                         (total_connections - 2))
