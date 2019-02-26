@@ -299,6 +299,7 @@ def mysql_c_api_info(mysql_config, debug=False):
     # Return a tuple for version instead of a string
     info["version"] = tuple([int(num) if num.isdigit() else num
                              for num in info["version"].split(".")])
+
     return info
 
 
@@ -534,7 +535,7 @@ class BuildExtDynamic(build_ext):
         # Set up the build_ext class
         self.include_dirs.extend(include_dirs)
         self.libraries.extend(libraries)
-        self.library_dirs.append(library_dirs)
+        self.library_dirs.extend(library_dirs)
 
         # We try to offer a nice message when the architecture of Python
         # is not the same as MySQL Connector/C binaries.
