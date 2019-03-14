@@ -32,7 +32,6 @@
 from datetime import datetime
 from distutils.command.build_ext import build_ext
 from distutils.command.install import install
-from distutils.command.install_data import install_data
 from distutils.command.install_lib import install_lib
 from distutils.errors import DistutilsExecError
 from distutils.util import get_platform
@@ -952,13 +951,6 @@ class BuildExtStatic(BuildExtDynamic):
             # Add extra link args
             if self.extra_link_args and ext.name != "_mysqlxpb":
                 ext.extra_link_args.extend(self.extra_link_args.split())
-
-
-class InstallData(install_data):
-    def run(self):
-        if platform.system() == "Darwin":
-            return
-        install_data.run(self)
 
 
 class InstallLib(install_lib):

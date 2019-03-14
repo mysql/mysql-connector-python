@@ -31,7 +31,7 @@ import os
 import sys
 
 from lib.cpy_distutils import (
-    Install, InstallData, InstallLib, BuildExtDynamic, BuildExtStatic
+    Install, InstallLib, BuildExtDynamic, BuildExtStatic
 )
 
 # Development Status Trove Classifiers significant for Connector/Python
@@ -57,7 +57,6 @@ BuildExtDynamic.min_connector_c_version = (5, 5, 8)
 command_classes = {
     'build_ext': BuildExtDynamic,
     'build_ext_static': BuildExtStatic,
-    'install_data': InstallData,
     'install_lib': InstallLib,
     'install': Install,
 }
