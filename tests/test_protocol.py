@@ -308,14 +308,14 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         """Parse an integer from a binary packet"""
         # Case = Expected value; pack format; field type; field flag
         cases = [
-            (-128, 'b', FieldType.TINY, 0),
-            (-32768, 'h', FieldType.SHORT, 0),
-            (-2147483648, 'i', FieldType.LONG, 0),
-            (-9999999999, 'q', FieldType.LONGLONG, 0),
-            (255, 'B', FieldType.TINY, FieldFlag.UNSIGNED),
-            (65535, 'H', FieldType.SHORT, FieldFlag.UNSIGNED),
-            (4294967295, 'I', FieldType.LONG, FieldFlag.UNSIGNED),
-            (9999999999, 'Q', FieldType.LONGLONG, FieldFlag.UNSIGNED),
+            (-128, '<b', FieldType.TINY, 0),
+            (-32768, '<h', FieldType.SHORT, 0),
+            (-2147483648, '<i', FieldType.LONG, 0),
+            (-9999999999, '<q', FieldType.LONGLONG, 0),
+            (255, '<B', FieldType.TINY, FieldFlag.UNSIGNED),
+            (65535, '<H', FieldType.SHORT, FieldFlag.UNSIGNED),
+            (4294967295, '<I', FieldType.LONG, FieldFlag.UNSIGNED),
+            (9999999999, '<Q', FieldType.LONGLONG, FieldFlag.UNSIGNED),
         ]
         field_info = [None] * 8
         field_info[0] = 'c1'
@@ -427,19 +427,19 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         """Prepare an integer for the MySQL binary protocol"""
         # Case = Data; expected value
         cases = [
-            (-128, (struct.pack('b', -128), FieldType.TINY, 0)),
-            (-32768, (struct.pack('h', -32768), FieldType.SHORT, 0)),
+            (-128, (struct.pack('<b', -128), FieldType.TINY, 0)),
+            (-32768, (struct.pack('<h', -32768), FieldType.SHORT, 0)),
             (-2147483648,
-             (struct.pack('i', -2147483648), FieldType.LONG, 0)),
+             (struct.pack('<i', -2147483648), FieldType.LONG, 0)),
             (-9999999999,
-             (struct.pack('q', -9999999999), FieldType.LONGLONG, 0)),
+             (struct.pack('<q', -9999999999), FieldType.LONGLONG, 0)),
 
-            (255, (struct.pack('B', 255), FieldType.TINY, 128)),
-            (65535, (struct.pack('H', 65535), FieldType.SHORT, 128)),
+            (255, (struct.pack('<B', 255), FieldType.TINY, 128)),
+            (65535, (struct.pack('<H', 65535), FieldType.SHORT, 128)),
             (4294967295,
-             (struct.pack('I', 4294967295), FieldType.LONG, 128)),
+             (struct.pack('<I', 4294967295), FieldType.LONG, 128)),
             (9999999999,
-             (struct.pack('Q', 9999999999), FieldType.LONGLONG, 128)),
+             (struct.pack('<Q', 9999999999), FieldType.LONGLONG, 128)),
         ]
         for data, exp in cases:
             res = self._protocol._prepare_binary_integer(data)
