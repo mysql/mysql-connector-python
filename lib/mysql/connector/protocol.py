@@ -359,16 +359,16 @@ class MySQLProtocol(object):
     def _parse_binary_integer(self, packet, field):
         """Parse an integer from a binary packet"""
         if field[1] == FieldType.TINY:
-            format_ = 'b'
+            format_ = '<b'
             length = 1
         elif field[1] == FieldType.SHORT:
-            format_ = 'h'
+            format_ = '<h'
             length = 2
         elif field[1] in (FieldType.INT24, FieldType.LONG):
-            format_ = 'i'
+            format_ = '<i'
             length = 4
         elif field[1] == FieldType.LONGLONG:
-            format_ = 'q'
+            format_ = '<q'
             length = 8
 
         if field[7] & FieldFlag.UNSIGNED:
@@ -380,10 +380,10 @@ class MySQLProtocol(object):
         """Parse a float/double from a binary packet"""
         if field[1] == FieldType.DOUBLE:
             length = 8
-            format_ = 'd'
+            format_ = '<d'
         else:
             length = 4
-            format_ = 'f'
+            format_ = '<f'
 
         return (packet[length:], struct_unpack(format_, packet[0:length])[0])
 
@@ -393,15 +393,15 @@ class MySQLProtocol(object):
         value = None
         if length == 4:
             value = datetime.date(
-                year=struct_unpack('H', packet[1:3])[0],
+                year=struct_unpack('<H', packet[1:3])[0],
                 month=packet[3],
                 day=packet[4])
         elif length >= 7:
             mcs = 0
             if length == 11:
-                mcs = struct_unpack('I', packet[8:length + 1])[0]
+                mcs = struct_unpack('<I', packet[8:length + 1])[0]
             value = datetime.datetime(
-                year=struct_unpack('H', packet[1:3])[0],
+                year=struct_unpack('<H', packet[1:3])[0],
                 month=packet[3],
                 day=packet[4],
                 hour=packet[5],
@@ -417,8 +417,8 @@ class MySQLProtocol(object):
         data = packet[1:length + 1]
         mcs = 0
         if length > 8:
-            mcs = struct_unpack('I', data[8:])[0]
-        days = struct_unpack('I', data[1:5])[0]
+            mcs = struct_unpack('<I', data[8:])[0]
+        days = struct_unpack('<I', data[1:5])[0]
         if data[0] == 1:
             days *= -1
         tmp = datetime.timedelta(days=days,
@@ -512,31 +512,31 @@ class MySQLProtocol(object):
         flags = 0
         if value < 0:
             if value >= -128:
-                format_ = 'b'
+                format_ = '<b'
                 field_type = FieldType.TINY
             elif value >= -32768:
-                format_ = 'h'
+                format_ = '<h'
                 field_type = FieldType.SHORT
             elif value >= -2147483648:
-                format_ = 'i'
+                format_ = '<i'
                 field_type = FieldType.LONG
             else:
-                format_ = 'q'
+                format_ = '<q'
                 field_type = FieldType.LONGLONG
         else:
             flags = 128
             if value <= 255:
-                format_ = 'B'
+                format_ = '<B'
                 field_type = FieldType.TINY
             elif value <= 65535:
-                format_ = 'H'
+                format_ = '<H'
                 field_type = FieldType.SHORT
             elif value <= 4294967295:
-                format_ = 'I'
+                format_ = '<I'
                 field_type = FieldType.LONG
             else:
                 field_type = FieldType.LONGLONG
-                format_ = 'Q'
+                format_ = '<Q'
         return (struct.pack(format_, value), field_type, flags)
 
     def _prepare_binary_timestamp(self, value):
@@ -688,7 +688,7 @@ class MySQLProtocol(object):
                             charset))) + str(value).encode(charset))
                     field_type = FieldType.DECIMAL
                 elif isinstance(value, float):
-                    values.append(struct.pack('d', value))
+                    values.append(struct.pack('<d', value))
                     field_type = FieldType.DOUBLE
                 elif isinstance(value, (datetime.datetime, datetime.date)):
                     (packed, field_type) = self._prepare_binary_timestamp(
