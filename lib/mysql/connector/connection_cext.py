@@ -514,6 +514,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def unread_result(self):
         """Check if there are unread results or rows"""
         return self.result_set_available
+    
+    @unread_result.setter
+    def unread_result(self, value):
+        if not isinstance(value, bool):
+            raise ValueError("Expected a boolean type")
+        self._unread_result = value
 
     @property
     def more_results(self):
