@@ -39,7 +39,10 @@ PY3 = sys.version_info[0] == 3
 # pylint: disable=E0401,E0602,E0611,W0611,
 if PY3:
     import queue
-    from json.decoder import JSONDecodeError
+    try:
+        from json.decoder import JSONDecodeError
+    except ImportError:
+        JSONDecodeError = ValueError
     from urllib.parse import urlparse, unquote, parse_qsl
 
     def hexlify(data):
