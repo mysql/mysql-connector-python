@@ -684,7 +684,20 @@ class MySQLxCollectionTests(tests.MySQLxTests):
           }
         }).execute()
 
-        tests = [
+        if tests.MYSQL_VERSION >= (8, 0, 17):
+            # To comply with the SQL standard, IN returns NULL not only if the
+            # expression on the left hand side is NULL, but also if no match
+            # is found in the list and one of the expressions in the list is NULL.
+            not_found_without_null = False
+            not_found_with_null = None
+            # Value false match result changed
+            value_false_match_everything = False
+        else:
+            not_found_without_null = None
+            not_found_with_null = True
+            value_false_match_everything = True
+
+        test_cases = [
             ("(1+5) in (1, 2, 3, 4, 5)", False),
             ("(1>5) in (true, false)", True),
             ("('a'>'b') in (true, false)", True),
@@ -697,7 +710,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              True),
             ("{ 'name' : 'MILLA PECK' } IN actors", True),
             ("{\"field\":true} IN (\"mystring\", 124, myvar, othervar.jsonobj)",
-             None),
+             not_found_without_null),
             ("actor.name IN ['a name', null, (1<5-4), myvar.jsonobj.name]",
              None),
             ("!false && true IN [true]", True),
@@ -707,8 +720,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
              "{ 'title' : 'Atomic Firefighter' })", True),
             ("1 IN ('African Egg', 1, true, NULL, [0,1,2], "
              "{ 'title' : 'Atomic Firefighter' })", True),
+            ("true IN ('African Egg', 1, false, NULL, [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", not_found_with_null),
             ("false IN ('African Egg', 1, true, NULL, [0,1,2], "
-             "{ 'title' : 'Atomic Firefighter' })", True),
+             "{ 'title' : 'Atomic Firefighter' })", not_found_with_null),
+            ("false IN ('African Egg', 1, true, 'No null', [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", value_false_match_everything),
             ("[0,1,2] IN ('African Egg', 1, true, NULL, [0,1,2], "
              "{ 'title' : 'Atomic Firefighter' })", True),
             ("{ 'title' : 'Atomic Firefighter' } IN ('African Egg', 1, true, "
@@ -733,7 +750,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             ("'Angelic Orduno' IN additionalinfo.writers", True),
         ]
 
-        for test in tests:
+        for test in test_cases:
             try:
                 result = collection.find() \
                                    .fields("{0} as res".format(test[0])) \
@@ -741,7 +758,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             except:
                 self.assertEqual(None, test[1])
             else:
-                self.assertEqual(result['res'], test[1])
+                self.assertEqual(result['res'], test[1], "For test case {} "
+                                 "result was {}".format(test, result))
         self.schema.drop_collection(collection_name)
 
     def test_ilri_expressions(self):
