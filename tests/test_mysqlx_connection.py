@@ -230,7 +230,7 @@ class ServerSocketStream(SocketStream):
         my_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         my_sock.bind((host, port))
         # Starting receiving...
-        if sys.version_info > (3, 4):
+        if sys.version_info > (3, 5):
             my_sock.listen()
         else:
             my_sock.listen(1)
