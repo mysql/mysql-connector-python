@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,8 +29,8 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 # This file was auto-generated.
-_GENERATED_ON = '2017-12-18'
-_MYSQL_VERSION = (8, 0, 4)
+_GENERATED_ON = '2019-04-29'
+_MYSQL_VERSION = (8, 0, 17)
 
 """This module contains the MySQL Server Character Sets"""
 
@@ -81,7 +81,7 @@ MYSQL_CHARACTER_SETS = [
     ("latin7", "latin7_general_cs", False),  # 42
     ("macce", "macce_bin", False),  # 43
     ("cp1250", "cp1250_croatian_ci", False),  # 44
-    ("utf8mb4", "utf8mb4_general_ci", True),  # 45
+    ("utf8mb4", "utf8mb4_general_ci", False),  # 45
     ("utf8mb4", "utf8mb4_bin", False),  # 46
     ("latin1", "latin1_bin", False),  # 47
     ("latin1", "latin1_general_ci", False),  # 48
@@ -291,7 +291,7 @@ MYSQL_CHARACTER_SETS = [
     None,
     None,
     None,
-    ("utf8mb4", "utf8mb4_0900_ai_ci", False),  # 255
+    ("utf8mb4", "utf8mb4_0900_ai_ci", True),  # 255
     ("utf8mb4", "utf8mb4_de_pb_0900_ai_ci", False),  # 256
     ("utf8mb4", "utf8mb4_is_0900_ai_ci", False),  # 257
     ("utf8mb4", "utf8mb4_lv_0900_ai_ci", False),  # 258
@@ -344,5 +344,7 @@ MYSQL_CHARACTER_SETS = [
     ("utf8mb4", "utf8mb4_0900_as_ci", False),  # 305
     ("utf8mb4", "utf8mb4_ru_0900_ai_ci", False),  # 306
     ("utf8mb4", "utf8mb4_ru_0900_as_cs", False),  # 307
+    ("utf8mb4", "utf8mb4_zh_0900_as_cs", False),  # 308
+    ("utf8mb4", "utf8mb4_0900_bin", False),  # 309
 ]
 
