@@ -899,7 +899,6 @@ class ExprParser(object):
             raise ValueError("Invalid placeholder name at token pos {0}"
                              "".format(self.pos))
 
-        place_holder_name = place_holder_name.lower()
         msg_expr = Message("Mysqlx.Expr.Expr")
         msg_expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.PLACEHOLDER")
         if place_holder_name in self.placeholder_name_to_position:

@@ -49,6 +49,7 @@ _CREATE_TEST_VIEW_QUERY = ("CREATE VIEW `{0}`.`{1}` AS SELECT * "
 _CREATE_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS {2}"
 _DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
 _DROP_VIEW_QUERY = "DROP VIEW IF EXISTS `{0}`.`{1}`"
+_SHOW_INDEXES_QUERY = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
 _PREP_STMT_QUERY = (
     "SELECT p.sql_text, p.count_execute "
     "FROM performance_schema.prepared_statements_instances AS p "
@@ -1785,12 +1786,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                                              "required": True}],
                                  "unique": False}).execute()
 
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-            "".format(self.schema_name, collection_name, index_name)
-        )
-
-        result = self.session.sql(show_indexes_sql).execute()
+        result = self.session.sql(_SHOW_INDEXES_QUERY.format(
+            self.schema_name, collection_name, index_name)).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 
@@ -1805,12 +1802,8 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                                              "required": True}],
                                  "unique": False}).execute()
 
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-            "".format(self.schema_name, collection_name, index_name)
-        )
-
-        result = self.session.sql(show_indexes_sql).execute()
+        result = self.session.sql(_SHOW_INDEXES_QUERY.format(
+            self.schema_name, collection_name, index_name)).execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
 
@@ -1825,12 +1818,19 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                                  "unique": False,
                                  "type":'SPATIAL'}).execute()
 
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'"
-            "".format(self.schema_name, collection_name, index_name)
-        )
+        result = self.session.sql(_SHOW_INDEXES_QUERY.format(
+            self.schema_name, collection_name, index_name)).execute()
+        rows = result.fetch_all()
+        self.assertEqual(1, len(rows))
 
-        result = self.session.sql(show_indexes_sql).execute()
+        # Create an index on document fields which contain arrays
+        index_name = "emails_idx"
+        index_desc = {"fields": [{"field": "$.emails", "type": "CHAR(128)",
+                                  "array": True}]}
+        collection.create_index(index_name, index_desc).execute()
+
+        result = self.session.sql(_SHOW_INDEXES_QUERY.format(
+            self.schema_name, collection_name, index_name)).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
 
@@ -1975,6 +1975,20 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                       "type" : "SPATIAL"}
         create_index = collection.create_index(index_name, index_desc)
         self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
+
+        # "required" fields must be Boolean
+        index_name = "age_idx"
+        index_desc = {"fields": [{"field": "$.age", "type": "INT",
+                                  "required": "True"}], "unique": False}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(TypeError, create_index.execute)
+
+        # "array" fields must be Boolean
+        index_name = "emails_idx"
+        index_desc = {"fields": [{"field": "$.emails", "type": "CHAR(128)",
+                                  "array": "True"}]}
+        create_index = collection.create_index(index_name, index_desc)
+        self.assertRaises(TypeError, create_index.execute)
 
         self.schema.drop_collection(collection_name)
 

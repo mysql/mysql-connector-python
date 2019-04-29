@@ -395,6 +395,7 @@ class Collection(DatabaseObject):
                                    {"fields": [{"field": member_path,
                                                 "type": member_type,
                                                 "required": member_required,
+                                                "array": array,
                                                 "collation": collation,
                                                 "options": options,
                                                 "srid": srid},

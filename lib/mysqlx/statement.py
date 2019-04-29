@@ -1354,12 +1354,12 @@ class CreateCollectionIndexStatement(Statement):
 
         # Validate members that constraint the index
         if not self._fields_desc:
-            raise ProgrammingError("Required member \"fields\" not found in "
+            raise ProgrammingError("Required member 'fields' not found in "
                                    "the given index description: {}"
                                    "".format(self._index_desc))
 
         if not isinstance(self._fields_desc, list):
-            raise ProgrammingError("Required member \"fields\" must contain a "
+            raise ProgrammingError("Required member 'fields' must contain a "
                                    "list.")
 
         args = {}
@@ -1386,37 +1386,42 @@ class CreateCollectionIndexStatement(Statement):
                 constraint["member"] = field_desc.pop("field")
                 constraint["type"] = field_desc.pop("type")
                 constraint["required"] = field_desc.pop("required", False)
+                constraint["array"] = field_desc.pop("array", False)
+                if not isinstance(constraint["required"], bool):
+                    raise TypeError("Field member 'required' must be Boolean")
+                if not isinstance(constraint["array"], bool):
+                    raise TypeError("Field member 'array' must be Boolean")
                 if args["type"].upper() == "SPATIAL" and \
                    not constraint["required"]:
-                    raise ProgrammingError('Field member "required" must be '
-                                           'set to "True" when index type is'
-                                           ' set to "SPATIAL"')
+                    raise ProgrammingError(
+                        "Field member 'required' must be set to 'True' when "
+                        "index type is set to 'SPATIAL'")
                 if args["type"].upper() == "INDEX" and \
-                   constraint["type"] == 'GEOJSON':
-                    raise ProgrammingError('Index "type" must be set to '
-                                           '"SPATIAL" when field type is set '
-                                           'to "GEOJSON"')
+                   constraint["type"] == "GEOJSON":
+                    raise ProgrammingError(
+                        "Index 'type' must be set to 'SPATIAL' when field "
+                        "type is set to 'GEOJSON'")
                 if "collation" in field_desc:
                     if not constraint["type"].upper().startswith("TEXT"):
                         raise ProgrammingError(
-                            "The \"collation\" member can only be used when "
-                            "field  type is set to \"GEOJSON\"")
+                            "The 'collation' member can only be used when "
+                            "field  type is set to 'GEOJSON'")
                     else:
                         constraint["collation"] = field_desc.pop("collation")
                 # "options" and "srid" fields in IndexField can be
                 # present only if "type" is set to "GEOJSON"
                 if "options" in field_desc:
-                    if constraint["type"].upper() != 'GEOJSON':
+                    if constraint["type"].upper() != "GEOJSON":
                         raise ProgrammingError(
-                            "The \"options\" member can only be used when "
-                            "index type is set to \"GEOJSON\"")
+                            "The 'options' member can only be used when "
+                            "index type is set to 'GEOJSON'")
                     else:
                         constraint["options"] = field_desc.pop("options")
                 if "srid" in field_desc:
-                    if constraint["type"].upper() != 'GEOJSON':
+                    if constraint["type"].upper() != "GEOJSON":
                         raise ProgrammingError(
-                            "The \"srid\" member can only be used when index"
-                            " type is set to \"GEOJSON\"")
+                            "The 'srid' member can only be used when index "
+                            "type is set to 'GEOJSON'")
                     else:
                         constraint["srid"] = field_desc.pop("srid")
                 args["constraint"].append(constraint)
