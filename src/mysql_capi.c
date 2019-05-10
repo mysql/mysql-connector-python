@@ -1075,7 +1075,9 @@ PyObject*
 MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
     char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
-    char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
+    char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL,
+         *ssl_cipher_suites= NULL, *tls_versions= NULL,
+         *tls_cipher_suites= NULL;
     PyObject *charset_name= NULL, *compress= NULL, *ssl_verify_cert= NULL,
              *ssl_verify_identity= NULL, *ssl_disabled= NULL,
              *conn_attrs= NULL, *key= NULL, *value= NULL;
@@ -1104,24 +1106,27 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     static char *kwlist[]=
     {
         "host", "user", "password", "database",	"port", "unix_socket",
-        "client_flags", "ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert",
+        "client_flags", "ssl_ca", "ssl_cert", "ssl_key", "ssl_cipher_suites",
+        "tls_versions", "tls_cipher_suites",  "ssl_verify_cert",
         "ssl_verify_identity", "ssl_disabled", "compress", "conn_attrs",
         NULL
     };
 #ifdef PY3
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzzzzO!O!O!O!O!", kwlist,
 #else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzzzzO!O!O!O!O!", kwlist,
 #endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
                                      &ssl_ca, &ssl_cert, &ssl_key,
+                                     &ssl_cipher_suites, &tls_versions,
+                                     &tls_cipher_suites,
                                      &PyBool_Type, &ssl_verify_cert,
                                      &PyBool_Type, &ssl_verify_identity,
                                      &PyBool_Type, &ssl_disabled,
                                      &PyBool_Type, &compress,
-									 &PyDict_Type, &conn_attrs))
+                                     &PyDict_Type, &conn_attrs))
     {
         return NULL;
     }
@@ -1208,6 +1213,22 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
             ssl_ca= NULL;
         }
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
+        char logout[100];
+        if (tls_versions != NULL)
+        {
+            mysql_options(&self->session,
+                          MYSQL_OPT_TLS_VERSION, tls_versions);
+        }
+        if (ssl_cipher_suites != NULL)
+        {
+            mysql_options(&self->session,
+                         MYSQL_OPT_SSL_CIPHER, ssl_cipher_suites);
+        }
+        if (tls_cipher_suites != NULL)
+        {
+            mysql_options(&self->session,
+                          MYSQL_OPT_TLS_CIPHERSUITES, tls_cipher_suites);
+        }
     } else {
         // Make sure to not enforce SSL
 #if MYSQL_VERSION_ID > 50703 && MYSQL_VERSION_ID < 50711

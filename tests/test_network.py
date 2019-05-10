@@ -305,7 +305,7 @@ class MySQLUnixSocketTests(tests.MySQLConnectorTests):
             'ca': os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem'),
             'cert': os.path.join(tests.SSL_DIR, 'tests_client_cert.pem'),
             'key': os.path.join(tests.SSL_DIR, 'tests_client_key.pem'),
-            'cipher': 'AES256-SHA'
+            'cipher_suites': 'AES256-SHA'
         }
         self.assertRaises(errors.InterfaceError,
                           self.cnx.switch_to_ssl, **args)

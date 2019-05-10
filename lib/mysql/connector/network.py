@@ -30,6 +30,7 @@
 """
 
 from collections import deque
+import os
 import socket
 import struct
 import sys
@@ -37,11 +38,26 @@ import zlib
 
 try:
     import ssl
+    TLS_VERSIONS = {
+        "TLSv1": ssl.PROTOCOL_TLSv1,
+        "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
+        "TLSv1.2": ssl.PROTOCOL_TLSv1_2}
+    # TLSv1.3 included in PROTOCOL_TLS, but PROTOCOL_TLS is not included on 3.4
+    if hasattr(ssl, "PROTOCOL_TLS"):
+        TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_TLS  # pylint: disable=E1101
+    else:
+        TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_SSLv23  # Alias of PROTOCOL_TLS
+    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+        TLS_V1_3_SUPPORTED = True
+    else:
+        TLS_V1_3_SUPPORTED = False
 except:
     # If import fails, we don't have SSL support.
+    TLS_V1_3_SUPPORTED = False
     pass
 
 from . import constants, errors
+from .errors import InterfaceError
 from .catch23 import PY2, init_bytearray, struct_unpack
 
 
@@ -412,7 +428,8 @@ class BaseMySQLSocket(object):
 
     # pylint: disable=C0103,E1101
     def switch_to_ssl(self, ca, cert, key, verify_cert=False,
-                      verify_identity=False, cipher=None, ssl_version=None):
+                      verify_identity=False, cipher_suites=None,
+                      tls_versions=None):
         """Switch the socket to use SSL"""
         if not self.sock:
             raise errors.InterfaceError(errno=2048)
@@ -420,22 +437,82 @@ class BaseMySQLSocket(object):
         try:
             if verify_cert:
                 cert_reqs = ssl.CERT_REQUIRED
+            elif verify_identity:
+                cert_reqs = ssl.CERT_OPTIONAL
             else:
                 cert_reqs = ssl.CERT_NONE
 
-            if ssl_version is None:
-                self.sock = ssl.wrap_socket(
-                    self.sock, keyfile=key, certfile=cert, ca_certs=ca,
-                    cert_reqs=cert_reqs, do_handshake_on_connect=False,
-                    ciphers=cipher)
+            if tls_versions is None or not tls_versions:
+                context = ssl.create_default_context()
+                if not verify_identity:
+                    context.check_hostname = False
+                context.options
             else:
-                self.sock = ssl.wrap_socket(
-                    self.sock, keyfile=key, certfile=cert, ca_certs=ca,
-                    cert_reqs=cert_reqs, do_handshake_on_connect=False,
-                    ssl_version=ssl_version, ciphers=cipher)
-            self.sock.do_handshake()
+                tls_versions.sort(reverse=True)
+
+                tls_version = tls_versions[0]
+                if not TLS_V1_3_SUPPORTED and \
+                   tls_version == "TLSv1.3" and len(tls_versions) > 1:
+                    tls_version = tls_versions[1]
+                ssl_protocol = TLS_VERSIONS[tls_version]
+                context = ssl.SSLContext(ssl_protocol)
+
+                if tls_version == "TLSv1.3":
+                    if "TLSv1.2" not in tls_versions:
+                        context.options |= ssl.OP_NO_TLSv1_2
+                    if "TLSv1.1" not in tls_versions:
+                        context.options |= ssl.OP_NO_TLSv1_1
+                    if "TLSv1" not in tls_versions:
+                        context.options |= ssl.OP_NO_TLSv1
+
+            context.check_hostname = False
+            context.verify_mode = cert_reqs
+            context.load_default_certs()
+
+            if ca:
+                try:
+                    context.load_verify_locations(ca)
+                except (IOError, ssl.SSLError) as err:
+                    self.sock.close()
+                    raise InterfaceError(
+                        "Invalid CA Certificate: {}".format(err))
+            if cert:
+                try:
+                    context.load_cert_chain(cert, key)
+                except (IOError, ssl.SSLError) as err:
+                    self.sock.close()
+                    raise InterfaceError(
+                        "Invalid Certificate/Key: {}".format(err))
+            if cipher_suites:
+                context.set_ciphers(cipher_suites)
+
+            if hasattr(self, "server_host"):
+                self.sock = context.wrap_socket(
+                    self.sock, server_hostname=self.server_host)
+            else:
+                self.sock = context.wrap_socket(self.sock)
+
             if verify_identity:
-                ssl.match_hostname(self.sock.getpeercert(), self.server_host)
+                context.check_hostname = True
+                hostnames = [self.server_host]
+                if os.name == 'nt' and self.server_host == 'localhost':
+                    hostnames = ['localhost', '127.0.0.1']
+                    aliases = socket.gethostbyaddr(self.server_host)
+                    hostnames.extend([aliases[0]] + aliases[1])
+                match_found = False
+                errs = []
+                for hostname in hostnames:
+                    try:
+                        ssl.match_hostname(self.sock.getpeercert(), hostname)
+                    except ssl.CertificateError as err:
+                        errs.append(str(err))
+                    else:
+                        match_found = True
+                        break
+                if not match_found:
+                    self.sock.close()
+                    raise InterfaceError("Unable to verify server identity: {}"
+                                         "".format(", ".join(errs)))
         except NameError:
             raise errors.NotSupportedError(
                 "Python installation has no SSL support")

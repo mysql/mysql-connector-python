@@ -31,8 +31,22 @@
 try:
     import ssl
     SSL_AVAILABLE = True
+    TLS_VERSIONS = {
+        "TLSv1": ssl.PROTOCOL_TLSv1,
+        "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
+        "TLSv1.2": ssl.PROTOCOL_TLSv1_2}
+    # TLSv1.3 included in PROTOCOL_TLS, but PROTOCOL_TLS is not included on 3.4
+    if hasattr(ssl, "PROTOCOL_TLS"):
+        TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_TLS  # pylint: disable=E1101
+    else:
+        TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_SSLv23  # Alias of PROTOCOL_TLS
+    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+        TLS_V1_3_SUPPORTED = True
+    else:
+        TLS_V1_3_SUPPORTED = False
 except:
     SSL_AVAILABLE = False
+    TLS_V1_3_SUPPORTED = False
 
 import sys
 import socket
@@ -56,7 +70,7 @@ from .errors import (InterfaceError, NotSupportedError, OperationalError,
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
 from .constants import SSLMode, Auth
-from .helpers import escape, get_item_or_attr
+from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
 from .protocol import Protocol, MessageReaderWriter
 from .result import Result, RowResult, SqlResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
@@ -187,15 +201,18 @@ class SocketStream(object):
     def __del__(self):
         self.close()
 
-    def set_ssl(self, ssl_mode, ssl_ca, ssl_crl, ssl_cert, ssl_key):
+    def set_ssl(self, ssl_protos, ssl_mode, ssl_ca, ssl_crl, ssl_cert, ssl_key,
+                ssl_ciphers):
         """Set SSL parameters.
 
         Args:
+            ssl_protos (list): SSL protocol to use.
             ssl_mode (str): SSL mode.
             ssl_ca (str): The certification authority certificate.
             ssl_crl (str): The certification revocation lists.
             ssl_cert (str): The certificate.
             ssl_key (str): The certificate key.
+            ssl_ciphers (list): SSL ciphersuites to use.
 
         Raises:
             :class:`mysqlx.RuntimeError`: If Python installation has no SSL
@@ -206,13 +223,29 @@ class SocketStream(object):
             self.close()
             raise RuntimeError("Python installation has no SSL support")
 
-        if hasattr(ssl, "PROTOCOL_TLS"):
-            protocol = ssl.PROTOCOL_TLS  # pylint: disable=E1101
+        if ssl_protos is None or not ssl_protos:
+            context = ssl.create_default_context()
+            if ssl_mode != SSLMode.VERIFY_IDENTITY:
+                context.check_hostname = False
+            if ssl_mode == SSLMode.REQUIRED:
+                context.verify_mode = ssl.CERT_NONE
         else:
-            protocol = ssl.PROTOCOL_TLSv1
+            ssl_protos.sort(reverse=True)
+            
+            tls_version = ssl_protos[0]
+            if not TLS_V1_3_SUPPORTED and \
+               tls_version == "TLSv1.3" and len(ssl_protos) > 1:
+                tls_version = ssl_protos[1]
+            ssl_protocol = TLS_VERSIONS[tls_version]
+            context = ssl.SSLContext(ssl_protocol)
 
-        context = ssl.SSLContext(protocol)
-        context.load_default_certs()
+            if tls_version == "TLSv1.3":
+                if "TLSv1.2" not in ssl_protos:
+                    context.options |= ssl.OP_NO_TLSv1_2
+                if "TLSv1.1" not in ssl_protos:
+                    context.options |= ssl.OP_NO_TLSv1_1
+                if "TLSv1" not in ssl_protos:
+                    context.options |= ssl.OP_NO_TLSv1
 
         if ssl_ca:
             try:
@@ -237,8 +270,16 @@ class SocketStream(object):
                 self.close()
                 raise InterfaceError("Invalid Certificate/Key: {}".format(err))
 
-        self._socket = context.wrap_socket(self._socket)
+        if ssl_ciphers:
+            context.set_ciphers(":".join(iani_to_openssl_cs_name(ssl_protos[0],
+                                                                 ssl_ciphers)))
+        try:
+            self._socket = context.wrap_socket(self._socket,
+                                               server_hostname=self._host)
+        except ssl.CertificateError as err:
+            raise InterfaceError(str(err))
         if ssl_mode == SSLMode.VERIFY_IDENTITY:
+            context.check_hostname = True
             hostnames = []
             # Windows does not return loopback aliases on gethostbyaddr
             if os.name == 'nt' and (self._host == 'localhost' or \
@@ -252,7 +293,7 @@ class SocketStream(object):
                 try:
                     ssl.match_hostname(self._socket.getpeercert(), hostname)
                 except ssl.CertificateError as err:
-                    errs.append(err)
+                    errs.append(str(err))
                 else:
                     match_found = True
                     break
@@ -260,6 +301,7 @@ class SocketStream(object):
                 self.close()
                 raise InterfaceError("Unable to verify server identity: {}"
                                      "".format(", ".join(errs)))
+
         self._is_ssl = True
 
     def is_ssl(self):
@@ -493,11 +535,13 @@ class Connection(object):
                                "this Python version")
 
         self.protocol.set_capabilities(tls=True)
-        self.stream.set_ssl(self.settings.get("ssl-mode", SSLMode.REQUIRED),
+        self.stream.set_ssl(self.settings.get("tls-versions", None),
+                            self.settings.get("ssl-mode", SSLMode.REQUIRED),
                             self.settings.get("ssl-ca"),
                             self.settings.get("ssl-crl"),
                             self.settings.get("ssl-cert"),
-                            self.settings.get("ssl-key"))
+                            self.settings.get("ssl-key"),
+                            self.settings.get("tls-ciphersuites"))
         if "attributes" in self.settings:
             conn_attrs = self.settings["attributes"]
             self.protocol.set_capabilities(session_connect_attrs=conn_attrs)

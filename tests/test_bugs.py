@@ -59,6 +59,7 @@ if tests.SSL_AVAILABLE:
 
 from tests import foreach_cnx, cnx_config
 from . import PY2
+from . import check_tls_versions_support
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
 from mysql.connector.optionfiles import read_option_files
@@ -75,8 +76,6 @@ except ImportError:
     MySQLInterfaceError = None
 
 ERR_NO_CEXT = "C Extension not available"
-if tests.SSL_AVAILABLE:
-    TLS_VERSIONS = {"TLSv1.2": ssl.PROTOCOL_TLSv1_2}
 
 
 @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
@@ -4902,7 +4901,7 @@ class Bug26484601(tests.MySQLConnectorTests):
 
     def try_connect(self, tls_version, expected_ssl_version):
         config = tests.get_mysql_config().copy()
-        config['ssl_version'] = tls_version
+        config['tls_versions'] = tls_version
         config['ssl_ca'] = ''
         cnx = connection.MySQLConnection(**config)
         query = "SHOW STATUS LIKE 'ssl_version%'"
@@ -4965,8 +4964,11 @@ class Bug26484601(tests.MySQLConnectorTests):
             not correct on windows, only indicates the newer version supported.
 
         """
-        for tls_v_name, tls_version in TLS_VERSIONS.items():
-            self.try_connect(tls_version, tls_v_name)
+        test_tls_versions = check_tls_versions_support(["TLSv1.1", "TLSv1.2"])
+        if not test_tls_versions:
+            self.fail("No TLS version to test: {}".format(test_tls_versions))
+        for tls_v_name in test_tls_versions:
+            self.try_connect([tls_v_name], tls_v_name)
 
     def test_get_connection_using_servers_TLS_version(self):
         """Test connect using the servers default TLS version

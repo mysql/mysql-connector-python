@@ -38,8 +38,10 @@ import unittest
 from decimal import Decimal
 import io
 import socket
+import sys
 
 import tests
+from . import check_tls_versions_support
 from . import PY2
 
 try:
@@ -54,6 +56,7 @@ from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
 from mysql.connector.errors import InterfaceError
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.network import TLS_V1_3_SUPPORTED
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
 
@@ -1853,6 +1856,204 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                              "Attribute {} with value {} differs of {}"
                              "".format(attr_name, res_dict[attr_name],
                                        expected_attrs[attr_name]))
+
+    @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
+                     "not available for Python versions < 2.7.9.")
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 40), "TLSv1.1 incompatible")
+    @tests.foreach_cnx()
+    def test_get_connection_with_tls_version(self):
+        if isinstance(self.cnx, connection.MySQLConnection):
+            connector_class = connection.MySQLConnection
+        else:
+            connector_class = CMySQLConnection
+
+        # Test None value is returned if no schema name is specified
+        settings = tests.get_mysql_config()
+        if "unix_socket" in settings:
+            settings.pop("unix_socket")
+
+        # tls_versions and ssl_disabled=True
+        settings["tls_versions"] = ["TLSv1"]
+        settings["ssl_disabled"] = True
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("along with ssl_disabled" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # tls_versions and ssl_disabled=True
+        settings.pop("tls_versions")
+        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["ssl_disabled"] = True
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("along with ssl_disabled" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # Empty tls_version list
+        settings.pop("ssl_disabled")
+        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls_versions"] = []
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("At least one" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # Empty tls_ciphersuites list using dict settings
+        settings["tls_ciphersuites"] = []
+        settings["tls_versions"] = ["TLSv1"]
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("No valid cipher suite" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # Empty tls_ciphersuites list without tls-versions
+        settings["tls_ciphersuites"] = []
+        settings.pop("tls_versions")
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("No valid cipher suite" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # Given tls-version not in ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
+        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls_versions"] = ["TLSv0.2", "TLSv1.7", "TLSv10.2"]
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+
+        # Repeated values in tls_versions on dict settings
+        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls_versions"] = ["TLSv1.2", "TLSv1.1", "TLSv1.2"]
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+
+        # Empty tls_versions on dict settings
+        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls_versions"] = []
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("At least one TLS" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # Verify unkown cipher suite case?
+        settings["tls_ciphersuites"] = ["NOT-KNOWN"]
+        settings["tls_versions"] = ["TLSv1.2"]
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+
+        # Verify AttributeError exception is raised With invalid TLS version
+        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls_versions"] = ["TLSv8"]
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+        self.assertTrue(("not recognized" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+        # Verify unkown cipher suite case?
+        settings["tls_ciphersuites"] = ["NOT-KNOWN"]
+        settings["tls_versions"] = ["TLSv1.2"]
+        with self.assertRaises(AttributeError) as context:
+            _ = connector_class(**settings)
+
+        # Verify unsupported TLSv1.3 version is accepted (connection success)
+        settings["tls_ciphersuites"] = None
+        settings["tls_versions"] = ["TLSv1.3", "TLSv1.2"]
+        # Connection must be successfully
+        _ = connector_class(**settings)
+
+        err_msg = ("Not using the expected TLS version: {}, instead the "
+                   "connection used: {}.")
+
+        supported_tls = check_tls_versions_support(
+            ["TLSv1.2", "TLSv1.1", "TLSv1"])
+        if not supported_tls:
+            self.fail("No TLS version to test: {}".format(supported_tls))
+
+        # Following tests requires TLSv1.2
+        if tests.MYSQL_VERSION < (8, 0, 17):
+            return
+
+        if len(supported_tls) > 1:
+            # Verify given TLS version is used
+            settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+            for test_ver in supported_tls:
+                expected_ssl_version = test_ver
+                settings["tls_versions"] = [test_ver]
+                cnx = connector_class(**settings)
+                cur = cnx.cursor()
+                cur.execute("SHOW STATUS LIKE 'Ssl_version%'")
+                res = cur.fetchall()
+    
+                self.assertEqual(res[0][1], expected_ssl_version,
+                                 err_msg.format(expected_ssl_version, res))
+
+        # Verify the newest TLS version is used from the given list
+        exp_res = ["TLSv1.2", "TLSv1.2", "TLSv1.2"]
+        test_vers = [["TLSv1", "TLSv1.2", "TLSv1.1"], ["TLSv1.1", "TLSv1.2"],
+                     ["TLSv1.2", "TLSv1.1"]]
+        for test_ver, exp_ver in zip(test_vers, exp_res):
+            settings["tls_versions"] = test_ver
+            cnx = connector_class(**settings)
+            cur = cnx.cursor()
+            res = cur.execute("SHOW STATUS LIKE 'ssl_version%'")
+            res = cur.fetchall()
+            self.assertEqual(res[0][1], exp_ver, "On test case {}, {}"
+                             "".format(test_ver, err_msg.format(exp_ver, res)))
+
+        # Verify given TLS cipher suite is used
+        exp_res = ["DHE-RSA-AES128-GCM-SHA256", "DHE-RSA-AES128-GCM-SHA256",
+                   "DHE-RSA-AES128-GCM-SHA256"]
+        test_ciphers = [["DHE-RSA-AES128-GCM-SHA256"],
+                        ["DHE-RSA-AES128-GCM-SHA256"],
+                        ["TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"]]
+        settings["tls_versions"] = ["TLSv1.2"]
+        for test_cipher, exp_ver in zip(test_ciphers, exp_res):
+            settings["tls_ciphersuites"] = test_cipher
+            cnx = connector_class(**settings)
+            cur = cnx.cursor()
+            cur.execute("SHOW STATUS LIKE 'Ssl_cipher%'")
+            res = cur.fetchall()
+            self.assertEqual(res[0][1], exp_ver, "Unexpected TLS version found:"
+                             " {} for: {}".format(res[0][1], test_cipher))
+
+        # Verify one of TLS cipher suite is used from the given list
+        exp_res = ["DHE-RSA-AES256-SHA256", "DHE-RSA-AES256-SHA256",
+                   "DHE-RSA-AES128-GCM-SHA256"]
+        test_ciphers = ["TLS_DHE_RSA_WITH_AES_256_CBC_SHA256",
+                        "DHE-RSA-AES256-SHA256",
+                        "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"]
+        settings["tls_ciphersuites"] = test_ciphers
+        cnx = connector_class(**settings)
+        cur = cnx.cursor()
+        cur.execute("SHOW STATUS LIKE 'Ssl_cipher%'")
+        res = cur.fetchall()
+        self.assertIn(res[0][1], exp_res, "Unexpected TLS version found"
+                      ": {} not in {}".format(res[0][1], exp_res))
+
+        if "TLSv1.1" in supported_tls:
+            # Verify connection success with either TLS given version when.
+            # TLSv1.3 is not supported.
+            settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+            settings["tls_versions"] = ["TLSv1.3", "TLSv1.1"]
+
+            cnx = connector_class(**settings)
+            cur = cnx.cursor()
+            cur.execute("SHOW STATUS LIKE 'ssl_version%'")
+            res = cur.fetchall()
+            self.assertNotEqual(res[0][1], 'TLSv1.2', "Unexpected TLS version "
+                                "found: {}".format(res[0][1]))
+
+        # Verify error when TLSv1.3 is not supported.
+        if not TLS_V1_3_SUPPORTED:
+            settings["tls_versions"] = ["TLSv1.3"]
+            with self.assertRaises(AttributeError) as context:
+                _ = connector_class(**settings)
 
     def test_connection_attributes_user_defined(self):
         """Tests defined connection attributes"""

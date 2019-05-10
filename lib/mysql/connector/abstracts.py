@@ -32,15 +32,35 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 import re
 import time
 import weakref
+TLS_V1_3_SUPPORTED = False
+try:
+    import ssl
+    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+        TLS_V1_3_SUPPORTED = True
+except:
+    # If import fails, we don't have SSL support.
+    pass
 
 from .catch23 import make_abc, BYTE_TYPES, STRING_TYPES
 from .conversion import MySQLConverterBase
 from .constants import (ClientFlag, CharacterSet, CONN_ATTRS_DN,
-                        DEFAULT_CONFIGURATION)
+                        DEFAULT_CONFIGURATION, OPENSSL_CS_NAMES,
+                        TLS_CIPHER_SUITES, TLS_VERSIONS)
 from .optionfiles import MySQLOptionsParser
 from . import errors
 
 NAMED_TUPLE_CACHE = weakref.WeakValueDictionary()
+
+DUPLICATED_IN_LIST_ERROR = (
+    "The '{list}' list must not contain repeated values, the value "
+    "'{value}' is duplicated.")
+
+TLS_VERSION_ERROR = ("The given tls_version: '{}' is not recognized as a valid "
+                     "TLS protocol version (should be one of {}).")
+
+TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
+                        "'tls-versions' list '{}'. ")
+
 
 @make_abc(ABCMeta)
 class MySQLConnectionAbstract(object):
@@ -151,6 +171,151 @@ class MySQLConnectionAbstract(object):
                     except (NameError, SyntaxError):
                         config[option] = value[0]
         return config
+
+    def _validate_tls_ciphersuites(self):
+        """Validates the tls_ciphersuites option.
+        """
+        tls_ciphersuites = []
+        tls_cs = self._ssl["tls_ciphersuites"]
+
+        if isinstance(tls_cs, STRING_TYPES):
+            if not (tls_cs.startswith("[") and
+                    tls_cs.endswith("]")):
+                raise AttributeError("tls_ciphersuites must be a list, "
+                                     "found: '{}'".format(tls_cs))
+            else:
+                tls_css = tls_cs[1:-1].split(",")
+                if not tls_css:
+                    raise AttributeError("No valid cipher suite found "
+                                         "in 'tls_ciphersuites' list.")
+                for _tls_cs in tls_css:
+                    _tls_cs = tls_cs.strip().upper()
+                    if _tls_cs:
+                        tls_ciphersuites.append(_tls_cs)
+
+        elif isinstance(tls_cs, list):
+            tls_ciphersuites = [tls_cs for tls_cs in tls_cs if tls_cs]
+
+        elif isinstance(tls_cs, set):
+            for tls_cs in tls_ciphersuites:
+                if tls_cs:
+                    tls_ciphersuites.append(tls_cs)
+        else:
+            raise AttributeError(
+                "tls_ciphersuites should be a list with one or more "
+                "ciphersuites. Found: '{}'".format(tls_cs))
+
+        tls_versions = TLS_VERSIONS[:] if self._ssl.get("tls_versions", None) \
+           is None else self._ssl["tls_versions"][:]
+
+        # A newer TLS version can use a cipher introduced on
+        # an older version.
+        tls_versions.sort(reverse=True)
+        newer_tls_ver = tls_versions[0]
+        # translated_names[0] belongs to TLSv1, TLSv1.1 and TLSv1.2
+        # translated_names[1] are TLSv1.3 only
+        translated_names = [[],[]]
+        iani_cipher_suites_names = {}
+        ossl_cipher_suites_names = []
+
+        # Old ciphers can work with new TLS versions.
+        # Find all the ciphers introduced on previous TLS versions.
+        for tls_ver in TLS_VERSIONS[:TLS_VERSIONS.index(newer_tls_ver) + 1]:
+            iani_cipher_suites_names.update(TLS_CIPHER_SUITES[tls_ver])
+            ossl_cipher_suites_names.extend(OPENSSL_CS_NAMES[tls_ver])
+
+        for name in tls_ciphersuites:
+            if "-" in name and name in ossl_cipher_suites_names:
+                if name in OPENSSL_CS_NAMES["TLSv1.3"]:
+                    translated_names[1].append(name)
+                else:
+                    translated_names[0].append(name)
+            elif name in iani_cipher_suites_names:
+                translated_name = iani_cipher_suites_names[name]
+                if translated_name in translated_names:
+                    raise AttributeError(
+                        DUPLICATED_IN_LIST_ERROR.format(
+                            list="tls_ciphersuites", value=translated_name))
+                else:
+                    if name in TLS_CIPHER_SUITES["TLSv1.3"]:
+                        translated_names[1].append(
+                            iani_cipher_suites_names[name])
+                    else:
+                        translated_names[0].append(
+                            iani_cipher_suites_names[name])
+            else:
+                raise AttributeError(
+                    "The value '{}' in tls_ciphersuites is not a valid "
+                    "cipher suite".format(name))
+        if not translated_names[0] and not translated_names[1]:
+            raise AttributeError("No valid cipher suite found in the "
+                                 "'tls_ciphersuites' list.")
+        translated_names = [":".join(translated_names[0]),
+                            ":".join(translated_names[1])]
+        self._ssl["tls_ciphersuites"] = translated_names
+
+    def _validate_tls_versions(self):
+        """Validates the tls_versions option.
+        """
+        tls_versions = []
+        tls_version = self._ssl["tls_versions"]
+
+        if isinstance(tls_version, STRING_TYPES):
+            if not (tls_version.startswith("[") and tls_version.endswith("]")):
+                raise AttributeError("tls_versions must be a list, found: '{}'"
+                                     "".format(tls_version))
+            else:
+                tls_vers = tls_version[1:-1].split(",")
+                for tls_ver in tls_vers:
+                    tls_version = tls_ver.strip()
+                    if tls_version == "":
+                        continue
+                    elif tls_version not in TLS_VERSIONS:
+                        raise AttributeError(
+                            TLS_VERSION_ERROR.format(tls_version, TLS_VERSIONS))
+                    elif tls_version in tls_versions:
+                        raise AttributeError(
+                            DUPLICATED_IN_LIST_ERROR.format(
+                                list="tls_versions", value=tls_version))
+                        tls_versions.append(tls_version)
+                if tls_vers == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
+                        raise AttributeError(
+                            TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))
+        elif isinstance(tls_version, list):
+            if not tls_version:
+                raise AttributeError(
+                    "At least one TLS protocol version must be specified in "
+                    "'tls_versions' list.")
+            for tls_ver in tls_version:
+                if tls_ver not in TLS_VERSIONS:
+                    raise AttributeError(
+                        TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
+                elif tls_ver in tls_versions:
+                    raise AttributeError(
+                        DUPLICATED_IN_LIST_ERROR.format(
+                            list="tls_versions", value=tls_ver))
+                else:
+                    tls_versions.append(tls_ver)
+        elif isinstance(tls_version, set):
+            for tls_ver in tls_version:
+                if tls_ver not in TLS_VERSIONS:
+                    raise AttributeError(
+                        TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
+                tls_versions.append(tls_ver)
+        else:
+            raise AttributeError(
+                "tls_versions should be a list with one or more of versions in "
+                "{}. found: '{}'".format(", ".join(TLS_VERSIONS), tls_versions))
+
+        if not tls_versions:
+            raise AttributeError(
+                "At least one TLS protocol version must be specified "
+                "in 'tls_versions' list when this option is given.")
+        if tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
+            raise AttributeError(
+                TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))
+        tls_versions.sort()
+        self._ssl["tls_versions"] = tls_versions
 
     @property
     def user(self):
@@ -333,6 +498,9 @@ class MySQLConnectionAbstract(object):
             if key.startswith('ssl_'):
                 set_ssl_flag = True
                 self._ssl.update({key.replace('ssl_', ''): value})
+            elif key.startswith('tls_'):
+                set_ssl_flag = True
+                self._ssl.update({key: value})
             else:
                 attribute = '_' + key
                 try:
@@ -349,8 +517,7 @@ class MySQLConnectionAbstract(object):
                     DEFAULT_CONFIGURATION['ssl_verify_identity']
             # Make sure both ssl_key/ssl_cert are set, or neither (XOR)
             if 'ca' not in self._ssl or self._ssl['ca'] is None:
-                raise AttributeError(
-                    "Missing ssl_ca argument.")
+                self._ssl['ca'] = ""
             if bool('key' in self._ssl) != bool('cert' in self._ssl):
                 raise AttributeError(
                     "ssl_key and ssl_cert need to be both "
@@ -365,6 +532,18 @@ class MySQLConnectionAbstract(object):
                     "ssl_key and ssl_cert need to be both "
                     "set, or neither."
                 )
+            if "tls_versions" in self._ssl and \
+               self._ssl["tls_versions"] is not None:
+                if self._ssl_disabled:
+                    raise AttributeError("The tls_versions option can not be "
+                                         "used along with ssl_disabled.")
+                self._validate_tls_versions()
+
+            if "tls_ciphersuites" in self._ssl and self._ssl["tls_ciphersuites"] is not None:
+                if self._ssl_disabled:
+                    raise AttributeError("The tls_ciphersuites option can not "
+                                         "be used along with ssl_disabled.")
+                self._validate_tls_ciphersuites()
 
         if self._conn_attrs is None:
             self._conn_attrs = {}
@@ -779,7 +958,7 @@ class MySQLConnectionAbstract(object):
 
         self.disconnect()
         self._open_connection()
-        # Server does not allow to run any other statement different from ALTER 
+        # Server does not allow to run any other statement different from ALTER
         # when user's password has been expired.
         if not self._client_flags & ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS:
             self._post_connection()

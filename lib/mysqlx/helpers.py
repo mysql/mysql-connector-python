@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -25,7 +25,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
-
 """This module contains helper functions."""
 
 import functools
@@ -33,6 +32,8 @@ import inspect
 import warnings
 
 from .compat import NUMERIC_TYPES
+from .constants import TLS_CIPHER_SUITES, TLS_VERSIONS
+from .errors import InterfaceError
 
 
 def encode_to_bytes(value, encoding="utf-8"):
@@ -166,3 +167,28 @@ def deprecated(version=None, reason=None):
             return func(*args, **kwargs)
         return wrapper
     return decorate
+
+def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
+    """Translates a cipher suites names list; from IANI names to OpenSSL names.
+
+    Args:
+        TLS_version (str): The TLS version to look at for a translation.
+        cipher_suite_names (list): A list of cipher suites names.
+    """
+    translated_names = []
+
+    cipher_suites = {}#TLS_CIPHER_SUITES[TLS_version]
+
+    # Find the previews TLS versions of the given on TLS_version
+    for index in range(TLS_VERSIONS.index(tls_version) + 1):
+        cipher_suites.update(TLS_CIPHER_SUITES[TLS_VERSIONS[index]])
+
+    for name in cipher_suites_names:
+        if "-" in name:
+            translated_names.append(name)
+        elif name in cipher_suites:
+            translated_names.append(cipher_suites[name])
+        else:
+            raise InterfaceError("The '{}' in cipher suites is not a valid "
+                                 "cipher suite".format(name))
+    return translated_names

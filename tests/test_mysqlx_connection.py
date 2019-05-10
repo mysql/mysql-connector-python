@@ -45,7 +45,9 @@ import mysqlx
 from threading import Thread
 from time import sleep
 
+from . import check_tls_versions_support
 from mysqlx.connection import SocketStream
+from mysqlx.connection import TLS_V1_3_SUPPORTED
 from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
@@ -199,7 +201,7 @@ def build_uri(**kwargs):
     if "connection_attributes" in kwargs:
         conn_attrs = kwargs["connection_attributes"]
         if isinstance(conn_attrs, STRING_TYPES) and \
-           not (conn_attrs.startswith("[") and conn_attrs.endswith("[")):
+           not (conn_attrs.startswith("[") and conn_attrs.endswith("]")):
             query.append("connection-attributes={}"
                          "".format(kwargs["connection_attributes"]))
         else:
@@ -208,6 +210,24 @@ def build_uri(**kwargs):
                 attr_list.append("{}={}".format(key, conn_attrs[key]))
             query.append("connection-attributes={0}"
                          "".format("[{}]".format(",".join(attr_list))))
+
+    if "tls-versions" in kwargs:
+        tls_versions = kwargs["tls-versions"]
+        if isinstance(tls_versions, STRING_TYPES) and \
+           not (tls_versions.startswith("[") and tls_versions.endswith("]")):
+            query.append("tls-versions=[{}]"
+                         "".format(kwargs["tls-versions"]))
+        else:
+            query.append("tls-versions=[{}]".format(",".join(tls_versions)))
+
+    if "tls-ciphersuites" in kwargs:
+        tls_ciphers = kwargs["tls-ciphersuites"]
+        if isinstance(tls_ciphers, STRING_TYPES) and \
+           not (tls_ciphers.startswith("[") and tls_ciphers.endswith("]")):
+            query.append("tls-ciphersuites=[{}]"
+                         "".format(",".format(tls_ciphers)))
+        else:
+            query.append("tls-ciphersuites=[{}]".format(",".join(tls_ciphers)))
 
     if len(query) > 0:
         uri = "{0}?{1}".format(uri, "&".join(query))
@@ -920,14 +940,29 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(InterfaceError, mysqlx.get_session, config)
 
         # Connection with ssl parameters
-        config["ssl-mode"] = "verify_identity"
+        # Setting an invalid host name against a server certificate
+        config["host"] = "127.0.0.1"
+        # Should connect with ssl_mode=False
+        config["ssl-mode"] = "verify_ca"
         session = mysqlx.get_session(config)
-
-        res = mysqlx.statement.SqlStatement(session._connection,
+        res = session.sql(
             "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
         self.assertEqual("ON", res[0][1])
 
-        res = mysqlx.statement.SqlStatement(session._connection,
+        # Should fail to connect with verify_identity
+        config["ssl-mode"] = "verify_identity"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Should connect with verify_identitythe and correct host name 
+        config["host"] = "localhost"
+        config["ssl-mode"] = "verify_identity"
+        session = mysqlx.get_session(config)
+
+        res = session.sql(
+            "SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
+        self.assertEqual("ON", res[0][1])
+
+        res = session.sql(
             "SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
         self.assertTrue("TLS" in res[0][1])
 
@@ -958,6 +993,288 @@ class MySQLxSessionTests(tests.MySQLxTests):
                  ("ssl_cert", file_uri(tests.SSL_CERT))]
         uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
         session = mysqlx.get_session(uri)
+
+    @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
+                     "not available for Python versions < 2.7.9.")
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 40), "TLSv1.1 incompatible")
+    def test_get_session_with_tls_version(self):
+        # Test None value is returned if no schema name is specified
+        settings = self.connect_kwargs.copy()
+        settings.pop("schema")
+        settings.pop("socket")
+
+        # Dictionary connection settings tests using dict settings
+        # Empty tls_version list
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = []
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        self.assertTrue(("At least one" in context.exception.msg), "Unexpected "
+                        "exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Empty tls_ciphersuites list using dict settings
+        settings["tls-ciphersuites"] = []
+        settings["tls-versions"] = ["TLSv1"]
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        self.assertTrue(("No valid cipher suite" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Given tls-version not in ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv0.2", "TLSv1.7", "TLSv10.2"]
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+
+        # Repeated values in tls-versions on dict settings
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv1.2", "TLSv1.1", "TLSv1.2"]
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+
+        # Empty tls-versions on dict settings
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = []
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+        self.assertTrue(("At least one TLS" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Verify unkown cipher suite case?
+        settings["tls-ciphersuites"] = ["NOT-KNOWN"]
+        settings["tls-versions"] = ["TLSv1.2"]
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(settings)
+
+        # URI string connection settings tests
+        # Empty tls_version list on URI
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = []
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("At least one" in context.exception.msg), "Unexpected "
+                        "exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Empty tls_ciphersuites list without tls-versions
+        settings["tls-ciphersuites"] = []
+        settings.pop("tls-versions")
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("No valid cipher suite" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Empty tls_ciphersuites list without tls-versions
+        settings["tls-ciphersuites"] = ["INVALID"]
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("value 'INVALID' in cipher" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        settings["tls-ciphersuites"] = "INVALID"
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("No valid cipher suite" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Invalid value on tls_version list on URI
+        settings.pop("tls-ciphersuites")
+        settings["tls-versions"] = "INVALID"
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("tls-version: 'INVALID' is" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Empty tls_ciphersuites list
+        settings["tls-ciphersuites"] = []
+        settings["tls-versions"] = ["TLSv1"]
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("No valid cipher suite" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Given tls-version not in ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv0.2", "TLSv1.7", "TLSv10.2"]
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+
+        # Empty tls-versions list
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = []
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("At least one TLS" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Repeated values in tls-versions on URI
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv1.2", "TLSv1.1", "TLSv1.2"]
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+
+        # Repeated tls-versions on URI
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv1.2", "TLSv1.3"]
+        uri_settings = build_uri(**settings)
+        uri_settings = "{}&{}".format(uri_settings,
+                                      "tls-versions=[TLSv1.1,TLSv1.2]")
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("Duplicate option" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Verify InterfaceError exception is raised With invalid TLS version
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv8"]
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+        self.assertTrue(("not recognized" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        # Verify unkown cipher suite case?
+        settings["tls-ciphersuites"] = ["NOT-KNOWN"]
+        settings["tls-versions"] = ["TLSv1.2"]
+        uri_settings = build_uri(**settings)
+        with self.assertRaises(InterfaceError) as context:
+            _ = mysqlx.get_session(uri_settings)
+
+        # Verify that TLSv1.3 version is accepted (connection success)
+        # even if it's unsupported.
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-versions"] = ["TLSv1.3", "TLSv1.2"]
+        uri_settings = build_uri(**settings)
+        # Connection must be successfully by including another TLS version
+        _ = mysqlx.get_session(uri_settings)
+
+        supported_tls = check_tls_versions_support(
+            ["TLSv1.2", "TLSv1.1", "TLSv1"])
+        if not supported_tls:
+            self.fail("No TLS version to test: {}".format(supported_tls))
+        if len(supported_tls) > 1:
+            # Verify given TLS version is used
+            settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+            for tes_ver in supported_tls:
+                settings["tls-versions"] = [tes_ver]
+                uri_settings = build_uri(**settings)
+                session = mysqlx.get_session(uri_settings)
+                status = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version%'"
+                                     ).execute().fetch_all()
+                for row in status:
+                    if row.get_string("Variable_name") == 'Mysqlx_ssl_version':
+                        self.assertEqual(row.get_string("Value"), tes_ver,
+                                         "Unexpected TLS version found: {} for: {}"
+                                         "".format(row.get_string("Value"),
+                                                   tes_ver))
+
+        # Following tests requires TLSv1.2
+        if tests.MYSQL_VERSION < (8, 0, 17):
+            return
+
+        if "TLSv1.1" in supported_tls:
+            # Verify the newest TLS version is used from the given list
+            exp_res = ["TLSv1.2", "TLSv1.1", "TLSv1.2"]
+            test_vers = [["TLSv1", "TLSv1.2", "TLSv1.1"], ["TLSv1", "TLSv1.1"],
+                         ["TLSv1.2", "TLSv1"]]
+            for tes_ver, exp_ver in zip(test_vers, exp_res):
+                settings["tls-versions"] = tes_ver
+                uri_settings = build_uri(**settings)
+                session = mysqlx.get_session(uri_settings)
+                status = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version%'"
+                                     ).execute().fetch_all()
+                for row in status:
+                    if row.get_string('Variable_name') == 'Mysqlx_ssl_version':
+                        self.assertEqual(row.get_string('Value'), exp_ver,
+                                         "Unexpected TLS version found: {}"
+                                         "".format(row.get_string('Value')))
+
+        # Verify given TLS cipher suite is used
+        exp_res = ["DHE-RSA-AES256-SHA256", "DHE-RSA-AES256-SHA256",
+                   "DHE-RSA-AES128-GCM-SHA256"]
+        test_ciphers = [["TLS_DHE_RSA_WITH_AES_256_CBC_SHA256"],
+                        ["DHE-RSA-AES256-SHA256"],
+                        ["TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"]]
+        settings["tls-versions"] = "TLSv1.2"
+        for test_cipher, exp_ver in zip(test_ciphers, exp_res):
+            settings["tls-ciphersuites"] = test_cipher
+            uri_settings = build_uri(**settings)
+            session = mysqlx.get_session(uri_settings)
+            status = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_cipher%'"
+                                 ).execute().fetch_all()
+            for row in status:
+                if row.get_string("Variable_name") == "Mysqlx_ssl_cipher":
+                    self.assertEqual(row.get_string("Value"), exp_ver,
+                                     "Unexpected TLS version found: {} for: {}"
+                                     "".format(row.get_string("Value"),
+                                               test_cipher))
+
+        # Verify one of TLS cipher suite is used from the given list
+        exp_res = ["DHE-RSA-AES256-SHA256", "DHE-RSA-AES256-SHA256",
+                   "DHE-RSA-AES128-GCM-SHA256"]
+        test_ciphers = ["TLS_DHE_RSA_WITH_AES_256_CBC_SHA256",
+                        "DHE-RSA-AES256-SHA256",
+                        "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"]
+        settings["tls-ciphersuites"] = test_ciphers
+        settings["tls-versions"] = "TLSv1.2"
+        uri_settings = build_uri(**settings)
+        session = mysqlx.get_session(uri_settings)
+        status = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_cipher%'"
+                             ).execute().fetch_all()
+        for row in status:
+            if row.get_string("Variable_name") == "Mysqlx_ssl_cipher":
+                self.assertIn(row.get_string("Value"), exp_res,
+                                 "Unexpected TLS version found: {} not in {}"
+                                 "".format(row.get_string('Value'), exp_res))
+
+        if "TLSv1.1" in supported_tls:
+            # Verify behavior when "TLSv1.3" is not supported.
+            if TLS_V1_3_SUPPORTED:
+                exp_tls_ver = "TLSv1.3"
+            else:
+                exp_tls_ver = "TLSv1.2"
+            # connection success with secundary TLS given version.
+            settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+            settings["tls-versions"] = ["TLSv1.3", "TLSv1.2"]
+            settings_n = 0
+            for settings_case in [settings, build_uri(**settings)]:
+                settings_n +=1
+                session = mysqlx.get_session(settings_case)
+                status = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version%'"
+                                     ).execute().fetch_all()
+                for row in status:
+                    if row.get_string('Variable_name') == 'Mysqlx_ssl_version':
+                        self.assertEqual(row.get_string('Value'), exp_tls_ver,
+                            "Unexpected TLS version {} while using settings#{}"
+                            ": {}".format(row.get_string('Value'),
+                                          settings_n, settings_case))
+
+        # Verify error when TLSv1.3 is not supported.
+        if not TLS_V1_3_SUPPORTED:
+            settings["tls-versions"] = ["TLSv1.3"]
+            for settings_case in [settings, build_uri(**settings)]:
+                with self.assertRaises(InterfaceError) as context:
+                    _ = mysqlx.get_session(settings_case)
 
     def test_disabled_x_protocol(self):
         session = mysqlx.get_session(self.connect_kwargs)

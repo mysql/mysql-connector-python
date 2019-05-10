@@ -31,12 +31,14 @@
 import re
 import json
 import logging
+import ssl
 
 from . import constants
 from .compat import (INT_TYPES, STRING_TYPES, JSONDecodeError, urlparse,
                      unquote, parse_qsl)
 from .connection import Client, Session
-from .constants import Auth, LockContention, SSLMode
+from .constants import (Auth, LockContention, OPENSSL_CS_NAMES, SSLMode,
+                        TLS_VERSIONS, TLS_CIPHER_SUITES)
 from .crud import Schema, Collection, Table, View
 from .dbdoc import DbDoc
 # pylint: disable=W0622
@@ -57,13 +59,30 @@ from .expr import ExprParser as expr
 _SPLIT_RE = re.compile(r",(?![^\(\)]*\))")
 _PRIORITY_RE = re.compile(r"^\(address=(.+),priority=(\d+)\)$", re.VERBOSE)
 _URI_SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+\-.]+)://(.*)")
-_SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
+_SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl", "tls-versions",
+             "tls-ciphersuites"]
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
                           "routers", "socket", "ssl-mode", "auth", "use-pure",
                           "connect-timeout", "connection-attributes",
                           "dns-srv"]
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+DUPLICATED_IN_LIST_ERROR = (
+    "The '{list}' list must not contain repeated values, the value "
+    "'{value}' is duplicated.")
+
+TLS_VERSION_ERROR = ("The given tls-version: '{}' is not recognized as a valid "
+                     "TLS protocol version (should be one of {}).")
+
+TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
+                        "'tls-versions' list '{}'. ")
+
+TLS_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]
+
+TLS_V1_3_SUPPORTED = False
+if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+    TLS_V1_3_SUPPORTED = True
 
 
 def _parse_address_list(path):
@@ -249,6 +268,12 @@ def _validate_settings(settings):
     elif "host" in settings and not settings.get("port"):
         settings["port"] = 33060
 
+    if "tls-versions" in settings:
+        validate_tls_versions(settings)
+
+    if "tls-ciphersuites" in settings:
+        validate_tls_ciphersuites(settings)
+
 
 def _validate_hosts(settings, default_port=None):
     """Validate hosts.
@@ -382,6 +407,162 @@ def validate_connection_attributes(settings):
                                      "".format(attr_name, attr_value))
 
     settings["connection-attributes"] = attributes
+
+
+def validate_tls_versions(settings):
+    """Validate tls-versions.
+
+    Args:
+        settings (dict): Settings dictionary.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: If tls-versions name is not valid.
+    """
+    tls_versions = []
+    if "tls-versions" not in settings:
+        return
+
+    tls_versions_settings = settings["tls-versions"]
+
+    if isinstance(tls_versions_settings, STRING_TYPES):
+        if not (tls_versions_settings.startswith("[") and
+                tls_versions_settings.endswith("]")):
+            raise InterfaceError("tls-versions must be a list, found: '{}'"
+                                 "".format(tls_versions_settings))
+        else:
+            tls_vers = tls_versions_settings[1:-1].split(",")
+            for tls_ver in tls_vers:
+                tls_version = tls_ver.strip()
+                if tls_version == "":
+                    continue
+                if tls_version not in TLS_VERSIONS:
+                    raise InterfaceError(TLS_VERSION_ERROR.format(tls_version,
+                                                                  TLS_VERSIONS))
+                else:
+                    if tls_version in tls_versions:
+                        raise InterfaceError(
+                            DUPLICATED_IN_LIST_ERROR.format(
+                                list="tls_versions", value=tls_version))
+                    tls_versions.append(tls_version)
+    elif isinstance(tls_versions_settings, list):
+        if not tls_versions_settings:
+            raise InterfaceError("At least one TLS protocol version must be "
+                                 "specified in 'tls-versions' list.")
+        for tls_ver in tls_versions_settings:
+            if tls_ver not in TLS_VERSIONS:
+                raise InterfaceError(TLS_VERSION_ERROR.format(tls_ver,
+                                                              TLS_VERSIONS))
+            elif tls_ver in tls_versions:
+                raise InterfaceError(
+                    DUPLICATED_IN_LIST_ERROR.format(list="tls_versions",
+                                                    value=tls_ver))
+            else:
+                tls_versions.append(tls_ver)
+
+    elif isinstance(tls_versions_settings, set):
+        for tls_ver in tls_versions_settings:
+            if tls_ver not in TLS_VERSIONS:
+                raise InterfaceError(TLS_VERSION_ERROR.format(tls_ver,
+                                                              TLS_VERSIONS))
+            else:
+                tls_versions.append(tls_ver)
+    else:
+        raise InterfaceError("tls-versions should be a list with one or more "
+                             "of versions in {}. found: '{}'"
+                             "".format(", ".join(TLS_VERSIONS), tls_versions))
+
+    if not tls_versions:
+        raise InterfaceError("At least one TLS protocol version must be "
+                             "specified in 'tls-versions' list.")
+
+    if tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
+            raise InterfaceError(
+                TLS_VER_NO_SUPPORTED.format(tls_versions, TLS_VERSIONS))
+
+    settings["tls-versions"] = tls_versions
+
+
+def validate_tls_ciphersuites(settings):
+    """Validate tls-ciphersuites.
+
+    Args:
+        settings (dict): Settings dictionary.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: If tls-ciphersuites name is not valid.
+    """
+    tls_ciphersuites = []
+    if "tls-ciphersuites" not in settings:
+        return
+
+    tls_ciphersuites_settings = settings["tls-ciphersuites"]
+
+    if isinstance(tls_ciphersuites_settings, STRING_TYPES):
+        if not (tls_ciphersuites_settings.startswith("[") and
+                tls_ciphersuites_settings.endswith("]")):
+            raise InterfaceError("tls-ciphersuites must be a list, found: '{}'"
+                                 "".format(tls_ciphersuites_settings))
+        else:
+            tls_css = tls_ciphersuites_settings[1:-1].split(",")
+            if not tls_css:
+                raise InterfaceError("No valid cipher suite found in the "
+                                     "'tls-ciphersuites' list.")
+            for tls_cs in tls_css:
+                tls_cs = tls_cs.strip().upper()
+                if tls_cs:
+                    tls_ciphersuites.append(tls_cs)
+    elif isinstance(tls_ciphersuites_settings, list):
+        tls_ciphersuites = [tls_cs for tls_cs in tls_ciphersuites_settings
+                            if tls_cs]
+
+    elif isinstance(tls_ciphersuites_settings, set):
+        for tls_cs in tls_ciphersuites:
+            if tls_cs:
+                tls_ciphersuites.append(tls_cs)
+    else:
+        raise InterfaceError("tls-ciphersuites should be a list with one or "
+                             "more ciphersuites. Found: '{}'"
+                             "".format(tls_ciphersuites_settings))
+
+    tls_versions = TLS_VERSIONS[:] if settings.get("tls-versions", None) \
+       is None else settings["tls-versions"][:]
+
+    # A newer TLS version can use a cipher introduced on
+    # an older version.
+    tls_versions.sort(reverse=True)
+    newer_tls_ver = tls_versions[0]
+
+    translated_names = []
+    iani_cipher_suites_names = {}
+    ossl_cipher_suites_names = []
+
+    # Old ciphers can work with new TLS versions.
+    # Find all the ciphers introduced on previous TLS versions
+    for tls_ver in TLS_VERSIONS[:TLS_VERSIONS.index(newer_tls_ver) + 1]:
+        iani_cipher_suites_names.update(TLS_CIPHER_SUITES[tls_ver])
+        ossl_cipher_suites_names.extend(OPENSSL_CS_NAMES[tls_ver])
+
+    for name in tls_ciphersuites:
+        if "-" in name and name in ossl_cipher_suites_names:
+            translated_names.append(name)
+        elif name in iani_cipher_suites_names:
+            translated_name = iani_cipher_suites_names[name]
+            if translated_name in translated_names:
+                raise AttributeError(
+                    DUPLICATED_IN_LIST_ERROR.format(
+                        list="tls_ciphersuites", value=translated_name))
+            else:
+                translated_names.append(translated_name)
+        else:
+            raise InterfaceError(
+                "The value '{}' in cipher suites is not a valid "
+                "cipher suite".format(name))
+
+    if not translated_names:
+        raise InterfaceError("No valid cipher suite found in the "
+                             "'tls-ciphersuites' list.")
+
+    settings["tls-ciphersuites"] = translated_names
 
 
 def _get_connection_settings(*args, **kwargs):

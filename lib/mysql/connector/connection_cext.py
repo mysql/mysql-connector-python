@@ -185,11 +185,27 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "conn_attrs": self._conn_attrs
         }
 
+        tls_versions = self._ssl.get('tls_versions')
+        if tls_versions is not None:
+            tls_versions.sort(reverse=True)
+            tls_versions = ",".join(tls_versions)
+        if self._ssl.get('tls_ciphersuites') is not None:
+            ssl_ciphersuites = self._ssl.get('tls_ciphersuites')[0]
+            tls_ciphersuites = self._ssl.get('tls_ciphersuites')[1]
+        else:
+            ssl_ciphersuites = None
+            tls_ciphersuites = None
+        if tls_versions is not None and "TLSv1.3" in tls_versions and \
+           not tls_ciphersuites:
+            tls_ciphersuites = "TLS_AES_256_GCM_SHA384"
         if not self._ssl_disabled:
             cnx_kwargs.update({
                 'ssl_ca': self._ssl.get('ca'),
                 'ssl_cert': self._ssl.get('cert'),
                 'ssl_key': self._ssl.get('key'),
+                'ssl_cipher_suites': ssl_ciphersuites,
+                'tls_versions': tls_versions,
+                'tls_cipher_suites': tls_ciphersuites,
                 'ssl_verify_cert': self._ssl.get('verify_cert') or False,
                 'ssl_verify_identity':
                     self._ssl.get('verify_identity') or False,
@@ -201,6 +217,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
+
         self._do_handshake()
 
     def close(self):

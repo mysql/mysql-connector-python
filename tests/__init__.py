@@ -940,3 +940,33 @@ def check_c_extension(exc=None):
     else:
         LOGGER.error("C Extension not available: %s", error_msg)
         sys.exit(1)
+
+def check_tls_versions_support(tls_versions):
+    """Check whether we can connect with given TLS version
+
+    Attempts a connection to a server using a specific TLS version but does not verify
+    which TLS version was used on the connection.
+
+    :param: List of TLS versions to test.
+    :return: List of supported TLS versions.
+    :rtype: list
+    """
+    settings = get_mysql_config()
+    if "socket" in settings:
+        settings.pop("socket")
+    if "unix_socket" in settings:
+            settings.pop("unix_socket")
+    supported_tls = []
+    try:
+        from mysql.connector import MySQLConnection
+        for tls_v in tls_versions:
+            try:
+                settings["tls_versions"] = [tls_v]
+                cnx = MySQLConnection(**settings)
+                cnx.close()
+                supported_tls.append(tls_v)
+            except:
+                pass
+    except ImportError:
+        pass
+    return supported_tls
