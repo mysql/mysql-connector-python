@@ -73,6 +73,7 @@ DEFAULT_CONFIGURATION = {
     'auth_plugin': None,
     'allow_local_infile': False,
     'consume_results': False,
+    'conn_attrs': None,
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
@@ -448,6 +449,7 @@ class ClientFlag(_Flags):
         SECURE_CONNECTION,
         MULTI_STATEMENTS,
         MULTI_RESULTS,
+        CONNECT_ARGS
     ]
 
     @classmethod
@@ -782,3 +784,7 @@ class SQLMode(_Constants):
                     and not hasattr(getattr(cls, key), '__call__'):
                 res.append(key)
         return tuple(sorted(res))
+
+CONN_ATTRS_DN = ["_pid", "_platform", "_source_host", "_client_name",
+                 "_client_license", "_client_version", "_os", "_connector_name",
+                 "_connector_license", "_connector_version"]

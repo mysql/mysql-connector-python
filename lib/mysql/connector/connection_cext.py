@@ -32,7 +32,9 @@
 # Detection of abstract methods in pylint is not working correctly
 #pylint: disable=W0223
 
-from . import errors
+import socket
+
+from . import errors, version
 from .catch23 import INT_TYPES
 from .constants import (
     CharacterSet, FieldFlag, ServerFlag, ShutdownType, ClientFlag
@@ -76,6 +78,22 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         if kwargs:
             self.connect(**kwargs)
+
+    def _add_default_conn_attrs(self):
+        """Add default connection attributes"""
+        license_chunks = version.LICENSE.split(" ")
+        if license_chunks[0] == "GPLv2":
+            client_license = "GPL-2.0"
+        else:
+            client_license = "Commercial"
+
+        self._conn_attrs.update({
+            "_connector_name": "mysql-connector-python",
+            "_connector_license": client_license,
+            "_connector_version": ".".join(
+                [str(x) for x in version.VERSION[0:3]]),
+            "_source_host": socket.gethostname()
+            })
 
     def _do_handshake(self):
         """Gather information of the MySQL server before authentication"""
@@ -161,7 +179,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
             'client_flags': self._client_flags,
             'unix_socket': self._unix_socket,
             'compress': self.isset_client_flag(ClientFlag.COMPRESS),
-            'ssl_disabled': True
+            'ssl_disabled': True,
+            "conn_attrs": self._conn_attrs
         }
 
         if not self._ssl_disabled:

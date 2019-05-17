@@ -1050,11 +1050,13 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
     char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL;
     PyObject *charset_name= NULL, *compress= NULL, *ssl_verify_cert= NULL,
-             *ssl_verify_identity= NULL, *ssl_disabled= NULL;
+             *ssl_verify_identity= NULL, *ssl_disabled= NULL,
+             *conn_attrs= NULL, *key= NULL, *value= NULL;
     const char* auth_plugin;
     unsigned long client_flags= 0;
     unsigned int port= 3306, tmp_uint;
     unsigned int protocol= 0;
+    Py_ssize_t pos= 0;
 #if MYSQL_VERSION_ID >= 50711
     unsigned int ssl_mode;
 #endif
@@ -1076,14 +1078,13 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     {
         "host", "user", "password", "database",	"port", "unix_socket",
         "client_flags", "ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert",
-        "ssl_verify_identity", "ssl_disabled", "compress",
+        "ssl_verify_identity", "ssl_disabled", "compress", "conn_attrs",
         NULL
     };
-
 #ifdef PY3
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzO!O!O!O!O!", kwlist,
 #else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzO!O!O!O!O!", kwlist,
 #endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
@@ -1092,7 +1093,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                                      &PyBool_Type, &ssl_verify_cert,
                                      &PyBool_Type, &ssl_verify_identity,
                                      &PyBool_Type, &ssl_disabled,
-                                     &PyBool_Type, &compress))
+                                     &PyBool_Type, &compress,
+									 &PyDict_Type, &conn_attrs))
     {
         return NULL;
     }
@@ -1239,6 +1241,67 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     if (client_flags & CLIENT_LOCAL_FILES) {
         unsigned int val= 1;
         mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, &val);
+    }
+
+    if (conn_attrs != NULL)
+    {
+		while (PyDict_Next(conn_attrs, &pos, &key, &value)) {
+			char* attr_name;
+#ifdef PY3
+			PyObject *str_name = PyObject_Str(key);
+			if (!str_name)
+			{
+				printf("Unable to get attribute name\n");
+			}
+			attr_name= PyUnicode_AsUTF8AndSize(str_name, NULL);
+#else
+			PyObject* u_attr_name= NULL;
+			if (PyUnicode_Check(key))
+			{
+				u_attr_name= PyUnicode_AsUTF8String(key);
+				attr_name= PyString_AsString(u_attr_name);
+			}
+			else
+			{
+				attr_name= PyString_AsString(key);
+			}
+#endif
+			char* attr_value;
+#ifdef PY3
+			PyObject *str_value = PyObject_Str(value);
+			if (!str_value)
+			{
+				printf("Unable to get attribute value\n");
+			}
+			attr_value= PyUnicode_AsUTF8AndSize(str_value, NULL);
+#else
+			PyObject* u_attr_value= NULL;
+			if (PyUnicode_Check(value))
+			{
+				u_attr_value= PyUnicode_AsUTF8String(value);
+				attr_value= PyString_AsString(u_attr_value);
+			}
+			else
+			{
+				attr_value= PyString_AsString(value);
+			}
+#endif
+			mysql_options4(&self->session, MYSQL_OPT_CONNECT_ATTR_ADD, attr_name, attr_value);
+
+#ifdef PY3
+			Py_DECREF(str_name);
+			Py_DECREF(str_value);
+#else
+			if (u_attr_name != NULL)
+			{
+				Py_DECREF(u_attr_name);
+			}
+			if (u_attr_value != NULL)
+			{
+				Py_DECREF(u_attr_value);
+			}
+#endif
+		}
     }
 
 #ifdef PY3

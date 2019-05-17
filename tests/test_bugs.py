@@ -2434,7 +2434,8 @@ class BugOra16217765(tests.MySQLConnectorTests):
         user = self.users['sha256user']
         config['user'] = user['username']
         config['password'] = user['password']
-        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH]
+        config['client_flags'] = [constants.ClientFlag.PLUGIN_AUTH,
+                                  -constants.ClientFlag.CONNECT_ARGS]
         config['auth_plugin'] = user['auth_plugin']
 
         try:
@@ -2448,7 +2449,8 @@ class BugOra16217765(tests.MySQLConnectorTests):
             cnx.cmd_change_user(config['user'], config['password'])
         except:
             self.fail("Changing user using sha256_password auth failed "
-                      "with pure Python connector")
+                      "with pure Python connector. \nflags on cnx: {} \n"
+                      "".format(config['client_flags']))
 
         if CMySQLConnection:
             try:

@@ -29,8 +29,10 @@
 """Unittests for mysql.connector.connection
 """
 
+import copy
 import os
 import logging
+import platform
 import timeit
 import unittest
 from decimal import Decimal
@@ -51,6 +53,7 @@ from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.version import VERSION, LICENSE
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
@@ -1789,3 +1792,160 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, cur.fetchall())
         cur.execute("DROP TABLE IF EXISTS local_data")
         cur.close()
+
+    @tests.foreach_cnx()
+    def test_connection_attributes_defaults(self):
+        """Test default connection attributes"""
+        if os.name == "nt":
+            if "64" in platform.architecture()[0]:
+                platform_arch = "x86_64"
+            elif "32" in platform.architecture()[0]:
+                platform_arch = "i386"
+            else:
+                platform_arch = platform.architecture()
+            os_ver = "Windows-{}".format(platform.win32_ver()[1])
+        else:
+            platform_arch = platform.machine()
+            if platform.system() == "Darwin":
+                os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
+            else:
+                os_ver = "-".join(platform.linux_distribution()[0:2])
+
+        license_chunks = LICENSE.split(" ")
+        if license_chunks[0] == "GPLv2":
+            client_license = "GPL-2.0"
+        else:
+            client_license = "Commercial"
+
+        cur = self.cnx.cursor()
+        # Verify user defined session-connection-attributes are in the server
+        cur.execute("SHOW VARIABLES LIKE \"pseudo_thread_id\"")
+        pseudo_thread_id = cur.fetchall()[0][1]
+        get_attrs = ("SELECT ATTR_NAME, ATTR_VALUE FROM "
+                    "performance_schema.session_account_connect_attrs "
+                    "where PROCESSLIST_ID = \"{}\"")
+        cur.execute(get_attrs.format(pseudo_thread_id))
+        rows = cur.fetchall()
+        res_dict = dict(rows)
+        if CMySQLConnection is not None and \
+           isinstance(self.cnx, CMySQLConnection):
+            expected_attrs = {
+                "_source_host": socket.gethostname(),
+                "_connector_name": "mysql-connector-python",
+                "_connector_license": client_license,
+                "_connector_version": ".".join([str(x) for x in VERSION[0:3]]),
+            }
+        else:
+            expected_attrs = {
+                "_pid": str(os.getpid()),
+                "_platform": platform_arch,
+                "_source_host": socket.gethostname(),
+                "_client_name": "mysql-connector-python",
+                "_client_license": client_license,
+                "_client_version": ".".join([str(x) for x in VERSION[0:3]]),
+                "_os": os_ver
+            }
+        # Note that for an empty string "" value the server stores a Null value
+        for attr_name in expected_attrs:
+            self.assertEqual(expected_attrs[attr_name], res_dict[attr_name],
+                             "Attribute {} with value {} differs of {}"
+                             "".format(attr_name, res_dict[attr_name],
+                                       expected_attrs[attr_name]))
+
+    def test_connection_attributes_user_defined(self):
+        """Tests defined connection attributes"""
+        config = tests.get_mysql_config()
+        use_pure_values = [True]
+        if HAVE_CMYSQL:
+            use_pure_values.append(False)
+        for use_pure in use_pure_values:
+            config['use_pure'] = use_pure
+
+            # Validate an error is raised if user defined connection attributes
+            # are invalid
+            invalid_conn_attrs = [{1:"1"}, {1:2}, {"_invalid":""}, {"_": ""},
+                                  123, 123.45, "text", {"_invalid"}, ['_a1=2',]]
+
+            for invalid_attr in invalid_conn_attrs:
+                test_config = copy.deepcopy(config)
+                test_config['conn_attrs'] = invalid_attr
+                with self.assertRaises(errors.InterfaceError) as _:
+                    _ = connect(**test_config)
+                    LOGGER.error("InterfaceError not raised while testing "
+                                 "invalid attribute: {}".format(invalid_attr))
+
+            # Test error is raised for attribute name starting with '_'
+            connection_attributes = [
+                {"foo": "bar", "_baz": "zoom"},
+                {"_baz": "zoom"},
+                {"foo": "bar", "_baz": "zoom", "puuuuum": "kaplot"}
+            ]
+            for invalid_attr in connection_attributes:
+                test_config = copy.deepcopy(config)
+                test_config['conn_attrs'] = invalid_attr
+                with self.assertRaises(errors.InterfaceError) as _:
+                    _ = connect(**test_config)
+                    LOGGER.error("InterfaceError not raised while testing "
+                                 "invalid attribute: {}".format(invalid_attr))
+
+            # Test error is raised for attribute name size exceeds 32 characters
+            connection_attributes = [
+                {"foo": "bar", "p{}w".format("o"*31): "kaplot"},
+                {"p{}w".format("o"*31): "kaplot"},
+                {"baz": "zoom", "p{}w".format("o"*31): "kaplot", "a": "b"}
+            ]
+            for invalid_attr in connection_attributes:
+                test_config = copy.deepcopy(config)
+                test_config['conn_attrs'] = invalid_attr
+                with self.assertRaises(errors.InterfaceError) as context:
+                    _ = connect(**test_config)
+                    LOGGER.error("InterfaceError not raised while testing "
+                                 "invalid attribute: {}".format(invalid_attr))
+
+                self.assertTrue("exceeds 32 characters limit size" in
+                                context.exception.msg)
+
+            # Test error is raised for attribute value size exceeds 1024 characters
+            connection_attributes = [
+                {"foo": "bar", "pum": "kr{}nk".format("u"*1024)},
+                {"pum": "kr{}nk".format("u"*1024)},
+                {"baz": "zoom", "pum": "kr{}nk".format("u"*1024), "a": "b"}
+            ]
+            for invalid_attr in connection_attributes:
+                test_config = copy.deepcopy(config)
+                test_config['conn_attrs'] = invalid_attr
+                with self.assertRaises(errors.InterfaceError) as context:
+                    _ = connect(**test_config)
+                    LOGGER.error("InterfaceError not raised while testing "
+                                 "invalid attribute: {}".format(invalid_attr))
+
+            self.assertTrue("exceeds 1024 characters limit size" in
+                            context.exception.msg)
+
+            # Validate the user defined attributes are created in the server
+            connection_attributes = {
+                "foo": "bar",
+                "baz": "zoom",
+                "quash": "",
+                "puuuuum": "kaplot"
+            }
+            test_config = copy.deepcopy(config)
+            test_config['conn_attrs'] = connection_attributes
+            cnx = connect(**test_config)
+            cur = cnx.cursor()
+            cur.execute("SHOW VARIABLES LIKE \"pseudo_thread_id\"")
+            pseudo_thread_id = cur.fetchall()[0][1]
+            get_attrs = ("SELECT ATTR_NAME, ATTR_VALUE FROM "
+                        "performance_schema.session_account_connect_attrs "
+                        "where PROCESSLIST_ID = \"{}\"")
+            cur.execute(get_attrs.format(pseudo_thread_id))
+            rows = cur.fetchall()
+            res_dict = dict(rows)
+            expected_attrs = copy.deepcopy(connection_attributes)
+            # Note: For an empty string "" value the server stores a Null value
+            expected_attrs["quash"] = None
+            for attr_name in expected_attrs:
+                self.assertEqual(expected_attrs[attr_name], res_dict[attr_name],
+                                 "Attribute {} with value {} differs of {}"
+                                 "".format(attr_name, res_dict[attr_name],
+                                           expected_attrs[attr_name]))

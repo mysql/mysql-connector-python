@@ -31,6 +31,8 @@
 
 from io import IOBase
 import os
+import platform
+import socket
 import time
 
 from .authentication import get_auth_plugin
@@ -40,7 +42,7 @@ from .constants import (
     flag_is_set, ShutdownType, NET_BUFFER_LENGTH
 )
 
-from . import errors
+from . import errors, version
 from .conversion import MySQLConverter
 from .cursor import (
     CursorBase, MySQLCursor, MySQLCursorRaw,
@@ -106,6 +108,39 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self._socket = None
                 raise
 
+    def _add_default_conn_attrs(self):
+        """Add the default connection attributes."""
+        if os.name == "nt":
+            if "64" in platform.architecture()[0]:
+                platform_arch = "x86_64"
+            elif "32" in platform.architecture()[0]:
+                platform_arch = "i386"
+            else:
+                platform_arch = platform.architecture()
+            os_ver = "Windows-{}".format(platform.win32_ver()[1])
+        else:
+            platform_arch = platform.machine()
+            if platform.system() == "Darwin":
+                os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
+            else:
+                os_ver = "-".join(platform.linux_distribution()[0:2]) # pylint: disable=W1505
+
+        license_chunks = version.LICENSE.split(" ")
+        if license_chunks[0] == "GPLv2":
+            client_license = "GPL-2.0"
+        else:
+            client_license = "Commercial"
+        default_conn_attrs = {
+            "_pid": str(os.getpid()),
+            "_platform": platform_arch,
+            "_source_host": socket.gethostname(),
+            "_client_name": "mysql-connector-python",
+            "_client_license": client_license,
+            "_client_version": ".".join([str(x) for x in version.VERSION[0:3]]),
+            "_os": os_ver}
+
+        self._conn_attrs.update((default_conn_attrs))
+
     def _do_handshake(self):
         """Get the handshake from the MySQL server"""
         packet = self._socket.recv()
@@ -137,7 +172,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._handshake = handshake
 
     def _do_auth(self, username=None, password=None, database=None,
-                 client_flags=0, charset=45, ssl_options=None):
+                 client_flags=0, charset=45, ssl_options=None, conn_attrs=None):
         """Authenticate with the MySQL server
 
         Authentication happens in two parts. We first send a response to the
@@ -167,7 +202,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             username=username, password=password, database=database,
             charset=charset, client_flags=client_flags,
             ssl_enabled=self._ssl_active,
-            auth_plugin=self._auth_plugin)
+            auth_plugin=self._auth_plugin,
+            conn_attrs=conn_attrs)
         self._socket.send(packet)
         self._auth_switch_request(username, password)
 
@@ -249,7 +285,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._do_handshake()
             self._do_auth(self._user, self._password,
                           self._database, self._client_flags, self._charset_id,
-                          self._ssl)
+                          self._ssl, self._conn_attrs)
             self.set_converter_class(self._converter_class)
             if self._client_flags & ClientFlag.COMPRESS:
                 self._socket.recv = self._socket.recv_compressed

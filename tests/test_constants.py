@@ -306,6 +306,7 @@ class ClientFlagTests(tests.MySQLConnectorTests):
             constants.ClientFlag.SECURE_CONNECTION,
             constants.ClientFlag.MULTI_STATEMENTS,
             constants.ClientFlag.MULTI_RESULTS,
+            constants.ClientFlag.CONNECT_ARGS,
         ]
         exp = 0
         for option in data:

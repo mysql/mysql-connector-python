@@ -81,7 +81,7 @@ class MySQLProtocol(object):
     def make_auth(self, handshake, username=None, password=None, database=None,
                   charset=45, client_flags=0,
                   max_allowed_packet=1073741824, ssl_enabled=False,
-                  auth_plugin=None):
+                  auth_plugin=None, conn_attrs=None):
         """Make a MySQL Authentication packet"""
 
         try:
@@ -113,7 +113,27 @@ class MySQLProtocol(object):
         if client_flags & ClientFlag.PLUGIN_AUTH:
             packet += auth_plugin.encode('utf8') + b'\x00'
 
+        if (client_flags & ClientFlag.CONNECT_ARGS) and conn_attrs is not None:
+            packet += self.make_conn_attrs(conn_attrs)
+
         return packet
+
+    def make_conn_attrs(self, conn_attrs):
+        """Encode the connection attributes"""
+        for attr_name in conn_attrs:
+            if conn_attrs[attr_name] is None:
+                conn_attrs[attr_name] = ""
+        conn_attrs_len = (
+            sum([len(x) + len(conn_attrs[x]) for x in conn_attrs]) +
+            len(conn_attrs.keys()) + len(conn_attrs.values()))
+
+        conn_attrs_packet = struct.pack('<B', conn_attrs_len)
+        for attr_name in conn_attrs:
+            conn_attrs_packet += struct.pack('<B', len(attr_name))
+            conn_attrs_packet += attr_name.encode('utf8')
+            conn_attrs_packet += struct.pack('<B', len(conn_attrs[attr_name]))
+            conn_attrs_packet += conn_attrs[attr_name].encode('utf8')
+        return conn_attrs_packet
 
     def make_auth_ssl(self, charset=45, client_flags=0,
                       max_allowed_packet=1073741824):

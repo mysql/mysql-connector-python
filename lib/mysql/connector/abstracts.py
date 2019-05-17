@@ -33,9 +33,10 @@ import re
 import time
 import weakref
 
-from .catch23 import make_abc, BYTE_TYPES
+from .catch23 import make_abc, BYTE_TYPES, STRING_TYPES
 from .conversion import MySQLConverterBase
-from .constants import ClientFlag, CharacterSet, DEFAULT_CONFIGURATION
+from .constants import (ClientFlag, CharacterSet, CONN_ATTRS_DN,
+                        DEFAULT_CONFIGURATION)
 from .optionfiles import MySQLOptionsParser
 from . import errors
 
@@ -55,6 +56,7 @@ class MySQLConnectionAbstract(object):
         self._autocommit = False
         self._server_version = None
         self._handshake = None
+        self._conn_attrs = {}
 
         self._user = ''
         self._password = ''
@@ -362,6 +364,48 @@ class MySQLConnectionAbstract(object):
                     "ssl_key and ssl_cert need to be both "
                     "set, or neither."
                 )
+
+        if self._conn_attrs is None:
+            self._conn_attrs = {}
+        elif not isinstance(self._conn_attrs, dict):
+            raise errors.InterfaceError('conn_attrs must be of type dict.')
+        else:
+            for attr_name in self._conn_attrs:
+                if attr_name in CONN_ATTRS_DN:
+                    continue
+                # Validate name type
+                if not isinstance(attr_name, STRING_TYPES):
+                    raise errors.InterfaceError(
+                        "Attribute name should be a string, found: '{}' in '{}'"
+                        "".format(attr_name, self._conn_attrs))
+                # Validate attribute name limit 32 characters
+                if len(attr_name) > 32:
+                    raise errors.InterfaceError(
+                        "Attribute name '{}' exceeds 32 characters limit size."
+                        "".format(attr_name))
+                # Validate names in connection attributes cannot start with "_"
+                if attr_name.startswith("_"):
+                    raise errors.InterfaceError(
+                        "Key names in connection attributes cannot start with "
+                        "'_', found: '{}'".format(attr_name))
+                # Validate value type
+                attr_value = self._conn_attrs[attr_name]
+                if not isinstance(attr_value, STRING_TYPES):
+                    raise errors.InterfaceError(
+                        "Attribute '{}' value: '{}' must be a string type."
+                        "".format(attr_name, attr_value))
+                # Validate attribute value limit 1024 characters
+                if len(attr_value) > 1024:
+                    raise errors.InterfaceError(
+                        "Attribute '{}' value: '{}' exceeds 1024 characters "
+                        "limit size".format(attr_name, attr_value))
+
+        if self._client_flags & ClientFlag.CONNECT_ARGS:
+            self._add_default_conn_attrs()
+
+    def _add_default_conn_attrs(self):
+        """Add the default connection attributes."""
+        pass
 
     def _check_server_version(self, server_version):
         """Check the MySQL version
