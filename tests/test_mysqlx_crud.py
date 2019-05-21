@@ -1281,6 +1281,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertRaises(ValueError, collection.find().limit, -1)
         self.assertRaises(ValueError, collection.find().limit(1).offset, -1)
 
+        # test unread result found
+        find = collection.find()
+        find.execute()
+        self.assertRaises(mysqlx.ProgrammingError, find.execute)
+
         self.schema.drop_collection(collection_name)
 
     def test_modify(self):
