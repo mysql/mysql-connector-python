@@ -1,5 +1,7 @@
 include README.txt
+include README.rst
 include LICENSE.txt
+include CONTRIBUTING.rst
 include CHANGES.txt
 include setup.py
 include setupinfo.py
