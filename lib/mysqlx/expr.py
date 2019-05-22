@@ -124,6 +124,7 @@ class TokenType(object):
     DAY_MINUTE = 86
     DAY_HOUR = 87
     YEAR_MONTH = 88
+    OVERLAPS = 89
 # pylint: enable=C0103
 
 _INTERVAL_UNITS = set([
@@ -157,6 +158,7 @@ _RESERVED_WORDS = {
     "not":      TokenType.NOT,
     "like":     TokenType.LIKE,
     "in":       TokenType.IN,
+    "overlaps": TokenType.OVERLAPS,
     "regexp":   TokenType.REGEXP,
     "between":  TokenType.BETWEEN,
     "interval": TokenType.INTERVAL,
@@ -235,6 +237,7 @@ _OPERATORS = {
     "<": "<",
     "<=": "<=",
     "&": "&",
+    "&&": "&&",
     "|": "|",
     "<<": "<<",
     ">>": ">>",
@@ -245,7 +248,8 @@ _OPERATORS = {
     "~": "~",
     "%": "%",
     "cast": "cast",
-    "cont_in": "cont_in"
+    "cont_in": "cont_in",
+    "overlaps": "overlaps"
 }
 
 _UNARY_OPERATORS = {
@@ -262,7 +266,8 @@ _NEGATION = {
     "regexp": "not_regexp",
     "like": "not_like",
     "in": "not_in",
-    "cont_in": "not_cont_in"
+    "cont_in": "not_cont_in",
+    "overlaps": "not_overlaps",
 }
 
 
@@ -549,7 +554,7 @@ class ExprParser(object):
                     token = Token(TokenType.EQ, "==", 1)
             elif char == "&":
                 if self.next_char_is(i, "&"):
-                    token = Token(TokenType.ANDAND, char, 2)
+                    token = Token(TokenType.ANDAND, "&&", 2)
                 else:
                     token = Token(TokenType.BITAND, char)
             elif char == "^":
@@ -653,10 +658,10 @@ class ExprParser(object):
         exprs = []
         self.consume_token(TokenType.LPAREN)
         if not self.cur_token_type_is(TokenType.RPAREN):
-            exprs.append(self.expr().get_message())
+            exprs.append(self._expr().get_message())
             while self.cur_token_type_is(TokenType.COMMA):
                 self.pos += 1
-                exprs.append(self.expr().get_message())
+                exprs.append(self._expr().get_message())
         self.consume_token(TokenType.RPAREN)
         return exprs
 
@@ -848,7 +853,7 @@ class ExprParser(object):
         msg = Message("Mysqlx.Expr.Array")
         while self.pos < len(self.tokens) and \
             not self.cur_token_type_is(TokenType.RSQBRACKET):
-            msg["value"].extend([self.expr().get_message()])
+            msg["value"].extend([self._expr().get_message()])
             if not self.cur_token_type_is(TokenType.COMMA):
                 break
             self.consume_token(TokenType.COMMA)
@@ -870,7 +875,7 @@ class ExprParser(object):
             item = Message("Mysqlx.Expr.Object.ObjectField")
             item["key"] = self.consume_token(TokenType.LSTRING)
             self.consume_token(TokenType.COLON)
-            item["value"] = self.expr().get_message()
+            item["value"] = self._expr().get_message()
             msg["fld"].extend([item.get_message()])
             if not self.cur_token_type_is(TokenType.COMMA):
                 break
@@ -912,7 +917,7 @@ class ExprParser(object):
         """
         operator = Message("Mysqlx.Expr.Operator", name="cast")
         self.consume_token(TokenType.LPAREN)
-        operator["param"].extend([self.expr().get_message()])
+        operator["param"].extend([self._expr().get_message()])
         self.consume_token(TokenType.AS)
 
         type_scalar = build_bytes_scalar(str.encode(self.cast_data_type()))
@@ -991,7 +996,7 @@ class ExprParser(object):
         elif token.token_type == TokenType.CAST:
             return self.cast()
         elif token.token_type == TokenType.LPAREN:
-            expr = self.expr()
+            expr = self._expr()
             self.expect_token(TokenType.RPAREN)
             return expr
         elif token.token_type in [TokenType.PLUS, TokenType.MINUS]:
@@ -1126,6 +1131,10 @@ class ExprParser(object):
                 else:
                     op_name = "cont_in"
                     params.append(self.comp_expr().get_message())
+            elif self.cur_token_type_is(TokenType.OVERLAPS):
+                self.consume_token(TokenType.OVERLAPS)
+                params.append(self.comp_expr().get_message())
+
             elif self.cur_token_type_is(TokenType.LIKE):
                 self.consume_token(TokenType.LIKE)
                 params.append(self.comp_expr().get_message())
@@ -1168,7 +1177,7 @@ class ExprParser(object):
         return self.parse_left_assoc_binary_op_expr(
             set([TokenType.OR, TokenType.OROR]), self.xor_expr)
 
-    def expr(self, reparse=False):
+    def _expr(self, reparse=False):
         if reparse:
             self.tokens = []
             self.pos = 0
@@ -1176,6 +1185,17 @@ class ExprParser(object):
             self.positional_placeholder_count = 0
             self.lex()
         return self.or_expr()
+
+    def expr(self, reparse=False):
+        expression = self._expr(reparse)
+        used_tokens = self.pos
+        if self.pos_token_type_is(len(self.tokens) - 2, TokenType.AS):
+            used_tokens += 2
+        if used_tokens < len(self.tokens):
+            raise ValueError("Unused token types {} found in expression at "
+                             "position: {}".format(self.tokens[self.pos:],
+                                                   self.pos))
+        return expression
 
     def parse_table_insert_field(self):
         return Message("Mysqlx.Crud.Column",
@@ -1205,7 +1225,7 @@ class ExprParser(object):
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            projection = Message("Mysqlx.Crud.Projection", source=self.expr())
+            projection = Message("Mysqlx.Crud.Projection", source=self._expr())
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection["alias"] = self.consume_token(TokenType.IDENT)
@@ -1222,7 +1242,7 @@ class ExprParser(object):
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            order = Message("Mysqlx.Crud.Order", expr=self.expr())
+            order = Message("Mysqlx.Crud.Order", expr=self._expr())
             if self.cur_token_type_is(TokenType.ORDERBY_ASC):
                 order["direction"] = mysqlxpb_enum(
                     "Mysqlx.Crud.Order.Direction.ASC")
@@ -1241,5 +1261,5 @@ class ExprParser(object):
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            expr_list.append(self.expr().get_message())
+            expr_list.append(self._expr().get_message())
         return expr_list

@@ -762,6 +762,119 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                                  "result was {}".format(test, result))
         self.schema.drop_collection(collection_name)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 17),
+                     "OVERLAPS operator unavailable")
+    def test_overlaps_operator(self):
+        collection_name = "{0}.test".format(self.schema_name)
+        collection = self.schema.create_collection(collection_name)
+        collection.add({
+          "_id": "a6f4b93e1a264a108393524f29546a8c",
+          "title": "AFRICAN EGG",
+          "description": "A Fast-Paced Documentary of a Pastry Chef And a "
+                         "Dentist who must Pursue a Forensic Psychologist in "
+                         "The Gulf of Mexico",
+          "releaseyear": 2006,
+          "language": "English",
+          "duration": 130,
+          "rating": "G",
+          "genre": "Science fiction",
+          "actors": [{
+            "name": "MILLA PECK",
+            "country": "Mexico",
+            "birthdate": "12 Jan 1984"
+          }, {
+            "name": "VAL BOLGER",
+            "country": "Botswana",
+            "birthdate": "26 Jul 1975"
+          }, {
+            "name": "SCARLETT BENING",
+            "country": "Syria",
+            "birthdate": "16 Mar 1978"
+          }],
+          "additionalinfo": {
+            "director": "Sharice Legaspi",
+            "writers": ["Rusty Couturier", "Angelic Orduno", "Carin Postell"],
+            "productioncompanies": ["Qvodrill", "Indigoholdings"]
+          }
+        }).execute()
+
+        test_cases = [
+            ("(1+5) overlaps (1, 2, 3, 4, 5)", None),
+            ("(1>5) overlaps (true, false)", None),
+            ("('a'>'b') overlaps (true, false)", None),
+            ("(1>5) overlaps [true, false]", None),
+            ("[1>5] overlaps [true, false]", True),
+            ("[(1+5)] overlaps [1, 2, 3, 4, 5]", False),
+            ("[(1+4)] overlaps [1, 2, 3, 4, 5]", True),
+            ("('a'>'b') overlaps [true, false]", None),
+            ("true overlaps [(1>5), !(false), (true || false), (false && true)]",
+             True),
+            ("true overlaps ((1>5), !(false), (true || false), (false && true))",
+             None),
+            ("{ 'name' : 'MILLA PECK' } overlaps actors", False),
+            ("{\"field\":true} overlaps (\"mystring\", 124, myvar, othervar.jsonobj)",
+             None),
+            ("actor.name overlaps ['a name', null, (1<5-4), myvar.jsonobj.name]",
+             None),
+            ("!false && true overlaps [true]", True),
+            ("1-5/2*2 > 3-2/1*2 overlaps [true, false]", None),
+            ("true IN [1-5/2*2 > 3-2/1*2]", False),
+            ("'African Egg' overlaps ('African Egg', 1, true, NULL, [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", None),
+            ("1 overlaps ('African Egg', 1, true, NULL, [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", None),
+            ("true overlaps ('African Egg', 1, false, NULL, [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", None),
+            ("false overlaps ('African Egg', 1, true, NULL, [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", None),
+            ("false overlaps ('African Egg', 1, true, 'No null', [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", None),
+            ("[0,1,2] overlaps ('African Egg', 1, true, NULL, [0,1,2], "
+             "{ 'title' : 'Atomic Firefighter' })", None),
+            ("{ 'title' : 'Atomic Firefighter' } overlaps ('African Egg', 1, true, "
+             "NULL, [0,1,2], { 'title' : 'Atomic Firefighter' })", None),
+            ("title overlaps ('African Egg', 'The Witcher', 'Jurassic Perk')", None),
+            ("releaseyear overlaps (2006, 2010, 2017)", None),
+            ("'African overlaps' in movietitle", None),
+            ("0 NOT overlaps [1,2,3]", True),
+            ("1 NOT overlaps [1,2,3]", False),
+            ("[0] NOT overlaps [1,2,3]", True),
+            ("[1] NOT overlaps [1,2,3]", False),
+            ("[!false && true] OVERLAPS [true]", True),
+            ("[!false AND true] OVERLAPS [true]", True),
+            ("[!false & true] OVERLAPS [true]", False),
+            ("'' IN title", False),
+            ("title overlaps ('', ' ')", None),
+            ("title overlaps ['', ' ']", False),
+            ("[\"Rusty Couturier\", \"Angelic Orduno\", \"Carin Postell\"] IN "
+             "additionalinfo.writers", True),
+            ("{ \"name\" : \"MILLA PECK\", \"country\" : \"Mexico\", "
+             "\"birthdate\": \"12 Jan 1984\"} IN actors", True),
+            ("releaseyear IN [2006, 2007, 2008]", True),
+            ("true overlaps title", False),
+            ("false overlaps genre", False),
+            ("'Sharice Legaspi' overlaps additionalinfo.director", True),
+            ("'Mexico' overlaps actors[*].country", True),
+            ("'Angelic Orduno' overlaps additionalinfo.writers", True),
+            ("[([1,2] overlaps [1,2])] overlaps [false] invalid [true]", None),
+            ("[([1] overlaps [2])] overlaps [3] invalid [true] as res", None),
+            ("[] []", None),
+            ("[] TRUE as res", None)
+        ]
+
+        for test in test_cases:
+            try:
+                result = collection.find() \
+                                   .fields("{0} as res".format(test[0])) \
+                                   .execute().fetch_one()
+            except:
+                self.assertEqual(None, test[1], "For test case {} "
+                                 "exeption was not expected.".format(test))
+            else:
+                self.assertEqual(result['res'], test[1], "For test case {} "
+                                 "result was {}".format(test, result))
+        self.schema.drop_collection(collection_name)
+
     def test_ilri_expressions(self):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
