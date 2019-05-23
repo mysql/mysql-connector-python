@@ -1217,8 +1217,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
     if (client_flags & CLIENT_LOCAL_FILES) {
-        abool= 1;
-        mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, (unsigned int*)&abool);
+        unsigned int val= 1;
+        mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, &val);
     }
 
 #ifdef PY3
