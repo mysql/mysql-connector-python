@@ -2099,7 +2099,7 @@ class BugOra17780576(tests.MySQLConnectorTests):
 
         config = tests.get_mysql_config()
         tablename = 'utf8mb4test'
-        self.cnx.set_charset_collation('utf8mb4')
+        self.cnx.set_charset_collation('utf8mb4', 'utf8mb4_general_ci')
         cur = self.cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS {0}".format(tablename))
 
@@ -4643,6 +4643,7 @@ class BugOra24659561(tests.MySQLConnectorTests):
     def setUp(self):
         config = tests.get_mysql_config()
         config["charset"] = "utf8mb4"
+        config["collation"] = "utf8mb4_general_ci"
         self.tbl = "BugOra24659561"
         self.cnx = connection.MySQLConnection(**config)
         self.cur = self.cnx.cursor()
