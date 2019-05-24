@@ -280,12 +280,13 @@ MySQL_dealloc(MySQL *self)
 {
     if (self) {
         MySQL_free_result(self);
-        if (&self->session)
-        {
-            mysql_close(&self->session);
-        }
+        mysql_close(&self->session);
+
+        Py_DECREF(self->charset_name);
+        Py_DECREF(self->auth_plugin);
+
         Py_TYPE(self)->tp_free((PyObject*)self);
-	}
+    }
 }
 
 /**
@@ -358,7 +359,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 int
 MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *use_unicode= NULL, *auth_plugin= NULL, *tmp, *con_timeout= NULL;
+    PyObject *charset_name= NULL, *use_unicode= NULL, *auth_plugin= NULL, *tmp, *con_timeout= NULL;
 
 	static char *kwlist[]=
 	{
@@ -375,7 +376,7 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
                                      "|O!O!O!O!O!O!", kwlist,
                                      &PyBool_Type, &self->buffered_at_connect,
                                      &PyBool_Type, &self->raw_at_connect,
-                                     &PyStringType, &self->charset_name,
+                                     &PyStringType, &charset_name,
                                      &PyIntType, &con_timeout,
                                      &PyBool_Type, &use_unicode,
                                      &PyStringType, &auth_plugin))
@@ -398,6 +399,12 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
         {
             self->use_unicode= 1;
         }
+    }
+
+    if (charset_name) {
+        Py_DECREF(self->charset_name);
+        self->charset_name = charset_name;
+        Py_INCREF(self->charset_name);
     }
 
     if (auth_plugin)
@@ -974,7 +981,9 @@ MySQL_set_character_set(MySQL *self, PyObject *args)
     	return NULL;
     }
 
+    Py_DECREF(self->charset_name);
     self->charset_name= value;
+    Py_INCREF(self->charset_name);
 
     Py_RETURN_NONE;
 }
@@ -1740,22 +1749,17 @@ MySQL_ping(MySQL *self)
 PyObject*
 MySQL_convert_to_mysql(MySQL *self, PyObject *args)
 {
-    PyObject *value, *new_value;
-    PyObject *prepared, *quoted;
+    PyObject *prepared;
     int i;
     Py_ssize_t size;
     char error[100];
-#ifndef PY3
-    int tmp_size;
-    PyObject *numeric, *new_num;
-    char *tmp;
-#endif
 
     size = PyTuple_Size(args);
     prepared = PyTuple_New(size);
 
     for (i= 0; i < size; i++) {
-        value= PyTuple_GetItem(args, i);
+        PyObject *value= PyTuple_GetItem(args, i);
+        PyObject *new_value= NULL;
 
         if (value == NULL)
         {
@@ -1772,19 +1776,23 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         if (PyIntLong_Check(value) || PyFloat_Check(value))
         {
 #ifdef PY3
+            PyObject *str = PyObject_Str(value);
             PyTuple_SET_ITEM(prepared, i,
                              PyBytes_FromString(
                                 (const char *)PyUnicode_1BYTE_DATA(
-                                PyObject_Str(value))));
+                                str)));
+            Py_DECREF(str);
 #else
-            numeric= PyObject_Repr(value);
-            tmp= PyString_AsString(numeric);
+            int tmp_size;
+            PyObject *numeric= PyObject_Repr(value);
+            char *tmp= PyString_AsString(numeric);
             tmp_size= (int)PyString_Size(numeric);
             if (tmp[tmp_size - 1] == 'L')
             {
-                new_num= PyString_FromStringAndSize(tmp, tmp_size);
+                PyObject *new_num= PyString_FromStringAndSize(tmp, tmp_size);
                 _PyString_Resize(&new_num, tmp_size - 1);
                 PyTuple_SET_ITEM(prepared, i, new_num);
+                Py_DECREF(numeric);
             }
             else
             {
@@ -1854,16 +1862,16 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         }
         else if (PyBytes_Check(new_value))
         {
-            quoted= PyBytes_FromFormat("'%s'", PyBytes_AsString(new_value));
+            PyObject *quoted= PyBytes_FromFormat("'%s'", PyBytes_AsString(new_value));
             PyTuple_SET_ITEM(prepared, i, quoted);
 #endif
         }
         else if (PyString_Check(new_value))
         {
 #ifdef PY3
-            quoted= PyBytes_FromFormat("'%s'", PyUnicode_AS_DATA(new_value));
+            PyObject *quoted= PyBytes_FromFormat("'%s'", PyUnicode_AS_DATA(new_value));
 #else
-            quoted= PyString_FromFormat("'%s'", PyStringAsString(new_value));
+            PyObject *quoted= PyString_FromFormat("'%s'", PyStringAsString(new_value));
 #endif
             PyTuple_SET_ITEM(prepared, i, quoted);
         }
