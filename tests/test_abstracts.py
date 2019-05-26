@@ -37,7 +37,7 @@ import tests
 from tests import PY2, foreach_cnx
 
 from mysql.connector.connection import MySQLConnection
-from mysql.connector.constants import RefreshOption
+from mysql.connector.constants import RefreshOption, ClientFlag
 from mysql.connector import errors
 
 try:
@@ -169,6 +169,8 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.cnx.cmd_init_db('myconnpy')
         self.assertEqual(u'myconnpy', self.cnx.database)
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 2),
+                     "reset command not available")
     @foreach_cnx()
     def test_reset_session(self):
         exp = [True, u'STRICT_ALL_TABLES', u'-09:00', 33]

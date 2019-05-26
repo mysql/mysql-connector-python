@@ -170,6 +170,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
             use_unicode=self._use_unicode,
             auth_plugin=self._auth_plugin)
 
+        if not self.isset_client_flag(ClientFlag.CONNECT_ARGS):
+            self._conn_attrs = {}
         cnx_kwargs = {
             'host': self._host,
             'user': self._user,

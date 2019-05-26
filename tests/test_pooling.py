@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -41,6 +41,7 @@ import mysql.connector
 from mysql.connector import errors
 from mysql.connector.connection import MySQLConnection
 from mysql.connector import pooling
+from mysql.connector.constants import ClientFlag
 
 
 class PoolingTests(tests.MySQLConnectorTests):
@@ -73,6 +74,8 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test___init__(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(pool_size=1, **dbconfig)
         self.assertRaises(TypeError, pooling.PooledMySQLConnection)
         cnx = MySQLConnection(**dbconfig)
@@ -87,6 +90,8 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test___getattr__(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(pool_size=1, pool_name='test')
         cnx = MySQLConnection(**dbconfig)
         pcnx = pooling.PooledMySQLConnection(cnxpool, cnx)
@@ -110,6 +115,8 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_close(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(pool_size=1, **dbconfig)
 
         cnxpool._original_cnx = None
@@ -118,7 +125,8 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
             self._original_cnx = cnx
         cnxpool.add_connection = dummy_add_connection.__get__(
             cnxpool, pooling.MySQLConnectionPool)
-
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         pcnx = pooling.PooledMySQLConnection(cnxpool,
                                              MySQLConnection(**dbconfig))
 
@@ -141,6 +149,8 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
 
     def test___init__(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         self.assertRaises(errors.PoolError, pooling.MySQLConnectionPool)
 
         self.assertRaises(AttributeError, pooling.MySQLConnectionPool,
@@ -180,14 +190,6 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         cnxpool = pooling.MySQLConnectionPool(pool_name=pool_name)
         self.assertEqual(pool_name, cnxpool.pool_name)
 
-    def test_reset_session(self):
-        """Test MySQLConnectionPool.reset_session property"""
-        cnxpool = pooling.MySQLConnectionPool(pool_name='test',
-                                              pool_reset_session=False)
-        self.assertFalse(cnxpool.reset_session)
-        cnxpool._reset_session = True
-        self.assertTrue(cnxpool.reset_session)
-
     def test_pool_size(self):
         """Test MySQLConnectionPool.pool_size property"""
         pool_size = 4
@@ -226,6 +228,8 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.PoolError, cnxpool.add_connection)
 
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(pool_size=2, pool_name='test')
         cnxpool.set_config(**dbconfig)
 
@@ -258,6 +262,8 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
 
     def test_set_config(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(pool_name='test')
 
         # No configuration changes
@@ -283,6 +289,8 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
 
     def test_get_connection(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(pool_size=2, pool_name='test')
 
         self.assertRaises(errors.PoolError, cnxpool.get_connection)
@@ -313,6 +321,8 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
 
     def test__remove_connections(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(
             pool_size=2, pool_name='test', **dbconfig)
         pcnx = cnxpool.get_connection()
@@ -355,6 +365,8 @@ class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
 
     def test_connect(self):
         dbconfig = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
         cnx = mysql.connector.connect(pool_size=1, pool_name='ham', **dbconfig)
         exp = cnx.connection_id
         cnx.close()

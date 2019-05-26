@@ -317,7 +317,8 @@ class Bug501290(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_default(self):
         self._setup()
-        for flag in constants.ClientFlag.default:
+        flags = constants.ClientFlag.default
+        for flag in flags:
             self.assertTrue(self.cnx._client_flags & flag)
 
     @foreach_cnx()
@@ -326,6 +327,8 @@ class Bug501290(tests.MySQLConnectorTests):
         orig = self.cnx._client_flags
 
         exp = self.default_flags | constants.ClientFlag.COMPRESS
+        if tests.MYSQL_VERSION < (5, 7):
+            exp = exp & ~constants.ClientFlag.CONNECT_ARGS
         self.cnx.set_client_flags([constants.ClientFlag.COMPRESS])
         for flag in constants.ClientFlag.default:
             self.assertTrue(self.cnx._client_flags & flag)
@@ -1961,6 +1964,8 @@ class BugOra17414258(tests.MySQLConnectorTests):
         self.config = tests.get_mysql_config()
         self.config['pool_name'] = 'test'
         self.config['pool_size'] = 3
+        if tests.MYSQL_VERSION < (5, 7):
+            self.config["client_flags"] = [-constants.ClientFlag.CONNECT_ARGS]
 
     def tearDown(self):
         # Remove pools created by test
@@ -1998,6 +2003,8 @@ class Bug17578937(tests.MySQLConnectorTests):
         connection from a pool for which the MySQL server is not running.
         """
         config = tests.get_mysql_config().copy()
+        if tests.MYSQL_VERSION < (5, 7):
+            config["client_flags"] = [-constants.ClientFlag.CONNECT_ARGS]
         config['connection_timeout'] = 2
         cnxpool = pooling.MySQLConnectionPool(
             pool_name='test', pool_size=1, **config)
@@ -2212,8 +2219,11 @@ class BugOra18040042(tests.MySQLConnectorTests):
     """BUG#18040042: Reset session closing pooled Connection"""
 
     def test_clear_session(self):
+        pool_config = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            pool_config["client_flags"] = [-constants.ClientFlag.CONNECT_ARGS]
         cnxpool = pooling.MySQLConnectionPool(
-            pool_name='test', pool_size=1, **tests.get_mysql_config())
+            pool_name='test', pool_size=1, **pool_config)
 
         pcnx = cnxpool.get_connection()
         exp_session_id = pcnx.connection_id
@@ -3151,6 +3161,8 @@ class BugOra19168737(tests.MySQLConnectorTests):
         option_file_dir = os.path.join('tests', 'data', 'option_files')
         opt_file = os.path.join(option_file_dir, 'pool.cnf')
         config = tests.get_mysql_config()
+        if tests.MYSQL_VERSION < (5, 7):
+            config["client_flags"] = [-constants.ClientFlag.CONNECT_ARGS]
 
         conn = mysql.connector.connect(option_files=opt_file,
                                        option_groups=['pooling'], **config)
