@@ -576,6 +576,7 @@ class Connection(object):
             statement (Statement): A `Statement` based type object.
         """
         try:
+            self.fetch_active_result()
             self.protocol.send_prepare_prepare(msg_type, msg, statement)
         except NotSupportedError:
             self._prepared_stmt_supported = False
@@ -845,17 +846,17 @@ class Connection(object):
         if not self.is_open():
             return
 
-        # Deallocate all prepared statements
-        if self._prepared_stmt_supported:
-            for stmt_id in self._prepared_stmt_ids:
-                self.protocol.send_prepare_deallocate(stmt_id)
-            self._stmt_counter = 0
-
         try:
-            if self._active_result is not None:
-                self._active_result.fetch_all()
-                self.protocol.send_close()
-                self.protocol.read_ok()
+            # Fetch any active result
+            self.fetch_active_result()
+            # Deallocate all prepared statements
+            if self._prepared_stmt_supported:
+                for stmt_id in self._prepared_stmt_ids:
+                    self.protocol.send_prepare_deallocate(stmt_id)
+                self._stmt_counter = 0
+            # Send session close
+            self.protocol.send_close()
+            self.protocol.read_ok()
         except (InterfaceError, OperationalError) as err:
             _LOGGER.warning("Warning: An error occurred while attempting to "
                             "close the connection: {}".format(err))

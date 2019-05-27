@@ -1397,7 +1397,10 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # test unread result found
         find = collection.find()
         find.execute()
-        self.assertRaises(mysqlx.ProgrammingError, find.execute)
+        find.execute()
+        result = find.execute()
+        docs = result.fetch_all()
+        self.assertEqual(4, len(docs))
 
         self.schema.drop_collection(collection_name)
 

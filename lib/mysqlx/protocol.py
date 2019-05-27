@@ -824,17 +824,13 @@ class Protocol(object):
 
         Raises:
             :class:`mysqlx.InterfaceError`: If unexpected message.
-            :class:`mysqlx.ProgrammingError`: If unread result found.
         """
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
             raise InterfaceError("Mysqlx.Error: {}".format(msg["msg"]),
                                  errno=msg["code"])
-        if msg.type == "Mysqlx.Resultset.Row":
-            raise ProgrammingError("Unread result found")
         if msg.type != "Mysqlx.Ok":
-            raise InterfaceError("Unexpected message encountered: {}"
-                                 "".format(msg["msg"]))
+            raise InterfaceError("Unexpected message encountered")
 
     def send_connection_close(self):
         """Send connection close."""
