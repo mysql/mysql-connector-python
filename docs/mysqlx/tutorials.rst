@@ -9,3 +9,5 @@ Tutorials
    tutorials/transactions
    tutorials/creating_indexes
    tutorials/locking
+   tutorials/collection_patch
+   tutorials/connection_attributes
