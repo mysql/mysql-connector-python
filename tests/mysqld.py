@@ -523,7 +523,7 @@ class MySQLServer(MySQLServerBase):
                     "CREATE USER IF NOT EXISTS 'root'@'::1';",
                     "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;",
                     "CREATE USER IF NOT EXISTS mysqlxsys@localhost IDENTIFIED "
-                    "WITH mysql_native_password AS 'password' ACCOUNT LOCK;",
+                    "WITH mysql_native_password BY 'password' ACCOUNT LOCK;",
                     "GRANT SELECT ON mysql.user TO mysqlxsys@localhost;",
                     "GRANT SUPER ON *.* TO mysqlxsys@localhost;"
                 ])
