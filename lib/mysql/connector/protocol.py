@@ -98,8 +98,8 @@ class MySQLProtocol(object):
         except AttributeError:
             # Username is already bytes
             username_bytes = username
-        packet = struct.pack('<IIB{filler}{usrlen}sx'.format(
-            filler='x' * 23, usrlen=len(username_bytes)),
+        packet = struct.pack('<IIH{filler}{usrlen}sx'.format(
+            filler='x' * 22, usrlen=len(username_bytes)),
                              client_flags, max_allowed_packet, charset,
                              username_bytes)
 
@@ -140,7 +140,7 @@ class MySQLProtocol(object):
         """Make a SSL authentication packet"""
         return utils.int4store(client_flags) + \
                utils.int4store(max_allowed_packet) + \
-               utils.int1store(charset) + \
+               utils.int2store(charset) + \
                b'\x00' * 23
 
     def make_command(self, command, argument=None):

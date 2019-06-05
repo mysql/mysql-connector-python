@@ -5655,3 +5655,27 @@ class BugOra29324966(tests.MySQLConnectorTests):
 
         cnx = self.cnx.__class__(**config)
         cnx.close()
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 17),
+                 "MySQL 8.0.17+ is required for utf8mb4_0900_bin collation")
+class BugOra29855733(tests.MySQLConnectorTests):
+    """BUG#29855733: ERROR DURING THE CLASSIC CONNECTION WITH CHARSET AND
+    COLLATION SPECIFIED.
+    """
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    @foreach_cnx()
+    def test_connection_collation_utf8mb4_0900_bin(self):
+        config = self.config.copy()
+        config["username"] = config["user"]
+        config["passwd"] = config["password"]
+        config["charset"] = "utf8mb4"
+        config["collation"] = "utf8mb4_0900_bin"
+
+        cnx = self.cnx.__class__(**config)
+        cnx.close()
