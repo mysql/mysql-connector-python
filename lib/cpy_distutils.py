@@ -389,9 +389,7 @@ class BuildExtDynamic(build_ext):
         return openssl_libs
 
     def _copy_vendor_libraries(self):
-        is_wheel = getattr(self.distribution.get_command_obj("install"),
-                           "is_wheel", False)
-        if not self.with_mysql_capi or not is_wheel:
+        if not self.with_mysql_capi:
             return
 
         log.info("Copying vendor files")
@@ -671,6 +669,13 @@ class BuildExtDynamic(build_ext):
             if self.extra_link_args and ext.name == "_mysql_connector":
                 extra_link_args = self.extra_link_args.split()
                 if platform.system() == "Linux":
+                    mysql_config = self.with_mysql_capi \
+                        if not os.path.isdir(self.with_mysql_capi) \
+                        else os.path.join(self.with_mysql_capi, "bin", "mysql_config")
+                    mysql_info = mysql_c_api_info(mysql_config)
+                    extra_link_args.extend(
+                        ["-L{0}".format(lib)
+                         for lib in mysql_info["link_directories"]])
                     extra_link_args += ["-Wl,-rpath,$ORIGIN/mysql-vendor"]
                 ext.extra_link_args.extend(extra_link_args)
             # Add system headers

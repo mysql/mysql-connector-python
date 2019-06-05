@@ -849,7 +849,7 @@ def main():
                                 options.extra_compile_args,
                                 options.extra_link_args, options.debug)
 
-        if platform.system() == "Darwin" and tests.MYSQL_VERSION > (8, 0, 5):
+        if platform.system() in ("Darwin", "Linux") and tests.MYSQL_VERSION > (8, 0, 5):
             shutil.copytree(os.path.join(_TOPDIR, "mysql-vendor"),
                             os.path.join(tests.TEST_BUILD_DIR, "mysql-vendor"))
 
