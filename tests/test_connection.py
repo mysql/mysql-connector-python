@@ -1221,7 +1221,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         conn_id = cnx.connection_id
         cnx.reconnect(attempts=5)
         exp = conn_id + 1
-        self.assertEqual(exp, cnx.connection_id)
+        self.assertGreaterEqual(cnx.connection_id, exp)
 
     def test_ping(self):
         """Ping the MySQL server"""

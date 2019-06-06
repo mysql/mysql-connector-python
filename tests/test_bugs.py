@@ -76,9 +76,7 @@ except ImportError:
 
 ERR_NO_CEXT = "C Extension not available"
 if tests.SSL_AVAILABLE:
-    TLS_VERSIONS = {"TLSv1": ssl.PROTOCOL_TLSv1,
-                    "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
-                    "TLSv1.2": ssl.PROTOCOL_TLSv1_2}
+    TLS_VERSIONS = {"TLSv1.2": ssl.PROTOCOL_TLSv1_2}
 
 
 @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
