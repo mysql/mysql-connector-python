@@ -431,10 +431,7 @@ class BuildExtDynamic(build_ext):
                 log.info("copying {0} -> {1}".format(src, dst))
                 shutil.copy(src, dst)
         # Add data_files to distribution
-        self.distribution.data_files = [(
-            os.path.join(get_python_lib(1), vendor_folder),
-            data_files
-        )]
+        self.distribution.data_files = [(vendor_folder, data_files)]
 
     def _finalize_connector_c(self, connc_loc):
         """Finalize the --with-connector-c command line argument
