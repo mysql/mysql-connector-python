@@ -2,6 +2,7 @@
 .coverage
 .DS_Store
 *__pycache__*
+.python-version
 .idea/
 .vscode/
 commit.txt

@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -831,8 +831,9 @@ static const char* GetMessageNameByTypeId(Mysqlx::ServerMessages::Type type) {
     case Mysqlx::ServerMessages::RESULTSET_FETCH_DONE: {
       return "Mysqlx.Resultset.FetchDone";
     }
-    // TODO: Unused, enable in the future.
-    // case Mysqlx::ServerMessages::RESULTSET_FETCH_SUSPENDED: { return ""; }
+    case Mysqlx::ServerMessages::RESULTSET_FETCH_SUSPENDED: {
+      return "Mysqlx.Resultset.FetchSuspended";
+    }
     case Mysqlx::ServerMessages::RESULTSET_FETCH_DONE_MORE_RESULTSETS: {
       return "Mysqlx.Resultset.FetchDoneMoreResultsets";
     }

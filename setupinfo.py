@@ -115,7 +115,7 @@ author_email = ''
 maintainer = 'Nuno Mariz'
 maintainer_email = 'nuno.mariz@oracle.com'
 cpy_gpl_license = "GNU GPLv2 (with FOSS License Exception)"
-keywords = "mysql db",
+keywords = "mysql db"
 url = 'http://dev.mysql.com/doc/connector-python/en/index.html'
 download_url = 'http://dev.mysql.com/downloads/connector/python/'
 classifiers = [
@@ -133,6 +133,7 @@ classifiers = [
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
     'Topic :: Database',
     'Topic :: Software Development',
     'Topic :: Software Development :: Libraries :: Application Frameworks',

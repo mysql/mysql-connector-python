@@ -973,7 +973,7 @@ class ExprParser(object):
             dimension.append(self.consume_token(TokenType.LNUM))
         self.consume_token(TokenType.RPAREN)
 
-        return "({0})".format(dimension[0]) if len(dimension) is 1 else \
+        return "({0})".format(dimension[0]) if len(dimension) == 1 else \
                "({0},{1})".format(*dimension)
 
     def star_operator(self):

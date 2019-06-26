@@ -1107,6 +1107,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
     mysql_init(&self->session);
+    Py_END_ALLOW_THREADS
 
 #ifdef MS_WINDOWS
     if (NULL == host)
@@ -1130,9 +1131,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
 #ifdef PY3
-    Py_END_ALLOW_THREADS
     charset_name= PyUnicode_AsASCIIString(self->charset_name);
-    Py_BEGIN_ALLOW_THREADS
     if (NULL == charset_name)
     {
         return NULL;
@@ -1198,7 +1197,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
     }
 
-    Py_END_ALLOW_THREADS
     if (PyString_Check(self->auth_plugin)) {
         auth_plugin= PyStringAsString(self->auth_plugin);
         mysql_options(&self->session, MYSQL_DEFAULT_AUTH, auth_plugin);
@@ -1226,7 +1224,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                           (char*)&abool);
         }
     }
-    Py_BEGIN_ALLOW_THREADS
 
     if (database && strlen(database) == 0)
     {
@@ -1246,7 +1243,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     if (conn_attrs != NULL)
     {
 		while (PyDict_Next(conn_attrs, &pos, &key, &value)) {
-			char* attr_name;
+			const char* attr_name;
 #ifdef PY3
 			PyObject *str_name = PyObject_Str(key);
 			if (!str_name)
@@ -1266,7 +1263,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 				attr_name= PyString_AsString(key);
 			}
 #endif
-			char* attr_value;
+			const char* attr_value;
 #ifdef PY3
 			PyObject *str_value = PyObject_Str(value);
 			if (!str_value)
@@ -1305,8 +1302,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
 #ifdef PY3
+    Py_BEGIN_ALLOW_THREADS
     res= mysql_real_connect(&self->session, host, user, password, database,
                             port, unix_socket, client_flags);
+    Py_END_ALLOW_THREADS
 #else
 {
     char* c_password;
@@ -1320,12 +1319,12 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     {
         c_password= PyString_AsString(password);
     }
+    Py_BEGIN_ALLOW_THREADS
     res= mysql_real_connect(&self->session, host, user, c_password, database,
                             port, unix_socket, client_flags);
+    Py_END_ALLOW_THREADS
 }
 #endif
-
-    Py_END_ALLOW_THREADS
 
     if (!res)
     {
@@ -1431,11 +1430,9 @@ MySQL_escape_string(MySQL *self, PyObject *value)
     to= BytesFromStringAndSize(NULL, from_size * 2 + 1);
     to_str= PyBytesAsString(to);
 
-    Py_BEGIN_ALLOW_THREADS
     escaped_size= (Py_ssize_t)mysql_real_escape_string(&self->session, to_str,
                                                        from_str,
                                                        (unsigned long)from_size);
-    Py_END_ALLOW_THREADS
 
     BytesResize(&to, escaped_size);
     Py_XDECREF(from);
@@ -3232,7 +3229,7 @@ cleanup:
 PyObject*
 MySQLPrepStmt_handle_result(MySQLPrepStmt *self)
 {
-    int i= 0;
+    unsigned int i= 0;
 
     Py_BEGIN_ALLOW_THREADS
     self->res = mysql_stmt_result_metadata(self->stmt);
@@ -3346,7 +3343,8 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
     PyObject *field_info;
     PyObject *mod_decimal, *decimal, *dec_args;
     unsigned long field_flags;
-    int i= 0, fetch= 0;
+    unsigned int i= 0;
+    int fetch= 0;
 
     row= PyTuple_New(self->column_count);
 

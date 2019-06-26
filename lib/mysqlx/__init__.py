@@ -363,10 +363,8 @@ def _get_connection_settings(*args, **kwargs):
             for key, val in args[0].items():
                 settings[key.replace("_", "-")] = val
     elif kwargs:
-        settings.update(kwargs)
-        for key in settings:
-            if "_" in key:
-                settings[key.replace("_", "-")] = settings.pop(key)
+        for key, val in kwargs.items():
+            settings[key.replace("_", "-")] = val
 
     if not settings:
         raise InterfaceError("Settings not provided")

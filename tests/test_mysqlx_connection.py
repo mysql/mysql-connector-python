@@ -50,6 +50,7 @@ from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
 from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, mysqlxpb_enum, Protobuf
+from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
 
 if mysqlx.compat.PY3:
@@ -285,7 +286,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             if platform.system() == "Darwin":
                 self.os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
             else:
-                self.os_ver = "-".join(platform.linux_distribution()[0:2])
+                self.os_ver = "-".join(linux_distribution()[0:2])
 
         license_chunks = LICENSE.split(" ")
         if license_chunks[0] == "GPLv2":

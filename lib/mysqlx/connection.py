@@ -61,6 +61,7 @@ from .protobuf import Protobuf
 
 # pylint: disable=C0411,C0413
 sys.path.append("..")
+from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
 
 
@@ -480,8 +481,7 @@ class Connection(object):
 
         is_ol7 = False
         if platform.system() == "Linux":
-            # pylint: disable=W1505
-            distname, version, _ = platform.linux_distribution()
+            distname, version, _ = linux_distribution()
             try:
                 is_ol7 = "Oracle Linux" in distname and \
                     version.split(".")[0] == "7"
@@ -1406,8 +1406,7 @@ class Session(object):
             if platform.system() == "Darwin":
                 os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
             else:
-                os_ver = "-".join(
-                    platform.linux_distribution()[0:2]) # pylint: disable=W1505
+                os_ver = "-".join(linux_distribution()[0:2])
 
         license_chunks = LICENSE.split(' ')
         if license_chunks[0] == "GPLv2":

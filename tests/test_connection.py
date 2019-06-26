@@ -53,6 +53,7 @@ from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
@@ -1809,7 +1810,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             if platform.system() == "Darwin":
                 os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
             else:
-                os_ver = "-".join(platform.linux_distribution()[0:2])
+                os_ver = "-".join(linux_distribution()[0:2])
 
         license_chunks = LICENSE.split(" ")
         if license_chunks[0] == "GPLv2":

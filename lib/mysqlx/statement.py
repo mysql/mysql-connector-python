@@ -119,7 +119,7 @@ def parse_table_name(default_schema, table_name, sql_mode=""):
     quote = '"' if "ANSI_QUOTES" in sql_mode else "`"
     delimiter = ".{0}".format(quote) if quote in table_name else "."
     temp = table_name.split(delimiter, 1)
-    return (default_schema if len(temp) is 1 else temp[0].strip(quote),
+    return (default_schema if len(temp) == 1 else temp[0].strip(quote),
             temp[-1].strip(quote),)
 
 
