@@ -2562,15 +2562,18 @@ MySQL_fetch_row(MySQL *self)
         else if (field_type == MYSQL_TYPE_FLOAT ||
                  field_type == MYSQL_TYPE_DOUBLE)
         {
-#ifdef PY3
-            value= PyFloat_FromString(PyStringFromString(row[i]));
-#else
-            value= PyFloat_FromString(PyStringFromString(row[i]), NULL);
-#endif
-            if (!value)
+            char *end;
+            double val= PyOS_string_to_double(row[i], &end, NULL);
+
+            if (*end == '\0')
+            {
+                value= PyFloat_FromDouble(val);
+            }
+            else
             {
                 value= Py_None;
             }
+
             PyTuple_SET_ITEM(result_row, i, value);
         }
         else if (field_type == MYSQL_TYPE_BIT)
