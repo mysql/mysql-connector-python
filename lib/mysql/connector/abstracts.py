@@ -281,6 +281,7 @@ class MySQLConnectionAbstract(object):
             ('username', 'user'),
             ('passwd', 'password'),
             ('connect_timeout', 'connection_timeout'),
+            ('read_default_file', 'option_files') ,
         ]
         for compat, translate in compat_map:
             try:

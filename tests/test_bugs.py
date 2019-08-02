@@ -5677,3 +5677,27 @@ class BugOra29855733(tests.MySQLConnectorTests):
 
         cnx = self.cnx.__class__(**config)
         cnx.close()
+
+
+class BugOra25349794(tests.MySQLConnectorTests):
+    """BUG#25349794: ADD READ_DEFAULT_FILE ARGUMENT FOR CONNECT().
+    """
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    @foreach_cnx()
+    def test_read_default_file_alias(self):
+        opt_file = os.path.join("tests", "data", "option_files", "pool.cnf")
+        config = tests.get_mysql_config()
+
+        if tests.MYSQL_VERSION < (5, 7):
+            config["client_flags"] = [-constants.ClientFlag.CONNECT_ARGS]
+
+        conn = mysql.connector.connect(read_default_file=opt_file,
+                                       option_groups=["pooling"], **config)
+        self.assertEqual("my_pool", conn.pool_name)
+        mysql.connector._CONNECTION_POOLS = {}
+        conn.close()
