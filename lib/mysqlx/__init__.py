@@ -65,7 +65,7 @@ _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl", "tls-versions",
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
                           "routers", "socket", "ssl-mode", "auth", "use-pure",
                           "connect-timeout", "connection-attributes",
-                          "dns-srv"]
+                          "compression", "dns-srv"]
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -82,7 +82,7 @@ TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
 TLS_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]
 
 TLS_V1_3_SUPPORTED = False
-if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3:
     TLS_V1_3_SUPPORTED = True
 
 
@@ -255,6 +255,15 @@ def _validate_settings(settings):
             Auth.index(settings["auth"])
         except (AttributeError, ValueError):
             raise InterfaceError("Invalid Auth '{0}'".format(settings["auth"]))
+
+    if "compression" in settings:
+        compression = settings["compression"].lower().strip()
+        if compression not in ("preferred", "required", "disabled"):
+            raise InterfaceError(
+                "The connection property 'compression' acceptable values are: "
+                "'preferred', 'required', or 'disabled'. The value '{0}' is "
+                "not acceptable".format(settings["compression"]))
+        settings["compression"] = compression
 
     if "connection-attributes" in settings:
         validate_connection_attributes(settings)

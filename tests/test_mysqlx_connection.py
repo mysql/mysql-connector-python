@@ -38,8 +38,10 @@ import unittest
 import sys
 import tests
 import time
+import string
 import socket
 import struct
+import random
 import mysqlx
 
 from threading import Thread
@@ -49,7 +51,8 @@ from . import check_tls_versions_support
 from mysqlx.connection import SocketStream, TLS_V1_3_SUPPORTED, HAVE_DNSPYTHON
 from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
-from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
+from mysqlx.protocol import (Message, MessageReader, MessageWriter, Protocol,
+                             HAVE_LZ4)
 from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, mysqlxpb_enum, Protobuf
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
@@ -83,6 +86,12 @@ _URI_TEST_RESULTS = (  # (uri, result)
                                               "password": "", "port": 33060,
                                               "user": "user",
                                               "use-pure": True}),
+    ("user:@127.0.0.1/schema?compression=required", {"schema": "schema",
+                                                     "host": "127.0.0.1",
+                                                     "port": 33060,
+                                                     "password": "",
+                                                     "user": "user",
+                                                     "compression": "required"}),
     ("user{0}:password{0}@127.0.0.1/schema?use_pure=true"
      "".format(quote("?!@#$%/:")), {"schema": "schema", "host": "127.0.0.1",
                                     "port": 33060, "user": "user?!@#$%/:",
@@ -239,7 +248,7 @@ class ServerSocketStream(SocketStream):
         self._socket = None
 
     def start_receive(self, host, port):
-        """Opens a sokect to comunicate to the given host, port
+        """Opens a socket to comunicate to the given host, port
 
         Args:
             host (str): host name.
@@ -259,8 +268,8 @@ class ServerSocketStream(SocketStream):
 
 
 class ServerProtocol(Protocol):
-    def __init__(self, reader_writer):
-        super(ServerProtocol, self).__init__(reader_writer)
+    def __init__(self, reader, writer):
+        super(ServerProtocol, self).__init__(reader, writer)
 
     def send_auth_continue_server(self, auth_data):
         """Send Server authenticate continue.
@@ -1564,7 +1573,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 20), "XPlugin not compatible")
 class MySQLxInnitialNoticeTests(tests.MySQLxTests):
 
     def setUp(self):
@@ -1574,20 +1583,49 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             "password": "",
             "host": "localhost",
             "ssl-mode": "disabled",
-            "use_pure": True
+            "compression": "disabled",
         }
 
     def _server_thread(self, host="localhost", port=33061, notice=1):
             stream = ServerSocketStream()
             stream.start_receive(host, port)
-            reader_writer = MessageReaderWriter(stream)
-            protocol = ServerProtocol(reader_writer)
+            reader = MessageReader(stream)
+            writer = MessageWriter(stream)
+            protocol = ServerProtocol(reader, writer)
             # Read message header
             hdr = stream.read(5)
             msg_len, msg_type = struct.unpack("<LB", hdr)
-            self.assertEqual(msg_type, 4)
-            # Read payload
             _ = stream.read(msg_len - 1)
+            self.assertEqual(msg_type, 1)
+
+            # Send server capabilities
+            stream.sendall(b'\x05\x00\x00\x00\x0b\x08\x05\x1a\x00P\x01\x00'
+                           b'\x00\x02\n\x0f\n\x03tls\x12\x08\x08\x01\x12\x04'
+                           b'\x08\x07@\x00\nM\n\x19authentication.mechanisms'
+                           b'\x120\x08\x03",\n\x11\x08\x01\x12\r\x08\x08J\t\n'
+                           b'\x07MYSQL41\n\x17\x08\x01\x12\x13\x08\x08J\x0f\n'
+                           b'\rSHA256_MEMORY\n\x1d\n\x0bdoc.formats\x12\x0e'
+                           b'\x08\x01\x12\n\x08\x08J\x06\n\x04text\n\x1e\n'
+                           b'\x12client.interactive\x12\x08\x08\x01\x12\x04'
+                           b'\x08\x07@\x00\nn\n\x0bcompression\x12_\x08\x02'
+                           b'\x1a[\nY\n\talgorithm\x12L\x08\x03"H\n\x18\x08'
+                           b'\x01\x12\x14\x08\x08J\x10\n\x0edeflate_stream\n'
+                           b'\x15\x08\x01\x12\x11\x08\x08J\r\n\x0blz4_message'
+                           b'\n\x15\x08\x01\x12\x11\x08\x08J\r\n\x0b'
+                           b'zstd_stream\n\x1c\n\tnode_type\x12\x0f\x08\x01'
+                           b'\x12\x0b\x08\x08J\x07\n\x05mysql\n \n\x14'
+                           b'client.pwd_expire_ok\x12\x08\x08\x01\x12\x04\x08'
+                           b'\x07@\x00\x01\x00\x00\x00\x00')
+            # read client capabilities
+            frame_size, frame_type = struct.unpack("<LB", stream.read(5))
+            _ = stream.read(frame_size - 1)
+            self.assertEqual(frame_type, 2)
+
+            frame_size, frame_type = struct.unpack("<LB", stream.read(5))
+            self.assertEqual(frame_type, 4)
+            ## Read payload
+            _ = stream.read(frame_size - 1)
+
             # send handshake
             if notice == 1:
                 # send empty notice
@@ -1595,8 +1633,8 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             else:
                 # send notice frame with explicit default
                 stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
-                #stream.sendall(b"\x01\x00\x00\x00\x0b")
-            # send auth start")
+
+            # send auth start
             protocol.send_auth_continue_server("00000000000000000000")
             # Capabilities are not check for ssl-mode: disabled
             # Reading auth_continue from client
@@ -1605,15 +1643,17 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             self.assertEqual(msg_type, 5)
             # Read payload
             _ = stream.read(msg_len - 1)
+
             # Send auth_ok
             protocol.send_auth_ok()
 
-            # Read message
+            # Read query message
             hdr = stream.read(5)
             msg_len, msg_type = struct.unpack("<LB", hdr)
             self.assertEqual(msg_type, 12)
             # Read payload
             _ = stream.read(msg_len - 1)
+
             # send empty notice
             if notice == 1:
                 # send empty notice
@@ -1623,12 +1663,12 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
                 stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
 
             # msg_type: 12 Mysqlx.Resultset.ColumnMetaData
-            stream.sendall(b"\x31\x00\x00\x00\x0c"
-                           b"\x08\x07\x12\x08\x44\x61\x74\x61\x62\x61\x73"
-                           b"\x65\x1a\x08\x44\x61\x74\x61\x62\x61\x73\x65"
-                           b"\x22\x08\x53\x43\x48\x45\x4d\x41\x54\x41\x2a"
-                           b"\x00\x32\x00\x3a\x03\x64\x65\x66\x40\x4c\x50"
-                           b"\xc0\x01\x58\x10")
+            stream.sendall(b"\x32\x00\x00\x00\x0c"
+                           b"\x08\x07\x40\xff\x01\x50\xc0\x01\x58\x10\x12"
+                           b"\x08\x44\x61\x74\x61\x62\x61\x73\x65\x1a\x08"
+                           b"\x44\x61\x74\x61\x62\x61\x73\x65\x22\x08\x53"
+                           b"\x43\x48\x45\x4d\x41\x54\x41\x2a\x00\x32\x00"
+                           b"\x3a\x03\x64\x65\x66")
 
             # send unexpected notice
             if notice == 1:
@@ -1639,9 +1679,24 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
                 stream.sendall(b"\x03\x00\x00\x00\x0b\x08\x01")
 
             # msg_type: 13 Mysqlx.Resultset.Row
+            # information_schema
             stream.sendall(b"\x16\x00\x00\x00\x0d"
                            b"\x0a\x13\x69\x6e\x66\x6f\x72\x6d\x61\x74\x69"
-                           b"\x6f\x6e\x5f\x73\x63\x68\x65\x6d\x61\x00")
+                           b"\x6f\x6e\x5f\x73\x63\x68\x65\x6d\x61\x00"
+                           # myconnpy
+                           b"\x0c\x00\x00\x00\x0d"
+                           b"\x0a\x09\x6d\x79\x63\x6f\x6e\x6e\x70\x79\x00"
+                           b"\x09\x00\x00\x00\x0d"
+                           # mysql
+                           b"\x0a\x06\x6d\x79\x73\x71\x6c\x00"
+                           b"\x16\x00\x00\x00\x0d"
+                           # performance_schema
+                           b"\x0a\x13\x70\x65\x72\x66\x6f\x72\x6d\x61\x6e"
+                           b"\x63\x65\x5f\x73\x63\x68\x65\x6d\x61\x00"
+                           b"\x07\x00\x00\x00\x0d"
+                           # sys
+                           b"\x0a\x04\x73\x79\x73\x00")
+
             # msg_type: 14 Mysqlx.Resultset.FetchDone
             stream.sendall(b"\x01\x00\x00\x00\x0e")
             # msg_type: 11 Mysqlx.Notice.Frame
@@ -1659,13 +1714,14 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
             # msg_type: 17 Mysqlx.Sql.StmtExecuteOk
             stream.sendall(b"\x01\x00\x00\x00\x11")
 
-            # Read message
+            stream.sendall(b"\x01\x00\x00\x00\x00")
+
+            # Read message close connection
             hdr = stream.read(5)
             msg_len, msg_type = struct.unpack("<LB", hdr)
-            self.assertEqual(msg_type, 7)
             # Read payload
             _ = stream.read(msg_len - 1)
-            stream.sendall(b"\x07\x00\x00\x00\x00\n\x04bye!")
+            self.assertEqual(msg_type, 7)
 
             # Close socket
             stream.close()
@@ -1734,4 +1790,111 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
         session = mysqlx.get_session(settings)
         rows = session.sql("show databases").execute().fetch_all()
         self.assertEqual(rows[0][0], "information_schema")
+        session.close()
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 20), "Compression not available")
+class MySQLxCompressionTests(tests.MySQLxTests):
+
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysqlx_config()
+        self.schema_name = self.connect_kwargs["schema"]
+        self.session = mysqlx.get_session(self.connect_kwargs)
+
+    def tearDown(self):
+        self.session.close()
+
+    def _get_mysqlx_bytes(self, session):
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_bytes%'").execute();
+        return {key: int(val) for key, val in res.fetch_all()}
+
+    def _get_random_data(self, size):
+        return "".join([random.choice(string.ascii_letters + string.digits)
+                        for _ in range(size)])
+
+    def _set_compression_algorithms(self, algorithms):
+        self.session.sql("SET GLOBAL mysqlx_compression_algorithms='{}'"
+                         "".format(algorithms)).execute()
+
+    def test_compression_negotiation(self):
+        config = self.connect_kwargs.copy()
+
+        res = self.session.sql(
+            "SHOW VARIABLES LIKE 'mysqlx_compression_algorithms'").execute()
+        default_algorithms = res.fetch_all()[0][1]
+
+        # Set default compression settings on the server
+        self._set_compression_algorithms("lz4_message,deflate_stream")
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+
+        if HAVE_LZ4:
+            self.assertEqual("lz4_message", algorithm)
+        else:
+            self.assertEqual("deflate_stream", algorithm)
+        session.close()
+
+        # Disable lz4
+        self._set_compression_algorithms("deflate_stream")
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+        self.assertEqual("deflate_stream", algorithm)
+        session.close()
+
+        # The compression algorithm negotiation should fail when there is no
+        # compression algorithm available in the server and compress is
+        # required
+        config["compression"] = "required"
+        self._set_compression_algorithms("")
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Using compress='disabled' should work even when there is no
+        # compression algorithm available in the server
+        config["compression"] = "disabled"
+        session = mysqlx.get_session(config)
+        session.close()
+
+        # Should fail when using an invalid compress option
+        config["compression"] = "invalid"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Restore the default compression algorithms
+        self._set_compression_algorithms(default_algorithms)
+
+    def test_compression_sizes(self):
+        coll_name = "compress_col"
+
+        # Test using the default compression settings on the server
+        session = mysqlx.get_session(self.connect_kwargs)
+        sizes = self._get_mysqlx_bytes(session)
+        self.assertEqual(sizes["Mysqlx_bytes_received_compressed_payload"], 0)
+        self.assertEqual(sizes["Mysqlx_bytes_received_uncompressed_frame"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_sent_compressed_payload"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_sent_uncompressed_frame"], 0)
+        session.close()
+
+        # Test the mysqlx.protocol.COMPRESSION_THRESHOLD < 1000 bytes
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+        coll = schema.create_collection(coll_name)
+        coll.add({"data": self._get_random_data(900)}).execute()
+        sizes = self._get_mysqlx_bytes(session)
+        self.assertEqual(sizes["Mysqlx_bytes_received_compressed_payload"], 0)
+        self.assertEqual(sizes["Mysqlx_bytes_received_uncompressed_frame"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_sent_compressed_payload"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_sent_uncompressed_frame"], 0)
+        schema.drop_collection(coll_name)
+        session.close()
+
+        # Test the mysqlx.protocol.COMPRESSION_THRESHOLD > 1000 bytes
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+        coll = schema.create_collection(coll_name)
+        coll.add({"data": self._get_random_data(2000)}).execute()
+        sizes = self._get_mysqlx_bytes(session)
+        self.assertGreater(sizes["Mysqlx_bytes_received_compressed_payload"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_received_uncompressed_frame"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_sent_compressed_payload"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_sent_uncompressed_frame"], 0)
+        schema.drop_collection(coll_name)
         session.close()

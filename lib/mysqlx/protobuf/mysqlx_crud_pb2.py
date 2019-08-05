@@ -8,23 +8,23 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
 
 
-from mysqlx.protobuf import mysqlx_expr_pb2
-from mysqlx.protobuf import mysqlx_datatypes_pb2
+from mysqlx.protobuf import mysqlx_expr_pb2 as mysqlx__expr__pb2
+from mysqlx.protobuf import mysqlx_datatypes_pb2 as mysqlx__datatypes__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_crud.proto',
   package='Mysqlx.Crud',
+  syntax='proto2',
+  serialized_options=_b('\n\027com.mysql.cj.x.protobufH\003'),
   serialized_pb=_b('\n\x11mysqlx_crud.proto\x12\x0bMysqlx.Crud\x1a\x11mysqlx_expr.proto\x1a\x16mysqlx_datatypes.proto\"[\n\x06\x43olumn\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05\x61lias\x18\x02 \x01(\t\x12\x34\n\rdocument_path\x18\x03 \x03(\x0b\x32\x1d.Mysqlx.Expr.DocumentPathItem\">\n\nProjection\x12!\n\x06source\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12\r\n\x05\x61lias\x18\x02 \x01(\t\"*\n\nCollection\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0e\n\x06schema\x18\x02 \x01(\t\"*\n\x05Limit\x12\x11\n\trow_count\x18\x01 \x02(\x04\x12\x0e\n\x06offset\x18\x02 \x01(\x04\"T\n\tLimitExpr\x12$\n\trow_count\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12!\n\x06offset\x18\x02 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\"~\n\x05Order\x12\x1f\n\x04\x65xpr\x18\x01 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\x12\x34\n\tdirection\x18\x02 \x01(\x0e\x32\x1c.Mysqlx.Crud.Order.Direction:\x03\x41SC\"\x1e\n\tDirection\x12\x07\n\x03\x41SC\x10\x01\x12\x08\n\x04\x44\x45SC\x10\x02\"\xac\x02\n\x0fUpdateOperation\x12-\n\x06source\x18\x01 \x02(\x0b\x32\x1d.Mysqlx.Expr.ColumnIdentifier\x12:\n\toperation\x18\x02 \x02(\x0e\x32\'.Mysqlx.Crud.UpdateOperation.UpdateType\x12 \n\x05value\x18\x03 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\"\x8b\x01\n\nUpdateType\x12\x07\n\x03SET\x10\x01\x12\x0f\n\x0bITEM_REMOVE\x10\x02\x12\x0c\n\x08ITEM_SET\x10\x03\x12\x10\n\x0cITEM_REPLACE\x10\x04\x12\x0e\n\nITEM_MERGE\x10\x05\x12\x10\n\x0c\x41RRAY_INSERT\x10\x06\x12\x10\n\x0c\x41RRAY_APPEND\x10\x07\x12\x0f\n\x0bMERGE_PATCH\x10\x08\"\xe4\x04\n\x04\x46ind\x12+\n\ncollection\x18\x02 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x03 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12+\n\nprojection\x18\x04 \x03(\x0b\x32\x17.Mysqlx.Crud.Projection\x12#\n\x08\x63riteria\x18\x05 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x0b \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05order\x18\x07 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12#\n\x08grouping\x18\x08 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\x12,\n\x11grouping_criteria\x18\t \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12*\n\x07locking\x18\x0c \x01(\x0e\x32\x19.Mysqlx.Crud.Find.RowLock\x12\x39\n\x0flocking_options\x18\r \x01(\x0e\x32 .Mysqlx.Crud.Find.RowLockOptions\x12!\n\x05limit\x18\x06 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12*\n\nlimit_expr\x18\x0e \x01(\x0b\x32\x16.Mysqlx.Crud.LimitExpr\".\n\x07RowLock\x12\x0f\n\x0bSHARED_LOCK\x10\x01\x12\x12\n\x0e\x45XCLUSIVE_LOCK\x10\x02\"-\n\x0eRowLockOptions\x12\n\n\x06NOWAIT\x10\x01\x12\x0f\n\x0bSKIP_LOCKED\x10\x02\"\xa2\x02\n\x06Insert\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x02 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12\'\n\nprojection\x18\x03 \x03(\x0b\x32\x13.Mysqlx.Crud.Column\x12)\n\x03row\x18\x04 \x03(\x0b\x32\x1c.Mysqlx.Crud.Insert.TypedRow\x12&\n\x04\x61rgs\x18\x05 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12\x15\n\x06upsert\x18\x06 \x01(\x08:\x05\x66\x61lse\x1a,\n\x08TypedRow\x12 \n\x05\x66ield\x18\x01 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\"\xd1\x02\n\x06Update\x12+\n\ncollection\x18\x02 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x03 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12#\n\x08\x63riteria\x18\x04 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x08 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05order\x18\x06 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12/\n\toperation\x18\x07 \x03(\x0b\x32\x1c.Mysqlx.Crud.UpdateOperation\x12!\n\x05limit\x18\x05 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12*\n\nlimit_expr\x18\t \x01(\x0b\x32\x16.Mysqlx.Crud.LimitExpr\"\xa0\x02\n\x06\x44\x65lete\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12*\n\ndata_model\x18\x02 \x01(\x0e\x32\x16.Mysqlx.Crud.DataModel\x12#\n\x08\x63riteria\x18\x03 \x01(\x0b\x32\x11.Mysqlx.Expr.Expr\x12&\n\x04\x61rgs\x18\x06 \x03(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12!\n\x05order\x18\x05 \x03(\x0b\x32\x12.Mysqlx.Crud.Order\x12!\n\x05limit\x18\x04 \x01(\x0b\x32\x12.Mysqlx.Crud.Limit\x12*\n\nlimit_expr\x18\x07 \x01(\x0b\x32\x16.Mysqlx.Crud.LimitExpr\"\xbc\x02\n\nCreateView\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12\x0f\n\x07\x64\x65\x66iner\x18\x02 \x01(\t\x12\x38\n\talgorithm\x18\x03 \x01(\x0e\x32\x1a.Mysqlx.Crud.ViewAlgorithm:\tUNDEFINED\x12\x37\n\x08security\x18\x04 \x01(\x0e\x32\x1c.Mysqlx.Crud.ViewSqlSecurity:\x07\x44\x45\x46INER\x12+\n\x05\x63heck\x18\x05 \x01(\x0e\x32\x1c.Mysqlx.Crud.ViewCheckOption\x12\x0e\n\x06\x63olumn\x18\x06 \x03(\t\x12\x1f\n\x04stmt\x18\x07 \x02(\x0b\x32\x11.Mysqlx.Crud.Find\x12\x1f\n\x10replace_existing\x18\x08 \x01(\x08:\x05\x66\x61lse\"\x87\x02\n\nModifyView\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12\x0f\n\x07\x64\x65\x66iner\x18\x02 \x01(\t\x12-\n\talgorithm\x18\x03 \x01(\x0e\x32\x1a.Mysqlx.Crud.ViewAlgorithm\x12.\n\x08security\x18\x04 \x01(\x0e\x32\x1c.Mysqlx.Crud.ViewSqlSecurity\x12+\n\x05\x63heck\x18\x05 \x01(\x0e\x32\x1c.Mysqlx.Crud.ViewCheckOption\x12\x0e\n\x06\x63olumn\x18\x06 \x03(\t\x12\x1f\n\x04stmt\x18\x07 \x01(\x0b\x32\x11.Mysqlx.Crud.Find\"Q\n\x08\x44ropView\x12+\n\ncollection\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Crud.Collection\x12\x18\n\tif_exists\x18\x02 \x01(\x08:\x05\x66\x61lse*$\n\tDataModel\x12\x0c\n\x08\x44OCUMENT\x10\x01\x12\t\n\x05TABLE\x10\x02*8\n\rViewAlgorithm\x12\r\n\tUNDEFINED\x10\x01\x12\t\n\x05MERGE\x10\x02\x12\r\n\tTEMPTABLE\x10\x03*+\n\x0fViewSqlSecurity\x12\x0b\n\x07INVOKER\x10\x01\x12\x0b\n\x07\x44\x45\x46INER\x10\x02**\n\x0fViewCheckOption\x12\t\n\x05LOCAL\x10\x01\x12\x0c\n\x08\x43\x41SCADED\x10\x02\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
-  dependencies=[mysqlx_expr_pb2.DESCRIPTOR,mysqlx_datatypes_pb2.DESCRIPTOR,])
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
+  dependencies=[mysqlx__expr__pb2.DESCRIPTOR,mysqlx__datatypes__pb2.DESCRIPTOR,])
 
 _DATAMODEL = _descriptor.EnumDescriptor(
   name='DataModel',
@@ -34,15 +34,15 @@ _DATAMODEL = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='DOCUMENT', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='TABLE', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=3046,
   serialized_end=3082,
 )
@@ -57,19 +57,19 @@ _VIEWALGORITHM = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='UNDEFINED', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='MERGE', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='TEMPTABLE', index=2, number=3,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=3084,
   serialized_end=3140,
 )
@@ -84,15 +84,15 @@ _VIEWSQLSECURITY = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='INVOKER', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DEFINER', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=3142,
   serialized_end=3185,
 )
@@ -107,15 +107,15 @@ _VIEWCHECKOPTION = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='LOCAL', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='CASCADED', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=3187,
   serialized_end=3229,
 )
@@ -141,15 +141,15 @@ _ORDER_DIRECTION = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='ASC', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DESC', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=504,
   serialized_end=534,
 )
@@ -163,39 +163,39 @@ _UPDATEOPERATION_UPDATETYPE = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='SET', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ITEM_REMOVE', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ITEM_SET', index=2, number=3,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ITEM_REPLACE', index=3, number=4,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ITEM_MERGE', index=4, number=5,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ARRAY_INSERT', index=5, number=6,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ARRAY_APPEND', index=6, number=7,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='MERGE_PATCH', index=7, number=8,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=698,
   serialized_end=837,
 )
@@ -209,15 +209,15 @@ _FIND_ROWLOCK = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='SHARED_LOCK', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='EXCLUSIVE_LOCK', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=1359,
   serialized_end=1405,
 )
@@ -231,15 +231,15 @@ _FIND_ROWLOCKOPTIONS = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='NOWAIT', index=0, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='SKIP_LOCKED', index=1, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=1407,
   serialized_end=1452,
 )
@@ -259,29 +259,30 @@ _COLUMN = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='alias', full_name='Mysqlx.Crud.Column.alias', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='document_path', full_name='Mysqlx.Crud.Column.document_path', index=2,
       number=3, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -303,22 +304,23 @@ _PROJECTION = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='alias', full_name='Mysqlx.Crud.Projection.alias', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -340,22 +342,23 @@ _COLLECTION = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='schema', full_name='Mysqlx.Crud.Collection.schema', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -377,22 +380,23 @@ _LIMIT = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='offset', full_name='Mysqlx.Crud.Limit.offset', index=1,
       number=2, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -414,22 +418,23 @@ _LIMITEXPR = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='offset', full_name='Mysqlx.Crud.LimitExpr.offset', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -451,14 +456,14 @@ _ORDER = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='direction', full_name='Mysqlx.Crud.Order.direction', index=1,
       number=2, type=14, cpp_type=8, label=1,
       has_default_value=True, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -466,8 +471,9 @@ _ORDER = _descriptor.Descriptor(
   enum_types=[
     _ORDER_DIRECTION,
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -489,21 +495,21 @@ _UPDATEOPERATION = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='operation', full_name='Mysqlx.Crud.UpdateOperation.operation', index=1,
       number=2, type=14, cpp_type=8, label=2,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='value', full_name='Mysqlx.Crud.UpdateOperation.value', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -511,8 +517,9 @@ _UPDATEOPERATION = _descriptor.Descriptor(
   enum_types=[
     _UPDATEOPERATION_UPDATETYPE,
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -534,84 +541,84 @@ _FIND = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='data_model', full_name='Mysqlx.Crud.Find.data_model', index=1,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='projection', full_name='Mysqlx.Crud.Find.projection', index=2,
       number=4, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='criteria', full_name='Mysqlx.Crud.Find.criteria', index=3,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='args', full_name='Mysqlx.Crud.Find.args', index=4,
       number=11, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='order', full_name='Mysqlx.Crud.Find.order', index=5,
       number=7, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='grouping', full_name='Mysqlx.Crud.Find.grouping', index=6,
       number=8, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='grouping_criteria', full_name='Mysqlx.Crud.Find.grouping_criteria', index=7,
       number=9, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='locking', full_name='Mysqlx.Crud.Find.locking', index=8,
       number=12, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='locking_options', full_name='Mysqlx.Crud.Find.locking_options', index=9,
       number=13, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='limit', full_name='Mysqlx.Crud.Find.limit', index=10,
       number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='limit_expr', full_name='Mysqlx.Crud.Find.limit_expr', index=11,
       number=14, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -620,8 +627,9 @@ _FIND = _descriptor.Descriptor(
     _FIND_ROWLOCK,
     _FIND_ROWLOCKOPTIONS,
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -643,15 +651,16 @@ _INSERT_TYPEDROW = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -672,50 +681,51 @@ _INSERT = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='data_model', full_name='Mysqlx.Crud.Insert.data_model', index=1,
       number=2, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='projection', full_name='Mysqlx.Crud.Insert.projection', index=2,
       number=3, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='row', full_name='Mysqlx.Crud.Insert.row', index=3,
       number=4, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='args', full_name='Mysqlx.Crud.Insert.args', index=4,
       number=5, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='upsert', full_name='Mysqlx.Crud.Insert.upsert', index=5,
       number=6, type=8, cpp_type=7, label=1,
       has_default_value=True, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[_INSERT_TYPEDROW, ],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -737,64 +747,65 @@ _UPDATE = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='data_model', full_name='Mysqlx.Crud.Update.data_model', index=1,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='criteria', full_name='Mysqlx.Crud.Update.criteria', index=2,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='args', full_name='Mysqlx.Crud.Update.args', index=3,
       number=8, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='order', full_name='Mysqlx.Crud.Update.order', index=4,
       number=6, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='operation', full_name='Mysqlx.Crud.Update.operation', index=5,
       number=7, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='limit', full_name='Mysqlx.Crud.Update.limit', index=6,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='limit_expr', full_name='Mysqlx.Crud.Update.limit_expr', index=7,
       number=9, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -816,57 +827,58 @@ _DELETE = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='data_model', full_name='Mysqlx.Crud.Delete.data_model', index=1,
       number=2, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='criteria', full_name='Mysqlx.Crud.Delete.criteria', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='args', full_name='Mysqlx.Crud.Delete.args', index=3,
       number=6, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='order', full_name='Mysqlx.Crud.Delete.order', index=4,
       number=5, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='limit', full_name='Mysqlx.Crud.Delete.limit', index=5,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='limit_expr', full_name='Mysqlx.Crud.Delete.limit_expr', index=6,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -888,64 +900,65 @@ _CREATEVIEW = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='definer', full_name='Mysqlx.Crud.CreateView.definer', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='algorithm', full_name='Mysqlx.Crud.CreateView.algorithm', index=2,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=True, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='security', full_name='Mysqlx.Crud.CreateView.security', index=3,
       number=4, type=14, cpp_type=8, label=1,
       has_default_value=True, default_value=2,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='check', full_name='Mysqlx.Crud.CreateView.check', index=4,
       number=5, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='column', full_name='Mysqlx.Crud.CreateView.column', index=5,
       number=6, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='stmt', full_name='Mysqlx.Crud.CreateView.stmt', index=6,
       number=7, type=11, cpp_type=10, label=2,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='replace_existing', full_name='Mysqlx.Crud.CreateView.replace_existing', index=7,
       number=8, type=8, cpp_type=7, label=1,
       has_default_value=True, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -967,57 +980,58 @@ _MODIFYVIEW = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='definer', full_name='Mysqlx.Crud.ModifyView.definer', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='algorithm', full_name='Mysqlx.Crud.ModifyView.algorithm', index=2,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='security', full_name='Mysqlx.Crud.ModifyView.security', index=3,
       number=4, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='check', full_name='Mysqlx.Crud.ModifyView.check', index=4,
       number=5, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='column', full_name='Mysqlx.Crud.ModifyView.column', index=5,
       number=6, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='stmt', full_name='Mysqlx.Crud.ModifyView.stmt', index=6,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -1039,22 +1053,23 @@ _DROPVIEW = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='if_exists', full_name='Mysqlx.Crud.DropView.if_exists', index=1,
       number=2, type=8, cpp_type=7, label=1,
       has_default_value=True, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
+  syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
@@ -1062,50 +1077,50 @@ _DROPVIEW = _descriptor.Descriptor(
   serialized_end=3044,
 )
 
-_COLUMN.fields_by_name['document_path'].message_type = mysqlx_expr_pb2._DOCUMENTPATHITEM
-_PROJECTION.fields_by_name['source'].message_type = mysqlx_expr_pb2._EXPR
-_LIMITEXPR.fields_by_name['row_count'].message_type = mysqlx_expr_pb2._EXPR
-_LIMITEXPR.fields_by_name['offset'].message_type = mysqlx_expr_pb2._EXPR
-_ORDER.fields_by_name['expr'].message_type = mysqlx_expr_pb2._EXPR
+_COLUMN.fields_by_name['document_path'].message_type = mysqlx__expr__pb2._DOCUMENTPATHITEM
+_PROJECTION.fields_by_name['source'].message_type = mysqlx__expr__pb2._EXPR
+_LIMITEXPR.fields_by_name['row_count'].message_type = mysqlx__expr__pb2._EXPR
+_LIMITEXPR.fields_by_name['offset'].message_type = mysqlx__expr__pb2._EXPR
+_ORDER.fields_by_name['expr'].message_type = mysqlx__expr__pb2._EXPR
 _ORDER.fields_by_name['direction'].enum_type = _ORDER_DIRECTION
 _ORDER_DIRECTION.containing_type = _ORDER
-_UPDATEOPERATION.fields_by_name['source'].message_type = mysqlx_expr_pb2._COLUMNIDENTIFIER
+_UPDATEOPERATION.fields_by_name['source'].message_type = mysqlx__expr__pb2._COLUMNIDENTIFIER
 _UPDATEOPERATION.fields_by_name['operation'].enum_type = _UPDATEOPERATION_UPDATETYPE
-_UPDATEOPERATION.fields_by_name['value'].message_type = mysqlx_expr_pb2._EXPR
+_UPDATEOPERATION.fields_by_name['value'].message_type = mysqlx__expr__pb2._EXPR
 _UPDATEOPERATION_UPDATETYPE.containing_type = _UPDATEOPERATION
 _FIND.fields_by_name['collection'].message_type = _COLLECTION
 _FIND.fields_by_name['data_model'].enum_type = _DATAMODEL
 _FIND.fields_by_name['projection'].message_type = _PROJECTION
-_FIND.fields_by_name['criteria'].message_type = mysqlx_expr_pb2._EXPR
-_FIND.fields_by_name['args'].message_type = mysqlx_datatypes_pb2._SCALAR
+_FIND.fields_by_name['criteria'].message_type = mysqlx__expr__pb2._EXPR
+_FIND.fields_by_name['args'].message_type = mysqlx__datatypes__pb2._SCALAR
 _FIND.fields_by_name['order'].message_type = _ORDER
-_FIND.fields_by_name['grouping'].message_type = mysqlx_expr_pb2._EXPR
-_FIND.fields_by_name['grouping_criteria'].message_type = mysqlx_expr_pb2._EXPR
+_FIND.fields_by_name['grouping'].message_type = mysqlx__expr__pb2._EXPR
+_FIND.fields_by_name['grouping_criteria'].message_type = mysqlx__expr__pb2._EXPR
 _FIND.fields_by_name['locking'].enum_type = _FIND_ROWLOCK
 _FIND.fields_by_name['locking_options'].enum_type = _FIND_ROWLOCKOPTIONS
 _FIND.fields_by_name['limit'].message_type = _LIMIT
 _FIND.fields_by_name['limit_expr'].message_type = _LIMITEXPR
 _FIND_ROWLOCK.containing_type = _FIND
 _FIND_ROWLOCKOPTIONS.containing_type = _FIND
-_INSERT_TYPEDROW.fields_by_name['field'].message_type = mysqlx_expr_pb2._EXPR
+_INSERT_TYPEDROW.fields_by_name['field'].message_type = mysqlx__expr__pb2._EXPR
 _INSERT_TYPEDROW.containing_type = _INSERT
 _INSERT.fields_by_name['collection'].message_type = _COLLECTION
 _INSERT.fields_by_name['data_model'].enum_type = _DATAMODEL
 _INSERT.fields_by_name['projection'].message_type = _COLUMN
 _INSERT.fields_by_name['row'].message_type = _INSERT_TYPEDROW
-_INSERT.fields_by_name['args'].message_type = mysqlx_datatypes_pb2._SCALAR
+_INSERT.fields_by_name['args'].message_type = mysqlx__datatypes__pb2._SCALAR
 _UPDATE.fields_by_name['collection'].message_type = _COLLECTION
 _UPDATE.fields_by_name['data_model'].enum_type = _DATAMODEL
-_UPDATE.fields_by_name['criteria'].message_type = mysqlx_expr_pb2._EXPR
-_UPDATE.fields_by_name['args'].message_type = mysqlx_datatypes_pb2._SCALAR
+_UPDATE.fields_by_name['criteria'].message_type = mysqlx__expr__pb2._EXPR
+_UPDATE.fields_by_name['args'].message_type = mysqlx__datatypes__pb2._SCALAR
 _UPDATE.fields_by_name['order'].message_type = _ORDER
 _UPDATE.fields_by_name['operation'].message_type = _UPDATEOPERATION
 _UPDATE.fields_by_name['limit'].message_type = _LIMIT
 _UPDATE.fields_by_name['limit_expr'].message_type = _LIMITEXPR
 _DELETE.fields_by_name['collection'].message_type = _COLLECTION
 _DELETE.fields_by_name['data_model'].enum_type = _DATAMODEL
-_DELETE.fields_by_name['criteria'].message_type = mysqlx_expr_pb2._EXPR
-_DELETE.fields_by_name['args'].message_type = mysqlx_datatypes_pb2._SCALAR
+_DELETE.fields_by_name['criteria'].message_type = mysqlx__expr__pb2._EXPR
+_DELETE.fields_by_name['args'].message_type = mysqlx__datatypes__pb2._SCALAR
 _DELETE.fields_by_name['order'].message_type = _ORDER
 _DELETE.fields_by_name['limit'].message_type = _LIMIT
 _DELETE.fields_by_name['limit_expr'].message_type = _LIMITEXPR
@@ -1138,6 +1153,7 @@ DESCRIPTOR.enum_types_by_name['DataModel'] = _DATAMODEL
 DESCRIPTOR.enum_types_by_name['ViewAlgorithm'] = _VIEWALGORITHM
 DESCRIPTOR.enum_types_by_name['ViewSqlSecurity'] = _VIEWSQLSECURITY
 DESCRIPTOR.enum_types_by_name['ViewCheckOption'] = _VIEWCHECKOPTION
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Column = _reflection.GeneratedProtocolMessageType('Column', (_message.Message,), dict(
   DESCRIPTOR = _COLUMN,
@@ -1246,6 +1262,5 @@ DropView = _reflection.GeneratedProtocolMessageType('DropView', (_message.Messag
 _sym_db.RegisterMessage(DropView)
 
 
-DESCRIPTOR.has_options = True
-DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
+DESCRIPTOR._options = None
 # @@protoc_insertion_point(module_scope)

@@ -139,5 +139,8 @@ classifiers = [
     'Topic :: Software Development :: Libraries :: Application Frameworks',
     'Topic :: Software Development :: Libraries :: Python Modules'
 ]
-install_requires = ["protobuf>=3.0.0"],
-extras_require = {"dns-srv": ["dnspython>=1.16.0"]}
+install_requires = ["protobuf>=3.0.0"]
+extras_require = {
+    "dns-srv": ["dnspython>=1.16.0"],
+    "compression": ["lz4>=2.1.6"],
+}

@@ -78,7 +78,7 @@ from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
 from .constants import SSLMode, Auth
 from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
-from .protocol import Protocol, MessageReaderWriter
+from .protocol import Protocol, MessageReader, MessageWriter, HAVE_LZ4
 from .result import Result, RowResult, SqlResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
@@ -558,7 +558,6 @@ class Connection(object):
     def __init__(self, settings):
         self.settings = settings
         self.stream = SocketStream()
-        self.reader_writer = None
         self.protocol = None
         self.keep_open = None
         self._user = settings.get("user")
@@ -617,10 +616,31 @@ class Connection(object):
                 router = self.router_manager.get_next_router()
                 self.stream.connect(router.get_connection_params(),
                                     self._connect_timeout)
-                self.reader_writer = MessageReaderWriter(self.stream)
-                self.protocol = Protocol(self.reader_writer)
-                self._handle_capabilities()
+                reader = MessageReader(self.stream)
+                writer = MessageWriter(self.stream)
+                self.protocol = Protocol(reader, writer)
+
+                caps_data = self.protocol.get_capabilites().capabilities
+                caps = {
+                    get_item_or_attr(cap, "name").lower():
+                        cap for cap in caps_data
+                } if caps_data else {}
+
+                # Set TLS capabilities
+                self._set_tls_capabilities(caps)
+
+                # Set connection attributes capabilities
+                if "attributes" in self.settings:
+                    conn_attrs = self.settings["attributes"]
+                    self.protocol.set_capabilities(
+                        session_connect_attrs=conn_attrs)
+
+                # Set compression capabilities
+                compression = self.settings.get("compression", "preferred")
+                algorithm = None if compression == "disabled" \
+                    else self._set_compression_capabilities(caps, compression)
                 self._authenticate()
+                self.protocol.set_compression(algorithm)
                 return
             except (socket.error, RuntimeError) as err:
                 error = err
@@ -643,30 +663,31 @@ class Connection(object):
             raise InterfaceError("Cannot connect to host: {0}".format(error))
         raise InterfaceError("Unable to connect to any of the target hosts", 4001)
 
-    def _handle_capabilities(self):
-        """Handle capabilities.
+    def _set_tls_capabilities(self, caps):
+        """Sets the TLS capabilities.
+
+        Args:
+            caps (dict): Dictionary with the server capabilities.
 
         Raises:
             :class:`mysqlx.OperationalError`: If SSL is not enabled at the
                                              server.
             :class:`mysqlx.RuntimeError`: If support for SSL is not available
                                           in Python.
+
+        .. versionadded:: 8.0.21
         """
         if self.settings.get("ssl-mode") == SSLMode.DISABLED:
             return
+
         if self.stream.is_socket():
             if self.settings.get("ssl-mode"):
                 _LOGGER.warning("SSL not required when using Unix socket.")
             return
 
-        try:
-            data = self.protocol.get_capabilites().capabilities
-            if not (get_item_or_attr(data[0], "name").lower() == "tls"
-                    if data else False):
-                self.close_connection()
-                raise OperationalError("SSL not enabled at server")
-        except (AttributeError, KeyError):
-            pass
+        if "tls" not in caps:
+            self.close_connection()
+            raise OperationalError("SSL not enabled at server")
 
         is_ol7 = False
         if platform.system() == "Linux":
@@ -693,6 +714,65 @@ class Connection(object):
         if "attributes" in self.settings:
             conn_attrs = self.settings["attributes"]
             self.protocol.set_capabilities(session_connect_attrs=conn_attrs)
+
+    def _set_compression_capabilities(self, caps, compression):
+        """Sets the compression capabilities.
+
+        If compression is available, negociates client and server algorithms.
+        Using the following priority:
+
+        1) lz4_message
+        2) deflate_stream
+
+        Args:
+            caps (dict): Dictionary with the server capabilities.
+            compression (str): The compression connection setting.
+
+        Returns:
+            str: The compression algorithm.
+
+        .. versionadded:: 8.0.21
+        """
+        compression_data = caps.get("compression")
+        if compression_data is None:
+            msg = "Compression requested but the server does not support it"
+            if compression == "required":
+                raise NotSupportedError(msg)
+            else:
+                _LOGGER.warning(msg)
+            return None
+
+        compression_dict = {}
+        if isinstance(compression_data, dict):  # C extension is being used
+            for fld in compression_data["value"]["obj"]["fld"]:
+                compression_dict[fld["key"]] = [
+                    value["scalar"]["v_string"]["value"].decode("utf-8")
+                    for value in fld["value"]["array"]["value"]
+                ]
+        else:
+            for fld in compression_data.value.obj.fld:
+                compression_dict[fld.key] = [
+                    value.scalar.v_string.value.decode("utf-8")
+                    for value in fld.value.array.value
+                ]
+
+        server_algorithms = compression_dict.get("algorithm", [])
+        if HAVE_LZ4 and "lz4_message" in server_algorithms:
+            algorithm = "lz4_message"
+        else:
+            algorithm = "deflate_stream"
+
+        if algorithm not in server_algorithms:
+            msg = ("Compression requested but the compression algorithm "
+                   "negotiation failed")
+            if compression == "required":
+                raise InterfaceError(msg)
+            else:
+                _LOGGER.warning(msg)
+            return None
+
+        self.protocol.set_capabilities(compression={"algorithm": algorithm})
+        return algorithm
 
     def _authenticate(self):
         """Authenticate with the MySQL server."""

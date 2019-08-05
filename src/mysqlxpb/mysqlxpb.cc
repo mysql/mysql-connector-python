@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -843,6 +843,9 @@ static const char* GetMessageNameByTypeId(Mysqlx::ServerMessages::Type type) {
     case Mysqlx::ServerMessages::RESULTSET_FETCH_DONE_MORE_OUT_PARAMS: {
       return "Mysqlx.Resultset.FetchDoneMoreOutParams";
     }
+    case Mysqlx::ServerMessages::COMPRESSION: {
+      return "Mysqlx.Connection.Compression";
+    }
   }
 
   assert(false);
@@ -882,6 +885,29 @@ static PyObject* SerializeMessage(PyObject* self, PyObject* args) {
 
     if (message) {
       std::string buffer = message->SerializeAsString();
+
+#ifdef PY3
+      result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
+#else
+      result = PyString_FromStringAndSize(buffer.c_str(), buffer.size());
+#endif
+    }
+  }
+  return result;
+}
+
+
+static PyObject* SerializePartialMessage(PyObject* self, PyObject* args) {
+  PyObject* result = NULL;
+  PyObject* dict;
+  google::protobuf::DynamicMessageFactory factory;
+
+  if (PyArg_ParseTuple(args, "O", &dict)) {
+    MyScopedPtr<google::protobuf::Message> message(
+        CreateMessage(dict, factory));
+
+    if (message) {
+      std::string buffer = message->SerializePartialAsString();
 
 #ifdef PY3
       result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
@@ -952,6 +978,8 @@ init_mysqlxpb() {
       "Parse a server-side message." },
     { "serialize_message", SerializeMessage, METH_VARARGS,
       "Serialize a message." },
+    { "serialize_partial_message", SerializePartialMessage, METH_VARARGS,
+      "Serialize a message, but allows missing required fields." },
     { "enum_value", EnumValue, METH_VARARGS, "Get enum value." },
     { NULL, NULL, 0, NULL }
   };

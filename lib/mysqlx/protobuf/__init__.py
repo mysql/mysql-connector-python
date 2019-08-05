@@ -56,6 +56,8 @@ _SERVER_MESSAGES_TUPLES = (
      "Mysqlx.Sql.StmtExecuteOk"),
     ("Mysqlx.ServerMessages.Type.RESULTSET_FETCH_DONE_MORE_OUT_PARAMS",
      "Mysqlx.Resultset.FetchDoneMoreOutParams"),
+    ("Mysqlx.ServerMessages.Type.COMPRESSION",
+     "Mysqlx.Connection.Compression"),
 )
 
 PROTOBUF_REPEATED_TYPES = [list]
@@ -74,6 +76,7 @@ from ..helpers import encode_to_bytes
 try:
     from . import mysqlx_connection_pb2
     from . import mysqlx_crud_pb2
+    from . import mysqlx_cursor_pb2
     from . import mysqlx_datatypes_pb2
     from . import mysqlx_expect_pb2
     from . import mysqlx_expr_pb2
@@ -169,6 +172,8 @@ try:
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
         mysqlx_crud_pb2.DESCRIPTOR.serialized_pb))
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
+        mysqlx_cursor_pb2.DESCRIPTOR.serialized_pb))
+    _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
         mysqlx_datatypes_pb2.DESCRIPTOR.serialized_pb))
     _DESCRIPTOR_DB.Add(descriptor_pb2.FileDescriptorProto.FromString(
         mysqlx_expect_pb2.DESCRIPTOR.serialized_pb))
@@ -212,6 +217,10 @@ try:
         @staticmethod
         def serialize_message(msg):
             return msg.SerializeToString()
+
+        @staticmethod
+        def serialize_partial_message(msg):
+            return msg.SerializePartialToString()
 
         @staticmethod
         def parse_message(msg_type_name, payload):
@@ -346,9 +355,20 @@ class Message(object):
         """Serializes a message to a string.
 
         Returns:
-           string: A string representing a message containing parsed data.
+            str: A string representing a message containing parsed data.
         """
         return Protobuf.mysqlxpb.serialize_message(self._msg)
+
+    def serialize_partial_to_string(self):
+        """Serializes the protocol message to a binary string.
+
+        This method is similar to serialize_to_string but doesn't check if the
+        message is initialized.
+
+        Returns:
+            str: A string representation of the partial message.
+        """
+        return Protobuf.mysqlxpb.serialize_partial_message(self._msg)
 
     @property
     def type(self):
@@ -366,8 +386,25 @@ class Message(object):
 
         Returns:
             dict: The dictionary representing a message containing parsed data.
+
+        .. versionadded:: 8.0.21
         """
         return Protobuf.mysqlxpb.parse_message(msg_type_name, payload)
+
+    @staticmethod
+    def byte_size(msg):
+        """Returns the size of the message in bytes.
+
+        Args:
+            msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
+
+        Returns:
+            int: Size of the message in bytes.
+
+        .. versionadded:: 8.0.21
+        """
+        return msg.ByteSize() if Protobuf.use_pure \
+            else len(encode_to_bytes(msg.serialize_to_string()))
 
     @staticmethod
     def parse_from_server(msg_type, payload):

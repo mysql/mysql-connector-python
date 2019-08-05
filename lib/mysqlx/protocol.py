@@ -26,9 +26,19 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implementation of the X protocol for MySQL servers."""
+"""Implementation of the X protocol for MySQL servers.
+"""
 
 import struct
+import zlib
+
+from io import BytesIO
+
+try:
+    import lz4.frame
+    HAVE_LZ4 = True
+except ImportError:
+    HAVE_LZ4 = False
 
 from .compat import STRING_TYPES, INT_TYPES
 from .errors import (InterfaceError, NotSupportedError, OperationalError,
@@ -41,18 +51,87 @@ from .protobuf import (CRUD_PREPARE_MAPPING, SERVER_MESSAGES,
                        PROTOBUF_REPEATED_TYPES, Message, mysqlxpb_enum)
 
 
-class MessageReaderWriter(object):
-    """Implements a Message Reader/Writer.
+_COMPRESSION_THRESHOLD = 1000
+_COMPRESSION_ALGORITHMS = ("lz4_message", "deflate_stream")
+
+
+class Compressor(object):
+    """Implements compression/decompression using `lz4_message`
+    and `deflate_stream` algorithms.
+
+    Args:
+        algorithm (str): Compression algorithm.
+
+    .. versionadded:: 8.0.21
+
+    """
+    def __init__(self, algorithm):
+        self._algorithm = algorithm
+        if algorithm == "deflate_stream":
+            self._compressobj = zlib.compressobj()
+            self._decompressobj = zlib.decompressobj()
+        else:
+            self._compressobj = None
+            self._decompressobj = None
+
+    def compress(self, data):
+        """Compresses data and returns it.
+
+        Args:
+            data (str, bytes or buffer object): Data to be compressed.
+
+        Returns:
+            bytes: Compressed data.
+        """
+        if self._algorithm == "lz4_message":
+            with lz4.frame.LZ4FrameCompressor() as compressor:
+                compressed = compressor.begin()
+                compressed += compressor.compress(data)
+                compressed += compressor.flush()
+            return compressed
+
+        # Using 'deflate_stream' algorithm
+        compressed = self._compressobj.compress(data)
+        compressed += self._compressobj.flush(zlib.Z_SYNC_FLUSH)
+        return compressed
+
+    def decompress(self, data):
+        """Decompresses a frame of data and returns it as a string of bytes.
+
+        Args:
+            data (str, bytes or buffer object): Data to be compressed.
+
+        Returns:
+            bytes: Decompresssed data.
+        """
+        if self._algorithm == "lz4_message":
+            with lz4.frame.LZ4FrameDecompressor() as decompressor:
+                decompressed = decompressor.decompress(data)
+            return decompressed
+
+        # Using 'deflate' algorithm
+        decompressed = self._decompressobj.decompress(data)
+        decompressed += self._decompressobj.flush(zlib.Z_SYNC_FLUSH)
+        return decompressed
+
+
+class MessageReader(object):
+    """Implements a Message Reader.
 
     Args:
         socket_stream (mysqlx.connection.SocketStream): `SocketStream` object.
+
+    .. versionadded:: 8.0.21
     """
     def __init__(self, socket_stream):
         self._stream = socket_stream
+        self._compressor = None
         self._msg = None
+        self._msg_queue = []
 
     def _read_message(self):
-        """Read message.
+        """Reads X Protocol messages from the stream and returns a
+        :class:`mysqlx.protobuf.Message` object.
 
         Raises:
             :class:`mysqlx.ProgrammingError`: If e connected server does not
@@ -62,25 +141,39 @@ class MessageReaderWriter(object):
         Returns:
             mysqlx.protobuf.Message: MySQL X Protobuf Message.
         """
-        hdr = self._stream.read(5)
-        msg_len, msg_type = struct.unpack("<LB", hdr)
-        if msg_type == 10:
+        if self._msg_queue:
+            return self._msg_queue.pop(0)
+
+        frame_size, frame_type = struct.unpack("<LB", self._stream.read(5))
+        if frame_type == 10:
             raise ProgrammingError("The connected server does not have the "
-                                   "MySQL X protocol plugin enabled or protocol"
-                                   "mismatch")
-        payload = self._stream.read(msg_len - 1)
-        msg_type_name = SERVER_MESSAGES.get(msg_type)
-        if not msg_type_name:
-            raise ValueError("Unknown msg_type: {0}".format(msg_type))
-        # Do not parse empty notices, Message requires a type in payload.
-        if msg_type == 11 and payload == b"":
+                                   "MySQL X protocol plugin enabled or "
+                                   "protocol mismatch")
+
+        frame_payload = self._stream.read(frame_size - 1)
+        if frame_type not in SERVER_MESSAGES:
+            raise ValueError("Unknown message type: {}".format(frame_type))
+
+        # Do not parse empty notices, Message requires a type in payload
+        if frame_type == 11 and frame_payload == b"":
             return self._read_message()
-        else:
-            try:
-                msg = Message.from_server_message(msg_type, payload)
-            except RuntimeError:
-                return self._read_message()
-        return msg
+
+        frame_msg = Message.from_server_message(frame_type, frame_payload)
+
+        if frame_type == 19:  # Mysqlx.ServerMessages.Type.COMPRESSION
+            uncompressed_size = frame_msg["uncompressed_size"]
+            stream = BytesIO(self._compressor.decompress(frame_msg["payload"]))
+            bytes_processed = 0
+            while bytes_processed < uncompressed_size:
+                payload_size, msg_type = \
+                    struct.unpack("<LB", stream.read(5))
+                payload = stream.read(payload_size - 1)
+                self._msg_queue.append(
+                    Message.from_server_message(msg_type, payload))
+                bytes_processed += payload_size + 4
+            return self._msg_queue.pop(0) if self._msg_queue else None
+
+        return frame_msg
 
     def read_message(self):
         """Read message.
@@ -107,29 +200,95 @@ class MessageReaderWriter(object):
             raise OperationalError("Message push slot is full")
         self._msg = msg
 
-    def write_message(self, msg_id, msg):
+    def set_compression(self, algorithm):
+        """Creates a :class:`mysqlx.protocol.Compressor` object based on the
+        compression algorithm.
+
+        Args:
+            algorithm (str): Compression algorithm.
+
+        .. versionadded:: 8.0.21
+
+        """
+        self._compressor = Compressor(algorithm) if algorithm else None
+
+
+class MessageWriter(object):
+    """Implements a Message Writer.
+
+    Args:
+        socket_stream (mysqlx.connection.SocketStream): `SocketStream` object.
+
+    .. versionadded:: 8.0.21
+
+    """
+    def __init__(self, socket_stream):
+        self._stream = socket_stream
+        self._compressor = None
+
+    def write_message(self, msg_type, msg):
         """Write message.
 
         Args:
-            msg_id (int): The message ID.
+            msg_type (int): The message type.
             msg (mysqlx.protobuf.Message): MySQL X Protobuf Message.
         """
-        msg_str = encode_to_bytes(msg.serialize_to_string())
-        header = struct.pack("<LB", len(msg_str) + 1, msg_id)
-        self._stream.sendall(b"".join([header, msg_str]))
+        msg_size = msg.byte_size(msg)
+        if self._compressor and msg_size > _COMPRESSION_THRESHOLD:
+            msg_str = encode_to_bytes(msg.serialize_to_string())
+            header = struct.pack("<LB", msg_size + 1, msg_type)
+            compressed = self._compressor.compress(b"".join([header, msg_str]))
+
+            msg_first_fields = Message("Mysqlx.Connection.Compression")
+            msg_first_fields["client_messages"] = msg_type
+            msg_first_fields["uncompressed_size"] = msg_size + 5
+
+            msg_payload = Message("Mysqlx.Connection.Compression")
+            msg_payload["payload"] = compressed
+
+            output = b"".join([
+                encode_to_bytes(msg_first_fields.serialize_partial_to_string())[:-2],
+                encode_to_bytes(msg_payload.serialize_partial_to_string())
+            ])
+
+            msg_comp_id = \
+                mysqlxpb_enum("Mysqlx.ClientMessages.Type.COMPRESSION")
+            header = struct.pack("<LB", len(output) + 1, msg_comp_id)
+            self._stream.sendall(b"".join([header, output]))
+        else:
+            msg_str = encode_to_bytes(msg.serialize_to_string())
+            header = struct.pack("<LB", msg_size + 1, msg_type)
+            self._stream.sendall(b"".join([header, msg_str]))
+
+    def set_compression(self, algorithm):
+        """Creates a :class:`mysqlx.protocol.Compressor` object based on the
+        compression algorithm.
+
+        Args:
+            algorithm (str): Compression algorithm.
+        """
+        self._compressor = Compressor(algorithm) if algorithm else None
 
 
 class Protocol(object):
     """Implements the MySQL X Protocol.
 
     Args:
-        read_writer (mysqlx.protocol.MessageReaderWriter): A Message \
-            Reader/Writer object.
+        read (mysqlx.protocol.MessageReader): A Message Reader object.
+        writer (mysqlx.protocol.MessageWriter): A Message Writer object.
+
+    .. versionchanged:: 8.0.21
     """
-    def __init__(self, reader_writer):
-        self._reader = reader_writer
-        self._writer = reader_writer
-        self._message = None
+    def __init__(self, reader, writer):
+        self._reader = reader
+        self._writer = writer
+        self._compression_algorithm = None
+
+    @property
+    def compression_algorithm(self):
+        """str: The compresion algorithm.
+        """
+        return self._compression_algorithm
 
     def _apply_filter(self, msg, stmt):
         """Apply filter.
@@ -302,6 +461,20 @@ class Protocol(object):
                 break
         return msg
 
+    def set_compression(self, algorithm):
+        """Sets the compression algorithm to be used by the compression
+        object, for uplink and downlink.
+
+        Args:
+            algorithm (str): Algorithm to be used in compression/decompression.
+
+        .. versionadded:: 8.0.21
+
+        """
+        self._compression_algorithm = algorithm
+        self._reader.set_compression(algorithm)
+        self._writer.set_compression(algorithm)
+
     def get_capabilites(self):
         """Get capabilities.
 
@@ -315,6 +488,10 @@ class Protocol(object):
         msg = self._reader.read_message()
         while msg.type == "Mysqlx.Notice.Frame":
             msg = self._reader.read_message()
+
+        if msg.type == "Mysqlx.Error":
+            raise OperationalError(msg["msg"], msg["code"])
+
         return msg
 
     def set_capabilities(self, **kwargs):
@@ -326,6 +503,8 @@ class Protocol(object):
         Returns:
             mysqlx.protobuf.Message: MySQL X Protobuf Message.
         """
+        if not kwargs:
+            return
         capabilities = Message("Mysqlx.Connection.Capabilities")
         for key, value in kwargs.items():
             capability = Message("Mysqlx.Connection.Capability")
@@ -359,28 +538,6 @@ class Protocol(object):
             if err.errno != 5002:
                 raise
         return None
-
-    def set_session_capabilities(self, **kwargs):
-        """Set capabilities.
-
-        Args:
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            mysqlx.protobuf.Message: MySQL X Protobuf Message.
-        """
-        capabilities = Message("Mysqlx.Connection.Capabilities")
-        for key, value in kwargs.items():
-            capability = Message("Mysqlx.Connection.Capability")
-            capability["name"] = key
-            capability["value"] = self._create_any(value)
-            capabilities["capabilities"].extend([capability.get_message()])
-        msg = Message("Mysqlx.Connection.CapabilitiesSet")
-        msg["session_connect_attrs"] = capabilities
-        self._writer.write_message(
-            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_SET"),
-            msg)
-        return self.read_ok()
 
     def send_auth_start(self, method, auth_data=None, initial_response=None):
         """Send authenticate start.
