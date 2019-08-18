@@ -1950,3 +1950,39 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                                  "Attribute {} with value {} differs of {}"
                                  "".format(attr_name, res_dict[attr_name],
                                            expected_attrs[attr_name]))
+
+
+class WL13335(tests.MySQLConnectorTests):
+    """WL#13335: Avoid set config values whit flag CAN_HANDLE_EXPIRED_PASSWORDS
+    """
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        cnx = connection.MySQLConnection(**self.config)
+        self.user = "expired_pw_user"
+        self.passw = "i+QEqGkFr8h5"
+        self.hosts = ["localhost", "127.0.0.1"]
+        for host in self.hosts:
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED BY "
+                          "'{}'".format(self.user, host, self.passw))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format(self.user, host))
+            cnx.cmd_query("ALTER USER '{}'@'{}' PASSWORD EXPIRE"
+                          "".format(self.user, host))
+        cnx.close()
+
+    def tearDown(self):
+        cnx = connection.MySQLConnection(**self.config)
+        for host in self.hosts:
+            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, host))
+        cnx.close()
+
+    @tests.foreach_cnx()
+    def test_connect_with_can_handle_expired_pw_flag(self):
+        cnx_config = self.config.copy()
+        cnx_config['user'] = self.user
+        cnx_config['password'] = self.passw
+        flags = constants.ClientFlag.get_default()
+        flags |= constants.ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS
+        cnx_config['client_flags'] =flags
+        # connection must be successful
+        _ = self.cnx.__class__(**cnx_config)
