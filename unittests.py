@@ -545,16 +545,16 @@ class StatsTestRunner(unittest.TextTestRunner):
     """Committing results test results"""
     resultclass = StatsTestResult
 
-    def __init__(self, stream=sys.stderr, descriptions=True, verbosity=1,
+    def __init__(self, stream=sys.stderr, descriptions=False, verbosity=1,
                  failfast=False, buffer=False, resultclass=None, dbcnx=None):
         try:
             super(StatsTestRunner, self).__init__(
-                stream=sys.stderr, descriptions=True, verbosity=1,
+                stream=sys.stderr, descriptions=descriptions, verbosity=verbosity,
                 failfast=False, buffer=False)
         except TypeError:
             # Compatibility with Python v2.6
             super(StatsTestRunner, self).__init__(
-                stream=sys.stderr, descriptions=True, verbosity=1)
+                stream=sys.stderr, descriptions=descriptions, verbosity=verbosity)
         self._dbcnx = dbcnx
 
     def _makeResult(self):
@@ -586,7 +586,7 @@ class BasicTestRunner(unittest.TextTestRunner):
     """Basic test runner"""
     resultclass = BasicTestResult
 
-    def __init__(self, stream=sys.stderr, descriptions=True, verbosity=1,
+    def __init__(self, stream=sys.stderr, descriptions=False, verbosity=1,
                  failfast=False, buffer=False, warnings='ignore'):
         try:
             super(BasicTestRunner, self).__init__(
@@ -602,7 +602,7 @@ class BasicTestRunner(unittest.TextTestRunner):
 class Python26TestRunner(unittest.TextTestRunner):
     """Python v2.6/3.1 Test Runner backporting needed functionality"""
 
-    def __init__(self, stream=sys.stderr, descriptions=True, verbosity=1,
+    def __init__(self, stream=sys.stderr, descriptions=False, verbosity=1,
                  failfast=False, buffer=False):
         super(Python26TestRunner, self).__init__(
             stream=stream, descriptions=descriptions, verbosity=verbosity)
