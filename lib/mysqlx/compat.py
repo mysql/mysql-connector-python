@@ -82,5 +82,5 @@ else:
     UNICODE_TYPES = (unicode,)
     STRING_TYPES = (str, unicode,)
     BYTE_TYPES = (bytearray,)
-    MAX_INT = sys.maxint
+    MAX_INT = sys.maxint  # pylint: disable=E1101
     JSONDecodeError = ValueError

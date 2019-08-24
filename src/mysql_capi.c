@@ -890,22 +890,49 @@ MySQL_autocommit(MySQL *self, PyObject *mode)
 PyObject*
 MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
 {
-	char *user= NULL, *password= NULL, *database= NULL;
+	char *user= NULL, *database= NULL;
+#ifdef PY3
+    char *password = NULL;
+#else
+    PyObject *password = NULL;
+#endif
 	int res;
 	static char *kwlist[]= {"user", "password", "database", NULL};
 
     IS_CONNECTED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|sss", kwlist,
-                                     &user, &password, &database))
+#ifdef PY3
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzz", kwlist,
+#else
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zOz", kwlist,
+#endif
+                                     &user, &password, &database
+                                     ))
     {
         return NULL;
     }
-
+#ifdef PY3
     Py_BEGIN_ALLOW_THREADS
     res= mysql_change_user(&self->session, user, password, database);
     Py_END_ALLOW_THREADS
-
+#else
+{
+	char* c_password;
+	if (PyUnicode_Check(password))
+	{
+		PyObject* u_password= PyUnicode_AsUTF8String(password);
+		c_password= PyString_AsString(u_password);
+		Py_DECREF(u_password);
+	}
+	else
+	{
+		c_password= PyString_AsString(password);
+	}
+	Py_BEGIN_ALLOW_THREADS
+	res= mysql_change_user(&self->session, user, c_password, database);
+	Py_END_ALLOW_THREADS
+}
+#endif
     if (res)
     {
     	raise_with_session(&self->session, NULL);

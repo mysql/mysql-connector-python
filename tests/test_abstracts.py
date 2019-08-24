@@ -172,6 +172,8 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 2),
                      "reset command not available")
     @foreach_cnx()
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0),
+                     "Not working with cross version MySQL lib< 8.0.")
     def test_reset_session(self):
         exp = [True, u'STRICT_ALL_TABLES', u'-09:00', 33]
         self.cnx.autocommit = exp[0]

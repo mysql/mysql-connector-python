@@ -771,6 +771,7 @@ class BugOra13392739(tests.MySQLConnectorTests):
             self.assertTrue('3 attempt(s)' in str(exc))
 
 
+@unittest.skipIf(sys.version_info < (3, 5), "Objects not collected by GC.")
 class BugOra13435186(tests.MySQLConnectorTests):
     def setUp(self):
         self.sample_size = 100
@@ -2341,8 +2342,9 @@ class BugOra17054848(tests.MySQLConnectorTests):
         self.assertTrue(res != '')
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 7),
-                 "BugOra16217765 not tested with MySQL version < 5.6.7")
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0),
+                 "BugOra16217765 not tested with MySQL version < 5.6.7. "
+                 "Not working with cross version MySQL lib< 8.0.")
 class BugOra16217765(tests.MySQLConnectorTests):
     """BUG#16217765: Fix authentication plugin support
     """
