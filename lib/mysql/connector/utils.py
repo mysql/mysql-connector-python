@@ -427,11 +427,12 @@ def linux_distribution():
                 distro.get("distrib_release", ""),
                 distro.get("distrib_codename", ""))
 
-    distro = _parse_lsb_release_command()
-    if distro:
-        return (distro.get("distributor_id", ""),
-                distro.get("release", ""),
-                distro.get("codename", ""))
+    if not PY2:
+        distro = _parse_lsb_release_command()
+        if distro:
+            return (distro.get("distributor_id", ""),
+                    distro.get("release", ""),
+                    distro.get("codename", ""))
 
     distro = _parse_os_release()
     if distro:

@@ -401,7 +401,12 @@ class BuildExtDynamic(build_ext):
 
         if os.name == "nt":
             mysql_capi = os.path.join(self.with_mysql_capi, "bin")
-            vendor_libs.append((mysql_capi, ["ssleay32.dll", "libeay32.dll"]))
+            if ARCH_64BIT:
+                vendor_libs.append((mysql_capi, ["libssl-1_1-x64.dll",
+                                                 "libcrypto-1_1-x64.dll"]))
+            else:
+                vendor_libs.append((mysql_capi, ["libssl-1_1.dll",
+                                                 "libcrypto-1_1.dll"]))
             # Bundle libmysql.dll
             src = os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
             dst = os.getcwd()
