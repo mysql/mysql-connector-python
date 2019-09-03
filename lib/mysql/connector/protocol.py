@@ -141,7 +141,7 @@ class MySQLProtocol(object):
         return utils.int4store(client_flags) + \
                utils.int4store(max_allowed_packet) + \
                utils.int2store(charset) + \
-               b'\x00' * 23
+               b'\x00' * 22
 
     def make_command(self, command, argument=None):
         """Make a MySQL packet containing a command"""
