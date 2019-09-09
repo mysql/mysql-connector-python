@@ -47,6 +47,11 @@ from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
 
+try:
+    import _mysql_connector
+except ImportError:
+    pass
+
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
 PY2 = sys.version_info[0] == 2
