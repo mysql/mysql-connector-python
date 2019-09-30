@@ -679,13 +679,13 @@ class Protocol(object):
         self._apply_filter(msg, stmt)
         return "Mysqlx.ClientMessages.Type.CRUD_DELETE", msg
 
-    def build_execute_statement(self, namespace, stmt, args):
+    def build_execute_statement(self, namespace, stmt, fields=None):
         """Build execute statement.
 
         Args:
             namespace (str): The namespace.
             stmt (Statement): A `Statement` based type object.
-            args (iterable): An iterable object.
+            fields (Optional[dict]): The message fields.
 
         Returns:
             (tuple): Tuple containing:
@@ -698,23 +698,15 @@ class Protocol(object):
         msg = Message("Mysqlx.Sql.StmtExecute", namespace=namespace, stmt=stmt,
                       compact_metadata=False)
 
-        if namespace == "mysqlx":
-            # mysqlx namespace behavior: one object with a list of arguments
-            items = args[0].items() if isinstance(args, (list, tuple)) else \
-                    args.items()
+        if fields:
             obj_flds = []
-            for key, value in items:
+            for key, value in fields.items():
                 obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
                                   key=key, value=self._create_any(value))
                 obj_flds.append(obj_fld.get_message())
             msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
             msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
             msg["args"] = [msg_any.get_message()]
-        else:
-            # xplugin namespace behavior: list of arguments
-            for arg in args:
-                value = self._create_any(arg)
-                msg["args"].extend([value.get_message()])
 
         return "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE", msg
 

@@ -64,7 +64,7 @@ def get_current_connections(session):
     return connections
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxClientTests(tests.MySQLxTests):
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()
@@ -423,7 +423,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         # No errors should raise from closing client.
         client.close()
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxClientPoolingTests(tests.MySQLxTests):
     def setUp(self):
         settings = tests.get_mysqlx_config()
@@ -510,7 +510,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
         client2.close()
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxConnectionPoolingTests(tests.MySQLxTests):
     def setUp(self):
         settings = tests.get_mysqlx_config()
@@ -739,7 +739,7 @@ class MySQLxClientConnectionAttributesTests(tests.MySQLConnectorTests):
                                  expected_attrs[row.get_string('ATTR_NAME')]))
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxPoolingSessionTests(tests.MySQLxTests):
     def setUp(self):
         self.connect_kwargs = tests.get_mysqlx_config()

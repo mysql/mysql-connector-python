@@ -262,7 +262,7 @@ class ServerProtocol(Protocol):
             "Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_OK"), msg)
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxSessionTests(tests.MySQLxTests):
 
     def setUp(self):
@@ -1174,7 +1174,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                          "while was specified to not do so: {}".format(rows))
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxInnitialNoticeTests(tests.MySQLxTests):
 
     def setUp(self):

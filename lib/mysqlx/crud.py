@@ -177,7 +177,8 @@ class Schema(DatabaseObject):
         Returns:
             `list`: List of Collection objects.
         """
-        rows = self._connection.get_row_result("list_objects", self._name)
+        rows = self._connection.get_row_result("list_objects",
+                                               {"schema": self._name})
         rows.fetch_all()
         collections = []
         for row in rows:
@@ -205,7 +206,8 @@ class Schema(DatabaseObject):
         Returns:
             `list`: List of Table objects.
         """
-        rows = self._connection.get_row_result("list_objects", self._name)
+        rows = self._connection.get_row_result("list_objects",
+                                               {"schema": self._name})
         rows.fetch_all()
         tables = []
         object_types = ("TABLE", "VIEW",)
@@ -283,8 +285,9 @@ class Schema(DatabaseObject):
             raise ProgrammingError("Collection name is invalid")
         collection = Collection(self, name)
         if not collection.exists_in_database():
-            self._connection.execute_nonquery("xplugin", "create_collection",
-                                              True, self._name, name)
+            self._connection.execute_nonquery("mysqlx", "create_collection",
+                                              True, {"schema": self._name,
+                                                     "name": name})
         elif not reuse:
             raise ProgrammingError("Collection already exists")
         return collection
@@ -413,9 +416,10 @@ class Collection(DatabaseObject):
         Args:
             index_name (str): Index name.
         """
-        self._connection.execute_nonquery("xplugin", "drop_collection_index",
-                                          False, self._schema.name, self._name,
-                                          index_name)
+        self._connection.execute_nonquery("mysqlx", "drop_collection_index",
+                                          False, {"schema": self._schema.name,
+                                                  "collection": self._name,
+                                                  "name": index_name})
 
     def replace_one(self, doc_id, doc):
         """Replaces the Document matching the document ID with a new document

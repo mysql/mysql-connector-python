@@ -73,7 +73,7 @@ def drop_view(schema, view_name):
     schema.get_session().sql(query).execute()
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxDbDocTests(tests.MySQLxTests):
 
     def setUp(self):
@@ -115,7 +115,7 @@ class MySQLxDbDocTests(tests.MySQLxTests):
         doc_6 = doc_5.copy()
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxSchemaTests(tests.MySQLxTests):
 
     def setUp(self):
@@ -254,7 +254,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.schema.drop_collection(collection_name)
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxCollectionTests(tests.MySQLxTests):
 
     def setUp(self):
@@ -2305,7 +2305,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         session.close()
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):
 
     def setUp(self):
@@ -2882,7 +2882,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         session.close()
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxViewTests(tests.MySQLxTests):
 
     def setUp(self):

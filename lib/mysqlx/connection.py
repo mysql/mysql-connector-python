@@ -640,12 +640,11 @@ class Connection(object):
         statement.increment_exec_counter()
 
     @catch_network_exception
-    def send_sql(self, statement, *args):
+    def send_sql(self, statement):
         """Execute a SQL statement.
 
         Args:
             sql (str): The SQL statement.
-            *args: Arbitrary arguments.
 
         Raises:
             :class:`mysqlx.ProgrammingError`: If the SQL statement is not a
@@ -658,10 +657,10 @@ class Connection(object):
             raise ProgrammingError("The SQL statement is not a valid string")
         if not PY3 and isinstance(sql, UNICODE_TYPES):
             msg_type, msg = self.protocol.build_execute_statement(
-                "sql", bytes(bytearray(sql, "utf-8")), args)
+                "sql", bytes(bytearray(sql, "utf-8")))
         else:
             msg_type, msg = self.protocol.build_execute_statement(
-                "sql", sql, args)
+                "sql", sql)
         self.protocol.send_msg_without_ps(msg_type, msg, statement)
         return SqlResult(self)
 
@@ -732,14 +731,14 @@ class Connection(object):
         return Result(self)
 
     @catch_network_exception
-    def execute_nonquery(self, namespace, cmd, raise_on_fail, *args):
+    def execute_nonquery(self, namespace, cmd, raise_on_fail, fields=None):
         """Execute a non query command.
 
         Args:
             namespace (str): The namespace.
             cmd (str): The command.
             raise_on_fail (bool): `True` to raise on fail.
-            *args: Arbitrary arguments.
+            fields (Optional[dict]): The message fields.
 
         Raises:
             :class:`mysqlx.OperationalError`: On errors.
@@ -749,7 +748,7 @@ class Connection(object):
         """
         try:
             msg_type, msg = \
-                self.protocol.build_execute_statement(namespace, cmd, args)
+                self.protocol.build_execute_statement(namespace, cmd, fields)
             self.protocol.send_msg(msg_type, msg)
             return Result(self)
         except OperationalError:
@@ -757,12 +756,11 @@ class Connection(object):
                 raise
 
     @catch_network_exception
-    def execute_sql_scalar(self, sql, *args):
+    def execute_sql_scalar(self, sql):
         """Execute a SQL scalar.
 
         Args:
             sql (str): The SQL statement.
-            *args: Arbitrary arguments.
 
         Raises:
             :class:`mysqlx.InterfaceError`: If no data found.
@@ -770,7 +768,7 @@ class Connection(object):
         Returns:
             :class:`mysqlx.Result`: The result.
         """
-        msg_type, msg = self.protocol.build_execute_statement("sql", sql, args)
+        msg_type, msg = self.protocol.build_execute_statement("sql", sql)
         self.protocol.send_msg(msg_type, msg)
         result = RowResult(self)
         result.fetch_all()
@@ -779,18 +777,18 @@ class Connection(object):
         return result[0][0]
 
     @catch_network_exception
-    def get_row_result(self, cmd, *args):
+    def get_row_result(self, cmd, fields):
         """Returns the row result.
 
         Args:
             cmd (str): The command.
-            *args: Arbitrary arguments.
+            fields (dict): The message fields.
 
         Returns:
             :class:`mysqlx.RowResult`: The result object.
         """
         msg_type, msg = \
-            self.protocol.build_execute_statement("xplugin", cmd, args)
+            self.protocol.build_execute_statement("mysqlx", cmd, fields)
         self.protocol.send_msg(msg_type, msg)
         return RowResult(self)
 
