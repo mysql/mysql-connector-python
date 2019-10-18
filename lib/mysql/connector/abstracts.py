@@ -423,11 +423,17 @@ class MySQLConnectionAbstract(object):
             server_version = server_version.decode()
 
         # pylint: disable=W1401
-        regex_ver = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{1,3})(.*)")
+        regex_ver = re.compile(r"^5\.5\.5-(\d{1,2})\.(\d{1,2})\.(\d{1,2})")
         # pylint: enable=W1401
         match = regex_ver.match(server_version)
+
         if not match:
-            raise errors.InterfaceError("Failed parsing MySQL version")
+            # pylint: disable=W1401
+            regex_ver = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{1,3})(.*)")
+            # pylint: enable=W1401
+            match = regex_ver.match(server_version)
+            if not match:
+                raise errors.InterfaceError("Failed parsing MySQL version")
 
         version = tuple([int(v) for v in match.groups()[0:3]])
         if version < (4, 1):
