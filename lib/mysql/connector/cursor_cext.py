@@ -105,7 +105,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         When free is True (default) the result will be freed.
         """
         self._rowcount = -1
-        self._nextrow = None
+        self._nextrow = (None, None)
         self._affected_rows = -1
         self._insert_id = 0
         self._warning_count = 0
@@ -511,11 +511,14 @@ class CMySQLCursor(MySQLCursorAbstract):
         if size and self._cnx.unread_result:
             rows.extend(self._cnx.get_rows(size)[0])
 
-        if size and self._cnx.unread_result:
-            self._nextrow = self._cnx.get_row()
-            if self._nextrow and not self._nextrow[0] and \
-               not self._cnx.more_results:
-                self._cnx.free_result()
+        if size: 
+            if self._cnx.unread_result:
+                self._nextrow = self._cnx.get_row()
+                if self._nextrow and not self._nextrow[0] and \
+                    not self._cnx.more_results:
+                    self._cnx.free_result()
+            else:
+                self._nextrow = (None, None)
 
         if not rows:
             self._handle_eof()
