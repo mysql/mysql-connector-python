@@ -322,7 +322,10 @@ def get_git_info():
         stdout, _ = proc.communicate()
         git_info = dict(parse_qsl(stdout.replace("'", "").replace("+", "%2B")
                                   .split(",")[-1:][0].strip()))
-        git_info["branch"] = stdout.split(",")[0].split("->")[1].strip()
+        try:
+            git_info["branch"] = stdout.split(",")[0].split("->")[1].strip()
+        except:
+            git_info["branch"] = stdout.split(",")[0].split("=")[1].strip()
         return git_info
     else:
         branch_src = os.getenv("BRANCH_SOURCE")

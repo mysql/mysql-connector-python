@@ -40,7 +40,7 @@ try:
         TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_TLS  # pylint: disable=E1101
     else:
         TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_SSLv23  # Alias of PROTOCOL_TLS
-    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3:
         TLS_V1_3_SUPPORTED = True
     else:
         TLS_V1_3_SUPPORTED = False
@@ -54,12 +54,14 @@ import logging
 import uuid
 import platform
 import os
+import random
 import re
 import threading
 
 import dns.resolver
 import dns.exception
 
+from datetime import datetime, timedelta
 from functools import wraps
 
 from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
@@ -93,6 +95,28 @@ _CNX_POOL_MAX_NAME_SIZE = 120
 _CNX_POOL_NAME_REGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')
 _CNX_POOL_MAX_IDLE_TIME = 2147483
 _CNX_POOL_QUEUE_TIMEOUT = 2147483
+
+# Time is on seconds
+_PENALTY_SERVER_OFFLINE = 1000000
+_PENALTY_MAXED_OUT = 60
+_PENALTY_NO_ADD_INFO = 60 * 60
+_PENALTY_CONN_TIMEOUT = 60 * 60
+_PENALTY_WRONG_PASSW = 60 * 60 * 24
+_TIMEOUT_PENALTIES = {
+    # Server denays service e.g Max connections reached
+    "[WinError 10053]": _PENALTY_MAXED_OUT, # Established connection was aborted
+    "[Errno 32]": _PENALTY_MAXED_OUT, # Broken pipe
+    # Server is Offline
+    "[WinError 10061]": _PENALTY_SERVER_OFFLINE, # Target machine actively refused it
+    "[Errno 111]": _PENALTY_SERVER_OFFLINE, # Connection refused
+    # Host is offline:
+    "[WinError 10060]": _PENALTY_CONN_TIMEOUT, # Not respond after a period of time
+    # No route to Host:
+    "[Errno 11001]": _PENALTY_NO_ADD_INFO,# getaddrinfo failed
+    "[Errno -2]": _PENALTY_NO_ADD_INFO, # Name or service not known
+    # Wrong Password
+    "Access denied": _PENALTY_WRONG_PASSW
+}
 
 _LOGGER = logging.getLogger("mysqlx")
 
@@ -184,7 +208,10 @@ class SocketStream(object):
         """
         if self._socket is None:
             raise OperationalError("MySQLx Connection not available")
-        self._socket.sendall(data)
+        try:
+            self._socket.sendall(data)
+        except socket.error as err:
+            raise OperationalError("Unexpected socket error: {}".format(err))
 
     def close(self):
         """Close the socket."""
@@ -231,7 +258,6 @@ class SocketStream(object):
                 context.verify_mode = ssl.CERT_NONE
         else:
             ssl_protos.sort(reverse=True)
-            
             tls_version = ssl_protos[0]
             if not TLS_V1_3_SUPPORTED and \
                tls_version == "TLSv1.3" and len(ssl_protos) > 1:
@@ -355,6 +381,169 @@ def catch_network_exception(func):
     return wrapper
 
 
+class Router(dict):
+    """Represents a set of connection parameters.
+
+    Args:
+       settings (dict): Dictionary with connection settings
+    .. versionadded:: 8.0.20
+    """
+    def __init__(self, connection_params):
+        self.update(connection_params)
+        self["available"] = self.get("available", True)
+
+    def available(self):
+        """Verifies if the Router is available to open connections.
+
+        Returns:
+            bool: True if this Router is available else False.
+        """
+        return self["available"]
+
+    def set_unavailable(self):
+        """Sets this Router unavailable to open connections.
+        """
+        self["available"] = False
+
+    def get_connection_params(self):
+        """Verifies if the Router is available to open connections.
+
+        Returns:
+            tuple: host and port or socket information tuple.
+        """
+        if "socket" in self:
+            return self["socket"]
+        return (self["host"], self["port"])
+
+
+class RouterManager():
+    """Manages the connection parameters of all the routers.
+
+    Args:
+        Routers (list): A list of Router objects.
+        settings (dict): Dictionary with connection settings.
+    .. versionadded:: 8.0.20
+    """
+    def __init__(self, routers, settings):
+        self._routers = routers
+        self._settings = settings
+        self._cur_priority_idx = 0
+        self._can_failover = True
+        # Reuters status
+        self._routers_directory = {}
+        self.routers_priority_list = []
+        self._ensure_priorities()
+
+    def _ensure_priorities(self):
+        """Ensure priorities.
+
+        Raises:
+            :class:`mysqlx.ProgrammingError`: If priorities are invalid.
+        """
+        priority_count = 0
+
+        for router in self._routers:
+            priority = router.get("priority", None)
+            if priority is None:
+                priority_count += 1
+                router["priority"] = 100
+            elif priority > 100:
+                raise ProgrammingError("The priorities must be between 0 and "
+                                       "100", 4007)
+
+        if 0 < priority_count < len(self._routers):
+            raise ProgrammingError("You must either assign no priority to any "
+                                   "of the routers or give a priority for "
+                                   "every router", 4000)
+
+        self._routers.sort(key=lambda x: x["priority"], reverse=True)
+
+        # Group servers with the same priority
+        for router in self._routers:
+            priority = router["priority"]
+            if priority not in self._routers_directory.keys():
+                self._routers_directory[priority] = [Router(router)]
+                self.routers_priority_list.append(priority)
+            else:
+                self._routers_directory[priority].append(Router(router))
+
+    def _get_available_routers(self, priority):
+        """Get a list of the current available routers that shares the given priority.
+
+        Returns:
+            list: A list of the current available routers.
+        """
+        router_list = self._routers_directory[priority]
+        router_list = [router for router in router_list if router.available()]
+        return router_list
+
+    def _get_random_connection_params(self, priority):
+        """Get a random router from the group with the given priority.
+
+        Returns:
+            Router: A random router.
+        """
+        router_list = self._get_available_routers(priority)
+        if not router_list:
+            return None
+        if len(router_list) == 1:
+            return router_list[0]
+
+        last = len(router_list) - 1
+        index = random.randint(0, last)
+        return router_list[index]
+
+    def can_failover(self):
+        """Returns the next connection parameters.
+
+        Returns:
+            bool: True if there is more server to failover to else False.
+        """
+        return self._can_failover
+
+    def get_next_router(self):
+        """Returns the next connection parameters.
+
+        Returns:
+            Router: with the connection parameters.
+        """
+        if not self._routers:
+            self._can_failover = False
+            router_settings = self._settings.copy()
+            router_settings["host"] = self._settings.get("host", "localhost")
+            router_settings["port"] = self._settings.get("port", 33060)
+            return Router(router_settings)
+
+        cur_priority = self.routers_priority_list[self._cur_priority_idx]
+        routers_priority_len = len(self.routers_priority_list)
+
+        search = True
+        while search:
+            router = self._get_random_connection_params(cur_priority)
+
+            if router is not None or \
+               self._cur_priority_idx >= routers_priority_len:
+                if self._cur_priority_idx == routers_priority_len -1 and \
+                    len(self._get_available_routers(cur_priority)) < 2:
+                    self._can_failover = False
+                break
+
+            # Search on next group
+            self._cur_priority_idx += 1
+            if self._cur_priority_idx < routers_priority_len:
+                cur_priority = self.routers_priority_list[self._cur_priority_idx]
+
+        return router
+
+    def get_routers_directory(self):
+        """Returns the directory containing all the routers managed.
+
+        Returns:
+            dict: Dictionary with priorities as connection settings.
+        """
+        return self._routers_directory
+
+
 class Connection(object):
     """Connection to a MySQL Server.
 
@@ -372,10 +561,14 @@ class Connection(object):
         self._schema = settings.get("schema")
         self._active_result = None
         self._routers = settings.get("routers", [])
-        self._cur_router = -1
-        self._can_failover = True
-        self._ensure_priorities()
-        self._routers.sort(key=lambda x: (x["priority"], -x.get("weight", 0)))
+
+        if "host" in settings and settings["host"]:
+            self._routers.append({
+                "host": settings.get("host"),
+                "port": settings.get("port", None)
+            })
+
+        self.router_manager = RouterManager(self._routers, settings)
         self._connect_timeout = settings.get("connect-timeout",
                                              _CONNECT_TIMEOUT)
         if self._connect_timeout == 0:
@@ -404,62 +597,6 @@ class Connection(object):
         """
         self._active_result = result
 
-    def _ensure_priorities(self):
-        """Ensure priorities.
-
-        Raises:
-            :class:`mysqlx.ProgrammingError`: If priorities are invalid.
-        """
-        priority_count = 0
-        priority = 100
-
-        for router in self._routers:
-            pri = router.get("priority", None)
-            if pri is None:
-                priority_count += 1
-                router["priority"] = priority
-            elif pri > 100:
-                raise ProgrammingError("The priorities must be between 0 and "
-                                       "100", 4007)
-            priority -= 1
-
-        if 0 < priority_count < len(self._routers):
-            raise ProgrammingError("You must either assign no priority to any "
-                                   "of the routers or give a priority for "
-                                   "every router", 4000)
-
-    def _get_connection_params(self):
-        """Returns the connection parameters.
-
-        Returns:
-            tuple: The connection parameters.
-        """
-        if not self._routers:
-            self._can_failover = False
-            if "host" in self.settings:
-                return self.settings["host"], self.settings.get("port", 33060)
-            if "socket" in self.settings:
-                return self.settings["socket"]
-            return ("localhost", 33060,)
-
-        # Reset routers status once all are tried
-        if not self._can_failover or self._cur_router == -1:
-            self._cur_router = -1
-            self._can_failover = True
-            for router in self._routers:
-                router['available'] = True
-
-        self._cur_router += 1
-        host = self._routers[self._cur_router]["host"]
-        port = self._routers[self._cur_router]["port"]
-
-        if self._cur_router > 0:
-            self._routers[self._cur_router-1]["available"] = False
-        if self._cur_router >= len(self._routers) - 1:
-            self._can_failover = False
-
-        return (host, port,)
-
     def connect(self):
         """Attempt to connect to the MySQL server.
 
@@ -470,23 +607,26 @@ class Connection(object):
         """
         # Loop and check
         error = None
-        while self._can_failover:
+        while self.router_manager.can_failover():
             try:
-                self.stream.connect(self._get_connection_params(),
+                router = self.router_manager.get_next_router()
+                self.stream.connect(router.get_connection_params(),
                                     self._connect_timeout)
                 self.reader_writer = MessageReaderWriter(self.stream)
                 self.protocol = Protocol(self.reader_writer)
                 self._handle_capabilities()
                 self._authenticate()
                 return
-            except socket.error as err:
+            except (socket.error, RuntimeError) as err:
                 error = err
+                router.set_unavailable()
 
         # Python 2.7 does not raise a socket.timeout exception when using
         # settimeout(), but it raises a socket.error with errno.EAGAIN (11)
         # or errno.EINPROGRESS (115) if connect-timeout value is too low
-        if error is not None and (isinstance(error, socket.timeout) or
-                                  (error.errno in (11, 115) and not PY3)):
+        if error is not None and \
+           (isinstance(error, socket.timeout) or
+            (hasattr(error, "errno") and error.errno in (11, 115) and not PY3)):
             if len(self._routers) <= 1:
                 raise TimeoutError("Connection attempt to the server was "
                                    "aborted. Timeout of {0} ms was exceeded"
@@ -496,7 +636,7 @@ class Connection(object):
                                "selected server".format(self._connect_timeout))
         if len(self._routers) <= 1:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
-        raise InterfaceError("Failed to connect to any of the routers", 4001)
+        raise InterfaceError("Unable to connect to any of the target hosts", 4001)
 
     def _handle_capabilities(self):
         """Handle capabilities.
@@ -514,11 +654,14 @@ class Connection(object):
                 _LOGGER.warning("SSL not required when using Unix socket.")
             return
 
-        data = self.protocol.get_capabilites().capabilities
-        if not (get_item_or_attr(data[0], "name").lower() == "tls"
-                if data else False):
-            self.close_connection()
-            raise OperationalError("SSL not enabled at server")
+        try:
+            data = self.protocol.get_capabilites().capabilities
+            if not (get_item_or_attr(data[0], "name").lower() == "tls"
+                    if data else False):
+                self.close_connection()
+                raise OperationalError("SSL not enabled at server")
+        except (AttributeError, KeyError):
+            pass
 
         is_ol7 = False
         if platform.system() == "Linux":
@@ -1038,6 +1181,9 @@ class ConnectionPool(queue.Queue):
         self._set_pool_name(name)
         self._open_sessions = 0
         self._connections_openned = []
+        self._available = True
+        self._timeout = 0
+        self._timeout_stamp = datetime.now()
         self.pool_max_size = kwargs.get("max_size", 25)
         # Can't invoke super due to Queue not is a new-style class
         queue.Queue.__init__(self, self.pool_max_size)
@@ -1045,7 +1191,7 @@ class ConnectionPool(queue.Queue):
         self.max_idle_time = kwargs.get("max_idle_time", 25)
         self.settings = kwargs
         self.queue_timeout = kwargs.get("queue_timeout", 25)
-        self._priority = kwargs.get('priority', 0)
+        self.priority = kwargs.get("priority", 0)
         self.cnx_config = kwargs
         self.host = kwargs['host']
         self.port = kwargs['port']
@@ -1078,7 +1224,7 @@ class ConnectionPool(queue.Queue):
         return len(self._connections_openned)
 
     def remove_connection(self, cnx=None):
-        """Removes a connection to this pool.
+        """Removes a connection from this pool.
 
         Args:
             cnx (PooledConnection): The connection object.
@@ -1156,6 +1302,41 @@ class ConnectionPool(queue.Queue):
 
     def __str__(self):
         return self.name
+
+    def available(self):
+        """Returns if this pool is available for pool connectinos from it.
+
+        Returns:
+            bool: True if this pool is available else False.
+        .. versionadded:: 8.0.20
+        """
+        return self._available
+
+    def set_unavailable(self, time_out=-1):
+        """Sets this pool unavailable for a period of time (in seconds).
+
+        .. versionadded:: 8.0.20
+        """
+        self._available = False
+        self._timeout_stamp = datetime.now()
+        self._timeout = time_out
+
+    def set_available(self):
+        """Sets this pool available for pool connectinos from it.
+
+        .. versionadded:: 8.0.20
+        """
+        self._available = True
+        self._timeout_stamp = datetime.now()
+
+    def get_timeout_stamp(self):
+        """Returnds the penalized time (timeout) and the time at the penalty.
+
+        Returns:
+            tuple: penalty seconds (int), timestamp at penalty (datetime object)
+        .. versionadded:: 8.0.20
+        """
+        return (self._timeout, self._timeout_stamp)
 
     def close(self):
         """Empty this ConnectionPool.
@@ -1279,6 +1460,69 @@ class PoolsManager(object):
                                         [])
                 pool.append(ConnectionPool(router_name, **settings))
 
+    def _get_random_pool(self, pool_list):
+        """Get a random router from the group with the given priority.
+
+        Returns:
+            Router: a random router.
+
+        .. versionadded:: 8.0.20
+        """
+        if not pool_list:
+            return None
+        if len(pool_list) == 1:
+            return pool_list[0]
+
+        last = len(pool_list) - 1
+        index = random.randint(0, last)
+        return pool_list[index]
+
+    def get_sublist(self, pools, index, cur_priority):
+        sublist = []
+        next_priority = None
+        while index < len(pools):
+            next_priority = pools[index].priority
+            if cur_priority == next_priority and pools[index].available():
+                sublist.append(pools[index])
+            elif cur_priority != next_priority:
+                break
+            index += 1
+        return sublist
+
+    def _get_next_pool(self, pools, cur_priority):
+        index = 0
+        for pool in pools:
+            if pool.available() and cur_priority == pool.priority:
+                break
+            index += 1
+        subpool = []
+        while not subpool and index < len(pools):
+            subpool = self.get_sublist(pools, index, cur_priority)
+            index += 1
+        return self._get_random_pool(subpool)
+
+    def _get_next_priority(self, pools, cur_priority=None):
+        if cur_priority is None and pools:
+            return pools[0].priority
+        else:
+            # find the first pool that does not share the same priority
+            for t_pool in pools:
+                if t_pool.priority != cur_priority:
+                    cur_priority = t_pool.priority
+                    return cur_priority
+        return None
+
+    def _check_unavailable_pools(self, settings, revive=None):
+        pools = self._get_pools(settings)
+        for pool in pools:
+            if pool.available():
+                continue
+            timeout, timeout_stamp = pool.get_timeout_stamp()
+            if revive:
+                timeout = revive
+            if datetime.now() > (timeout_stamp + timedelta(seconds=timeout)):
+                pool.set_available()
+
     def get_connection(self, settings):
         """Get a connection from the pool.
 
@@ -1294,10 +1538,16 @@ class PoolsManager(object):
             PooledConnection: A pooled connection object.
         """
         pools = self._get_pools(settings)
-        # Pools are stored by router priority
-        num_pools = len(pools)
-        for pool_number in range(num_pools):
-            pool = pools[pool_number]
+        cur_priority = settings.get("cur_priority", None)
+        error_list = []
+
+        if cur_priority is None:
+            cur_priority = self._get_next_priority(pools, cur_priority)
+        settings["cur_priority"] = cur_priority
+        self._check_unavailable_pools(settings)
+        pool = self._get_next_pool(pools, cur_priority)
+
+        while pool is not None:
             try:
                 # Check connections aviability in this pool
                 if pool.qsize() > 0:
@@ -1310,25 +1560,56 @@ class PoolsManager(object):
                             raise PoolError(
                                 "Failed getting connection; pool exhausted")
                         try:
-                            # Only reset the connection by reauthentification if
-                            # the connection was unnable to keep open by the server
+                            # Only reset the connection by re-authentification
+                            # if the connection was unable to keep open by the
+                            # server
                             if not cnx.keep_open:
                                 cnx.reset()
                             ver = cnx.sql('show variables like "version"'
                                          ).execute().fetch_all()[0][1]
                         except (RuntimeError, socket.error, InterfaceError):
+                            # Unable to reset connection, close and remove
                             try:
                                 cnx.close_connection()
                             except (RuntimeError, socket.error, InterfaceError):
                                 pass
                             finally:
                                 pool.remove_connection(cnx)
+                            # By WL#13222 all idle sessions that connect to the
+                            # same endpoint should be removed from the pool.
+                            while pool.qsize() > 0:
+                                try:
+                                    cnx = pool.get(block=True,
+                                                   timeout=pool.queue_timeout)
+                                except queue.Empty:
+                                    pass
+                                else:
+                                    try:
+                                        cnx.close_connection()
+                                    except (RuntimeError, socket.error, InterfaceError):
+                                        pass
+                                    finally:
+                                        pool.remove_connection(cnx)
                             # Connection was closed by the server, create new
-                            cnx = PooledConnection(pool)
-                            pool.track_connection(cnx)
-                            cnx.connect()
-                            ver = cnx.sql('show variables like "version"'
-                                         ).execute().fetch_all()[0][1]
+                            try:
+                                cnx = PooledConnection(pool)
+                                pool.track_connection(cnx)
+                                cnx.connect()
+                                ver = cnx.sql('show variables like "version"'
+                                             ).execute().fetch_all()[0][1]
+                            except (RuntimeError, socket.error, InterfaceError):
+                                pass
+                            finally:
+                                # Server must be down, take down idle
+                                # connections from this pool
+                                while pool.qsize() > 0:
+                                    try:
+                                        cnx = pool.get(block=True,
+                                                       timeout=pool.queue_timeout)
+                                        cnx.close_connection()
+                                        pool.remove_connection(cnx)
+                                    except (RuntimeError, socket.error, InterfaceError):
+                                        pass
                         # mysqlx_wait_timeout is only available on MySQL 8
                         if tuple([int(n) for n in
                                   ver.split("-")[0].split(".")]) > (8, 0, 10):
@@ -1367,11 +1648,36 @@ class PoolsManager(object):
                             return cnx
                         except queue.Empty:
                             raise PoolError("pool max size has been reached")
-            except (InterfaceError, TimeoutError):
-                if pool_number == num_pools - 1:
-                    raise
+            except (InterfaceError, TimeoutError, PoolError) as err:
+                error_list.append("pool: {} error: {}".format(pool, err))
+                if isinstance(err, PoolError):
+                    # Pool can be exhaust now but can be ready again in no time,
+                    # e.g a connection is returned to the pool.
+                    pool.set_unavailable(2)
                 else:
-                    continue
+                    penalty = None
+                    for timeout_penalty in _TIMEOUT_PENALTIES:
+                        if timeout_penalty in err.msg:
+                            penalty = _TIMEOUT_PENALTIES[timeout_penalty]
+                    if penalty:
+                        pool.set_unavailable(penalty)
+                    else:
+                        # Other errors are severe punished
+                        pool.set_unavailable(100000)
+
+                self._check_unavailable_pools(settings)
+                # Try next pool with the same priority
+                pool = self._get_next_pool(pools, cur_priority)
+
+                if pool is None:
+                    cur_priority = self._get_next_priority(pools, cur_priority)
+                    settings["cur_priority"] = cur_priority
+                    pool = self._get_next_pool(pools, cur_priority)
+                    if pool is None:
+                        msg = "\n  ".join(error_list)
+                        raise PoolError("Unable to connect to any of the "
+                                        "target hosts: [\n  {}\n]".format(msg))
+                continue
 
     def close_pool(self, cnx_settings):
         """Closes the connections in the pools

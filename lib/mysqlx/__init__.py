@@ -58,6 +58,7 @@ from .expr import ExprParser as expr
 
 _SPLIT_RE = re.compile(r",(?![^\(\)]*\))")
 _PRIORITY_RE = re.compile(r"^\(address=(.+),priority=(\d+)\)$", re.VERBOSE)
+_ROUTER_RE = re.compile(r"^\(address=(.+)[,]*\)$", re.VERBOSE)
 _URI_SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+\-.]+)://(.*)")
 _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl", "tls-versions",
              "tls-ciphersuites"]
@@ -102,6 +103,7 @@ def _parse_address_list(path):
 
     routers = []
     address_list = _SPLIT_RE.split(path[1:-1] if array else path)
+    priority_count = 0
     for address in address_list:
         router = {}
 
@@ -109,13 +111,28 @@ def _parse_address_list(path):
         if match:
             address = match.group(1)
             router["priority"] = int(match.group(2))
+            priority_count += 1
+        else:
+            match = _ROUTER_RE.match(address)
+            if match:
+                address = match.group(1)
+                router["priority"] = 100
 
         match = urlparse("//{0}".format(address))
         if not match.hostname:
             raise InterfaceError("Invalid address: {0}".format(address))
 
-        router.update(host=match.hostname, port=match.port)
+        try:
+            router.update(host=match.hostname, port=match.port)
+        except ValueError as err:
+            raise ProgrammingError("Invalid URI: {0}".format(err), 4002)
+
         routers.append(router)
+
+    if 0 < priority_count < len(address_list):
+        raise ProgrammingError("You must either assign no priority to any "
+                               "of the routers or give a priority for "
+                               "every router", 4000)
 
     return {"routers": routers} if array else routers[0]
 
@@ -288,8 +305,14 @@ def _validate_hosts(settings, default_port=None):
     if "priority" in settings and settings["priority"]:
         try:
             settings["priority"] = int(settings["priority"])
+            if settings["priority"] < 0 or settings["priority"] > 100:
+                raise ProgrammingError("Invalid priority value, "
+                                       "must be between 0 and 100", 4007)
         except NameError:
-            raise InterfaceError("Invalid priority")
+            raise ProgrammingError("Invalid priority", 4007)
+        except ValueError:
+            raise ProgrammingError(
+                "Invalid priority: {}".format(settings["priority"]), 4007)
 
     if "port" in settings and settings["port"]:
         try:

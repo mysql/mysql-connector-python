@@ -356,6 +356,33 @@ class MySQLxSessionTests(tests.MySQLxTests):
         except ProgrammingError as err:
             self.assertEqual(4007, err.errno)
 
+        routers = [{"host": "bad_host", "priority": 100},
+                   {"host": host, "port": port, "priority": "A"}]
+        uri = build_uri(user=user, password=password, routers=routers)
+        self.assertRaises(ProgrammingError, mysqlx.get_session, uri)
+        try:
+            session = mysqlx.get_session(uri)
+        except ProgrammingError as err:
+            self.assertEqual(4002, err.errno)
+
+        routers = [{"host": "bad_host", "priority": 100},
+                   {"host": host, "port": port, "priority": -101}]
+        settings = {"user": user, "password": password, "routers": routers}
+        self.assertRaises(ProgrammingError, mysqlx.get_session, **settings)
+        try:
+            session = mysqlx.get_session(**settings)
+        except ProgrammingError as err:
+            self.assertEqual(4007, err.errno)
+
+        routers = [{"host": "bad_host", "priority": 100},
+                   {"host": host, "port": port, "priority": "A"}]
+        settings = {"user": user, "password": password, "routers": routers}
+        self.assertRaises(ProgrammingError, mysqlx.get_session, **settings)
+        try:
+            session = mysqlx.get_session(**settings)
+        except ProgrammingError as err:
+            self.assertEqual(4007, err.errno)
+
         # Establish an Session to a farm using one of many routers (no prios)
         routers = [{"host": "bad_host"}, {"host": host, "port": port}]
         uri = build_uri(user=user, password=password, routers=routers)
@@ -642,7 +669,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                              "Timeout of 2000 ms was exceeded for each "
                              "selected server")
         except mysqlx.InterfaceError as err:
-            self.assertEqual(err.msg, "Failed to connect to any of the routers")
+            self.assertEqual(err.msg, "Unable to connect to any of the target hosts")
 
         # Trying to establish a connection with a wrong password should not
         # wait for timeout

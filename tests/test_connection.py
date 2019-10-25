@@ -2216,3 +2216,97 @@ class WL13335(tests.MySQLConnectorTests):
         cnx_config['client_flags'] =flags
         # connection must be successful
         _ = self.cnx.__class__(**cnx_config)
+
+
+class WL13334(tests.MySQLConnectorTests):
+    """WL#13334: Failover and multihost
+    """
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_failover_init(self):
+        cnx_config = tests.get_mysql_config()
+        user = cnx_config['user']
+        passw = cnx_config['password']
+        host = cnx_config['host']
+        port = cnx_config['port']
+
+        # check invalid priority values
+        settings_org = {
+            "failover": [
+                {"host":"127.0.1.2", "port":port, "user": user,
+                 "priority":80},
+                {"host":"127.0.1.5", "port":port, "user": user,
+                 "priority":80},
+                {"host":"127.0.1.7", "port":port, "user": user,
+                 "priority":10},
+                {"host":"127.0.1.10", "port":port, "user": user,
+                 "priority":10}],
+            "user": "root",
+            "passwd": passw,
+        }
+
+        # check invalid priority values: negative
+        settings = settings_org.copy()
+        settings["failover"].append({"host":host, "port":port, "user": user,
+                 "priority":-1})
+        with self.assertRaises(InterfaceError):
+            _ = connect(**settings)
+
+        # check invalid priority values: out of range
+        settings = settings_org.copy()
+        settings["failover"].append({"host":host, "port":port, "user": user,
+                 "priority":101})
+        with self.assertRaises(InterfaceError):
+            _ = connect(**settings)
+
+        # check invalid priority values: not int type
+        settings = settings_org.copy()
+        settings["failover"].append({"host":host, "port":port, "user": user,
+                 "priority":"A"})
+        with self.assertRaises(InterfaceError):
+            _ = connect(**settings)
+
+        # check all servers has priority or none error
+        settings = settings_org.copy()
+        settings["failover"].append({"host":host, "port":port, "user": user})
+        with self.assertRaises(InterfaceError):
+            _ = connect(**settings)
+
+    def test_failover(self):
+        cnx_config = tests.get_mysql_config()
+        user = cnx_config['user']
+        passw = cnx_config['password']
+        host = cnx_config['host']
+        port = cnx_config['port']
+
+        settings = {
+            "failover": [
+                {"host":"127.0.1.2", "port":port, "user": user,
+                 "priority":80},
+                {"host":"127.0.1.5", "port":port, "user": user,
+                 "priority":80},
+                {"host":"127.0.1.7", "port":port, "user": user,
+                 "priority":10},
+                {"host":"127.0.1.10", "port":port, "user": user,
+                 "priority":10}],
+            "user": "root",
+            "passwd": passw,
+        }
+
+        # connection must fail with error: "Unable to connect to any of the target hosts"
+        with self.assertRaises(InterfaceError) as context:
+            _ = connect(**settings)
+
+        self.assertTrue(
+            ("Unable to connect to any of the target hosts" in context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg))
+
+        # Verify connection is successful
+        settings["failover"].append({"host":host, "port":port, "user": user,
+                 "priority":100})
+        # connection must be successful
+        _ = connect(**cnx_config)

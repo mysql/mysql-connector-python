@@ -40,6 +40,7 @@ else:
 
 import dns.resolver
 import dns.exception
+import random
 
 from . import version
 from .connection import MySQLConnection
@@ -111,9 +112,10 @@ def _get_failover_connection(**kwargs):
 
     support_cnx_args = set(
         ['user', 'password', 'host', 'port', 'unix_socket',
-         'database', 'pool_name', 'pool_size'])
+         'database', 'pool_name', 'pool_size', 'priority'])
 
     # First check if we can add all use the configuration
+    priority_count = 0
     for server in failover:
         diff = set(server.keys()) - support_cnx_args
         if diff:
@@ -121,17 +123,51 @@ def _get_failover_connection(**kwargs):
                 "Unsupported connection argument {0} in failover: {1}".format(
                     's' if len(diff) > 1 else '',
                     ', '.join(diff)))
+        if hasattr(server, "priority"):
+            priority_count += 1
 
+        server["priority"] = server.get("priority", 100)
+        if server["priority"] < 0 or server["priority"] > 100:
+            raise InterfaceError(
+                "Priority value should be in the range of 0 to 100, "
+                "got : {}".format(server["priority"]))
+        if not isinstance(server["priority"], int):
+            raise InterfaceError(
+                "Priority value should be an integer in the range of 0 to "
+                "100, got : {}".format(server["priority"]))
+
+    if 0 < priority_count < len(failover):
+            raise ProgrammingError("You must either assign no priority to any "
+                                   "of the routers or give a priority for "
+                                   "every router")
+
+    failover.sort(key=lambda x: x['priority'], reverse=True)
+
+    server_directory = {}
+    server_priority_list = []
     for server in failover:
-        new_config = config.copy()
-        new_config.update(server)
-        try:
-            return connect(**new_config)
-        except Error:
-            # If we failed to connect, we try the next server
-            pass
+        if server["priority"] not in server_directory:
+            server_directory[server["priority"]] = [server]
+            server_priority_list.append(server["priority"])
+        else:
+            server_directory[server["priority"]].append(server)
 
-    raise InterfaceError("Could not failover: no MySQL server available")
+    for priority in server_priority_list:
+        failover_list = server_directory[priority]
+        for _ in range(len(failover_list)):
+            last = len(failover_list) - 1
+            index = random.randint(0, last)
+            server = failover_list.pop(index)
+            new_config = config.copy()
+            new_config.update(server)
+            new_config.pop('priority', None)
+            try:
+                return connect(**new_config)
+            except Error:
+                # If we failed to connect, we try the next server
+                pass
+
+    raise InterfaceError("Unable to connect to any of the target hosts")
 
 
 def connect(*args, **kwargs):

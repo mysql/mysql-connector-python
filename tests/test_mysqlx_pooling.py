@@ -36,6 +36,7 @@ import tests
 import mysqlx
 import os
 import platform
+import re
 import socket
 
 from mysqlx.errors import InterfaceError, ProgrammingError
@@ -278,7 +279,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         pooling_dict = {
             "enabled": True,
             "max_idle_time": 10000,
-            "queue_timeout": 2000,
+            "queue_timeout": 3000,
             "max_size": pool_limit,  # initial pool limit
         }
         cnx_options = {"pooling": pooling_dict}
@@ -308,8 +309,10 @@ class MySQLxClientTests(tests.MySQLxTests):
             client.get_session()
 
         # Verify that closing the last open session is returned to the pool
-        # so then can be retrieved again.
+        # so then can be retrieved again, which is only possibble after the
+        # pool has become available one more time (timeout has been reached).
         last_session.close()
+        sleep(3)
         _ = client.get_session()
         client.close()
 
@@ -676,6 +679,127 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
         session2.get_schema(settings["schema"])
 
         client2.close()
+
+    def test_routing_random(self):
+        settings = tests.get_mysqlx_config()
+        pooling_dict = {"enabled": True, "max_size": 5, 'queue_timeout': 1000}
+        cnx_options = {"pooling": pooling_dict}
+        uri = ("mysqlx://{user}:{pwd}@["
+               "(address=1.0.0.1:{port}, priority=20),"
+               " (address=1.0.0.2:{port}, priority=20),"
+               " (address=127.0.0.1:{port}, priority=30),"
+               " (address=localhost:{port}, priority=30),"
+               " (address=1.0.0.3:{port}, priority=60),"
+               " (address=1.0.0.4:{port}, priority=60)]"
+               "".format(user=settings["user"], pwd=settings["password"],
+                         port=settings["port"]))
+        client = mysqlx.get_client(uri, cnx_options)
+        # Getting a session must success, the higher priority will cause to a
+        # valid address to be used
+        sessions = []
+        for _ in range(10):
+            session = client.get_session()
+            sessions.append(session)
+        client.close()
+
+        # Test routers without priority
+        settings = tests.get_mysqlx_config()
+        pooling_dict = {"enabled": True, "max_size": 5, 'queue_timeout': 1000}
+        cnx_options = {"pooling": pooling_dict}
+        uri = ("mysqlx://{user}:{pwd}@["
+               "(address=1.0.0.2:{port}),"
+               " (address=1.0.0.1:{port}),"
+               " (address=127.0.0.1:{port}),"
+               " (address=localhost:{port}),"
+               " (address=127.0.0.1:{port}),"
+               " (address=localhost:{port})]"
+               "".format(user=settings["user"], pwd=settings["password"],
+                         port=settings["port"]))
+        client = mysqlx.get_client(uri, cnx_options)
+        # Getting the total of 10 sessions must success
+        sessions = []
+        for _ in range(10):
+            session = client.get_session()
+            sessions.append(session)
+
+        # verify error is thrown when the total sum of the pool sizes is reached
+        with self.assertRaises(mysqlx.errors.PoolError) as context:
+            _ = client.get_session()
+        self.assertTrue(("pool max size has been reached" in context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+        client.close()
+
+        # Verify "Unable to connect to any of the target hosts" error message
+        settings = tests.get_mysqlx_config()
+        pooling_dict = {"enabled": True, "max_size": 5, 'queue_timeout': 50}
+        cnx_options = {"pooling": pooling_dict}
+        uri = ("mysqlx://{user}:{pwd}@["
+               "(address=1.0.0.1:{port}),"
+               " (address=1.0.0.2:{port}),"
+               " (address=1.0.0.3:{port}),"
+               " (address=1.0.0.4:{port}),"
+               " (address=1.0.0.5:{port}),"
+               " (address=1.0.0.6:{port}),"
+               " (address=1.0.0.7:{port}),"
+               " (address=1.0.0.8:{port}),"
+               " (address=1.0.0.9:{port}),"
+               " (address=1.0.0.10:{port})]?connect-timeout=500"
+               "".format(user=settings["user"], pwd=settings["password"]+"$%^",
+                         port=settings["port"]))
+        client = mysqlx.get_client(uri, cnx_options)
+        with self.assertRaises(mysqlx.errors.PoolError) as context:
+            _ = client.get_session()
+        self.assertTrue(("Unable to connect to any of the target hosts" in
+                         context.exception.msg),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception.msg))
+
+        try:
+            client.close()
+        except:
+            # due to the small connect-timeout closing the client may fail.
+            pass
+        # Verify random order of the pools
+        ip_orders = {}
+        attempts = 10
+        for _ in range(attempts):
+            client = mysqlx.get_client(uri, cnx_options)
+            with self.assertRaises(mysqlx.errors.PoolError) as context:
+                _ = client.get_session()
+
+            re_ip = re.compile("  pool: 1.0.0.(\d+).*")
+            order_list = []
+            for line in context.exception.msg.splitlines():
+                if "pool:" not in line:
+                    continue
+                match = re_ip.match(line)
+                if match:
+                    order_list.append(match.group(1))
+            # Verify the 10 pools were verified
+            self.assertEqual(len(order_list), 10,
+                             "10 exception messages were expected but found: {}"
+                             "".format(context.exception.msg))
+            key = ",".join(order_list)
+            if not key in ip_orders:
+                ip_orders[key] = 1
+            else:
+                ip_orders[key] = ip_orders[key] + 1
+            try:
+                client.close()
+            except:
+                # due to the small connect-timeout closing the client may fail.
+                pass
+        max_repeated = -1
+        for ip_order in ip_orders:
+            cur = ip_orders[ip_order]
+            max_repeated = cur if  cur > max_repeated else max_repeated
+        # The possiblility of getting 2 times the same order is : ((1/(10!))^2)*9
+        # Getting the same number of different orders than attempts ensures no repetitions.
+        self.assertEqual(
+            len(ip_orders), attempts, "Expected less repetions found: {}"
+            "".format(["ip_order: {} reps: {}".format(ip_order, ip_orders[ip_order])
+                       for ip_order in ip_orders]))
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
