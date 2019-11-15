@@ -54,12 +54,14 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
 
 from .expr import ExprParser as expr
 
-_SPLIT = re.compile(r',(?![^\(\)]*\))')
-_PRIORITY = re.compile(r'^\(address=(.+),priority=(\d+)\)$', re.VERBOSE)
+_SPLIT_RE = re.compile(r",(?![^\(\)]*\))")
+_PRIORITY_RE = re.compile(r"^\(address=(.+),priority=(\d+)\)$", re.VERBOSE)
+_URI_SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+\-.]+)://(.*)")
 _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl"]
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
                           "routers", "socket", "ssl-mode", "auth", "use-pure",
-                          "connect-timeout", "connection-attributes"]
+                          "connect-timeout", "connection-attributes",
+                          "dns-srv"]
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -80,11 +82,11 @@ def _parse_address_list(path):
                 and path.endswith("]")
 
     routers = []
-    address_list = _SPLIT.split(path[1:-1] if array else path)
+    address_list = _SPLIT_RE.split(path[1:-1] if array else path)
     for address in address_list:
         router = {}
 
-        match = _PRIORITY.match(address)
+        match = _PRIORITY_RE.match(address)
         if match:
             address = match.group(1)
             router["priority"] = int(match.group(2))
@@ -109,13 +111,24 @@ def _parse_connection_uri(uri):
     Returns:
         Returns a dict with parsed values of credentials and address of the
         MySQL server/farm.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: If contains a duplicate option or
+                                        URI scheme is not valid.
     """
     settings = {"schema": ""}
-    uri = "{0}{1}".format("" if uri.startswith("mysqlx://")
-                          else "mysqlx://", uri)
-    _, temp = uri.split("://", 1)
-    userinfo, temp = temp.partition("@")[::2]
-    host, query_str = temp.partition("?")[::2]
+
+    match = _URI_SCHEME_RE.match(uri)
+    scheme, uri = match.groups() if match else ("mysqlx", uri)
+
+    if scheme not in ("mysqlx", "mysqlx+srv"):
+        raise InterfaceError("Scheme '{0}' is not valid".format(scheme))
+
+    if scheme == "mysqlx+srv":
+        settings["dns-srv"] = True
+
+    userinfo, tmp = uri.partition("@")[::2]
+    host, query_str = tmp.partition("?")[::2]
 
     pos = host.rfind("/")
     if host[pos:].find(")") == -1 and pos > 0:
@@ -130,14 +143,17 @@ def _parse_connection_uri(uri):
     if host.startswith(("/", "..", ".")):
         settings["socket"] = unquote(host)
     elif host.startswith("\\."):
-        raise InterfaceError("Windows Pipe is not supported.")
+        raise InterfaceError("Windows Pipe is not supported")
     else:
         settings.update(_parse_address_list(host))
 
+    invalid_options = ("user", "password", "dns-srv")
     for key, val in parse_qsl(query_str, True):
         opt = key.replace("_", "-").lower()
+        if opt in invalid_options:
+            raise InterfaceError("Invalid option: '{0}'".format(key))
         if opt in settings:
-            raise InterfaceError("Duplicate option '{0}'.".format(key))
+            raise InterfaceError("Duplicate option: '{0}'".format(key))
         if opt in _SSL_OPTS:
             settings[opt] = unquote(val.strip("()"))
         else:
@@ -159,15 +175,18 @@ def _validate_settings(settings):
 
     Args:
         settings: dict containing connection settings.
+
+    Raises:
+        :class:`mysqlx.InterfaceError`: On any configuration issue.
     """
     invalid_opts = set(settings.keys()).difference(_SESS_OPTS)
     if invalid_opts:
-        raise ProgrammingError("Invalid options: {0}."
-                               "".format(", ".join(invalid_opts)))
+        raise InterfaceError("Invalid option(s): '{0}'"
+                             "".format("', '".join(invalid_opts)))
 
     if "routers" in settings:
         for router in settings["routers"]:
-            _validate_hosts(router)
+            _validate_hosts(router, 33060)
     elif "host" in settings:
         _validate_hosts(settings)
 
@@ -176,23 +195,23 @@ def _validate_settings(settings):
             settings["ssl-mode"] = settings["ssl-mode"].lower()
             SSLMode.index(settings["ssl-mode"])
         except (AttributeError, ValueError):
-            raise InterfaceError("Invalid SSL Mode '{0}'."
+            raise InterfaceError("Invalid SSL Mode '{0}'"
                                  "".format(settings["ssl-mode"]))
         if settings["ssl-mode"] == SSLMode.DISABLED and \
             any(key in settings for key in _SSL_OPTS):
-            raise InterfaceError("SSL options used with ssl-mode 'disabled'.")
+            raise InterfaceError("SSL options used with ssl-mode 'disabled'")
 
     if "ssl-crl" in settings and not "ssl-ca" in settings:
-        raise InterfaceError("CA Certificate not provided.")
+        raise InterfaceError("CA Certificate not provided")
     if "ssl-key" in settings and not "ssl-cert" in settings:
-        raise InterfaceError("Client Certificate not provided.")
+        raise InterfaceError("Client Certificate not provided")
 
     if not "ssl-ca" in settings and settings.get("ssl-mode") \
         in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
-        raise InterfaceError("Cannot verify Server without CA.")
+        raise InterfaceError("Cannot verify Server without CA")
     if "ssl-ca" in settings and settings.get("ssl-mode") \
         not in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
-        raise InterfaceError("Must verify Server if CA is provided.")
+        raise InterfaceError("Must verify Server if CA is provided")
 
     if "auth" in settings:
         try:
@@ -204,12 +223,39 @@ def _validate_settings(settings):
     if "connection-attributes" in settings:
         validate_connection_attributes(settings)
 
+    if "connect-timeout" in settings:
+        try:
+            if isinstance(settings["connect-timeout"], STRING_TYPES):
+                settings["connect-timeout"] = int(settings["connect-timeout"])
+            if not isinstance(settings["connect-timeout"], INT_TYPES) \
+               or settings["connect-timeout"] < 0:
+                raise ValueError
+        except ValueError:
+            raise TypeError("The connection timeout value must be a positive "
+                            "integer (including 0)")
 
-def _validate_hosts(settings):
+    if "dns-srv" in settings:
+        if not isinstance(settings["dns-srv"], bool):
+            raise InterfaceError("The value of 'dns-srv' must be a boolean")
+        if settings.get("socket"):
+            raise InterfaceError("Using Unix domain sockets with DNS SRV "
+                                 "lookup is not allowed")
+        if settings.get("port"):
+            raise InterfaceError("Specifying a port number with DNS SRV "
+                                 "lookup is not allowed")
+        if settings.get("routers"):
+            raise InterfaceError("Specifying multiple hostnames with DNS "
+                                 "SRV look up is not allowed")
+    elif "host" in settings and not settings.get("port"):
+        settings["port"] = 33060
+
+
+def _validate_hosts(settings, default_port=None):
     """Validate hosts.
 
     Args:
         settings (dict): Settings dictionary.
+        default_port (int): Default connection port.
 
     Raises:
         :class:`mysqlx.InterfaceError`: If priority or port are invalid.
@@ -225,8 +271,8 @@ def _validate_hosts(settings):
             settings["port"] = int(settings["port"])
         except NameError:
             raise InterfaceError("Invalid port")
-    elif "host" in settings:
-        settings["port"] = 33060
+    elif "host" in settings and default_port:
+        settings["port"] = default_port
 
 
 def validate_connection_attributes(settings):
@@ -250,9 +296,9 @@ def validate_connection_attributes(settings):
             return
         if not (conn_attrs.startswith("[") and conn_attrs.endswith("]")) and \
            not conn_attrs in ['False', "false", "True", "true"]:
-            raise InterfaceError("connection-attributes must be Boolean or a "
-                                 "list of key-value pairs, found: '{}'"
-                                 "".format(conn_attrs))
+            raise InterfaceError("The value of 'connection-attributes' must "
+                                 "be a boolean or a list of key-value pairs, "
+                                 "found: '{}'".format(conn_attrs))
         elif conn_attrs in ['False', "false", "True", "true"]:
             if conn_attrs in ['False', "false"]:
                 settings["connection-attributes"] = False
@@ -317,7 +363,7 @@ def validate_connection_attributes(settings):
             # Validate attribute name limit 32 characters
             if len(attr_name) > 32:
                 raise InterfaceError("Attribute name '{}' exceeds 32 "
-                                     "characters limit size.".format(attr_name))
+                                     "characters limit size".format(attr_name))
             # Validate names in connection-attributes cannot start with "_"
             if attr_name.startswith("_"):
                 raise InterfaceError("Key names in connection-attributes "
@@ -327,7 +373,7 @@ def validate_connection_attributes(settings):
             # Validate value type
             if not isinstance(attr_value, STRING_TYPES):
                 raise InterfaceError("Attribute '{}' value: '{}' must "
-                                     "be a string type."
+                                     "be a string type"
                                      "".format(attr_name, attr_value))
             # Validate attribute value limit 1024 characters
             if len(attr_value) > 1024:
@@ -354,6 +400,7 @@ def _get_connection_settings(*args, **kwargs):
 
     Raises:
         TypeError: If connection timeout is not a positive integer.
+        :class:`mysqlx.InterfaceError`: If settings not provided.
     """
     settings = {}
     if args:
@@ -368,17 +415,6 @@ def _get_connection_settings(*args, **kwargs):
 
     if not settings:
         raise InterfaceError("Settings not provided")
-
-    if "connect-timeout" in settings:
-        try:
-            if isinstance(settings["connect-timeout"], STRING_TYPES):
-                settings["connect-timeout"] = int(settings["connect-timeout"])
-            if not isinstance(settings["connect-timeout"], INT_TYPES) \
-               or settings["connect-timeout"] < 0:
-                raise ValueError
-        except ValueError:
-            raise TypeError("The connection timeout value must be a positive "
-                            "integer (including 0)")
 
     _validate_settings(settings)
     return settings

@@ -357,7 +357,20 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Invalid option with URI
         uri = "mysqlx://{0}:{1}@{2}:{3}?invalid=option" \
               "".format(user, password, host, port)
-        self.assertRaises(ProgrammingError, mysqlx.get_session, uri)
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        uri = "mysqlx://{0}:{1}@{2}:{3}?user=root" \
+              "".format(user, password, host, port)
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        uri = "mysqlx://{0}:{1}@{2}:{3}?password=secret" \
+              "".format(user, password, host, port)
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        # Invalid scheme
+        uri = "mysqlx+invalid://{0}:{1}@{2}:{3}" \
+              "".format(user, password, host, port)
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Invalid option with dict
         config = {
@@ -367,10 +380,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
             "port": port,
             "invalid": "option"
         }
-        self.assertRaises(ProgrammingError, mysqlx.get_session, config)
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
 
         # Invalid option with kwargs
-        self.assertRaises(ProgrammingError, mysqlx.get_session, **config)
+        self.assertRaises(InterfaceError, mysqlx.get_session, **config)
 
         # SocketSteam.is_socket()
         session = mysqlx.get_session(user=user, password=password,
@@ -1172,6 +1185,38 @@ class MySQLxSessionTests(tests.MySQLxTests):
             execute().fetch_all()
         self.assertEqual(len(rows), 0, "connection attributes where created "
                          "while was specified to not do so: {}".format(rows))
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 19),
+                     "MySQL 8.0.19+ is required for DNS SRV")
+    def test_dns_srv(self):
+        # The value of 'dns-srv' must be a boolean
+        uri = "root:@localhost/myschema?dns-srv=invalid"
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        config = {"host": "localhost", "user": "root", "dns-srv": 0}
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        config = {"host": "localhost", "user": "root", "dns-srv": 1}
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        config = {"host": "localhost", "user": "root", "dns-srv": None}
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Using Unix domain sockets with DNS SRV lookup is not allowed
+        uri = "mysqlx+srv://root:@localhost/myschema?socket=/tmp/mysql.sock"
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        # Specifying a port number with DNS SRV lookup is not allowed
+        uri = "mysqlx+srv://root:@localhost:33060/myschema"
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        # Specifying multiple hostnames with DNS SRV look up is not allowed
+        uri = "mysqlx+srv://root:@[host1, host2, host3]/myschema"
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
+
+        # The option 'dns-srv' is now allowed in connection string options
+        uri = "mysqlx+srv://root:@localhost/myschema?dns-srv=true"
+        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")

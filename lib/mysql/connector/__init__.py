@@ -30,6 +30,9 @@
 MySQL Connector/Python - MySQL driver written in Python
 """
 
+import dns.resolver
+import dns.exception
+
 try:
     import _mysql_connector  # pylint: disable=F0401
     from .connection_cext import CMySQLConnection
@@ -40,6 +43,7 @@ else:
 
 from . import version
 from .connection import MySQLConnection
+from .constants import DEFAULT_CONFIGURATION
 from .errors import (  # pylint: disable=W0622
     Error, Warning, InterfaceError, DatabaseError,
     NotSupportedError, DataError, IntegrityError, ProgrammingError,
@@ -142,6 +146,44 @@ def connect(*args, **kwargs):
 
     Returns MySQLConnection or PooledMySQLConnection.
     """
+    # DNS SRV
+    dns_srv = kwargs.pop('dns_srv') if 'dns_srv' in kwargs else False
+
+    if not isinstance(dns_srv, bool):
+        raise InterfaceError("The value of 'dns-srv' must be a boolean")
+
+    if dns_srv:
+        if 'unix_socket' in kwargs:
+            raise InterfaceError('Using Unix domain sockets with DNS SRV '
+                                 'lookup is not allowed')
+        if 'port' in kwargs:
+            raise InterfaceError('Specifying a port number with DNS SRV '
+                                 'lookup is not allowed')
+        if 'failover' in kwargs:
+            raise InterfaceError('Specifying multiple hostnames with DNS '
+                                 'SRV look up is not allowed')
+        if 'host' not in kwargs:
+            kwargs['host'] = DEFAULT_CONFIGURATION['host']
+
+        try:
+            srv_records = dns.resolver.query(kwargs['host'], 'SRV')
+        except dns.exception.DNSException:
+            raise InterfaceError("Unable to locate any hosts for '{0}'"
+                                 "".format(kwargs['host']))
+
+        failover = []
+        for srv in srv_records:
+            failover.append({
+                'host': srv.target.to_text(omit_final_dot=True),
+                'port': srv.port,
+                'priority': srv.priority,
+                'weight': srv.weight
+            })
+
+        failover.sort(key=lambda x: (x['priority'], -x['weight']))
+        kwargs['failover'] = [{'host': srv['host'],
+                               'port': srv['port']} for srv in failover]
+
     # Option files
     if 'read_default_file' in kwargs:
         kwargs['option_files'] = kwargs['read_default_file']

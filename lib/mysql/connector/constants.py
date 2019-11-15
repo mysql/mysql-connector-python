@@ -74,6 +74,7 @@ DEFAULT_CONFIGURATION = {
     'allow_local_infile': False,
     'consume_results': False,
     'conn_attrs': None,
+    'dns_srv': False,
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')

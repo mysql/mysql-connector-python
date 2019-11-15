@@ -43,6 +43,9 @@ import os
 import re
 import threading
 
+import dns.resolver
+import dns.exception
+
 from functools import wraps
 
 from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
@@ -327,17 +330,10 @@ class Connection(object):
         self._schema = settings.get("schema")
         self._active_result = None
         self._routers = settings.get("routers", [])
-
-        if 'host' in settings and settings['host']:
-            self._routers.append({
-                'host': settings.get('host'),
-                'port': settings.get('port', None)
-            })
-
         self._cur_router = -1
         self._can_failover = True
         self._ensure_priorities()
-        self._routers.sort(key=lambda x: x['priority'], reverse=True)
+        self._routers.sort(key=lambda x: (x["priority"], -x.get("weight", 0)))
         self._connect_timeout = settings.get("connect-timeout",
                                              _CONNECT_TIMEOUT)
         if self._connect_timeout == 0:
@@ -376,7 +372,7 @@ class Connection(object):
         priority = 100
 
         for router in self._routers:
-            pri = router.get('priority', None)
+            pri = router.get("priority", None)
             if pri is None:
                 priority_count += 1
                 router["priority"] = priority
@@ -1197,16 +1193,18 @@ class PoolsManager(object):
         if "routers" in pool_settings:
             pool_settings.pop("routers")
         if "host" in pool_settings and "port" in pool_settings:
-            routers.append({"priority": 0,
+            routers.append({"priority": 100,
+                            "weight": 0,
                             "host": pool_settings["host"],
                             "port": pool_settings["port"]})
         # Order routers
-        routers.sort(key=lambda x: x["priority"], reverse=True)
+        routers.sort(key=lambda x: (x["priority"], -x.get("weight", 0)))
         for router in routers:
             connection_settings = pool_settings.copy()
             connection_settings["host"] = router["host"]
             connection_settings["port"] = router["port"]
             connection_settings["priority"] = router["priority"]
+            connection_settings["weight"] = router.get("weight", 0)
             connections_settings.append(
                 (generate_pool_name(**connection_settings),
                  connection_settings))
@@ -1366,6 +1364,22 @@ class Session(object):
         self.use_pure = settings.get("use-pure", Protobuf.use_pure)
         self._settings = settings
 
+        # Check for DNS SRV
+        if settings.get("host") and settings.get("dns-srv"):
+            try:
+                srv_records = dns.resolver.query(settings["host"], "SRV")
+            except dns.exception.DNSException:
+                raise InterfaceError("Unable to locate any hosts for '{0}'"
+                                     "".format(settings["host"]))
+            self._settings["routers"] = []
+            for srv in srv_records:
+                self._settings["routers"].append({
+                    "host": srv.target.to_text(omit_final_dot=True),
+                    "port": srv.port,
+                    "priority": srv.priority,
+                    "weight": srv.weight
+                })
+
         if "connection-attributes" not in self._settings or \
            self._settings["connection-attributes"] != False:
             self._settings["attributes"] = {}
@@ -1376,8 +1390,7 @@ class Session(object):
             PoolsManager().create_pool(settings)
             self._connection = PoolsManager().get_connection(settings)
             if self._connection is None:
-                raise PoolError("connection could not be retrieve from pool. %s",
-                                values=settings)
+                raise PoolError("Connection could not be retrieved from pool")
         else:
             self._connection = Connection(self._settings)
             self._connection.connect()

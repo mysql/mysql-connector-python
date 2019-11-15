@@ -184,3 +184,28 @@ Parameter binding is also available as a chained method to each of the CRUD oper
 
    my_coll = db.get_collection('my_collection')
    my_coll.remove('name = :data').bind('data', 'Sakila').execute()
+
+Resolving DNS SRV records
+-------------------------
+
+If you are using a DNS server with service discovery utility that supports mapping `SRV records <https://tools.ietf.org/html/rfc2782>`_, you can use the ``mysqlx+srv`` scheme or ``dns-srv`` connection option and Connector/Python will automatically resolve the available server addresses described by those SRV records.
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@foo.abc.com')
+   # or
+   session = mysqlx.get_session({
+       'host': 'foo.abc.com',
+       'user': 'root',
+       'password': '',
+       'dns-srv': True
+   })
+
+For instance, given the following SRV records by a DNS server at the ``foo.abc.com`` endpoint, the servers would be in the following priority: foo2.abc.com, foo1.abc.com, foo3.abc.com, foo4.abc.com. ::
+
+    Record                    TTL   Class    Priority Weight Port  Target
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   0        5      33060 foo1.abc.com
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   0        10     33060 foo2.abc.com
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   10       5      33060 foo3.abc.com
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   20       5      33060 foo4.abc.com
+

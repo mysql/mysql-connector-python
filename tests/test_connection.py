@@ -52,6 +52,7 @@ except ImportError:
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23)
+from mysql.connector.errors import InterfaceError
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
@@ -1950,6 +1951,34 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                                  "Attribute {} with value {} differs of {}"
                                  "".format(attr_name, res_dict[attr_name],
                                            expected_attrs[attr_name]))
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 19),
+                     "MySQL 8.0.19+ is required for DNS SRV")
+    def test_dns_srv(self):
+        config = tests.get_mysql_config().copy()
+        config.pop("unix_socket", None)
+        config.pop("port", None)
+
+        # The value of 'dns-srv' must be a boolean
+        config["dns_srv"] = "true"
+        self.assertRaises(InterfaceError, connect, **config)
+        config["dns_srv"] = "false"
+        self.assertRaises(InterfaceError, connect, **config)
+        config["dns_srv"] = 0
+        self.assertRaises(InterfaceError, connect, **config)
+        config["dns_srv"] = 1
+        self.assertRaises(InterfaceError, connect, **config)
+        config["dns_srv"] = True
+
+        # Specifying a port number with DNS SRV lookup is not allowed
+        config["port"] = 3306
+        self.assertRaises(InterfaceError, connect, **config)
+        del config["port"]
+
+        # Using Unix domain sockets with DNS SRV lookup is not allowed
+        config["unix_socket"] = "/tmp/mysql.sock"
+        self.assertRaises(InterfaceError, connect, **config)
+        del config["unix_socket"]
 
 
 class WL13335(tests.MySQLConnectorTests):

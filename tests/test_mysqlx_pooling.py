@@ -463,7 +463,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
         cnx_options = {"pooling": pooling_dict}
         uri = ("mysqlx://{user}:{pwd}@[(address=1.0.0.2:{port}, priority=30),"
                " (address=1.0.0.1:{port}, priority=40),"
-               " (address=127.0.0.1:{port}, priority=80),"
+               " (address=127.0.0.1:{port}, priority=20),"
                " (address=localhost:{port}, priority=50)]"
                "".format(user=settings["user"], pwd=settings["password"],
                          port=settings["port"]))
