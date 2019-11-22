@@ -435,6 +435,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         """Handle a LOAD DATA INFILE LOCAL request"""
         try:
             data_file = open(filename, 'rb')
+            return self._handle_ok(self._send_data(data_file,
+                                                   send_empty_packet=True))
         except IOError:
             # Send a empty packet to cancel the operation
             try:
@@ -444,9 +446,11 @@ class MySQLConnection(MySQLConnectionAbstract):
                     "MySQL Connection not available.")
             raise errors.InterfaceError(
                 "File '{0}' could not be read".format(filename))
-
-        return self._handle_ok(self._send_data(data_file,
-                                               send_empty_packet=True))
+        finally:
+            try:
+                data_file.close()
+            except (IOError, NameError):
+                pass
 
     def _handle_result(self, packet):
         """Handle a MySQL Result
