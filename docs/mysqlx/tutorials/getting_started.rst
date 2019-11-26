@@ -209,3 +209,31 @@ For instance, given the following SRV records by a DNS server at the ``foo.abc.c
     _mysqlx._tcp.foo.abc.com. 86400 IN SRV   10       5      33060 foo3.abc.com
     _mysqlx._tcp.foo.abc.com. 86400 IN SRV   20       5      33060 foo4.abc.com
 
+Specifying which TLS versions to use
+------------------------------------
+
+The desired TLS versions to use during the connection van be specified while getting the session with the use of ``tls-versions`` option and in addition the TLS ciphers can also be specified with the ``tls-ciphersuites`` option. 
+
+.. code-block:: python
+
+   session = mysqlx.get_session('mysqlx://root:@127.0.0.1:33060?tls-versions=[TLSv1.1,TLSv1.2]&tls-ciphersuites=[DHE-RSA-AES256-SHA]&ssl-mode=required')
+   # or
+   session = mysqlx.get_session({
+       'host': '127.0.0.1',
+       'user': 'root',
+       'password': '',
+       'tls-versions"': ["TLSv1.1", "TLSv1.2"],
+       'tls-ciphersuites': ["DHE-RSA-AES256-SHA"],
+   })
+   res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
+   print("Mysqlx_ssl_version: {}".format(res[0].get_string('Value')))
+   res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_cipher'").execute().fetch_all()
+   print("Mysqlx_ssl_cipher: {}".format(res[0].get_string('Value')))
+   session.close()
+
+From the given list of TLS versions, the highest supported version will be selected for the connection, given as result:
+
+    Mysqlx_ssl_version: TLSv1.2
+
+    Mysqlx_ssl_cipher: DHE-RSA-AES256-SHA
+
