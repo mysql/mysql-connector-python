@@ -8,6 +8,15 @@ Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.19
+=======
+
+- WL#13531: Remove xplugin namespace
+- WL#13372: DNS SRV support
+- WL#12738: Specify TLS ciphers to be used by a client or session
+- BUG#30270760: Fix reserved filed should have a length of 22
+- BUG#29417117: Close file in handle load data infile
+
 v8.0.18
 =======
 
