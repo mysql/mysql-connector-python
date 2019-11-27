@@ -105,7 +105,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         When free is True (default) the result will be freed.
         """
         self._rowcount = -1
-        self._nextrow = (None, None)
+        self._nextrow = None
         self._affected_rows = -1
         self._insert_id = 0
         self._warning_count = 0
