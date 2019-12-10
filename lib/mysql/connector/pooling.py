@@ -250,7 +250,7 @@ class MySQLConnectionPool(object):
         try:
             self._cnx_queue.put(cnx, block=False)
         except queue.Full:
-            errors.PoolError("Failed adding connection; queue is full")
+            raise errors.PoolError("Failed adding connection; queue is full")
 
     def add_connection(self, cnx=None):
         """Add a connection to the pool
