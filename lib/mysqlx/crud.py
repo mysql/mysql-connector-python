@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,9 +28,14 @@
 
 """Implementation of the CRUD database objects."""
 
+import json
+import warnings
+
 from .dbdoc import DbDoc
-from .errorcode import ER_NO_SUCH_TABLE
-from .errors import OperationalError, ProgrammingError
+from .compat import STRING_TYPES
+from .errorcode import (ER_NO_SUCH_TABLE, ER_TABLE_EXISTS_ERROR,
+                        ER_X_CMD_NUM_ARGUMENTS, ER_X_INVALID_ADMIN_COMMAND)
+from .errors import NotSupportedError, OperationalError, ProgrammingError
 from .helpers import deprecated, escape, quote_identifier
 from .statement import (FindStatement, AddStatement, RemoveStatement,
                         ModifyStatement, SelectStatement, InsertStatement,
@@ -266,31 +271,150 @@ class Schema(DatabaseObject):
             "sql", _DROP_TABLE_QUERY.format(quote_identifier(self._name),
                                             quote_identifier(name)), False)
 
-    def create_collection(self, name, reuse=False):
+    def create_collection(self, name, reuse_existing=False, validation=None,
+                          **kwargs):
         """Creates in the current schema a new collection with the specified
         name and retrieves an object representing the new collection created.
 
         Args:
             name (str): The name of the collection.
-            reuse (bool): `True` to reuse an existing collection.
+            reuse_existing (bool): `True` to reuse an existing collection.
+            validation (Optional[dict]): A dict, containing the keys `level`
+                                         with the validation level and `schema`
+                                         with a dict or a string representation
+                                         of a JSON schema specification.
 
         Returns:
             mysqlx.Collection: Collection object.
 
         Raises:
-            :class:`mysqlx.ProgrammingError`: If ``reuse`` is False and
-                                              collection exists.
+            :class:`mysqlx.ProgrammingError`: If ``reuse_existing`` is False
+                                              and collection exists or the
+                                              collection name is invalid.
+            :class:`mysqlx.NotSupportedError`: If schema validation is not
+                                               supported by the server.
+
+        .. versionchanged:: 8.0.21
         """
         if not name:
             raise ProgrammingError("Collection name is invalid")
+
+        if "reuse" in kwargs:
+            warnings.warn("'reuse' is deprecated since 8.0.21. "
+                          "Please use 'reuse_existing' instead",
+                          DeprecationWarning)
+            reuse_existing = kwargs["reuse"]
+
         collection = Collection(self, name)
-        if not collection.exists_in_database():
-            self._connection.execute_nonquery("mysqlx", "create_collection",
-                                              True, {"schema": self._name,
-                                                     "name": name})
-        elif not reuse:
-            raise ProgrammingError("Collection already exists")
+        fields = {"schema": self._name, "name": name}
+
+        if validation is not None:
+            if not isinstance(validation, dict) or not validation:
+                raise ProgrammingError("Invalid value for 'validation'")
+
+            valid_options = ("level", "schema")
+            for option in validation:
+                if option not in valid_options:
+                    raise ProgrammingError("Invalid option in 'validation': {}"
+                                           "".format(option))
+
+            options = []
+
+            if "level" in validation:
+                level = validation["level"]
+                if not isinstance(level, str):
+                    raise ProgrammingError("Invalid value for 'level'")
+                options.append(("level", level))
+
+            if "schema" in validation:
+                schema = validation["schema"]
+                if not isinstance(schema, (str, dict)):
+                    raise ProgrammingError("Invalid value for 'schema'")
+                options.append(
+                    ("schema", json.dumps(schema)
+                               if isinstance(schema, dict) else schema))
+
+            fields["options"] = ("validation", options)
+
+        try:
+            self._connection.execute_nonquery(
+                "mysqlx", "create_collection", True, fields)
+        except OperationalError as err:
+            if err.errno == ER_X_CMD_NUM_ARGUMENTS:
+                raise NotSupportedError(
+                    "Your MySQL server does not support the requested "
+                    "operation. Please update to MySQL 8.0.19 or a later "
+                    "version")
+            if err.errno == ER_TABLE_EXISTS_ERROR:
+                if not reuse_existing:
+                    raise ProgrammingError(
+                        "Collection '{}' already exists".format(name))
+            else:
+                raise ProgrammingError(err.msg, err.errno)
+
         return collection
+
+    def modify_collection(self, name, validation=None):
+        """Modifies a collection using a JSON schema validation.
+
+        Args:
+            name (str): The name of the collection.
+            validation (Optional[dict]): A dict, containing the keys `level`
+                                         with the validation level and `schema`
+                                         with a dict or a string representation
+                                         of a JSON schema specification.
+
+        Raises:
+            :class:`mysqlx.ProgrammingError`: If the collection name or
+                                              validation is invalid.
+            :class:`mysqlx.NotSupportedError`: If schema validation is not
+                                               supported by the server.
+
+        .. versionadded:: 8.0.21
+        """
+        if not name:
+            raise ProgrammingError("Collection name is invalid")
+
+        if not isinstance(validation, dict) or not validation:
+            raise ProgrammingError("Invalid value for 'validation'")
+
+        valid_options = ("level", "schema")
+        for option in validation:
+            if option not in valid_options:
+                raise ProgrammingError("Invalid option in 'validation': {}"
+                                       "".format(option))
+        options = []
+
+        if "level" in validation:
+            level = validation["level"]
+            if not isinstance(level, str):
+                raise ProgrammingError("Invalid value for 'level'")
+            options.append(("level", level))
+
+        if "schema" in validation:
+            schema = validation["schema"]
+            if not isinstance(schema, (str, dict)):
+                raise ProgrammingError("Invalid value for 'schema'")
+            options.append(
+                ("schema", json.dumps(schema)
+                           if isinstance(schema, dict) else schema))
+
+        fields = {
+            "schema": self._name,
+            "name": name,
+            "options": ("validation", options)
+        }
+
+        try:
+            self._connection.execute_nonquery(
+                "mysqlx", "modify_collection_options", True, fields)
+        except OperationalError as err:
+            if err.errno == ER_X_INVALID_ADMIN_COMMAND:
+                raise NotSupportedError(
+                    "Your MySQL server does not support the requested "
+                    "operation. Please update to MySQL 8.0.19 or a later "
+                    "version")
+            raise ProgrammingError(err.msg, err.errno)
 
 
 class Collection(DatabaseObject):
@@ -332,7 +456,6 @@ class Collection(DatabaseObject):
             mysqlx.AddStatement: AddStatement object.
         """
         return AddStatement(self).add(*values)
-
 
     def remove(self, condition):
         """Removes documents based on the ``condition``.

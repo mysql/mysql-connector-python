@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -328,7 +328,6 @@ class Protocol(object):
                                scalar=build_int_scalar(arg))
             return Message("Mysqlx.Datatypes.Any", type=1,
                            scalar=build_unsigned_int_scalar(arg))
-
         elif isinstance(arg, tuple) and len(arg) == 2:
             arg_key, arg_value = arg
             obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
@@ -336,7 +335,6 @@ class Protocol(object):
             obj = Message("Mysqlx.Datatypes.Object",
                           fld=[obj_fld.get_message()])
             return Message("Mysqlx.Datatypes.Any", type=2, obj=obj)
-
         elif isinstance(arg, dict) or (isinstance(arg, (list, tuple)) and
                                        isinstance(arg[0], dict)):
             array_values = []
@@ -354,6 +352,15 @@ class Protocol(object):
             msg = Message("Mysqlx.Datatypes.Array")
             msg["value"] = array_values
             return Message("Mysqlx.Datatypes.Any", type=3, array=msg)
+        elif isinstance(arg, list):
+            obj_flds = []
+            for key, value in arg:
+                obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
+                                  key=key, value=self._create_any(value))
+                obj_flds.append(obj_fld.get_message())
+            msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
+            msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
+            return msg_any
 
         return None
 
@@ -864,7 +871,6 @@ class Protocol(object):
             msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
             msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
             msg["args"] = [msg_any.get_message()]
-
         return "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE", msg
 
     def build_insert(self, stmt):

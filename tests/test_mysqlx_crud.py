@@ -32,6 +32,7 @@
 """
 
 import gc
+import json
 import logging
 import unittest
 import threading
@@ -252,6 +253,167 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         # dropping an non-existing collection should succeed silently
         self.schema.drop_collection(collection_name)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 19),
+                     "Schema validation unavailable.")
+    def test_schema_validation(self):
+        collection_name = "collection_test"
+        json_schema = {
+            "id": "http://json-schema.org/geo",
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Longitude and Latitude Values",
+            "description": "A geographical coordinate",
+            "required": ["latitude", "longitude"],
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                },
+                "longitude": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                }
+            },
+        }
+        json_schema_string = json.dumps(json_schema)
+
+        # Invalid validation options cases
+        invalid_options = [
+            "",
+            -1,
+            {},
+            {"foo": "bar"},
+            {"level": None, "schema": None},
+            {"level": "off", "schema": True},
+            {"level": "off", "schema": None},
+            {"level": "on", "schema": json_schema},
+            {"level": True, "schema": json_schema},
+        ]
+
+        # Test Schema.create_schema() validation options
+        for validation in invalid_options:
+            self.assertRaises(mysqlx.ProgrammingError,
+                              self.schema.create_collection,
+                              collection_name,
+                              validation=validation)
+
+        # Invalid option in validation
+        self.assertRaises(mysqlx.ProgrammingError,
+                          self.schema.create_collection,
+                          collection_name,
+                          validation={"level": "strict",
+                                      "schema": json_schema,
+                                      "invalid": "option"})
+
+        # Test using JSON schema as dict
+        coll = self.schema.create_collection(
+            collection_name, validation={"level": "strict",
+                                         "schema": json_schema})
+
+        # The latitude and longitude should be numbers
+        self.assertRaises(mysqlx.OperationalError,
+                          coll.add({"latitude": "41.14961",
+                                    "longitude": "-8.61099"}).execute)
+        coll.add({"latitude": 41.14961, "longitude": -8.61099}).execute()
+        self.assertEqual(1, coll.count())
+
+        self.schema.drop_collection(collection_name)
+
+        # Test JSON schema as string
+        coll = self.schema.create_collection(
+            collection_name, validation={"level": "strict",
+                                         "schema": json_schema_string})
+
+        self.assertRaises(mysqlx.OperationalError,
+                          coll.add({"latitude": "41.14961",
+                                    "longitude": "-8.61099"}).execute)
+        coll.add({"latitude": 41.14961, "longitude": -8.61099}).execute()
+        self.assertEqual(1, coll.count())
+
+        # Test Schema.modify_collection() validation options
+        for validation in invalid_options:
+            self.assertRaises(mysqlx.ProgrammingError,
+                              self.schema.modify_collection,
+                              collection_name,
+                              validation=validation)
+
+        # Test Schema.modify_collection()
+        coll.modify("TRUE").set("location", "Porto/Portugal").execute()
+        json_schema["properties"]["location"] = {"type": "string"}
+        json_schema["required"].append("location")
+        self.schema.modify_collection(
+            collection_name, validation={"level": "strict",
+                                         "schema": json_schema})
+
+        # The 'location' property is required
+        self.assertRaises(mysqlx.OperationalError,
+                          coll.add({"latitude": 41.14961,
+                                    "longitude": -8.61099}).execute)
+        coll.add({"location": "Porto/Portugal",
+                  "latitude": 41.14961,
+                  "longitude": -8.61099}).execute()
+        self.assertEqual(2, coll.count())
+
+        # Test using only 'level' option in Schema.modify_collectioa()
+        self.schema.modify_collection(
+            collection_name, validation={"level": "off"})
+
+        # Test using only 'schema' option in Schema.modify_collection()
+        self.schema.modify_collection(
+            collection_name, validation={"schema": json_schema})
+
+        # Test validation without any information in Schema.modify_collection()
+        self.schema.modify_collection(
+            collection_name, validation={"schema": json_schema})
+
+        # Drop the collection
+        self.schema.drop_collection(collection_name)
+
+    @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 19),
+                     "Schema validation is available.")
+    def test_unsupported_schema_validation(self):
+        collection_name = "collection_test"
+        json_schema = {
+            "id": "http://json-schema.org/geo",
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Longitude and Latitude Values",
+            "description": "A geographical coordinate",
+            "required": ["latitude", "longitude"],
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                },
+                "longitude": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                }
+            },
+        }
+
+        # Test creating a schema-less collection on server < 8.0.19
+        coll = self.schema.create_collection(collection_name)
+        self.schema.drop_collection(collection_name)
+
+        # Test creating a collection with validation on server < 8.0.19
+        self.assertRaises(mysqlx.NotSupportedError,
+                          self.schema.create_collection,
+                          collection_name,
+                          validation={"level": "strict",
+                                      "schema": json_schema})
+
+        # Test modifying a collection with validation on server < 8.0.19
+        self.assertRaises(mysqlx.NotSupportedError,
+                          self.schema.modify_collection,
+                          collection_name,
+                          validation={"level": "strict",
+                                      "schema": json_schema})
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
