@@ -30,9 +30,6 @@
 MySQL Connector/Python - MySQL driver written in Python
 """
 
-import dns.resolver
-import dns.exception
-
 try:
     import _mysql_connector  # pylint: disable=F0401
     from .connection_cext import CMySQLConnection
@@ -40,6 +37,9 @@ except ImportError:
     HAVE_CEXT = False
 else:
     HAVE_CEXT = True
+
+import dns.resolver
+import dns.exception
 
 from . import version
 from .connection import MySQLConnection
