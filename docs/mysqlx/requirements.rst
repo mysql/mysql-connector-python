@@ -5,3 +5,4 @@ Requirements
 * Python 2.7 or >= 3.4
 * Protobuf C++ (version >= 3.6.1)
 * Python Protobuf (version >= 3.6.1)
+* dnspython (version==1.16.0)
