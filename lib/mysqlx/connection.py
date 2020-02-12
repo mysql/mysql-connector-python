@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -58,8 +58,13 @@ import random
 import re
 import threading
 
-import dns.resolver
-import dns.exception
+try:
+    import dns.resolver
+    import dns.exception
+except ImportError:
+    HAVE_DNSPYTHON = False
+else:
+    HAVE_DNSPYTHON = True
 
 from datetime import datetime, timedelta
 from functools import wraps
@@ -1716,6 +1721,10 @@ class Session(object):
 
         # Check for DNS SRV
         if settings.get("host") and settings.get("dns-srv"):
+            if not HAVE_DNSPYTHON:
+                raise InterfaceError("MySQL host configuration requested DNS "
+                                     "SRV. This requires the Python dnspython "
+                                     "module. Please refer to documentation")
             try:
                 srv_records = dns.resolver.query(settings["host"], "SRV")
             except dns.exception.DNSException:

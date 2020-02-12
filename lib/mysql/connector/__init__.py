@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -38,8 +38,14 @@ except ImportError:
 else:
     HAVE_CEXT = True
 
-import dns.resolver
-import dns.exception
+try:
+    import dns.resolver
+    import dns.exception
+except ImportError:
+    HAVE_DNSPYTHON = False
+else:
+    HAVE_DNSPYTHON = True
+
 import random
 
 from . import version
@@ -189,6 +195,10 @@ def connect(*args, **kwargs):
         raise InterfaceError("The value of 'dns-srv' must be a boolean")
 
     if dns_srv:
+        if not HAVE_DNSPYTHON:
+            raise InterfaceError('MySQL host configuration requested DNS '
+                                 'SRV. This requires the Python dnspython '
+                                 'module. Please refer to documentation')
         if 'unix_socket' in kwargs:
             raise InterfaceError('Using Unix domain sockets with DNS SRV '
                                  'lookup is not allowed')

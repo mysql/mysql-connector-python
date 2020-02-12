@@ -190,6 +190,8 @@ Resolving DNS SRV records
 
 If you are using a DNS server with service discovery utility that supports mapping `SRV records <https://tools.ietf.org/html/rfc2782>`_, you can use the ``mysqlx+srv`` scheme or ``dns-srv`` connection option and Connector/Python will automatically resolve the available server addresses described by those SRV records.
 
+.. note:: MySQL host configuration using DNS SRV requires `dnspython <http://www.dnspython.org/>`_ module.
+
 .. code-block:: python
 
    session = mysqlx.get_session('mysqlx://root:@foo.abc.com')

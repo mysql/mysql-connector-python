@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -46,8 +46,7 @@ from threading import Thread
 from time import sleep
 
 from . import check_tls_versions_support
-from mysqlx.connection import SocketStream
-from mysqlx.connection import TLS_V1_3_SUPPORTED
+from mysqlx.connection import SocketStream, TLS_V1_3_SUPPORTED, HAVE_DNSPYTHON
 from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import  Message, MessageReaderWriter, Protocol
@@ -1532,6 +1531,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 19),
                      "MySQL 8.0.19+ is required for DNS SRV")
+    @unittest.skipIf(not HAVE_DNSPYTHON,
+                     "dnspython module is required for DNS SRV")
     def test_dns_srv(self):
         # The value of 'dns-srv' must be a boolean
         uri = "root:@localhost/myschema?dns-srv=invalid"

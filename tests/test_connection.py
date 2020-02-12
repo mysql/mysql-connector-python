@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -53,7 +53,8 @@ except ImportError:
 
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
-                             constants, cursor, abstracts, catch23)
+                             constants, cursor, abstracts, catch23,
+                             HAVE_DNSPYTHON)
 from mysql.connector.errors import InterfaceError
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.network import TLS_V1_3_SUPPORTED
@@ -2155,6 +2156,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 19),
                      "MySQL 8.0.19+ is required for DNS SRV")
+    @unittest.skipIf(not HAVE_DNSPYTHON,
+                     "dnspython module is required for DNS SRV")
     def test_dns_srv(self):
         config = tests.get_mysql_config().copy()
         config.pop("unix_socket", None)
