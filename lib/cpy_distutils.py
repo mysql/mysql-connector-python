@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -157,7 +157,7 @@ def unix_lib_is64bit(lib_file):
     if os.name != 'posix':
         raise OSError("unix_lib_is64bit only useful on UNIX-like systems")
 
-    if os.isdir(lib_file):
+    if os.path.isdir(lib_file):
         mysqlclient_libs = []
         for root, _, files in os.walk(lib_file):
             for filename in files:
@@ -246,11 +246,14 @@ def mysql_c_api_info(mysql_config, debug=False):
 
     Returns a dict.
     """
+    if os.path.isdir(mysql_config):
+        mysql_config = os.path.join(mysql_config, "bin", "mysql_config")
 
     process = Popen([mysql_config], stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate()
     if not stdout:
-        raise ValueError("Error executing command: {} ({})".format(cmd, stderr))
+        raise ValueError("Error executing command: {} ({})"
+                         "".format(mysql_config, stderr))
 
     # Parse the output. Try to be future safe in case new options
     # are added. This might of course fail.
@@ -365,7 +368,7 @@ class BuildExtDynamic(build_ext):
 
     min_connector_c_version = None
     arch = None
-    _mysql_config_info = None
+    mysql_info = None
 
     def initialize_options(self):
         build_ext.initialize_options(self)
@@ -380,7 +383,7 @@ class BuildExtDynamic(build_ext):
     def _get_posix_openssl_libs(self):
         openssl_libs = []
         try:
-            openssl_libs_path = os.path.join(self.with_mysql_capi, "lib")
+            openssl_libs_path = self.mysql_info["link_directories"][0]
             openssl_libs.extend([
                 os.path.basename(glob(
                     os.path.join(openssl_libs_path, "libssl.*.*.*"))[0]),
@@ -417,13 +420,9 @@ class BuildExtDynamic(build_ext):
             shutil.copy(src, dst)
             data_files.append("libmysql.dll")
         else:
-            mysql_config = self.with_mysql_capi \
-                if not os.path.isdir(self.with_mysql_capi) \
-                else os.path.join(self.with_mysql_capi, "bin", "mysql_config")
-            mysql_info = mysql_c_api_info(mysql_config)
-            if mysql_info["version"] >= (8, 0, 6):
-                mysql_capi = os.path.join(self.with_mysql_capi, "lib")
-                vendor_libs.append((mysql_capi, self._get_posix_openssl_libs()))
+            if self.mysql_info["version"] >= (8, 0, 6):
+                vendor_libs.append((self.mysql_info["link_directories"][0],
+                                    self._get_posix_openssl_libs()))
                 vendor_folder = "mysql-vendor"
 
         if vendor_folder:
@@ -445,7 +444,6 @@ class BuildExtDynamic(build_ext):
         """Finalize the --with-connector-c command line argument
         """
         platform = get_platform()
-        self._mysql_config_info = None
         min_version = BuildExtDynamic.min_connector_c_version
 
         err_invalid_loc = "MySQL C API location is invalid; was %s"
@@ -519,20 +517,16 @@ class BuildExtDynamic(build_ext):
         # We were given the location of the mysql_config tool (not on Windows)
         if not os.name == 'nt' and os.path.isfile(connc_loc) \
                 and os.access(connc_loc, os.X_OK):
-            mysql_config = connc_loc
-            # Check mysql_config
-            mysql_info = mysql_c_api_info(mysql_config)
-            log.debug("# mysql_info: {0}".format(mysql_info))
+            log.debug("# mysql_info: {0}".format(self.mysql_info))
 
-            if mysql_info['version'] < min_version:
+            if self.mysql_info['version'] < min_version:
                 log.error(err_version)
                 sys.exit(1)
 
-            include_dirs = mysql_info['include_directories']
-            libraries = mysql_info['libraries']
-            library_dirs = mysql_info['link_directories']
-            self._mysql_config_info = mysql_info
-            self.arch = self._mysql_config_info['arch']
+            include_dirs = self.mysql_info['include_directories']
+            libraries = self.mysql_info['libraries']
+            library_dirs = self.mysql_info['link_directories']
+            self.arch = self.mysql_info['arch']
             connc_64bit = self.arch == 'x86_64'
 
         for include_dir in include_dirs:
@@ -567,14 +561,15 @@ class BuildExtDynamic(build_ext):
             ('with_protobuf_lib_dir', 'with_protobuf_lib_dir'),
             ('with_protoc', 'with_protoc'))
 
-        self._copy_vendor_libraries()
-
         build_ext.finalize_options(self)
 
         print("# Python architecture: {0}".format(py_arch))
         print("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
 
         if self.with_mysql_capi:
+            if os.name != "nt":
+                self.mysql_info = mysql_c_api_info(self.with_mysql_capi)
+            self._copy_vendor_libraries()
             self._finalize_connector_c(self.with_mysql_capi)
 
         if not self.with_protobuf_include_dir:
@@ -676,18 +671,11 @@ class BuildExtDynamic(build_ext):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args and ext.name == "_mysql_connector":
-                extra_link_args = self.extra_link_args.split()
-                if platform.system() == "Linux":
-                    mysql_config = self.with_mysql_capi \
-                        if not os.path.isdir(self.with_mysql_capi) \
-                        else os.path.join(self.with_mysql_capi, "bin", "mysql_config")
-                    mysql_info = mysql_c_api_info(mysql_config)
-                    extra_link_args.extend(
-                        ["-L{0}".format(lib)
-                         for lib in mysql_info["link_directories"]])
-                    extra_link_args += ["-Wl,-rpath,$ORIGIN/mysql-vendor"]
-                ext.extra_link_args.extend(extra_link_args)
+            if self.extra_link_args:
+                ext.extra_link_args.extend(self.extra_link_args.split())
+            # Add -rpath if the platform is Linux and cext is _mysql_connector
+            if platform.system() == "Linux" and ext.name == "_mysql_connector":
+                ext.extra_link_args.extend(["-Wl,-rpath,$ORIGIN/mysql-vendor"])
             # Add system headers
             for sysheader in sysheaders:
                 if sysheader not in ext.extra_compile_args:
@@ -717,12 +705,8 @@ class BuildExtDynamic(build_ext):
         if self.with_mysql_capi:
             mysql_version = None
             if os.name != "nt":
-                # Get MySQL info
-                mysql_capi = self.with_mysql_capi
-                mysql_config = os.path.join(mysql_capi, "bin", "mysql_config") \
-                    if os.path.isdir(mysql_capi) else mysql_capi
-                mysql_info = mysql_c_api_info(mysql_config)
-                mysql_version = "{}.{}.{}".format(*mysql_info["version"][:3])
+                mysql_version = "{}.{}.{}".format(
+                    *self.mysql_info["version"][:3])
 
             # Generate docs/INFO_BIN
             now = NOW.strftime("%Y-%m-%d %H:%M:%S %z")
@@ -758,7 +742,7 @@ class BuildExtDynamic(build_ext):
             self.real_build_extensions()
 
             if self.with_mysql_capi:
-                copy_openssl = mysql_info["version"] >= (8, 0, 6)
+                copy_openssl = self.mysql_info["version"] >= (8, 0, 6)
                 if platform.system() == "Darwin" and copy_openssl:
                     libssl, libcrypto = self._get_posix_openssl_libs()
                     cmd_libssl = [
@@ -796,8 +780,6 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
-        self._copy_vendor_libraries()
-
         install_obj = self.distribution.get_command_obj('install')
         install_obj.with_mysql_capi = self.with_mysql_capi
         install_obj.with_protobuf_include_dir = self.with_protobuf_include_dir
@@ -839,29 +821,41 @@ class BuildExtStatic(BuildExtDynamic):
                                        self.with_protobuf_lib_dir,
                                        self.with_protoc))
         if self.with_mysql_capi:
+            if os.name != "nt":
+                self.mysql_info = mysql_c_api_info(self.with_mysql_capi)
+            self._copy_vendor_libraries()
             self._finalize_connector_c(self.with_mysql_capi)
 
         if self.with_mysqlxpb_cext:
             self._finalize_protobuf()
 
     def _finalize_connector_c(self, connc_loc):
-        if not os.path.isdir(connc_loc):
-            log.error("MySQL C API should be a directory")
-            sys.exit(1)
-
-        log.info("Copying MySQL libraries")
-        copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
-        log.info("Copying MySQL header files")
-        copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
+        if not os.path.exists(self.connc_lib):
+            os.makedirs(self.connc_lib)
 
         # Remove all but static libraries to force static linking
         if os.name == 'posix':
+            log.info("Copying MySQL libraries")
+            mysql_libraries = glob(os.path.join(
+                self.mysql_info["link_directories"][0], "libmysqlclient*"))
+            for lib in mysql_libraries:
+                shutil.copy(lib, self.connc_lib)
+
+            log.info("Copying MySQL header files")
+            copy_tree(self.mysql_info["include_directories"][0],
+                      self.connc_include)
+
             log.info("Removing non-static MySQL libraries from %s" % self.connc_lib)
             for lib_file in os.listdir(self.connc_lib):
                 lib_file_path = os.path.join(self.connc_lib, lib_file)
                 if os.path.isfile(lib_file_path) and not lib_file.endswith('.a'):
                     os.unlink(os.path.join(self.connc_lib, lib_file))
         elif os.name == 'nt':
+            log.info("Copying MySQL libraries")
+            copy_tree(os.path.join(connc_loc, 'lib'), self.connc_lib)
+            log.info("Copying MySQL header files")
+            copy_tree(os.path.join(connc_loc, 'include'), self.connc_include)
+
             self.include_dirs.extend([self.connc_include])
             self.libraries.extend(['libmysql'])
             self.library_dirs.extend([self.connc_lib])
@@ -944,7 +938,8 @@ class BuildExtStatic(BuildExtDynamic):
             include_dirs.append(self.connc_include)
             library_dirs.append(self.connc_lib)
             if self.with_mysql_capi:
-                libraries.append("mysqlclient")
+                library_dirs.extend(self.mysql_info["link_directories"])
+                libraries.extend(self.mysql_info["libraries"])
 
             # As we statically link and the "libmysqlclient.a" library
             # carry no information what it depends on, we need to
