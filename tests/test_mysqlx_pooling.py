@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -592,6 +592,21 @@ class MySQLxClientTests(tests.MySQLxTests):
                                  "".format(row.get_string('Value'), exp_res))
         session.close()
         client.close()
+
+    def test_context_manager(self):
+        """Test mysqlx.get_client() context manager."""
+        settings = self.connect_kwargs.copy()
+        pooling_dict = {"enabled": True, "max_size": 5}
+        cnx_options = {"pooling": pooling_dict}
+        with mysqlx.get_client(settings, cnx_options) as client:
+            with client.get_session() as session:
+                self.assertIsInstance(session, mysqlx.Session)
+                self.assertTrue(session.is_open())
+            self.assertFalse(session.is_open())
+            # Create one more session
+            _ = client.get_session()
+        for session in client.sessions:
+            self.assertFalse(session.is_open())
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")

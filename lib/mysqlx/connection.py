@@ -1845,6 +1845,12 @@ class Session(object):
                     else "Default schema '{}' does not exists".format(schema)
                 raise InterfaceError(errmsg, err.errno)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
     def _init_attributes(self):
         """Setup default and user defined connection-attributes."""
         if os.name == "nt":
@@ -2124,6 +2130,12 @@ class Client(object):
         self.settings["pooling"] = self.pooling_enabled
         self.settings["max_size"] = self.max_size
         self.settings["client_id"] = self.client_id
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     def _set_pool_size(self, pool_size):
         """Set the size of the pool.

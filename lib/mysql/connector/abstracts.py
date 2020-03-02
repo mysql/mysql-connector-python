@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -110,6 +110,12 @@ class MySQLConnectionAbstract(object):
         self._compress = False
 
         self._consume_results = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     def _get_self(self):
         """Return self for weakref.proxy
@@ -1231,6 +1237,12 @@ class MySQLCursorAbstract(object):
         self._last_insert_id = None
         self._warnings = None
         self.arraysize = 1
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     @abstractmethod
     def callproc(self, procname, args=()):

@@ -46,6 +46,7 @@ from . import PY2
 
 try:
     from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+    from mysql.connector import cursor_cext
 except ImportError:
     # Test without C Extension
     CMySQLConnection = None
@@ -2001,7 +2002,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 cur = cnx.cursor()
                 cur.execute("SHOW STATUS LIKE 'Ssl_version%'")
                 res = cur.fetchall()
-    
                 self.assertEqual(res[0][1], expected_ssl_version,
                                  err_msg.format(expected_ssl_version, res))
 
@@ -2194,6 +2194,29 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         config["unix_socket"] = "/tmp/mysql.sock"
         self.assertRaises(InterfaceError, connect, **config)
         del config["unix_socket"]
+
+    @unittest.skipIf(not HAVE_CMYSQL, "C Extension not available")
+    def test_context_manager_cext(self):
+        """Test connection and cursor context manager using the C extension."""
+        config = tests.get_mysql_config().copy()
+        config["use_pure"] = False
+        with connect(**config) as conn:
+            self.assertTrue(conn.is_connected())
+            with conn.cursor() as cur:
+                self.assertIsInstance(cur, cursor_cext.CMySQLCursor)
+            self.assertIsNone(cur._cnx)
+        self.assertFalse(conn.is_connected())
+
+    def test_context_manager_pure(self):
+        """Test connection and cursor context manager using pure Python."""
+        config = tests.get_mysql_config().copy()
+        config["use_pure"] = True
+        with connect(**config) as conn:
+            self.assertTrue(conn.is_connected())
+            with conn.cursor() as cur:
+                self.assertIsInstance(cur, cursor.MySQLCursor)
+            self.assertIsNone(cur._connection)
+        self.assertFalse(conn.is_connected())
 
 
 class WL13335(tests.MySQLConnectorTests):

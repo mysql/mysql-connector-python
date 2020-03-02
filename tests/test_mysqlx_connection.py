@@ -1583,6 +1583,13 @@ class MySQLxSessionTests(tests.MySQLxTests):
         uri = "mysqlx+srv://root:@localhost/myschema?dns-srv=true"
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
+    def test_context_manager(self):
+        """Test mysqlx.get_session() context manager."""
+        with mysqlx.get_session(self.connect_kwargs) as session:
+            self.assertIsInstance(session, mysqlx.Session)
+            self.assertTrue(session.is_open())
+        self.assertFalse(session.is_open())
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 20), "XPlugin not compatible")
 class MySQLxInnitialNoticeTests(tests.MySQLxTests):
