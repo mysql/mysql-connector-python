@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -2662,19 +2662,23 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         self.session.sql(
             "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
-            "config JSON, created DATE, active BIT)"
+            "config JSON, created DATE, updated DATETIME(6), ts TIMESTAMP(2), "
+            "active BIT)".format(table_name)).execute()
+        self.session.sql(
+            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', "
+            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)"
             "".format(table_name)).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
+            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12', "
+            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)"
             "".format(table_name)).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
-            ", 0)".format(table_name)).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', 1)"
+            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', "
+            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 1)"
             "".format(table_name)).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', 0)"
+            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', "
+            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)"
             "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
@@ -2705,7 +2709,22 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.JSON, col.get_type())
 
+        col = result.columns[4]
+        self.assertEqual("created", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.DATE, col.get_type())
+
         col = result.columns[5]
+        self.assertEqual("updated", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.DATETIME, col.get_type())
+
+        col = result.columns[6]
+        self.assertEqual("ts", col.get_column_name())
+        self.assertEqual("test", col.get_table_name())
+        self.assertEqual(mysqlx.ColumnType.TIMESTAMP, col.get_type())
+
+        col = result.columns[7]
         self.assertEqual("active", col.get_column_name())
         self.assertEqual("test", col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())

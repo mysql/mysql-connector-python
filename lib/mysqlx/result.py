@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -488,10 +488,10 @@ class Column(object):
         """Map datetime."""
         if self._length == 10:
             self._col_type = ColumnType.DATE
-        elif self._length == 19:
-            self._col_type = ColumnType.DATETIME
         elif self._flags & DatetimeColumnFlags.TIMESTAMP > 0:
             self._col_type = ColumnType.TIMESTAMP
+        elif self._length >= 19:
+            self._col_type = ColumnType.DATETIME
         else:
             raise ValueError("Datetime mapping scenario unhandled")
 
