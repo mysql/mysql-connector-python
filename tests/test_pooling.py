@@ -30,11 +30,17 @@
 """
 
 import uuid
+import unittest
 try:
     from Queue import Queue
 except ImportError:
     # Python 3
     from queue import Queue
+
+try:
+    from mysql.connector.connection_cext import (CMySQLConnection)
+except ImportError:
+    CMySQLConnection = None
 
 import tests
 import mysql.connector
@@ -43,7 +49,11 @@ from mysql.connector.connection import MySQLConnection
 from mysql.connector import pooling
 from mysql.connector.constants import ClientFlag
 
+MYSQL_CNX_CLASS = ((MySQLConnection) if CMySQLConnection is None else
+                   (MySQLConnection, CMySQLConnection))
 
+@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
+                 "Pool not supported with with MySQL version 5.6")
 class PoolingTests(tests.MySQLConnectorTests):
 
     def tearDown(self):
@@ -67,6 +77,8 @@ class PoolingTests(tests.MySQLConnectorTests):
                          pooling.generate_pool_name(**config))
 
 
+@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
+                 "Pool not supported with with MySQL version 5.6")
 class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def tearDown(self):
@@ -142,6 +154,8 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.PoolError, cnx.config, user='spam')
 
 
+@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
+                 "Pool not supported with with MySQL version 5.6")
 class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
 
     def tearDown(self):
@@ -237,14 +251,14 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         pcnx = pooling.PooledMySQLConnection(
             cnxpool,
             cnxpool._cnx_queue.get(block=False))
-        self.assertTrue(isinstance(pcnx._cnx, MySQLConnection))
+        self.assertTrue(isinstance(pcnx._cnx, MYSQL_CNX_CLASS))
         self.assertEqual(cnxpool, pcnx._cnx_pool)
         self.assertEqual(cnxpool._config_version,
                          pcnx._cnx._pool_config_version)
 
         cnx = pcnx._cnx
         pcnx.close()
-        # We should get the same connectoin back
+        # We should get the same connection back
         self.assertEqual(cnx, cnxpool._cnx_queue.get(block=False))
         cnxpool.add_connection(cnx)
 
@@ -256,7 +270,7 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         cnxpool._remove_connections()
         cnxpool._cnx_config['port'] = 9999999
         cnxpool._cnx_config['unix_socket'] = '/ham/spam/foobar.socket'
-        self.assertRaises(errors.InterfaceError, cnxpool.add_connection)
+        self.assertRaises(errors.Error, cnxpool.add_connection)
 
         self.assertRaises(errors.PoolError, cnxpool.add_connection, cnx=str)
 
@@ -334,6 +348,8 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.PoolError, cnxpool.get_connection)
 
 
+@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
+                 "Pool not supported with with MySQL version 5.6")
 class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
 
     """Testing MySQL Connector module pooling functionality"""
@@ -363,11 +379,12 @@ class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
         pool_name = pooling.generate_pool_name(**dbconfig)
         self.assertTrue(pool_name in mysql.connector._CONNECTION_POOLS)
 
-    def test_connect(self):
+    def test_connect_pure(self):
         dbconfig = tests.get_mysql_config()
-        if tests.MYSQL_VERSION < (5, 7):
-            dbconfig["client_flags"] = [-ClientFlag.CONNECT_ARGS]
+        dbconfig["use_pure"] = True
         cnx = mysql.connector.connect(pool_size=1, pool_name='ham', **dbconfig)
+        self.assertIsInstance(cnx._cnx, MySQLConnection,
+                              "{} type was expected".format(MySQLConnection))
         exp = cnx.connection_id
         cnx.close()
         self.assertEqual(
@@ -376,3 +393,25 @@ class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
                 pool_name='ham').connection_id
         )
 
+    @unittest.skipIf(not CMySQLConnection, "cext is required for this test")
+    def test_connect_cext(self):
+        config = tests.get_mysql_config()
+        config["use_pure"] = False
+        cnx = mysql.connector.connect(pool_size=1, pool_name='ham', **config)
+        self.assertIsInstance(cnx._cnx, CMySQLConnection,
+                              "{} type was expected".format(CMySQLConnection))
+        exp = cnx.connection_id
+        cnx.close()
+        self.assertEqual(
+            exp,
+            mysql.connector._get_pooled_connection(
+                pool_name='ham').connection_id
+        )
+
+    @unittest.skipIf(CMySQLConnection, "Test requires cext to be absent")
+    def test_connect_cext_error(self):
+        config = tests.get_mysql_config()
+        config["use_pure"] = False
+        config["pool_size"] = 1
+        config["pool_name"] = 'ham'
+        self.assertRaises(ImportError, mysql.connector.connect, **config)

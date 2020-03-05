@@ -2758,6 +2758,37 @@ MySQL_refresh(MySQL *self, PyObject *args)
 }
 
 /**
+  Resets current connection.
+
+  Resets this connection to MySQL.
+
+  @param    self    MySQL instance
+
+  @return   Boolean Object Py_True or Py_False
+    @retval Py_True for success
+    @retval Py_False if an error occurred
+*/
+PyObject*
+MySQL_reset_connection(MySQL *self)
+{
+    int res;
+
+    if (!self->connected)
+    {
+        Py_RETURN_FALSE;
+    }
+
+    res= mysql_reset_connection(&self->session);
+
+    if (!res)
+    {
+        Py_RETURN_TRUE;
+    }
+
+    Py_RETURN_FALSE;
+}
+
+/**
   Shut down the MySQL server.
 
   Shut down the MySQL server. The only argument currently allowed

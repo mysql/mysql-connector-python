@@ -78,6 +78,7 @@ DEFAULT_CONFIGURATION = {
     'consume_results': False,
     'conn_attrs': None,
     'dns_srv': False,
+    'use_pure': False
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')

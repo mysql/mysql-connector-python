@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -652,6 +652,23 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._charset_id = charset
         self._post_connection()
 
+    def cmd_reset_connection(self):
+        """Resets the session state without re-authenticating
+
+        Works only for MySQL server 5.7.3 or later.
+        """
+        if self._server_version < (5, 7, 3):
+            raise errors.NotSupportedError("MySQL version 5.7.2 and "
+                                           "earlier does not support "
+                                           "COM_RESET_CONNECTION.")
+        try:
+            self._cmysql.reset_connection()
+        except MySQLInterfaceError as exc:
+            raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
+                                             sqlstate=exc.sqlstate)
+
+        self._post_connection()
+
     def cmd_refresh(self, options):
         """Send the Refresh command to the MySQL server"""
         try:
@@ -710,3 +727,47 @@ class CMySQLConnection(MySQLConnectionAbstract):
             self.consume_results()
         elif unread_result:
             raise errors.InternalError("Unread result found")
+
+    def reset_session(self, user_variables=None, session_variables=None):
+        """Clears the current active session
+
+        This method resets the session state, if the MySQL server is 5.7.3
+        or later active session will be reset without re-authenticating.
+        For other server versions session will be reset by re-authenticating.
+
+        It is possible to provide a sequence of variables and their values to
+        be set after clearing the session. This is possible for both user
+        defined variables and session variables.
+        This method takes two arguments user_variables and session_variables
+        which are dictionaries.
+
+        Raises OperationalError if not connected, InternalError if there are
+        unread results and InterfaceError on errors.
+        """
+        if not self.is_connected():
+            raise errors.OperationalError("MySQL Connection not available.")
+
+        try:
+            self.cmd_reset_connection()
+        except (errors.NotSupportedError, NotImplementedError):
+            if self._compress:
+                raise errors.NotSupportedError(
+                    "Reset session is not supported with compression for "
+                    "MySQL server version 5.7.2 or earlier.")
+            elif self._server_version < (5, 7, 3):
+                raise errors.NotSupportedError(
+                    "Reset session is not supported with MySQL server "
+                    "version 5.7.2 or earlier.")
+            else:
+                self.cmd_change_user(self._user, self._password,
+                                     self._database, self._charset_id)
+
+        if user_variables or session_variables:
+            cur = self.cursor()
+            if user_variables:
+                for key, value in user_variables.items():
+                    cur.execute("SET @`{0}` = %s".format(key), (value,))
+            if session_variables:
+                for key, value in session_variables.items():
+                    cur.execute("SET SESSION `{0}` = %s".format(key), (value,))
+            cur.close()

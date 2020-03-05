@@ -66,6 +66,9 @@ from .optionfiles import read_option_files
 
 _CONNECTION_POOLS = {}
 
+ERROR_NO_CEXT = "MySQL Connector/Python C Extension not available"
+
+
 def _get_pooled_connection(**kwargs):
     """Return a pooled MySQL connection"""
     # If no pool name specified, generate one
@@ -77,6 +80,10 @@ def _get_pooled_connection(**kwargs):
         pool_name = kwargs['pool_name']
     except KeyError:
         pool_name = generate_pool_name(**kwargs)
+
+    if 'use_pure' in kwargs:
+        if not kwargs['use_pure'] and not HAVE_CEXT:
+            raise ImportError(ERROR_NO_CEXT)
 
     # Setup the pool, ensuring only 1 thread can update at a time
     with CONNECTION_POOL_LOCK:
@@ -257,8 +264,7 @@ def connect(*args, **kwargs):
     if 'use_pure' in kwargs:
         del kwargs['use_pure']  # Remove 'use_pure' from kwargs
         if not use_pure and not HAVE_CEXT:
-            raise ImportError("MySQL Connector/Python C Extension not "
-                              "available")
+            raise ImportError(ERROR_NO_CEXT)
 
     if HAVE_CEXT and not use_pure:
         return CMySQLConnection(*args, **kwargs)

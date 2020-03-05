@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -207,6 +207,9 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds);
 
 PyObject*
 MySQL_refresh(MySQL *self, PyObject *args);
+
+PyObject*
+MySQL_reset_connection(MySQL *self);
 
 PyObject*
 MySQL_rollback(MySQL *self);
