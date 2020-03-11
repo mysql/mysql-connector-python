@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -76,22 +76,6 @@ except ImportError:
     MySQLInterfaceError = None
 
 ERR_NO_CEXT = "C Extension not available"
-
-
-@unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
-                 "Bug328998 not tested with MySQL version 5.7.4")
-class Bug328998Tests(tests.MySQLConnectorTests):
-    """Tests where connection timeout has been set"""
-
-    @cnx_config(connection_timeout=1)
-    @foreach_cnx()
-    def test_set_connection_timeout(self):
-        cur = self.cnx.cursor()
-        self.assertRaises(
-            errors.OperationalError,
-            cur.execute,
-            "SELECT SLEEP({0})".format(self.config['connection_timeout'] + 4)
-        )
 
 
 class Bug437972Tests(tests.MySQLConnectorTests):

@@ -692,7 +692,16 @@ class MySQLxSessionTests(tests.MySQLxTests):
             self.fail("Trying to establish a connection with a wrong password "
                       "should not wait for timeout")
 
-        # The connection timeout value must be a positive integer
+        # The connect_timeout should be applied only for establishing the
+        # connection and not for all blocking socket operations
+        config = self.connect_kwargs.copy()
+        config["connect-timeout"] = 1000
+        session = mysqlx.get_session(config)
+        self.assertIsInstance(session, mysqlx.Session)
+        session.sql("SELECT SLEEP(2)").execute()
+        session.close()
+
+        # The connect_timeout value must be a positive integer
         config["connect-timeout"] = -1
         self.assertRaises(TypeError, mysqlx.get_session, config)
         config["connect-timeout"] = 10.0983

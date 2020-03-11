@@ -184,6 +184,7 @@ class SocketStream(object):
                 self._is_socket = True
             except AttributeError:
                 raise InterfaceError("Unix socket unsupported")
+        self._socket.settimeout(None)
 
     def read(self, count):
         """Receive data from the socket.

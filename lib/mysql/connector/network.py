@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -425,6 +425,8 @@ class BaseMySQLSocket(object):
     def set_connection_timeout(self, timeout):
         """Set the connection timeout"""
         self._connection_timeout = timeout
+        if self.sock:
+            self.sock.settimeout(timeout)
 
     # pylint: disable=C0103,E1101
     def switch_to_ssl(self, ca, cert, key, verify_cert=False,

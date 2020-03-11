@@ -701,7 +701,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 isinstance(cnx._handshake[key], type_),
                 "type check failed for '{0}', expected {1}, we got {2}".format(
                     key, type_, type(cnx._handshake[key])))
-        self.assertRaises(errors.OperationalError, cnx._do_handshake)
 
         class FakeSocket(object):
             def __init__(self, packet):
@@ -1228,6 +1227,18 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cnx.reconnect(attempts=5)
         exp = conn_id + 1
         self.assertGreaterEqual(cnx.connection_id, exp)
+
+    @tests.foreach_cnx(connection_timeout=1)
+    def test_connect_timeout(self):
+        """Test connect_timeout.
+
+        The connect_timeout should be applied only for establishing the
+        connection and not for all blocking socket operations.
+        """
+        cur = self.cnx.cursor()
+        cur.execute("SELECT SLEEP(2)")
+        cur.fetchall()
+        cur.close()
 
     def test_ping(self):
         """Ping the MySQL server"""

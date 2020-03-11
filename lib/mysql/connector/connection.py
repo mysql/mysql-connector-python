@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -294,6 +294,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             if self._client_flags & ClientFlag.COMPRESS:
                 self._socket.recv = self._socket.recv_compressed
                 self._socket.send = self._socket.send_compressed
+            self._socket.set_connection_timeout(None)
         except:
             # close socket
             self.close()

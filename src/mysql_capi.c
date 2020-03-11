@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -1182,8 +1182,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 
     tmp_uint= self->connection_timeout;
     mysql_options(&self->session, MYSQL_OPT_CONNECT_TIMEOUT, (char*)&tmp_uint);
-    mysql_options(&self->session, MYSQL_OPT_READ_TIMEOUT, (char*)&tmp_uint);
-    mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, (char*)&tmp_uint);
 
     if (ssl_disabled  != NULL && (PyBool_Check(ssl_disabled) && ssl_disabled  == Py_False)) {
         ssl_enabled= 1;
