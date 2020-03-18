@@ -1,6 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
-import django
 import subprocess
 
 from django.db.backends.base.client import BaseDatabaseClient

@@ -4,10 +4,9 @@ from __future__ import unicode_literals
 
 import uuid
 
-import django
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-from django.utils import six, timezone
+from django.utils import timezone
 from django.utils.encoding import force_text
 
 try:

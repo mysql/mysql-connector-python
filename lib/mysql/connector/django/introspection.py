@@ -4,7 +4,6 @@
 import re
 from collections import namedtuple
 
-import django
 from django.db.backends.base.introspection import (
     BaseDatabaseIntrospection, FieldInfo, TableInfo
 )

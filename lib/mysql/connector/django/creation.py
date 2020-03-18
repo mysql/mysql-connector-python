@@ -1,6 +1,5 @@
 # MySQL Connector/Python - MySQL driver written in Python.
 
-import django
 from django.db import models
 
 from django.db.backends.base.creation import BaseDatabaseCreation
