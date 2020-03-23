@@ -53,7 +53,8 @@ from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import (Message, MessageReader, MessageWriter, Protocol,
                              HAVE_LZ4)
-from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, mysqlxpb_enum, Protobuf
+from mysqlx.protobuf import (HAVE_MYSQLXPB_CEXT, HAVE_PROTOBUF, mysqlxpb_enum,
+                             Protobuf)
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
 
@@ -1330,6 +1331,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(ProgrammingError, mysqlx.get_session, settings)
 
     @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
+    @unittest.skipUnless(HAVE_PROTOBUF, "Protobuf not available")
     def test_use_pure(self):
         settings = self.connect_kwargs.copy()
         settings["use-pure"] = False
@@ -1752,6 +1754,7 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
         self.assertEqual(rows[0][0], "information_schema")
         session.close()
 
+    @unittest.skipUnless(HAVE_PROTOBUF, "Protobuf not available")
     def test_initial_empty_notice_pure(self):
         connect_kwargs = self.connect_kwargs.copy()
         host = "localhost"
@@ -1785,6 +1788,7 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
         self.assertEqual(rows[0][0], "information_schema")
         session.close()
 
+    @unittest.skipUnless(HAVE_PROTOBUF, "Protobuf not available")
     def test_initial_notice_pure(self):
         connect_kwargs = self.connect_kwargs.copy()
         host = "localhost"

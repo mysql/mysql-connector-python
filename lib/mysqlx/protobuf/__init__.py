@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -196,7 +196,7 @@ try:
         [(_MESSAGES[key], val) for key, val in _SERVER_MESSAGES_TUPLES]
     )
     HAVE_PROTOBUF = True
-
+    HAVE_PROTOBUF_ERROR = None
 
     class _mysqlxpb_pure(object):
         """This class implements the methods in pure Python used by the
@@ -236,10 +236,11 @@ try:
             msg = _mysqlxpb_pure.new_message(msg_type_name)
             msg.ParseFromString(payload)
             return msg
-except ImportError:
+except ImportError as err:
     HAVE_PROTOBUF = False
+    HAVE_PROTOBUF_ERROR = err
     if not HAVE_MYSQLXPB_CEXT:
-        raise ImportError("Protobuf is not available")
+        raise ImportError("Protobuf is not available: {}".format(err))
 
 CRUD_PREPARE_MAPPING = {
     "Mysqlx.ClientMessages.Type.CRUD_FIND": (
@@ -271,7 +272,8 @@ class Protobuf(object):
             use_pure (bool): `True` to use pure Python implementation.
         """
         if use_pure and not HAVE_PROTOBUF:
-            raise ImportError("Protobuf is not available")
+            raise ImportError("Protobuf is not available: {}"
+                              "".format(HAVE_PROTOBUF_ERROR))
         elif not use_pure and not HAVE_MYSQLXPB_CEXT:
             raise ImportError("MySQL X Protobuf C extension is not available")
         Protobuf.mysqlxpb = _mysqlxpb_pure if use_pure else _mysqlxpb
