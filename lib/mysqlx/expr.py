@@ -413,9 +413,10 @@ def escape_literal(string):
 
 
 class ExprParser(object):
-    def __init__(self, string, allow_relational=False):
+    def __init__(self, string, allow_relational=True):
         self.string = string
         self.tokens = []
+        self.path_name_queue = []
         self.pos = 0
         self._allow_relational_columns = allow_relational
         self.placeholder_name_to_position = {}
@@ -624,8 +625,9 @@ class ExprParser(object):
                              "tokens left".format(token_type, self.pos))
         if self.tokens[self.pos].token_type != token_type:
             raise ValueError("Expected token type {0} at pos {1} but found "
-                             "type {2}".format(token_type, self.pos,
-                                               self.tokens[self.pos]))
+                             "type {2}, on tokens {3}"
+                             "".format(token_type, self.pos,
+                                       self.tokens[self.pos], self.tokens))
 
     def cur_token_type_is(self, token_type):
         return self.pos_token_type_is(self.pos, token_type)
@@ -656,13 +658,24 @@ class ExprParser(object):
         list and return a list of Expr objects.
         """
         exprs = []
+        path_name_added = False
         self.consume_token(TokenType.LPAREN)
         if not self.cur_token_type_is(TokenType.RPAREN):
-            exprs.append(self._expr().get_message())
+            msg_expr = self._expr().get_message()
+            if hasattr(msg_expr, "identifier") and msg_expr.identifier.name:
+                self.path_name_queue.insert(0, msg_expr.identifier.name)
+                path_name_added = True
+            elif not hasattr(msg_expr, "identifier") and \
+               "identifier" in msg_expr and "name" in msg_expr["identifier"]:
+                self.path_name_queue.insert(0, msg_expr["identifier"]["name"])
+                path_name_added = True
+            exprs.append(msg_expr)
             while self.cur_token_type_is(TokenType.COMMA):
                 self.pos += 1
                 exprs.append(self._expr().get_message())
         self.consume_token(TokenType.RPAREN)
+        if path_name_added:
+            self.path_name_queue.pop()
         return exprs
 
     def identifier(self):
@@ -740,6 +753,8 @@ class ExprParser(object):
             doc_path_item["value"] = self.consume_token(TokenType.IDENT)
             col_id["document_path"].extend([doc_path_item.get_message()])
         col_id["document_path"].extend(self.document_path())
+        if self.path_name_queue:
+            col_id["name"] = self.path_name_queue[0]
         expr = Message("Mysqlx.Expr.Expr")
         expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT")
         expr["identifier"] = col_id

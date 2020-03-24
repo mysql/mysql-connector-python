@@ -2504,15 +2504,15 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_update(self):
         self.session.sql("CREATE TABLE {0}.test(age INT, name "
-                         "VARCHAR(50), gender CHAR(1))"
+                         "VARCHAR(50), gender CHAR(1), `info` json DEFAULT NULL)"
                          "".format(self.schema_name)).execute()
         table = self.schema.get_table("test")
 
-        result = table.insert("age", "name") \
-            .values(21, 'Fred') \
-            .values(28, 'Barney') \
-            .values(42, 'Wilma') \
-            .values(67, 'Betty').execute()
+        result = table.insert("age", "name", "info") \
+            .values(21, 'Fred', {"married": True, "sons": 0}) \
+            .values(28, 'Barney', {"married": True, "sons": 1}) \
+            .values(42, 'Wilma', {"married": True, "sons": 0}) \
+            .values(67, 'Betty', {"married": True, "sons": 1}).execute()
 
         result = table.update().set("age", 25).where("age == 21").execute()
         self.assertEqual(1, result.get_affected_items_count())
@@ -2520,6 +2520,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         # Table.update() is not allowed without a condition
         result = table.update().set("age", 25)
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
+
+        # Update with a mysqlx expression
+        statement =  table.update()
+        statement.set("info", mysqlx.expr("JSON_SET(info, '$.sons', $.sons * 2)"))
+        result = statement.where( "name = 'Barney' or name = 'Betty'").execute()
+        assert (2 == result.get_affected_items_count())
 
         drop_table(self.schema, "test")
 
