@@ -567,9 +567,9 @@ class BuildExtDynamic(build_ext):
         print("# Python ARCH_64BIT: {0}".format(ARCH_64BIT))
 
         if self.with_mysql_capi:
-            if os.name != "nt":
+            if os.name == "posix":
                 self.mysql_info = mysql_c_api_info(self.with_mysql_capi)
-            self._copy_vendor_libraries()
+                self._copy_vendor_libraries()
             self._finalize_connector_c(self.with_mysql_capi)
 
         if not self.with_protobuf_include_dir:
@@ -671,7 +671,7 @@ class BuildExtDynamic(build_ext):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args:
+            if self.extra_link_args and ext.name == "_mysql_connector":
                 ext.extra_link_args.extend(self.extra_link_args.split())
             # Add -rpath if the platform is Linux and cext is _mysql_connector
             if platform.system() == "Linux" and ext.name == "_mysql_connector":
@@ -727,7 +727,7 @@ class BuildExtDynamic(build_ext):
                 if self.extra_compile_args:
                     ext.extra_compile_args.extend(self.extra_compile_args.split())
                 # Add extra link args
-                if self.extra_link_args and ext.name != "_mysqlxpb":
+                if self.extra_link_args and ext.name == "_mysql_connector":
                     ext.extra_link_args.extend(self.extra_link_args.split())
             if self.with_mysqlxpb_cext:
                 self.run_protoc()
@@ -780,6 +780,10 @@ class BuildExtStatic(BuildExtDynamic):
     user_options = build_ext.user_options + CEXT_OPTIONS
 
     def finalize_options(self):
+        if self.with_mysql_capi and os.name == "posix":
+            self.mysql_info = mysql_c_api_info(self.with_mysql_capi)
+            self._copy_vendor_libraries()
+
         install_obj = self.distribution.get_command_obj('install')
         install_obj.with_mysql_capi = self.with_mysql_capi
         install_obj.with_protobuf_include_dir = self.with_protobuf_include_dir
@@ -821,9 +825,6 @@ class BuildExtStatic(BuildExtDynamic):
                                        self.with_protobuf_lib_dir,
                                        self.with_protoc))
         if self.with_mysql_capi:
-            if os.name != "nt":
-                self.mysql_info = mysql_c_api_info(self.with_mysql_capi)
-            self._copy_vendor_libraries()
             self._finalize_connector_c(self.with_mysql_capi)
 
         if self.with_mysqlxpb_cext:
@@ -959,7 +960,7 @@ class BuildExtStatic(BuildExtDynamic):
             if self.extra_compile_args:
                 ext.extra_compile_args.extend(self.extra_compile_args.split())
             # Add extra link args
-            if self.extra_link_args and ext.name != "_mysqlxpb":
+            if self.extra_link_args and ext.name == "_mysql_connector":
                 ext.extra_link_args.extend(self.extra_link_args.split())
 
 
