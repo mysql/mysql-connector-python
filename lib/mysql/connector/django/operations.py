@@ -224,17 +224,17 @@ class DatabaseOperations(BaseDatabaseOperations):
         return converters
 
     def convert_booleanfield_value(self, value,
-                                   expression, connection, context):
+                                   expression, connection):
         if value in (0, 1):
             value = bool(value)
         return value
 
-    def convert_uuidfield_value(self, value, expression, connection, context):
+    def convert_uuidfield_value(self, value, expression, connection):
         if value is not None:
             value = uuid.UUID(value)
         return value
 
-    def convert_textfield_value(self, value, expression, connection, context):
+    def convert_textfield_value(self, value, expression, connection):
         if value is not None:
             value = force_text(value)
         return value
