@@ -2527,6 +2527,11 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = statement.where( "name = 'Barney' or name = 'Betty'").execute()
         assert (2 == result.get_affected_items_count())
 
+        statement =  table.update()
+        statement.set("info", mysqlx.expr("JSON_REPLACE(info, '$.married', False)"))
+        result = statement.where( "name = 'Fred' or name = 'Wilma'").execute()
+        assert (2 == result.get_affected_items_count())
+
         drop_table(self.schema, "test")
 
     def test_delete(self):
