@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,7 +32,9 @@
 """
 
 import tests
+import unittest
 
+from .. import PY2
 from mysql.connector import errors
 from mysql.connector.constants import ClientFlag, flag_is_set
 from mysql.connector.connection import MySQLConnection
@@ -127,3 +129,18 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
             'server_status': 0, 'field_count': 0
         }
         self.assertEqual(exp, info)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
+                     "MySQL >= 5.7.3 is required for reset command")
+    def test_cmd_reset_connection(self):
+        """Resets session without re-authenticating"""
+        exp_session_id = self.cnx.connection_id
+        self.cnx.cmd_query("SET @ham = 2")
+        self.cnx.cmd_reset_connection()
+
+        self.cnx.cmd_query("SELECT @ham")
+        self.assertEqual(exp_session_id, self.cnx.connection_id)
+        if PY2:
+            self.assertNotEqual(('2',), self.cnx.get_rows()[0][0])
+        else:
+            self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])

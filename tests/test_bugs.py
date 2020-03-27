@@ -63,6 +63,7 @@ from . import check_tls_versions_support
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.catch23 import STRING_TYPES
 import mysql.connector
 import cpy_distutils
@@ -3385,22 +3386,32 @@ class BugOra19500097(tests.MySQLConnectorTests):
 class BugOra19549363(tests.MySQLConnectorTests):
     """BUG#19549363: Compression does not work with Change User
     """
-    def test_compress_reset_connection(self):
-        config = tests.get_mysql_config()
-        config['compress'] = True
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config['compress'] = True
 
         mysql.connector._CONNECTION_POOLS = {}
-        config['pool_name'] = 'mypool'
-        config['pool_size'] = 3
-        config['pool_reset_session'] = True
-        cnx1 = mysql.connector.connect(**config)
+        self.config['pool_name'] = 'mypool'
+        self.config['pool_size'] = 3
+        self.config['pool_reset_session'] = True
 
-        try:
-            cnx1.close()
-        except:
-            self.fail("Reset session with compression test failed.")
-        finally:
-            mysql.connector._CONNECTION_POOLS = {}
+
+    def tearDown(self):
+        # Remove pools created by test
+        mysql.connector._CONNECTION_POOLS = {}
+
+    def test_compress_reset_connection(self):
+        for use_pure in [True, False]:
+            self.config['use_pure'] = use_pure
+
+            cnx1 = mysql.connector.connect(**self.config)
+
+            try:
+                cnx1.close()
+            except:
+                self.fail("Reset session with compression test failed.")
+            finally:
+                mysql.connector._CONNECTION_POOLS = {}
 
 
 class BugOra19803702(tests.MySQLConnectorTests):
@@ -4564,8 +4575,12 @@ class BugOra25383644(tests.MySQLConnectorTests):
                 self.mysql_server.wait_down()
                 cur.execute(sql)
             except (mysql.connector.errors.OperationalError,
-                    mysql.connector.errors.ProgrammingError):
+                    mysql.connector.errors.ProgrammingError,
+                    mysql.connector.errors.DatabaseError) as err:
                 try:
+                    if isinstance(err, mysql.connector.errors.DatabaseError):
+                        if err.errno != 2006:
+                            raise
                     cur.close()
                     cnx.close()
                 except mysql.connector.errors.OperationalError:
@@ -5689,3 +5704,62 @@ class BugOra25349794(tests.MySQLConnectorTests):
         self.assertEqual("my_pool", conn.pool_name)
         mysql.connector._CONNECTION_POOLS = {}
         conn.close()
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
+                 "MySQL >= 5.7.3 is required for reset command")
+@unittest.skipIf(CMySQLConnection is None,
+                 "CMySQLConnection is required but is not available")
+class Bug27489937(tests.MySQLConnectorTests):
+    """BUG#17414258: SUPPORT C EXTENSION FOR CONNECTION POOLS
+    """
+
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.config['pool_name'] = 'Bug27489937'
+        self.config['pool_size'] = 3
+        self.config['use_pure'] = False
+        try:
+            del mysql.connector._CONNECTION_POOLS[self.config['pool_name']]
+        except:
+            pass
+
+    def tearDown(self):
+        # Remove pools created by test
+        del mysql.connector._CONNECTION_POOLS[self.config['pool_name']]
+
+    def test_cext_pool_support(self):
+        """Basic pool tests"""
+        cnx_list = []
+        session_ids = []
+        for _ in range(self.config['pool_size']):
+            cnx = mysql.connector.connect(**self.config)
+            self.assertIsInstance(cnx, PooledMySQLConnection,
+                                  "Expected a CMySQLConnection instance")
+            self.assertIsInstance(cnx._cnx, CMySQLConnection,
+                                  "Expected a CMySQLConnection instance")
+            cnx_list.append(cnx)
+            exp_session_id = cnx.connection_id
+            session_ids.append(exp_session_id)
+            cnx.cmd_query("SET @ham = 2")
+            cnx.cmd_reset_connection()
+
+            cnx.cmd_query("SELECT @ham")
+            self.assertEqual(exp_session_id, cnx.connection_id)
+            if PY2:
+                self.assertNotEqual(('2',), cnx.get_rows()[0][0])
+            else:
+                self.assertNotEqual((b'2',), cnx.get_rows()[0][0])
+        self.assertRaises(errors.PoolError, mysql.connector.connect,
+                          **self.config)
+
+        for cnx in cnx_list:
+            cnx.close()
+
+        cnx = mysql.connector.connect(**self.config)
+        cnx.cmd_query("SELECT @ham")
+        self.assertIn(cnx.connection_id, session_ids,
+                      "Pooled connection was not reused.")
+        if PY2:
+            self.assertNotEqual(('2',), cnx.get_rows()[0][0])
+        else:
+            self.assertNotEqual((b'2',), cnx.get_rows()[0][0])
