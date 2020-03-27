@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -41,9 +41,7 @@ except ImportError:
 import threading
 
 from . import errors
-from . import Connect
 from .connection import MySQLConnection
-from .connection_cext import CMySQLConnection
 
 CONNECTION_POOL_LOCK = threading.RLock()
 CNX_POOL_MAXSIZE = 32
@@ -99,7 +97,7 @@ class PooledMySQLConnection(object):
         if not isinstance(pool, MySQLConnectionPool):
             raise AttributeError(
                 "pool should be a MySQLConnectionPool")
-        if not isinstance(cnx, (MySQLConnection, CMySQLConnection)):
+        if not isinstance(cnx, MySQLConnection):
             raise AttributeError(
                 "cnx should be a MySQLConnection")
         self._cnx_pool = pool
@@ -196,7 +194,7 @@ class MySQLConnectionPool(object):
 
         with CONNECTION_POOL_LOCK:
             try:
-                test_cnx = Connect()
+                test_cnx = MySQLConnection()
                 if "use_pure" in kwargs:
                     del kwargs["use_pure"]
                 test_cnx.config(**kwargs)
@@ -245,7 +243,7 @@ class MySQLConnectionPool(object):
 
         Raises PoolError on errors.
         """
-        if not isinstance(cnx, (MySQLConnection, CMySQLConnection)):
+        if not isinstance(cnx, MySQLConnection):
             raise errors.PoolError(
                 "Connection instance not subclass of MySQLConnection.")
 
@@ -277,7 +275,7 @@ class MySQLConnectionPool(object):
                     "Failed adding connection; queue is full")
 
             if not cnx:
-                cnx = Connect(**self._cnx_config)
+                cnx = MySQLConnection(**self._cnx_config)
                 try:
                     if (self._reset_session and self._cnx_config['compress']
                             and cnx.get_server_version() < (5, 7, 3)):
@@ -293,7 +291,7 @@ class MySQLConnectionPool(object):
                 cnx._pool_config_version = self._config_version
                 # pylint: enable=W0201,W0212
             else:
-                if not isinstance(cnx, (MySQLConnection, CMySQLConnection)):
+                if not isinstance(cnx, MySQLConnection):
                     raise errors.PoolError(
                         "Connection instance not subclass of MySQLConnection.")
 

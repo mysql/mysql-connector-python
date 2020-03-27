@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -650,23 +650,6 @@ class CMySQLConnection(MySQLConnectionAbstract):
                                              sqlstate=exc.sqlstate)
 
         self._charset_id = charset
-        self._post_connection()
-
-    def cmd_reset_connection(self):
-        """Resets the session state without re-authenticating
-
-        Works only for MySQL server 5.7.3 or later.
-        """
-        if self._server_version < (5, 7, 3):
-            raise errors.NotSupportedError("MySQL version 5.7.2 and "
-                                           "earlier does not support "
-                                           "COM_RESET_CONNECTION.")
-        try:
-            self._cmysql.reset_connection()
-        except MySQLInterfaceError as exc:
-            raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
-                                             sqlstate=exc.sqlstate)
-
         self._post_connection()
 
     def cmd_refresh(self, options):

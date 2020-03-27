@@ -40,7 +40,6 @@ import tests
 import mysql.connector
 from mysql.connector import errors
 from mysql.connector.connection import MySQLConnection
-from mysql.connector.connection_cext import CMySQLConnection
 from mysql.connector import pooling
 from mysql.connector.constants import ClientFlag
 
@@ -238,14 +237,14 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         pcnx = pooling.PooledMySQLConnection(
             cnxpool,
             cnxpool._cnx_queue.get(block=False))
-        self.assertTrue(isinstance(pcnx._cnx, (CMySQLConnection, MySQLConnection)))
+        self.assertTrue(isinstance(pcnx._cnx, MySQLConnection))
         self.assertEqual(cnxpool, pcnx._cnx_pool)
         self.assertEqual(cnxpool._config_version,
                          pcnx._cnx._pool_config_version)
 
         cnx = pcnx._cnx
         pcnx.close()
-        # We should get the same connection back
+        # We should get the same connectoin back
         self.assertEqual(cnx, cnxpool._cnx_queue.get(block=False))
         cnxpool.add_connection(cnx)
 
@@ -257,7 +256,7 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         cnxpool._remove_connections()
         cnxpool._cnx_config['port'] = 9999999
         cnxpool._cnx_config['unix_socket'] = '/ham/spam/foobar.socket'
-        self.assertRaises(errors.Error, cnxpool.add_connection)
+        self.assertRaises(errors.InterfaceError, cnxpool.add_connection)
 
         self.assertRaises(errors.PoolError, cnxpool.add_connection, cnx=str)
 
