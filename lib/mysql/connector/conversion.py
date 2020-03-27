@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -582,66 +582,6 @@ class MySQLConverter(MySQLConverterBase):
             raise ValueError("Could not convert set %s to a sequence." % value)
         return set_type
 
-    def _JSON_to_python(self, value, dsc=None):  # pylint: disable=C0103
-        """Returns JSON column type as python type
-
-        Returns JSON column type as python type.
-        """
-        try:
-            num = float(value)
-            if num.is_integer():
-                return int(value)
-            return num
-        except ValueError:
-            pass
-
-        if value == b'true':
-            return True
-        elif value == b'false':
-            return False
-
-        # The following types are returned between double quotes or
-        # bytearray(b'"')[0] or int 34 for shortness.
-        if value[0] == 34 and value[-1] == 34:
-            value_nq = value[1:-1]
-
-            try:
-                value_datetime = self._DATETIME_to_python(value_nq)
-                if value_datetime is not None:
-                    return value_datetime
-            except ValueError:
-                pass
-            try:
-                value_date = self._DATE_to_python(value_nq)
-                if value_date is not None:
-                    return value_date
-            except ValueError:
-                pass
-            try:
-                value_time = self._TIME_to_python(value_nq)
-                if value_time is not None:
-                    return value_time
-            except ValueError:
-                pass
-
-            if isinstance(value, (bytes, bytearray)):
-                return value.decode(self.charset)
-
-        if dsc is not None:
-            # Check if we deal with a SET
-            if dsc[7] & FieldFlag.SET:
-                return self._SET_to_python(value, dsc)
-            if dsc[7] & FieldFlag.BINARY:
-                if self.charset != 'binary' and not isinstance(value, str):
-                    try:
-                        return value.decode(self.charset)
-                    except (LookupError, UnicodeDecodeError):
-                        return value
-                else:
-                    return value
-
-        return self._STRING_to_python(value, dsc)
-
     def _STRING_to_python(self, value, dsc=None):  # pylint: disable=C0103
         """
         Note that a SET is a string too, but using the FieldFlag we can see
@@ -670,15 +610,14 @@ class MySQLConverter(MySQLConverterBase):
         return value
 
     _VAR_STRING_to_python = _STRING_to_python
+    _JSON_to_python = _STRING_to_python
 
     def _BLOB_to_python(self, value, dsc=None):  # pylint: disable=C0103
-        """Convert BLOB data type to Python"""
-        if not value:
-            # This is an empty BLOB
-            return ""
-        # JSON Values are stored in LONG BLOB, but the blob values recived
-        # from the server are not dilutable, check for JSON values.
-        return self._JSON_to_python(value, dsc)
+        """Convert BLOB data type to Python."""
+        if dsc is not None:
+            if dsc[7] & FieldFlag.BLOB and dsc[7] & FieldFlag.BINARY:
+                return bytes(value)
+        return self._STRING_to_python(value, dsc)
 
     _LONG_BLOB_to_python = _BLOB_to_python
     _MEDIUM_BLOB_to_python = _BLOB_to_python

@@ -4717,6 +4717,7 @@ class BugOra27991948(tests.MySQLConnectorTests):
 
         cur_cext.close()
 
+
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 1),
                  "Collation utf8mb4_0900_ai_ci not available on 5.7.x")
 class BugOra27277964(tests.MySQLConnectorTests):
@@ -4739,158 +4740,6 @@ class BugOra27277964(tests.MySQLConnectorTests):
 
     def test_execute_utf8mb4_collation(self):
         self.cur.execute("INSERT INTO {0} VALUES (1, 'Nuno')".format(self.tbl))
-
-
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 8),
-                 "Support for native JSON data types introduced on 5.7.8 ")
-class BugOra24948186(tests.MySQLConnectorTests):
-    """BUG#24948186: MySQL JSON TYPES RETURNED AS BYTES INSTEAD OF PYTHON TYPES
-    """
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def run_test_mysql_json_type(self, stm, test_values, expected_values,
-                                 mysql_type, expected_type):
-        config = tests.get_mysql_config()
-        config['charset'] = "utf8"
-        config['use_unicode'] = True
-        cnx = connection.MySQLConnection(**config)
-        cur = cnx.cursor()
-
-        for test_value, expected_value in zip(test_values, expected_values):
-            cur.execute(stm.format(value=test_value))
-            row = cur.fetchall()[0]
-            self.assertEqual(row[0], expected_value) #,"value is not the expected")
-            self.assertTrue(isinstance(row[0], expected_type),
-                            u"value {} is not python type {}"
-                            u"".format(row[0], expected_type))
-            self.assertEqual(row[1], mysql_type,
-                             u"value {} is mysql type {} but expected {}"
-                             u"".format(row[0], row[1], mysql_type))
-        cur.close()
-        cnx.close()
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_boolean(self):
-        stm = ("SELECT j, JSON_TYPE(j)"
-               "from (SELECT CAST({value} AS JSON) as J) jdata")
-        test_values = ["true", "false"]
-        expected_values = [True, False]
-        mysql_type = "BOOLEAN"
-        expected_type = bool
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_integer(self):
-        arch64bit = sys.maxsize > 2**32
-        stm = ("SELECT j->>'$.foo', JSON_TYPE(j->>'$.foo')"
-               "FROM (SELECT json_object('foo', {value}) AS j) jdata")
-        test_values = [-2147483648, -1, 0, 1, 2147483647]
-        expected_values = test_values
-        mysql_type = "INTEGER"
-        expected_type = int
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-        test_values = [-9223372036854775808]
-        expected_values = test_values
-        mysql_type = "INTEGER"
-        if PY2 and (os.name == "nt" or not arch64bit):
-            expected_type = long
-        else:
-            expected_type = int
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-        test_values = [92233720368547760]
-        expected_values = test_values
-        mysql_type = "UNSIGNED INTEGER"
-        if PY2 and (os.name == "nt" or not arch64bit):
-            expected_type = long
-        else:
-            expected_type = int
-        self.run_test_mysql_json_type(stm, test_values,
-                                      expected_values,
-                                      mysql_type, expected_type)
-
-        test_values = [18446744073709551615]
-        expected_values = test_values
-        mysql_type = "UNSIGNED INTEGER"
-        if PY2:
-            expected_type = long
-        else:
-            expected_type = int
-        self.run_test_mysql_json_type(stm, test_values,
-                                      expected_values,
-                                      mysql_type, expected_type)
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_double(self):
-        # Because floating-point values are approximate and not stored as exact
-        # values the test values are not the true maximun or minum values
-        stm = ("SELECT j->>'$.foo', JSON_TYPE(j->>'$.foo')"
-               "FROM (SELECT json_object('foo', {value}) AS j) jdata")
-        test_values = [-12345.555, -1.55, 1.55, 12345.555]
-        expected_values = test_values
-        mysql_type = "DOUBLE"
-        expected_type = float
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_string(self):
-        stm = (u"SELECT j->>'$.foo', JSON_TYPE(j->>'$.foo')"
-               u"FROM (SELECT json_object('foo', {value}) AS j) jdata")
-        test_values = ['\'" "\'', '\'"some text"\'', u'\'"データベース"\'']
-        expected_values = ['" "', '"some text"', u'"データベース"']
-        mysql_type = "STRING"
-        expected_type = STRING_TYPES
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_datetime_types(self):
-        stm = ("SELECT j, JSON_TYPE(j)"
-               "from (SELECT CAST({value} AS JSON) as J) jdata")
-        test_values = ["cast('1972-01-01 00:42:49.000000' as DATETIME)",
-                       "cast('2018-01-01 23:59:59.000000' as DATETIME)"]
-        expected_values = [datetime(1972, 1, 1, 0, 42, 49),
-                           datetime(2018, 1, 1, 23, 59, 59)]
-        mysql_type = "DATETIME"
-        expected_type = datetime
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_date_types(self):
-        stm = ("SELECT j, JSON_TYPE(j)"
-               "from (SELECT CAST({value} AS JSON) as J) jdata")
-        test_values = ["DATE('1972-01-01')",
-                       "DATE('2018-12-31')"]
-        expected_values = [date(1972, 1, 1),
-                           date(2018, 12, 31)]
-        mysql_type = "DATE"
-        expected_type = date
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
-
-    @foreach_cnx()
-    def test_retrieve_mysql_json_time_types(self):
-        stm = ("SELECT j, JSON_TYPE(j)"
-               "from (SELECT CAST({value} AS JSON) as J) jdata")
-        test_values = ["TIME('00:42:49.000000')",
-                       "TIME('23:59:59.000001')"]
-        expected_values = [timedelta(hours=0, minutes=42, seconds=49),
-                           timedelta(hours=23, minutes=59, seconds=59,
-                                     microseconds=1)]
-        mysql_type = "TIME"
-        expected_type = timedelta
-        self.run_test_mysql_json_type(stm, test_values, expected_values,
-                                      mysql_type, expected_type)
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 11),
@@ -5357,14 +5206,8 @@ class BugOra27802700(tests.MySQLConnectorTests):
 
         rows = cnx.get_rows()[0][len(test_values) * (-1):]
         for returned_val, expected_value in zip(rows, expected_values):
-            self.assertEqual(returned_val[0], expected_value,
-                             u"value {} is not the expected {}."
-                             u"".format(returned_val[0], expected_value))
-            self.assertTrue(isinstance(returned_val[0], expected_type),
-                            u"value {} is not python type {},"
-                            u"instead found a type {}"
-                            u"".format(returned_val[0], expected_type,
-                                       type(returned_val[0])))
+            self.assertEqual(returned_val[0], expected_value)
+            self.assertTrue(isinstance(returned_val[0], expected_type))
 
         cur.close()
         cnx.close()
@@ -5401,8 +5244,11 @@ class BugOra27802700(tests.MySQLConnectorTests):
         stm = self.insert_stmt.format(self.table_name, column)
         test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
                        "\"'12345'\""]
-        expected_values = [' ', 'some text', u'データベース', "'12345'"]
-        expected_type = STRING_TYPES
+        expected_values = [b' ', b'some text', b'\xe3\x83\x87\xe3\x83\xbc\xe3'
+                           b'\x82\xbf\xe3\x83\x99\xe3\x83\xbc\xe3\x82\xb9'
+                           if PY2 else u'データベース'.encode("utf-8"),
+                           b"'12345'"]
+        expected_type = bytes
 
         self.run_test_retrieve_stored_type(stm, test_values, expected_values,
                                            column, expected_type)
@@ -5613,7 +5459,7 @@ class Bug27897881(tests.MySQLConnectorTests):
         # "12345" handle as datetime in JSON produced index error.
         # LONGBLOB can store big data
         test_values = ["", "12345", '"54321"', "A"*(2**20)]
-        expected_values = ["", 12345, '"54321"', "A"*(2**20)]
+        expected_values = [b"", b"12345", b'"54321"', b"A"*(2**20)]
         stm = "INSERT INTO {} (col1, col2) VALUES ('{}', '{}')"
 
         for num, test_value in zip(range(len(test_values)), test_values):
@@ -5705,6 +5551,7 @@ class BugOra25349794(tests.MySQLConnectorTests):
         mysql.connector._CONNECTION_POOLS = {}
         conn.close()
 
+
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
                  "MySQL >= 5.7.3 is required for reset command")
 @unittest.skipIf(CMySQLConnection is None,
@@ -5763,3 +5610,50 @@ class Bug27489937(tests.MySQLConnectorTests):
             self.assertNotEqual(('2',), cnx.get_rows()[0][0])
         else:
             self.assertNotEqual((b'2',), cnx.get_rows()[0][0])
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 8), "No JSON support")
+class BugOra29808262(tests.MySQLConnectorTests):
+    """BUG#229808262: TEXT COLUMN WITH ONLY DIGITS READS IN AS INT.
+    """
+    table_name = "BugOra29808262"
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    @foreach_cnx()
+    def test_blob_fields(self):
+        cur = self.cnx.cursor()
+        cur.execute("DROP TABLE IF EXISTS {}".format(self.table_name))
+        cur.execute("CREATE TABLE {} ("
+                    "  my_blob BLOB,"
+                    "  my_longblob LONGBLOB,"
+                    "  my_json JSON,"
+                    "  my_text TEXT) CHARACTER SET utf8"
+                    "  COLLATE utf8_general_ci".format(self.table_name))
+
+        test_values = (
+            "BLOB" * (2**10),
+            "LONG_BLOB" * (2**20),
+            '{"lat": "41.14961", "lon": "-8.61099", "name": "Porto"}',
+            "My TEXT",
+        )
+        expected_values = (
+            b"BLOB" * (2**10),
+            b"LONG_BLOB" * (2**20),
+            '{"lat": "41.14961", "lon": "-8.61099", "name": "Porto"}',
+            "My TEXT",
+        )
+        cur = self.cnx.cursor()
+        cur.execute("INSERT INTO {} VALUES ('{}')"
+                    "".format(self.table_name, "', '".join(test_values)))
+        cur.execute("SELECT my_blob, my_longblob, my_json, my_text FROM {}"
+                    "".format(self.table_name))
+        res = cur.fetchall()
+        self.assertEqual(res[0], expected_values)
+
+        cur.execute("DROP TABLE IF EXISTS {}".format(self.table_name))
+        cur.close()

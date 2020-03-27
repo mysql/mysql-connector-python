@@ -2626,8 +2626,15 @@ MySQL_fetch_row(MySQL *self)
         }
         else if (field_type == MYSQL_TYPE_BLOB)
         {
-            value= mytopy_string(row[i], field_lengths[i], field_flags,
-                                  charset, self->use_unicode);
+            if ((field_flags & BLOB_FLAG) && (field_flags & BINARY_FLAG))
+            {
+                value= BytesFromStringAndSize(row[i], field_lengths[i]);
+            }
+            else
+            {
+                value= mytopy_string(row[i], field_lengths[i], field_flags,
+                                     charset, self->use_unicode);
+            }
             PyTuple_SET_ITEM(result_row, i, value);
         }
         else if (field_type == MYSQL_TYPE_GEOMETRY)
