@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Change permissions for files in MySQL Package
+#
+
+CPY_PACKAGE="/Library/Python/2.7/site-packages/mysql/connector"
+chown -R root:wheel "${CPY_PACKAGE}"
+
+exit 0

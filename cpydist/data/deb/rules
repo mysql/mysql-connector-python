@@ -1,0 +1,238 @@
+#!/usr/bin/make -f
+
+
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0, as
+# published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an
+# additional permission to link the program and your derivative works
+# with the separately licensed software that they have included with
+# MySQL.
+#
+# Without limiting anything contained in the foregoing, this file,
+# which is part of MySQL Connector/Python, is also subject to the
+# Universal FOSS Exception, version 1.0, a copy of which can be found at
+# http://oss.oracle.com/licenses/universal-foss-exception.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+
+PY2_BUILD_LIB_OPT = --build-lib=build/python2
+PY3_BUILD_LIB_OPT = --build-lib=build/python3
+
+DEB_PYTHON_INSTALL_ARGS_ALL = --install-layout=deb
+
+ifeq ($(LABEL), 0)
+    LIC_EXT =
+else
+    LIC_EXT = -$(LABEL)
+endif
+
+ifeq ($(origin MYSQL_CAPI), undefined)
+    $(error Please set environment variable MYSQL_CAPI \
+    pointing to location of MySQL Connector/C)
+endif
+
+ifeq ($(origin OPENSSL_INCLUDE_DIR), "")
+    OPENSSL_OPT =
+else
+    OPENSSL_OPT = --with-openssl-include-dir=$(OPENSSL_INCLUDE_DIR)  --with-openssl-lib-dir=$(OPENSSL_LIB_DIR)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOBUF_INCLUDE_DIR), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOBUF_INCLUDE_DIR \
+    pointing to location of Protobuf include dir)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOBUF_LIB_DIR), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOBUF_LIB_DIR \
+    pointing to location of Protobuf library dir)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOC), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOC \
+    pointing to location of Protobuf protoc binary)
+endif
+
+# Check whether we have Python v3 support
+ifneq ($(shell which py3versions 2>/dev/null),)
+  WITHPYTHON="python2,python3"
+  PYTHON3_SUPPORTED=$(shell py3versions -sv)
+else
+  WITHPYTHON="python2"
+  PYTHON3_SUPPORTED=
+endif
+
+ifeq ($(BYTE_CODE_ONLY), 1)
+    BYTE_CODE_ONLY = --byte-code-only
+    EXTRA_OPTIONS_DH =
+else
+    BYTE_CODE_ONLY =
+    EXTRA_OPTIONS_DH = --buildsystem=python_distutils --with $(WITHPYTHON)
+endif
+
+# We do not support Python v2.5
+PYTHON2_SUPPORTED=$(shell pyversions -sv | sed -e "s/\s*2\.5\s*//g")
+
+%:
+	dh $@ $(EXTRA_OPTIONS_DH)
+
+override_dh_auto_build:
+	# Python v2
+	set -xe; \
+	for pyver in $(PYTHON2_SUPPORTED); \
+	do \
+		python$$pyver setup.py build \
+			--build-base=build \
+			$(PY2_BUILD_LIB_OPT) \
+			--build-platlib=build/python2; \
+	done
+
+	# Python v2 C Extension
+	if [ -n "$(WITH_CEXT)" ]; then \
+		set -xe; \
+		for pyver in $(PYTHON2_SUPPORTED); \
+		do \
+			python$$pyver setup.py build_ext \
+				--build-lib=build/python2_cext \
+				--with-mysql-capi=$(MYSQL_CAPI) \
+				--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
+				--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
+				--with-protoc=$(MYSQLXPB_PROTOC) \
+				--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
+				--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT); \
+		done; \
+	fi
+
+	# Python v3
+	set -xe; \
+	for pyver in $(PYTHON3_SUPPORTED); \
+	do \
+		python$$pyver setup.py build \
+			--build-base=build \
+			$(PY3_BUILD_LIB_OPT) \
+			--build-platlib=build/python3; \
+	done
+
+	# Python v3 C Extension
+	if [ -n "$(WITH_CEXT)" ]; then \
+		set -xe; \
+		for pyver in $(PYTHON3_SUPPORTED); \
+		do \
+			python$$pyver setup.py build_ext \
+				--build-lib=build/python3_cext \
+				--with-mysql-capi=$(MYSQL_CAPI) \
+				--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
+				--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
+				--with-protoc=$(MYSQLXPB_PROTOC) \
+				--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
+				--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT); \
+		done; \
+	fi
+
+override_dh_auto_install:
+	# Python v2
+	set -xe; \
+	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT); \
+	for pyver in $(PYTHON2_SUPPORTED); \
+	do \
+	    python$$pyver setup.py \
+		install_lib --build-dir=build/python2 $(EXTRA_INSTALL_LIB_OPTS) \
+		install --skip-build --install-layout=deb \
+		--root $$DESTDIR $(BYTE_CODE_ONLY); \
+	done
+
+	# Python v2 C Extension
+	set -xe; \
+	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT); \
+	for pyver in $(PYTHON2_SUPPORTED); \
+	do \
+		python$$pyver setup.py \
+			install_lib --build-dir=build/python2_cext $(EXTRA_INSTALL_LIB_OPTS) \
+			install --skip-build --install-layout=deb \
+			--root $$DESTDIR $(BYTE_CODE_ONLY); \
+		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
+	done
+
+	# Python v3
+	set -xe; \
+	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT)-py3; \
+	for pyver in $(PYTHON3_SUPPORTED); \
+	do \
+		python$$pyver setup.py \
+			install_lib --build-dir=build/python3 $(EXTRA_INSTALL_LIB_OPTS) \
+			install --skip-build --install-layout=deb \
+			--root $$DESTDIR $(BYTE_CODE_ONLY); \
+	done
+
+	# Python v3 C Extension
+	set -xe; \
+	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT)-py3; \
+	for pyver in $(PYTHON3_SUPPORTED); \
+	do \
+		python$$pyver setup.py \
+			install_lib --build-dir=build/python3_cext $(EXTRA_INSTALL_LIB_OPTS) \
+			install --skip-build --install-layout=deb \
+			--root $$DESTDIR $(BYTE_CODE_ONLY); \
+		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
+	done
+
+ifeq ($(BYTE_CODE_ONLY), --byte-code-only)
+override_dh_pysupport:
+	# Skipped. We need to keep the .pyc files.
+endif
+
+override_dh_installdocs:
+	dh_installdocs --all LICENSE.txt
+	dh_installdocs --all README.txt
+	dh_installdocs --all README.rst
+	dh_installdocs --all CONTRIBUTING.rst
+	dh_installdocs --all docs/INFO_SRC
+	dh_installdocs --all docs/INFO_BIN
+
+# Post install scripts uses "sysconfig", seems for some Deb platforms
+# the Python 3 default install this is provided by "python3-distutils".
+# Debian 9 and Ubuntu 16 lacks "python3-distutils" but has "sysconfig"
+# anyway.
+
+ifeq ($(shell lsb_release --short --codename),stretch)
+  SUBSTVARS = -Vpython3-distutils:Depends=
+else ifeq ($(shell lsb_release --short --codename),xenial)
+  SUBSTVARS = -Vpython3-distutils:Depends=
+else
+  SUBSTVARS = -Vpython3-distutils:Depends="python3-distutils"
+endif
+
+# Python PROTOBUF is required to communicate with the server using a pure
+# Python implementation of the protocol. Ubuntu 16.04 lacks a recent enough Python
+# protobuf module and then can't communicate using pure Python. But if installing
+# the C extension Deb it can be used for the communication instead. At least
+# if using the default settings to use the binary driver.
+#
+# So on Ubuntu 16.04 instead letting the pure Python Deb depend on Python protobuf,
+# we let it depend on the C extension Deb. Making it a cross dependency that APT
+# can sort out. If installing using "dpkg" you need to force install or install
+# both Debs at the same time.
+
+ifeq ($(shell lsb_release --short --codename),xenial)
+  SUBSTVARS += -Vpython2-protobuf:Depends='mysql-connector-python$(LIC_EXT) (= $${binary:Version})'
+  SUBSTVARS += -Vpython3-protobuf:Depends='mysql-connector-python$(LIC_EXT)-py3 (= $${binary:Version})'
+else
+  SUBSTVARS += -Vpython2-protobuf:Depends='python-protobuf (>= 3.0.0)'
+  SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (>= 3.0.0)'
+endif
+
+override_dh_gencontrol:
+	dh_gencontrol -- $(SUBSTVARS)

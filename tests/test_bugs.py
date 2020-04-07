@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -66,7 +66,6 @@ from mysql.connector.optionfiles import read_option_files
 from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.catch23 import STRING_TYPES
 import mysql.connector
-import cpy_distutils
 
 try:
     from mysql.connector.connection_cext import (CMySQLConnection,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -168,8 +168,8 @@ if os.name == 'nt':
         "ssl-cert = {ssl_cert}",
         "ssl-key = {ssl_key}",
     ))
-    MYSQL_DEFAULT_BASE = os.path.join(
-        "C:/", "Program Files", "MySQL", "MySQL Server 5.6")
+    MYSQL_DEFAULT_BASE = os.environ.get("MYSQL", os.path.join(
+        "C:/", "Program Files", "MySQL", "MySQL Server 8.0"))
 else:
     MY_CNF += '\n'.join((
         "ssl-ca = {ssl_ca}",
@@ -177,7 +177,8 @@ else:
         "ssl-key = {ssl_key}",
         "innodb_flush_method = O_DIRECT",
     ))
-    MYSQL_DEFAULT_BASE = os.path.join('/', 'usr', 'local', 'mysql')
+    MYSQL_DEFAULT_BASE = os.environ.get("MYSQL", os.path.join(
+        "/", "usr", "local", "mysql"))
 
 MY_CNF += "\nssl={ssl}"
 
@@ -354,21 +355,33 @@ _UNITTESTS_CMD_ARGS = {
                  "or full path to mysql_config")
     },
 
+    ('', '--with-openssl-include-dir'): {
+        'dest': 'openssl_include_dir', 'metavar': 'NAME',
+        'default': os.environ.get("MYSQLXPB_OPENSSL_INCLUDE_DIR"),
+        'help': ("Location of OpenSSL include directory")
+    },
+
+    ('', '--with-openssl-lib-dir'): {
+        'dest': 'openssl_lib_dir', 'metavar': 'NAME',
+        'default': os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR"),
+        'help': ("Location of OpenSSL library directory")
+    },
+
     ('', '--with-protobuf-include-dir'): {
         'dest': 'protobuf_include_dir', 'metavar': 'NAME',
-        'default': None,
+        'default': os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR"),
         'help': ("Location of Protobuf include directory")
     },
 
     ('', '--with-protobuf-lib-dir'): {
         'dest': 'protobuf_lib_dir', 'metavar': 'NAME',
-        'default': None,
+        'default': os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR"),
         'help': ("Location of Protobuf library directory")
     },
 
     ('', '--with-protoc'): {
         'dest': 'protoc', 'metavar': 'NAME',
-        'default': None,
+        'default': os.environ.get("MYSQLXPB_PROTOC"),
         'help': ("Location of Protobuf protoc binary")
     },
 
@@ -841,17 +854,28 @@ def main():
             if not protoc:
                 LOGGER.error("Unable to find Protobuf protoc binary.")
                 sys.exit(1)
+
+        openssl_include_dir = options.openssl_include_dir or \
+            os.environ.get("MYSQLXPB_OPENSSL_INCLUDE_DIR")
+        openssl_lib_dir = options.openssl_lib_dir or \
+            os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR")
+        if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
+            if not openssl_include_dir:
+                LOGGER.error("Unable to find OpenSSL include directory.")
+                sys.exit(1)
+            if not openssl_lib_dir:
+                LOGGER.error("Unable to find OpenSSL library directory.")
+                sys.exit(1)
+
         tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
+                                openssl_include_dir,
+                                openssl_lib_dir,
                                 protobuf_include_dir,
                                 protobuf_lib_dir,
                                 protoc,
                                 options.mysql_capi,
                                 options.extra_compile_args,
                                 options.extra_link_args, options.debug)
-
-        if platform.system() in ("Darwin", "Linux") and tests.MYSQL_VERSION > (8, 0, 5):
-            shutil.copytree(os.path.join(_TOPDIR, "mysql-vendor"),
-                            os.path.join(tests.TEST_BUILD_DIR, "mysql-vendor"))
 
     # Which tests cases to run
     testcases = []

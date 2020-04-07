@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import errno
 import traceback
+from cpydist.utils import mysql_c_api_info
 from distutils.dist import Distribution
 from imp import load_source
 from functools import wraps
@@ -76,8 +77,6 @@ except ImportError:
     else:
         LOGGER.error("Could not initialize Python's unittest module")
         sys.exit(1)
-
-from lib.cpy_distutils import mysql_c_api_info
 
 SSL_AVAILABLE = True
 try:
@@ -233,8 +232,7 @@ def get_test_modules():
     pattern = re.compile('.*test_(.*)')
     for finder, name, is_pkg in walk_packages(__path__, prefix=__name__+'.'):
         if ('.test_' not in name or
-                ('django' in name and not DJANGO_VERSION) or
-                ('cext' in name and not MYSQL_CAPI)):
+                ('django' in name and not DJANGO_VERSION)):
             continue
 
         module_path = os.path.join(finder.path, name.split('.')[-1] + '.py')
@@ -246,6 +244,7 @@ def get_test_modules():
             continue
         except ImportError as exc:
             check_c_extension(exc)
+            continue
         else:
             try:
                 dsc = mod.__doc__.splitlines()[0]
@@ -808,7 +807,8 @@ def setup_logger(logger, debug=False, logfile=None):
     LOGGER.addHandler(handler)
 
 
-def install_connector(root_dir, install_dir, protobuf_include_dir,
+def install_connector(root_dir, install_dir, openssl_include_dir,
+                      openssl_lib_dir, protobuf_include_dir,
                       protobuf_lib_dir, protoc, connc_location=None,
                       extra_compile_args=None, extra_link_args=None,
                       debug=False):
@@ -839,12 +839,16 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
         'install',
         '--root', install_dir,
         '--install-lib', '.',
-        '--static',
-        '--is-wheel'
     ])
     if os.name == 'nt':
         cmd.extend([
             '--install-data', cmd_build.build_platlib
+        ])
+
+    if any((openssl_include_dir, openssl_lib_dir)):
+        cmd.extend([
+            '--with-openssl-include-dir', openssl_include_dir,
+            '--with-openssl-lib-dir', openssl_lib_dir,
         ])
 
     if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
@@ -863,12 +867,15 @@ def install_connector(root_dir, install_dir, protobuf_include_dir,
     if extra_link_args:
         cmd.extend(['--extra-link-args', extra_link_args])
 
+    if debug:
+        cmd.append('--debug')
+
     LOGGER.debug("Installing command: {0}".format(cmd))
     prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                            cwd=root_dir)
     stdout = prc.communicate()[0]
-    if prc.returncode is not 0:
+    if prc.returncode != 0:
         with open(logfile, 'wb') as logfp:
             logfp.write(stdout)
         LOGGER.error("Failed installing Connector/Python, see {log}".format(
@@ -907,7 +914,7 @@ def check_c_extension(exc=None):
             mysql_config = os.path.join(MYSQL_CAPI, 'bin', 'mysql_config')
         else:
             mysql_config = MYSQL_CAPI
-        lib_dir = mysql_c_api_info(mysql_config)['link_directories']
+        lib_dir = mysql_c_api_info(mysql_config)['link_dirs']
     elif os.path.isdir(MYSQL_CAPI):
         lib_dir = os.path.join(MYSQL_CAPI, 'lib')
     else:

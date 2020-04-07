@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?define ProductName="MySQL Connector Python"?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+  <Product Id="*"
+   Name="$(var.ProductName) v$(var.Version)" Language="1033"
+   Version="$(var.Version)"
+   Manufacturer="Oracle"
+   UpgradeCode="$(var.UpgradeCode)">
+
+    <Package Compressed="yes" InstallerVersion="200"
+     Description="$(var.ProductName) Installer"
+     Comments="Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved."
+     InstallScope="perMachine"
+     Platform="$(var.Platform)"/>
+
+    <Property Id="PREVIOUSVERSIONSINSTALLED27" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED34" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED35" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED36" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
+
+	<Upgrade Id="60240289-1258-4914-8a49-db547a459f2d">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED27"/>
+    </Upgrade>
+	<Upgrade Id="d37ecc44-a317-4c2c-b90a-70b4dc67fb19">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED34"/>
+    </Upgrade>
+	<Upgrade Id="ebb1adfa-3a55-11e7-a9ba-0021f6bb00b4">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED35"/>
+    </Upgrade>
+	<Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED36"/>
+    </Upgrade>
+    <Upgrade Id="212eea22-7fa3-11e8-81b7-37e66f6c3ce1">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED37"/>
+    </Upgrade>
+	<Upgrade Id="29739579-22ec-4df7-905f-05ca0d778c41">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED38"/>
+    </Upgrade>
+
+    <!-- Obtain location of the Python interpreters installed on the system-->
+    <!-- Python 2.7 -->
+    <Property Id="PYTHON27INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python27InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="yes"/>
+      <?else?>
+      <RegistrySearch Id="Python27InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON27INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python27InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="yes"/>
+      <?else?>
+      <RegistrySearch Id="Python27InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <!-- Python 3.4 -->
+    <Property Id="PYTHON34INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python34InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="yes"/>
+      <?else?>
+      <RegistrySearch Id="Python34InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON34INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python34InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="yes"/>
+      <?else?>
+      <RegistrySearch Id="Python34InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <!-- Python 3.5 -->
+    <Property Id="PYTHON35INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python35InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.5\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python35InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.5-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON35INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python35InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.5\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python35InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.5-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <!-- Python 3.6 -->
+    <Property Id="PYTHON36INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python36InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.6\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python36InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.6-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON36INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python36InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.6\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python36InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.6-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <!-- Python 3.7 -->
+    <Property Id="PYTHON37INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python37InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.7\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python37InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.7-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON37INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python37InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.7\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python37InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.7-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <!-- Python 3.8 -->
+    <Property Id="PYTHON38INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python38InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.8\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python38InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.8-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON38INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python38InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.8\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python38InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.8-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
+      Installed OR PYTHON27INSTALLPATH_ALL OR PYTHON27INSTALLPATH_CURRENT OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON35INSTALLPATH_ALL OR PYTHON35INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT
+    </Condition>
+
+    <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
+
+    <!-- Definition of the folders used by the installed files-->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <?if "$(var.Platform)"="x64" ?>
+        <Directory Id="INSTALLDIRP27" Name="Python27">
+          <Directory Id="PythonLibDir27" Name="Lib">
+            <Directory Id="SitePackagesDir27" Name="site-packages">
+              <Directory Id="EggInfoDir27" Name="mysql_connector_python-$(var.FullVersion)-py2.7.egg-info"/>
+              <Directory Id="MySQLXPackageDir27" Name="mysqlx">
+                <Directory Id="MySQLXPB2Dir27" Name="protobuf"/>
+                <Directory Id="MySQLXLocalesDir27" Name="locales">
+                  <Directory Id="MySQLXLocalesEngDir27" Name="eng"/>
+                </Directory>
+              </Directory>
+              <Directory Id="MySQLPackageDir27" Name="mysql">
+                <Directory Id="ConnectorPackageDir27" Name="connector">
+                  <Directory Id="DjangoDir27" Name="django"/>
+                  <Directory Id="ConnectorLocalesDir27" Name="locales">
+                    <Directory Id="LocalesEngDir27" Name="eng"/>
+                  </Directory>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      <?else?>
+        <Directory Id="INSTALLDIRP27" Name="Python27">
+          <Directory Id="PythonLibDir27" Name="Lib">
+            <Directory Id="SitePackagesDir27" Name="site-packages">
+              <Directory Id="EggInfoDir27" Name="mysql_connector_python-$(var.FullVersion)-py2.7.egg-info"/>
+              <Directory Id="MySQLXPackageDir27" Name="mysqlx">
+                <Directory Id="MySQLXPB2Dir27" Name="protobuf"/>
+                <Directory Id="MySQLXLocalesDir27" Name="locales">
+                  <Directory Id="MySQLXLocalesEngDir27" Name="eng"/>
+                </Directory>
+              </Directory>
+              <Directory Id="MySQLPackageDir27" Name="mysql">
+                <Directory Id="ConnectorPackageDir27" Name="connector">
+                  <Directory Id="DjangoDir27" Name="django"/>
+                  <Directory Id="ConnectorLocalesDir27" Name="locales">
+                    <Directory Id="LocalesEngDir27" Name="eng"/>
+                  </Directory>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      <?endif?>
+
+      <Directory Id="INSTALLDIRP34" Name="Python34">
+        <Directory Id="PythonLibDir34" Name="Lib">
+          <Directory Id="SitePackagesDir34" Name="site-packages">
+            <Directory Id="EggInfoDir34" Name="mysql_connector_python-$(var.FullVersion)-py3.4.egg-info"/>
+            <Directory Id="MySQLXPackageDir34" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir34" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir34" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir34" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir34" Name="mysql">
+              <Directory Id="ConnectorPackageDir34" Name="connector">
+                <Directory Id="DjangoDir34" Name="django"/>
+                <Directory Id="ConnectorLocalesDir34" Name="locales">
+                  <Directory Id="LocalesEngDir34" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP35" Name="Python35">
+        <Directory Id="PythonLibDir35" Name="Lib">
+          <Directory Id="SitePackagesDir35" Name="site-packages">
+            <Directory Id="EggInfoDir35" Name="mysql_connector_python-$(var.FullVersion)-py3.5.egg-info"/>
+            <Directory Id="MySQLXPackageDir35" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir35" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir35" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir35" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir35" Name="mysql">
+              <Directory Id="ConnectorPackageDir35" Name="connector">
+                <Directory Id="DjangoDir35" Name="django"/>
+                <Directory Id="ConnectorLocalesDir35" Name="locales">
+                  <Directory Id="LocalesEngDir35" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP36" Name="Python36">
+        <Directory Id="PythonLibDir36" Name="Lib">
+          <Directory Id="SitePackagesDir36" Name="site-packages">
+            <Directory Id="EggInfoDir36" Name="mysql_connector_python-$(var.FullVersion)-py3.6.egg-info"/>
+            <Directory Id="MySQLXPackageDir36" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir36" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir36" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir36" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir36" Name="mysql">
+              <Directory Id="ConnectorPackageDir36" Name="connector">
+                <Directory Id="DjangoDir36" Name="django"/>
+                <Directory Id="ConnectorLocalesDir36" Name="locales">
+                  <Directory Id="LocalesEngDir36" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP37" Name="Python37">
+        <Directory Id="PythonLibDir37" Name="Lib">
+          <Directory Id="SitePackagesDir37" Name="site-packages">
+            <Directory Id="EggInfoDir37" Name="mysql_connector_python-$(var.FullVersion)-py3.7.egg-info"/>
+            <Directory Id="MySQLXPackageDir37" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir37" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir37" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir37" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir37" Name="mysql">
+              <Directory Id="ConnectorPackageDir37" Name="connector">
+                <Directory Id="DjangoDir37" Name="django"/>
+                <Directory Id="ConnectorLocalesDir37" Name="locales">
+                  <Directory Id="LocalesEngDir37" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP38" Name="Python38">
+        <Directory Id="PythonLibDir38" Name="Lib">
+          <Directory Id="SitePackagesDir38" Name="site-packages">
+            <Directory Id="EggInfoDir38" Name="mysql_connector_python-$(var.FullVersion)-py3.8.egg-info"/>
+            <Directory Id="MySQLXPackageDir38" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir38" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir38" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir38" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir38" Name="mysql">
+              <Directory Id="ConnectorPackageDir38" Name="connector">
+                <Directory Id="DjangoDir38" Name="django"/>
+                <Directory Id="ConnectorLocalesDir38" Name="locales">
+                  <Directory Id="LocalesEngDir38" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <!-- Common files-->
+      <Directory Id="$(var.Directory_Id)">
+        <Directory Id="CompanyDir" Name="MySQL">
+          <Directory Id="INSTALLDIR" Name="$(var.ProductName) $(var.Major_Version).$(var.Minor_Version)">
+            <Directory Id="ProductDir">
+              <Directory Id="ExamplesDir" Name="Examples" />
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+    </Directory>
+
+    <!-- Common files Description-->
+    <DirectoryRef Id="ProductDir">
+      <Component Id="MyConnPyFiles" Guid="f0f7ecc4-8efd-4961-bab3-fb1b6486b42f" Win64="$(var.Win64)">
+        <File Id="README" Name="README.txt"
+         Source="$(var.BuildDir)\README.txt" DiskId="1"/>
+        <File Id="READMERST" Name="README.rst"
+         Source="$(var.BuildDir)\README.rst" DiskId="1"/>
+        <File Id="CONTRIBUTINGRST" Name="CONTRIBUTING.rst"
+         Source="$(var.BuildDir)\CONTRIBUTING.rst" DiskId="1"/>
+        <File Id="LICENSE" Name="LICENSE.txt"
+         Source="$(var.BuildDir)\LICENSE.txt" DiskId="1"/>
+        <File Id="CHANGES" Name="CHANGES.txt"
+         Source="$(var.BuildDir)\CHANGES.txt" DiskId="1"/>
+        <File Id="INFO_BIN" Name="INFO_BIN"
+         Source="$(var.BuildDir)\INFO_BIN" DiskId="1"/>
+        <File Id="INFO_SRC" Name="INFO_SRC "
+         Source="$(var.BuildDir)\INFO_SRC " DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ExamplesDir">
+      <Component Id="MyConnPyExamples" Guid="0a156506-a510-47e6-bb25-e251d5e804f5" Win64="$(var.Win64)">
+      <File Id="__init__" Name="__init__.py"
+            Source="$(var.BuildDir)\..\examples\__init__.py " DiskId="1"/>
+      <File Id="dates" Name="dates.py"
+            Source="$(var.BuildDir)\..\examples\dates.py " DiskId="1"/>
+      <File Id="engines" Name="engines.py"
+            Source="$(var.BuildDir)\..\examples\engines.py " DiskId="1"/>
+      <File Id="inserts" Name="inserts.py"
+            Source="$(var.BuildDir)\..\examples\inserts.py " DiskId="1"/>
+      <File Id="microseconds" Name="microseconds.py"
+            Source="$(var.BuildDir)\..\examples\microseconds.py " DiskId="1"/>
+      <File Id="multi_resultsets" Name="multi_resultsets.py"
+            Source="$(var.BuildDir)\..\examples\multi_resultsets.py " DiskId="1"/>
+      <File Id="mysql_warnings" Name="mysql_warnings.py"
+            Source="$(var.BuildDir)\..\examples\mysql_warnings.py " DiskId="1"/>
+      <File Id="prepared_statements" Name="prepared_statements.py"
+            Source="$(var.BuildDir)\..\examples\prepared_statements.py " DiskId="1"/>
+      <File Id="transaction" Name="transaction.py"
+            Source="$(var.BuildDir)\..\examples\transaction.py " DiskId="1"/>
+      <File Id="unicode" Name="unicode.py"
+            Source="$(var.BuildDir)\..\examples\unicode.py " DiskId="1"/>
+      <File Id="warnings" Name="warnings.py "
+            Source="$(var.BuildDir)\..\examples\warnings.py  " DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+    
+    <!-- Definition of Features available for installation-->
+    <Feature Id="Complete" Level="1" Title="Connector Python" Absent="disallow">
+      <!-- Common files -->
+      <Feature Id="CpyCommon" Title="C/py Readme and License" Level="1"
+               ConfigurableDirectory ="INSTALLDIR" Absent="disallow">
+        <ComponentRef Id="MyConnPyFiles"/>
+        <ComponentRef Id="MyConnPyExamples"/>
+      </Feature>
+
+      <!-- Python 2.7 -->
+      <?if $(var.BDist27) != "" ?>
+      <Feature Id="Python27" Title="C/py for Python 2.7" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP27" Absent="allow">
+        <Condition Level='0'>Not PYTHON27INSTALLPATH_ALL AND Not PYTHON27INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo27"/>
+        <ComponentRef Id="MySQLPackage27"/>
+        <ComponentRef Id="ConnectorPackage27"/>
+        <ComponentRef Id="ConnectorLocales27"/>
+        <ComponentRef Id="LocalesEng27"/>
+        <ComponentRef Id="DjangoBackend27"/>
+        <ComponentRef Id="MySQLXPackage27"/>
+        <ComponentRef Id="MySQLXPackagePB227"/>
+        <ComponentRef Id="MySQLXLocales27"/>
+        <ComponentRef Id="MySQLXLocalesEng27"/>
+      </Feature>
+      <?endif?>
+
+      <!-- Python 3.4 -->
+      <?if $(var.BDist34) != "" ?>
+      <Feature Id="Python34" Title="C/py for Python 3.4" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP34" Absent="allow">
+        <Condition Level='0'>Not PYTHON34INSTALLPATH_ALL AND Not PYTHON34INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo34"/>
+        <ComponentRef Id="MySQLPackage34"/>
+        <ComponentRef Id="ConnectorPackage34"/>
+        <ComponentRef Id="ConnectorLocales34"/>
+        <ComponentRef Id="LocalesEng34"/>
+        <ComponentRef Id="DjangoBackend34"/>
+        <ComponentRef Id="MySQLXPackage34"/>
+        <ComponentRef Id="MySQLXPackagePB234"/>
+        <ComponentRef Id="MySQLXLocales34"/>
+        <ComponentRef Id="MySQLXLocalesEng34"/>
+        <?if $(var.HaveCExt34) = 1 ?>
+        <ComponentRef Id="CExtension34"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
+
+      <!-- Python 3.5 -->
+      <?if $(var.BDist35) != "" ?>
+      <Feature Id="Python35" Title="C/py for Python 3.5" Level="1"
+               ConfigurableDirectory="INSTALLDIRP35" Absent="allow">
+        <Condition Level='0'>Not PYTHON35INSTALLPATH_ALL AND Not PYTHON35INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo35"/>
+        <ComponentRef Id="MySQLPackage35"/>
+        <ComponentRef Id="ConnectorPackage35"/>
+        <ComponentRef Id="ConnectorLocales35"/>
+        <ComponentRef Id="LocalesEng35"/>
+        <ComponentRef Id="DjangoBackend35"/>
+        <ComponentRef Id="MySQLXPackage35"/>
+        <ComponentRef Id="MySQLXPackagePB235"/>
+        <ComponentRef Id="MySQLXLocales35"/>
+        <ComponentRef Id="MySQLXLocalesEng35"/>
+        <?if $(var.HaveCExt35) = 1 ?>
+        <ComponentRef Id="CExtension35"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
+
+      <!-- Python 3.6 -->
+      <?if $(var.BDist36) != "" ?>
+      <Feature Id="Python36" Title="C/py for Python 3.6" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP36" Absent="allow">
+        <Condition Level='0'>Not PYTHON36INSTALLPATH_ALL AND Not PYTHON36INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo36"/>
+        <ComponentRef Id="MySQLPackage36"/>
+        <ComponentRef Id="ConnectorPackage36"/>
+        <ComponentRef Id="ConnectorLocales36"/>
+        <ComponentRef Id="LocalesEng36"/>
+        <ComponentRef Id="DjangoBackend36"/>
+        <ComponentRef Id="MySQLXPackage36"/>
+        <ComponentRef Id="MySQLXPackagePB236"/>
+        <ComponentRef Id="MySQLXLocales36"/>
+        <ComponentRef Id="MySQLXLocalesEng36"/>
+        <?if $(var.HaveCExt36) = 1 ?>
+        <ComponentRef Id="CExtension36"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
+
+      <!-- Python 3.7 -->
+      <?if $(var.BDist37) != "" ?>
+      <Feature Id="Python37" Title="C/py for Python 3.7" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP37" Absent="allow">
+        <Condition Level='0'>Not PYTHON37INSTALLPATH_ALL AND Not PYTHON37INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo37"/>
+        <ComponentRef Id="MySQLPackage37"/>
+        <ComponentRef Id="ConnectorPackage37"/>
+        <ComponentRef Id="ConnectorLocales37"/>
+        <ComponentRef Id="LocalesEng37"/>
+        <ComponentRef Id="DjangoBackend37"/>
+        <ComponentRef Id="MySQLXPackage37"/>
+        <ComponentRef Id="MySQLXPackagePB237"/>
+        <ComponentRef Id="MySQLXLocales37"/>
+        <ComponentRef Id="MySQLXLocalesEng37"/>
+        <?if $(var.HaveCExt37) = 1 ?>
+        <ComponentRef Id="CExtension37"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
+
+      <!-- Python 3.8 -->
+      <?if $(var.BDist38) != "" ?>
+      <Feature Id="Python38" Title="C/py for Python 3.8" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP38" Absent="allow">
+        <Condition Level='0'>Not PYTHON38INSTALLPATH_ALL AND Not PYTHON38INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo38"/>
+        <ComponentRef Id="MySQLPackage38"/>
+        <ComponentRef Id="ConnectorPackage38"/>
+        <ComponentRef Id="ConnectorLocales38"/>
+        <ComponentRef Id="LocalesEng38"/>
+        <ComponentRef Id="DjangoBackend38"/>
+        <ComponentRef Id="MySQLXPackage38"/>
+        <ComponentRef Id="MySQLXPackagePB238"/>
+        <ComponentRef Id="MySQLXLocales38"/>
+        <ComponentRef Id="MySQLXLocalesEng38"/>
+        <?if $(var.HaveCExt38) = 1 ?>
+        <ComponentRef Id="CExtension38"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
+    </Feature>
+
+    <!-- Python 2.7 -->
+    <CustomAction Id="SetInstallDirCurrentP27" Property="INSTALLDIRP27" Value="[PYTHON27INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP27" Property="INSTALLDIRP27" Value="[PYTHON27INSTALLPATH_ALL]"/>
+    <!--<CustomAction Id="SetInstallDirAllP27cdlg" Property="INSTALLDIRP27" Value="[PYTHON27INSTALLPATH_ALL]"/>-->
+    <CustomAction Id="ErrDebug27" Error="Installdir: [INSTALLDIRP27]"/>
+
+    <!-- Python 3.4 -->
+    <CustomAction Id="SetInstallDirCurrentP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug34" Error="Installdir: [INSTALLDIRP34]"/>
+
+    <!-- Python 3.5 -->
+    <CustomAction Id="SetInstallDirCurrentP35" Property="INSTALLDIRP35" Value="[PYTHON35INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP35" Property="INSTALLDIRP35" Value="[PYTHON35INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug35" Error="Installdir: [INSTALLDIRP35]"/>
+    <!-- Python 3.6 -->
+    <CustomAction Id="SetInstallDirCurrentP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug36" Error="Installdir: [INSTALLDIRP36]"/>
+
+    <!-- Python 3.7 -->
+    <CustomAction Id="SetInstallDirCurrentP37" Property="INSTALLDIRP37" Value="[PYTHON37INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP37" Property="INSTALLDIRP37" Value="[PYTHON37INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug37" Error="Installdir: [INSTALLDIRP37]"/>
+
+    <!-- Python 3.8 -->
+    <CustomAction Id="SetInstallDirCurrentP38" Property="INSTALLDIRP38" Value="[PYTHON38INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP38" Property="INSTALLDIRP38" Value="[PYTHON38INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug38" Error="Installdir: [INSTALLDIRP38]"/>
+
+    <UIRef Id="WixUI_CPY"/>
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <!-- Prevent downgrading -->
+    <CustomAction Id="PreventDowngrading" Error="Newer version already installed." />
+  
+    <InstallExecuteSequence>
+      <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
+      <RemoveExistingProducts After="InstallInitialize" />
+      <!-- Python 2.7 -->
+      <Custom Action="SetInstallDirCurrentP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_ALL</Custom>
+      <!-- Python 3.4 -->
+      <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
+      <!-- Python 3.5 -->
+      <Custom Action="SetInstallDirCurrentP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_ALL</Custom>
+      <!-- Python 3.6 -->
+      <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
+      <!-- Python 3.7 -->
+      <Custom Action="SetInstallDirCurrentP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_ALL</Custom>
+      <!-- Python 3.8 -->
+      <Custom Action="SetInstallDirCurrentP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_ALL</Custom>
+    </InstallExecuteSequence>
+
+    <InstallUISequence>
+      <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
+      <!-- Python 2.7 -->
+      <Custom Action="SetInstallDirCurrentP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_ALL</Custom>
+      <!--<Custom Action="SetInstallDirAllP27cdlg" Before="CostFinalize">NOT Installed AND PYTHON27INSTALLPATH_ALL</Custom>-->
+      <!-- Python 3.4 -->
+      <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
+      <!-- Python 3.5 -->
+      <Custom Action="SetInstallDirCurrentP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_ALL</Custom>
+      <!-- Python 3.6 -->
+      <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
+      <!-- Python 3.7 -->
+      <Custom Action="SetInstallDirCurrentP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_ALL</Custom>
+      <!-- Python 3.8 -->
+      <Custom Action="SetInstallDirCurrentP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_ALL</Custom>
+    </InstallUISequence>
+  </Product>
+</Wix>
+
