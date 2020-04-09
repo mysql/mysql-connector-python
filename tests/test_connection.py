@@ -1787,7 +1787,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         data_file = os.path.join("tests", "data", "local_data.csv")
         cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
-        self.assertRaises(errors.ProgrammingError,
+        self.assertRaises((errors.DatabaseError, errors.ProgrammingError),
                           cur.execute, sql, (data_file,))
         cur.execute("DROP TABLE IF EXISTS local_data")
         cur.close()
