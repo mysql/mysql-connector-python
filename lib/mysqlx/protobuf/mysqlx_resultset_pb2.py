@@ -8,6 +8,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -19,9 +20,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_resultset.proto',
   package='Mysqlx.Resultset',
   syntax='proto2',
-  serialized_options=_b('\n\027com.mysql.cj.x.protobufH\003'),
   serialized_pb=_b('\n\x16mysqlx_resultset.proto\x12\x10Mysqlx.Resultset\"\x18\n\x16\x46\x65tchDoneMoreOutParams\"\x19\n\x17\x46\x65tchDoneMoreResultsets\"\x0b\n\tFetchDone\"\x10\n\x0e\x46\x65tchSuspended\"\x9f\x03\n\x0e\x43olumnMetaData\x12\x38\n\x04type\x18\x01 \x02(\x0e\x32*.Mysqlx.Resultset.ColumnMetaData.FieldType\x12\x0c\n\x04name\x18\x02 \x01(\x0c\x12\x15\n\roriginal_name\x18\x03 \x01(\x0c\x12\r\n\x05table\x18\x04 \x01(\x0c\x12\x16\n\x0eoriginal_table\x18\x05 \x01(\x0c\x12\x0e\n\x06schema\x18\x06 \x01(\x0c\x12\x0f\n\x07\x63\x61talog\x18\x07 \x01(\x0c\x12\x11\n\tcollation\x18\x08 \x01(\x04\x12\x19\n\x11\x66ractional_digits\x18\t \x01(\r\x12\x0e\n\x06length\x18\n \x01(\r\x12\r\n\x05\x66lags\x18\x0b \x01(\r\x12\x14\n\x0c\x63ontent_type\x18\x0c \x01(\r\"\x82\x01\n\tFieldType\x12\x08\n\x04SINT\x10\x01\x12\x08\n\x04UINT\x10\x02\x12\n\n\x06\x44OUBLE\x10\x05\x12\t\n\x05\x46LOAT\x10\x06\x12\t\n\x05\x42YTES\x10\x07\x12\x08\n\x04TIME\x10\n\x12\x0c\n\x08\x44\x41TETIME\x10\x0c\x12\x07\n\x03SET\x10\x0f\x12\x08\n\x04\x45NUM\x10\x10\x12\x07\n\x03\x42IT\x10\x11\x12\x0b\n\x07\x44\x45\x43IMAL\x10\x12\"\x14\n\x03Row\x12\r\n\x05\x66ield\x18\x01 \x03(\x0c*4\n\x11\x43ontentType_BYTES\x12\x0c\n\x08GEOMETRY\x10\x01\x12\x08\n\x04JSON\x10\x02\x12\x07\n\x03XML\x10\x03*.\n\x14\x43ontentType_DATETIME\x12\x08\n\x04\x44\x41TE\x10\x01\x12\x0c\n\x08\x44\x41TETIME\x10\x02\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _CONTENTTYPE_BYTES = _descriptor.EnumDescriptor(
   name='ContentType_BYTES',
@@ -31,19 +32,19 @@ _CONTENTTYPE_BYTES = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='GEOMETRY', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='JSON', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='XML', index=2, number=3,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=568,
   serialized_end=620,
 )
@@ -58,15 +59,15 @@ _CONTENTTYPE_DATETIME = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='DATE', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DATETIME', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=622,
   serialized_end=668,
 )
@@ -88,51 +89,51 @@ _COLUMNMETADATA_FIELDTYPE = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='SINT', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='UINT', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DOUBLE', index=2, number=5,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='FLOAT', index=3, number=6,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='BYTES', index=4, number=7,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='TIME', index=5, number=10,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DATETIME', index=6, number=12,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='SET', index=7, number=15,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ENUM', index=8, number=16,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='BIT', index=9, number=17,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DECIMAL', index=10, number=18,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=414,
   serialized_end=544,
 )
@@ -152,7 +153,7 @@ _FETCHDONEMOREOUTPARAMS = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -176,7 +177,7 @@ _FETCHDONEMORERESULTSETS = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -200,7 +201,7 @@ _FETCHDONE = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -224,7 +225,7 @@ _FETCHSUSPENDED = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -248,84 +249,84 @@ _COLUMNMETADATA = _descriptor.Descriptor(
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='name', full_name='Mysqlx.Resultset.ColumnMetaData.name', index=1,
       number=2, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='original_name', full_name='Mysqlx.Resultset.ColumnMetaData.original_name', index=2,
       number=3, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='table', full_name='Mysqlx.Resultset.ColumnMetaData.table', index=3,
       number=4, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='original_table', full_name='Mysqlx.Resultset.ColumnMetaData.original_table', index=4,
       number=5, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='schema', full_name='Mysqlx.Resultset.ColumnMetaData.schema', index=5,
       number=6, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='catalog', full_name='Mysqlx.Resultset.ColumnMetaData.catalog', index=6,
       number=7, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='collation', full_name='Mysqlx.Resultset.ColumnMetaData.collation', index=7,
       number=8, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='fractional_digits', full_name='Mysqlx.Resultset.ColumnMetaData.fractional_digits', index=8,
       number=9, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='length', full_name='Mysqlx.Resultset.ColumnMetaData.length', index=9,
       number=10, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='flags', full_name='Mysqlx.Resultset.ColumnMetaData.flags', index=10,
       number=11, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='content_type', full_name='Mysqlx.Resultset.ColumnMetaData.content_type', index=11,
       number=12, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -333,7 +334,7 @@ _COLUMNMETADATA = _descriptor.Descriptor(
   enum_types=[
     _COLUMNMETADATA_FIELDTYPE,
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -357,14 +358,14 @@ _ROW = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -384,7 +385,6 @@ DESCRIPTOR.message_types_by_name['ColumnMetaData'] = _COLUMNMETADATA
 DESCRIPTOR.message_types_by_name['Row'] = _ROW
 DESCRIPTOR.enum_types_by_name['ContentType_BYTES'] = _CONTENTTYPE_BYTES
 DESCRIPTOR.enum_types_by_name['ContentType_DATETIME'] = _CONTENTTYPE_DATETIME
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 FetchDoneMoreOutParams = _reflection.GeneratedProtocolMessageType('FetchDoneMoreOutParams', (_message.Message,), dict(
   DESCRIPTOR = _FETCHDONEMOREOUTPARAMS,
@@ -429,5 +429,6 @@ Row = _reflection.GeneratedProtocolMessageType('Row', (_message.Message,), dict(
 _sym_db.RegisterMessage(Row)
 
 
-DESCRIPTOR._options = None
+DESCRIPTOR.has_options = True
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

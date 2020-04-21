@@ -7,6 +7,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -18,9 +19,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_datatypes.proto',
   package='Mysqlx.Datatypes',
   syntax='proto2',
-  serialized_options=_b('\n\027com.mysql.cj.x.protobufH\003'),
   serialized_pb=_b('\n\x16mysqlx_datatypes.proto\x12\x10Mysqlx.Datatypes\"\xc6\x03\n\x06Scalar\x12+\n\x04type\x18\x01 \x02(\x0e\x32\x1d.Mysqlx.Datatypes.Scalar.Type\x12\x14\n\x0cv_signed_int\x18\x02 \x01(\x12\x12\x16\n\x0ev_unsigned_int\x18\x03 \x01(\x04\x12\x31\n\x08v_octets\x18\x05 \x01(\x0b\x32\x1f.Mysqlx.Datatypes.Scalar.Octets\x12\x10\n\x08v_double\x18\x06 \x01(\x01\x12\x0f\n\x07v_float\x18\x07 \x01(\x02\x12\x0e\n\x06v_bool\x18\x08 \x01(\x08\x12\x31\n\x08v_string\x18\t \x01(\x0b\x32\x1f.Mysqlx.Datatypes.Scalar.String\x1a*\n\x06String\x12\r\n\x05value\x18\x01 \x02(\x0c\x12\x11\n\tcollation\x18\x02 \x01(\x04\x1a-\n\x06Octets\x12\r\n\x05value\x18\x01 \x02(\x0c\x12\x14\n\x0c\x63ontent_type\x18\x02 \x01(\r\"m\n\x04Type\x12\n\n\x06V_SINT\x10\x01\x12\n\n\x06V_UINT\x10\x02\x12\n\n\x06V_NULL\x10\x03\x12\x0c\n\x08V_OCTETS\x10\x04\x12\x0c\n\x08V_DOUBLE\x10\x05\x12\x0b\n\x07V_FLOAT\x10\x06\x12\n\n\x06V_BOOL\x10\x07\x12\x0c\n\x08V_STRING\x10\x08\"}\n\x06Object\x12\x31\n\x03\x66ld\x18\x01 \x03(\x0b\x32$.Mysqlx.Datatypes.Object.ObjectField\x1a@\n\x0bObjectField\x12\x0b\n\x03key\x18\x01 \x02(\t\x12$\n\x05value\x18\x02 \x02(\x0b\x32\x15.Mysqlx.Datatypes.Any\"-\n\x05\x41rray\x12$\n\x05value\x18\x01 \x03(\x0b\x32\x15.Mysqlx.Datatypes.Any\"\xd3\x01\n\x03\x41ny\x12(\n\x04type\x18\x01 \x02(\x0e\x32\x1a.Mysqlx.Datatypes.Any.Type\x12(\n\x06scalar\x18\x02 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12%\n\x03obj\x18\x03 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Object\x12&\n\x05\x61rray\x18\x04 \x01(\x0b\x32\x17.Mysqlx.Datatypes.Array\")\n\x04Type\x12\n\n\x06SCALAR\x10\x01\x12\n\n\x06OBJECT\x10\x02\x12\t\n\x05\x41RRAY\x10\x03\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 )
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -32,39 +33,39 @@ _SCALAR_TYPE = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='V_SINT', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_UINT', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_NULL', index=2, number=3,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_OCTETS', index=3, number=4,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_DOUBLE', index=4, number=5,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_FLOAT', index=5, number=6,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_BOOL', index=6, number=7,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='V_STRING', index=7, number=8,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=390,
   serialized_end=499,
 )
@@ -78,19 +79,19 @@ _ANY_TYPE = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='SCALAR', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='OBJECT', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ARRAY', index=2, number=3,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=846,
   serialized_end=887,
 )
@@ -110,21 +111,21 @@ _SCALAR_STRING = _descriptor.Descriptor(
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='collation', full_name='Mysqlx.Datatypes.Scalar.String.collation', index=1,
       number=2, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -147,21 +148,21 @@ _SCALAR_OCTETS = _descriptor.Descriptor(
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='content_type', full_name='Mysqlx.Datatypes.Scalar.Octets.content_type', index=1,
       number=2, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -184,56 +185,56 @@ _SCALAR = _descriptor.Descriptor(
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_signed_int', full_name='Mysqlx.Datatypes.Scalar.v_signed_int', index=1,
       number=2, type=18, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_unsigned_int', full_name='Mysqlx.Datatypes.Scalar.v_unsigned_int', index=2,
       number=3, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_octets', full_name='Mysqlx.Datatypes.Scalar.v_octets', index=3,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_double', full_name='Mysqlx.Datatypes.Scalar.v_double', index=4,
       number=6, type=1, cpp_type=5, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_float', full_name='Mysqlx.Datatypes.Scalar.v_float', index=5,
       number=7, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_bool', full_name='Mysqlx.Datatypes.Scalar.v_bool', index=6,
       number=8, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='v_string', full_name='Mysqlx.Datatypes.Scalar.v_string', index=7,
       number=9, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -241,7 +242,7 @@ _SCALAR = _descriptor.Descriptor(
   enum_types=[
     _SCALAR_TYPE,
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -265,21 +266,21 @@ _OBJECT_OBJECTFIELD = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='Mysqlx.Datatypes.Object.ObjectField.value', index=1,
       number=2, type=11, cpp_type=10, label=2,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -302,14 +303,14 @@ _OBJECT = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[_OBJECT_OBJECTFIELD, ],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -333,14 +334,14 @@ _ARRAY = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -364,28 +365,28 @@ _ANY = _descriptor.Descriptor(
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='scalar', full_name='Mysqlx.Datatypes.Any.scalar', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='obj', full_name='Mysqlx.Datatypes.Any.obj', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='array', full_name='Mysqlx.Datatypes.Any.array', index=3,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -393,7 +394,7 @@ _ANY = _descriptor.Descriptor(
   enum_types=[
     _ANY_TYPE,
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -422,7 +423,6 @@ DESCRIPTOR.message_types_by_name['Scalar'] = _SCALAR
 DESCRIPTOR.message_types_by_name['Object'] = _OBJECT
 DESCRIPTOR.message_types_by_name['Array'] = _ARRAY
 DESCRIPTOR.message_types_by_name['Any'] = _ANY
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Scalar = _reflection.GeneratedProtocolMessageType('Scalar', (_message.Message,), dict(
 
@@ -477,5 +477,6 @@ Any = _reflection.GeneratedProtocolMessageType('Any', (_message.Message,), dict(
 _sym_db.RegisterMessage(Any)
 
 
-DESCRIPTOR._options = None
+DESCRIPTOR.has_options = True
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

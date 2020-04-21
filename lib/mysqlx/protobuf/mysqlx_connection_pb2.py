@@ -7,6 +7,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -20,10 +21,10 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_connection.proto',
   package='Mysqlx.Connection',
   syntax='proto2',
-  serialized_options=_b('\n\027com.mysql.cj.x.protobufH\003'),
   serialized_pb=_b('\n\x17mysqlx_connection.proto\x12\x11Mysqlx.Connection\x1a\x16mysqlx_datatypes.proto\x1a\x0cmysqlx.proto\"@\n\nCapability\x12\x0c\n\x04name\x18\x01 \x02(\t\x12$\n\x05value\x18\x02 \x02(\x0b\x32\x15.Mysqlx.Datatypes.Any\"C\n\x0c\x43\x61pabilities\x12\x33\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32\x1d.Mysqlx.Connection.Capability\"\x11\n\x0f\x43\x61pabilitiesGet\"H\n\x0f\x43\x61pabilitiesSet\x12\x35\n\x0c\x63\x61pabilities\x18\x01 \x02(\x0b\x32\x1f.Mysqlx.Connection.Capabilities\"\x07\n\x05\x43lose\"\xa5\x01\n\x0b\x43ompression\x12\x19\n\x11uncompressed_size\x18\x01 \x01(\x04\x12\x34\n\x0fserver_messages\x18\x02 \x01(\x0e\x32\x1b.Mysqlx.ServerMessages.Type\x12\x34\n\x0f\x63lient_messages\x18\x03 \x01(\x0e\x32\x1b.Mysqlx.ClientMessages.Type\x12\x0f\n\x07payload\x18\x04 \x02(\x0c\x42\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
   dependencies=[mysqlx__datatypes__pb2.DESCRIPTOR,mysqlx__pb2.DESCRIPTOR,])
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -41,21 +42,21 @@ _CAPABILITY = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='Mysqlx.Connection.Capability.value', index=1,
       number=2, type=11, cpp_type=10, label=2,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -79,14 +80,14 @@ _CAPABILITIES = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -110,7 +111,7 @@ _CAPABILITIESGET = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -134,14 +135,14 @@ _CAPABILITIESSET = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -165,7 +166,7 @@ _CLOSE = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -189,35 +190,35 @@ _COMPRESSION = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='server_messages', full_name='Mysqlx.Connection.Compression.server_messages', index=1,
       number=2, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='client_messages', full_name='Mysqlx.Connection.Compression.client_messages', index=2,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='payload', full_name='Mysqlx.Connection.Compression.payload', index=3,
       number=4, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -238,7 +239,6 @@ DESCRIPTOR.message_types_by_name['CapabilitiesGet'] = _CAPABILITIESGET
 DESCRIPTOR.message_types_by_name['CapabilitiesSet'] = _CAPABILITIESSET
 DESCRIPTOR.message_types_by_name['Close'] = _CLOSE
 DESCRIPTOR.message_types_by_name['Compression'] = _COMPRESSION
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Capability = _reflection.GeneratedProtocolMessageType('Capability', (_message.Message,), dict(
   DESCRIPTOR = _CAPABILITY,
@@ -283,5 +283,6 @@ Compression = _reflection.GeneratedProtocolMessageType('Compression', (_message.
 _sym_db.RegisterMessage(Compression)
 
 
-DESCRIPTOR._options = None
+DESCRIPTOR.has_options = True
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)

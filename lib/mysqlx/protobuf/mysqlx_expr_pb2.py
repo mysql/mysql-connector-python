@@ -7,6 +7,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -19,10 +20,10 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='mysqlx_expr.proto',
   package='Mysqlx.Expr',
   syntax='proto2',
-  serialized_options=_b('\n\027com.mysql.cj.x.protobufH\003'),
   serialized_pb=_b('\n\x11mysqlx_expr.proto\x12\x0bMysqlx.Expr\x1a\x16mysqlx_datatypes.proto\"\xc4\x03\n\x04\x45xpr\x12$\n\x04type\x18\x01 \x02(\x0e\x32\x16.Mysqlx.Expr.Expr.Type\x12\x31\n\nidentifier\x18\x02 \x01(\x0b\x32\x1d.Mysqlx.Expr.ColumnIdentifier\x12\x10\n\x08variable\x18\x03 \x01(\t\x12)\n\x07literal\x18\x04 \x01(\x0b\x32\x18.Mysqlx.Datatypes.Scalar\x12\x30\n\rfunction_call\x18\x05 \x01(\x0b\x32\x19.Mysqlx.Expr.FunctionCall\x12\'\n\x08operator\x18\x06 \x01(\x0b\x32\x15.Mysqlx.Expr.Operator\x12\x10\n\x08position\x18\x07 \x01(\r\x12#\n\x06object\x18\x08 \x01(\x0b\x32\x13.Mysqlx.Expr.Object\x12!\n\x05\x61rray\x18\t \x01(\x0b\x32\x12.Mysqlx.Expr.Array\"q\n\x04Type\x12\t\n\x05IDENT\x10\x01\x12\x0b\n\x07LITERAL\x10\x02\x12\x0c\n\x08VARIABLE\x10\x03\x12\r\n\tFUNC_CALL\x10\x04\x12\x0c\n\x08OPERATOR\x10\x05\x12\x0f\n\x0bPLACEHOLDER\x10\x06\x12\n\n\x06OBJECT\x10\x07\x12\t\n\x05\x41RRAY\x10\x08\"/\n\nIdentifier\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x13\n\x0bschema_name\x18\x02 \x01(\t\"\xcb\x01\n\x10\x44ocumentPathItem\x12\x30\n\x04type\x18\x01 \x02(\x0e\x32\".Mysqlx.Expr.DocumentPathItem.Type\x12\r\n\x05value\x18\x02 \x01(\t\x12\r\n\x05index\x18\x03 \x01(\r\"g\n\x04Type\x12\n\n\x06MEMBER\x10\x01\x12\x13\n\x0fMEMBER_ASTERISK\x10\x02\x12\x0f\n\x0b\x41RRAY_INDEX\x10\x03\x12\x18\n\x14\x41RRAY_INDEX_ASTERISK\x10\x04\x12\x13\n\x0f\x44OUBLE_ASTERISK\x10\x05\"\x7f\n\x10\x43olumnIdentifier\x12\x34\n\rdocument_path\x18\x01 \x03(\x0b\x32\x1d.Mysqlx.Expr.DocumentPathItem\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x12\n\ntable_name\x18\x03 \x01(\t\x12\x13\n\x0bschema_name\x18\x04 \x01(\t\"W\n\x0c\x46unctionCall\x12%\n\x04name\x18\x01 \x02(\x0b\x32\x17.Mysqlx.Expr.Identifier\x12 \n\x05param\x18\x02 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\":\n\x08Operator\x12\x0c\n\x04name\x18\x01 \x02(\t\x12 \n\x05param\x18\x02 \x03(\x0b\x32\x11.Mysqlx.Expr.Expr\"t\n\x06Object\x12,\n\x03\x66ld\x18\x01 \x03(\x0b\x32\x1f.Mysqlx.Expr.Object.ObjectField\x1a<\n\x0bObjectField\x12\x0b\n\x03key\x18\x01 \x02(\t\x12 \n\x05value\x18\x02 \x02(\x0b\x32\x11.Mysqlx.Expr.Expr\")\n\x05\x41rray\x12 \n\x05value\x18\x01 \x03(\x0b\x32\x11.Mysqlx.Expr.ExprB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
   ,
   dependencies=[mysqlx__datatypes__pb2.DESCRIPTOR,])
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -34,39 +35,39 @@ _EXPR_TYPE = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='IDENT', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='LITERAL', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='VARIABLE', index=2, number=3,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='FUNC_CALL', index=3, number=4,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='OPERATOR', index=4, number=5,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='PLACEHOLDER', index=5, number=6,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='OBJECT', index=6, number=7,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ARRAY', index=7, number=8,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=398,
   serialized_end=511,
 )
@@ -80,27 +81,27 @@ _DOCUMENTPATHITEM_TYPE = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='MEMBER', index=0, number=1,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='MEMBER_ASTERISK', index=1, number=2,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ARRAY_INDEX', index=2, number=3,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ARRAY_INDEX_ASTERISK', index=3, number=4,
-      serialized_options=None,
+      options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='DOUBLE_ASTERISK', index=4, number=5,
-      serialized_options=None,
+      options=None,
       type=None),
   ],
   containing_type=None,
-  serialized_options=None,
+  options=None,
   serialized_start=663,
   serialized_end=766,
 )
@@ -120,63 +121,63 @@ _EXPR = _descriptor.Descriptor(
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='identifier', full_name='Mysqlx.Expr.Expr.identifier', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='variable', full_name='Mysqlx.Expr.Expr.variable', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='literal', full_name='Mysqlx.Expr.Expr.literal', index=3,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='function_call', full_name='Mysqlx.Expr.Expr.function_call', index=4,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='operator', full_name='Mysqlx.Expr.Expr.operator', index=5,
       number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='position', full_name='Mysqlx.Expr.Expr.position', index=6,
       number=7, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='object', full_name='Mysqlx.Expr.Expr.object', index=7,
       number=8, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='array', full_name='Mysqlx.Expr.Expr.array', index=8,
       number=9, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -184,7 +185,7 @@ _EXPR = _descriptor.Descriptor(
   enum_types=[
     _EXPR_TYPE,
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -208,21 +209,21 @@ _IDENTIFIER = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='schema_name', full_name='Mysqlx.Expr.Identifier.schema_name', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -246,21 +247,21 @@ _DOCUMENTPATHITEM = _descriptor.Descriptor(
       has_default_value=False, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='Mysqlx.Expr.DocumentPathItem.value', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='index', full_name='Mysqlx.Expr.DocumentPathItem.index', index=2,
       number=3, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
@@ -268,7 +269,7 @@ _DOCUMENTPATHITEM = _descriptor.Descriptor(
   enum_types=[
     _DOCUMENTPATHITEM_TYPE,
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -292,35 +293,35 @@ _COLUMNIDENTIFIER = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='name', full_name='Mysqlx.Expr.ColumnIdentifier.name', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='table_name', full_name='Mysqlx.Expr.ColumnIdentifier.table_name', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='schema_name', full_name='Mysqlx.Expr.ColumnIdentifier.schema_name', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -344,21 +345,21 @@ _FUNCTIONCALL = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='param', full_name='Mysqlx.Expr.FunctionCall.param', index=1,
       number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -382,21 +383,21 @@ _OPERATOR = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='param', full_name='Mysqlx.Expr.Operator.param', index=1,
       number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -420,21 +421,21 @@ _OBJECT_OBJECTFIELD = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='Mysqlx.Expr.Object.ObjectField.value', index=1,
       number=2, type=11, cpp_type=10, label=2,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -457,14 +458,14 @@ _OBJECT = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[_OBJECT_OBJECTFIELD, ],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -488,14 +489,14 @@ _ARRAY = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  serialized_options=None,
+  options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -531,7 +532,6 @@ DESCRIPTOR.message_types_by_name['FunctionCall'] = _FUNCTIONCALL
 DESCRIPTOR.message_types_by_name['Operator'] = _OPERATOR
 DESCRIPTOR.message_types_by_name['Object'] = _OBJECT
 DESCRIPTOR.message_types_by_name['Array'] = _ARRAY
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Expr = _reflection.GeneratedProtocolMessageType('Expr', (_message.Message,), dict(
   DESCRIPTOR = _EXPR,
@@ -598,5 +598,6 @@ Array = _reflection.GeneratedProtocolMessageType('Array', (_message.Message,), d
 _sym_db.RegisterMessage(Array)
 
 
-DESCRIPTOR._options = None
+DESCRIPTOR.has_options = True
+DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
 # @@protoc_insertion_point(module_scope)
