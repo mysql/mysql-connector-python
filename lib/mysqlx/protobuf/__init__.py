@@ -60,6 +60,7 @@ _SERVER_MESSAGES_TUPLES = (
      "Mysqlx.Connection.Compression"),
 )
 
+PROTOBUF_VERSION = None
 PROTOBUF_REPEATED_TYPES = [list]
 
 try:
@@ -74,19 +75,7 @@ from ..compat import PY3, NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES
 from ..helpers import encode_to_bytes
 
 try:
-    from . import mysqlx_connection_pb2
-    from . import mysqlx_crud_pb2
-    from . import mysqlx_cursor_pb2
-    from . import mysqlx_datatypes_pb2
-    from . import mysqlx_expect_pb2
-    from . import mysqlx_expr_pb2
-    from . import mysqlx_notice_pb2
-    from . import mysqlx_pb2
-    from . import mysqlx_prepare_pb2
-    from . import mysqlx_resultset_pb2
-    from . import mysqlx_session_pb2
-    from . import mysqlx_sql_pb2
-
+    from google import protobuf
     from google.protobuf import descriptor_database
     from google.protobuf import descriptor_pb2
     from google.protobuf import descriptor_pool
@@ -101,6 +90,22 @@ try:
         pass
 
     PROTOBUF_REPEATED_TYPES.append(RepeatedCompositeFieldContainer)
+    if hasattr(protobuf, "__version__"):
+        # Only Protobuf versions >=3.0.0 provide `__version__`
+        PROTOBUF_VERSION = protobuf.__version__
+
+    from . import mysqlx_connection_pb2
+    from . import mysqlx_crud_pb2
+    from . import mysqlx_cursor_pb2
+    from . import mysqlx_datatypes_pb2
+    from . import mysqlx_expect_pb2
+    from . import mysqlx_expr_pb2
+    from . import mysqlx_notice_pb2
+    from . import mysqlx_pb2
+    from . import mysqlx_prepare_pb2
+    from . import mysqlx_resultset_pb2
+    from . import mysqlx_session_pb2
+    from . import mysqlx_sql_pb2
 
     # Dictionary with all messages descriptors
     _MESSAGES = {}
@@ -236,11 +241,13 @@ try:
             msg = _mysqlxpb_pure.new_message(msg_type_name)
             msg.ParseFromString(payload)
             return msg
-except ImportError as err:
+except (ImportError, SyntaxError, TypeError) as err:
     HAVE_PROTOBUF = False
-    HAVE_PROTOBUF_ERROR = err
+    HAVE_PROTOBUF_ERROR = err if PROTOBUF_VERSION is not None \
+       else "Protobuf >=3.0.0 is required"
     if not HAVE_MYSQLXPB_CEXT:
-        raise ImportError("Protobuf is not available: {}".format(err))
+        raise ImportError("Protobuf is not available: {}"
+                          "".format(HAVE_PROTOBUF_ERROR))
 
 CRUD_PREPARE_MAPPING = {
     "Mysqlx.ClientMessages.Type.CRUD_FIND": (
