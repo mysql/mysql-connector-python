@@ -448,7 +448,6 @@ class BaseMySQLSocket(object):
                 context = ssl.create_default_context()
                 if not verify_identity:
                     context.check_hostname = False
-                context.options
             else:
                 tls_versions.sort(reverse=True)
 

@@ -1214,11 +1214,22 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             except:
                 pass
 
-        # Check the delay
-        timer = timeit.Timer(_test_reconnect_delay)
-        result = timer.timeit(number=1)
-        self.assertTrue(result > 3 and result < 12,
-                        "3 <= result < 12, was {0}".format(result))
+        tries = 3
+        results = []
+        reconnect_time = 12
+        while tries:
+            # Check the delay
+            timer = timeit.Timer(_test_reconnect_delay)
+            result = timer.timeit(number=1)
+            if results and result < results[0]:
+                results.insert(0, result)
+            else:
+                results.append(result)
+            if results[0] < reconnect_time:
+                break
+            tries -= 1
+        self.assertTrue(results[0] > 3 and results[0] < reconnect_time,
+                        "3 <= result < 12, was {0}".format(results))
 
         # Check reconnect stops when successful
         config = tests.get_mysql_config()

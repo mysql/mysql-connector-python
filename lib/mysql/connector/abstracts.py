@@ -283,7 +283,7 @@ class MySQLConnectionAbstract(object):
                         raise AttributeError(
                             DUPLICATED_IN_LIST_ERROR.format(
                                 list="tls_versions", value=tls_version))
-                        tls_versions.append(tls_version)
+                    tls_versions.append(tls_version)
                 if tls_vers == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
                         raise AttributeError(
                             TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))

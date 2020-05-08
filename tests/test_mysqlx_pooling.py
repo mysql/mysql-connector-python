@@ -66,6 +66,19 @@ def get_current_connections(session):
     return connections
 
 
+def wait_for_connections(session, user, exp_connections, tries=5):
+    """Waits for current connections to be closed or be the expected"""
+    open_connections = -1
+    while tries > 0:
+        current_conns = get_current_connections(session)
+        open_connections = len(current_conns.get(user, []))
+        if open_connections <= exp_connections:
+            return open_connections
+        sleep(1)
+        tries-=1
+    return open_connections
+
+
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxClientTests(tests.MySQLxTests):
     def setUp(self):
@@ -238,7 +251,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             session = client.get_session()
             self.assertTrue(isinstance(session, mysqlx.connection.Session))
             sessions.append(session)
-        sleep(0.5)
+
         # Verify the number of connections open in the server
         connections = get_current_connections(old_session)
         self.assertEqual(len(connections[self.users[0][0]]), total_connections)
@@ -247,27 +260,26 @@ class MySQLxClientTests(tests.MySQLxTests):
         # to the pool instead of being closed
         sessions[5].close()
         sessions[9].close()
-        sleep(0.5)
         connections = get_current_connections(old_session)
         self.assertTrue(len(connections[self.users[0][0]]) >=
                         (total_connections - 2))
 
-        connections = get_current_connections(old_session)
-        open_connections = connections.get("unauthenticated user", [])
         if tests.MYSQL_VERSION < (8, 0, 16):
             # Send reset message requires the user to re-authentificate
             # the connection user stays in unauthenticated user
-            self.assertEqual(len(open_connections), 2)
+            open_connections = wait_for_connections(old_session,
+                                                    "unauthenticated user", 2)
+            self.assertGreaterEqual(open_connections, 2)
         else:
-            self.assertEqual(len(open_connections), 0)
+            open_connections = wait_for_connections(old_session,
+                                                    "unauthenticated user", 0)
+            self.assertEqual(open_connections, 0)
 
         # Connections must be closed when client.close() is invoked
         # check len(pool) == total_connections
         client.close()
-        sleep(3)
         # Verify the connections on the pool are closed
-        connections = get_current_connections(old_session)
-        open_connections = connections.get("self.users[0][0]", 0)
+        open_connections = wait_for_connections(old_session, self.users[0][0], 0)
         self.assertEqual(open_connections, 0)
 
     def test_max_pool_size(self):
@@ -639,9 +651,9 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
                                   password=self.password)).execute()
 
     def tearDown(self):
+        session = mysqlx.get_session(tests.get_mysqlx_config())
         for host in self.hosts:
-            self.session.sql(DROP_USER.format(user=self.user,
-                                              host=host)).execute()
+            session.sql(DROP_USER.format(user=self.user, host=host)).execute()
 
     def test_routing(self):
         settings = tests.get_mysqlx_config()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -41,6 +41,7 @@ import tests
 from mysql.connector.constants import ServerFlag, ClientFlag
 try:
     from _mysql_connector import MySQL, MySQLError, MySQLInterfaceError
+    from mysql.connector import CMySQLConnection
 except ImportError:
     CEXT_MYSQL_AVAILABLE = False
 else:
@@ -461,55 +462,130 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
 
-    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 0), "Plugin unavailable.")
     def test_change_user(self):
         connect_kwargs = self.connect_kwargs.copy()
-        connect_kwargs['unix_socket'] = None
-        connect_kwargs['ssl_disabled'] = False
-        cmy1 = MySQL(buffered=True)
-        cmy1.connect(**connect_kwargs)
-        cmy2 = MySQL(buffered=True)
-        cmy2.connect(**connect_kwargs)
+        cnx = CMySQLConnection(**connect_kwargs)
+        users = [
+            {'user': 'user_native1',
+             'host': self.config['host'],
+             'port': self.config['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'native1_pass',
+             'auth_plugin': 'mysql_native_password'},
+            {'user': 'user_native2',
+             'host': self.config['host'],
+             'port': self.config['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'native2_pass',
+             'auth_plugin': 'mysql_native_password'},
+            {'user': 'user_sha2561',
+             'host': self.config['host'],
+             'port': self.config['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'sha2561_pass',
+             'auth_plugin': 'sha256_password'},
+            {'user': 'user_sha2562',
+             'host': self.config['host'],
+             'port': self.config['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'sha2562_pass',
+             'auth_plugin': 'sha256_password'},
+            {'user': 'user_caching1',
+             'host': self.config['host'],
+             'port': self.config['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'caching1_pass',
+             'auth_plugin': 'caching_sha2_password'},
+            {'user': 'user_caching2',
+             'host': self.config['host'],
+             'port': self.config['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'caching2_pass',
+             'auth_plugin': 'caching_sha2_password'}]
 
-        new_user = {
-            'user': 'cextuser',
-            'host': self.config['host'],
-            'database': self.connect_kwargs['database'],
-            'password': 'connc',
-        }
-
-        try:
-            cmy1.query("DROP USER '{user}'@'{host}'".format(**new_user))
-        except MySQLInterfaceError:
-            # Probably not created
-            pass
-
-        stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED WITH "
-                "caching_sha2_password").format(**new_user)
-        cmy1.query(stmt)
-        if tests.MYSQL_VERSION < (8, 0, 5):
-            cmy1.query("SET old_passwords = 0")
-            res = cmy1.query("SET PASSWORD FOR '{user}'@'{host}' = "
-                             "PASSWORD('{password}')".format(**new_user))
+        # create users
+        if tests.MYSQL_VERSION < (8, 0, 0):
+            new_users = users[0:4]
         else:
-            res = cmy1.query("ALTER USER '{user}'@'{host}' IDENTIFIED BY "
-                             "'{password}'".format(**new_user))
-        cmy1.query("GRANT ALL ON {database}.* "
-                   "TO '{user}'@'{host}'".format(**new_user))
+            new_users = users
 
-        cmy2.query("SHOW GRANTS FOR {user}@{host}".format(**new_user))
-        cmy2.query("SELECT USER()")
-        orig_user = cmy2.fetch_row()[0]
-        cmy2.free_result()
-        cmy2.change_user(user=new_user['user'], password=new_user['password'],
-                         database=new_user['database'])
+        for new_user in new_users:
+            try:
+                cnx.cmd_query("DROP USER '{user}'@'{host}'".format(**new_user))
+            except:
+                pass
+            if tests.MYSQL_VERSION > (5, 7, 0):
+                stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED "
+                        "WITH {auth_plugin} BY '{password}'").format(**new_user)
+                cnx.cmd_query(stmt)
+            else:
+                stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED "
+                        "WITH {auth_plugin}").format(**new_user)
+                cnx.cmd_query(stmt)
+                if new_user["auth_plugin"] == 'mysql_native_password':
+                    cnx.cmd_query("SET old_passwords = 0")
+                else:
+                    cnx.cmd_query("SET old_passwords = 2")
+                cnx.cmd_query("SET PASSWORD FOR '{user}'@'{host}' = "
+                              "PASSWORD('{password}')".format(**new_user))
 
-        cmy2.query("SELECT USER()")
-        current_user = cmy2.fetch_row()[0]
-        self.assertNotEqual(orig_user, current_user)
-        self.assertTrue(
-            u"{user}@".format(**new_user) in current_user.decode('utf8'))
-        cmy2.free_result()
+            stmt = ("CREATE USER IF NOT EXISTS '{user}'@'{host}' IDENTIFIED "
+                    "WITH {auth_plugin} BY '{password}'").format(**new_user)
+
+            cnx.cmd_query("GRANT ALL PRIVILEGES ON {database}.* TO '{user}'@'{host}'"
+                          "".format(**new_user))
+
+        # test users connect
+        for user in new_users:
+            conn_args = user.copy()
+            try:
+                connect_kwargs.pop('auth_plugin')
+            except:
+                pass
+            cnx_test = CMySQLConnection(**conn_args)
+            cnx_test.cmd_query("SELECT USER()")
+            current_user = cnx_test.get_rows()[0][0][0]
+            self.assertTrue(u"{user}@".format(**user) in current_user)
+            cnx_test.close()
+
+        # tests change user
+        if tests.MYSQL_VERSION < (8, 0, 0):
+            # 5.6 does noy suport caching_sha2_password auth plugin
+            test_cases = [(0, 1), (1, 2), (2,3), (3, 0)]
+        else:
+            test_cases = [(0, 1), (1, 2), (2,3), (3, 0), (3, 4), (4, 5), (5, 3),
+                          (5, 0)]
+        for user1, user2 in test_cases:
+            conn_args_user1 = users[user1].copy()
+            try:
+                conn_args_user1.pop('auth_plugin')
+            except:
+                pass
+            if tests.MYSQL_VERSION < (8, 0, 0):
+                # change user does not work in 5.x with charset utf8mb4
+                conn_args_user1['charset'] = 'utf8'
+
+            cnx_test = CMySQLConnection(**conn_args_user1)
+            cnx_test.cmd_query("SELECT USER()")
+            current_user = cnx_test.get_rows()[0][0][0]
+            self.assertTrue(u"{user}@".format(**users[user1]) in current_user)
+
+            cnx_test.cmd_change_user(users[user2]['user'],
+                                     users[user2]['password'],
+                                     users[user2]['database'])
+            cnx_test.cmd_query("SELECT USER()")
+            rows = cnx_test.get_rows()
+            current_user = rows[0][0][0]
+            self.assertNotEqual(user['user'], current_user)
+            self.assertTrue(u"{user}@".format(**users[user2]) in current_user)
+            cnx_test.close()
+
+        # cleanup users
+        for new_user in users:
+            try:
+                cnx.cmd_query("DROP USER '{user}'@'{host}'".format(**new_user))
+            except:
+                pass
 
     def test_character_set_name(self):
         cmy1 = MySQL(buffered=True)
