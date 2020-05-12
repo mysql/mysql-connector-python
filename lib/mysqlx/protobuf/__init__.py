@@ -29,6 +29,11 @@
 """This module contains the implementation of a helper class for MySQL X
 Protobuf messages."""
 
+try:
+    ModuleNotFoundError
+except NameError:
+    ModuleNotFoundError = ImportError
+
 _SERVER_MESSAGES_TUPLES = (
     ("Mysqlx.ServerMessages.Type.OK",
      "Mysqlx.Ok"),
@@ -241,10 +246,10 @@ try:
             msg = _mysqlxpb_pure.new_message(msg_type_name)
             msg.ParseFromString(payload)
             return msg
-except (ImportError, SyntaxError, TypeError) as err:
+except (ImportError, ModuleNotFoundError, SyntaxError, TypeError) as err:
     HAVE_PROTOBUF = False
     HAVE_PROTOBUF_ERROR = err if PROTOBUF_VERSION is not None \
-       else "Protobuf >=3.0.0 is required"
+        else "Protobuf >=3.0.0 is required"
     if not HAVE_MYSQLXPB_CEXT:
         raise ImportError("Protobuf is not available: {}"
                           "".format(HAVE_PROTOBUF_ERROR))
