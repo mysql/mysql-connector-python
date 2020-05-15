@@ -701,8 +701,11 @@ PyObject*
 pytomy_decimal(PyObject *obj)
 {
 #ifdef PY3
-    return PyBytes_FromString((const char *)PyUnicode_1BYTE_DATA(
-                              PyObject_Str(obj)));
+    PyObject *str = PyObject_Str(obj);
+    PyObject *ret_tmp = (const char *)PyUnicode_1BYTE_DATA(str);
+    PyObject *ret = PyBytes_FromString(ret_tmp);
+    Py_DECREF(ret_tmp);
+    return ret;
 #else
     PyObject *numeric, *new_num;
     int tmp_size;
