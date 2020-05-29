@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -65,7 +65,7 @@ _SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl", "tls-versions",
 _SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
                           "routers", "socket", "ssl-mode", "auth", "use-pure",
                           "connect-timeout", "connection-attributes",
-                          "compression", "dns-srv"]
+                          "compression", "compression-algorithms", "dns-srv"]
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -265,8 +265,23 @@ def _validate_settings(settings):
                 "not acceptable".format(settings["compression"]))
         settings["compression"] = compression
 
+    if "compression-algorithms" in settings:
+        if isinstance(settings["compression-algorithms"], STRING_TYPES):
+            compression_algorithms = \
+                settings["compression-algorithms"].strip().strip("[]")
+            if compression_algorithms:
+                settings["compression-algorithms"] = \
+                    compression_algorithms.split(",")
+            else:
+                settings["compression-algorithms"] = None
+        elif not isinstance(settings["compression-algorithms"], (list, tuple)):
+            raise InterfaceError("Invalid type of the connection property "
+                                 "'compression-algorithms'")
+        if settings.get("compression") == "disabled":
+            settings["compression-algorithms"] = None
+
     if "connection-attributes" in settings:
-        validate_connection_attributes(settings)
+        _validate_connection_attributes(settings)
 
     if "connect-timeout" in settings:
         try:
@@ -295,10 +310,10 @@ def _validate_settings(settings):
         settings["port"] = 33060
 
     if "tls-versions" in settings:
-        validate_tls_versions(settings)
+        _validate_tls_versions(settings)
 
     if "tls-ciphersuites" in settings:
-        validate_tls_ciphersuites(settings)
+        _validate_tls_ciphersuites(settings)
 
 
 def _validate_hosts(settings, default_port=None):
@@ -332,7 +347,7 @@ def _validate_hosts(settings, default_port=None):
         settings["port"] = default_port
 
 
-def validate_connection_attributes(settings):
+def _validate_connection_attributes(settings):
     """Validate connection-attributes.
 
     Args:
@@ -441,7 +456,7 @@ def validate_connection_attributes(settings):
     settings["connection-attributes"] = attributes
 
 
-def validate_tls_versions(settings):
+def _validate_tls_versions(settings):
     """Validate tls-versions.
 
     Args:
@@ -514,7 +529,7 @@ def validate_tls_versions(settings):
     settings["tls-versions"] = tls_versions
 
 
-def validate_tls_ciphersuites(settings):
+def _validate_tls_ciphersuites(settings):
     """Validate tls-ciphersuites.
 
     Args:

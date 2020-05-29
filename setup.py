@@ -142,6 +142,6 @@ setup(
     install_requires=["protobuf>=3.0.0"],
     extras_require={
         "dns-srv": ["dnspython>=1.16.0"],
-        "compression": ["lz4>=2.1.6"],
+        "compression": ["lz4>=2.1.6", "zstandard>=0.12.0"],
     }
 )

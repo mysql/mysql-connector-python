@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -52,7 +52,7 @@ from mysqlx.connection import SocketStream, TLS_V1_3_SUPPORTED, HAVE_DNSPYTHON
 from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import (Message, MessageReader, MessageWriter, Protocol,
-                             HAVE_LZ4)
+                             HAVE_LZ4, HAVE_ZSTD)
 from mysqlx.protobuf import (HAVE_MYSQLXPB_CEXT, HAVE_PROTOBUF, mysqlxpb_enum,
                              Protobuf)
 from mysql.connector.utils import linux_distribution
@@ -1825,7 +1825,7 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         self.session.close()
 
     def _get_mysqlx_bytes(self, session):
-        res = session.sql("SHOW STATUS LIKE 'Mysqlx_bytes%'").execute();
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_bytes%'").execute()
         return {key: int(val) for key, val in res.fetch_all()}
 
     def _get_random_data(self, size):
@@ -1848,13 +1848,28 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         session = mysqlx.get_session(config)
         algorithm = session.get_connection().protocol.compression_algorithm
 
+        # The lz4 should have the highest priority
         if HAVE_LZ4:
             self.assertEqual("lz4_message", algorithm)
         else:
             self.assertEqual("deflate_stream", algorithm)
         session.close()
 
-        # Disable lz4
+        # The zstd_stream should have the highest priority
+        self._set_compression_algorithms(
+            "zstd_stream,lz4_message,deflate_stream")
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+
+        if HAVE_ZSTD:
+            self.assertEqual("zstd_stream", algorithm)
+        elif HAVE_LZ4:
+            self.assertEqual("lz4_message", algorithm)
+        else:
+            self.assertEqual("deflate_stream", algorithm)
+        session.close()
+
+        # Disable lz4 and zstd
         self._set_compression_algorithms("deflate_stream")
         session = mysqlx.get_session(config)
         algorithm = session.get_connection().protocol.compression_algorithm
@@ -1918,3 +1933,92 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         self.assertGreater(sizes["Mysqlx_bytes_sent_uncompressed_frame"], 0)
         schema.drop_collection(coll_name)
         session.close()
+
+    def test_compression_algorithms(self):
+        config = self.connect_kwargs.copy()
+
+        res = self.session.sql(
+            "SHOW VARIABLES LIKE 'mysqlx_compression_algorithms'").execute()
+        default_algorithms = res.fetch_all()[0][1]
+
+        # Set the server compression algorithms
+        self._set_compression_algorithms(
+            "deflate_stream,lz4_message,zstd_stream")
+
+        # Test algorithms with a given order with aliases
+        config["compression-algorithms"] = "deflate,lz4"
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+        self.assertEqual("deflate_stream", algorithm)
+        session.close()
+
+        if HAVE_LZ4:
+            config["compression-algorithms"] = "lz4,deflate"
+            session = mysqlx.get_session(config)
+            algorithm = session.get_connection().protocol.compression_algorithm
+            self.assertEqual("lz4_message", algorithm)
+            session.close()
+
+        # Test with unsupported algorithms by the client
+        config["compression-algorithms"] = "unsupported,deflate"
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+        self.assertEqual("deflate_stream", algorithm)
+        session.close()
+
+        # Test with compression="required" and without compression algorithms
+        config["compression"] = "required"
+        config["compression-algorithms"] = []
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+        if HAVE_LZ4:
+            self.assertEqual("lz4_message", algorithm)
+        else:
+            self.assertEqual("deflate_stream", algorithm)
+        session.close()
+
+        # Test with compression="required" and with unsupported compression
+        # algorithms
+        config["compression"] = "required"
+        config["compression-algorithms"] = "unsupported"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Test with compression="required", with supported compression
+        # algorithms, but not supported by the server
+        self._set_compression_algorithms("lz4_message")
+        config["compression"] = "required"
+        config["compression-algorithms"] = "deflate"
+        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+
+        # Test with compression="preferred" and with unsupported compression
+        # algorithms
+        config["compression"] = "preferred"
+        config["compression-algorithms"] = "unsupported"
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+        self.assertIsNone(algorithm)  # None means that compression is disabled
+        session.close()
+
+        # Test with compresison="disabled" and with valid compression
+        # algorithms
+        config["compression"] = "disabled"
+        config["compression-algorithms"] = "deflate"
+        session = mysqlx.get_session(config)
+        algorithm = session.get_connection().protocol.compression_algorithm
+        self.assertIsNone(algorithm)  # None means that compression is disabled
+        session.close()
+
+        del config["compression"]
+
+        # Test with unsupported algorithms by the server
+        if not HAVE_LZ4:
+            # Disable lz4
+            self._set_compression_algorithms("deflate_stream")
+            config["compression-algorithms"] = "lz4"
+            session = mysqlx.get_session(config)
+            algorithm = session.get_connection().protocol.compression_algorithm
+            # None means that compression is disabled
+            self.assertIsNone(algorithm)
+
+        # Restore the default compression algorithms
+        self._set_compression_algorithms(default_algorithms)

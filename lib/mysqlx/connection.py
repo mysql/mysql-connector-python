@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -76,9 +76,10 @@ from .errors import (InterfaceError, NotSupportedError, OperationalError,
                      PoolError, ProgrammingError, TimeoutError)
 from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
-from .constants import SSLMode, Auth
+from .constants import SSLMode, Auth, COMPRESSION_ALGORITHMS
 from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
-from .protocol import Protocol, MessageReader, MessageWriter, HAVE_LZ4
+from .protocol import (Protocol, MessageReader, MessageWriter, HAVE_LZ4,
+                       HAVE_ZSTD)
 from .result import Result, RowResult, SqlResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
@@ -639,8 +640,11 @@ class Connection(object):
 
                 # Set compression capabilities
                 compression = self.settings.get("compression", "preferred")
+                algorithms = self.settings.get("compression-algorithms")
                 algorithm = None if compression == "disabled" \
-                    else self._set_compression_capabilities(caps, compression)
+                    else self._set_compression_capabilities(caps,
+                                                            compression,
+                                                            algorithms)
                 self._authenticate()
                 self.protocol.set_compression(algorithm)
                 return
@@ -663,10 +667,11 @@ class Connection(object):
                                "selected server".format(self._connect_timeout))
         if len(self._routers) <= 1:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
-        raise InterfaceError("Unable to connect to any of the target hosts", 4001)
+        raise InterfaceError("Unable to connect to any of the target hosts",
+                             4001)
 
     def _set_tls_capabilities(self, caps):
-        """Sets the TLS capabilities.
+        """Set the TLS capabilities.
 
         Args:
             caps (dict): Dictionary with the server capabilities.
@@ -717,31 +722,38 @@ class Connection(object):
             conn_attrs = self.settings["attributes"]
             self.protocol.set_capabilities(session_connect_attrs=conn_attrs)
 
-    def _set_compression_capabilities(self, caps, compression):
-        """Sets the compression capabilities.
+    def _set_compression_capabilities(self, caps, compression,
+                                      algorithms=None):
+        """Set the compression capabilities.
 
         If compression is available, negociates client and server algorithms.
-        Using the following priority:
+        By trying to find an algorithm from the requested compression
+        algorithms list, which is supported by the server.
 
-        1) lz4_message
-        2) deflate_stream
+        If no compression algorithms list is provided, the following priority
+        is used:
+
+        1) zstd_stream
+        2) lz4_message
+        3) deflate_stream
 
         Args:
             caps (dict): Dictionary with the server capabilities.
             compression (str): The compression connection setting.
+            algorithms (list): List of requested compression algorithms.
 
         Returns:
             str: The compression algorithm.
 
         .. versionadded:: 8.0.21
+        .. versionchanged:: 8.0.22
         """
         compression_data = caps.get("compression")
         if compression_data is None:
             msg = "Compression requested but the server does not support it"
             if compression == "required":
                 raise NotSupportedError(msg)
-            else:
-                _LOGGER.warning(msg)
+            _LOGGER.warning(msg)
             return None
 
         compression_dict = {}
@@ -759,18 +771,45 @@ class Connection(object):
                 ]
 
         server_algorithms = compression_dict.get("algorithm", [])
-        if HAVE_LZ4 and "lz4_message" in server_algorithms:
-            algorithm = "lz4_message"
-        else:
-            algorithm = "deflate_stream"
+        algorithm = None
+
+        # Try to find an algorithm from the requested compression algorithms
+        # list, which is supported by the server
+        if algorithms:
+            # Resolve compression algorithms aliases and ignore unsupported
+            client_algorithms = [
+                COMPRESSION_ALGORITHMS[item] for item in algorithms
+                if item in COMPRESSION_ALGORITHMS
+            ]
+            matched = [
+                item for item in client_algorithms
+                if item in server_algorithms
+            ]
+            if matched:
+                algorithm = COMPRESSION_ALGORITHMS.get(matched[0])
+            elif compression == "required":
+                raise InterfaceError("The connection compression is set as "
+                                     "required, but none of the provided "
+                                     "compression algorithms are supported.")
+            else:
+                return None  # Disable compression
+
+        # No compression algorithms list was provided or couldn't found one
+        # supported by the server
+        if algorithm is None:
+            if HAVE_ZSTD and "zstd_stream" in server_algorithms:
+                algorithm = "zstd_stream"
+            elif HAVE_LZ4 and "lz4_message" in server_algorithms:
+                algorithm = "lz4_message"
+            else:
+                algorithm = "deflate_stream"
 
         if algorithm not in server_algorithms:
             msg = ("Compression requested but the compression algorithm "
                    "negotiation failed")
             if compression == "required":
                 raise InterfaceError(msg)
-            else:
-                _LOGGER.warning(msg)
+            _LOGGER.warning(msg)
             return None
 
         self.protocol.set_capabilities(compression={"algorithm": algorithm})

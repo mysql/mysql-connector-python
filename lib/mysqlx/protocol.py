@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -40,6 +40,12 @@ try:
 except ImportError:
     HAVE_LZ4 = False
 
+try:
+    import zstandard as zstd
+    HAVE_ZSTD = True
+except ImportError:
+    HAVE_ZSTD = False
+
 from .compat import STRING_TYPES, INT_TYPES
 from .errors import (InterfaceError, NotSupportedError, OperationalError,
                      ProgrammingError)
@@ -52,11 +58,10 @@ from .protobuf import (CRUD_PREPARE_MAPPING, SERVER_MESSAGES,
 
 
 _COMPRESSION_THRESHOLD = 1000
-_COMPRESSION_ALGORITHMS = ("lz4_message", "deflate_stream")
 
 
 class Compressor(object):
-    """Implements compression/decompression using `lz4_message`
+    """Implements compression/decompression using `zstd_stream`, `lz4_message`
     and `deflate_stream` algorithms.
 
     Args:
@@ -67,7 +72,10 @@ class Compressor(object):
     """
     def __init__(self, algorithm):
         self._algorithm = algorithm
-        if algorithm == "deflate_stream":
+        if algorithm == "zstd_stream":
+            self._compressobj = zstd.ZstdCompressor()
+            self._decompressobj = zstd.ZstdDecompressor()
+        elif algorithm == "deflate_stream":
             self._compressobj = zlib.compressobj()
             self._decompressobj = zlib.decompressobj()
         else:
@@ -83,6 +91,8 @@ class Compressor(object):
         Returns:
             bytes: Compressed data.
         """
+        if self._algorithm == "zstd_stream":
+            return self._compressobj.compress(data)
         if self._algorithm == "lz4_message":
             with lz4.frame.LZ4FrameCompressor() as compressor:
                 compressed = compressor.begin()
@@ -104,6 +114,8 @@ class Compressor(object):
         Returns:
             bytes: Decompresssed data.
         """
+        if self._algorithm == "zstd_stream":
+            return self._decompressobj.decompress(data)
         if self._algorithm == "lz4_message":
             with lz4.frame.LZ4FrameDecompressor() as decompressor:
                 decompressed = decompressor.decompress(data)

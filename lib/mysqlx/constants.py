@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2019, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -57,6 +57,16 @@ Auth = create_enum("Auth",
                    ("plain", "mysql41", "sha256_memory"))
 LockContention = create_enum("LockContention",
                              ("DEFAULT", "NOWAIT", "SKIP_LOCKED"), (0, 1, 2))
+
+# Compression algorithms and aliases
+COMPRESSION_ALGORITHMS = {
+    "deflate": "deflate_stream",
+    "deflate_stream": "deflate_stream",
+    "lz4": "lz4_message",
+    "lz4_message": "lz4_message",
+    "zstd": "zstd_stream",
+    "zstd_stream": "zstd_stream"
+}
 
 TLS_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]
 
