@@ -3,7 +3,7 @@ MySQL Connector/Python 8.0 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
