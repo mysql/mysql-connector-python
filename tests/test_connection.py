@@ -40,6 +40,7 @@ import io
 import socket
 import subprocess
 import sys
+from time import sleep
 
 import tests
 from . import check_tls_versions_support
@@ -57,7 +58,7 @@ from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
                              constants, cursor, abstracts, catch23,
                              HAVE_DNSPYTHON)
-from mysql.connector.errors import InterfaceError
+from mysql.connector.errors import InterfaceError, ProgrammingError
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.network import TLS_V1_3_SUPPORTED
 from mysql.connector.utils import linux_distribution
@@ -2529,6 +2530,170 @@ class WL13335(tests.MySQLConnectorTests):
         cnx_config['client_flags'] =flags
         # connection must be successful
         _ = self.cnx.__class__(**cnx_config)
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
+                 "Authentication with ldap_simple not supported")
+@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_simple"),
+                 "Plugin authentication_ldap_simple not available")
+#Skip if remote ldap server is not reachable.
+@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
+                 "ldap server is not reachable")
+class WL13994(tests.MySQLConnectorTests):
+    """WL#13994: Support clear text passwords
+    """
+    def setUp(self):
+        self.server = tests.MYSQL_SERVERS[0]
+        self.server_cnf = self.server._cnf
+        self.config = tests.get_mysql_config()
+        self.config.pop("unix_socket", None)
+        self.user = "test1@MYSQL.LOCAL"
+        self.host = "%"
+
+        cnx = connection.MySQLConnection(**self.config)
+        ext = "dll" if os.name == "nt" else "so"
+        plugin_name = "authentication_ldap_simple.{}".format(ext)
+
+        ldap_simple_config = {
+            "plugin-load-add": plugin_name,
+            "authentication_ldap_simple_auth_method_name": "simple",
+            "authentication_ldap_simple_bind_base_dn": '"dc=MYSQL,dc=local"',
+            "authentication_ldap_simple_init_pool_size": 1,
+            "authentication_ldap_simple_bind_root_dn": "",
+            "authentication_ldap_simple_bind_root_pwd": "",
+            "authentication_ldap_simple_ca_path": '""',
+            "authentication_ldap_simple_log_status": 6,
+            "authentication_ldap_simple_server_host": "100.103.18.98",
+            "authentication_ldap_simple_user_search_attr": "cn",
+            "authentication_ldap_simple_group_search_attr": "cn",
+        }
+        cnf = "\n# ldap_simple"
+        for key in ldap_simple_config:
+            cnf = "{}\n{}={}".format(cnf, key, ldap_simple_config[key])
+        self.server_cnf += cnf
+
+        cnx.close()
+        self.server.stop()
+        self.server.wait_down()
+
+        self.server.start(my_cnf=self.server_cnf)
+        self.server.wait_up()
+        sleep(1)
+
+        cnx = connection.MySQLConnection(**self.config)
+
+        identified_by = "CN=test1,CN=Users,DC=mysql,DC=local"
+
+        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                      "WITH authentication_ldap_simple AS"
+                      "'{}'".format(self.user, self.host, identified_by))
+        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                      "".format(self.user, self.host))
+        cnx.cmd_query("FLUSH PRIVILEGES")
+        cnx.close()
+
+    def tearDown(self):
+        cnx = connection.MySQLConnection(**self.config)
+        try:
+            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+        except:
+            pass
+        cnx.cmd_query("UNINSTALL PLUGIN authentication_ldap_simple")
+        cnx.cmd_query('show variables like "have_ssl"')
+        res = cnx.get_rows()[0][0]
+        cnx.close()
+        if res == ('have_ssl', 'DISABLED'):
+            self._enable_ssl()
+
+    def _disable_ssl(self):
+        self.server.stop()
+        self.server.wait_down()
+
+        self.server.start(ssl_ca='', ssl_cert='', ssl_key='', ssl=0,
+                          my_cnf=self.server_cnf)
+        self.server.wait_up()
+        sleep(1)
+        cnx = connection.MySQLConnection(**self.config)
+        cnx.cmd_query('show variables like "have_ssl"')
+        res = cnx.get_rows()[0][0]
+        self.assertEqual(res, ('have_ssl', 'DISABLED'),
+                         "can not dissable ssl: {}".format(res))
+
+    def _enable_ssl(self):
+        self.server.stop()
+        self.server.wait_down()
+        self.server.start()
+        self.server.wait_up()
+        sleep(1)
+
+    @tests.foreach_cnx()
+    def test_clear_text_pass(self):
+        """test_clear_text_passwords_without_secure_connection"""
+        conn_args = {
+            "user": "test1@MYSQL.LOCAL",
+            "host": self.config["host"],
+            "port": self.config["port"],
+            "password": "Testpw1",
+            "auth_plugin": "mysql_clear_password",
+        }
+
+        # Atempt connection with wrong password
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["password"] = "wrong_password"
+        with self.assertRaises(ProgrammingError) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        self.assertIn("Access denied for user", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+        # connect using mysql clear password and ldap simple auth method
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
+
+        # Disabling ssl must raise an error.
+        conn_args["ssl_disabled"] = True
+        with self.assertRaises(InterfaceError) as context:
+            _ = self.cnx.__class__(**conn_args)
+        self.assertEqual("Clear password authentication is not supported over "
+                         "insecure channels", context.exception.msg,
+                         "Unexpected exception message found: {}"
+                         "".format(context.exception.msg))
+
+        # Unix socket is used in unix by default if not popped or set to None
+        conn_args["unix_socket"] = tests.get_mysql_config().get("unix_socket", None)
+        with self.assertRaises(InterfaceError) as context:
+            _ = self.cnx.__class__(**conn_args)
+        self.assertEqual("Clear password authentication is not supported over "
+                         "insecure channels", context.exception.msg,
+                         "Unexpected exception message found: {}"
+                         "".format(context.exception.msg))
+
+        # Attempt connection with verify certificate set to True
+        conn_args.pop("ssl_disabled")
+        conn_args.pop("unix_socket")
+        conn_args.update({
+            'ssl_ca': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem')),
+            'ssl_cert': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_cert.pem')),
+            'ssl_key': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_key.pem')),
+        })
+        conn_args["ssl_verify_cert"] = True
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
+
+        if CMySQLConnection is not None and isinstance(cnx, CMySQLConnection):
+            # Not testing cext without ssl
+            return
+        self._disable_ssl()
+        # Error must be raised to avoid send the password insecurely
+        self.assertRaises(InterfaceError, self.cnx.__class__, **conn_args)
 
 
 class WL13334(tests.MySQLConnectorTests):

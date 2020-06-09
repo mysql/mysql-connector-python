@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2018, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -169,7 +169,9 @@ class MySQLServerBase(object):
         self._process = None
         self._lc_messages_dir = None
         self._init_mysql_install()
-        self._version = self._get_version()
+        ver, lic = self._get_version()
+        self._version = ver
+        self._license = lic
 
         if option_file and os.access(option_file, 0):
             MySQLBootstrapError("Option file not accessible: {name}".format(
@@ -242,7 +244,7 @@ class MySQLServerBase(object):
                    afile == 'innodb_memcached_config.sql':
                     self._scriptdir = root
 
-        version = self._get_version()
+        version = self._get_version()[0]
         if not self._lc_messages_dir or (version < (8, 0, 13) and
                                          not self._scriptdir):
             raise MySQLBootstrapError(
@@ -296,8 +298,10 @@ class MySQLServerBase(object):
         """Get the MySQL server version
 
         This method executes mysqld with the --version argument. It parses
-        the output looking for the version number and returns it as a
-        tuple with integer values: (major,minor,patch)
+        the output looking for the version number and license, returns it as a
+        tuple with version number as fisrt element as a tuple with integer
+        values and a string as second element indicating the version in the
+        form:  ((major,minor,patch), "license as shown by mysqld")
 
         Returns a tuple.
         """
@@ -308,9 +312,13 @@ class MySQLServerBase(object):
 
         prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         verstr = str(prc.communicate()[0])
-        matches = re.match(r'.*Ver (\d)\.(\d).(\d{1,2}).*', verstr)
+        matches = re.match(r'.*Ver (\d)\.(\d).(\d{1,2})-*(\S*).*', verstr)
         if matches:
-            return tuple([int(v) for v in matches.groups()])
+            matches_groups = matches.groups()
+            ver = tuple([int(v) for v in matches_groups[0:-1]])
+            lic = matches_groups[-1]
+            LOGGER.debug("MySQL version: %s license: %s", ver, lic)
+            return (ver, lic)
         else:
             raise MySQLServerError(
                 'Failed reading version from mysqld --version')
@@ -322,6 +330,14 @@ class MySQLServerBase(object):
         Returns a tuple.
         """
         return self._version
+
+    @property
+    def license(self):
+        """Returns the MySQL server license type
+
+        Returns a tuple.
+        """
+        return self._license
 
     def _start_server(self):
         """Start the MySQL server"""
@@ -632,6 +648,7 @@ class MySQLServer(MySQLServerBase):
             'ssl': 1,
         }
 
+        cnf = kwargs.pop("my_cnf", self._cnf)
         for arg in self._extra_args:
             if self._version < arg["version"]:
                 options.update(dict([(key, '') for key in
@@ -639,9 +656,10 @@ class MySQLServer(MySQLServerBase):
             else:
                 options.update(arg["options"])
         options.update(**kwargs)
+
         try:
             fp = open(self._option_file, 'w')
-            fp.write(self._cnf.format(**options))
+            fp.write(cnf.format(**options))
             fp.close()
         except Exception as ex:
             LOGGER.error("Failed to write config file {0}".format(ex))

@@ -43,6 +43,7 @@ import subprocess
 import errno
 import traceback
 from cpydist.utils import mysql_c_api_info
+from time import sleep
 from distutils.dist import Distribution
 from imp import load_source
 from functools import wraps
@@ -113,6 +114,7 @@ OPTIONS_INIT = False
 MYSQL_SERVERS_NEEDED = 1
 MYSQL_SERVERS = []
 MYSQL_VERSION = ()
+MYSQL_LICENSE = ""
 MYSQL_VERSION_TXT = ''
 MYSQL_DUMMY = None
 MYSQL_DUMMY_THREAD = None
@@ -947,6 +949,75 @@ def check_c_extension(exc=None):
     else:
         LOGGER.error("C Extension not available: %s", error_msg)
         sys.exit(1)
+
+
+def is_host_reachable(host):
+    """Attempts to reach a host, by using the ping command.
+    Returns True if success else False.
+    """
+    param_attemps = "-n" if os.name == "nt" else "-c"
+    attemps = "1"
+    command = ["ping", param_attemps, attemps, host]
+    try:
+        return subprocess.call(command) == 0
+    except OSError:
+        return False
+
+
+def is_plugin_available(plugin_name, config_vars=None, in_server=None):
+    """Checks if the plugin name is available
+
+    The given plugin must be able to be load in the server and his status must
+    be "active" be mark as available, in either result Server will be restarted
+    with the default configuration.
+
+    Returns True if plugin an success else False.
+    """
+    available = False
+    server = in_server if in_server else MYSQL_SERVERS[0]
+    plugin_config_vars = config_vars if config_vars else []
+    server_cnf = server._cnf
+    config = get_mysql_config(server.name)
+
+    ext = "dll" if os.name == "nt" else "so"
+    plugin_full_name = "{name}.{ext}".format(name=plugin_name, ext=ext)
+
+    plugin_config = {
+        "plugin-load-add": plugin_full_name,
+    }
+    plugin_config.update(plugin_config_vars)
+    cnf = "\n# is_plugin_available vars:"
+    for key in plugin_config:
+        cnf = "{}\n{}={}".format(cnf, key, plugin_config[key])
+    server_cnf += cnf
+
+    server.stop()
+    server.wait_down()
+
+    try:
+        server.start(my_cnf=server_cnf)
+        server.wait_up()
+        sleep(1)
+        from mysql.connector import MySQLConnection
+        cnx = MySQLConnection(**config)
+        cnx.cmd_query("SHOW PLUGINS")
+        res = cnx.get_rows()
+        for row in res[0]:
+            if row[0] == plugin_name:
+                if row[1] == "ACTIVE":
+                    available = True
+        cnx.cmd_query("UNINSTALL PLUGIN {}".format(plugin_name))
+        cnx.close()
+        return available
+    except:
+        pass
+    finally:
+        server.stop()
+        server.wait_down()
+        server.start(my_cnf=server_cnf)
+        server.wait_up()
+        sleep(1)
+    return available
 
 def check_tls_versions_support(tls_versions):
     """Check whether we can connect with given TLS version

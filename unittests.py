@@ -736,6 +736,7 @@ def init_mysql_server(port, options):
             mysql_server.remove()
 
     tests.MYSQL_VERSION = mysql_server.version
+    tests.MYSQL_LICENSE = mysql_server.license
     tests.MYSQL_VERSION_TXT = '.'.join([str(i) for i in mysql_server.version])
     tests.MYSQL_SERVERS.append(mysql_server)
 
@@ -913,8 +914,9 @@ def main():
     for i in range(1, tests.MYSQL_SERVERS_NEEDED):
         init_mysql_server(port=(options.port + i), options=options)
 
-    LOGGER.info("Using MySQL server version %s",
-                '.'.join([str(v) for v in tests.MYSQL_VERSION[0:3]]))
+    LOGGER.info("Using MySQL server version %s %s",
+                '.'.join([str(v) for v in tests.MYSQL_VERSION[0:3]]),
+                tests.MYSQL_LICENSE)
 
     LOGGER.info("Starting unit tests")
     was_successful = False

@@ -159,10 +159,14 @@ class MySQLConnection(MySQLConnectionAbstract):
             handshake['server_version_original'])
 
         if not handshake['capabilities'] & ClientFlag.SSL:
-            self._client_flags &= ~ClientFlag.SSL
+            if self._auth_plugin == "mysql_clear_password":
+                err_msg = ("Clear password authentication is not supported "
+                           "over insecure channels")
+                raise errors.InterfaceError(err_msg)
             if self._ssl.get('verify_cert'):
                 raise errors.InterfaceError("SSL is required but the server "
                                             "doesn't support it", errno=2026)
+            self._client_flags &= ~ClientFlag.SSL
         elif not self._ssl_disabled:
             self._client_flags |= ClientFlag.SSL
 

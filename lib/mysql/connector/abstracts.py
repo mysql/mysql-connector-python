@@ -508,6 +508,10 @@ class MySQLConnectionAbstract(object):
         if "ssl_disabled" in config:
             self._ssl_disabled = config.pop("ssl_disabled")
 
+        if self._ssl_disabled and self._auth_plugin == "mysql_clear_password":
+            raise errors.InterfaceError("Clear password authentication is not "
+                                        "supported over insecure channels")
+
         # Other configuration
         set_ssl_flag = False
         for key, value in config.items():
