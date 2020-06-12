@@ -136,6 +136,21 @@
       </Component>
     </DirectoryRef>
 
+    <DirectoryRef Id="VendorDir38">
+      <?if $(var.HaveLdapLibs38) = 1 ?>
+      <Component Id="Vendor38" Guid="681a48cd-be38-11ea-84eb-04ea56793316" Win64="$(var.Win64)">
+        <File Id="authenticationldapsaslclient38" Name="authentication_ldap_sasl_client.dll"
+         Source="$(var.BDist38)\mysql\vendor\authentication_ldap_sasl_client.dll" DiskId="1"/>
+        <File Id="libsasl38" Name="libsasl.dll"
+         Source="$(var.BDist38)\mysql\vendor\libsasl.dll" DiskId="1"/>
+        <File Id="libcrypto_1_138" Name="libcrypto-1_1-x64.dll"
+         Source="$(var.BDist38)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
+        <File Id="saslSCRAM38" Name="saslSCRAM.dll"
+         Source="$(var.BDist38)\mysql\vendor\saslSCRAM.dll" DiskId="1"/>
+      </Component>
+      <?endif?>
+    </DirectoryRef>
+
     <DirectoryRef Id="ConnectorPackageDir38">
       <Component Id="ConnectorPackage38" Guid="9915296f-c91c-4df0-b6bf-2e0686fedc3a" Win64="$(var.Win64)">
         <File Id="initpy38" Name="__init__.$(var.PyExt)"

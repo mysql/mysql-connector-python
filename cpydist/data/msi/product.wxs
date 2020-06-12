@@ -273,6 +273,7 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir35" Name="mysql">
+              <Directory Id="VendorDir35" Name="vendor"/>
               <Directory Id="ConnectorPackageDir35" Name="connector">
                 <Directory Id="DjangoDir35" Name="django"/>
                 <Directory Id="ConnectorLocalesDir35" Name="locales">
@@ -295,6 +296,7 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir36" Name="mysql">
+              <Directory Id="VendorDir36" Name="vendor"/>
               <Directory Id="ConnectorPackageDir36" Name="connector">
                 <Directory Id="DjangoDir36" Name="django"/>
                 <Directory Id="ConnectorLocalesDir36" Name="locales">
@@ -317,6 +319,7 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir37" Name="mysql">
+              <Directory Id="VendorDir37" Name="vendor"/>
               <Directory Id="ConnectorPackageDir37" Name="connector">
                 <Directory Id="DjangoDir37" Name="django"/>
                 <Directory Id="ConnectorLocalesDir37" Name="locales">
@@ -339,6 +342,7 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir38" Name="mysql">
+              <Directory Id="VendorDir38" Name="vendor"/>
               <Directory Id="ConnectorPackageDir38" Name="connector">
                 <Directory Id="DjangoDir38" Name="django"/>
                 <Directory Id="ConnectorLocalesDir38" Name="locales">
@@ -465,6 +469,9 @@
         <Condition Level='0'>Not PYTHON35INSTALLPATH_ALL AND Not PYTHON35INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo35"/>
         <ComponentRef Id="MySQLPackage35"/>
+        <?if $(var.HaveLdapLibs35) = 1 ?>
+        <ComponentRef Id="Vendor35"/>
+        <?endif?>
         <ComponentRef Id="ConnectorPackage35"/>
         <ComponentRef Id="ConnectorLocales35"/>
         <ComponentRef Id="LocalesEng35"/>
@@ -486,6 +493,9 @@
         <Condition Level='0'>Not PYTHON36INSTALLPATH_ALL AND Not PYTHON36INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo36"/>
         <ComponentRef Id="MySQLPackage36"/>
+        <?if $(var.HaveLdapLibs36) = 1 ?>
+        <ComponentRef Id="Vendor36"/>
+        <?endif?>
         <ComponentRef Id="ConnectorPackage36"/>
         <ComponentRef Id="ConnectorLocales36"/>
         <ComponentRef Id="LocalesEng36"/>
@@ -507,6 +517,9 @@
         <Condition Level='0'>Not PYTHON37INSTALLPATH_ALL AND Not PYTHON37INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo37"/>
         <ComponentRef Id="MySQLPackage37"/>
+        <?if $(var.HaveLdapLibs37) = 1 ?>
+        <ComponentRef Id="Vendor37"/>
+        <?endif?>
         <ComponentRef Id="ConnectorPackage37"/>
         <ComponentRef Id="ConnectorLocales37"/>
         <ComponentRef Id="LocalesEng37"/>
@@ -528,6 +541,9 @@
         <Condition Level='0'>Not PYTHON38INSTALLPATH_ALL AND Not PYTHON38INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo38"/>
         <ComponentRef Id="MySQLPackage38"/>
+        <?if $(var.HaveLdapLibs38) = 1 ?>
+        <ComponentRef Id="Vendor38"/>
+        <?endif?>
         <ComponentRef Id="ConnectorPackage38"/>
         <ComponentRef Id="ConnectorLocales38"/>
         <ComponentRef Id="LocalesEng38"/>

@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,7 +32,9 @@
 # Detection of abstract methods in pylint is not working correctly
 #pylint: disable=W0223
 
+import os
 import socket
+import sysconfig
 
 from . import errors, version
 from .catch23 import INT_TYPES
@@ -73,6 +75,10 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 "MySQL Connector/Python C Extension not available")
         self._cmysql = None
         self._columns = []
+        self._plugin_dir = os.path.join(
+            os.path.dirname(os.path.abspath(_mysql_connector.__file__)),
+            "mysql", "vendor"
+        )
         self.converter = None
         super(CMySQLConnection, self).__init__(**kwargs)
 
@@ -177,8 +183,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
             charset_name=charset_name,
             connection_timeout=(self._connection_timeout or 0),
             use_unicode=self._use_unicode,
-            auth_plugin=self._auth_plugin)
-
+            auth_plugin=self._auth_plugin,
+            plugin_dir=self._plugin_dir)
         if not self.isset_client_flag(ClientFlag.CONNECT_ARGS):
             self._conn_attrs = {}
         cnx_kwargs = {

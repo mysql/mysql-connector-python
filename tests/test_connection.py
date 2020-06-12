@@ -2497,7 +2497,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
 
 class WL13335(tests.MySQLConnectorTests):
-    """WL#13335: Avoid set config values whit flag CAN_HANDLE_EXPIRED_PASSWORDS
+    """WL#13335: Avoid set config values with flag CAN_HANDLE_EXPIRED_PASSWORDS
     """
     def setUp(self):
         self.config = tests.get_mysql_config()
@@ -2530,6 +2530,134 @@ class WL13335(tests.MySQLConnectorTests):
         cnx_config['client_flags'] =flags
         # connection must be successful
         _ = self.cnx.__class__(**cnx_config)
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
+                 "Authentication with ldap_simple not supported")
+#Skip if remote ldap server is not reachable.
+@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
+                 "ldap server is not reachable")
+@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_simple"),
+                 "Plugin authentication_ldap_simple not available")
+class WL14110(tests.MySQLConnectorTests):
+    """WL#14110: Add support for SCRAM-SHA-1
+    """
+    def setUp(self):
+        self.server = tests.MYSQL_SERVERS[0]
+        self.server_cnf = self.server._cnf
+        self.config = tests.get_mysql_config()
+        self.config.pop("unix_socket", None)
+        self.user = "sadmin"
+        self.host = "%"
+
+        cnx = connection.MySQLConnection(**self.config)
+        ext = "dll" if os.name == "nt" else "so"
+        plugin_name = "authentication_ldap_sasl.{}".format(ext)
+
+        ldap_sasl_config = {
+            "plugin-load-add": plugin_name,
+            "authentication_ldap_sasl_auth_method_name": "SCRAM-SHA-1",
+            "authentication_ldap_sasl_bind_base_dn": '"dc=my-domain,dc=com"',
+            "authentication_ldap_sasl_log_status": 6,
+            "authentication_ldap_sasl_server_host": "10.172.166.126",
+            "authentication_ldap_sasl_group_search_attr": "",
+            "authentication_ldap_sasl_user_search_attr": "cn",
+        }
+        cnf = "\n# ldap_sasl"
+        for key in ldap_sasl_config:
+            cnf = "{}\n{}={}".format(cnf, key, ldap_sasl_config[key])
+        self.server_cnf += cnf
+
+        cnx.close()
+        self.server.stop()
+        self.server.wait_down()
+
+        self.server.start(my_cnf=self.server_cnf)
+        self.server.wait_up()
+        sleep(1)
+
+        cnx = connection.MySQLConnection(**self.config)
+
+        try:
+            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+            cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
+        except:
+            pass
+
+        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                      "WITH authentication_ldap_sasl"
+                      "".format(self.user, self.host))
+
+        cnx.cmd_query("CREATE USER '{}'@'{}'"
+                      "".format("common", self.host))
+        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                      "".format("common", self.host))
+
+        cnx.close()
+
+    def tearDown(self):
+        return
+        cnx = connection.MySQLConnection(**self.config)
+        try:
+            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+            cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
+        except:
+            pass
+        cnx.cmd_query("UNINSTALL PLUGIN authentication_ldap_sasl")
+        cnx.close()
+
+    @tests.foreach_cnx()
+    def test_authentication_ldap_sasl_client(self):
+        """test_authentication_ldap_sasl_client_with_SCRAM-SHA-1"""
+        # Not running with c-ext if plugin libraries are not setup
+        if self.cnx.__class__ == CMySQLConnection and \
+           os.getenv('TEST_AUTHENTICATION_LDAP_SASL_CLIENT_CEXT', None) is None:
+            return
+        conn_args = {
+            "user": "sadmin",
+            "host": self.config["host"],
+            "port": self.config["port"],
+            "password": "perola",
+        }
+
+        # Atempt connection with wrong password
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["password"] = "wrong_password"
+        with self.assertRaises(ProgrammingError) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        self.assertIn("Access denied for user", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+        # Atempt connection with correct password
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
+
+        # Force unix_socket to None
+        conn_args["unix_socket"] = None
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
+
+        # Attempt connection with verify certificate set to True
+        conn_args.update({
+            'ssl_ca': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem')),
+            'ssl_cert': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_cert.pem')),
+            'ssl_key': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_key.pem')),
+        })
+        conn_args["ssl_verify_cert"] = True
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),

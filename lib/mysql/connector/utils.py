@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2019, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,8 +31,13 @@
 
 import os
 import subprocess
+from stringprep import (in_table_a1, in_table_b1, in_table_c11, in_table_c12,
+                        in_table_c21_c22, in_table_c3, in_table_c4, in_table_c5,
+                        in_table_c6, in_table_c7, in_table_c8, in_table_c9,
+                        in_table_c12, in_table_d1, in_table_d2)
 import struct
 import sys
+import unicodedata
 
 from .catch23 import struct_unpack, PY2
 
@@ -441,3 +446,131 @@ def linux_distribution():
                 distro.get("version_codename", ""))
 
     return ("", "", "")
+
+
+def _get_unicode_read_direction(unicode_str):
+    """Get the readiness direction of the unicode string.
+
+    We assume that the direction is "L-to-R" if the first character does not
+    indicate the direction is "R-to-L" or an "AL" (Arabic Letter).
+    """
+    if unicode_str and unicodedata.bidirectional(unicode_str[0]) in ("R", "AL"):
+        return "R-to-L"
+    return "L-to-R"
+
+
+def _get_unicode_direction_rule(unicode_str):
+    """
+        1) The characters in section 5.8 MUST be prohibited.
+
+        2) If a string contains any RandALCat character, the string MUST NOT
+           contain any LCat character.
+
+        3) If a string contains any RandALCat character, a RandALCat
+           character MUST be the first character of the string, and a
+           RandALCat character MUST be the last character of the string.
+    """
+    read_dir = _get_unicode_read_direction(unicode_str)
+
+    # point 3)
+    if read_dir == "R-to-L":
+        if not (in_table_d1(unicode_str[0]) and in_table_d1(unicode_str[-1])):
+            raise ValueError("Invalid unicode Bidirectional sequence, if the "
+                             "first character is RandALCat, the final character"
+                             "must be RandALCat too.")
+        # characters from in_table_d2 are prohibited.
+        return {"Bidirectional Characters requirement 2 [StringPrep, d2]":
+                in_table_d2}
+
+    # characters from in_table_d1 are prohibited.
+    return {"Bidirectional Characters requirement 2 [StringPrep, d2]":
+            in_table_d1}
+
+
+def validate_normalized_unicode_string(normalized_str):
+    """Check for Prohibited Output according to rfc4013 profile.
+
+    This profile specifies the following characters as prohibited input:
+
+       - Non-ASCII space characters [StringPrep, C.1.2]
+       - ASCII control characters [StringPrep, C.2.1]
+       - Non-ASCII control characters [StringPrep, C.2.2]
+       - Private Use characters [StringPrep, C.3]
+       - Non-character code points [StringPrep, C.4]
+       - Surrogate code points [StringPrep, C.5]
+       - Inappropriate for plain text characters [StringPrep, C.6]
+       - Inappropriate for canonical representation characters [StringPrep, C.7]
+       - Change display properties or deprecated characters [StringPrep, C.8]
+       - Tagging characters [StringPrep, C.9]
+
+    In addition of checking of Bidirectional Characters [StringPrep, Section 6]
+    and the Unassigned Code Points [StringPrep, A.1].
+
+    Returns:
+        A tuple with ("probited character", "breaked_rule")
+    """
+    rules = {
+        "Space characters that contains the ASCII code points": in_table_c11,
+        "Space characters non-ASCII code points": in_table_c12,
+        "Unassigned Code Points [StringPrep, A.1]": in_table_a1,
+        "Non-ASCII space characters [StringPrep, C.1.2]": in_table_c12,
+        "ASCII control characters [StringPrep, C.2.1]": in_table_c21_c22,
+        "Private Use characters [StringPrep, C.3]": in_table_c3,
+        "Non-character code points [StringPrep, C.4]": in_table_c4,
+        "Surrogate code points [StringPrep, C.5]": in_table_c5,
+        "Inappropriate for plain text characters [StringPrep, C.6]": in_table_c6,
+        "Inappropriate for canonical representation characters [StringPrep, C.7]": in_table_c7,
+        "Change display properties or deprecated characters [StringPrep, C.8]": in_table_c8,
+        "Tagging characters [StringPrep, C.9]": in_table_c9
+    }
+
+    try:
+        rules.update(_get_unicode_direction_rule(normalized_str))
+    except ValueError as err:
+        return normalized_str, str(err)
+
+    for char in normalized_str:
+        for rule in rules:
+            if rules[rule](char) and char != u' ':
+                return char, rule
+
+    return None
+
+
+def normalize_unicode_string(a_string):
+    """normalizes a unicode string according to rfc4013
+
+    Normalization of a unicode string according to rfc4013: The SASLprep profile
+    of the "stringprep" algorithm.
+
+    Normalization Unicode equivalence is the specification by the Unicode
+    character encoding standard that some sequences of code points represent
+    essentially the same character.
+
+    This method normalizes using the Normalization Form Compatibility
+    Composition (NFKC), as described in rfc4013 2.2.
+
+    Returns:
+        Normalized unicode string according to rfc4013.
+    """
+
+    if PY2 and not isinstance(a_string, unicode):
+        a_string = unicode(a_string)
+    # Per rfc4013 2.1. Mapping
+    # non-ASCII space characters [StringPrep, C.1.2] are mapped to ' ' (U+0020)
+    # "commonly mapped to nothing" characters [StringPrep, B.1] are mapped to ''
+    nstr_list = [
+        u' ' if in_table_c12(char) else u'' if in_table_b1(char) else char
+        for char in a_string]
+
+    nstr = u''.join(nstr_list)
+
+    # Per rfc4013 2.2. Use NFKC Normalization Form Compatibility Composition
+    # Characters are decomposed by compatibility, then recomposed by canonical
+    # equivalence.
+    nstr = unicodedata.normalize('NFKC', nstr)
+    if not nstr:
+        # Normilization results in empty string.
+        return u''
+
+    return nstr

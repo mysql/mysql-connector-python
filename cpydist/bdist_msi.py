@@ -389,6 +389,7 @@ class DistMSI(BaseCommand):
             params["CExtXPBName{}{}".format(*ver)] = \
                 "_mysqlxpb{}".format(pyd_ext)
             params["HaveCExt{}{}".format(*ver)] = 0
+            params["HaveLdapLibs{}{}".format(*ver)] = 0
 
             if py_ver in self.pyver_bdist_paths:
                 params["BDist{}{}".format(*ver)] = \
@@ -397,6 +398,11 @@ class DistMSI(BaseCommand):
                     os.path.join(self.pyver_bdist_paths[py_ver],
                                  params["CExtLibName{}{}".format(*ver)])):
                     params["HaveCExt{}{}".format(*ver)] = 1
+                if os.path.exists(
+                    os.path.join(self.pyver_bdist_paths[py_ver],
+                                 "mysql", "vendor",
+                                 "authentication_ldap_sasl_client.dll")):
+                    params["HaveLdapLibs{}{}".format(*ver)] = 1
 
         self.log.info("### wixer params:")
         for param in params:

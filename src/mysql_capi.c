@@ -284,6 +284,7 @@ MySQL_dealloc(MySQL *self)
 
         Py_DECREF(self->charset_name);
         Py_DECREF(self->auth_plugin);
+        Py_DECREF(self->plugin_dir);
 
         Py_TYPE(self)->tp_free((PyObject*)self);
     }
@@ -328,6 +329,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self->fields=               NULL;
 	self->use_unicode=          1;
 	self->auth_plugin=          PyStringFromString("mysql_native_password");
+	self->plugin_dir=           PyStringFromString(".");
 
 	return (PyObject *)self;
 }
@@ -359,13 +361,13 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 int
 MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *charset_name= NULL, *use_unicode= NULL, *auth_plugin= NULL, *tmp, *con_timeout= NULL;
+    PyObject *charset_name= NULL, *use_unicode= NULL, *auth_plugin= NULL, *plugin_dir= NULL, *tmp, *con_timeout= NULL;
 
 	static char *kwlist[]=
 	{
 	    "buffered", "raw", "charset_name",
 	    "connection_timeout", "use_unicode",
-	    "auth_plugin",
+	    "auth_plugin", "plugin_dir",
 	    NULL
 	};
 
@@ -373,13 +375,14 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 
     // Initialization expect -1 when parsing arguments failed
     if (!PyArg_ParseTupleAndKeywords(args, kwds,
-                                     "|O!O!O!O!O!O!", kwlist,
+                                     "|O!O!O!O!O!O!O!", kwlist,
                                      &PyBool_Type, &self->buffered_at_connect,
                                      &PyBool_Type, &self->raw_at_connect,
                                      &PyStringType, &charset_name,
                                      &PyIntType, &con_timeout,
                                      &PyBool_Type, &use_unicode,
-                                     &PyStringType, &auth_plugin))
+                                     &PyStringType, &auth_plugin,
+                                     &PyStringType, &plugin_dir))
         return -1;
 
     if (self->buffered_at_connect)
@@ -420,6 +423,13 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
             self->auth_plugin= auth_plugin;
             Py_XDECREF(tmp);
         }
+    }
+
+    if (plugin_dir)
+    {
+        Py_DECREF(self->plugin_dir);
+        self->plugin_dir = plugin_dir;
+        Py_INCREF(self->plugin_dir);
     }
 
     if (con_timeout)
@@ -1125,7 +1135,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     PyObject *charset_name= NULL, *compress= NULL, *ssl_verify_cert= NULL,
              *ssl_verify_identity= NULL, *ssl_disabled= NULL,
              *conn_attrs= NULL, *key= NULL, *value= NULL;
-    const char* auth_plugin;
+    const char *auth_plugin, *plugin_dir;
     unsigned long client_flags= 0;
     unsigned int port= 3306, tmp_uint;
     int local_infile= -1;
@@ -1240,6 +1250,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     charset_name= self->charset_name;
 #endif
 
+    plugin_dir= PyStringAsString(self->plugin_dir);
+    mysql_options(&self->session, MYSQL_PLUGIN_DIR, plugin_dir);
     mysql_options(&self->session, MYSQL_OPT_PROTOCOL, (char*)&protocol);
     mysql_options(&self->session, MYSQL_SET_CHARSET_NAME,
                   PyBytesAsString(charset_name));
@@ -1409,6 +1421,19 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
 		}
     }
+
+    /* Begin of test loading authentication_ldap_sasl_client plugin */
+    struct st_mysql_client_plugin *ldap_sasl_plugin_p= NULL;
+    ldap_sasl_plugin_p = mysql_client_find_plugin(
+        &self->session, "authentication_ldap_sasl_client",
+        MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
+    if (!ldap_sasl_plugin_p)
+    {
+        mysql_load_plugin(&self->session, "authentication_ldap_sasl_client",
+                          MYSQL_CLIENT_AUTHENTICATION_PLUGIN, 0);
+    }
+
+    /* End of test loading authentication_ldap_sasl_client plugin */
 
 #ifdef PY3
     Py_BEGIN_ALLOW_THREADS

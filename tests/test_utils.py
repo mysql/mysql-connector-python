@@ -268,3 +268,34 @@ class UtilsTests(tests.MySQLConnectorTests):
         exprest = bytearray(b'\xdd\xdd')
         self.assertEqual((exprest, exp), utils.read_lc_int(lcs),
                          "Failed getting length coded long long")
+
+    def test_normalize_unicode_string(self):
+        """Test normalize an unicode string"""
+        # Test cases    Input    Output    Comments
+        test_cases = [
+            (u"I\u00ADX", u"IX", "SOFT HYPHEN mapped to nothing"),
+            (u"user", u"user", "no transformation"),
+            (u"USER", u"USER", "case preserved, will not match #2"),
+            (u"\u00AA", u"a", "output is NFKC, input in ISO 8859-1"),
+            (u"\u2168", u"IX", "output is NFKC, will match #1"),
+            (u"\u0007", u"\u0007", "Error - prohibited character"),
+            (u"\u0627\u0031", u"\u0627\u0031", "Error - bidirectional check")
+        ]
+
+        for input_str, output, comment  in test_cases:
+            res = utils.normalize_unicode_string(input_str)
+            self.assertEqual(output, res)
+        self.maxDiff = None
+        # Test cases    Input    Output    Expected Error
+        test_error_cases = [
+            (u"\u0007", "Error - prohibited character",
+             "ASCII control characters [StringPrep, C.2.1]"),
+            (u"\u0627\u0031", "Error - bidirectional check",
+             "Invalid unicode Bidirectional sequence, if the first character "
+             "is RandALCat, the final charactermust be RandALCat too.")
+        ]
+
+        for input_str, output, comment  in test_error_cases:
+            res = utils.normalize_unicode_string(input_str)
+            _, b_rule = utils.validate_normalized_unicode_string(res)
+            self.assertEqual(comment, b_rule)

@@ -30,6 +30,7 @@
 """
 
 from io import IOBase
+import logging
 import os
 import platform
 import socket
@@ -53,6 +54,8 @@ from .network import MySQLUnixSocket, MySQLTCPSocket
 from .protocol import MySQLProtocol
 from .utils import int4store, linux_distribution
 from .abstracts import MySQLConnectionAbstract
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MySQLConnection(MySQLConnectionAbstract):
@@ -228,6 +231,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         auth = None
         new_auth_plugin = self._auth_plugin or self._handshake["auth_plugin"]
+        _LOGGER.debug("new_auth_plugin: %s", new_auth_plugin)
         packet = self._socket.recv()
         if packet[4] == 254 and len(packet) == 5:
             raise errors.NotSupportedError(
@@ -238,11 +242,23 @@ class MySQLConnection(MySQLConnectionAbstract):
             # AuthSwitchRequest
             (new_auth_plugin,
              auth_data) = self._protocol.parse_auth_switch_request(packet)
-            auth = get_auth_plugin(new_auth_plugin)(
-                auth_data, password=password, ssl_enabled=self._ssl_active)
+            auth = get_auth_plugin(new_auth_plugin)(auth_data,
+                 username=self._user, password=password,
+                 ssl_enabled=self._ssl_active)
             response = auth.auth_response()
             self._socket.send(response)
             packet = self._socket.recv()
+
+            if packet[5] == 114 and packet[6] == 61: # 'r' and '='
+                # Continue with sasl authentication
+                dec_response = packet[5:].decode()
+                cresponse = auth.auth_continue(dec_response)
+                self._socket.send(cresponse)
+                packet = self._socket.recv()
+                if packet[5] == 118 and packet[6] == 61: # 'v' and '='
+                    if auth.auth_finalize(packet[5:]):
+                        # receive packed OK
+                        packet = self._socket.recv()
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)

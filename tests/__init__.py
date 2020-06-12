@@ -50,9 +50,26 @@ from functools import wraps
 from pkgutil import walk_packages
 
 try:
-    import _mysql_connector
+    from functools import lru_cache
 except ImportError:
-    pass
+    def lru_cache(*args, **kwargs):
+        """A Python 2.7 replacement for lru_cache
+        """
+        cache = dict()
+        def decorator_lru_cache(func):
+            @wraps(func)
+            def memoized_func(*args, **kwargs):
+                if args in cache:
+                    return cache[args]
+                result = func(*args)
+                cache[args] = result
+                return result
+            return memoized_func
+        return decorator_lru_cache
+    try:
+        import _mysql_connector
+    except ImportError:
+        pass
 
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
@@ -951,6 +968,7 @@ def check_c_extension(exc=None):
         sys.exit(1)
 
 
+@lru_cache(maxsize=10, typed=False)
 def is_host_reachable(host):
     """Attempts to reach a host, by using the ping command.
     Returns True if success else False.
@@ -964,6 +982,7 @@ def is_host_reachable(host):
         return False
 
 
+@lru_cache(maxsize=10, typed=False)
 def is_plugin_available(plugin_name, config_vars=None, in_server=None):
     """Checks if the plugin name is available
 
