@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -549,7 +549,7 @@ class MySQLCursor(CursorBase):
         except (UnicodeDecodeError, UnicodeEncodeError) as err:
             raise errors.ProgrammingError(str(err))
 
-        if params is not None:
+        if params:
             if isinstance(params, dict):
                 stmt = _bytestr_format_dict(
                     stmt, self._process_params_dict(params))

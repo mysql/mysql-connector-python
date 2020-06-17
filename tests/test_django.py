@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,8 +31,6 @@
 
 import datetime
 import unittest
-import sys
-import unittest
 
 import tests
 
@@ -49,7 +47,7 @@ if DJANGO_AVAILABLE:
     try:
         settings.configure()
     except RuntimeError as exc:
-        if not 'already configured' in str(exc):
+        if 'already configured' not in str(exc):
             raise
     DBCONFIG = tests.get_mysql_config()
 
@@ -99,7 +97,7 @@ FOREIGN KEY (id_t1) REFERENCES django_t1(id) ON DELETE CASCADE
 # Have to load django.db to make importing db backend work for Django < 1.6
 import django.db  # pylint: disable=W0611
 from django.db.backends.signals import connection_created
-from django.utils.safestring import SafeBytes, SafeText
+from django.utils.safestring import SafeText
 
 import mysql.connector
 from mysql.connector.django.introspection import FieldInfo
@@ -112,20 +110,13 @@ if DJANGO_AVAILABLE:
 
 @unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")
 class DjangoIntrospection(tests.MySQLConnectorTests):
-
     """Test the Django introspection module"""
 
     cnx = None
     introspect = None
 
-    def setUp(self):
-        # Python 2.6 has no setUpClass, we run it here, once.
-        if sys.version_info < (2, 7) and not self.__class__.cnx:
-            self.__class__.setUpClass()
-
     @classmethod
     def setUpClass(cls):
-        dbconfig = tests.get_mysql_config()
         cls.cnx = DatabaseWrapper(settings.DATABASES['default'])
         cls.introspect = DatabaseIntrospection(cls.cnx)
 
@@ -150,72 +141,33 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
     def test_get_table_list(self):
         cur = self.cnx.cursor()
         for exp in TABLES.keys():
-            if sys.version_info < (2, 7):
-                self.assertTrue(exp in self.introspect.get_table_list(cur))
-            else:
-                if tests.DJANGO_VERSION < (1, 8):
-                    res = any(table == exp
-                              for table in self.introspect.get_table_list(cur))
-                else:
-                    res = any(table.name == exp
-                              for table in self.introspect.get_table_list(cur))
-                self.assertTrue(res, "Table {table_name} not in table list"
-                                     "".format(table_name=exp))
+            res = any(table.name == exp
+                      for table in self.introspect.get_table_list(cur))
+            self.assertTrue(res, "Table {table_name} not in table list"
+                            "".format(table_name=exp))
 
     def test_get_table_description(self):
         cur = self.cnx.cursor()
-
-        if tests.DJANGO_VERSION < (1, 6):
-            exp = [
-                ('id', 3, None, None, None, None, 0, 16899),
-                ('c1', 3, None, None, None, None, 1, 16392),
-                ('c2', 253, None, 20, None, None, 1, 16388)
-            ]
-        elif tests.DJANGO_VERSION < (1, 8):
-            exp = [
-                FieldInfo(name=u'id', type_code=3, display_size=None,
-                          internal_size=None, precision=None, scale=None,
-                          null_ok=0),
-                FieldInfo(name=u'c1', type_code=3, display_size=None,
-                          internal_size=None, precision=None, scale=None,
-                          null_ok=1),
-                FieldInfo(name=u'c2', type_code=253, display_size=None,
-                          internal_size=20, precision=None, scale=None,
-                          null_ok=1)
-            ]
-        elif tests.DJANGO_VERSION < (1, 11):
-            exp = [
-                FieldInfo(name=u'id', type_code=3, display_size=None,
-                          internal_size=None, precision=10, scale=None,
-                          null_ok=0, extra=u'auto_increment'),
-                FieldInfo(name=u'c1', type_code=3, display_size=None,
-                          internal_size=None, precision=10, scale=None,
-                          null_ok=1, extra=u''),
-                FieldInfo(name=u'c2', type_code=253, display_size=None,
-                          internal_size=20, precision=None, scale=None,
-                          null_ok=1, extra=u'')
-            ]
-        else:
-            exp = [
-                FieldInfo(name=u'id', type_code=3, display_size=None,
-                          internal_size=None, precision=10, scale=None,
-                          null_ok=0, default=None, extra=u'auto_increment'),
-                FieldInfo(name=u'c1', type_code=3, display_size=None,
-                          internal_size=None, precision=10, scale=None,
-                          null_ok=1, default=None, extra=u''),
-                FieldInfo(name=u'c2', type_code=253, display_size=None,
-                          internal_size=20, precision=None, scale=None,
-                          null_ok=1, default=None, extra=u'')
-            ]
+        exp = [
+            FieldInfo(name=u'id', type_code=3, display_size=None,
+                      internal_size=None, precision=10, scale=None,
+                      null_ok=0, default=None, extra=u'auto_increment',
+                      is_unsigned=0, has_json_constraint=False),
+            FieldInfo(name=u'c1', type_code=3, display_size=None,
+                      internal_size=None, precision=10, scale=None,
+                      null_ok=1, default=None, extra=u'', is_unsigned=0,
+                      has_json_constraint=False),
+            FieldInfo(name=u'c2', type_code=253, display_size=None,
+                      internal_size=20, precision=None, scale=None,
+                      null_ok=1, default=None, extra=u'', is_unsigned=0,
+                      has_json_constraint=False),
+        ]
         res = self.introspect.get_table_description(cur, 'django_t1')
         self.assertEqual(exp, res)
 
     def test_get_relations(self):
         cur = self.cnx.cursor()
-        if tests.DJANGO_VERSION < (1, 8):
-            exp = {1: (0, 'django_t1')}
-        else:
-            exp = {u'id_t1': (u'id', u'django_t1')}
+        exp = {u'id_t1': (u'id', u'django_t1')}
         self.assertEqual(exp, self.introspect.get_relations(cur, 'django_t2'))
 
     def test_get_key_columns(self):
@@ -245,6 +197,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
                         'foreign_key': None,
                         'index': True,
                         'primary_key': True,
+                        'type': 'idx',
                         'unique': True},
             'django_t2_ibfk_1': {'check': False,
                                  'columns': ['id_t1'],
@@ -257,14 +210,15 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
                       'foreign_key': None,
                       'index': True,
                       'primary_key': False,
+                      'type': 'idx',
                       'unique': False}
         }
         self.assertEqual(
             exp, self.introspect.get_constraints(cur, 'django_t2'))
 
+
 @unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")
 class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
-
     """Test the Django base.DatabaseWrapper class"""
 
     def setUp(self):
@@ -308,12 +262,11 @@ class DjangoDatabaseWrapper(tests.MySQLConnectorTests):
         # Checking if DatabaseWrapper object creates a connection by default
         conn = DatabaseWrapper(settings.DATABASES['default'])
         dbo = DatabaseOperations(conn)
-        dbo.value_to_db_time(datetime.time(3, 3, 3))
+        dbo.adapt_timefield_value(datetime.time(3, 3, 3))
         self.assertEqual(self.connections, 0)
 
 
 class DjangoDatabaseOperations(tests.MySQLConnectorTests):
-
     """Test the Django base.DatabaseOperations class"""
 
     def setUp(self):
@@ -324,11 +277,7 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
         self.dbo = DatabaseOperations(self.cnx)
 
     def test_value_to_db_time(self):
-        if tests.DJANGO_VERSION < (1, 9):
-            value_to_db_time = self.dbo.value_to_db_time
-        else:
-            value_to_db_time = self.dbo.adapt_timefield_value
-
+        value_to_db_time = self.dbo.adapt_timefield_value
         self.assertEqual(None, value_to_db_time(None))
 
         value = datetime.time(0, 0, 0)
@@ -340,11 +289,7 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
         self.assertEqual(exp, value_to_db_time(value))
 
     def test_value_to_db_datetime(self):
-        if tests.DJANGO_VERSION < (1, 9):
-            value_to_db_datetime = self.dbo.value_to_db_datetime
-        else:
-            value_to_db_datetime = self.dbo.adapt_datetimefield_value
-
+        value_to_db_datetime = self.dbo.adapt_datetimefield_value
         self.assertEqual(None, value_to_db_datetime(None))
 
         value = datetime.datetime(1, 1, 1)
@@ -361,16 +306,13 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
         placeholder_rows = [["%s"] * len(fields) for _ in range(num_values)]
         exp = "VALUES {0}".format(", ".join(
             ["({0})".format(", ".join(["%s"] * len(fields)))] * num_values))
-        if tests.DJANGO_VERSION < (1, 9):
-            self.assertEqual(
-                exp, self.dbo.bulk_insert_sql(fields, num_values))
-        else:
-            self.assertEqual(
-                exp, self.dbo.bulk_insert_sql(fields, placeholder_rows))
+        self.assertEqual(
+            exp, self.dbo.bulk_insert_sql(fields, placeholder_rows))
 
 
 class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
     """Test the Django base.DjangoMySQLConverter class"""
+
     def test__TIME_to_python(self):
         value = b'10:11:12'
         django_converter = DjangoMySQLConverter()
@@ -393,6 +335,7 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
 
 class BugOra20106629(tests.MySQLConnectorTests):
     """CONNECTOR/PYTHON DJANGO BACKEND DOESN'T SUPPORT SAFETEXT"""
+
     def setUp(self):
         dbconfig = tests.get_mysql_config()
         self.conn = mysql.connector.connect(**dbconfig)
@@ -407,7 +350,7 @@ class BugOra20106629(tests.MySQLConnectorTests):
 
     def test_safe_string(self):
         safe_text = SafeText("dummy & safe data <html> ")
-        safe_bytes = SafeBytes(b"\x00\x00\x4c\x6e\x67\x39")
+        safe_bytes = SafeText("dummy & safe data <html> ")
         self.cur.execute("INSERT INTO {0} VALUES(%s, %s)".format(self.tbl), (safe_text, safe_bytes))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl), ())
-        self.assertEqual(self.cur.fetchall(), [(safe_text, safe_bytes)])
+        self.assertEqual(self.cur.fetchall(), [(safe_text, safe_bytes.encode())])

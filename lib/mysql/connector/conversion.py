@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -283,13 +283,13 @@ class MySQLConverter(MySQLConverterBase):
         Returns a bytes.
         """
         if value.microsecond:
-            fmt = '{0:d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}.{6:06d}'
+            fmt = '{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}.{6:06d}'
             return fmt.format(
                 value.year, value.month, value.day,
                 value.hour, value.minute, value.second,
                 value.microsecond).encode('ascii')
 
-        fmt = '{0:d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}'
+        fmt = '{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}'
         return fmt.format(
             value.year, value.month, value.day,
             value.hour, value.minute, value.second).encode('ascii')
@@ -303,8 +303,8 @@ class MySQLConverter(MySQLConverterBase):
 
         Returns a bytes.
         """
-        return '{0:d}-{1:02d}-{2:02d}'.format(value.year, value.month,
-                                              value.day).encode('ascii')
+        return '{0:04d}-{1:02d}-{2:02d}'.format(value.year, value.month,
+                                                value.day).encode('ascii')
 
     def _time_to_mysql(self, value):
         """
