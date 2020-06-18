@@ -75,6 +75,7 @@ DEFAULT_CONFIGURATION = {
     'force_ipv6': False,
     'auth_plugin': None,
     'allow_local_infile': False,
+    'allow_local_infile_in_path': None,
     'consume_results': False,
     'conn_attrs': None,
     'dns_srv': False,

@@ -117,6 +117,15 @@ class CMySQLConnection(MySQLConnectionAbstract):
         """Returns the server status attribute of MYSQL structure"""
         return self._cmysql.st_server_status()
 
+    def set_allow_local_infile_in_path(self, path):
+        """set local_infile_in_path
+
+        Set allow_local_infile_in_path.
+        """
+
+        if self._cmysql:
+            self._cmysql.set_load_data_local_infile_option(path)
+
     def set_unicode(self, value=True):
         """Toggle unicode mode
 
@@ -182,7 +191,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             'unix_socket': self._unix_socket,
             'compress': self.isset_client_flag(ClientFlag.COMPRESS),
             'ssl_disabled': True,
-            "conn_attrs": self._conn_attrs
+            "conn_attrs": self._conn_attrs,
+            "local_infile": self._allow_local_infile,
+            "load_data_local_dir": self._allow_local_infile_in_path
         }
 
         tls_versions = self._ssl.get('tls_versions')

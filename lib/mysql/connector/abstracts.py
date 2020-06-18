@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,6 +29,7 @@
 """Module gathering all abstract base classes"""
 
 from abc import ABCMeta, abstractmethod, abstractproperty
+import os
 import re
 import time
 import weakref
@@ -99,6 +100,9 @@ class MySQLConnectionAbstract(object):
         self._have_next_result = False
         self._raw = False
         self._in_transaction = False
+        self._allow_local_infile = DEFAULT_CONFIGURATION["allow_local_infile"]
+        self._allow_local_infile_in_path = (
+            DEFAULT_CONFIGURATION["allow_local_infile_in_path"])
 
         self._prepared_statements = None
 
@@ -399,9 +403,20 @@ class MySQLConnectionAbstract(object):
         except KeyError:
             pass  # Missing compress argument is OK
 
-        allow_local_infile = config.get(
+        self._allow_local_infile = config.get(
             'allow_local_infile', DEFAULT_CONFIGURATION['allow_local_infile'])
-        if allow_local_infile:
+        self._allow_local_infile_in_path = config.get(
+            'allow_local_infile_in_path',
+            DEFAULT_CONFIGURATION['allow_local_infile_in_path'])
+        infile_in_path = None
+        if self._allow_local_infile_in_path:
+            infile_in_path = os.path.abspath(self._allow_local_infile_in_path)
+            if infile_in_path and os.path.exists(infile_in_path) and \
+               not os.path.isdir(infile_in_path) or \
+               os.path.islink(infile_in_path):
+                raise AttributeError("allow_local_infile_in_path must be a "
+                                     "directory")
+        if self._allow_local_infile or self._allow_local_infile_in_path:
             self.set_client_flags([ClientFlag.LOCAL_FILES])
         else:
             self.set_client_flags([-ClientFlag.LOCAL_FILES])

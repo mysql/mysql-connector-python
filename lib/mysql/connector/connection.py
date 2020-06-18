@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -438,8 +438,39 @@ class MySQLConnection(MySQLConnectionAbstract):
 
     def _handle_load_data_infile(self, filename):
         """Handle a LOAD DATA INFILE LOCAL request"""
+        file_name = os.path.abspath(filename)
+        if os.path.islink(file_name):
+            raise errors.OperationalError("Use of symbolic link is not allowed")
+        if not self._allow_local_infile and \
+           not self._allow_local_infile_in_path:
+            raise errors.DatabaseError(
+                "LOAD DATA LOCAL INFILE file request rejected due to "
+                "restrictions on access.")
+        if not self._allow_local_infile and self._allow_local_infile_in_path:
+            # validate filename is inside of allow_local_infile_in_path path.
+            infile_path = os.path.abspath(self._allow_local_infile_in_path)
+            c_path = None
+            try:
+                if PY2:
+                    c_path = os.path.commonprefix([infile_path, file_name])
+                    if not os.path.exists(c_path):
+                        raise ValueError("Can't locate path")
+                else:
+                    c_path = os.path.commonpath([infile_path, file_name])
+            except ValueError as err:
+                err_msg = ("{} while loading file `{}` and path `{}` given"
+                           " in allow_local_infile_in_path")
+                raise errors.InterfaceError(
+                    err_msg.format(str(err), file_name, infile_path))
+
+            if c_path != infile_path:
+                err_msg = ("The file `{}` is not found in the given "
+                           "allow_local_infile_in_path {}")
+                raise errors.DatabaseError(
+                    err_msg.format(file_name,infile_path))
+
         try:
-            data_file = open(filename, 'rb')
+            data_file = open(file_name, 'rb')
             return self._handle_ok(self._send_data(data_file,
                                                    send_empty_packet=True))
         except IOError:
@@ -450,7 +481,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 raise errors.OperationalError(
                     "MySQL Connection not available.")
             raise errors.InterfaceError(
-                "File '{0}' could not be read".format(filename))
+                "File '{0}' could not be read".format(file_name))
         finally:
             try:
                 data_file.close()
@@ -596,8 +627,15 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         if not isinstance(query, bytes):
             query = query.encode('utf-8')
-        result = self._handle_result(self._send_cmd(ServerCmd.QUERY, query))
-
+        try:
+            result = self._handle_result(self._send_cmd(ServerCmd.QUERY, query))
+        except errors.ProgrammingError as err:
+            if err.errno == 3948 and \
+               "Loading local data is disabled" in err.msg:
+                err_msg = ("LOAD DATA LOCAL INFILE file request rejected due "
+                           "to restrictions on access.")
+                raise errors.DatabaseError(err_msg)
+            raise
         if self._have_next_result:
             raise errors.InterfaceError(
                 'Use cmd_query_iter for statements with multiple queries.')
@@ -796,6 +834,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         except:
             return False  # This method does not raise
         return True
+
+    def set_allow_local_infile_in_path(self, path):
+        """set local_infile_in_path
+
+        Set allow_local_infile_in_path.
+        """
+        self._allow_local_infile_in_path = path
 
     def reset_session(self, user_variables=None, session_variables=None):
         """Clears the current active session

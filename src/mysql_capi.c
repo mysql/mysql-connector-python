@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -1004,13 +1004,56 @@ MySQL_set_character_set(MySQL *self, PyObject *args)
 
     if (res)
     {
-    	raise_with_session(&self->session, NULL);
-    	return NULL;
+        raise_with_session(&self->session, NULL);
+        return NULL;
     }
 
     Py_DECREF(self->charset_name);
     self->charset_name= value;
     Py_INCREF(self->charset_name);
+
+    Py_RETURN_NONE;
+}
+
+/**
+  Set the local_infile_in_path for the current session.
+
+  Set the local_infile_in_path for the current session. The
+  directory from where a load data is allowed when allow_local_infile is
+  dissabled.
+
+  Raises TypeError when the argument is not a PyString_type.
+
+  @param    self    MySQL instance
+  @param    args    allow_local_infile_in_path
+
+  @return   int
+    @retval 0   Zero for success.
+*/
+PyObject*
+MySQL_set_load_data_local_infile_option(MySQL *self, PyObject *args)
+{
+    PyObject* value;
+    int res;
+
+    if (!PyArg_ParseTuple(args, "O!", &PyStringType, &value))
+    {
+        return NULL;
+    }
+
+    IS_CONNECTED(self);
+
+    Py_BEGIN_ALLOW_THREADS
+
+    res= mysql_options(&self->session, MYSQL_OPT_LOAD_DATA_LOCAL_DIR , PyStringAsString(value));
+
+    Py_END_ALLOW_THREADS
+
+    if (res)
+    {
+        raise_with_session(&self->session, NULL);
+        return NULL;
+    }
 
     Py_RETURN_NONE;
 }
@@ -1075,6 +1118,7 @@ PyObject*
 MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
     char *host= NULL, *user= NULL, *database= NULL, *unix_socket= NULL;
+    char *load_data_local_dir= NULL;
     char *ssl_ca= NULL, *ssl_cert= NULL, *ssl_key= NULL,
          *ssl_cipher_suites= NULL, *tls_versions= NULL,
          *tls_cipher_suites= NULL;
@@ -1084,6 +1128,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     const char* auth_plugin;
     unsigned long client_flags= 0;
     unsigned int port= 3306, tmp_uint;
+    int local_infile= -1;
     unsigned int protocol= 0;
     Py_ssize_t pos= 0;
 #if MYSQL_VERSION_ID >= 50711
@@ -1105,16 +1150,17 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 
     static char *kwlist[]=
     {
-        "host", "user", "password", "database",	"port", "unix_socket",
+        "host", "user", "password", "database", "port", "unix_socket",
         "client_flags", "ssl_ca", "ssl_cert", "ssl_key", "ssl_cipher_suites",
-        "tls_versions", "tls_cipher_suites",  "ssl_verify_cert",
+        "tls_versions", "tls_cipher_suites", "ssl_verify_cert",
         "ssl_verify_identity", "ssl_disabled", "compress", "conn_attrs",
+        "local_infile", "load_data_local_dir",
         NULL
     };
 #ifdef PY3
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzzzzO!O!O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzzzzO!O!O!O!O!iz", kwlist,
 #else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzzzzO!O!O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzzzzO!O!O!O!O!iz", kwlist,
 #endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
@@ -1126,7 +1172,9 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                                      &PyBool_Type, &ssl_verify_identity,
                                      &PyBool_Type, &ssl_disabled,
                                      &PyBool_Type, &compress,
-                                     &PyDict_Type, &conn_attrs))
+                                     &PyDict_Type, &conn_attrs,
+                                     &local_infile,
+                                     &load_data_local_dir))
     {
         return NULL;
     }
@@ -1140,6 +1188,26 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 
     mysql_init(&self->session);
     Py_END_ALLOW_THREADS
+
+	if (local_infile == 1) {
+		unsigned int accept= 1;
+		mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, &accept);
+
+	} else if (local_infile == 0 && load_data_local_dir != NULL) {
+		if (load_data_local_dir != NULL){
+			mysql_options(&self->session, MYSQL_OPT_LOAD_DATA_LOCAL_DIR,
+                          load_data_local_dir);
+		}
+
+	} else {
+		unsigned int denied= 0;
+		mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, &denied);
+
+	}
+
+	if (client_flags & CLIENT_LOCAL_FILES && (local_infile != 1)){
+        client_flags= client_flags & ~CLIENT_LOCAL_FILES;
+    }
 
 #ifdef MS_WINDOWS
     if (NULL == host)
@@ -1279,11 +1347,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     if (!database)
     {
         client_flags= client_flags & ~CLIENT_CONNECT_WITH_DB;
-    }
-
-    if (client_flags & CLIENT_LOCAL_FILES) {
-        unsigned int val= 1;
-        mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, &val);
     }
 
     if (conn_attrs != NULL)

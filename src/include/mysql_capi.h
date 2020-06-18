@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -219,6 +219,9 @@ MySQL_select_db(MySQL *self, PyObject *db);
 
 PyObject*
 MySQL_set_character_set(MySQL *self, PyObject *args);
+
+PyObject*
+MySQL_set_load_data_local_infile_option(MySQL *self, PyObject *args);
 
 PyObject*
 MySQL_shutdown(MySQL *self, PyObject *args);
