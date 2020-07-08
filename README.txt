@@ -3,7 +3,7 @@ MySQL Connector/Python 8.0
 ==========================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 
 License information can be found in the LICENSE.txt file.
 
@@ -11,7 +11,7 @@ License information can be found in the LICENSE.txt file.
 Requirements
 ============
 
-Protobuf C++ (version >= 2.6.0) and Python Protobuf (version >= 3.0.0)
+Protobuf C++ (version >= 3.0.0) and Python Protobuf (version >= 3.0.0)
 https://developers.google.com/protocol-buffers/docs/downloads
 
 
@@ -29,7 +29,7 @@ They can be found in the examples/ directory.
 License
 =======
 
-Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2011, 2020, Oracle and/or its affiliates.
 
 This is a release of MySQL Connector/Python, Oracle's Python driver for MySQL.
 

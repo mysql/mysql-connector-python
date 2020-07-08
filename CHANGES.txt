@@ -3,7 +3,7 @@ MySQL Connector/Python 8.0 - Release Notes & Changes
 ====================================================
 
 MySQL Connector/Python
-Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
@@ -11,7 +11,6 @@ Full release notes:
 v8.0.21
 =======
 
-- WL#13874: Dockerize test suite
 - WL#13847: Add support for context managers
 - WL#13059: Add schema validation support
 - WL#12501: Connection compression
