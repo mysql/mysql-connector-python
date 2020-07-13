@@ -5531,6 +5531,37 @@ class BugOra29324966(tests.MySQLConnectorTests):
         cnx.close()
 
 
+class Bug20811567(tests.MySQLConnectorTests):
+    """BUG#20811567: Support use_pure option in config files.
+    """
+
+    def write_config_file(self, use_pure, test_file):
+        temp_cnf_file = os.path.join(os.getcwd(), test_file)
+        with open(temp_cnf_file, "w") as cnf_file:
+            config = tests.get_mysql_config()
+            config["use_pure"] = use_pure
+            cnf = "[connector_python]\n"
+            cnf += "\n".join(["{0} = {1}".format(key, value)
+                             for key, value in config.items()])
+            cnf_file.write(cnf)
+
+    @foreach_cnx()
+    def test_support_use_pure_option_in_config_files(self):
+        if self.cnx.__class__ == CMySQLConnection:
+            temp_cnf_file = "temp_cnf_file_not_pure.cnf"
+            use_pure = False
+        else:
+            temp_cnf_file = "temp_cnf_file_use_pure.cnf"
+            use_pure = True
+        # Prepare config file.
+        self.write_config_file(use_pure, temp_cnf_file)
+        # Get connection
+        with mysql.connector.connect(option_files=temp_cnf_file) as cnx:
+            self.assertEqual(self.cnx.__class__, cnx.__class__)
+        # Remove config file
+        os.remove(temp_cnf_file)
+
+
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 17),
                  "MySQL 8.0.17+ is required for utf8mb4_0900_bin collation")
 class BugOra29855733(tests.MySQLConnectorTests):
