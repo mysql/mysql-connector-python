@@ -55,8 +55,9 @@ from django.db import utils
 from django.db.backends import utils as backend_utils
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.signals import connection_created
-from django.utils import (six, timezone, dateparse)
+from django.utils import (timezone, dateparse)
 from django.conf import settings
+import six
 
 from mysql.connector.django.client import DatabaseClient
 from mysql.connector.django.creation import DatabaseCreation

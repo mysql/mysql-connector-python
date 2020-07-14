@@ -3,7 +3,7 @@
 
 import django
 from django.db.models.sql import compiler
-from django.utils.six.moves import zip_longest
+from six.moves import zip_longest
 
 
 class SQLCompiler(compiler.SQLCompiler):
