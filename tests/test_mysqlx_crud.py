@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -2151,6 +2151,29 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                                   "array": "True"}]}
         create_index = collection.create_index(index_name, index_desc)
         self.assertRaises(TypeError, create_index.execute)
+
+        # check error message for wrong collation
+        err_msg = ("The 'collation' member can only be used when field type "
+                   "is set to '{}'")
+        index_name = "age_idx"
+        index_desc = {"fields": [{"field": "$.age", "type": "INT",
+                                  "collation": "utf8mb4_0900_ai_ci"}],
+                      "type": "INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        try:
+            create_index.execute()
+        except mysqlx.ProgrammingError as err:
+            self.assertEqual(err.msg, err_msg.format("INT"))
+
+        index_name = "emails_idx"
+        index_desc = {"fields": [{"field": "$.emails", "type": "CHAR(128)",
+                                  "collation": "utf8mb4_0900_ai_ci"}],
+                      "type": "INDEX"}
+        create_index = collection.create_index(index_name, index_desc)
+        try:
+            create_index.execute()
+        except mysqlx.ProgrammingError as err:
+            self.assertEqual(err.msg, err_msg.format("CHAR(128)"))
 
         self.schema.drop_collection(collection_name)
 

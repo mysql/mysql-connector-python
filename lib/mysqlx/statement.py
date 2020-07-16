@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1405,9 +1405,9 @@ class CreateCollectionIndexStatement(Statement):
                     if not constraint["type"].upper().startswith("TEXT"):
                         raise ProgrammingError(
                             "The 'collation' member can only be used when "
-                            "field  type is set to 'GEOJSON'")
-                    else:
-                        constraint["collation"] = field_desc.pop("collation")
+                            "field type is set to '{}'"
+                            "".format(constraint["type"].upper()))
+                    constraint["collation"] = field_desc.pop("collation")
                 # "options" and "srid" fields in IndexField can be
                 # present only if "type" is set to "GEOJSON"
                 if "options" in field_desc:
@@ -1415,15 +1415,13 @@ class CreateCollectionIndexStatement(Statement):
                         raise ProgrammingError(
                             "The 'options' member can only be used when "
                             "index type is set to 'GEOJSON'")
-                    else:
-                        constraint["options"] = field_desc.pop("options")
+                    constraint["options"] = field_desc.pop("options")
                 if "srid" in field_desc:
                     if constraint["type"].upper() != "GEOJSON":
                         raise ProgrammingError(
                             "The 'srid' member can only be used when index "
                             "type is set to 'GEOJSON'")
-                    else:
-                        constraint["srid"] = field_desc.pop("srid")
+                    constraint["srid"] = field_desc.pop("srid")
                 args["constraint"].append(constraint)
         except KeyError as err:
             raise ProgrammingError("Required inner member {} not found in "
