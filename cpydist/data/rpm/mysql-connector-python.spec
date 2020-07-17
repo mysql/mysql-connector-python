@@ -61,7 +61,7 @@
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
 # set version if not defined through 'rpmbuild'
-%{!?version: %global version 8.0.21}
+%{!?version: %global version 8.0.22}
 
 %global with_openssl_opts ""
 
@@ -289,6 +289,9 @@ rm -rf %{buildroot}
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Fri Jul 17 2020  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.22-1
+- Updated for 8.0.22
+
 * Thu May 28 2020  Prashant Tekriwal <Prashant.Tekriwal@oracle.com> - 8.0.21-1
 - Combined cext package and pure python package to single pkg.
 - Added 'lic_type' variable: sets license type. Default is GPLv2
