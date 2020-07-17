@@ -28,6 +28,7 @@ v8.0.21
 - WL#13847: Add support for context managers
 - WL#13059: Add schema validation support
 - WL#12501: Connection compression
+- BUG#31098686: Unittests for CMD_CHANGE_USER does not cover CMySQLConnection defaults
 - BUG#31060730: Skip pure Python tests if Protobuf is not available
 - BUG#30996790: Fix connect_timeout option behavior
 - BUG#30950184: Fix error when using the fractional part in DATETIME
@@ -35,6 +36,7 @@ v8.0.21
 - BUG#29181907: Fix discovering of MySQL libraries
 - BUG#28627768: JSON_REPLACE not working correctly for SQL tables
 - BUG#27602636: Expressions in Table.update.set() raises an exception
+- BUG#27489937: Support for connection pools in the C extension
 
 v8.0.20
 =======
