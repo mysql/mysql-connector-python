@@ -42,8 +42,8 @@ See the MySQL manual for information on how to change the default storage
 engine:
  http://dev.mysql.com/doc/refman/5.6/en/storage-engine-setting.html
 
-Make sure the database 'cpydjango1' has been created on the Master and is
-also available on the slave.
+Make sure the database 'cpydjango1' has been created on the Main and is
+also available on the subordinate.
  CREATE DATABASE cpydjango1 DEFAULT CHARACTER SET utf8;
 
 Test settings
