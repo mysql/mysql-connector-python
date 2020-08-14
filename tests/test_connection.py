@@ -42,6 +42,11 @@ import subprocess
 import sys
 from time import sleep
 
+try:
+    import gssapi
+except:
+    gssapi = None
+
 import tests
 from . import check_tls_versions_support
 from . import PY2
@@ -2628,7 +2633,7 @@ class WL14110(tests.MySQLConnectorTests):
             "password": "perola",
         }
 
-        # Atempt connection with wrong password
+        # Attempt connection with wrong password
         bad_pass_args = conn_args.copy()
         bad_pass_args["password"] = "wrong_password"
         with self.assertRaises(ProgrammingError) as context:
@@ -2636,7 +2641,7 @@ class WL14110(tests.MySQLConnectorTests):
         self.assertIn("Access denied for user", context.exception.msg,
                       "not the expected error {}".format(context.exception.msg))
 
-        # Atempt connection with correct password
+        # Attempt connection with correct password
         cnx = self.cnx.__class__(**conn_args)
         cnx.cmd_query('SELECT USER()')
         res = cnx.get_rows()[0][0][0]
@@ -2773,7 +2778,7 @@ class WL13994(tests.MySQLConnectorTests):
             "auth_plugin": "mysql_clear_password",
         }
 
-        # Atempt connection with wrong password
+        # Attempt connection with wrong password
         bad_pass_args = conn_args.copy()
         bad_pass_args["password"] = "wrong_password"
         with self.assertRaises(ProgrammingError) as context:
@@ -3052,3 +3057,142 @@ class WL13334(tests.MySQLConnectorTests):
                  "priority":100})
         # connection must be successful
         _ = connect(**cnx_config)
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
+                 "Authentication with ldap_simple not supported")
+#Skip if remote ldap server is not reachable.
+@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
+                 "ldap server is not reachable")
+@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
+                 "Plugin authentication_ldap_sasl not available")
+@unittest.skipIf(os.name == "nt", "Skipping due to GRANT PROXY issue")
+@unittest.skipIf(gssapi == None, "GSSAPI Module not installed")
+class WL14213(tests.MySQLConnectorTests):
+    """WL#14213: Add support for Kerberos authentication.
+    """
+    def setUp(self):
+        self.server = tests.MYSQL_SERVERS[0]
+        self.server_cnf = self.server._cnf
+        self.config = tests.get_mysql_config()
+        self.user = "test3"
+        self.host = "MYSQL.LOCAL"
+
+        cnx = connection.MySQLConnection(**self.config)
+        ext = "dll" if os.name == "nt" else "so"
+        plugin_name = "authentication_ldap_sasl.{}".format(ext)
+
+        ldap_sasl_config = {
+            "plugin-load-add": plugin_name,
+            "authentication_ldap_sasl_auth_method_name": "GSSAPI",
+            "authentication_ldap_sasl_bind_base_dn": '"DC=mysql,DC=local"',
+            "authentication_ldap_sasl_bind_root_dn": '"CN=test2,CN=Users,DC=mysql,DC=local"',
+            "authentication_ldap_sasl_bind_root_pwd": '"Testpw1"',
+            "authentication_ldap_sasl_log_status": 6,
+            "authentication_ldap_sasl_server_host": "100.103.18.98",
+            "authentication_ldap_sasl_server_port": "389",
+            "authentication_ldap_sasl_group_search_attr":"'cn'",
+            "authentication_ldap_sasl_user_search_attr": "sAMAccountName",
+        }
+        cnf = "\n# ldap_sasl"
+        for key in ldap_sasl_config:
+            cnf = "{}\n{}={}".format(cnf, key, ldap_sasl_config[key])
+        self.server_cnf += cnf
+
+        cnx.close()
+        self.server.stop()
+        self.server.wait_down()
+
+        self.server.start(my_cnf=self.server_cnf)
+        self.server.wait_up()
+        sleep(1)
+
+        cnx = connection.MySQLConnection(**self.config)
+
+        try:
+            cnx.cmd_query("DROP USER '{}@{}'".format(self.user, self.host))
+            cnx.cmd_query("DROP USER '{}'".format("mysql_engineering"))
+        except:
+            pass
+
+        cnx.cmd_query("CREATE USER '{}@{}' IDENTIFIED "
+                      "WITH authentication_ldap_sasl "
+                      "BY \"#testgrp=mysql_engineering\""
+                      "".format(self.user, self.host))
+
+        cnx.cmd_query("CREATE USER '{}'".format("mysql_engineering"))
+        cnx.cmd_query("GRANT ALL ON myconnpy.* TO '{}'"
+                      "".format("mysql_engineering"))
+        cnx.cmd_query("GRANT PROXY on '{}' TO '{}@{}'"
+                      "".format("mysql_engineering", self.user, self.host))
+
+        cnx.close()
+
+    def tearDown(self):
+        return
+        cnx = connection.MySQLConnection(**self.config)
+        try:
+            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+            cnx.cmd_query("DROP USER '{}'".format("mysql_engineering"))
+        except:
+            pass
+        cnx.cmd_query("UNINSTALL PLUGIN authentication_ldap_sasl")
+        cnx.close()
+
+    @tests.foreach_cnx()
+    def test_authentication_ldap_sasl_krb(self):
+        """test_authentication_ldap_sasl_client_with_GSSAPI"""
+        # Not running with c-ext if plugin libraries are not setup
+        if self.cnx.__class__ == CMySQLConnection and \
+           os.getenv('TEST_AUTHENTICATION_LDAP_SASL_KRB_CEXT', None) is None:
+            return
+        conn_args = {
+            "user": "test3@MYSQL.LOCAL",
+            "host": self.config["host"],
+            "port": self.config["port"],
+            "password": "Testpw1",
+        }
+
+        # Attempt connection with wrong password
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["password"] = "wrong_password"
+        with self.assertRaises((ProgrammingError, InterfaceError)) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        if os.name == "nt":
+            self.assertIn("Lost connection to MySQL server",
+                          context.exception.msg, "not the expected error {}"
+                          "".format(context.exception.msg))
+        else:
+            self.assertIn("Unable to retrieve credentials with the given "
+                          "password", context.exception.msg, "not the expected "
+                          "error {}".format(context.exception.msg))
+
+        # Attempt connection with correct password
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
+
+        # Force unix_socket to None
+        conn_args["unix_socket"] = None
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()
+
+        # Attempt connection with verify certificate set to True
+        conn_args.update({
+            'ssl_ca': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_CA_cert.pem')),
+            'ssl_cert': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_cert.pem')),
+            'ssl_key': os.path.abspath(
+                os.path.join(tests.SSL_DIR, 'tests_client_key.pem')),
+        })
+        conn_args["ssl_verify_cert"] = True
+        cnx = self.cnx.__class__(**conn_args)
+        cnx.cmd_query('SELECT USER()')
+        res = cnx.get_rows()[0][0][0]
+        self.assertIn(self.user, res, "not the expected user {}".format(res))
+        cnx.close()

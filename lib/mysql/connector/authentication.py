@@ -34,14 +34,22 @@ import hmac
 import logging
 import struct
 from uuid import uuid4
+try:
+    import gssapi
+except:
+    gssapi = None
 
 from . import errors
 from .catch23 import PY2, isstr, UNICODE_TYPES, BYTE_TYPES
 from .utils import (normalize_unicode_string as norm_ustr,
                     validate_normalized_unicode_string as valid_norm)
 
-_LOGGER = logging.getLogger(__name__)
+if PY2:
+    from urllib import quote
+else:
+    from urllib.parse import quote
 
+_LOGGER = logging.getLogger(__name__)
 
 class BaseAuthPlugin(object):
     """Base class for authentication plugins
@@ -280,7 +288,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         server, the second server respond needs to be passed to auth_finalize()
         to finish the authentication process.
     """
-    sasl_mechanisms = ['SCRAM-SHA-1', 'SCRAM-SHA-256']
+    sasl_mechanisms = ['SCRAM-SHA-1', 'SCRAM-SHA-256', 'GSSAPI']
     requires_ssl = False
     plugin_name = 'authentication_ldap_sasl_client'
     def_digest_mode = sha1
@@ -350,6 +358,144 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             cfm = cfm.encode('utf8')
         return cfm
 
+    def _first_message_krb(self):
+        """Get a TGT Authentication request and initiates security context.
+
+        This method will contact the Kerberos KDC in order of obtain a TGT.
+        """
+        _LOGGER.debug("# user name: %s", self._username)
+        user_name = gssapi.raw.names.import_name(self._username.encode('utf8'),
+                                                 name_type=gssapi.NameType.user)
+
+        # Use defaults store = {'ccache': 'FILE:/tmp/krb5cc_1000'}#, 'keytab':'/etc/some.keytab' }
+        # Attempt to retrieve credential from default cache file.
+        try:
+            cred = gssapi.Credentials()
+            _LOGGER.debug("# Stored credentials found, if password was given it"
+                          " will be ignored.")
+            try:
+                # validate credentials has not expired.
+                cred.lifetime
+            except gssapi.raw.exceptions.ExpiredCredentialsError as err:
+                _LOGGER.warning(" Credentials has expired: %s", err)
+                cred.acquire(user_name)
+                raise errors.InterfaceError("Credentials has expired: {}".format(err))
+        except gssapi.raw.misc.GSSError as err:
+            if not self._password:
+                _LOGGER.error(" Unable to retrieve stored credentials: %s", err)
+                raise errors.InterfaceError(
+                    "Unable to retrieve stored credentials error: {}".format(err))
+            else:
+                try:
+                    _LOGGER.debug("# Attempt to retrieve credentials with "
+                                  "given password")
+                    acquire_cred_result = gssapi.raw.acquire_cred_with_password(
+                        user_name, self._password.encode('utf8'), usage="initiate")
+                    cred = acquire_cred_result[0]
+                except gssapi.raw.misc.GSSError as err:
+                    _LOGGER.error(" Unable to retrieve credentials with the given "
+                                  "password: %s", err)
+                    raise errors.ProgrammingError(
+                        "Unable to retrieve credentials with the given password: "
+                        "{}".format(err))
+
+        flags_l = (gssapi.RequirementFlag.mutual_authentication,
+                   gssapi.RequirementFlag.extended_error,
+                   gssapi.RequirementFlag.delegate_to_peer
+        )
+
+        service_principal = "ldap/ldapauth"
+        _LOGGER.debug("# service principal: %s", service_principal)
+        servk = gssapi.Name(service_principal, name_type=gssapi.NameType.kerberos_principal)
+        self.target_name = servk
+        self.ctx = gssapi.SecurityContext(name=servk,
+                                          creds=cred,
+                                          flags=sum(flags_l),
+                                          usage='initiate')
+
+        try:
+            initial_client_token = self.ctx.step()
+        except gssapi.raw.misc.GSSError as err:
+            _LOGGER.error("Unable to initiate security context: %s", err)
+            raise errors.InterfaceError("Unable to initiate security context: {}".format(err))
+
+        _LOGGER.debug("# initial client token: %s", initial_client_token)
+        return initial_client_token
+
+
+    def auth_continue_krb(self, tgt_auth_challenge):
+        """Continue with the Kerberos TGT service request.
+
+        With the TGT authentication service given response generate a TGT
+        service request. This method must be invoked sequentially (in a loop)
+        until the security context is completed and an empty response needs to
+        be send to acknowledge the server.
+
+        Args:
+            tgt_auth_challenge the challenge for the negotiation.
+
+        Returns: tuple (bytearray TGS service request,
+                        bool True if context is completed otherwise False).
+        """
+        _LOGGER.debug("tgt_auth challenge: %s", tgt_auth_challenge)
+
+        resp = self.ctx.step(tgt_auth_challenge)
+        _LOGGER.debug("# context step response: %s", resp)
+        _LOGGER.debug("# context completed?: %s", self.ctx.complete)
+
+        return resp, self.ctx.complete
+
+    def auth_accept_close_handshake(self, message):
+        """Accept handshake and generate closing handshake message for server.
+
+        This method verifies the server authenticity from the given message
+        and included signature and generates the closing handshake for the
+        server.
+
+        When this method is invoked the security context is already established
+        and the client and server can send GSSAPI formated secure messages.
+
+        To finish the authentication handshake the server sends a message
+        with the security layer availability and the maximum buffer size.
+
+        Since the connector only uses the GSSAPI authentication mechanism to
+        authenticate the user with the server, the server will verify clients
+        message signature and terminate the GSSAPI authentication and send two
+        messages; an authentication acceptance b'\x01\x00\x00\x08\x01' and a
+        OK packet (that must be received after sent the returned message from
+        this method).
+
+        Args:
+            message a wrapped hssapi message from the server.
+
+        Returns: bytearray closing handshake message to be send to the server.
+        """
+        if not self.ctx.complete:
+            raise errors.ProgrammingError("Security context is not completed.")
+        _LOGGER.debug("# servers message: %s", message)
+        _LOGGER.debug("# GSSAPI flags in use: %s", self.ctx.actual_flags)
+        try:
+            unwraped = self.ctx.unwrap(message)
+            _LOGGER.debug("# unwraped: %s", unwraped)
+        except gssapi.raw.exceptions.BadMICError as err:
+            _LOGGER.debug("Unable to unwrap server message: %s", err)
+            raise errors.InterfaceError("Unable to unwrap server message: {}"
+                                 "".format(err))
+
+        _LOGGER.debug("# unwrapped server message: %s", unwraped)
+        # The message contents for the clients closing message:
+        #   - security level 1 byte, must be always 1.
+        #   - conciliated buffer size 3 bytes, without importance as no
+        #     further GSSAPI messages will be sends.
+        response = bytearray(b"\x01\x00\x00\00")
+        # Closing handshake must not be encrypted.
+        _LOGGER.debug("# message response: %s", response)
+        wraped = self.ctx.wrap(response, encrypt=False)
+        _LOGGER.debug("# wrapped message response: %s, length: %d",
+                      wraped[0], len(wraped[0]))
+
+        return wraped.message
+
     def auth_response(self):
         """This method will prepare the fist message to the server.
 
@@ -363,6 +509,14 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
                 'is not supported. Only "{}" and "{}" are supported'.format(
                     auth_mechanism, '", "'.join(self.sasl_mechanisms[:-1]),
                     self.sasl_mechanisms[-1]))
+
+        if b'GSSAPI' in self._auth_data:
+            if not gssapi:
+                raise errors.ProgrammingError(
+                    "Module gssapi is required for GSSAPI authentication "
+                    "mechanism but was not found. Unable to authenticate "
+                    "with the server")
+            return self._first_message_krb()
 
         if self._auth_data == b'SCRAM-SHA-256':
             self.def_digest_mode = sha256

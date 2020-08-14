@@ -246,10 +246,12 @@ class MySQLConnection(MySQLConnectionAbstract):
                  username=self._user, password=password,
                  ssl_enabled=self._ssl_active)
             response = auth.auth_response()
+            _LOGGER.debug("# request size: %s", len(response))
             self._socket.send(response)
             packet = self._socket.recv()
-
-            if packet[5] == 114 and packet[6] == 61: # 'r' and '='
+            _LOGGER.debug("server response packet: %s", packet)
+            if new_auth_plugin == "authentication_ldap_sasl_client" \
+               and len(packet) >= 6 and packet[5] == 114 and packet[6] == 61: # 'r' and '='
                 # Continue with sasl authentication
                 dec_response = packet[5:]
                 cresponse = auth.auth_continue(dec_response)
@@ -259,6 +261,41 @@ class MySQLConnection(MySQLConnectionAbstract):
                     if auth.auth_finalize(packet[5:]):
                         # receive packed OK
                         packet = self._socket.recv()
+            elif new_auth_plugin == "authentication_ldap_sasl_client":
+                rcode_size = 5  # header size for the response status code.
+                _LOGGER.debug("# Continue with sasl GSSAPI authentication")
+                _LOGGER.debug("# response header: %s", packet[:rcode_size+1])
+                _LOGGER.debug("# response size: %s", len(packet))
+
+                _LOGGER.debug("# Negotiate a service request")
+                complete = False
+                tries = 0  # To avoid a infinite loop attempt no more than feedback messages
+                while not complete and tries < 5:
+                    _LOGGER.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
+                    _LOGGER.debug("<< server response: %s", packet)
+                    _LOGGER.debug("# response code: %s", packet[:rcode_size + 1])
+                    step, complete = auth.auth_continue_krb(packet[rcode_size:])
+                    _LOGGER.debug(" >> response to server: %s", step)
+                    self._socket.send(step or b'')
+                    packet = self._socket.recv()
+                    tries += 1
+                if not complete:
+                    raise errors.InterfaceError(
+                        "Unable to fulfill server request after %s attempts. "
+                        "Last server response: %s", tries, packet)
+                _LOGGER.debug(" last GSSAPI response from server: %s length: %d",
+                              packet, len(packet))
+                last_step = auth.auth_accept_close_handshake(packet[rcode_size:])
+                _LOGGER.debug(" >> last response to server: %s length: %d",
+                              last_step, len(last_step))
+                self._socket.send(last_step)
+                # Receive final handshake from server
+                packet = self._socket.recv()
+                _LOGGER.debug("<< final handshake from server: %s", packet)
+
+                # receive OK packet from server.
+                packet = self._socket.recv()
+                _LOGGER.debug("<< ok packet from server: %s", packet)
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)

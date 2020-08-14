@@ -143,5 +143,6 @@ setup(
     extras_require={
         "dns-srv": ["dnspython>=1.16.0"],
         "compression": ["lz4>=2.1.6", "zstandard>=0.12.0"],
+        "gssapi": ["gssapi>=1.6.9"],
     }
 )
