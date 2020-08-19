@@ -241,27 +241,15 @@ EXTRA_LINK_ARGS=""
 
 rm -rf %{buildroot}
 
-# skip-build is broken
-
 %{__python2} setup.py ${COMMON_INSTALL_ARGS} \
     --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
     --extra-link-args="${EXTRA_LINK_ARGS}" \
     --with-mysql-capi=%{with_mysql_capi} %{?byte_code_only}
-rm -rf %{buildroot}%{python2_sitearch}/mysql
-rm -rf %{buildroot}%{python2_sitearch}/mysqlx
-%{__python2} setup.py ${COMMON_INSTALL_ARGS} \
-    --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
-    --extra-link-args="${EXTRA_LINK_ARGS}" %{?byte_code_only}
 pushd %{py3dir}
 %{__python3} setup.py ${COMMON_INSTALL_ARGS} \
     --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
     --extra-link-args="${EXTRA_LINK_ARGS}" \
     --with-mysql-capi=%{with_mysql_capi} %{?byte_code_only}
-rm -rf %{buildroot}%{python3_sitearch}/mysql
-rm -rf %{buildroot}%{python3_sitearch}/mysqlx
-%{__python3} setup.py ${COMMON_INSTALL_ARGS} \
-    --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
-    --extra-link-args="${EXTRA_LINK_ARGS}" %{?byte_code_only}
 popd
 
 %clean

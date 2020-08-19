@@ -29,6 +29,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+export DH_VERBOSE = 1
+
 PY2_BUILD_LIB_OPT = --build-lib=build/python2
 PY3_BUILD_LIB_OPT = --build-lib=build/python3
 
@@ -89,79 +91,20 @@ PYTHON2_SUPPORTED=$(shell pyversions -sv | sed -e "s/\s*2\.5\s*//g")
 %:
 	dh $@ $(EXTRA_OPTIONS_DH)
 
-override_dh_auto_build:
-	# Python v2
-	set -xe; \
-	for pyver in $(PYTHON2_SUPPORTED); \
-	do \
-		python$$pyver setup.py build \
-			--build-base=build \
-			$(PY2_BUILD_LIB_OPT) \
-			--build-platlib=build/python2; \
-	done
-
-	# Python v2 C Extension
-	if [ -n "$(WITH_CEXT)" ]; then \
-		set -xe; \
-		for pyver in $(PYTHON2_SUPPORTED); \
-		do \
-			python$$pyver setup.py build_ext \
-				--build-lib=build/python2_cext \
-				--with-mysql-capi=$(MYSQL_CAPI) \
-				--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
-				--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
-				--with-protoc=$(MYSQLXPB_PROTOC) \
-				--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
-				--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT); \
-		done; \
-	fi
-
-	# Python v3
-	set -xe; \
-	for pyver in $(PYTHON3_SUPPORTED); \
-	do \
-		python$$pyver setup.py build \
-			--build-base=build \
-			$(PY3_BUILD_LIB_OPT) \
-			--build-platlib=build/python3; \
-	done
-
-	# Python v3 C Extension
-	if [ -n "$(WITH_CEXT)" ]; then \
-		set -xe; \
-		for pyver in $(PYTHON3_SUPPORTED); \
-		do \
-			python$$pyver setup.py build_ext \
-				--build-lib=build/python3_cext \
-				--with-mysql-capi=$(MYSQL_CAPI) \
-				--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
-				--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
-				--with-protoc=$(MYSQLXPB_PROTOC) \
-				--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
-				--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT); \
-		done; \
-	fi
-
 override_dh_auto_install:
 	# Python v2
 	set -xe; \
 	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT); \
 	for pyver in $(PYTHON2_SUPPORTED); \
 	do \
-	    python$$pyver setup.py \
-		install_lib --build-dir=build/python2 $(EXTRA_INSTALL_LIB_OPTS) \
-		install --skip-build --install-layout=deb \
-		--root $$DESTDIR $(BYTE_CODE_ONLY); \
-	done
-
-	# Python v2 C Extension
-	set -xe; \
-	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT); \
-	for pyver in $(PYTHON2_SUPPORTED); \
-	do \
 		python$$pyver setup.py \
-			install_lib --build-dir=build/python2_cext $(EXTRA_INSTALL_LIB_OPTS) \
-			install --skip-build --install-layout=deb \
+			install --install-layout=deb \
+			--with-mysql-capi=$(MYSQL_CAPI) \
+			--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
+			--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
+			--with-protoc=$(MYSQLXPB_PROTOC) \
+			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
+			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
 			--root $$DESTDIR $(BYTE_CODE_ONLY); \
 		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
 	done
@@ -172,22 +115,22 @@ override_dh_auto_install:
 	for pyver in $(PYTHON3_SUPPORTED); \
 	do \
 		python$$pyver setup.py \
-			install_lib --build-dir=build/python3 $(EXTRA_INSTALL_LIB_OPTS) \
-			install --skip-build --install-layout=deb \
-			--root $$DESTDIR $(BYTE_CODE_ONLY); \
-	done
-
-	# Python v3 C Extension
-	set -xe; \
-	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT)-py3; \
-	for pyver in $(PYTHON3_SUPPORTED); \
-	do \
-		python$$pyver setup.py \
-			install_lib --build-dir=build/python3_cext $(EXTRA_INSTALL_LIB_OPTS) \
-			install --skip-build --install-layout=deb \
+			install --install-layout=deb \
+			--with-mysql-capi=$(MYSQL_CAPI) \
+			--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
+			--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
+			--with-protoc=$(MYSQLXPB_PROTOC) \
+			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
+			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
 			--root $$DESTDIR $(BYTE_CODE_ONLY); \
 		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
 	done
+
+override_dh_python2:
+	dh_python2 --no-ext-rename
+
+override_dh_python3:
+	dh_python3 --no-ext-rename
 
 ifeq ($(BYTE_CODE_ONLY), --byte-code-only)
 override_dh_pysupport:
