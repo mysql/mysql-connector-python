@@ -114,7 +114,7 @@ class DistSolaris(bdist, BaseCommand):
         self.set_undefined_options("bdist", ("dist_dir", "dist_dir"))
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(2)  # Set Distutils logging level to DEBUG
+            log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
     def _prepare_pkg_base(self, template_name, data_dir, root=""):
         """Create and populate the src base directory."""

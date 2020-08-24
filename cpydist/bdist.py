@@ -93,7 +93,7 @@ class DistBinary(bdist):
                                           "bdist.{}".format(self.plat_name))
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(2)  # Set Distutils logging level to DEBUG
+            log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
     def _remove_sources(self):
         """Remove Python source files from the build directory."""

@@ -98,7 +98,7 @@ handler.setFormatter(
     logging.Formatter("%(levelname)s[%(name)s]: %(message)s")
 )
 LOGGER.addHandler(handler)
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.WARNING)
 
 
 class BaseCommand(Command):
@@ -155,7 +155,7 @@ class BaseCommand(Command):
         """Finalize the options."""
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(2)  # Set Distutils logging level to DEBUG
+            log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
         cmd_build_ext = self.distribution.get_command_obj("build_ext")
         cmd_build_ext.with_mysql_capi = self.with_mysql_capi

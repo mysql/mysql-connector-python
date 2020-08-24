@@ -99,7 +99,7 @@ class DistSource(sdist):
         sdist.finalize_options(self)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(2)  # Set Distutils logging level to DEBUG
+            log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
     def make_release_tree(self, base_dir, files):
         """Make the release tree."""
@@ -195,7 +195,7 @@ class SourceGPL(sdist):
 
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(2)  # Set Distutils logging level to DEBUG
+            log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
     def run(self):
         """Run the command."""

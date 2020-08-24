@@ -318,8 +318,7 @@ class DistDeb(BaseCommand):
                                 stderr=subprocess.PIPE,
                                 universal_newlines=True,
                                 env=env)
-        stdout = proc.stdout.read()
-        stderr = proc.stderr.read()
+        stdout, stderr = proc.communicate()
         for line in stdout.split("\n"):
             if self.debug:
                 self.log.info(line)
