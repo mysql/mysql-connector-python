@@ -174,16 +174,7 @@ Provides:      mysql-connector-python3 = %{version}-%{release}
 %endif
 
 Requires:      python3
-
-%if 0%{?rhel} == 7 || 0%{?rhel} == 8 || 0%{?suse_version} == 1315
-
-Requires:      mysql-connector-python3%{?product_suffix}-cext = %{version}-%{release}
-
-%else
-
 Requires:      python3-protobuf >= %{requires_py_protobuf_version}
-
-%endif
 
 # Some operations requires DNSPYTHON but this is not a strict
 # requirement for the RPM install as currently few RPM platforms has
