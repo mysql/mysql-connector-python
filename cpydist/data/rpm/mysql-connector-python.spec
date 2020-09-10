@@ -133,11 +133,20 @@ Requires:      python
 Requires:      python2-dns >= %{wants_py_dnspython_version}
 %endif
 
-Obsoletes:   mysql-connector-python%{?product_suffix}-cext < 8.0.22
+%if 0%{?byte_code_only:1}
+Requires: mysql%{?product_suffix}-client-plugins = %{version}
+%else
+Requires: mysql-community-client-plugins = %{version}
+%endif
+
+Obsoletes:   mysql-connector-python%{?product_suffix}-cext < %{version}-%{release}
+Provides:    mysql-connector-python%{?product_suffix}-cext = %{version}-%{release}
 
 %if 0%{?byte_code_only:1}
 Obsoletes:     mysql-connector-python < %{version}-%{release}
 Provides:      mysql-connector-python = %{version}-%{release}
+Obsoletes:     mysql-connector-python-cext < %{version}-%{release}
+Provides:      mysql-connector-python-cext = %{version}-%{release}
 %endif
 BuildRoot:     %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -166,15 +175,22 @@ Group:         Development/Libraries/Python
 Group:         Development/Libraries
 %endif
 
-Obsoletes:   mysql-connector-python3%{?product_suffix}-cext < 8.0.22
+Obsoletes:   mysql-connector-python3%{?product_suffix}-cext < %{version}-%{release}
+Provides:    mysql-connector-python3%{?product_suffix}-cext = %{version}-%{release}
 
 %if 0%{?byte_code_only:1}
 Obsoletes:     mysql-connector-python3 < %{version}-%{release}
 Provides:      mysql-connector-python3 = %{version}-%{release}
+Obsoletes:     mysql-connector-python3-cext < %{version}-%{release}
+Provides:      mysql-connector-python3-cext = %{version}-%{release}
 %endif
 
 Requires:      python3
+
+# There is no new enough python3-protobuf on some older Linux distros
+%if ! ( 0%{?rhel} == 7 || 0%{?rhel} == 8 || 0%{?suse_version} == 1315 )
 Requires:      python3-protobuf >= %{requires_py_protobuf_version}
+%endif
 
 # Some operations requires DNSPYTHON but this is not a strict
 # requirement for the RPM install as currently few RPM platforms has
@@ -232,6 +248,12 @@ EXTRA_LINK_ARGS=""
 
 rm -rf %{buildroot}
 
+# The LDAP client plugin from the Server is bundled if it exists under
+# 'with_mysql_capi'. For RPM builds we don't want to bundle, instead
+# we want to depend on the MySQL Server "client-plugins" RPM package.
+# Remove the plugin to force the build not to bundle.
+rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
+
 %{__python2} setup.py ${COMMON_INSTALL_ARGS} \
     --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
     --extra-link-args="${EXTRA_LINK_ARGS}" \
@@ -268,8 +290,12 @@ rm -rf %{buildroot}
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
-* Fri Jul 17 2020  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.22-1
+* Mon Sep 07 2020  Kent Boortz <kent.boortz@oracle.com> - 8.0.22-1
 - Updated for 8.0.22
+- Still provide "mysql-connector-python-cext"
+- Removed dependency on "mysql-connector-python3-cext"
+- Disabled the bundling of "authentication_ldap_sasl_client.so"
+  and added dependency on the Server "client-plugin" RPM
 
 * Thu May 28 2020  Prashant Tekriwal <Prashant.Tekriwal@oracle.com> - 8.0.21-1
 - Combined cext package and pure python package to single pkg.
