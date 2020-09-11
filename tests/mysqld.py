@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -142,7 +142,9 @@ def get_pid(pid_file):
     Returns None or int.
     """
     try:
-        return int(open(pid_file, 'r').readline().strip())
+        with open(pid_file, 'r') as fp:
+            pid = int(fp.readline().strip())
+        return pid
     except IOError as err:
         LOGGER.debug("Failed reading pid file: %s", err)
         return None

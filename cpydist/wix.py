@@ -190,6 +190,7 @@ class WiX:
             r"cpydist\data\msi\PY36.wxs",
             r"cpydist\data\msi\PY37.wxs",
             r"cpydist\data\msi\PY38.wxs",
+            r"cpydist\data\msi\PY39.wxs",
             r"cpydist\data\msi\cpy_msi_gui.wxs",
         ]
         if parameters:
@@ -229,6 +230,7 @@ class WiX:
             r"{}\PY36.wixobj".format(data_path),
             r"{}\PY37.wixobj".format(data_path),
             r"{}\PY38.wixobj".format(data_path),
+            r"{}\PY39.wixobj".format(data_path),
         ]
 
         self._run_tool("light.exe", cmdargs)

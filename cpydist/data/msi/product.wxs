@@ -18,6 +18,7 @@
     <Property Id="PREVIOUSVERSIONSINSTALLED36" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED39" Secure="yes" />
 
 	<Upgrade Id="d37ecc44-a317-4c2c-b90a-70b4dc67fb19">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
@@ -48,6 +49,12 @@
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED38"/>
+    </Upgrade>
+	<Upgrade Id="ec8c52c3-ca72-4d59-a21b-6c40111393af">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED39"/>
     </Upgrade>
 
     <!-- Obtain location of the Python interpreters installed on the system-->
@@ -159,8 +166,30 @@
       <?endif?>
     </Property>
 
+    <!-- Python 3.9 -->
+    <Property Id="PYTHON39INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python39InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.9\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python39InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.9-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON39INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python39InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.9\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python39InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.9-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
     <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
-      Installed OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON35INSTALLPATH_ALL OR PYTHON35INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT
+      Installed OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON35INSTALLPATH_ALL OR PYTHON35INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT
     </Condition>
 
     <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
@@ -274,6 +303,29 @@
                 <Directory Id="DjangoDir38" Name="django"/>
                 <Directory Id="ConnectorLocalesDir38" Name="locales">
                   <Directory Id="LocalesEngDir38" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP39" Name="Python39">
+        <Directory Id="PythonLibDir39" Name="Lib">
+          <Directory Id="SitePackagesDir39" Name="site-packages">
+            <Directory Id="EggInfoDir39" Name="mysql_connector_python-$(var.FullVersion)-py3.9.egg-info"/>
+            <Directory Id="MySQLXPackageDir39" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir39" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir39" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir39" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir39" Name="mysql">
+              <Directory Id="VendorDir39" Name="vendor"/>
+              <Directory Id="ConnectorPackageDir39" Name="connector">
+                <Directory Id="DjangoDir39" Name="django"/>
+                <Directory Id="ConnectorLocalesDir39" Name="locales">
+                  <Directory Id="LocalesEngDir39" Name="eng"/>
                 </Directory>
               </Directory>
             </Directory>
@@ -466,6 +518,30 @@
         <?endif?>
       </Feature>
       <?endif?>
+
+      <!-- Python 3.9 -->
+      <?if $(var.BDist39) != "" ?>
+      <Feature Id="Python39" Title="C/py for Python 3.9" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP39" Absent="allow">
+        <Condition Level='0'>Not PYTHON39INSTALLPATH_ALL AND Not PYTHON39INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo39"/>
+        <ComponentRef Id="MySQLPackage39"/>
+        <?if $(var.HaveLdapLibs39) = 1 ?>
+        <ComponentRef Id="Vendor39"/>
+        <?endif?>
+        <ComponentRef Id="ConnectorPackage39"/>
+        <ComponentRef Id="ConnectorLocales39"/>
+        <ComponentRef Id="LocalesEng39"/>
+        <ComponentRef Id="DjangoBackend39"/>
+        <ComponentRef Id="MySQLXPackage39"/>
+        <ComponentRef Id="MySQLXPackagePB239"/>
+        <ComponentRef Id="MySQLXLocales39"/>
+        <ComponentRef Id="MySQLXLocalesEng39"/>
+        <?if $(var.HaveCExt39) = 1 ?>
+        <ComponentRef Id="CExtension39"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
     </Feature>
 
     <!-- Python 3.4 -->
@@ -492,6 +568,11 @@
     <CustomAction Id="SetInstallDirAllP38" Property="INSTALLDIRP38" Value="[PYTHON38INSTALLPATH_ALL]"/>
     <CustomAction Id="ErrDebug38" Error="Installdir: [INSTALLDIRP38]"/>
 
+    <!-- Python 3.9 -->
+    <CustomAction Id="SetInstallDirCurrentP39" Property="INSTALLDIRP39" Value="[PYTHON39INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP39" Property="INSTALLDIRP39" Value="[PYTHON39INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug39" Error="Installdir: [INSTALLDIRP39]"/>
+
     <UIRef Id="WixUI_CPY"/>
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
     <UIRef Id="WixUI_ErrorProgressText" />
@@ -517,6 +598,9 @@
       <!-- Python 3.8 -->
       <Custom Action="SetInstallDirCurrentP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_ALL</Custom>
+      <!-- Python 3.9 -->
+      <Custom Action="SetInstallDirCurrentP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_ALL</Custom>
     </InstallExecuteSequence>
 
     <InstallUISequence>
@@ -536,6 +620,9 @@
       <!-- Python 3.8 -->
       <Custom Action="SetInstallDirCurrentP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_ALL</Custom>
+      <!-- Python 3.9 -->
+      <Custom Action="SetInstallDirCurrentP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_ALL</Custom>
     </InstallUISequence>
   </Product>
 </Wix>

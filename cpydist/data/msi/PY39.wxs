@@ -1,0 +1,246 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<?define ProductName="MySQL Connector Python"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment Id='PY39Fragment'>
+
+    <DirectoryRef Id="EggInfoDir39">
+      <Component Id="EggInfo39" Guid="54612a2a-8cdb-4ece-9b15-fe8a29f71f78" Win64="$(var.Win64)">
+        <File Id="requires.txt39" Name="requires.txt"
+         Source="$(var.BDist39)\mysql_connector_python-$(var.FullVersion)-py3.9.egg-info\requires.txt" DiskId="1"/>
+        <File Id="PKG_INFO39" Name="PKG-INFO"
+         Source="$(var.BDist39)\mysql_connector_python-$(var.FullVersion)-py3.9.egg-info\PKG-INFO" DiskId="1"/>
+        <File Id="top_level.txt39" Name="top_level.txt"
+         Source="$(var.BDist39)\mysql_connector_python-$(var.FullVersion)-py3.9.egg-info\top_level.txt" DiskId="1"/>
+        <File Id="dependency_links.txt39" Name="dependency_links.txt"
+         Source="$(var.BDist39)\mysql_connector_python-$(var.FullVersion)-py3.9.egg-info\dependency_links.txt" DiskId="1"/>
+        <File Id="SOURCES.txt39" Name="SOURCES.txt"
+         Source="$(var.BDist39)\mysql_connector_python-$(var.FullVersion)-py3.9.egg-info\SOURCES.txt" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="SitePackagesDir39">
+      <!--
+      Currently no files directly in this location (unless HaveCExt below), but keep as place holder
+      <Component Id="SitePackages39" Guid="e73e5d08-41c9-46b1-ade4-4165d3b31130" Win64="$(var.Win64)">
+      </Component>
+-->
+      <?if $(var.HaveCExt39) = 1 ?>
+      <Component Id="CExtension39" Guid="f510e231-c944-4667-b35d-50cff5b34747" Win64="$(var.Win64)">
+        <File Id="CExtensionLib39" Name="$(var.CExtLibName39)"
+         Source="$(var.BDist39)\$(var.CExtLibName39)" DiskId="1"/>
+        <File Id="CExtensionXPB39" Name="$(var.CExtXPBName39)"
+         Source="$(var.BDist39)\$(var.CExtXPBName39)" DiskId="1"/>
+        <File Id="LibMySQLDLL39" Name="libmysql.dll"
+         Source="$(var.LibMySQLDLL)" DiskId="1"/>
+        <?if "$(var.Platform)"="x64" ?>
+          <File Id="LIBcrypto39" Name="libcrypto-1_1-x64.dll"
+           Source="$(var.LIBcryptoDLL)" DiskId="1"/>
+          <File Id="LIBSSL39" Name="libssl-1_1-x64.dll"
+           Source="$(var.LIBSSLDLL)" DiskId="1"/>
+        <?else?>
+          <File Id="LIBcrypto39" Name="libcrypto-1_1.dll"
+           Source="$(var.LIBcryptoDLL)" DiskId="1"/>
+          <File Id="LIBSSL39" Name="libssl-1_1.dll"
+           Source="$(var.LIBSSLDLL)" DiskId="1"/>
+        <?endif?>
+      </Component>
+      <?endif?>
+    </DirectoryRef>
+
+    <DirectoryRef Id="MySQLXPackageDir39">
+      <Component Id="MySQLXPackage39" Guid="b4964141-ed10-4fa6-9e9a-6d0e4cd570dc" Win64="$(var.Win64)">
+        <File Id="mysqlx_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_authenticationpy39" Name="authentication.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\authentication.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_charsetspy39" Name="charsets.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\charsets.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_compatpy39" Name="compat.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\compat.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_connectionpy39" Name="connection.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\connection.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_constantspy39" Name="constants.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\constants.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_crudpy39" Name="crud.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\crud.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_dbdocpy39" Name="dbdoc.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\dbdoc.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_errorspy39" Name="errors.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\errors.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_errorcodepy39" Name="errorcode.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\errorcode.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_exprpy39" Name="expr.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\expr.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_helperspy39" Name="helpers.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\helpers.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protocolpy39" Name="protocol.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protocol.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_resultpy39" Name="result.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\result.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_statementpy39" Name="statement.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\statement.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="MySQLXPB2Dir39">
+      <Component Id="MySQLXPackagePB239" Guid="996d7946-7ed2-4231-854d-70973635879c" Win64="$(var.Win64)">
+        <File Id="mysqlx_protobuf_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_connection_pb2py39" Name="mysqlx_connection_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_connection_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_crud_pb2py39" Name="mysqlx_crud_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_crud_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_cursor_pb2py39" Name="mysqlx_cursor_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_cursor_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_datatypes_pb2py39" Name="mysqlx_datatypes_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_datatypes_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_expect_pb2py39" Name="mysqlx_expect_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_expect_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_expr_pb2py39" Name="mysqlx_expr_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_expr_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_notice_pb2py39" Name="mysqlx_notice_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_notice_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_pb2py39" Name="mysqlx_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_prepare_pb2py39" Name="mysqlx_prepare_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_prepare_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_resultset_pb2py39" Name="mysqlx_resultset_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_resultset_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_session_pb2py39" Name="mysqlx_session_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_session_pb2.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_protobuf_sql_pb2p39y" Name="mysqlx_sql_pb2.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\protobuf\mysqlx_sql_pb2.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="MySQLXLocalesDir39">
+      <Component Id="MySQLXLocales39" Guid="e2a0c235-8a36-40ce-9634-ea87700d5399" Win64="$(var.Win64)">
+        <File Id="mysqlx_locales_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\locales\__init__.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="MySQLXLocalesEngDir39">
+      <Component Id="MySQLXLocalesEng39" Guid="a51a0970-7162-47b8-8add-ebd1e34ee21f" Win64="$(var.Win64)">
+        <File Id="mysqlx_eng_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\locales\eng\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_eng_clienterrorpy39" Name="client_error.$(var.PyExt)"
+         Source="$(var.BDist39)\mysqlx\locales\eng\client_error.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="MySQLPackageDir39">
+      <Component Id="MySQLPackage39" Guid="f089e86b-6a2b-480e-bae8-f124a0b1e005" Win64="$(var.Win64)">
+        <File Id="mysql_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\__init__.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="VendorDir39">
+      <?if $(var.HaveLdapLibs39) = 1 ?>
+      <Component Id="Vendor39" Guid="ba33e641-5337-4e26-9db5-4c8084b48b3f" Win64="$(var.Win64)">
+        <File Id="authenticationldapsaslclient39" Name="authentication_ldap_sasl_client.dll"
+         Source="$(var.BDist39)\mysql\vendor\authentication_ldap_sasl_client.dll" DiskId="1"/>
+        <File Id="libsasl39" Name="libsasl.dll"
+         Source="$(var.BDist39)\mysql\vendor\libsasl.dll" DiskId="1"/>
+        <File Id="libcrypto_1_139" Name="libcrypto-1_1-x64.dll"
+         Source="$(var.BDist39)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
+        <File Id="saslSCRAM39" Name="saslSCRAM.dll"
+         Source="$(var.BDist39)\mysql\vendor\saslSCRAM.dll" DiskId="1"/>
+      </Component>
+      <?endif?>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ConnectorPackageDir39">
+      <Component Id="ConnectorPackage39" Guid="e877179a-33bf-43e4-82c6-98ae2fd2e98a" Win64="$(var.Win64)">
+        <File Id="initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="connectionpy39" Name="connection.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\connection.$(var.PyExt)" DiskId="1"/>
+        <File Id="constantspy39" Name="constants.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\constants.$(var.PyExt)" DiskId="1"/>
+        <File Id="conversionpy39" Name="conversion.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\conversion.$(var.PyExt)" DiskId="1"/>
+        <File Id="cursorpy39" Name="cursor.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\cursor.$(var.PyExt)" DiskId="1"/>
+        <File Id="dbapipy39" Name="dbapi.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\dbapi.$(var.PyExt)" DiskId="1"/>
+        <File Id="errorspy39" Name="errors.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\errors.$(var.PyExt)" DiskId="1"/>
+        <File Id="errorcodepy39" Name="errorcode.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\errorcode.$(var.PyExt)" DiskId="1"/>
+        <File Id="networkpy39" Name="network.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\network.$(var.PyExt)" DiskId="1"/>
+        <File Id="protocolpy39" Name="protocol.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\protocol.$(var.PyExt)" DiskId="1"/>
+        <File Id="utilspy39" Name="utils.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\utils.$(var.PyExt)" DiskId="1"/>
+        <File Id="versionpy39" Name="version.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\version.$(var.PyExt)" DiskId="1"/>
+        <File Id="poolingpy39" Name="pooling.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\pooling.$(var.PyExt)" DiskId="1"/>
+        <File Id="charsetspy39" Name="charsets.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\charsets.$(var.PyExt)" DiskId="1"/>
+        <File Id="authenticationpy39" Name="authentication.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\authentication.$(var.PyExt)" DiskId="1"/>
+        <File Id="catch23py39" Name="catch23.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\catch23.$(var.PyExt)" DiskId="1"/>
+        <File Id="optionfilespy39" Name="optionfiles.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\optionfiles.$(var.PyExt)" DiskId="1"/>
+        <File Id="customtypespy39" Name="custom_types.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\custom_types.$(var.PyExt)" DiskId="1"/>
+        <File Id="abstractspy39" Name="abstracts.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\abstracts.$(var.PyExt)" DiskId="1"/>
+
+        <?if $(var.HaveCExt39) = 1 ?>
+        <File Id="connectioncextpy39" Name="connection_cext.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\connection_cext.$(var.PyExt)" DiskId="1"/>
+        <File Id="cursorcextpy39" Name="cursor_cext.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\cursor_cext.$(var.PyExt)" DiskId="1"/>
+        <?endif?>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ConnectorLocalesDir39">
+      <Component Id="ConnectorLocales39" Guid="0dd62277-691e-4507-a13a-4ac601b2b013" Win64="$(var.Win64)">
+        <File Id="locales_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\locales\__init__.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="LocalesEngDir39">
+      <Component Id="LocalesEng39" Guid="ec1ef3e5-a80d-49e5-9246-f5a00685612d" Win64="$(var.Win64)">
+        <File Id="eng_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\locales\eng\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="eng_clienterrorpy39" Name="client_error.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\locales\eng\client_error.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DjangoDir39">
+      <Component Id="DjangoBackend39" Guid="066aefc2-f1bd-49c3-86cb-75c16484b3e2" Win64="$(var.Win64)">
+        <File Id="django_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_basepy39" Name="base.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\base.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_clientpy39" Name="client.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\client.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_compilerpy39" Name="compiler.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\compiler.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_creationpy39" Name="creation.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\creation.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_introspectionpy39" Name="introspection.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\introspection.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_validationpy39" Name="validation.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\validation.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_schemapy39" Name="schema.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\schema.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_featurespy39" Name="features.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\features.$(var.PyExt)" DiskId="1"/>
+        <File Id="django_operationspy39" Name="operations.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\django\operations.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
+  </Fragment>
+</Wix>

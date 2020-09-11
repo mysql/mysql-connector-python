@@ -34,6 +34,7 @@ import sys
 import re
 import socket
 import datetime
+import importlib
 import inspect
 import platform
 import unittest
@@ -45,7 +46,6 @@ import traceback
 from cpydist.utils import mysql_c_api_info
 from time import sleep
 from distutils.dist import Distribution
-from imp import load_source
 from functools import wraps
 from pkgutil import walk_packages
 
@@ -74,6 +74,15 @@ except ImportError:
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
 _CACHED_TESTCASES = []
+
+
+def load_source(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    spec = importlib.util.spec_from_loader(name, loader)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    loader.exec_module(module)
+
 
 try:
     from unittest.util import strclass
@@ -255,9 +264,13 @@ def get_test_modules():
 
         module_path = os.path.join(finder.path, name.split('.')[-1] + '.py')
         dsc = '(description not available)'
+
+        testing_dir = os.path.dirname(os.path.realpath(__file__))
+        sys.path.append(os.path.join(testing_dir, '..', 'build', 'testing'))
+
         try:
             mod = load_source(name, module_path)
-        except IOError as exc:
+        except IOError:
             # Not Python source files
             continue
         except ImportError as exc:
@@ -942,7 +955,7 @@ def check_c_extension(exc=None):
         # Nothing to do
         return
 
-    match = re.match('.*Library not loaded:\s(.+)\n.*', error_msg)
+    match = re.match(r'.*Library not loaded:\s(.+)\n.*', error_msg)
     if match:
         lib_name = match.group(1)
         LOGGER.error(

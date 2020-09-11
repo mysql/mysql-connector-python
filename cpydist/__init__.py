@@ -35,8 +35,7 @@ import shutil
 import sys
 
 from glob import glob
-from subprocess import check_call, Popen, PIPE
-
+from setuptools.command.build_ext import build_ext
 from distutils import log
 from distutils.command.install import install
 from distutils.command.install_lib import install_lib
@@ -44,8 +43,7 @@ from distutils.core import Command
 from distutils.dir_util import mkpath, remove_tree
 from distutils.sysconfig import get_python_version
 from distutils.version import LooseVersion
-
-from setuptools.command.build_ext import build_ext
+from subprocess import check_call, Popen, PIPE
 
 from .utils import ARCH, mysql_c_api_info, write_info_src, write_info_bin
 
