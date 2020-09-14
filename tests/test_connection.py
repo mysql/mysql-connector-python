@@ -2537,8 +2537,8 @@ class WL13335(tests.MySQLConnectorTests):
 #Skip if remote ldap server is not reachable.
 @unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
                  "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_simple"),
-                 "Plugin authentication_ldap_simple not available")
+@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
+                 "Plugin authentication_ldap_sasl not available")
 class WL14110(tests.MySQLConnectorTests):
     """WL#14110: Add support for SCRAM-SHA-1
     """
