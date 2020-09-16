@@ -282,13 +282,111 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
         # verify an error is shown if server response is not well formated.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_continue("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54")
+            auth_plugin.auth_continue(
+                bytearray("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54".encode()))
         self.assertIn("Incomplete reponse", context.exception.msg,
                       "not the expected error {}".format(context.exception.msg))
 
         # verify an error is shown if server does not authenticate response.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_continue("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40")
+            auth_plugin.auth_continue(
+                bytearray("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40".encode()))
+        self.assertIn("Unable to authenticate resp", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+        bad_proofs = [None, "", b"5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
+        for bad_proof in bad_proofs:
+            # verify an error is shown if server proof is not well formated.
+            with self.assertRaises(InterfaceError) as context:
+                auth_plugin.auth_finalize(bad_proof)
+            self.assertIn("proof is not well formated.", context.exception.msg,
+                          "not the expected: {}".format(context.exception.msg))
+
+        # verify an error is shown it the server can not prove it self.
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_finalize(
+                bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
+        self.assertIn("Unable to proof server identity", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+    def test_auth_response256(self):
+        # Test unsupported mechanism error message
+        auth_data = b'UNKOWN-METHOD'
+        auth_plugin = self.plugin_class(auth_data, username="user",
+                                        password="spam")
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_response()
+        self.assertIn('sasl authentication method "UNKOWN-METHOD"',
+                      context.exception.msg, "not the expected error {}"
+                      "".format(context.exception.msg))
+        self.assertIn("is not supported", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+        with self.assertRaises(NotImplementedError) as context:
+            auth_plugin.prepare_password()
+
+        # Test SCRAM-SHA-256 mechanism is accepted
+        auth_data = b'SCRAM-SHA-256'
+
+        auth_plugin = self.plugin_class(auth_data, username="", password="")
+
+        # Verify the format of the first message from client.
+        exp = b'n,a=,n=,r='
+        client_first_nsg = auth_plugin.auth_response()
+        self.assertTrue(client_first_nsg.startswith(exp),
+                        "got header: {}".format(auth_plugin.auth_response()))
+
+        auth_plugin = self.plugin_class(auth_data, username="user",
+                                        password="spam")
+
+        # Verify the length of the client's nonce in r=
+        cnonce = client_first_nsg[(len(b'n,a=,n=,r=')):]
+        r_len = len(cnonce)
+        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+
+        # Verify the format of the first message from client.
+        exp = b'n,a=user,n=user,r='
+        client_first_nsg = auth_plugin.auth_response()
+        self.assertTrue(client_first_nsg.startswith(exp),
+                        "got header: {}".format(auth_plugin.auth_response()))
+
+        # Verify the length of the client's nonce in r=
+        cnonce = client_first_nsg[(len(exp)):]
+        r_len = len(cnonce)
+        self.assertEqual(32, r_len, "Unexpected cnonce legth {}, response {}"
+                         "".format(len(cnonce), client_first_nsg))
+
+        # Verify that a user name that requires character mapping is mapped
+        auth_plugin = self.plugin_class(auth_data, username=u"u\u1680ser",
+                                        password="spam")
+        exp = b'n,a=u ser,n=u ser,r='
+        client_first_nsg = auth_plugin.auth_response()
+        self.assertTrue(client_first_nsg.startswith(exp),
+                        "got header: {}".format(auth_plugin.auth_response()))
+
+        # Verify the length of the client's nonce in r=
+        cnonce = client_first_nsg[(len(exp)):]
+        r_len = len(cnonce)
+        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+
+        bad_responses = [None, "", "v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
+        for bad_res in bad_responses:
+            # verify an error is shown if server response is not as expected.
+            with self.assertRaises(InterfaceError) as context:
+                auth_plugin.auth_continue(bad_res)
+            self.assertIn("Unexpected server message", context.exception.msg,
+                          "not the expected: {}".format(context.exception.msg))
+
+        # verify an error is shown if server response is not well formated.
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_continue(
+                bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54"))
+        self.assertIn("Incomplete reponse", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+        # verify an error is shown if server does not authenticate response.
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_continue(
+                bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40"))
         self.assertIn("Unable to authenticate resp", context.exception.msg,
                       "not the expected error {}".format(context.exception.msg))
 

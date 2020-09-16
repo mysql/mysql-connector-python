@@ -36,7 +36,7 @@ import struct
 from uuid import uuid4
 
 from . import errors
-from .catch23 import PY2, isstr, UNICODE_TYPES, STRING_TYPES
+from .catch23 import PY2, isstr, UNICODE_TYPES, BYTE_TYPES
 from .utils import (normalize_unicode_string as norm_ustr,
                     validate_normalized_unicode_string as valid_norm)
 
@@ -267,9 +267,9 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
 
     The MySQL's ldap sasl authentication plugin support two authentication
     methods SCRAM-SHA-1 and GSSAPI (using Kerberos). This implementation only
-    support SCRAM-SHA-1.
+    support SCRAM-SHA-1 and SCRAM-SHA-256.
 
-    SCRAM-SHA-1
+    SCRAM-SHA-1 amd SCRAM-SHA-256
         This method requires 2 messages from client and 2 responses from
         server.
 
@@ -280,6 +280,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         server, the second server respond needs to be passed to auth_finalize()
         to finish the authentication process.
     """
+    sasl_mechanisms = ['SCRAM-SHA-1', 'SCRAM-SHA-256']
     requires_ssl = False
     plugin_name = 'authentication_ldap_sasl_client'
     def_digest_mode = sha1
@@ -354,14 +355,17 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
 
         Returns bytes to send to the server as the first message.
         """
-        # We only support SCRAM-SHA-1 authentication method.
-        _LOGGER.debug("read_method_name_from_server: %s",
-                      self._auth_data.decode())
-        if self._auth_data != b'SCRAM-SHA-1':
+        auth_mechanism = self._auth_data.decode()
+        _LOGGER.debug("read_method_name_from_server: %s", auth_mechanism)
+        if auth_mechanism not in self.sasl_mechanisms:
             raise errors.InterfaceError(
                 'The sasl authentication method "{}" requested from the server '
-                'is not supported. Only "{}" is supported'.format(
-                    self._auth_data, "SCRAM-SHA-1"))
+                'is not supported. Only "{}" and "{}" are supported'.format(
+                    auth_mechanism, '", "'.join(self.sasl_mechanisms[:-1]),
+                    self.sasl_mechanisms[-1]))
+
+        if self._auth_data == b'SCRAM-SHA-256':
+            self.def_digest_mode = sha256
 
         return self._first_message()
 
@@ -440,11 +444,12 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         First message from the server is in the form:
             <server_salt>,i=<iterations>
         """
-        self.servers_first = servers_first
-        if not servers_first or not isinstance(servers_first, STRING_TYPES):
+        if not servers_first or not isinstance(servers_first, BYTE_TYPES):
             raise errors.InterfaceError("Unexpected server message: {}"
                                         "".format(servers_first))
         try:
+            servers_first = servers_first.decode()
+            self.servers_first = servers_first
             r_server_nonce, s_salt, i_counter = servers_first.split(",")
         except ValueError:
             raise errors.InterfaceError("Unexpected server message: {}"

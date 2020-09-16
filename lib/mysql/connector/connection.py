@@ -251,7 +251,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
             if packet[5] == 114 and packet[6] == 61: # 'r' and '='
                 # Continue with sasl authentication
-                dec_response = packet[5:].decode()
+                dec_response = packet[5:]
                 cresponse = auth.auth_continue(dec_response)
                 self._socket.send(cresponse)
                 packet = self._socket.recv()
