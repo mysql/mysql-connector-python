@@ -77,11 +77,11 @@ else
   PYTHON3_SUPPORTED=
 endif
 
-ifeq ($(BYTE_CODE_ONLY), 1)
-    BYTE_CODE_ONLY = --byte-code-only
+ifneq ($(BYTE_CODE_ONLY),)
+    BYTE_CODE_ONLY_OPT = --byte-code-only
     EXTRA_OPTIONS_DH =
 else
-    BYTE_CODE_ONLY =
+    BYTE_CODE_ONLY_OPT =
     EXTRA_OPTIONS_DH = --buildsystem=python_distutils --with $(WITHPYTHON)
 endif
 
@@ -105,7 +105,7 @@ override_dh_auto_install:
 			--with-protoc=$(MYSQLXPB_PROTOC) \
 			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
 			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
-			--root $$DESTDIR $(BYTE_CODE_ONLY); \
+			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT); \
 		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
 	done
 
@@ -122,7 +122,7 @@ override_dh_auto_install:
 			--with-protoc=$(MYSQLXPB_PROTOC) \
 			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
 			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
-			--root $$DESTDIR $(BYTE_CODE_ONLY); \
+			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT); \
 		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
 	done
 
@@ -132,7 +132,7 @@ override_dh_python2:
 override_dh_python3:
 	dh_python3 --no-ext-rename
 
-ifeq ($(BYTE_CODE_ONLY), --byte-code-only)
+ifneq ($(BYTE_CODE_ONLY),)
 override_dh_pysupport:
 	# Skipped. We need to keep the .pyc files.
 endif

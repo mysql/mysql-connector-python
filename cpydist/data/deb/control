@@ -9,7 +9,7 @@ Homepage: http://dev.mysql.com/downloads/connector/python/
 X-Python3-Version: >= 3.4
 
 Package: mysql-connector-python
-Architecture: all
+Architecture: any
 Depends:
  ${python:Depends},
  ${python2-protobuf:Depends}
@@ -21,7 +21,7 @@ Description: MySQL database driver written in pure Python
  @LICENSE@
 
 Package: mysql-connector-python-py3
-Architecture: all
+Architecture: any
 Depends:
  ${python3:Depends},
  ${python3-protobuf:Depends},
