@@ -47,8 +47,10 @@ else:
     HAVE_DNSPYTHON = True
 
 import random
+import warnings
 
 from . import version
+from .catch23 import PY2
 from .connection import MySQLConnection
 from .constants import DEFAULT_CONFIGURATION
 from .errors import (  # pylint: disable=W0622
@@ -63,6 +65,11 @@ from .dbapi import (
     STRING, BINARY, NUMBER, DATETIME, ROWID,
     apilevel, threadsafety, paramstyle)
 from .optionfiles import read_option_files
+
+if PY2:
+    warnings.warn("MySQL Connector/Python will drop support for Python 2.7 in "
+                  "release 8.0.24. Please upgrade your Python as Python 2.7 "
+                  "won't work after this release", category=DeprecationWarning)
 
 _CONNECTION_POOLS = {}
 
