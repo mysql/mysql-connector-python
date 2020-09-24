@@ -1309,7 +1309,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                          self.cnx.connection_id)
 
         del self.cnx._handshake['server_threadid']
-        self.assertEqual(None, self.cnx.connection_id)
+        self.assertIsNone(self.cnx.connection_id)
+
+        self.cnx.close()
+        self.assertIsNone(self.cnx.connection_id)
+        self.cnx.connect()
 
     def test_set_login(self):
         """Set login information for MySQL"""

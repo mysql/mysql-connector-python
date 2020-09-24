@@ -229,8 +229,8 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not operation:
             return None
 
-        if not self._cnx:
-            raise errors.ProgrammingError("Cursor is not connected")
+        if not self._cnx or self._cnx.is_closed():
+            raise errors.ProgrammingError("Cursor is not connected", 2055)
         self._cnx.handle_unread_result()
 
         stmt = ''
@@ -903,8 +903,8 @@ class CMySQLCursorPrepared(CMySQLCursor):
         if not operation:
             return
 
-        if not self._cnx:
-            raise errors.ProgrammingError("Cursor is not connected")
+        if not self._cnx or self._cnx.is_closed():
+            raise errors.ProgrammingError("Cursor is not connected", 2055)
 
         self._cnx.handle_unread_result(prepared=True)
 

@@ -1743,7 +1743,8 @@ class BugOra17022399(tests.MySQLConnectorTests):
         self.cnx.close()
         try:
             cur.execute("SELECT 1")
-        except mysql.connector.OperationalError as exc:
+        except (mysql.connector.OperationalError,
+                mysql.connector.ProgrammingError) as exc:
             self.assertEqual(2055, exc.errno, 'Was: ' + str(exc))
 
     @cnx_config(client_flags=[constants.ClientFlag.COMPRESS])
@@ -1753,7 +1754,8 @@ class BugOra17022399(tests.MySQLConnectorTests):
         self.cnx.close()
         try:
             cur.execute("SELECT 1")
-        except mysql.connector.OperationalError as exc:
+        except (mysql.connector.OperationalError,
+                mysql.connector.ProgrammingError) as exc:
             self.assertEqual(2055, exc.errno, 'Was: ' + str(exc))
 
 

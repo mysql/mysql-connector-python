@@ -341,6 +341,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         except (AttributeError, errors.Error):
             pass  # Getting an exception would mean we are disconnected.
         self._socket.close_connection()
+        self._handshake = None
 
     disconnect = close
 
@@ -950,10 +951,9 @@ class MySQLConnection(MySQLConnectionAbstract):
     @property
     def connection_id(self):
         """MySQL connection ID"""
-        try:
-            return self._handshake['server_threadid']
-        except KeyError:
-            return None
+        if self._handshake:
+            return self._handshake.get("server_threadid")
+        return None
 
     def cursor(self, buffered=None, raw=None, prepared=None, cursor_class=None,
                dictionary=None, named_tuple=None):

@@ -143,3 +143,12 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
         exp = ('2',) if PY2 else (b'2',)
         self.assertNotEqual(exp, self.cnx.get_rows()[0][0])
+
+    def test_connection_id(self):
+        """MySQL connection ID"""
+        self.assertEqual(self.cnx._cmysql.thread_id(),
+                         self.cnx.connection_id)
+        self.cnx.close()
+        self.assertIsNone(self.cnx.connection_id)
+        self.cnx.connect()
+

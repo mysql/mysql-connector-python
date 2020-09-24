@@ -246,8 +246,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
             except MySQLInterfaceError as exc:
                 raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                                  sqlstate=exc.sqlstate)
-            self._cmysql = None
     disconnect = close
+
+    def is_closed(self):
+        """Return True if the connection to MySQL Server is closed."""
+        return not self._cmysql.connected()
 
     def is_connected(self):
         """Reports whether the connection to MySQL Server is available"""
