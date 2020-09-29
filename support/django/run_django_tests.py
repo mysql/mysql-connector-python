@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -42,8 +42,8 @@ See the MySQL manual for information on how to change the default storage
 engine:
  http://dev.mysql.com/doc/refman/5.6/en/storage-engine-setting.html
 
-Make sure the database 'cpydjango1' has been created on the Master and is
-also available on the slave.
+Make sure the database 'cpydjango1' has been created on the Source and is
+also available on the Replica.
  CREATE DATABASE cpydjango1 DEFAULT CHARACTER SET utf8;
 
 Test settings

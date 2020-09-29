@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -337,7 +337,7 @@ class ServerCmd(_Constants):
     BINLOG_DUMP = 18
     TABLE_DUMP = 19
     CONNECT_OUT = 20
-    REGISTER_SLAVE = 21
+    REGISTER_REPLICA = 21
     STMT_PREPARE = 22
     STMT_EXECUTE = 23
     STMT_SEND_LONG_DATA = 24
@@ -371,7 +371,7 @@ class ServerCmd(_Constants):
         'BINLOG_DUMP': (18, 'BINLOG_DUMP'),
         'TABLE_DUMP': (19, 'TABLE_DUMP'),
         'CONNECT_OUT': (20, 'CONNECT_OUT'),
-        'REGISTER_SLAVE': (21, 'REGISTER_SLAVE'),
+        'REGISTER_REPLICA': (21, 'REGISTER_REPLICA'),
         'STMT_PREPARE': (22, 'STMT_PREPARE'),
         'STMT_EXECUTE': (23, 'STMT_EXECUTE'),
         'STMT_SEND_LONG_DATA': (24, 'STMT_SEND_LONG_DATA'),
@@ -543,7 +543,7 @@ class RefreshOption(_Constants):
     HOST = 1 << 3
     STATUS = 1 << 4
     THREADS = 1 << 5
-    SLAVE = 1 << 6
+    REPLICA = 1 << 6
 
     desc = {
         'GRANT': (1 << 0, 'Refresh grant tables'),
@@ -552,7 +552,7 @@ class RefreshOption(_Constants):
         'HOSTS': (1 << 3, 'Flush host cache'),
         'STATUS': (1 << 4, 'Flush status variables'),
         'THREADS': (1 << 5, 'Flush thread cache'),
-        'SLAVE': (1 << 6, 'Reset master info and restart slave thread'),
+        'REPLICA': (1 << 6, 'Reset source info and restart replica thread'),
     }
 
 

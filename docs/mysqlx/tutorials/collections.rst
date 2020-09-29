@@ -157,14 +157,14 @@ value.
 .. code-block:: python
 
    collection.modify('name == "Daenerys"').patch('''
-   {"dragons":{"drogon": "black with red markings",
+   {"dragons":{"drogon": "dark grayish with red markings",
                "Rhaegal": "green with bronze markings",
                "Viserion": "creamy white, with gold markings",
                "count": 3}}
                ''').execute()
    doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
    assert(doc.dragons == {"count": 3,
-                          "drogon": "black with red markings",
+                          "drogon": "dark grayish with red markings",
                           "Rhaegal": "green with bronze markings",
                           "Viserion": "creamy white, with gold markings"})
 

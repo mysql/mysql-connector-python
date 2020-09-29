@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,8 +29,8 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 # This file was auto-generated.
-_GENERATED_ON = '2018-03-16'
-_MYSQL_VERSION = (8, 0, 11)
+_GENERATED_ON = '2020-09-29'
+_MYSQL_VERSION = (8, 0, 23)
 
 # Start MySQL Error messages
 CR_UNKNOWN_ERROR = u"Unknown MySQL error"
@@ -55,10 +55,10 @@ CR_NAMEDPIPESETSTATE_ERROR = u"Can't set state of named pipe to host: %-.64s  pi
 CR_CANT_READ_CHARSET = u"Can't initialize character set %-.32s (path: %-.100s)"
 CR_NET_PACKET_TOO_LARGE = u"Got packet bigger than 'max_allowed_packet' bytes"
 CR_EMBEDDED_CONNECTION = u"Embedded server"
-CR_PROBE_SLAVE_STATUS = u"Error on SHOW SLAVE STATUS:"
-CR_PROBE_SLAVE_HOSTS = u"Error on SHOW SLAVE HOSTS:"
-CR_PROBE_SLAVE_CONNECT = u"Error connecting to slave:"
-CR_PROBE_MASTER_CONNECT = u"Error connecting to master:"
+CR_PROBE_REPLICA_STATUS = u"Error on SHOW REPLICA STATUS:"
+CR_PROBE_REPLICA_HOSTS = u"Error on SHOW REPLICA HOSTS:"
+CR_PROBE_REPLICA_CONNECT = u"Error connecting to replica:"
+CR_PROBE_SOURCE_CONNECT = u"Error connecting to source:"
 CR_SSL_CONNECTION_ERROR = u"SSL connection error: %-.100s"
 CR_MALFORMED_PACKET = u"Malformed packet"
 CR_WRONG_LICENSE = u"This client library is licensed only for use with MySQL servers having '%s' license"
@@ -98,5 +98,11 @@ CR_AUTH_PLUGIN_ERR = u"Authentication plugin '%s' reported error: %s"
 CR_INSECURE_API_ERR = u"Insecure API function call: '%s' Use instead: '%s'"
 CR_FILE_NAME_TOO_LONG = u"File name is too long"
 CR_SSL_FIPS_MODE_ERR = u"Set FIPS mode ON/STRICT failed"
+CR_DEPRECATED_COMPRESSION_NOT_SUPPORTED = u"Compression protocol not supported with asynchronous protocol"
+CR_COMPRESSION_WRONGLY_CONFIGURED = u"Connection failed due to wrongly configured compression algorithm"
+CR_KERBEROS_USER_NOT_FOUND = u"SSO user not found, Please perform SSO authentication using kerberos."
+CR_LOAD_DATA_LOCAL_INFILE_REJECTED = u"LOAD DATA LOCAL INFILE file request rejected due to restrictions on access."
+CR_LOAD_DATA_LOCAL_INFILE_REALPATH_FAIL = u"Determining the real path for '%s' failed with error (%s): %s"
+CR_DNS_SRV_LOOKUP_FAILED = u"DNS SRV lookup failed with error : %s"
 # End MySQL Error messages
 

@@ -1701,14 +1701,14 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         # Test add and update of a nested attribute with doc value
         result = collection.modify('name == "Daenerys"').patch('''
-        {"dragons":{"drogon": "black with red markings",
+        {"dragons":{"drogon": "dark grayish with red markings",
                     "Rhaegal": "green with bronze markings",
                     "Viserion": "creamy white, with gold markings"}}
                     ''').execute()
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
-            {"drogon": "black with red markings",
+            {"drogon": "dark grayish with red markings",
              "Rhaegal": "green with bronze markings",
              "Viserion": "creamy white, with gold markings"},
             doc.dragons)
@@ -1719,14 +1719,14 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         # Test remove a nested attribute with doc value
         result = collection.modify('name == "Daenerys"').patch(
-            {"dragons": {"drogon": "black with red markings",
+            {"dragons": {"drogon": "dark grayish with red markings",
                          "Rhaegal": "green with bronze markings",
                          "Viserion": None}}
         ).execute()
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
-            {"drogon": "black with red markings",
+            {"drogon": "dark grayish with red markings",
              "Rhaegal": "green with bronze markings"},
             doc.dragons)
 
@@ -1737,7 +1737,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
-            {"drogon": "black with red markings",
+            {"drogon": "dark grayish with red markings",
              "Rhaegal": "green with bronze markings",
              "count": 3},
             doc.dragons)
@@ -1749,7 +1749,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, result.get_affected_items_count())
         doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
         self.assertEqual(
-            {"drogon": "black with red markings",
+            {"drogon": "dark grayish with red markings",
              "Rhaegal": "green with bronze markings",
              "count": 2},
             doc.dragons)
