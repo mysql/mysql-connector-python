@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -39,6 +39,19 @@ import inspect
 import tests
 import mysql.connector as myconn
 
+from mysql.connector.errors import InterfaceError
+
+CURSOR_TYPES = [
+    {},  # MySQLCursor
+    {"buffered": True},  # MySQLCursorBuffered
+    {"raw": True},  # MySQLCursorRaw
+    {"raw": True, "buffered": True},  # MySQLCursorBufferedRaw
+    {"dictionary": True},  # MySQLCursorDict
+    {"dictionary": True, "buffered": True},  # MySQLCursorBufferedDict
+    {"named_tuple": True},  # MySQLCursorNamedTuple
+    {"named_tuple": True, "buffered": True},  # MySQLCursorBufferedNamedTuple
+    {"prepared": True},  # MySQLCursorPrepared
+]
 
 class PEP249Base(tests.MySQLConnectorTests):
 
@@ -272,26 +285,62 @@ class PEP249CursorTests(PEP249Base):
             inspect.ismethod(self.cur.executemany),
             "Cursor object defines executemany, but is not a method")
 
+    @tests.foreach_cnx()
     def test_fetchone(self):
         """Cursor object has fetchone()-method"""
-        self.assertTrue(hasattr(self.cur, 'fetchone'),
-                        "Cursor object has no fetchone()-method")
-        self.assertTrue(inspect.ismethod(self.cur.fetchone),
-                        "Cursor object defines fetchone, but is not a method")
+        for cursor_type in CURSOR_TYPES:
+            with self.cnx.cursor(**cursor_type) as cur:
+                self.assertTrue(hasattr(cur, "fetchone"),
+                                "Cursor object has no fetchone()-method")
+                self.assertTrue(inspect.ismethod(cur.fetchone),
+                                "Cursor object defines fetchone, "
+                                "but is not a method")
+                # An exception is raised if the previous call to execute*()
+                # did not produce any result set or no call was issued yet
+                self.assertRaises(InterfaceError, cur.fetchone)
+                # Fetch results
+                cur.execute("SELECT 1 AS mycolumn")
+                cur.fetchone()
+                # Subquent calls should return None
+                self.assertIsNone(cur.fetchone())
 
+    @tests.foreach_cnx()
     def test_fetchmany(self):
         """Cursor object has fetchmany()-method"""
-        self.assertTrue(hasattr(self.cur, 'execute'),
-                        "Cursor object has no fetchmany()-method")
-        self.assertTrue(inspect.ismethod(self.cur.fetchmany),
-                        "Cursor object defines fetchmany, but is not a method")
+        for cursor_type in CURSOR_TYPES:
+            with self.cnx.cursor(**cursor_type) as cur:
+                self.assertTrue(hasattr(cur, "execute"),
+                                "Cursor object has no fetchmany()-method")
+                self.assertTrue(inspect.ismethod(cur.fetchmany),
+                                "Cursor object defines fetchmany, "
+                                "but is not a method")
+                # An exception is raised if the previous call to execute*()
+                # did not produce any result set or no call was issued yet
+                self.assertRaises(InterfaceError, cur.fetchmany)
+                # Fetch results
+                cur.execute("SELECT 1 AS mycolumn")
+                cur.fetchmany()
+                # Subquent calls should not raise an error
+                cur.fetchmany()
 
+    @tests.foreach_cnx()
     def test_fetchall(self):
         """Cursor object has fetchall()-method"""
-        self.assertTrue(hasattr(self.cur, 'fetchall'),
-                        "Cursor object has no fetchall()-method")
-        self.assertTrue(inspect.ismethod(self.cur.fetchall),
-                        "Cursor object defines fetchall, but is not a method")
+        for cursor_type in CURSOR_TYPES:
+            with self.cnx.cursor(**cursor_type) as cur:
+                self.assertTrue(hasattr(cur, "fetchall"),
+                                "Cursor object has no fetchall()-method")
+                self.assertTrue(inspect.ismethod(cur.fetchall),
+                                "Cursor object defines fetchall, "
+                                "but is not a method")
+                # An exception is raised if the previous call to execute*()
+                # did not produce any result set or no call was issued yet
+                self.assertRaises(InterfaceError, cur.fetchall)
+                # Fetch results
+                cur.execute("SELECT 1 AS mycolumn")
+                cur.fetchall()
+                # Subquent calls should not raise an error
+                cur.fetchall()
 
     def test_nextset(self):
         """Cursor object has nextset()-method"""

@@ -367,6 +367,14 @@ class MySQLCursor(CursorBase):
         except AttributeError:
             return False
 
+    def _check_executed(self):
+        """Check if the statement has been executed.
+
+        Raises an error if the statement has not been executed.
+        """
+        if self._executed is None:
+            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
+
     def next(self):
         """Used for iterating over the result set."""
         return self.__next__()
@@ -667,6 +675,7 @@ class MySQLCursor(CursorBase):
                 return None
             stmt = self._batch_insert(operation, seq_params)
             if stmt is not None:
+                self._executed = stmt
                 return self.execute(stmt)
 
         rowcnt = 0
@@ -875,12 +884,11 @@ class MySQLCursor(CursorBase):
 
         Returns a tuple or None.
         """
-        row = self._fetch_row()
-        if row:
-            return row
-        return None
+        self._check_executed()
+        return self._fetch_row()
 
     def fetchmany(self, size=None):
+        self._check_executed()
         res = []
         cnt = (size or self.arraysize)
         while cnt > 0 and self._have_unread_result():
@@ -891,8 +899,10 @@ class MySQLCursor(CursorBase):
         return res
 
     def fetchall(self):
+        self._check_executed()
         if not self._have_unread_result():
-            raise errors.InterfaceError("No result set to fetch from.")
+            return []
+
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
@@ -995,20 +1005,19 @@ class MySQLCursorBuffered(MySQLCursor):
 
         Returns a tuple or None.
         """
-        row = self._fetch_row()
-        if row:
-            return row
-        return None
+        self._check_executed()
+        return self._fetch_row()
 
     def fetchall(self):
-        if self._rows is None:
-            raise errors.InterfaceError("No result set to fetch from.")
+        if self._executed is None or self._rows is None:
+            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         res = []
         res = self._rows[self._next_row:]
         self._next_row = len(self._rows)
         return res
 
     def fetchmany(self, size=None):
+        self._check_executed()
         res = []
         cnt = (size or self.arraysize)
         while cnt > 0:
@@ -1032,15 +1041,13 @@ class MySQLCursorRaw(MySQLCursor):
     _raw = True
 
     def fetchone(self):
-        row = self._fetch_row(raw=True)
-
-        if row:
-            return row
-        return None
+        self._check_executed()
+        return self._fetch_row(raw=True)
 
     def fetchall(self):
+        self._check_executed()
         if not self._have_unread_result():
-            raise errors.InterfaceError("No result set to fetch from.")
+            return []
         (rows, eof) = self._connection.get_rows(raw=True)
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
@@ -1071,14 +1078,11 @@ class MySQLCursorBufferedRaw(MySQLCursorBuffered):
             pass
 
     def fetchone(self):
-        row = self._fetch_row()
-        if row:
-            return row
-        return None
+        self._check_executed()
+        return self._fetch_row()
 
     def fetchall(self):
-        if self._rows is None:
-            raise errors.InterfaceError("No result set to fetch from.")
+        self._check_executed()
         return [r for r in self._rows[self._next_row:]]
 
     @property
@@ -1247,11 +1251,13 @@ class MySQLCursorPrepared(MySQLCursor):
 
         Returns a tuple or None.
         """
+        self._check_executed()
         if self._cursor_exists:
             self._connection.cmd_stmt_fetch(self._prepared['statement_id'])
         return self._fetch_row() or None
 
     def fetchmany(self, size=None):
+        self._check_executed()
         res = []
         cnt = (size or self.arraysize)
         while cnt > 0 and self._have_unread_result():
@@ -1262,8 +1268,7 @@ class MySQLCursorPrepared(MySQLCursor):
         return res
 
     def fetchall(self):
-        if not self._have_unread_result():
-            raise errors.InterfaceError("No result set to fetch from.")
+        self._check_executed()
         rows = []
         if self._nextrow[0]:
             rows.append(self._nextrow[0])
@@ -1305,6 +1310,7 @@ class MySQLCursorDict(MySQLCursor):
     def fetchone(self):
         """Returns next row of a query result set
         """
+        self._check_executed()
         row = self._fetch_row()
         if row:
             return self._row_to_python(row, self.description)
@@ -1313,8 +1319,10 @@ class MySQLCursorDict(MySQLCursor):
     def fetchall(self):
         """Returns all rows of a query result set
         """
+        self._check_executed()
         if not self._have_unread_result():
-            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
+            return []
+
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
@@ -1359,6 +1367,7 @@ class MySQLCursorNamedTuple(MySQLCursor):
     def fetchone(self):
         """Returns next row of a query result set
         """
+        self._check_executed()
         row = self._fetch_row()
         if row:
             if hasattr(self._connection, 'converter'):
@@ -1369,8 +1378,10 @@ class MySQLCursorNamedTuple(MySQLCursor):
     def fetchall(self):
         """Returns all rows of a query result set
         """
+        self._check_executed()
         if not self._have_unread_result():
-            raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
+            return []
+
         (rows, eof) = self._connection.get_rows()
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
@@ -1392,6 +1403,7 @@ class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
     def fetchone(self):
         """Returns next row of a query result set
         """
+        self._check_executed()
         row = self._fetch_row()
         if row:
             return self._row_to_python(row, self.description)
@@ -1400,7 +1412,7 @@ class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
     def fetchall(self):
         """Returns all rows of a query result set
         """
-        if self._rows is None:
+        if self._executed is None or self._rows is None:
             raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         res = []
         for row in self._rows[self._next_row:]:
@@ -1417,6 +1429,7 @@ class MySQLCursorBufferedNamedTuple(MySQLCursorNamedTuple, MySQLCursorBuffered):
     def fetchone(self):
         """Returns next row of a query result set
         """
+        self._check_executed()
         row = self._fetch_row()
         if row:
             return self._row_to_python(row, self.description)
@@ -1425,7 +1438,7 @@ class MySQLCursorBufferedNamedTuple(MySQLCursorNamedTuple, MySQLCursorBuffered):
     def fetchall(self):
         """Returns all rows of a query result set
         """
-        if self._rows is None:
+        if self._executed is None or self._rows is None:
             raise errors.InterfaceError(ERR_NO_RESULT_TO_FETCH)
         res = []
         for row in self._rows[self._next_row:]:

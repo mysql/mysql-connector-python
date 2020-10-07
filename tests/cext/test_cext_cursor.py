@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -178,7 +178,6 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
                           "INSERT INTO t1 1 %s", [(1,), (2,)])
 
         cur.executemany("SELECT SHA1(%s)", [('foo',), ('bar',)])
-        self.assertEqual(None, cur.fetchone())
 
     def test_executemany(self):
         tbl = 'myconnpy_cursor'
@@ -346,7 +345,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
     def test_fetchone(self):
         cur = self._get_cursor(self.cnx)
 
-        self.assertEqual(None, cur.fetchone())
+        self.assertRaises(errors.InterfaceError, cur.fetchone)
 
         cur = self.cnx.cursor()
         cur.execute("SELECT BINARY 'ham'")
@@ -359,7 +358,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         """MySQLCursor object fetchmany()-method"""
         cur = self._get_cursor(self.cnx)
 
-        self.assertEqual([], cur.fetchmany())
+        self.assertRaises(errors.InterfaceError, cur.fetchmany)
 
         tbl = 'myconnpy_fetch'
         self.setup_table(self.cnx, tbl)
@@ -620,7 +619,7 @@ class CMySQLCursorRawTests(tests.CMySQLCursorTests):
 
     def test_fetchone(self):
         cur = self._get_cursor(self.cnx)
-        self.assertEqual(None, cur.fetchone())
+        self.assertRaises(errors.InterfaceError, cur.fetchone)
 
         cur.execute("SELECT 1, 'string', MAKEDATE(2010,365), 2.5")
         exp = (b'1', b'string', b'2010-12-31', b'2.5')

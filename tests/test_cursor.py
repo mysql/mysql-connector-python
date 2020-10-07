@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -828,7 +828,7 @@ class MySQLCursorTests(tests.TestsCursor):
         """MySQLCursor object fetchone()-method"""
         self.check_method(self.cur, 'fetchone')
 
-        self.assertEqual(None, self.cur.fetchone())
+        self.assertRaises(errors.InterfaceError, self.cur.fetchone)
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
         self.cur = self.cnx.cursor()
@@ -842,7 +842,7 @@ class MySQLCursorTests(tests.TestsCursor):
         """MySQLCursor object fetchmany()-method"""
         self.check_method(self.cur, 'fetchmany')
 
-        self.assertEqual([], self.cur.fetchmany())
+        self.assertRaises(errors.InterfaceError, self.cur.fetchmany)
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
         tbl = 'myconnpy_fetch'
@@ -1070,7 +1070,7 @@ class MySQLCursorRawTests(tests.TestsCursor):
     def test_fetchone(self):
         self.check_method(self.cur, 'fetchone')
 
-        self.assertEqual(None, self.cur.fetchone())
+        self.assertRaises(errors.InterfaceError, self.cur.fetchone)
 
         self.cur.execute("SELECT 1, 'string', MAKEDATE(2010,365), 2.5")
         exp = (b'1', b'string', b'2010-12-31', b'2.5')
@@ -1094,7 +1094,7 @@ class MySQLCursorRawBufferedTests(tests.TestsCursor):
     def test_fetchone(self):
         self.check_method(self.cur, 'fetchone')
 
-        self.assertEqual(None, self.cur.fetchone())
+        self.assertRaises(errors.InterfaceError, self.cur.fetchone)
 
         self.cur.execute("SELECT 1, 'string', MAKEDATE(2010,365), 2.5")
         exp = (b'1', b'string', b'2010-12-31', b'2.5')
@@ -1261,6 +1261,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
                 return None
             return row
         cur._fetch_row = _fetch_row
+        cur._executed = "SELECT 1"
 
         cur._test_fetch_row = [('ham',)]
         self.assertEqual(('ham',), cur.fetchone())
@@ -1277,6 +1278,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
                 return None
             return row
         cur._fetch_row = _fetch_row
+        cur._executed = "SELECT 1"
 
         rows = [(1, b'100'), (2, b'200'), (3, b'300')]
         cur._test_fetch_row = rows
@@ -1299,11 +1301,11 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         rows = [(1, 100), (2, 200), (3, 300)]
         self.cnx._test_fetch_row = rows
         self.cnx.unread_result = True
+        cur._executed = "SELECT 1"
 
         self.assertEqual(rows, cur.fetchall())
         self.assertEqual(len(rows), cur._rowcount)
         self.assertEqual(3, cur._warning_count)
-        self.assertRaises(errors.InterfaceError, cur.fetchall)
 
 
 class MySQLCursorDictTests(tests.TestsCursor):

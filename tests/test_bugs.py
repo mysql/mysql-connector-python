@@ -117,20 +117,6 @@ class Bug441430Tests(tests.MySQLConnectorTests):
         self.cnx.close()
 
 
-class Bug454782(tests.MySQLConnectorTests):
-
-    """lp:454782 fetchone() does not follow pep-0249"""
-
-    @foreach_cnx()
-    def test_fetch_retun_values(self):
-        cur = self.cnx.cursor()
-        self.assertEqual(None, cur.fetchone())
-        self.assertEqual([], cur.fetchmany())
-        self.assertRaises(errors.InterfaceError, cur.fetchall)
-        cur.close()
-        self.cnx.close()
-
-
 class Bug454790(tests.MySQLConnectorTests):
 
     """lp:454790 pyformat / other named parameters broken"""
@@ -5152,7 +5138,7 @@ class BugOra27364914(tests.MySQLConnectorTests):
         self.cnx.commit()
 
         cur.execute("SELECT id, c1 FROM {0} ORDER BY id".format(tablename))
-        for row in cur:
+        for row in cur.fetchall():
             self.assertTrue(isinstance(row[1], STRING_TYPES),
                             "The value is expected to be a string")
             self.assertEqual(data[row[0] - 1], row[1])
