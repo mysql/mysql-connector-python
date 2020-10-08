@@ -774,10 +774,17 @@ class MySQLCursor(CursorBase):
             can_consume_results = self._connection._consume_results
             for result in self._connection.cmd_query_iter(call):
                 self._connection._consume_results = False
-                if self._raw:
-                    tmp = MySQLCursorBufferedRaw(self._connection._get_self())
+                if isinstance(self, (MySQLCursorDict,
+                                     MySQLCursorBufferedDict)):
+                    cursor_class = MySQLCursorBufferedDict
+                elif isinstance(self, (MySQLCursorNamedTuple,
+                                       MySQLCursorBufferedNamedTuple)):
+                    cursor_class = MySQLCursorBufferedNamedTuple
+                elif self._raw:
+                    cursor_class = MySQLCursorBufferedRaw
                 else:
-                    tmp = MySQLCursorBuffered(self._connection._get_self())
+                    cursor_class = MySQLCursorBuffered
+                tmp = cursor_class(self._connection._get_self())
                 tmp._executed = "(a result of {0})".format(call)
                 tmp._handle_result(result)
                 if tmp._warnings is not None:
@@ -788,7 +795,12 @@ class MySQLCursor(CursorBase):
             # pylint: enable=W0212
 
             if argnames:
-                select = "SELECT {0}".format(','.join(argtypes))
+                # Create names aliases to be compatible with namedtuples
+                args = [
+                    "{} AS {}".format(name, alias) for name, alias in
+                    zip(argtypes, [arg.lstrip("@_") for arg in argnames])
+                ]
+                select = "SELECT {}".format(",".join(args))
                 self.execute(select)
                 self._stored_results = results
                 return self.fetchone()

@@ -45,6 +45,7 @@ import io
 import os
 import gc
 import tempfile
+from collections import namedtuple
 from datetime import date, datetime, timedelta, time
 from threading import Thread
 import traceback
@@ -5703,3 +5704,80 @@ class Bug27489937(tests.MySQLConnectorTests):
 
         exp = ('2',) if PY2 else (b'2',)
         self.assertNotEqual(exp, cnx.get_rows()[0][0])
+
+
+class BugOra29195610(tests.MySQLConnectorTests):
+    """BUG#29195610: CALLPROC() NOT SUPPORTED WITH NAMED TUPLE CURSOR AND FOR
+    DICT CURSOR IS IGNORED
+    """
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query("DROP TABLE IF EXISTS bug29195610")
+            cnx.cmd_query("DROP PROCEDURE IF EXISTS sp_bug29195610")
+            cnx.cmd_query("CREATE TABLE bug29195610 (id INT, name VARCHAR(5))")
+            cnx.cmd_query(
+                "INSERT INTO bug29195610 (id, name) VALUES (2020, 'Foo')"
+            )
+            cnx.cmd_query(
+                "CREATE PROCEDURE sp_bug29195610 (in_id INT) "
+                "SELECT id, name FROM bug29195610 WHERE id = in_id;"
+            )
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query("DROP TABLE IF EXISTS bug29195610")
+            cnx.cmd_query("DROP PROCEDURE IF EXISTS sp_bug29195610")
+
+    @foreach_cnx()
+    def test_callproc_cursor_types(self):
+        named_tuple = namedtuple("Row", ["id", "name"])
+        cases = [
+            (
+                {},
+                [(2020, "Foo")]
+            ),
+            (
+                {"buffered": True},
+                [(2020, "Foo")]
+            ),
+            (
+                {"raw": True},
+                [(bytearray(b"2020"), bytearray(b"Foo"))]
+            ),
+            (
+                {"raw": True, "buffered": True},
+                [(bytearray(b"2020"), bytearray(b"Foo"))]
+            ),
+            (
+                {"raw": True, "buffered": True},
+                [(bytearray(b"2020"), bytearray(b"Foo"))]
+            ),
+            (
+                {"dictionary": True},
+                [{"id": 2020, "name": "Foo"}]
+            ),
+            (
+                {"dictionary": True, "buffered": True},
+                [{"id": 2020, "name": "Foo"}]
+            ),
+            (
+                {"named_tuple": True},
+                [named_tuple(2020, "Foo")]
+            ),
+            (
+                {"named_tuple": True, "buffered": True},
+                [named_tuple(2020, "Foo")]
+            )
+        ]
+
+        for cursor_type, exp in cases:
+            with self.cnx.cursor(**cursor_type) as cur:
+                cur.callproc("sp_bug29195610", (2020,))
+                for res in cur.stored_results():
+                    self.assertEqual(exp, res.fetchall())
+
+        with self.cnx.cursor(prepared=True) as cur:
+            self.assertRaises(errors.NotSupportedError,
+                              cur.callproc, 'sp_bug29195610', (2020,))

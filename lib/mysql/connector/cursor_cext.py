@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -450,10 +450,17 @@ class CMySQLCursor(MySQLCursorAbstract):
             while self._cnx.result_set_available:
                 result = self._cnx.fetch_eof_columns()
                 # pylint: disable=W0212
-                if self._raw:
-                    cur = CMySQLCursorBufferedRaw(self._cnx._get_self())
+                if isinstance(self, (CMySQLCursorDict,
+                                     CMySQLCursorBufferedDict)):
+                    cursor_class = CMySQLCursorBufferedDict
+                elif isinstance(self, (CMySQLCursorNamedTuple,
+                                       CMySQLCursorBufferedNamedTuple)):
+                    cursor_class = CMySQLCursorBufferedNamedTuple
+                elif self._raw:
+                    cursor_class = CMySQLCursorBufferedRaw
                 else:
-                    cur = CMySQLCursorBuffered(self._cnx._get_self())
+                    cursor_class = CMySQLCursorBuffered
+                cur = cursor_class(self._cnx._get_self())
                 cur._executed = "(a result of {0})".format(call)
                 cur._handle_result(result)
                 # pylint: enable=W0212
@@ -464,7 +471,12 @@ class CMySQLCursor(MySQLCursorAbstract):
 
             if argnames:
                 self.reset()
-                select = "SELECT {0}".format(','.join(argtypes))
+                # Create names aliases to be compatible with namedtuples
+                args = [
+                    "{} AS {}".format(name, alias) for name, alias in
+                    zip(argtypes, [arg.lstrip("@_") for arg in argnames])
+                ]
+                select = "SELECT {}".format(",".join(args))
                 self.execute(select)
 
                 return self.fetchone()
