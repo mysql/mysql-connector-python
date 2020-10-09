@@ -10,7 +10,7 @@ Introduction
    third-party software which may be included in this distribution of
    MySQL Connector/Python 8.0.
 
-   Last updated: July 2020
+   Last updated: October 2020
 
 Licensing Information
 
@@ -58,8 +58,10 @@ on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 either express or implied. See the License for the specific language
 governing permissions and limitations under the License.
 
-=====================================================================
-=====================================================================
+
+  ======================================================================
+  ======================================================================
+
 
 GNU GENERAL PUBLIC LICENSE
 Version 2, June 1991
@@ -409,8 +411,8 @@ you may consider it more useful to permit linking proprietary
 applications with the library.  If this is what you want to do, use
 the GNU Lesser General Public License instead of this License.
 
-   =====================================================================
-   =====================================================================
+   ======================================================================
+   ======================================================================
 
 The Universal FOSS Exception, Version 1.0
 

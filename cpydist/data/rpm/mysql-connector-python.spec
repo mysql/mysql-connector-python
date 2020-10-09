@@ -61,7 +61,7 @@
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
 # set version if not defined through 'rpmbuild'
-%{!?version: %global version 8.0.22}
+%{!?version: %global version 8.0.23}
 
 %global with_openssl_opts ""
 
@@ -290,6 +290,9 @@ rm -rf %{buildroot}
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Fri Oct 9 2020  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.23-1
+- Updated for 8.0.23
+
 * Mon Sep 07 2020  Kent Boortz <kent.boortz@oracle.com> - 8.0.22-1
 - Updated for 8.0.22
 - Still provide "mysql-connector-python-cext"
