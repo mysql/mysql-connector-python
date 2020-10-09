@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -727,7 +727,7 @@ class MySQLProtocol(object):
 
         packet = (
             utils.int4store(statement_id) +
-            utils.int1store(flags) +
+            utils.int1store(0) +
             utils.int4store(iteration_count) +
             b''.join([struct.pack('B', bit) for bit in null_bitmap]) +
             utils.int1store(1)

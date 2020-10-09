@@ -851,7 +851,9 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             # To comply with the SQL standard, IN returns NULL not only if the
             # expression on the left hand side is NULL, but also if no match
             # is found in the list and one of the expressions in the list is NULL.
-            not_found_without_null = False
+            not_found_without_null = (
+                False if tests.MYSQL_VERSION < (8, 0, 22) else None
+            )
             not_found_with_null = None
             # Value false match result changed
             value_false_match_everything = False

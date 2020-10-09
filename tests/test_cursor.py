@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1165,11 +1165,17 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         stmt = "SELECT (? * 2) AS c1"
         cur.execute(stmt, (5,))
         self.assertEqual(stmt, cur._executed)
+        if tests.MYSQL_VERSION < (8, 0, 22):
+            parameters = [('?', 253, None, None, None, None, 1, 128)]
+            columns = [('c1', 5, None, None, None, None, 1, 128)]
+        else:
+            parameters = [('?', 8, None, None, None, None, 1, 128)]
+            columns = [('c1', 8, None, None, None, None, 1, 128)]
         exp = {
             'num_params': 1, 'statement_id': 1,
-            'parameters': [('?', 253, None, None, None, None, 1, 128)],
+            'parameters': parameters,
             'warning_count': 0, 'num_columns': 1,
-            'columns': [('c1', 5, None, None, None, None, 1, 128)]
+            'columns': columns
         }
         self.assertEqual(exp, cur._prepared)
 
@@ -1182,11 +1188,19 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         self.assertRaises(errors.ProgrammingError, cur2.execute, stmt, (1, 3))
         cur2.execute(stmt, (5,))
         self.assertEqual(stmt, cur2._executed)
+        if tests.MYSQL_VERSION < (8, 0, 22):
+            parameters = [('?', 253, None, None, None, None, 1, 128)]
+            columns = [('c2', 5, None, None, None, None, 1, 128)]
+            statement_id = 2
+        else:
+            parameters = [('?', 8, None, None, None, None, 1, 128)]
+            columns = [('c2', 8, None, None, None, None, 1, 128)]
+            statement_id = 3  # See BUG#31964167 about this change in 8.0.22
         exp = {
-            'num_params': 1, 'statement_id': 2,
-            'parameters': [('?', 253, None, None, None, None, 1, 128)],
+            'num_params': 1, 'statement_id': statement_id,
+            'parameters': parameters,
             'warning_count': 0, 'num_columns': 1,
-            'columns': [('c2', 5, None, None, None, None, 1, 128)]
+            'columns': columns
         }
         self.assertEqual(exp, cur2._prepared)
         self.assertEqual([(15,)], cur2.fetchall())
@@ -1196,14 +1210,16 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         exp = [(5.0,)]
         stmt = "SELECT SQRT(POW(?, 2) + POW(?, 2)) AS hypotenuse"
         cur.execute(stmt, data)
-        self.assertEqual(3, cur._prepared['statement_id'])
+        # See BUG#31964167 about this change in 8.0.22
+        statement_id = 3 if tests.MYSQL_VERSION < (8, 0, 22) else 5
+        self.assertEqual(statement_id, cur._prepared['statement_id'])
         self.assertEqual(exp, cur.fetchall())
 
         # Execute the already prepared statement
         data = (4, 5)
         exp = (6.4031242374328485,)
         cur.execute(stmt, data)
-        self.assertEqual(3, cur._prepared['statement_id'])
+        self.assertEqual(statement_id, cur._prepared['statement_id'])
         self.assertEqual(exp, cur.fetchone())
 
     def test_executemany(self):

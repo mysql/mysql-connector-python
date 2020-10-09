@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -514,26 +514,26 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         # Testing types
         cases = [
             ('ham',
-             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00'
-                       b'\x01\x0f\x00\x03\x68\x61\x6d')),
+             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x0f\x00'
+                       b'\x03ham')),
             (decimal.Decimal('3.14'),
-             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00'
-                       b'\x01\x00\x00\x04\x33\x2e\x31\x34')),
+             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00'
+                       b'\x043.14')),
             (255,
-             bytearray(b'\x01\x00\x00\x00\x80\x01\x00'
-                       b'\x00\x00\x00\x01\x01\x80\xff')),
+             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x01\x80'
+                       b'\xff')),
             (-128,
-             bytearray(b'\x01\x00\x00\x00\x00\x01\x00'
-                       b'\x00\x00\x00\x01\x01\x00\x80')),
+             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x01\x00'
+                       b'\x80')),
             (datetime.datetime(1977, 6, 14, 21, 20, 30),
-             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00'
-                       b'\x01\x0c\x00\x07\xb9\x07\x06\x0e\x15\x14\x1e')),
+             bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x0c\x00'
+                       b'\x07\xb9\x07\x06\x0e\x15\x14\x1e')),
             (datetime.time(14, 53, 36, 345),
              bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x0b\x00'
-                       b'\x0c\x00\x00\x00\x00\x00\x0e\x35\x24\x59\x01\x00\x00')),
+                       b'\x0c\x00\x00\x00\x00\x00\x0e5$Y\x01\x00\x00')),
             (3.14,
              bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x05\x00'
-                       b'\x1f\x85\xeb\x51\xb8\x1e\x09\x40')),
+                       b'\x1f\x85\xebQ\xb8\x1e\t@')),
         ]
         for data, exp in cases:
             res = self._protocol.make_stmt_execute(statement_id, (data,), (1,))
