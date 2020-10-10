@@ -996,6 +996,7 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
     server = in_server if in_server else MYSQL_SERVERS[0]
     plugin_config_vars = config_vars if config_vars else []
     server_cnf = server._cnf
+    server_cnf_bkp = server._cnf
     config = get_mysql_config(server.name)
 
     ext = "dll" if os.name == "nt" else "so"
@@ -1029,14 +1030,14 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
         cnx.close()
         return available
     except:
-        pass
+        LOGGER.warning("# Unable to load plugin '{}'.".format(plugin_name))
     finally:
         server.stop()
         server.wait_down()
-        server.start(my_cnf=server_cnf)
+        server.start(my_cnf=server_cnf_bkp)
         server.wait_up()
         sleep(1)
-    return available
+        return available
 
 def check_tls_versions_support(tls_versions):
     """Check whether we can connect with given TLS version

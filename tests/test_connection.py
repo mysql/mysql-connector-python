@@ -2837,12 +2837,14 @@ class WL13994(tests.MySQLConnectorTests):
         self.assertRaises(InterfaceError, self.cnx.__class__, **conn_args)
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
+plugin_opts = (("authentication_ldap_sasl_auth_method_name", "SCRAM-SHA-256"),)
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 2, 22),
                  "Authentication with ldap_simple not supported")
 #Skip if remote ldap server is not reachable.
 @unittest.skipIf(not tests.is_host_reachable("100.103.19.5"),
                  "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
+@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl",
+                                               plugin_opts),
                  "Plugin authentication_ldap_simple not available")
 class WL14263(tests.MySQLConnectorTests):
     """WL#14110: Add support for SCRAM-SHA-256
