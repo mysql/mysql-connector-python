@@ -47,6 +47,8 @@ class DistWheel(bdist_wheel, BaseCommand):
         """Finalize the options."""
         bdist_wheel.finalize_options(self)
         BaseCommand.finalize_options(self)
+        if self.universal:
+            self.root_is_pure = True
 
     def run(self):
         """Run the command."""
