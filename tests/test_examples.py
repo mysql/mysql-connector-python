@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,7 +36,6 @@ import sys
 import unittest
 import tests
 
-from . import PY2
 import mysql.connector
 
 try:
@@ -144,12 +143,8 @@ class TestExamples(tests.MySQLConnectorTests):
         except Exception as e:
             self.fail(e)
         output = self._exec_main(example)
-        if PY2:
-            exp = [u'Unicode string: ¿Habla español?',
-                   u'Unicode string coming from db: ¿Habla español?']
-        else:
-            exp = ['Unicode string: ¿Habla español?',
-                   'Unicode string coming from db: ¿Habla español?']
+        exp = ['Unicode string: ¿Habla español?',
+               'Unicode string coming from db: ¿Habla español?']
         self.assertEqual(output, exp)
 
         sys.modules.pop('examples.unicode', None)

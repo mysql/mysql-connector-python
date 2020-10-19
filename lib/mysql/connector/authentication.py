@@ -33,21 +33,19 @@ from hashlib import sha1, sha256
 import hmac
 import logging
 import struct
+
+from urllib.parse import quote
 from uuid import uuid4
+
 try:
     import gssapi
 except:
     gssapi = None
 
 from . import errors
-from .catch23 import PY2, isstr, UNICODE_TYPES, BYTE_TYPES
 from .utils import (normalize_unicode_string as norm_ustr,
                     validate_normalized_unicode_string as valid_norm)
 
-if PY2:
-    from urllib import quote
-else:
-    from urllib.parse import quote
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,30 +114,19 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             return b''
         password = self._password
 
-        if isstr(self._password):
+        if isinstance(self._password, str):
             password = self._password.encode('utf-8')
         else:
             password = self._password
 
-        if PY2:
-            password = buffer(password)  # pylint: disable=E0602
-            try:
-                auth_data = buffer(self._auth_data)  # pylint: disable=E0602
-            except TypeError:
-                raise errors.InterfaceError("Authentication data incorrect")
-        else:
-            password = password
-            auth_data = self._auth_data
+        auth_data = self._auth_data
 
         hash4 = None
         try:
             hash1 = sha1(password).digest()
             hash2 = sha1(hash1).digest()
             hash3 = sha1(auth_data + hash2).digest()
-            if PY2:
-                xored = [ord(h1) ^ ord(h3) for (h1, h3) in zip(hash1, hash3)]
-            else:
-                xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
+            xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
             hash4 = struct.pack('20B', *xored)
         except Exception as exc:
             raise errors.InterfaceError(
@@ -160,10 +147,7 @@ class MySQLClearPasswordAuthPlugin(BaseAuthPlugin):
             return b'\x00'
         password = self._password
 
-        if PY2:
-            if isinstance(password, unicode):  # pylint: disable=E0602
-                password = password.encode('utf8')
-        elif isinstance(password, str):
+        if isinstance(password, str):
             password = password.encode('utf8')
 
         return password + b'\x00'
@@ -185,10 +169,7 @@ class MySQLSHA256PasswordAuthPlugin(BaseAuthPlugin):
             return b'\x00'
         password = self._password
 
-        if PY2:
-            if isinstance(password, unicode):  # pylint: disable=E0602
-                password = password.encode('utf8')
-        elif isinstance(password, str):
+        if isinstance(password, str):
             password = password.encode('utf8')
 
         return password + b'\x00'
@@ -219,27 +200,15 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
             return b''
 
         password = self._password.encode('utf-8') \
-            if isinstance(self._password, UNICODE_TYPES) else self._password
-
-        if PY2:
-            password = buffer(password)  # pylint: disable=E0602
-            try:
-                auth_data = buffer(self._auth_data)  # pylint: disable=E0602
-            except TypeError:
-                raise errors.InterfaceError("Authentication data incorrect")
-        else:
-            password = password
-            auth_data = self._auth_data
+            if isinstance(self._password, str) else self._password
+        auth_data = self._auth_data
 
         hash1 = sha256(password).digest()
         hash2 = sha256()
         hash2.update(sha256(hash1).digest())
         hash2.update(auth_data)
         hash2 = hash2.digest()
-        if PY2:
-            xored = [ord(h1) ^ ord(h2) for (h1, h2) in zip(hash1, hash2)]
-        else:
-            xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
+        xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
         hash3 = struct.pack('32B', *xored)
 
         return hash3
@@ -261,10 +230,7 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
             return b'\x00'
         password = self._password
 
-        if PY2:
-            if isinstance(password, UNICODE_TYPES):  # pylint: disable=E0602
-                password = password.encode('utf8')
-        elif isinstance(password, str):
+        if isinstance(password, str):
             password = password.encode('utf8')
 
         return password + b'\x00'
@@ -300,12 +266,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
     server_auth_var = None
 
     def _xor(self, bytes1, bytes2):
-        if PY2:
-            xor = [ord(b1) ^ ord(b2) for b1, b2 in zip(bytes1, bytes2)]
-            xor = b"".join([chr(i) for i in xor])
-            return xor
-        else:
-            return bytes([b1 ^ b2 for b1, b2 in zip(bytes1, bytes2)])
+        return bytes([b1 ^ b2 for b1, b2 in zip(bytes1, bytes2)])
 
     def _hmac(self, password, salt):
         digest_maker = hmac.new(password, salt, self.def_digest_mode)
@@ -352,10 +313,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         cfm = cfm_fprnat.format(user_name=self._normalize(self._username),
                                 client_nonce=self.client_nonce)
 
-        if PY2:
-            if isinstance(cfm, UNICODE_TYPES):  # pylint: disable=E0602
-                cfm = cfm.encode('utf8')
-        elif isinstance(cfm, str):
+        if isinstance(cfm, str):
             cfm = cfm.encode('utf8')
         return cfm
 
@@ -603,7 +561,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         First message from the server is in the form:
             <server_salt>,i=<iterations>
         """
-        if not servers_first or not isinstance(servers_first, BYTE_TYPES):
+        if not servers_first or not isinstance(servers_first, (bytearray, bytes)):
             raise errors.InterfaceError("Unexpected server message: {}"
                                         "".format(servers_first))
         try:

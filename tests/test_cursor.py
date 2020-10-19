@@ -47,7 +47,6 @@ from decimal import Decimal
 import re
 import time
 
-from . import PY2
 import tests
 from mysql.connector import (connection, cursor, errors)
 
@@ -375,7 +374,7 @@ class MySQLCursorTests(tests.TestsCursor):
             b'NULL',
             b'128',
             b'1281288',
-            repr(float(3.14)) if PY2 else b'3.14',
+            b'3.14',
             b"'3.14'",
             b"'back\\\\slash'",
             b"'newline\\n'",
@@ -439,7 +438,7 @@ class MySQLCursorTests(tests.TestsCursor):
             b'a': b'NULL',
             b'b': b'128',
             b'c': b'1281288',
-            b'd': repr(float(3.14)) if PY2 else b'3.14',
+            b'd': b'3.14',
             b'e': b"'3.14'",
             b'f': b"'back\\\\slash'",
             b'g': b"'newline\\n'",
@@ -591,9 +590,7 @@ class MySQLCursorTests(tests.TestsCursor):
             "BEGIN SELECT 1; SELECT 'ham'; END"
         )
         self.cur.execute(procedure)
-        exp_stmt = "CALL multi_results()"
-        if not PY2:
-            exp_stmt = b"CALL multi_results()"
+        exp_stmt = b"CALL multi_results()"
         exp_result = [[(1,)], [(u'ham',)]]
         results = []
         for result in self.cur.execute(exp_stmt, multi=True):

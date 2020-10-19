@@ -30,7 +30,6 @@
 
 import json
 
-from .compat import STRING_TYPES
 from .errors import ProgrammingError
 
 
@@ -56,7 +55,7 @@ class DbDoc(object):
     def __init__(self, value):
         if isinstance(value, dict):
             self.__dict__ = value
-        elif isinstance(value, STRING_TYPES):
+        elif isinstance(value, str):
             self.__dict__ = json.loads(value)
         else:
             raise ValueError("Unable to handle type: {0}".format(type(value)))

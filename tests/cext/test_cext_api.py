@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -320,10 +320,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy.connect(**self.connect_kwargs)
 
-        if tests.PY2:
-            self.assertIsInstance(cmy.thread_id(), long)
-        else:
-            self.assertIsInstance(cmy.thread_id(), int)
+        self.assertIsInstance(cmy.thread_id(), int)
         self.assertGreater(cmy.thread_id(), 0)
         thread_id = cmy.thread_id()
         cmy.close()

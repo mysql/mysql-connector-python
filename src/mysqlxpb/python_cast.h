@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -54,11 +54,6 @@ T common_int_cast(PyObject* obj)
 {
   if (PyLong_CheckExact(obj))
     return static_cast<T>(PyLong_AsLong(obj));
-
-#ifndef PY3
-  if (PyInt_CheckExact(obj))
-    return static_cast<T>(PyInt_AsLong(obj));
-#endif
 
   THROW_BAD_PYTHON_CAST(long);
 }
@@ -125,7 +120,6 @@ std::string python_cast<std::string>(PyObject* obj) {
   if (PyString_CheckExact(obj)) {
     return std::string(PyString_AsString(obj), PyString_Size(obj));
   }
-#ifdef PY3
   else if (PyUnicode_CheckExact(obj)) {
     Py_ssize_t len;
     const char* str = PyUnicode_AsUTF8AndSize(obj, &len);
@@ -133,16 +127,6 @@ std::string python_cast<std::string>(PyObject* obj) {
   } else if (PyBytes_CheckExact(obj)) {
     return std::string(PyBytes_AsString(obj), PyBytes_Size(obj));
   }
-#else
-  else if (PyUnicode_CheckExact(obj)) {
-    PyObject* pystring = PyUnicode_AsUTF8String(obj);
-    if (pystring) {
-      std::string result(PyString_AsString(pystring), PyString_Size(pystring));
-      Py_DECREF(pystring);
-      return result;
-    }
-  }
-#endif
 
   THROW_BAD_PYTHON_CAST(std::string);
 }

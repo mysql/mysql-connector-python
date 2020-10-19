@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -38,7 +38,6 @@ import uuid
 
 import tests
 from mysql.connector import conversion, constants
-from mysql.connector.catch23 import PY2
 
 
 class MySQLConverterBaseTests(tests.MySQLConnectorTests):
@@ -117,8 +116,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         set(['val1', 'val2']),
         int(_to_python_data[8][0]),
         2147483648,
-        unicode(b'\xc3\xa4 utf8 string', 'utf8') if PY2 \
-            else str(b'\xc3\xa4 utf8 string', 'utf8')
+        str(b'\xc3\xa4 utf8 string', 'utf8')
     )
 
     def setUp(self):
@@ -177,7 +175,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             b'NULL',
             b'128',
             b'1281288',
-            repr(float(3.14)) if PY2 else b'3.14',
+            b'3.14',
             b'3.14',
             b"'string A'",
             b"'string B'",

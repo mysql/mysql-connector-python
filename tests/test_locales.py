@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,7 +32,6 @@
 from datetime import datetime
 
 import tests
-from . import PY2
 from mysql.connector import errorcode, locales
 
 
@@ -114,10 +113,5 @@ class LocalesEngClientErrorTests(tests.MySQLConnectorTests):
                 count += 1
         self.assertEqual(len(errors), count)
 
-        if PY2:
-            strtype = unicode  # pylint: disable=E0602
-        else:
-            strtype = str
-
         for name in errors.keys():
-            self.assertTrue(isinstance(getattr(client_error, name), strtype))
+            self.assertTrue(isinstance(getattr(client_error, name), str))

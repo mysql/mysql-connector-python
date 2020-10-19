@@ -37,7 +37,6 @@ import socket
 import sysconfig
 
 from . import errors, version
-from .catch23 import INT_TYPES
 from .constants import (
     CharacterSet, FieldFlag, ServerFlag, ShutdownType, ClientFlag
 )
@@ -735,7 +734,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def cmd_process_kill(self, mysql_pid):
         """Kill a MySQL process"""
-        if not isinstance(mysql_pid, INT_TYPES):
+        if not isinstance(mysql_pid, int):
             raise ValueError("MySQL PID must be int")
         self.info_query("KILL {0}".format(mysql_pid))
 

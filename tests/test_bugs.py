@@ -59,13 +59,11 @@ if tests.SSL_AVAILABLE:
     import ssl
 
 from tests import foreach_cnx, cnx_config
-from . import PY2
 from . import check_tls_versions_support
 from mysql.connector import (connection, cursor, conversion, protocol,
                              errors, constants, pooling)
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.pooling import PooledMySQLConnection
-from mysql.connector.catch23 import STRING_TYPES
 import mysql.connector
 
 try:
@@ -3491,10 +3489,7 @@ class BugOra19777815(tests.MySQLConnectorTests):
         cur.callproc(self.sp2)
 
         exp = [(1,)]
-        if PY2:
-            self.assertEqual(exp, cur.stored_results().next().fetchall())
-        else:
-            self.assertEqual(exp, next(cur.stored_results()).fetchall())
+        self.assertEqual(exp, next(cur.stored_results()).fetchall())
 
         exp = [(u'Warning', 1642, u'TEST WARNING')]
         self.assertEqual(exp, cur.fetchwarnings())
@@ -3899,10 +3894,7 @@ class BugOra21535573(tests.MySQLConnectorTests):
         cur = self.cnx.cursor()
 
         cur.execute("DROP TABLE IF EXISTS {0}".format(tablename))
-        if PY2:
-            column = data.encode(charset)
-        else:
-            column = data
+        column = data
         table = (
             "CREATE TABLE {table} ("
             " {col} INT AUTO_INCREMENT KEY, "
@@ -4434,7 +4426,7 @@ class Bug28133321(tests.MySQLConnectorTests):
 
         for row in rows:
             for col, val in row.items():
-                self.assertTrue(isinstance(col, STRING_TYPES),
+                self.assertTrue(isinstance(col, str),
                                 "The columns name {} is not a string type"
                                 "".format(col))
                 self.assertFalse(isinstance(col, (bytearray)),
@@ -4445,7 +4437,7 @@ class Bug28133321(tests.MySQLConnectorTests):
                                 "".format(val, col))
 
         for col_name in col_names:
-            self.assertTrue(isinstance(col_name, STRING_TYPES),
+            self.assertTrue(isinstance(col_name, str),
                             "The columns name {} is not a string type"
                             "".format(col_name))
             self.assertFalse(isinstance(col_name, (bytearray)),
@@ -5140,7 +5132,7 @@ class BugOra27364914(tests.MySQLConnectorTests):
 
         cur.execute("SELECT id, c1 FROM {0} ORDER BY id".format(tablename))
         for row in cur.fetchall():
-            self.assertTrue(isinstance(row[1], STRING_TYPES),
+            self.assertTrue(isinstance(row[1], str),
                             "The value is expected to be a string")
             self.assertEqual(data[row[0] - 1], row[1])
 
@@ -5235,10 +5227,7 @@ class BugOra27802700(tests.MySQLConnectorTests):
         test_values = ["-12345", "0", "12345"]
         expected_values = [-12345, 0, 12345]
 
-        if PY2:
-            expected_type = (int, long)
-        else:
-            expected_type = (int)
+        expected_type = (int)
         self.run_test_retrieve_stored_type(stm, test_values, expected_values,
                                            column, expected_type)
 
@@ -5249,7 +5238,7 @@ class BugOra27802700(tests.MySQLConnectorTests):
         test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
                        '\'"12345"\'']
         expected_values = [' ', 'some text', u'データベース', '"12345"']
-        expected_type = STRING_TYPES
+        expected_type = str
 
         self.run_test_retrieve_stored_type(stm, test_values, expected_values,
                                            column, expected_type)
@@ -5260,9 +5249,8 @@ class BugOra27802700(tests.MySQLConnectorTests):
         stm = self.insert_stmt.format(self.table_name, column)
         test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
                        "\"'12345'\""]
-        expected_values = [b' ', b'some text', b'\xe3\x83\x87\xe3\x83\xbc\xe3'
-                           b'\x82\xbf\xe3\x83\x99\xe3\x83\xbc\xe3\x82\xb9'
-                           if PY2 else u'データベース'.encode("utf-8"),
+        expected_values = [b' ', b'some text',
+                           u'データベース'.encode("utf-8"),
                            b"'12345'"]
         expected_type = bytes
 
@@ -5276,7 +5264,7 @@ class BugOra27802700(tests.MySQLConnectorTests):
         test_values = ['\' \'', '\'some text\'', u'\'データベース\'',
                        "'12345'"]
         expected_values = [' ', 'some text', u'データベース', "12345"]
-        expected_type = STRING_TYPES
+        expected_type = str
 
         self.run_test_retrieve_stored_type(stm, test_values, expected_values,
                                            column, expected_type)
@@ -5689,7 +5677,7 @@ class Bug27489937(tests.MySQLConnectorTests):
             cnx.cmd_query("SELECT @ham")
             self.assertEqual(exp_session_id, cnx.connection_id)
 
-            exp = ('2',) if PY2 else (b'2',)
+            exp = (b'2',)
             self.assertNotEqual(exp, cnx.get_rows()[0][0])
         self.assertRaises(errors.PoolError, mysql.connector.connect,
                           **self.config)
@@ -5702,7 +5690,7 @@ class Bug27489937(tests.MySQLConnectorTests):
         self.assertIn(cnx.connection_id, session_ids,
                       "Pooled connection was not reused.")
 
-        exp = ('2',) if PY2 else (b'2',)
+        exp = (b'2',)
         self.assertNotEqual(exp, cnx.get_rows()[0][0])
 
 

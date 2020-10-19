@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -38,7 +38,6 @@ import logging
 import unittest
 
 from mysql.connector import errors, errorcode
-from .. import PY2
 
 import tests
 
@@ -554,9 +553,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
             "BEGIN SELECT 1; SELECT 'ham'; END"
         )
         cur.execute(procedure)
-        stmt = "CALL multi_results()"
-        if not PY2:
-            stmt = b"CALL multi_results()"
+        stmt = b"CALL multi_results()"
         exp_result = [[(1,)], [(u'ham',)]]
         results = []
         for result in cur.execute(stmt, multi=True):

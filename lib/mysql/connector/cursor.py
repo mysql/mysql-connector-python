@@ -35,7 +35,6 @@ import weakref
 
 from . import errors
 from .abstracts import MySQLCursorAbstract, NAMED_TUPLE_CACHE
-from .catch23 import PY2
 from .constants import ServerFlag
 
 SQL_COMMENT = r"\/\*.*?\*\/"
@@ -115,14 +114,9 @@ def _bytestr_format_dict(bytestr, value_dict):
         if value is None:
             raise ValueError("Unsupported conversion_type: {0}"
                              "".format(groups["conversion_type"]))
-        return bytes(value) if PY2 else value
+        return value
 
     stmt = RE_PY_MAPPING_PARAM.sub(replace, bytestr)
-    if PY2:
-        try:
-            return stmt.decode("utf-8")
-        except UnicodeDecodeError:
-            pass
     return stmt
 
 
@@ -418,10 +412,7 @@ class MySQLCursor(CursorBase):
                 conv = to_mysql(conv)
                 conv = escape(conv)
                 conv = quote(conv)
-                if PY2:
-                    res[key] = conv
-                else:
-                    res[key.encode()] = conv
+                res[key.encode()] = conv
         except Exception as err:
             raise errors.ProgrammingError(
                 "Failed processing pyformat-parameters; %s" % err)

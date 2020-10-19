@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -40,33 +40,24 @@
 #endif
 #include <mysql.h>
 
-#include "catch23.h"
 #include "exceptions.h"
 #include "mysql_connector.h"
 #include "mysql_capi.h"
 #include "mysql_capi_conversion.h"
 
-#ifdef PY3
-    #define MODULE_SUCCESS_VALUE(val) val
-    #define MODULE_ERROR_VALUE NULL
-    #define MODULE_DEF(ob, name, methods, doc) \
-        {static struct PyModuleDef moduledef = { \
-            PyModuleDef_HEAD_INIT, \
-            name, \
-            doc, \
-            -1, \
-            methods, \
-            NULL, NULL, NULL, NULL, \
-        }; \
-        ob = PyModule_Create(&moduledef); }
-    #define MODULE_INIT PyMODINIT_FUNC PyInit__mysql_connector(void)
-#else
-    #define MODULE_SUCCESS_VALUE(val)
-    #define MODULE_ERROR_VALUE
-    #define MODULE_DEF(ob, name, methods, doc) \
-        ob = Py_InitModule3(name, methods, doc);
-    #define MODULE_INIT PyMODINIT_FUNC init_mysql_connector(void)
-#endif
+#define MODULE_SUCCESS_VALUE(val) val
+#define MODULE_ERROR_VALUE NULL
+#define MODULE_DEF(ob, name, methods, doc) \
+    {static struct PyModuleDef moduledef = { \
+        PyModuleDef_HEAD_INIT, \
+        name, \
+        doc, \
+        -1, \
+        methods, \
+        NULL, NULL, NULL, NULL, \
+    }; \
+    ob = PyModule_Create(&moduledef); }
+#define MODULE_INIT PyMODINIT_FUNC PyInit__mysql_connector(void)
 
 
 PyObject *MySQLError;

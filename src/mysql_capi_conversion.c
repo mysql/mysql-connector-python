@@ -39,7 +39,6 @@
 #endif
 #include <mysql.h>
 
-#include "catch23.h"
 #include "exceptions.h"
 
 #define MINYEAR 1
@@ -163,7 +162,6 @@ is_valid_time(int hours, int mins, int secs, int usecs)
 
   @return   Converted timedelta object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -233,7 +231,7 @@ pytomy_timedelta(PyObject *obj)
         PyOS_snprintf(result, 17, fmt, hours, mins, secs);
     }
 
-    return PyBytesFromString(result);
+    return PyBytes_FromString(result);
 }
 
 /**
@@ -248,7 +246,6 @@ pytomy_timedelta(PyObject *obj)
 
   @return   Converted time object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -281,7 +278,7 @@ pytomy_time(PyObject *obj)
                  PyDateTime_TIME_GET_SECOND(obj));
     }
 
-    return PyBytesFromString(result);
+    return PyBytes_FromString(result);
 }
 
 /**
@@ -296,7 +293,6 @@ pytomy_time(PyObject *obj)
 
   @return   Converted datetime object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -333,7 +329,7 @@ pytomy_datetime(PyObject *obj)
                  PyDateTime_DATE_GET_MINUTE(obj),
                  PyDateTime_DATE_GET_SECOND(obj));
     }
-    return PyBytesFromString(result);
+    return PyBytes_FromString(result);
 }
 
 /**
@@ -348,7 +344,6 @@ pytomy_datetime(PyObject *obj)
 
   @return   Converted date object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -362,10 +357,10 @@ pytomy_date(PyObject *obj)
         return NULL;
     }
 
-    return PyBytesFromFormat("%04d-%02d-%02d",
-                             PyDateTime_GET_YEAR(obj),
-                             PyDateTime_GET_MONTH(obj),
-                             PyDateTime_GET_DAY(obj));
+    return PyBytes_FromFormat("%04d-%02d-%02d",
+                              PyDateTime_GET_YEAR(obj),
+                              PyDateTime_GET_MONTH(obj),
+                              PyDateTime_GET_DAY(obj));
 }
 
 /**
@@ -602,7 +597,6 @@ mytopy_time(const char *data, const unsigned long length)
 
   @return   Converted datetime object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -627,7 +621,6 @@ datetime_to_mysql(PyObject *self, PyObject *datetime)
 
   @return   Converted time object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -652,7 +645,6 @@ time_to_mysql(PyObject *self, PyObject *time)
 
   @return   Converted date object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
 PyObject*
@@ -686,9 +678,9 @@ mytopy_bit(const char *data, const unsigned long length)
         size--;
     }
 #ifdef HAVE_LONG_LONG
-    return PyIntFromULongLong(value);
+    return PyLong_FromUnsignedLongLong(value);
 #else
-    return PyIntFromULong(value);
+    return PyLong_FromUnsignedLong(value);
 #endif
 }
 
@@ -702,37 +694,15 @@ mytopy_bit(const char *data, const unsigned long length)
 
   @return   Converted decimal as string
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 pytomy_decimal(PyObject *obj)
 {
-#ifdef PY3
     PyObject *str= PyObject_Str(obj);
     PyObject *tmp= (const char *)PyUnicode_1BYTE_DATA(str);
     PyObject *ret= PyBytes_FromString(tmp);
     Py_DECREF(tmp);
     return ret;
-#else
-    PyObject *numeric, *new_num;
-    int tmp_size;
-    char *tmp;
-
-    numeric= PyObject_Str(obj);
-    tmp= PyString_AsString(numeric);
-    tmp_size= (int)PyString_Size(numeric);
-    if (tmp[tmp_size - 1] == 'L')
-    {
-        new_num= PyString_FromStringAndSize(tmp, tmp_size);
-        _PyString_Resize(&new_num, tmp_size - 1);
-        return new_num;
-    }
-    else
-    {
-        return numeric;
-    }
-
-#endif
 }
 
 /**
@@ -750,7 +720,6 @@ pytomy_decimal(PyObject *obj)
   @return   Converted string
     @retval PyUnicode   if not BINARY_FLAG
     @retval PyBytes     Python v3 if not use_unicode
-    @retval PyString    Python v2 if not use_unicode
     @retval NULL    Exception
  */
 PyObject*
@@ -768,10 +737,6 @@ mytopy_string(const char *data, const unsigned long length,
     }
     else
     {
-#ifndef PY3
-        return PyStringFromStringAndSize(data, length);
-#else
         return PyBytes_FromStringAndSize(data, length);
-#endif
     }
 }

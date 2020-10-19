@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -131,11 +131,7 @@ static PyObject* ConvertPbToPyRequired(
 
     case google::protobuf::FieldDescriptor::TYPE_BYTES: {
       std::string str = message.GetReflection()->GetString(message, &field);
-#ifdef PY3
       return PyBytes_FromStringAndSize(str.c_str(), str.size());
-#else
-      return PyString_FromStringAndSize(str.c_str(), str.size());
-#endif
     }
 
     case google::protobuf::FieldDescriptor::TYPE_UINT32: {
@@ -232,11 +228,7 @@ static PyObject* ConvertPbToPyRepeated(int index,
     case google::protobuf::FieldDescriptor::TYPE_BYTES: {
       std::string str = message.GetReflection()->
           GetRepeatedString(message, &field, index);
-#ifdef PY3
       return PyBytes_FromStringAndSize(str.c_str(), str.size());
-#else
-      return PyString_FromStringAndSize(str.c_str(), str.size());
-#endif
     }
 
     case google::protobuf::FieldDescriptor::TYPE_UINT32: {
@@ -885,12 +877,7 @@ static PyObject* SerializeMessage(PyObject* self, PyObject* args) {
 
     if (message) {
       std::string buffer = message->SerializeAsString();
-
-#ifdef PY3
       result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
-#else
-      result = PyString_FromStringAndSize(buffer.c_str(), buffer.size());
-#endif
     }
   }
   return result;
@@ -908,12 +895,7 @@ static PyObject* SerializePartialMessage(PyObject* self, PyObject* args) {
 
     if (message) {
       std::string buffer = message->SerializePartialAsString();
-
-#ifdef PY3
       result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
-#else
-      result = PyString_FromStringAndSize(buffer.c_str(), buffer.size());
-#endif
     }
   }
   return result;
@@ -957,18 +939,12 @@ static PyObject* EnumValue(PyObject* self, PyObject* args) {
   return result;
 }
 
-#ifdef PY3
 static void MyFree(void *) {
   google::protobuf::ShutdownProtobufLibrary();
 }
-#endif
 
 PyMODINIT_FUNC
-#ifdef PY3
 PyInit__mysqlxpb() {
-#else
-init_mysqlxpb() {
-#endif
   static const char* kModuleName = "_mysqlxpb";
 
   static PyMethodDef methods_definition[] = {
@@ -987,7 +963,6 @@ init_mysqlxpb() {
   protobuf_description_pool =
       google::protobuf::DescriptorPool::generated_pool();
 
-#ifdef PY3
   static PyModuleDef module_definition = {
     PyModuleDef_HEAD_INIT,
     kModuleName,
@@ -1001,7 +976,4 @@ init_mysqlxpb() {
   };
 
   return PyModule_Create(&module_definition);
-#else
-  Py_InitModule(kModuleName, methods_definition);
-#endif
 }

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,24 +28,9 @@
 
 """Implementation of the Python Database API Specification v2.0 exceptions."""
 
-import sys
-import struct
+from struct import unpack as struct_unpack
 
 from .locales import get_client_error
-
-PY2 = sys.version_info[0] == 2
-
-if PY2:
-    # pylint: disable=E0602
-    def struct_unpack(fmt, buf):
-        """Wrapper around struct.unpack handling buffer as bytes and strings.
-        """
-        if isinstance(buf, (bytearray, bytes)):
-            return struct.unpack_from(fmt, buffer(buf))
-        return struct.unpack_from(fmt, buf)
-    # pylint: enable=E0602
-else:
-    from struct import unpack as struct_unpack
 
 
 class Error(Exception):
@@ -70,7 +55,7 @@ class Error(Exception):
         if self.msg and self.errno != -1:
             fields = {
                 "errno": self.errno,
-                "msg": self.msg.encode("utf8") if PY2 else self.msg
+                "msg": self.msg
             }
             if self.sqlstate:
                 fmt = "{errno} ({state}): {msg}"

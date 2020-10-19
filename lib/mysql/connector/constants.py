@@ -32,7 +32,7 @@
 import ssl
 import warnings
 
-from .catch23 import make_abc
+from .utils import make_abc
 from .errors import ProgrammingError
 from .charsets import MYSQL_CHARACTER_SETS
 

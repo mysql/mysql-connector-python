@@ -33,9 +33,13 @@ import json
 import logging
 import ssl
 
-from . import constants
-from .compat import (INT_TYPES, STRING_TYPES, JSONDecodeError, urlparse,
-                     unquote, parse_qsl)
+from urllib.parse import parse_qsl, unquote, urlparse
+
+try:
+    from json.decoder import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError
+
 from .connection import Client, Session
 from .constants import (Auth, LockContention, OPENSSL_CS_NAMES, SSLMode,
                         TLS_VERSIONS, TLS_CIPHER_SUITES)
@@ -53,8 +57,8 @@ from .statement import (Statement, FilterableStatement, SqlStatement,
                         DeleteStatement, UpdateStatement,
                         CreateCollectionIndexStatement, Expr, ReadStatement,
                         WriteStatement)
-
 from .expr import ExprParser as expr
+
 
 _SPLIT_RE = re.compile(r",(?![^\(\)]*\))")
 _PRIORITY_RE = re.compile(r"^\(address=(.+),priority=(\d+)\)$", re.VERBOSE)
@@ -73,8 +77,8 @@ DUPLICATED_IN_LIST_ERROR = (
     "The '{list}' list must not contain repeated values, the value "
     "'{value}' is duplicated.")
 
-TLS_VERSION_ERROR = ("The given tls-version: '{}' is not recognized as a valid "
-                     "TLS protocol version (should be one of {}).")
+TLS_VERSION_ERROR = ("The given tls-version: '{}' is not recognized as a "
+                     "valid TLS protocol version (should be one of {}).")
 
 TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
                         "'tls-versions' list '{}'. ")
@@ -266,7 +270,7 @@ def _validate_settings(settings):
         settings["compression"] = compression
 
     if "compression-algorithms" in settings:
-        if isinstance(settings["compression-algorithms"], STRING_TYPES):
+        if isinstance(settings["compression-algorithms"], str):
             compression_algorithms = \
                 settings["compression-algorithms"].strip().strip("[]")
             if compression_algorithms:
@@ -285,9 +289,9 @@ def _validate_settings(settings):
 
     if "connect-timeout" in settings:
         try:
-            if isinstance(settings["connect-timeout"], STRING_TYPES):
+            if isinstance(settings["connect-timeout"], str):
                 settings["connect-timeout"] = int(settings["connect-timeout"])
-            if not isinstance(settings["connect-timeout"], INT_TYPES) \
+            if not isinstance(settings["connect-timeout"], int) \
                or settings["connect-timeout"] < 0:
                 raise ValueError
         except ValueError:
@@ -362,7 +366,7 @@ def _validate_connection_attributes(settings):
 
     conn_attrs = settings["connection-attributes"]
 
-    if isinstance(conn_attrs, STRING_TYPES):
+    if isinstance(conn_attrs, str):
         if conn_attrs == "":
             settings["connection-attributes"] = {}
             return
@@ -394,7 +398,7 @@ def _validate_connection_attributes(settings):
     elif isinstance(conn_attrs, dict):
         for attr_name in conn_attrs:
             attr_value = conn_attrs[attr_name]
-            if not isinstance(attr_value, STRING_TYPES):
+            if not isinstance(attr_value, str):
                 attr_value = repr(attr_value)
             attributes[attr_name] = attr_value
     elif isinstance(conn_attrs, bool) or conn_attrs in [0, 1]:
@@ -429,7 +433,7 @@ def _validate_connection_attributes(settings):
             attr_value = attributes[attr_name]
 
             # Validate name type
-            if not isinstance(attr_name, STRING_TYPES):
+            if not isinstance(attr_name, str):
                 raise InterfaceError("Attribute name '{}' must be a string"
                                      "type".format(attr_name))
             # Validate attribute name limit 32 characters
@@ -443,7 +447,7 @@ def _validate_connection_attributes(settings):
                                      "".format(attr_name))
 
             # Validate value type
-            if not isinstance(attr_value, STRING_TYPES):
+            if not isinstance(attr_value, str):
                 raise InterfaceError("Attribute '{}' value: '{}' must "
                                      "be a string type"
                                      "".format(attr_name, attr_value))
@@ -471,7 +475,7 @@ def _validate_tls_versions(settings):
 
     tls_versions_settings = settings["tls-versions"]
 
-    if isinstance(tls_versions_settings, STRING_TYPES):
+    if isinstance(tls_versions_settings, str):
         if not (tls_versions_settings.startswith("[") and
                 tls_versions_settings.endswith("]")):
             raise InterfaceError("tls-versions must be a list, found: '{}'"
@@ -544,7 +548,7 @@ def _validate_tls_ciphersuites(settings):
 
     tls_ciphersuites_settings = settings["tls-ciphersuites"]
 
-    if isinstance(tls_ciphersuites_settings, STRING_TYPES):
+    if isinstance(tls_ciphersuites_settings, str):
         if not (tls_ciphersuites_settings.startswith("[") and
                 tls_ciphersuites_settings.endswith("]")):
             raise InterfaceError("tls-ciphersuites must be a list, found: '{}'"
@@ -632,7 +636,7 @@ def _get_connection_settings(*args, **kwargs):
     """
     settings = {}
     if args:
-        if isinstance(args[0], STRING_TYPES):
+        if isinstance(args[0], str):
             settings = _parse_connection_uri(args[0])
         elif isinstance(args[0], dict):
             for key, val in args[0].items():
@@ -715,15 +719,15 @@ def get_client(connection_string, options_string):
 
     .. versionadded:: 8.0.13
     """
-    if not isinstance(connection_string, (STRING_TYPES, dict)):
+    if not isinstance(connection_string, (str, dict)):
         raise InterfaceError("connection_data must be a string or dict")
 
     settings_dict = _get_connection_settings(connection_string)
 
-    if not isinstance(options_string, (STRING_TYPES, dict)):
+    if not isinstance(options_string, (str, dict)):
         raise InterfaceError("connection_options must be a string or dict")
 
-    if isinstance(options_string, STRING_TYPES):
+    if isinstance(options_string, str):
         try:
             options_dict = json.loads(options_string)
         except JSONDecodeError:
@@ -786,5 +790,6 @@ __all__ = [
     "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
     "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
     "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
-    "CreateCollectionIndexStatement", "Expr",
+    "ReadStatement", "WriteStatement", "CreateCollectionIndexStatement",
+    "Expr",
 ]

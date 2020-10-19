@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -58,7 +58,7 @@ except:
 
 from . import constants, errors
 from .errors import InterfaceError
-from .catch23 import PY2, init_bytearray, struct_unpack
+from .utils import init_bytearray
 
 
 def _strioerror(err):
@@ -158,10 +158,7 @@ class BaseMySQLSocket(object):
         packets = _prepare_packets(buf, self._packet_number)
         for packet in packets:
             try:
-                if PY2:
-                    self.sock.sendall(buffer(packet))  # pylint: disable=E0602
-                else:
-                    self.sock.sendall(packet)
+                self.sock.sendall(packet)
             except IOError as err:
                 raise errors.OperationalError(
                     errno=2055, values=(self.get_address(), _strioerror(err)))
@@ -188,20 +185,12 @@ class BaseMySQLSocket(object):
         maxpktlen = constants.MAX_PACKET_LENGTH
         if pllen > maxpktlen:
             pkts = _prepare_packets(buf, pktnr)
-            if PY2:
-                tmpbuf = bytearray()
-                for pkt in pkts:
-                    tmpbuf += pkt
-                tmpbuf = buffer(tmpbuf)  # pylint: disable=E0602
-            else:
-                tmpbuf = b''.join(pkts)
+            tmpbuf = b''.join(pkts)
             del pkts
             zbuf = zlib.compress(tmpbuf[:16384])
             header = (struct.pack('<I', len(zbuf))[0:3]
                       + struct.pack('<B', self._compressed_packet_number)
                       + b'\x00\x40\x00')
-            if PY2:
-                header = buffer(header)  # pylint: disable=E0602
             zpkts.append(header + zbuf)
             tmpbuf = tmpbuf[16384:]
             pllen = len(tmpbuf)
@@ -211,8 +200,6 @@ class BaseMySQLSocket(object):
                 header = (struct.pack('<I', len(zbuf))[0:3]
                           + struct.pack('<B', self._compressed_packet_number)
                           + b'\xff\xff\xff')
-                if PY2:
-                    header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + zbuf)
                 tmpbuf = tmpbuf[maxpktlen:]
                 pllen = len(tmpbuf)
@@ -222,15 +209,11 @@ class BaseMySQLSocket(object):
                 header = (struct.pack('<I', len(zbuf))[0:3]
                           + struct.pack('<B', self._compressed_packet_number)
                           + struct.pack('<I', pllen)[0:3])
-                if PY2:
-                    header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + zbuf)
             del tmpbuf
         else:
             pkt = (struct.pack('<I', pllen)[0:3] +
                    struct.pack('<B', pktnr) + buf)
-            if PY2:
-                pkt = buffer(pkt)  # pylint: disable=E0602
             pllen = len(pkt)
             if pllen > 50:
                 zbuf = zlib.compress(pkt)
@@ -242,8 +225,6 @@ class BaseMySQLSocket(object):
                 header = (struct.pack('<I', pllen)[0:3]
                           + struct.pack('<B', self._compressed_packet_number)
                           + struct.pack('<I', 0)[0:3])
-                if PY2:
-                    header = buffer(header)  # pylint: disable=E0602
                 zpkts.append(header + pkt)
 
         for zip_packet in zpkts:
@@ -270,12 +251,7 @@ class BaseMySQLSocket(object):
 
             # Save the packet number and payload length
             self._packet_number = packet[3]
-            if PY2:
-                payload_len = struct.unpack_from(
-                    "<I",
-                    buffer(packet[0:3] + b'\x00'))[0]  # pylint: disable=E0602
-            else:
-                payload_len = struct.unpack("<I", packet[0:3] + b'\x00')[0]
+            payload_len = struct.unpack("<I", packet[0:3] + b'\x00')[0]
 
             # Read the payload
             rest = payload_len
@@ -308,7 +284,7 @@ class BaseMySQLSocket(object):
 
             # Save the packet number and payload length
             self._packet_number = header[3]
-            payload_len = struct_unpack("<I", header[0:3] + b'\x00')[0]
+            payload_len = struct.unpack("<I", header[0:3] + b'\x00')[0]
 
             # Read the payload
             rest = payload_len
@@ -333,13 +309,7 @@ class BaseMySQLSocket(object):
     def _split_zipped_payload(self, packet_bunch):
         """Split compressed payload"""
         while packet_bunch:
-            if PY2:
-                payload_length = struct.unpack_from(
-                    "<I",
-                    packet_bunch[0:3] + b'\x00')[0]  # pylint: disable=E0602
-            else:
-                payload_length = struct.unpack("<I", packet_bunch[0:3] + b'\x00')[0]
-
+            payload_length = struct.unpack("<I", packet_bunch[0:3] + b'\x00')[0]
             self._packet_queue.append(packet_bunch[0:payload_length + 4])
             packet_bunch = packet_bunch[payload_length + 4:]
 
@@ -364,12 +334,12 @@ class BaseMySQLSocket(object):
                     raise errors.InterfaceError(errno=2013)
 
                 # Get length of compressed packet
-                zip_payload_length = struct_unpack("<I",
+                zip_payload_length = struct.unpack("<I",
                                                    header[0:3] + b'\x00')[0]
                 self._compressed_packet_number = header[3]
 
                 # Get payload length before compression
-                payload_length = struct_unpack("<I", header[4:7] + b'\x00')[0]
+                payload_length = struct.unpack("<I", header[4:7] + b'\x00')[0]
 
                 zip_payload = init_bytearray(abyte)
                 while len(zip_payload) < zip_payload_length:
@@ -408,10 +378,7 @@ class BaseMySQLSocket(object):
         tmp = init_bytearray(b'')
         for payload_length, payload in packets:
             # payload_length can not be 0; this was previously handled
-            if PY2:
-                tmp += zlib.decompress(buffer(payload))  # pylint: disable=E0602
-            else:
-                tmp += zlib.decompress(payload)
+            tmp += zlib.decompress(payload)
         self._split_zipped_payload(tmp)
         del tmp
 

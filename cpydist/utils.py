@@ -61,7 +61,6 @@ except ImportError:
     from urlparse import parse_qsl
 
 
-PY2 = sys.version_info[0] == 2
 ARCH = "64-bit" if sys.maxsize > 2**33 else "32-bit"
 ARCH_64BIT = ARCH == "64-bit"
 MYSQL_C_API_MIN_VERSION = (8, 0, 0)
@@ -370,7 +369,7 @@ def _parse_lsb_release_command():
                 continue
             key = key_value[0].replace(" ", "_").lower()
             value = key_value[1].strip("\t")
-            distro[key] = value.encode("utf-8") if PY2 else value
+            distro[key] = value
     return distro
 
 

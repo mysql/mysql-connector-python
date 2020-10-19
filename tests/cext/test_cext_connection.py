@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,7 +34,6 @@
 import tests
 import unittest
 
-from .. import PY2
 from mysql.connector import errors
 from mysql.connector.constants import ClientFlag, flag_is_set
 from mysql.connector.connection import MySQLConnection
@@ -141,7 +140,7 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx.cmd_query("SELECT @ham")
         self.assertEqual(exp_session_id, self.cnx.connection_id)
 
-        exp = ('2',) if PY2 else (b'2',)
+        exp = (b'2',)
         self.assertNotEqual(exp, self.cnx.get_rows()[0][0])
 
     def test_connection_id(self):

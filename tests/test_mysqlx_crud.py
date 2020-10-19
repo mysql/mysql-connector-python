@@ -778,10 +778,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             result = collection.add(persons).execute()
             for person in persons:
                 # Ensure no '_id' field was added locally.
-                if tests.PY2:
-                    self.assertFalse(person.has_key("_id"))
-                else:
-                    self.assertFalse("_id" in person)
+                self.assertFalse("_id" in person)
 
             self.assertEqual(2, result.get_affected_items_count(),
                              "Not all documents were inserted")

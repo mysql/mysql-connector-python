@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,7 +36,6 @@ from datetime import datetime, timedelta
 
 from .dbdoc import DbDoc
 from .charsets import MYSQL_CHARACTER_SETS
-from .compat import STRING_TYPES
 from .helpers import decode_from_bytes, deprecated
 
 
@@ -766,10 +765,10 @@ class Row(object):
         .. versionchanged:: 8.0.12
         """
         int_index = self._resultset.index_of(index) \
-            if isinstance(index, STRING_TYPES) else index
-        if int_index == -1 and isinstance(index, STRING_TYPES):
+            if isinstance(index, str) else index
+        if int_index == -1 and isinstance(index, str):
             raise ValueError("Column name '{0}' not found".format(index))
-        elif int_index >= len(self._fields) or int_index < 0:
+        if int_index >= len(self._fields) or int_index < 0:
             raise IndexError("Index out of range")
         return self._fields[int_index]
 

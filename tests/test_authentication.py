@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -40,7 +40,6 @@ from mysql.connector import authentication
 from mysql.connector.errors import InterfaceError
 
 import tests
-from . import PY2
 
 
 _STANDARD_PLUGINS = (
@@ -131,26 +130,15 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertRaises(mysql.connector.InterfaceError,
                           auth_plugin.prepare_password)
 
-        if PY2:
-            empty = ''
-            auth_data = (
-                '\x2d\x3e\x33\x25\x5b\x7d\x25\x3c\x40\x6b'
-                '\x7b\x47\x30\x5b\x57\x25\x51\x48\x55\x53'
-                )
-            auth_response = (
-                '\x73\xb8\xf0\x4b\x3a\xa5\x7c\x46\xb9\x84'
-                '\x90\x50\xab\xc0\x3a\x0f\x8f\xad\x51\xa3'
+        empty = b''
+        auth_data = (
+            b'\x2d\x3e\x33\x25\x5b\x7d\x25\x3c\x40\x6b'
+            b'\x7b\x47\x30\x5b\x57\x25\x51\x48\x55\x53'
             )
-        else:
-            empty = b''
-            auth_data = (
-                b'\x2d\x3e\x33\x25\x5b\x7d\x25\x3c\x40\x6b'
-                b'\x7b\x47\x30\x5b\x57\x25\x51\x48\x55\x53'
-                )
-            auth_response = (
-                b'\x73\xb8\xf0\x4b\x3a\xa5\x7c\x46\xb9\x84'
-                b'\x90\x50\xab\xc0\x3a\x0f\x8f\xad\x51\xa3'
-            )
+        auth_response = (
+            b'\x73\xb8\xf0\x4b\x3a\xa5\x7c\x46\xb9\x84'
+            b'\x90\x50\xab\xc0\x3a\x0f\x8f\xad\x51\xa3'
+        )
 
         auth_plugin = self.plugin_class('\x3f'*20, password=None)
         self.assertEqual(empty, auth_plugin.prepare_password())
@@ -172,10 +160,7 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(True, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
-        if PY2:
-            exp = 'spam\x00'
-        else:
-            exp = b'spam\x00'
+        exp = b'spam\x00'
         auth_plugin = self.plugin_class(None, password='spam', ssl_enabled=True)
         self.assertEqual(exp, auth_plugin.prepare_password())
         self.assertEqual(exp, auth_plugin.auth_response())
@@ -193,10 +178,7 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(True, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
-        if PY2:
-            exp = 'spam\x00'
-        else:
-            exp = b'spam\x00'
+        exp = b'spam\x00'
         auth_plugin = self.plugin_class(None, password='spam', ssl_enabled=True)
         self.assertEqual(exp, auth_plugin.prepare_password())
         self.assertEqual(exp, auth_plugin.auth_response())

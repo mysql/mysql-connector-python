@@ -29,24 +29,9 @@
 %global requires_py_protobuf_version 3.0.0
 %global wants_py_dnspython_version 1.16.0
 
-# ======================================================================
-# Some older Linux distribution might lack some macros
-# ======================================================================
-
-%{!?__python2: %global __python2 %{__python}}
-%{!?__python3: %global __python3 /usr/bin/python3}
-
-%{!?python2_sitearch: %global python2_sitearch %{python_sitearch}}
-%{!?python3_sitearch: %global python3_sitearch %(%{__python3} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
-
-%{!?py3dir: %global py3dir %{_builddir}/python3-%{name}-%{version}-%{release}}
-
-# ======================================================================
-# Argument handling and misc defines
-# ======================================================================
-
 %if 0%{?suse_version} == 1315
 %global dist            .sles12
+%{!?__python3: %global __python3 /usr/bin/python3}
 %endif
 
 %if 0%{?suse_version} == 1500
@@ -91,58 +76,13 @@ Name:          mysql-connector-python%{?product_suffix}
 Version:       %{version}
 Release:       1%{?version_extra:.%{version_extra}}%{?byte_code_only:.1}%{?dist}
 License:       Copyright (c) 2015, 2020, Oracle and/or its affiliates. Under %{?license_type} license as shown in the Description field.
-%if 0%{?suse_version}
-Group:         Development/Libraries/Python
-%else
-Group:         Development/Libraries
-%endif
 URL:           https://dev.mysql.com/downloads/connector/python/
 Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python%{?product_suffix}-%{version}.tar.gz
-#BuildArch:     noarch
 
 %{!?with_mysql_capi:BuildRequires: mysql-devel}
 
-# ======================================================================
-# Build requirements
-# ======================================================================
-
-%if 0%{?rhel} >= 8 || 0%{?fedora}
-BuildRequires: python2-devel
-Requires:      python2-setuptools
-%else
-BuildRequires: python-devel
-Requires:      python-setuptools
-%endif
-
 BuildRequires: python3-devel
-
-# ======================================================================
-# Sub RPM specific sections
-# ======================================================================
-
-%if 0%{?rhel} >= 8 || 0%{?fedora}
-Requires:      python2
-%else
-Requires:      python
-%endif
-
-# Some operations requires DNSPYTHON but this is not a strict
-# requirement for the RPM install as currently few RPM platforms has
-# the required version as RPMs. Users need to install using PIP.
-%if 0%{?fedora} >= 30
-Requires:      python2-dns >= %{wants_py_dnspython_version}
-%endif
-
-Obsoletes:   mysql-connector-python%{?product_suffix}-cext < %{version}-%{release}
-Provides:    mysql-connector-python%{?product_suffix}-cext = %{version}-%{release}
-
-%if 0%{?byte_code_only:1}
-Obsoletes:     mysql-connector-python < %{version}-%{release}
-Provides:      mysql-connector-python = %{version}-%{release}
-Obsoletes:     mysql-connector-python-cext < %{version}-%{release}
-Provides:      mysql-connector-python-cext = %{version}-%{release}
-%endif
-BuildRoot:     %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildRequires: python3-setuptools
 
 %description
 MySQL Connector/Python enables Python programs to access MySQL
@@ -163,11 +103,6 @@ documentation and the manual for more information.
 
 %package    -n mysql-connector-python3%{?product_suffix}
 Summary:       Standardized MySQL database driver for Python 3
-%if 0%{?suse_version}
-Group:         Development/Libraries/Python
-%else
-Group:         Development/Libraries
-%endif
 
 Obsoletes:   mysql-connector-python3%{?product_suffix}-cext < %{version}-%{release}
 Provides:    mysql-connector-python3%{?product_suffix}-cext = %{version}-%{release}
@@ -214,8 +149,6 @@ documentation and the manual for more information.
 
 %prep
 %setup -q
-rm -rf %{py3dir}
-cp -a . %{py3dir}
 
 %install
 COMMON_INSTALL_ARGS="\
@@ -248,34 +181,12 @@ rm -rf %{buildroot}
 # Remove the plugin to force the build not to bundle.
 rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 
-%{__python2} setup.py ${COMMON_INSTALL_ARGS} \
-    --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
-    --extra-link-args="${EXTRA_LINK_ARGS}" \
-    --with-mysql-capi=%{with_mysql_capi} %{?byte_code_only}
-pushd %{py3dir}
 %{__python3} setup.py ${COMMON_INSTALL_ARGS} \
     --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
     --extra-link-args="${EXTRA_LINK_ARGS}" \
     --with-mysql-capi=%{with_mysql_capi} %{?byte_code_only}
-popd
-
-%clean
-rm -rf %{buildroot}
-
-%files
-%defattr(-, root, root, -)
-%doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst docs/INFO_SRC docs/INFO_BIN
-# For old generic python modules
-%{python2_sitearch}/mysql
-%{python2_sitearch}/mysqlx
-%if 0%{?rhel} > 5 || 0%{?fedora} > 12 || 0%{?suse_version} >= 1100
-%{python2_sitearch}/mysql_connector_python-*.egg-info
-%endif
-%{python2_sitearch}/_mysql_connector.so
-%{python2_sitearch}/_mysqlxpb.so
 
 %files -n mysql-connector-python3%{?product_suffix}
-%defattr(-, root, root, -)
 %doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst docs/INFO_SRC docs/INFO_BIN
 %{python3_sitearch}/mysql
 %{python3_sitearch}/mysqlx
@@ -284,6 +195,11 @@ rm -rf %{buildroot}
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Thu Dec 9 2020 Prashant Tekriwal <prashant.tekriwal@oracle.com> - 8.0.24-1
+- Updated for 8.0.24
+- Removed python2 support
+- Follow updated package guidelines and style
+
 * Mon Nov 16 2020  Prashant Tekriwal <prashant.tekriwal@oracle.com> - 8.0.23-1
 - Updated for 8.0.23
 - Removed dependency on the Server "client-plugin" RPM
@@ -295,7 +211,7 @@ rm -rf %{buildroot}
 - Disabled the bundling of "authentication_ldap_sasl_client.so"
   and added dependency on the Server "client-plugin" RPM
 
-* Thu May 28 2020  Prashant Tekriwal <Prashant.Tekriwal@oracle.com> - 8.0.21-1
+* Thu May 28 2020  Prashant Tekriwal <Prashant.Tekriwal@oracle.com> - 8.0.21-2
 - Combined cext package and pure python package to single pkg.
 - Added 'lic_type' variable: sets license type. Default is GPLv2
 - Removed commercial references.

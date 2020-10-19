@@ -73,7 +73,6 @@ except ImportError:
 
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
-PY2 = sys.version_info[0] == 2
 _CACHED_TESTCASES = []
 
 try:
@@ -324,10 +323,7 @@ def fake_hostname():
 
     Returns a string.
     """
-    if PY2:
-        return ''.join(["%02x" % ord(c) for c in os.urandom(4)])
-    else:
-        return ''.join(["%02x" % c for c in os.urandom(4)])
+    return ''.join(["%02x" % c for c in os.urandom(4)])
 
 
 def get_mysqlx_config(name=None, index=None):
@@ -605,11 +601,7 @@ class MySQLConnectorTests(unittest.TestCase):
                 finally:
                     result.stopTest(self)
                 return
-
-        if PY2:
-            return super(MySQLConnectorTests, self).run(result)
-        else:
-            return super().run(result)
+        return super().run(result)
 
     def check_namedtuple(self, tocheck, attrs):
         for attr in attrs:
@@ -756,11 +748,7 @@ class MySQLxTests(MySQLConnectorTests):
                 finally:
                     result.stopTest(self)
                 return
-
-        if PY2:
-            return super(MySQLxTests, self).run(result)
-        else:
-            return super().run(result)
+        return super().run(result)
 
 
 def printmsg(msg=None):

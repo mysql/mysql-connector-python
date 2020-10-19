@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,7 +31,6 @@
 
 from . import utils
 from .locales import get_client_error
-from .catch23 import PY2
 
 # _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is ued by the
 # function custom_error_exception. _ERROR_EXCEPTIONS (at bottom of module)
@@ -196,7 +195,7 @@ class Error(Exception):
         if self.msg and self.errno != -1:
             fields = {
                 'errno': self.errno,
-                'msg': self.msg.encode('utf8') if PY2 else self.msg
+                'msg': self.msg
             }
             if self.sqlstate:
                 fmt = '{errno} ({state}): {msg}'

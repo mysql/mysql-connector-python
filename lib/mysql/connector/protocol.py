@@ -31,13 +31,13 @@
 
 import struct
 import datetime
+
 from decimal import Decimal
 
 from .constants import (
     FieldFlag, ServerCmd, FieldType, ClientFlag)
 from . import errors, utils
 from .authentication import get_auth_plugin
-from .catch23 import PY2, struct_unpack
 from .errors import DatabaseError, get_exception
 
 PROTOCOL_VERSION = 10
@@ -193,7 +193,7 @@ class MySQLProtocol(object):
     def parse_handshake(self, packet):
         """Parse a MySQL Handshake-packet"""
         res = {}
-        res['protocol'] = struct_unpack('<xxxxB', packet[0:5])[0]
+        res['protocol'] = struct.unpack('<xxxxB', packet[0:5])[0]
         if res["protocol"] != PROTOCOL_VERSION:
             raise DatabaseError("Protocol mismatch; server version = {}, "
                                 "client version = {}".format(res["protocol"],
@@ -208,7 +208,7 @@ class MySQLProtocol(object):
          res['server_status'],
          capabilities2,
          auth_data_length
-        ) = struct_unpack('<I8sx2sBH2sBxxxxxxxxxx', packet[0:31])
+        ) = struct.unpack('<I8sx2sBH2sBxxxxxxxxxx', packet[0:31])
         res['server_version_original'] = res['server_version_original'].decode()
 
         packet = packet[31:]
@@ -245,11 +245,11 @@ class MySQLProtocol(object):
 
         ok_packet = {}
         try:
-            ok_packet['field_count'] = struct_unpack('<xxxxB', packet[0:5])[0]
+            ok_packet['field_count'] = struct.unpack('<xxxxB', packet[0:5])[0]
             (packet, ok_packet['affected_rows']) = utils.read_lc_int(packet[5:])
             (packet, ok_packet['insert_id']) = utils.read_lc_int(packet)
             (ok_packet['status_flag'],
-             ok_packet['warning_count']) = struct_unpack('<HH', packet[0:4])
+             ok_packet['warning_count']) = struct.unpack('<HH', packet[0:4])
             packet = packet[4:]
             if packet:
                 (packet, ok_packet['info_msg']) = utils.read_lc_string(packet)
@@ -277,7 +277,7 @@ class MySQLProtocol(object):
 
         try:
             (_, _, field_type,
-             flags, _) = struct_unpack('<xHIBHBxx', packet)
+             flags, _) = struct.unpack('<xHIBHBxx', packet)
         except struct.error:
             raise errors.InterfaceError("Failed parsing column information")
 
@@ -301,7 +301,7 @@ class MySQLProtocol(object):
         err_msg = "Failed parsing EOF packet."
         res = {}
         try:
-            unpacked = struct_unpack('<xxxBBHH', packet)
+            unpacked = struct.unpack('<xxxBBHH', packet)
         except struct.error:
             raise errors.InterfaceError(err_msg)
 
@@ -394,7 +394,7 @@ class MySQLProtocol(object):
         if field[7] & FieldFlag.UNSIGNED:
             format_ = format_.upper()
 
-        return (packet[length:], struct_unpack(format_, packet[0:length])[0])
+        return (packet[length:], struct.unpack(format_, packet[0:length])[0])
 
     def _parse_binary_float(self, packet, field):
         """Parse a float/double from a binary packet"""
@@ -405,7 +405,7 @@ class MySQLProtocol(object):
             length = 4
             format_ = '<f'
 
-        return (packet[length:], struct_unpack(format_, packet[0:length])[0])
+        return (packet[length:], struct.unpack(format_, packet[0:length])[0])
 
     def _parse_binary_timestamp(self, packet, field):
         """Parse a timestamp from a binary packet"""
@@ -413,15 +413,15 @@ class MySQLProtocol(object):
         value = None
         if length == 4:
             value = datetime.date(
-                year=struct_unpack('<H', packet[1:3])[0],
+                year=struct.unpack('<H', packet[1:3])[0],
                 month=packet[3],
                 day=packet[4])
         elif length >= 7:
             mcs = 0
             if length == 11:
-                mcs = struct_unpack('<I', packet[8:length + 1])[0]
+                mcs = struct.unpack('<I', packet[8:length + 1])[0]
             value = datetime.datetime(
-                year=struct_unpack('<H', packet[1:3])[0],
+                year=struct.unpack('<H', packet[1:3])[0],
                 month=packet[3],
                 day=packet[4],
                 hour=packet[5],
@@ -437,8 +437,8 @@ class MySQLProtocol(object):
         data = packet[1:length + 1]
         mcs = 0
         if length > 8:
-            mcs = struct_unpack('<I', data[8:])[0]
-        days = struct_unpack('<I', data[1:5])[0]
+            mcs = struct.unpack('<I', data[8:])[0]
+        days = struct.unpack('<I', data[1:5])[0]
         if data[0] == 1:
             days *= -1
         tmp = datetime.timedelta(days=days,
@@ -686,22 +686,12 @@ class MySQLProtocol(object):
                      flags) = self._prepare_binary_integer(value)
                     values.append(packed)
                 elif isinstance(value, str):
-                    if PY2:
-                        values.append(utils.lc_int(len(value)) +
-                                      value)
-                    else:
-                        value = value.encode(charset)
-                        values.append(
-                            utils.lc_int(len(value)) + value)
+                    value = value.encode(charset)
+                    values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.VARCHAR
                 elif isinstance(value, bytes):
                     values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.BLOB
-                elif PY2 and \
-                        isinstance(value, unicode):  # pylint: disable=E0602
-                    value = value.encode(charset)
-                    values.append(utils.lc_int(len(value)) + value)
-                    field_type = FieldType.VARCHAR
                 elif isinstance(value, Decimal):
                     values.append(
                         utils.lc_int(len(str(value).encode(

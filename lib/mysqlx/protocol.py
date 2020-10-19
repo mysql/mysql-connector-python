@@ -46,7 +46,6 @@ try:
 except ImportError:
     HAVE_ZSTD = False
 
-from .compat import STRING_TYPES, INT_TYPES
 from .errors import (InterfaceError, NotSupportedError, OperationalError,
                      ProgrammingError)
 from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
@@ -327,14 +326,14 @@ class Protocol(object):
         Returns:
             mysqlx.protobuf.Message: MySQL X Protobuf Message.
         """
-        if isinstance(arg, STRING_TYPES):
+        if isinstance(arg, str):
             value = Message("Mysqlx.Datatypes.Scalar.String", value=arg)
             scalar = Message("Mysqlx.Datatypes.Scalar", type=8, v_string=value)
             return Message("Mysqlx.Datatypes.Any", type=1, scalar=scalar)
         elif isinstance(arg, bool):
             return Message("Mysqlx.Datatypes.Any", type=1,
                            scalar=build_bool_scalar(arg))
-        elif isinstance(arg, INT_TYPES):
+        elif isinstance(arg, int):
             if arg < 0:
                 return Message("Mysqlx.Datatypes.Any", type=1,
                                scalar=build_int_scalar(arg))

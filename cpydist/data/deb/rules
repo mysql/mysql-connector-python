@@ -31,7 +31,6 @@
 
 export DH_VERBOSE = 1
 
-PY2_BUILD_LIB_OPT = --build-lib=build/python2
 PY3_BUILD_LIB_OPT = --build-lib=build/python3
 
 DEB_PYTHON_INSTALL_ARGS_ALL = --install-layout=deb
@@ -70,11 +69,8 @@ endif
 
 # Check whether we have Python v3 support
 ifneq ($(shell which py3versions 2>/dev/null),)
-  WITHPYTHON="python2,python3"
+  WITHPYTHON="python3"
   PYTHON3_SUPPORTED=$(shell py3versions -sv)
-else
-  WITHPYTHON="python2"
-  PYTHON3_SUPPORTED=
 endif
 
 ifneq ($(BYTE_CODE_ONLY),)
@@ -85,31 +81,11 @@ else
     EXTRA_OPTIONS_DH = --buildsystem=python_distutils --with $(WITHPYTHON)
 endif
 
-# We do not support Python v2.5
-PYTHON2_SUPPORTED=$(shell pyversions -sv | sed -e "s/\s*2\.5\s*//g")
-
 %:
 	dh $@ $(EXTRA_OPTIONS_DH)
 
 override_dh_auto_install:
-	# Python v2
-	set -xe; \
-	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT); \
-	for pyver in $(PYTHON2_SUPPORTED); \
-	do \
-		python$$pyver setup.py \
-			install --install-layout=deb \
-			--with-mysql-capi=$(MYSQL_CAPI) \
-			--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
-			--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
-			--with-protoc=$(MYSQLXPB_PROTOC) \
-			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
-			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
-			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT); \
-		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
-	done
 
-	# Python v3
 	set -xe; \
 	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT)-py3; \
 	for pyver in $(PYTHON3_SUPPORTED); \
@@ -125,9 +101,6 @@ override_dh_auto_install:
 			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT); \
 		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
 	done
-
-override_dh_python2:
-	dh_python2 --no-ext-rename
 
 override_dh_python3:
 	dh_python3 --no-ext-rename
@@ -170,10 +143,8 @@ endif
 # both Debs at the same time.
 
 ifeq ($(shell lsb_release --short --codename),xenial)
-  SUBSTVARS += -Vpython2-protobuf:Depends='mysql-connector-python$(LIC_EXT) (= $${binary:Version})'
   SUBSTVARS += -Vpython3-protobuf:Depends='mysql-connector-python$(LIC_EXT)-py3 (= $${binary:Version})'
 else
-  SUBSTVARS += -Vpython2-protobuf:Depends='python-protobuf (>= 3.0.0)'
   SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (>= 3.0.0)'
 endif
 

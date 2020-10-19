@@ -37,7 +37,6 @@ from _mysql_connector import MySQLInterfaceError  # pylint: disable=F0401,E0611
 
 from .abstracts import (MySQLConnectionAbstract, MySQLCursorAbstract,
                         NAMED_TUPLE_CACHE)
-from .catch23 import PY2, isunicode
 from . import errors
 from .errorcode import CR_NO_RESULT_SET
 
@@ -247,7 +246,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         self.reset()
 
         try:
-            if isunicode(operation):
+            if isinstance(operation, str):
                 stmt = operation.encode(self._cnx.python_charset)
             else:
                 stmt = operation
@@ -258,11 +257,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             prepared = self._cnx.prepare_for_mysql(params)
             if isinstance(prepared, dict):
                 for key, value in prepared.items():
-                    if PY2:
-                        stmt = stmt.replace("%({0})s".format(key), value)
-                    else:
-                        stmt = stmt.replace("%({0})s".format(key).encode(),
-                                            value)
+                    stmt = stmt.replace("%({0})s".format(key).encode(), value)
             elif isinstance(prepared, (list, tuple)):
                 psub = _ParamSubstitutor(prepared)
                 stmt = RE_PY_PARAM.sub(psub, stmt)
@@ -591,11 +586,6 @@ class CMySQLCursor(MySQLCursorAbstract):
             yield self._stored_results[i]
 
         self._stored_results = []
-
-    if PY2:
-        def next(self):
-            """Used for iterating over the result set."""
-            return self.__next__()
 
     def __next__(self):
         """Iteration over the result set

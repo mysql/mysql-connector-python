@@ -37,7 +37,6 @@ import socket
 import time
 
 from .authentication import get_auth_plugin
-from .catch23 import PY2, isstr, UNICODE_TYPES
 from .constants import (
     ClientFlag, ServerCmd, ServerFlag,
     flag_is_set, ShutdownType, NET_BUFFER_LENGTH
@@ -515,12 +514,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             infile_path = os.path.abspath(self._allow_local_infile_in_path)
             c_path = None
             try:
-                if PY2:
-                    c_path = os.path.commonprefix([infile_path, file_name])
-                    if not os.path.exists(c_path):
-                        raise ValueError("Can't locate path")
-                else:
-                    c_path = os.path.commonpath([infile_path, file_name])
+                c_path = os.path.commonpath([infile_path, file_name])
             except ValueError as err:
                 err_msg = ("{} while loading file `{}` and path `{}` given"
                            " in allow_local_infile_in_path")
@@ -571,10 +565,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         elif packet[4] == 0:
             return self._handle_ok(packet)
         elif packet[4] == 251:
-            if PY2:
-                filename = str(packet[5:])
-            else:
-                filename = packet[5:].decode()
+            filename = packet[5:].decode()
             return self._handle_load_data_infile(filename)
         elif packet[4] == 254:
             return self._handle_eof(packet)
@@ -724,7 +715,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         Returns a generator.
         """
         if not isinstance(statements, bytearray):
-            if isstr(statements) and isinstance(statements, UNICODE_TYPES):
+            if isinstance(statements, str):
                 statements = statements.encode('utf8')
             statements = bytearray(statements)
 

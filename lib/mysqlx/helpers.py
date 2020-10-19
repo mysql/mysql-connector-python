@@ -25,15 +25,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+
 """This module contains helper functions."""
 
+import binascii
+import decimal
 import functools
 import inspect
 import warnings
 
-from .compat import NUMERIC_TYPES
 from .constants import TLS_CIPHER_SUITES, TLS_VERSIONS
 from .errors import InterfaceError
+
+
+BYTE_TYPES = (bytearray, bytes,)
+NUMERIC_TYPES = (int, float, decimal.Decimal,)
 
 
 def encode_to_bytes(value, encoding="utf-8"):
@@ -168,6 +174,7 @@ def deprecated(version=None, reason=None):
         return wrapper
     return decorate
 
+
 def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
     """Translates a cipher suites names list; from IANI names to OpenSSL names.
 
@@ -192,3 +199,15 @@ def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
             raise InterfaceError("The '{}' in cipher suites is not a valid "
                                  "cipher suite".format(name))
     return translated_names
+
+
+def hexlify(data):
+    """Return the hexadecimal representation of the binary data.
+
+    Args:
+        data (str): The binary data.
+
+    Returns:
+        bytes: The hexadecimal representation of data.
+    """
+    return binascii.hexlify(data).decode("utf-8")

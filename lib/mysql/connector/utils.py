@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -39,10 +39,14 @@ import struct
 import sys
 import unicodedata
 
-from .catch23 import struct_unpack, PY2
+from decimal import Decimal
+
+from .custom_types import HexLiteral
 
 
 __MYSQL_DEBUG__ = False
+
+NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
 
 
 def intread(buf):
@@ -55,9 +59,9 @@ def intread(buf):
             return buf[0]
         elif length <= 4:
             tmp = buf + b'\x00'*(4-length)
-            return struct_unpack('<I', tmp)[0]
+            return struct.unpack('<I', tmp)[0]
         tmp = buf + b'\x00'*(8-length)
-        return struct_unpack('<Q', tmp)[0]
+        return struct.unpack('<Q', tmp)[0]
     except:
         raise
 
@@ -320,11 +324,11 @@ def read_lc_int(buf):
     elif lcbyte < 251:
         return (buf[1:], int(lcbyte))
     elif lcbyte == 252:
-        return (buf[3:], struct_unpack('<xH', buf[0:3])[0])
+        return (buf[3:], struct.unpack('<xH', buf[0:3])[0])
     elif lcbyte == 253:
-        return (buf[4:], struct_unpack('<I', buf[1:4] + b'\x00')[0])
+        return (buf[4:], struct.unpack('<I', buf[1:4] + b'\x00')[0])
     elif lcbyte == 254:
-        return (buf[9:], struct_unpack('<xQ', buf[0:9])[0])
+        return (buf[9:], struct.unpack('<xQ', buf[0:9])[0])
     else:
         raise ValueError("Failed reading length encoded integer")
 
@@ -412,7 +416,7 @@ def _parse_lsb_release_command():
                 continue
             key = key_value[0].replace(" ", "_").lower()
             value = key_value[1].strip("\t")
-            distro[key] = value.encode("utf-8") if PY2 else value
+            distro[key] = value
     return distro
 
 
@@ -432,12 +436,11 @@ def linux_distribution():
                 distro.get("distrib_release", ""),
                 distro.get("distrib_codename", ""))
 
-    if not PY2:
-        distro = _parse_lsb_release_command()
-        if distro:
-            return (distro.get("distributor_id", ""),
-                    distro.get("release", ""),
-                    distro.get("codename", ""))
+    distro = _parse_lsb_release_command()
+    if distro:
+        return (distro.get("distributor_id", ""),
+                distro.get("release", ""),
+                distro.get("codename", ""))
 
     distro = _parse_os_release()
     if distro:
@@ -553,9 +556,6 @@ def normalize_unicode_string(a_string):
     Returns:
         Normalized unicode string according to rfc4013.
     """
-
-    if PY2 and not isinstance(a_string, unicode):
-        a_string = unicode(a_string)
     # Per rfc4013 2.1. Mapping
     # non-ASCII space characters [StringPrep, C.1.2] are mapped to ' ' (U+0020)
     # "commonly mapped to nothing" characters [StringPrep, B.1] are mapped to ''
@@ -574,3 +574,38 @@ def normalize_unicode_string(a_string):
         return u''
 
     return nstr
+
+
+def make_abc(base_class):
+    """Decorator used to create a abstract base class.
+
+    We use this decorator to create abstract base classes instead of
+    using the abc-module. The decorator makes it possible to do the
+    same in both Python v2 and v3 code.
+    """
+    def wrapper(class_):
+        """Wrapper"""
+        attrs = class_.__dict__.copy()
+        for attr in '__dict__', '__weakref__':
+            attrs.pop(attr, None)  # ignore missing attributes
+
+        bases = class_.__bases__
+        bases = (class_,) + bases
+        return base_class(class_.__name__, bases, attrs)
+    return wrapper
+
+
+def init_bytearray(payload=b'', encoding='utf-8'):
+    """Initialize a bytearray from the payload."""
+    if isinstance(payload, bytearray):
+        return payload
+    if isinstance(payload, int):
+        return bytearray(payload)
+    if not isinstance(payload, bytes):
+        try:
+            return bytearray(payload.encode(encoding=encoding))
+        except AttributeError:
+            raise ValueError("payload must be a str or bytes")
+
+    return bytearray(payload)
+

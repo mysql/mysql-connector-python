@@ -28,8 +28,7 @@
 
 """Expression Parser."""
 
-from .compat import STRING_TYPES, BYTE_TYPES, UNICODE_TYPES
-from .helpers import get_item_or_attr
+from .helpers import BYTE_TYPES, get_item_or_attr
 from .dbdoc import DbDoc
 from .protobuf import Message, mysqlxpb_enum
 
@@ -309,7 +308,7 @@ def build_expr(value):
 
 
 def build_scalar(value):
-    if isinstance(value, STRING_TYPES):
+    if isinstance(value, str):
         return build_string_scalar(value)
     elif isinstance(value, BYTE_TYPES):
         return build_bytes_scalar(value)
@@ -331,7 +330,7 @@ def build_object(obj):
     msg = Message("Mysqlx.Expr.Object")
     for key, value in obj.items():
         pair = Message("Mysqlx.Expr.Object.ObjectField")
-        pair["key"] = key.encode() if isinstance(key, UNICODE_TYPES) else key
+        pair["key"] = key.encode() if isinstance(key, str) else key
         pair["value"] = build_expr(value).get_message()
         msg["fld"].extend([pair.get_message()])
     return msg
@@ -369,7 +368,7 @@ def build_unsigned_int_scalar(value):
     return msg
 
 def build_string_scalar(value):
-    if isinstance(value, STRING_TYPES):
+    if isinstance(value, str):
         value = bytes(bytearray(value, "utf-8"))
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_STRING")
@@ -433,7 +432,7 @@ class ExprParser(object):
         Removes the keywords "SELECT" and "WHERE" that does not form part of
         the expression itself.
         """
-        if not isinstance(self.string, STRING_TYPES):
+        if not isinstance(self.string, str):
             self.string = repr(self.string)
         self.string = self.string.strip(" ")
         if len(self.string) > 1 and self.string[-1] == ';':

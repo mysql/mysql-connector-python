@@ -49,7 +49,6 @@ except:
 
 import tests
 from . import check_tls_versions_support
-from . import PY2
 
 try:
     from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
@@ -61,8 +60,7 @@ except ImportError:
 
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (connect, connection, network, errors,
-                             constants, cursor, abstracts, catch23,
-                             HAVE_DNSPYTHON)
+                             constants, cursor, abstracts, HAVE_DNSPYTHON)
 from mysql.connector.errors import InterfaceError, ProgrammingError
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.network import TLS_V1_3_SUPPORTED
@@ -694,13 +692,13 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         exp = {
             'protocol': int,
-            'server_version_original': catch23.STRING_TYPES,
+            'server_version_original': str,
             'charset': int,
             'server_threadid': int,
-            'capabilities': catch23.INT_TYPES,
+            'capabilities': int,
             'server_status': int,
-            'auth_data': catch23.BYTE_TYPES,
-            'auth_plugin': catch23.STRING_TYPES,
+            'auth_data': (bytearray, bytes),
+            'auth_plugin': str,
         }
 
         self.assertEqual(len(exp), len(cnx._handshake))
@@ -1502,10 +1500,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         class TrueCursor(cursor.CursorBase):
 
             def __init__(self, cnx=None):
-                if PY2:
-                    super(TrueCursor, self).__init__()
-                else:
-                    super().__init__()
+                super().__init__()
 
         self.assertRaises(errors.ProgrammingError, self.cnx.cursor,
                           cursor_class=FalseCursor)
@@ -1751,10 +1746,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
             self.cnx.cmd_query("SELECT @ham")
             self.assertEqual(exp_session_id, self.cnx.connection_id)
-            if PY2:
-                self.assertNotEqual(('2',), self.cnx.get_rows()[0][0])
-            else:
-                self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
+            self.assertNotEqual((b'2',), self.cnx.get_rows()[0][0])
 
     @unittest.skipIf(os.environ.get("PB2WORKDIR"), "Do not run on PB2")
     @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1), "Shutdown CMD "

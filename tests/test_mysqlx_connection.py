@@ -46,10 +46,10 @@ import mysqlx
 
 from threading import Thread
 from time import sleep
+from urllib.parse import quote_plus, quote
 
 from . import check_tls_versions_support
 from mysqlx.connection import SocketStream, TLS_V1_3_SUPPORTED, HAVE_DNSPYTHON
-from mysqlx.compat import STRING_TYPES
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import (Message, MessageReader, MessageWriter, Protocol,
                              HAVE_LZ4, HAVE_ZSTD)
@@ -57,11 +57,6 @@ from mysqlx.protobuf import (HAVE_MYSQLXPB_CEXT, HAVE_PROTOBUF, mysqlxpb_enum,
                              Protobuf)
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
-
-if mysqlx.compat.PY3:
-    from urllib.parse import quote_plus, quote
-else:
-    from urllib import quote_plus, quote
 
 from .test_mysqlx_crud import drop_table
 
@@ -209,7 +204,7 @@ def build_uri(**kwargs):
         query.append("connect-timeout={0}".format(kwargs["connect_timeout"]))
     if "connection_attributes" in kwargs:
         conn_attrs = kwargs["connection_attributes"]
-        if isinstance(conn_attrs, STRING_TYPES) and \
+        if isinstance(conn_attrs, str) and \
            not (conn_attrs.startswith("[") and conn_attrs.endswith("]")):
             query.append("connection-attributes={}"
                          "".format(kwargs["connection_attributes"]))
@@ -222,7 +217,7 @@ def build_uri(**kwargs):
 
     if "tls-versions" in kwargs:
         tls_versions = kwargs["tls-versions"]
-        if isinstance(tls_versions, STRING_TYPES) and \
+        if isinstance(tls_versions, str) and \
            not (tls_versions.startswith("[") and tls_versions.endswith("]")):
             query.append("tls-versions=[{}]"
                          "".format(kwargs["tls-versions"]))
@@ -231,7 +226,7 @@ def build_uri(**kwargs):
 
     if "tls-ciphersuites" in kwargs:
         tls_ciphers = kwargs["tls-ciphersuites"]
-        if isinstance(tls_ciphers, STRING_TYPES) and \
+        if isinstance(tls_ciphers, str) and \
            not (tls_ciphers.startswith("[") and tls_ciphers.endswith("]")):
             query.append("tls-ciphersuites=[{}]"
                          "".format(",".format(tls_ciphers)))

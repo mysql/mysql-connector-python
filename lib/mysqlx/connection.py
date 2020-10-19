@@ -53,6 +53,7 @@ import socket
 import logging
 import uuid
 import platform
+import queue
 import os
 import random
 import re
@@ -74,7 +75,6 @@ from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
 # pylint: disable=W0622
 from .errors import (InterfaceError, NotSupportedError, OperationalError,
                      PoolError, ProgrammingError, TimeoutError)
-from .compat import PY3, STRING_TYPES, UNICODE_TYPES, queue
 from .crud import Schema
 from .constants import SSLMode, Auth, COMPRESSION_ALGORITHMS
 from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
@@ -655,9 +655,7 @@ class Connection(object):
         # Python 2.7 does not raise a socket.timeout exception when using
         # settimeout(), but it raises a socket.error with errno.EAGAIN (11)
         # or errno.EINPROGRESS (115) if connect-timeout value is too low
-        if error is not None and \
-           (isinstance(error, socket.timeout) or
-            (hasattr(error, "errno") and error.errno in (11, 115) and not PY3)):
+        if error is not None and isinstance(error, socket.timeout):
             if len(self._routers) <= 1:
                 raise TimeoutError("Connection attempt to the server was "
                                    "aborted. Timeout of {0} ms was exceeded"
@@ -962,11 +960,8 @@ class Connection(object):
         sql = statement.sql
         if self.protocol is None:
             raise OperationalError("MySQLx Connection not available")
-        if not isinstance(sql, STRING_TYPES):
+        if not isinstance(sql, str):
             raise ProgrammingError("The SQL statement is not a valid string")
-        if not PY3 and isinstance(sql, UNICODE_TYPES):
-            msg_type, msg = self.protocol.build_execute_statement(
-                "sql", bytes(bytearray(sql, "utf-8")))
         else:
             msg_type, msg = self.protocol.build_execute_statement(
                 "sql", sql)
@@ -1923,7 +1918,7 @@ class Session(object):
             for attr_name in self._settings["connection-attributes"]:
                 attr_value = self._settings["connection-attributes"][attr_name]
                 # Validate name type
-                if not isinstance(attr_name, STRING_TYPES):
+                if not isinstance(attr_name, str):
                     raise InterfaceError("Attribute name '{}' must be a string "
                                          "type".format(attr_name))
                 # Validate attribute name limit 32 characters
@@ -1937,7 +1932,7 @@ class Session(object):
                                          "attributes' cannot start with '_', "
                                          "found: {}".format(attr_name))
                 # Validate value type
-                if not isinstance(attr_value, STRING_TYPES):
+                if not isinstance(attr_value, str):
                     raise InterfaceError("Attribute name '{}' value '{}' must "
                                          "be a string type"
                                          "".format(attr_name, attr_value))
@@ -2089,7 +2084,7 @@ class Session(object):
         """
         if name is None:
             name = "{0}".format(uuid.uuid1())
-        elif not isinstance(name, STRING_TYPES) or len(name.strip()) == 0:
+        elif not isinstance(name, str) or len(name.strip()) == 0:
             raise ProgrammingError("Invalid SAVEPOINT name")
         self._connection.execute_nonquery("sql", "SAVEPOINT {0}"
                                           "".format(quote_identifier(name)),
@@ -2102,7 +2097,7 @@ class Session(object):
         Args:
             name (string): The savepoint name.
         """
-        if not isinstance(name, STRING_TYPES) or len(name.strip()) == 0:
+        if not isinstance(name, str) or len(name.strip()) == 0:
             raise ProgrammingError("Invalid SAVEPOINT name")
         self._connection.execute_nonquery("sql", "ROLLBACK TO SAVEPOINT {0}"
                                           "".format(quote_identifier(name)),
@@ -2114,7 +2109,7 @@ class Session(object):
         Args:
             name (string): The savepoint name.
         """
-        if not isinstance(name, STRING_TYPES) or len(name.strip()) == 0:
+        if not isinstance(name, str) or len(name.strip()) == 0:
             raise ProgrammingError("Invalid SAVEPOINT name")
         self._connection.execute_nonquery("sql", "RELEASE SAVEPOINT {0}"
                                           "".format(quote_identifier(name)),

@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -76,8 +76,7 @@ try:
 except ImportError:
     HAVE_MYSQLXPB_CEXT = False
 
-from ..compat import PY3, NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES
-from ..helpers import encode_to_bytes
+from ..helpers import BYTE_TYPES, NUMERIC_TYPES, encode_to_bytes
 
 try:
     from google import protobuf
@@ -307,9 +306,9 @@ class Message(object):
 
     def __setattr__(self, name, value):
         if Protobuf.use_pure:
-            if PY3 and isinstance(value, STRING_TYPES):
+            if isinstance(value, str):
                 setattr(self._msg, name, encode_to_bytes(value))
-            elif isinstance(value, (NUMERIC_TYPES, STRING_TYPES, BYTE_TYPES)):
+            elif isinstance(value, (NUMERIC_TYPES, BYTE_TYPES)):
                 setattr(self._msg, name, value)
             elif isinstance(value, list):
                 getattr(self._msg, name).extend(value)

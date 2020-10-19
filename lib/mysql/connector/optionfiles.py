@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,16 +34,13 @@ import io
 import os
 import re
 
-from .catch23 import PY2
+from configparser import (
+    ConfigParser as SafeConfigParser,
+    MissingSectionHeaderError
+)
+
 from .constants import DEFAULT_CONFIGURATION, CNX_POOL_ARGS
 
-# pylint: disable=F0401
-if PY2:
-    from ConfigParser import SafeConfigParser, MissingSectionHeaderError
-else:
-    from configparser import (ConfigParser as SafeConfigParser,
-                              MissingSectionHeaderError)
-# pylint: enable=F0401
 
 DEFAULT_EXTENSIONS = {
     'nt': ('ini', 'cnf'),
@@ -135,10 +132,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         self._options_dict = {}
 
-        if PY2:
-            SafeConfigParser.__init__(self)
-        else:
-            SafeConfigParser.__init__(self, strict=False)
+        SafeConfigParser.__init__(self, strict=False)
 
         self.default_extension = DEFAULT_EXTENSIONS[os.name]
         self.keep_dashes = keep_dashes

@@ -13,19 +13,12 @@
      InstallScope="perMachine"
      Platform="$(var.Platform)"/>
 
-    <Property Id="PREVIOUSVERSIONSINSTALLED27" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED34" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED35" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED36" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
 
-	<Upgrade Id="60240289-1258-4914-8a49-db547a459f2d">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED27"/>
-    </Upgrade>
 	<Upgrade Id="d37ecc44-a317-4c2c-b90a-70b4dc67fb19">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
        Minimum="1.0.0"
@@ -58,26 +51,6 @@
     </Upgrade>
 
     <!-- Obtain location of the Python interpreters installed on the system-->
-    <!-- Python 2.7 -->
-    <Property Id="PYTHON27INSTALLPATH_ALL">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python27InstallPathAll64" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="yes"/>
-      <?else?>
-      <RegistrySearch Id="Python27InstallPathAll32" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-    <Property Id="PYTHON27INSTALLPATH_CURRENT">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python27InstallPathCurrent64" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="yes"/>
-      <?else?>
-      <RegistrySearch Id="Python27InstallPathCurrent32" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\2.7\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-
     <!-- Python 3.4 -->
     <Property Id="PYTHON34INSTALLPATH_ALL">
       <?if "$(var.Platform)"="x64" ?>
@@ -187,59 +160,13 @@
     </Property>
 
     <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
-      Installed OR PYTHON27INSTALLPATH_ALL OR PYTHON27INSTALLPATH_CURRENT OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON35INSTALLPATH_ALL OR PYTHON35INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT
+      Installed OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON35INSTALLPATH_ALL OR PYTHON35INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT
     </Condition>
 
     <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
 
     <!-- Definition of the folders used by the installed files-->
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <?if "$(var.Platform)"="x64" ?>
-        <Directory Id="INSTALLDIRP27" Name="Python27">
-          <Directory Id="PythonLibDir27" Name="Lib">
-            <Directory Id="SitePackagesDir27" Name="site-packages">
-              <Directory Id="EggInfoDir27" Name="mysql_connector_python-$(var.FullVersion)-py2.7.egg-info"/>
-              <Directory Id="MySQLXPackageDir27" Name="mysqlx">
-                <Directory Id="MySQLXPB2Dir27" Name="protobuf"/>
-                <Directory Id="MySQLXLocalesDir27" Name="locales">
-                  <Directory Id="MySQLXLocalesEngDir27" Name="eng"/>
-                </Directory>
-              </Directory>
-              <Directory Id="MySQLPackageDir27" Name="mysql">
-                <Directory Id="ConnectorPackageDir27" Name="connector">
-                  <Directory Id="DjangoDir27" Name="django"/>
-                  <Directory Id="ConnectorLocalesDir27" Name="locales">
-                    <Directory Id="LocalesEngDir27" Name="eng"/>
-                  </Directory>
-                </Directory>
-              </Directory>
-            </Directory>
-          </Directory>
-        </Directory>
-      <?else?>
-        <Directory Id="INSTALLDIRP27" Name="Python27">
-          <Directory Id="PythonLibDir27" Name="Lib">
-            <Directory Id="SitePackagesDir27" Name="site-packages">
-              <Directory Id="EggInfoDir27" Name="mysql_connector_python-$(var.FullVersion)-py2.7.egg-info"/>
-              <Directory Id="MySQLXPackageDir27" Name="mysqlx">
-                <Directory Id="MySQLXPB2Dir27" Name="protobuf"/>
-                <Directory Id="MySQLXLocalesDir27" Name="locales">
-                  <Directory Id="MySQLXLocalesEngDir27" Name="eng"/>
-                </Directory>
-              </Directory>
-              <Directory Id="MySQLPackageDir27" Name="mysql">
-                <Directory Id="ConnectorPackageDir27" Name="connector">
-                  <Directory Id="DjangoDir27" Name="django"/>
-                  <Directory Id="ConnectorLocalesDir27" Name="locales">
-                    <Directory Id="LocalesEngDir27" Name="eng"/>
-                  </Directory>
-                </Directory>
-              </Directory>
-            </Directory>
-          </Directory>
-        </Directory>
-      <?endif?>
-
       <Directory Id="INSTALLDIRP34" Name="Python34">
         <Directory Id="PythonLibDir34" Name="Lib">
           <Directory Id="SitePackagesDir34" Name="site-packages">
@@ -423,24 +350,6 @@
         <ComponentRef Id="MyConnPyExamples"/>
       </Feature>
 
-      <!-- Python 2.7 -->
-      <?if $(var.BDist27) != "" ?>
-      <Feature Id="Python27" Title="C/py for Python 2.7" Level="1"
-               ConfigurableDirectory ="INSTALLDIRP27" Absent="allow">
-        <Condition Level='0'>Not PYTHON27INSTALLPATH_ALL AND Not PYTHON27INSTALLPATH_CURRENT AND Not Installed</Condition>
-        <ComponentRef Id="EggInfo27"/>
-        <ComponentRef Id="MySQLPackage27"/>
-        <ComponentRef Id="ConnectorPackage27"/>
-        <ComponentRef Id="ConnectorLocales27"/>
-        <ComponentRef Id="LocalesEng27"/>
-        <ComponentRef Id="DjangoBackend27"/>
-        <ComponentRef Id="MySQLXPackage27"/>
-        <ComponentRef Id="MySQLXPackagePB227"/>
-        <ComponentRef Id="MySQLXLocales27"/>
-        <ComponentRef Id="MySQLXLocalesEng27"/>
-      </Feature>
-      <?endif?>
-
       <!-- Python 3.4 -->
       <?if $(var.BDist34) != "" ?>
       <Feature Id="Python34" Title="C/py for Python 3.4" Level="1"
@@ -559,12 +468,6 @@
       <?endif?>
     </Feature>
 
-    <!-- Python 2.7 -->
-    <CustomAction Id="SetInstallDirCurrentP27" Property="INSTALLDIRP27" Value="[PYTHON27INSTALLPATH_CURRENT]"/>
-    <CustomAction Id="SetInstallDirAllP27" Property="INSTALLDIRP27" Value="[PYTHON27INSTALLPATH_ALL]"/>
-    <!--<CustomAction Id="SetInstallDirAllP27cdlg" Property="INSTALLDIRP27" Value="[PYTHON27INSTALLPATH_ALL]"/>-->
-    <CustomAction Id="ErrDebug27" Error="Installdir: [INSTALLDIRP27]"/>
-
     <!-- Python 3.4 -->
     <CustomAction Id="SetInstallDirCurrentP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_ALL]"/>
@@ -599,9 +502,6 @@
     <InstallExecuteSequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
       <RemoveExistingProducts After="InstallInitialize" />
-      <!-- Python 2.7 -->
-      <Custom Action="SetInstallDirCurrentP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_ALL</Custom>
       <!-- Python 3.4 -->
       <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
@@ -621,10 +521,6 @@
 
     <InstallUISequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
-      <!-- Python 2.7 -->
-      <Custom Action="SetInstallDirCurrentP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP27" After="AppSearch">NOT Installed AND PYTHON27INSTALLPATH_ALL</Custom>
-      <!--<Custom Action="SetInstallDirAllP27cdlg" Before="CostFinalize">NOT Installed AND PYTHON27INSTALLPATH_ALL</Custom>-->
       <!-- Python 3.4 -->
       <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>

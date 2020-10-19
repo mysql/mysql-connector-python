@@ -55,8 +55,6 @@
          Source="$(var.BDist37)\mysqlx\authentication.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_charsetspy37" Name="charsets.$(var.PyExt)"
          Source="$(var.BDist37)\mysqlx\charsets.$(var.PyExt)" DiskId="1"/>
-        <File Id="mysqlx_compatpy37" Name="compat.$(var.PyExt)"
-         Source="$(var.BDist37)\mysqlx\compat.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_connectionpy37" Name="connection.$(var.PyExt)"
          Source="$(var.BDist37)\mysqlx\connection.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_constantspy37" Name="constants.$(var.PyExt)"
@@ -183,8 +181,6 @@
          Source="$(var.BDist37)\mysql\connector\charsets.$(var.PyExt)" DiskId="1"/>
         <File Id="authenticationpy37" Name="authentication.$(var.PyExt)"
          Source="$(var.BDist37)\mysql\connector\authentication.$(var.PyExt)" DiskId="1"/>
-        <File Id="catch23py37" Name="catch23.$(var.PyExt)"
-         Source="$(var.BDist37)\mysql\connector\catch23.$(var.PyExt)" DiskId="1"/>
         <File Id="optionfilespy37" Name="optionfiles.$(var.PyExt)"
          Source="$(var.BDist37)\mysql\connector\optionfiles.$(var.PyExt)" DiskId="1"/>
         <File Id="customtypespy37" Name="custom_types.$(var.PyExt)"

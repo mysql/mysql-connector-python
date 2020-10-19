@@ -41,7 +41,6 @@
 #endif
 #include <mysql.h>
 
-#include "catch23.h"
 #include "mysql_connector.h"
 #include "exceptions.h"
 #include "mysql_capi.h"
@@ -55,7 +54,7 @@ PyObject* MySQL_connected(MySQL *self);
 
 // Handy Macros
 #define CHECK_SESSION(session) if (session == NULL) {\
-    raise_with_string(PyStringFromString("MySQL session not available."),\
+    raise_with_string(PyUnicode_FromString("MySQL session not available."),\
         NULL); return 0; }
 
 #define IS_CONNECTED(cnx) \
@@ -112,23 +111,11 @@ str_to_bytes(const char* charset, PyObject *value)
         }
         return bytes;
     }
-    else
-#ifndef PY3
-    // Python v2 strings, they are expected to be encoded if they were
-    // unicode
-    if (PyString_Check(value))
+    else if (PyBytes_Check(value))
     {
         return value;
     }
     else
-#else
-    // Python v3 bytes
-    if (PyBytes_Check(value))
-    {
-        return value;
-    }
-    else
-#endif
     {
         PyErr_SetString(PyExc_TypeError, "Argument must be str or bytes");
         return NULL;
@@ -255,11 +242,11 @@ fetch_fields(MYSQL_RES *result, unsigned int num_fields, MY_CHARSET_INFO *cs,
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 5, decoded);
 
-    	PyTuple_SET_ITEM(field, 6, PyInt_FromLong(myfs[i].charsetnr));
-    	PyTuple_SET_ITEM(field, 7, PyInt_FromLong(myfs[i].max_length));
-    	PyTuple_SET_ITEM(field, 8, PyInt_FromLong(myfs[i].type));
-    	PyTuple_SET_ITEM(field, 9, PyInt_FromLong(myfs[i].flags));
-    	PyTuple_SET_ITEM(field, 10, PyInt_FromLong(myfs[i].decimals));
+    	PyTuple_SET_ITEM(field, 6, PyLong_FromLong(myfs[i].charsetnr));
+    	PyTuple_SET_ITEM(field, 7, PyLong_FromLong(myfs[i].max_length));
+    	PyTuple_SET_ITEM(field, 8, PyLong_FromLong(myfs[i].type));
+    	PyTuple_SET_ITEM(field, 9, PyLong_FromLong(myfs[i].flags));
+    	PyTuple_SET_ITEM(field, 10, PyLong_FromLong(myfs[i].decimals));
         PyList_Append(fields, field);
 		Py_DECREF(field);
     }
@@ -321,15 +308,15 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self->raw_as_string=        Py_False;
 	self->buffered_at_connect=  Py_False;
 	self->raw_at_connect=       Py_False;
-	self->charset_name=         PyStringFromString("latin1");
+	self->charset_name=         PyUnicode_FromString("latin1");
 	self->connected=            0;
 	self->have_result_set=      Py_False;
 	self->connection_timeout=   CONNECTION_TIMEOUT;
 	self->result=               NULL;
 	self->fields=               NULL;
 	self->use_unicode=          1;
-	self->auth_plugin=          PyStringFromString("mysql_native_password");
-	self->plugin_dir=           PyStringFromString(".");
+	self->auth_plugin=          PyUnicode_FromString("mysql_native_password");
+	self->plugin_dir=           PyUnicode_FromString(".");
 
 	return (PyObject *)self;
 }
@@ -378,11 +365,11 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
                                      "|O!O!O!O!O!O!O!", kwlist,
                                      &PyBool_Type, &self->buffered_at_connect,
                                      &PyBool_Type, &self->raw_at_connect,
-                                     &PyStringType, &charset_name,
-                                     &PyIntType, &con_timeout,
+                                     &PyUnicode_Type, &charset_name,
+                                     &PyLong_Type, &con_timeout,
                                      &PyBool_Type, &use_unicode,
-                                     &PyStringType, &auth_plugin,
-                                     &PyStringType, &plugin_dir))
+                                     &PyUnicode_Type, &auth_plugin,
+                                     &PyUnicode_Type, &plugin_dir))
         return -1;
 
     if (self->buffered_at_connect)
@@ -412,7 +399,7 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 
     if (auth_plugin)
     {
-        if (strcmp(PyStringAsString(auth_plugin), "") == 0)
+        if (strcmp(PyUnicode_AsUTF8(auth_plugin), "") == 0)
         {
             auth_plugin= Py_None;
         }
@@ -434,7 +421,7 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 
     if (con_timeout)
     {
-        self->connection_timeout= (unsigned int)PyIntAsULong(con_timeout);
+        self->connection_timeout= (unsigned int)PyLong_AsUnsignedLong(con_timeout);
     }
 
     return 0;
@@ -683,7 +670,7 @@ MySQL_st_affected_rows(MySQL *self)
 {
     if (&self->session)
     {
-        return PyIntFromULongLong((&self->session)->affected_rows);
+        return PyLong_FromUnsignedLongLong((&self->session)->affected_rows);
     }
 
     Py_RETURN_NONE;
@@ -705,7 +692,7 @@ MySQL_st_client_flag(MySQL *self)
 {
     if (&self->session)
     {
-        return PyInt_FromLong((&self->session)->client_flag);
+        return PyLong_FromLong((&self->session)->client_flag);
     }
 
     Py_RETURN_NONE;
@@ -727,7 +714,7 @@ MySQL_st_field_count(MySQL *self)
 {
     if (&self->session)
     {
-        return PyInt_FromLong((&self->session)->field_count);
+        return PyLong_FromLong((&self->session)->field_count);
     }
 
     Py_RETURN_NONE;
@@ -749,7 +736,7 @@ MySQL_st_insert_id(MySQL *self)
 {
     if (&self->session)
     {
-        return PyIntFromULongLong((&self->session)->insert_id);
+        return PyLong_FromUnsignedLongLong((&self->session)->insert_id);
     }
 
     Py_RETURN_NONE;
@@ -771,7 +758,7 @@ MySQL_st_server_capabilities(MySQL *self)
 {
     if (&self->session)
     {
-        return PyInt_FromLong((&self->session)->server_capabilities);
+        return PyLong_FromLong((&self->session)->server_capabilities);
     }
 
     Py_RETURN_NONE;
@@ -793,7 +780,7 @@ MySQL_st_server_status(MySQL *self)
 {
     if (&self->session)
     {
-        return PyInt_FromLong((&self->session)->server_status);
+        return PyLong_FromLong((&self->session)->server_status);
     }
 
     Py_RETURN_NONE;
@@ -815,7 +802,7 @@ MySQL_st_warning_count(MySQL *self)
 {
     if (&self->session)
     {
-        return PyInt_FromLong((&self->session)->warning_count);
+        return PyLong_FromLong((&self->session)->warning_count);
     }
 
     Py_RETURN_NONE;
@@ -901,48 +888,21 @@ PyObject*
 MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	char *user= NULL, *database= NULL;
-#ifdef PY3
     char *password = NULL;
-#else
-    PyObject *password = NULL;
-#endif
 	int res;
 	static char *kwlist[]= {"user", "password", "database", NULL};
 
     IS_CONNECTED(self);
 
-#ifdef PY3
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzz", kwlist,
-#else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zOz", kwlist,
-#endif
                                      &user, &password, &database
                                      ))
     {
         return NULL;
     }
-#ifdef PY3
     Py_BEGIN_ALLOW_THREADS
     res= mysql_change_user(&self->session, user, password, database);
     Py_END_ALLOW_THREADS
-#else
-{
-	char* c_password;
-	if (PyUnicode_Check(password))
-	{
-		PyObject* u_password= PyUnicode_AsUTF8String(password);
-		c_password= PyString_AsString(u_password);
-		Py_DECREF(u_password);
-	}
-	else
-	{
-		c_password= PyString_AsString(password);
-	}
-	Py_BEGIN_ALLOW_THREADS
-	res= mysql_change_user(&self->session, user, c_password, database);
-	Py_END_ALLOW_THREADS
-}
-#endif
     if (res)
     {
     	raise_with_session(&self->session, NULL);
@@ -964,7 +924,6 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
 
   @return   MySQL character set name.
     @retval PyUnicode   Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 MySQL_character_set_name(MySQL *self)
@@ -977,7 +936,7 @@ MySQL_character_set_name(MySQL *self)
     name= mysql_character_set_name(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyStringFromString(name);
+    return PyUnicode_FromString(name);
 }
 
 /**
@@ -1001,7 +960,7 @@ MySQL_set_character_set(MySQL *self, PyObject *args)
     PyObject* value;
     int res;
 
-    if (!PyArg_ParseTuple(args, "O!", &PyStringType, &value))
+    if (!PyArg_ParseTuple(args, "O!", &PyUnicode_Type, &value))
     {
         return NULL;
     }
@@ -1009,7 +968,7 @@ MySQL_set_character_set(MySQL *self, PyObject *args)
     IS_CONNECTED(self);
 
     Py_BEGIN_ALLOW_THREADS
-    res= mysql_set_character_set(&self->session, PyStringAsString(value));
+    res= mysql_set_character_set(&self->session, PyUnicode_AsUTF8(value));
     Py_END_ALLOW_THREADS
 
     if (res)
@@ -1046,7 +1005,7 @@ MySQL_set_load_data_local_infile_option(MySQL *self, PyObject *args)
     PyObject* value;
     int res;
 
-    if (!PyArg_ParseTuple(args, "O!", &PyStringType, &value))
+    if (!PyArg_ParseTuple(args, "O!", &PyUnicode_Type, &value))
     {
         return NULL;
     }
@@ -1055,7 +1014,7 @@ MySQL_set_load_data_local_infile_option(MySQL *self, PyObject *args)
 
     Py_BEGIN_ALLOW_THREADS
 
-    res= mysql_options(&self->session, MYSQL_OPT_LOAD_DATA_LOCAL_DIR , PyStringAsString(value));
+    res= mysql_options(&self->session, MYSQL_OPT_LOAD_DATA_LOCAL_DIR , PyUnicode_AsUTF8(value));
 
     Py_END_ALLOW_THREADS
 
@@ -1151,11 +1110,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     my_bool abool;
     my_bool ssl_enabled= 0;
 #endif
-#ifdef PY3
     char *password = NULL;
-#else
-    PyObject *password = NULL;
-#endif
     MYSQL *res;
 
     static char *kwlist[]=
@@ -1167,11 +1122,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         "local_infile", "load_data_local_dir",
         NULL
     };
-#ifdef PY3
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzzzzO!O!O!O!O!iz", kwlist,
-#else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzOzkzkzzzzzzO!O!O!O!O!iz", kwlist,
-#endif
                                      &host, &user, &password, &database,
                                      &port, &unix_socket,
                                      &client_flags,
@@ -1240,25 +1191,19 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         protocol= MYSQL_PROTOCOL_TCP;
     }
 
-#ifdef PY3
     charset_name= PyUnicode_AsASCIIString(self->charset_name);
     if (NULL == charset_name)
     {
         return NULL;
     }
-#else
-    charset_name= self->charset_name;
-#endif
 
-    plugin_dir= PyStringAsString(self->plugin_dir);
+    plugin_dir= PyUnicode_AsUTF8(self->plugin_dir);
     mysql_options(&self->session, MYSQL_PLUGIN_DIR, plugin_dir);
     mysql_options(&self->session, MYSQL_OPT_PROTOCOL, (char*)&protocol);
     mysql_options(&self->session, MYSQL_SET_CHARSET_NAME,
-                  PyBytesAsString(charset_name));
+                  PyBytes_AsString(charset_name));
 
-#ifdef PY3
     Py_DECREF(charset_name);
-#endif
 
     tmp_uint= self->connection_timeout;
     mysql_options(&self->session, MYSQL_OPT_CONNECT_TIMEOUT, (char*)&tmp_uint);
@@ -1323,19 +1268,19 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
     }
 
-    if (PyString_Check(self->auth_plugin)) {
-        auth_plugin= PyStringAsString(self->auth_plugin);
+    if (PyUnicode_Check(self->auth_plugin)) {
+        auth_plugin= PyUnicode_AsUTF8(self->auth_plugin);
         mysql_options(&self->session, MYSQL_DEFAULT_AUTH, auth_plugin);
         if (strcmp(auth_plugin, "sha256_password") == 0 && !ssl_enabled)
         {
             PyObject *exc_type= MySQLInterfaceError;
-            PyObject *err_no= PyInt_FromLong(2002);
-            PyObject *err_msg= PyStringFromString("sha256_password requires SSL");
+            PyObject *err_no= PyLong_FromLong(2002);
+            PyObject *err_msg= PyUnicode_FromString("sha256_password requires SSL");
             PyObject *err_obj= NULL;
             err_obj= PyObject_CallFunctionObjArgs(exc_type, err_msg, NULL);
-            PyObject_SetAttr(err_obj, PyStringFromString("sqlstate"), Py_None);
-            PyObject_SetAttr(err_obj, PyStringFromString("errno"), err_no);
-            PyObject_SetAttr(err_obj, PyStringFromString("msg"), err_msg);
+            PyObject_SetAttr(err_obj, PyUnicode_FromString("sqlstate"), Py_None);
+            PyObject_SetAttr(err_obj, PyUnicode_FromString("errno"), err_no);
+            PyObject_SetAttr(err_obj, PyUnicode_FromString("msg"), err_msg);
             PyErr_SetObject(exc_type, err_obj);
             Py_XDECREF(exc_type);
             Py_XDECREF(err_no);
@@ -1365,60 +1310,23 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     {
 		while (PyDict_Next(conn_attrs, &pos, &key, &value)) {
 			const char* attr_name;
-#ifdef PY3
 			PyObject *str_name = PyObject_Str(key);
 			if (!str_name)
 			{
 				printf("Unable to get attribute name\n");
 			}
 			attr_name= PyUnicode_AsUTF8AndSize(str_name, NULL);
-#else
-			PyObject* u_attr_name= NULL;
-			if (PyUnicode_Check(key))
-			{
-				u_attr_name= PyUnicode_AsUTF8String(key);
-				attr_name= PyString_AsString(u_attr_name);
-			}
-			else
-			{
-				attr_name= PyString_AsString(key);
-			}
-#endif
 			const char* attr_value;
-#ifdef PY3
 			PyObject *str_value = PyObject_Str(value);
 			if (!str_value)
 			{
 				printf("Unable to get attribute value\n");
 			}
 			attr_value= PyUnicode_AsUTF8AndSize(str_value, NULL);
-#else
-			PyObject* u_attr_value= NULL;
-			if (PyUnicode_Check(value))
-			{
-				u_attr_value= PyUnicode_AsUTF8String(value);
-				attr_value= PyString_AsString(u_attr_value);
-			}
-			else
-			{
-				attr_value= PyString_AsString(value);
-			}
-#endif
 			mysql_options4(&self->session, MYSQL_OPT_CONNECT_ATTR_ADD, attr_name, attr_value);
 
-#ifdef PY3
 			Py_DECREF(str_name);
 			Py_DECREF(str_value);
-#else
-			if (u_attr_name != NULL)
-			{
-				Py_DECREF(u_attr_name);
-			}
-			if (u_attr_value != NULL)
-			{
-				Py_DECREF(u_attr_value);
-			}
-#endif
 		}
     }
 
@@ -1435,30 +1343,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 
     /* End of test loading authentication_ldap_sasl_client plugin */
 
-#ifdef PY3
     Py_BEGIN_ALLOW_THREADS
     res= mysql_real_connect(&self->session, host, user, password, database,
                             port, unix_socket, client_flags);
     Py_END_ALLOW_THREADS
-#else
-{
-    char* c_password;
-    if (PyUnicode_Check(password))
-    {
-        PyObject* u_password= PyUnicode_AsUTF8String(password);
-        c_password= PyString_AsString(u_password);
-        Py_DECREF(u_password);
-    }
-    else
-    {
-        c_password= PyString_AsString(password);
-    }
-    Py_BEGIN_ALLOW_THREADS
-    res= mysql_real_connect(&self->session, host, user, c_password, database,
-                            port, unix_socket, client_flags);
-    Py_END_ALLOW_THREADS
-}
-#endif
 
     if (!res)
     {
@@ -1510,7 +1398,6 @@ MySQL_close(MySQL *self)
 
   @return   PyObject with the escaped string.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception.
 */
 PyObject*
@@ -1537,38 +1424,28 @@ MySQL_escape_string(MySQL *self, PyObject *value)
         {
             return NULL;
         }
-        from_size= BytesSize(from);
-        from_str= PyBytesAsString(from);
+        from_size= PyBytes_Size(from);
+        from_str= PyBytes_AsString(from);
     }
-#ifndef PY3
-    // Python v2 str
-    else if (PyString_Check(value))
-#else
-    // Python v3 bytes
     else if (PyBytes_Check(value))
-#endif
     {
-        from_size= BytesSize(value);
-        from_str= PyBytesAsString(value);
+        from_size= PyBytes_Size(value);
+        from_str= PyBytes_AsString(value);
     }
     else
     {
-#ifdef PY3
         PyErr_SetString(PyExc_TypeError, "Argument must be str or bytes");
-#else
-        PyErr_SetString(PyExc_TypeError, "Argument must be unicode or str");
-#endif
         return NULL;
     }
 
-    to= BytesFromStringAndSize(NULL, from_size * 2 + 1);
-    to_str= PyBytesAsString(to);
+    to= PyBytes_FromStringAndSize(NULL, from_size * 2 + 1);
+    to_str= PyBytes_AsString(to);
 
     escaped_size= (Py_ssize_t)mysql_real_escape_string(&self->session, to_str,
                                                        from_str,
                                                        (unsigned long)from_size);
 
-    BytesResize(&to, escaped_size);
+    _PyBytes_Resize(&to, escaped_size);
     Py_XDECREF(from);
 
     if (!to)
@@ -1612,26 +1489,26 @@ MySQL_get_character_set_info(MySQL *self)
     Py_END_ALLOW_THREADS
 
 	cs_info= PyDict_New();
-	PyDict_SetItemString(cs_info, "number", PyInt_FromLong(cs.number));
+	PyDict_SetItemString(cs_info, "number", PyLong_FromLong(cs.number));
 	PyDict_SetItemString(cs_info, "name",
-	                     PyString_FromStringAndSize(cs.name, strlen(cs.name)));
+	                     PyUnicode_FromStringAndSize(cs.name, strlen(cs.name)));
 	PyDict_SetItemString(cs_info, "csname",
-                         PyString_FromStringAndSize(cs.csname,
-                                                    strlen(cs.csname)));
+                         PyUnicode_FromStringAndSize(cs.csname,
+                                                     strlen(cs.csname)));
 
 	PyDict_SetItemString(cs_info, "comment",
-                         PyString_FromStringAndSize(cs.comment,
-                                                    strlen(cs.comment)));
+                         PyUnicode_FromStringAndSize(cs.comment,
+                                                     strlen(cs.comment)));
 
     if (cs.dir)
     {
 	    PyDict_SetItemString(cs_info, "dir",
-                             PyString_FromStringAndSize(cs.dir,
-                                                        strlen(cs.dir)));
+                             PyUnicode_FromStringAndSize(cs.dir,
+                                                         strlen(cs.dir)));
     }
 
-	PyDict_SetItemString(cs_info, "mbminlen", PyInt_FromLong(cs.mbminlen));
-	PyDict_SetItemString(cs_info, "mbmaxlen", PyInt_FromLong(cs.mbmaxlen));
+	PyDict_SetItemString(cs_info, "mbminlen", PyLong_FromLong(cs.mbminlen));
+	PyDict_SetItemString(cs_info, "mbmaxlen", PyLong_FromLong(cs.mbmaxlen));
 
 	return cs_info;
 }
@@ -1643,7 +1520,6 @@ MySQL_get_character_set_info(MySQL *self)
 
   @return   MySQL client version as string.
     @retval PyUnicode   Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 MySQL_get_client_info(MySQL *self)
@@ -1654,7 +1530,7 @@ MySQL_get_client_info(MySQL *self)
     name= mysql_get_client_info();
     Py_END_ALLOW_THREADS
 
-    return PyStringFromString(name);
+    return PyUnicode_FromString(name);
 }
 
 /**
@@ -1677,11 +1553,11 @@ MySQL_get_client_version(MySQL *self)
 
     version= PyTuple_New(3);
     // ver has format XYYZZ: X=major, YY=minor, ZZ=sub-version
-    PyTuple_SET_ITEM(version, 0, PyInt_FromLong(ver / VERSION_OFFSET_MAJOR));
+    PyTuple_SET_ITEM(version, 0, PyLong_FromLong(ver / VERSION_OFFSET_MAJOR));
     PyTuple_SET_ITEM(version, 1,
-                     PyInt_FromLong((ver / VERSION_OFFSET_MINOR) \
+                     PyLong_FromLong((ver / VERSION_OFFSET_MINOR) \
                                     % VERSION_OFFSET_MINOR));
-    PyTuple_SET_ITEM(version, 2, PyInt_FromLong(ver % VERSION_OFFSET_MINOR));
+    PyTuple_SET_ITEM(version, 2, PyLong_FromLong(ver % VERSION_OFFSET_MINOR));
     return version;
 }
 
@@ -1692,7 +1568,6 @@ MySQL_get_client_version(MySQL *self)
 
   @return   Connection description as string.
     @retval PyUnicode   Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 MySQL_get_host_info(MySQL *self)
@@ -1705,7 +1580,7 @@ MySQL_get_host_info(MySQL *self)
     host= mysql_get_host_info(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyStringFromString(host);
+    return PyUnicode_FromString(host);
 }
 
 /**
@@ -1728,7 +1603,7 @@ MySQL_get_proto_info(MySQL *self)
     proto= mysql_get_proto_info(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyInt_FromLong(proto);
+    return PyLong_FromLong(proto);
 }
 
 /**
@@ -1738,7 +1613,6 @@ MySQL_get_proto_info(MySQL *self)
 
   @return   MySQL server version as string.
     @retval PyUnicode   Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 MySQL_get_server_info(MySQL *self)
@@ -1751,7 +1625,7 @@ MySQL_get_server_info(MySQL *self)
     name= mysql_get_server_info(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyStringFromString(name);
+    return PyUnicode_FromString(name);
 }
 
 /**
@@ -1775,11 +1649,11 @@ MySQL_get_server_version(MySQL *self)
     Py_END_ALLOW_THREADS
 
     version= PyTuple_New(3);
-    PyTuple_SET_ITEM(version, 0, PyInt_FromLong(ver / VERSION_OFFSET_MAJOR));
+    PyTuple_SET_ITEM(version, 0, PyLong_FromLong(ver / VERSION_OFFSET_MAJOR));
     PyTuple_SET_ITEM(version, 1,
-                     PyInt_FromLong((ver / VERSION_OFFSET_MINOR) \
-                                    % VERSION_OFFSET_MINOR));
-    PyTuple_SET_ITEM(version, 2, PyInt_FromLong(ver % VERSION_OFFSET_MINOR));
+                     PyLong_FromLong((ver / VERSION_OFFSET_MINOR) \
+                                     % VERSION_OFFSET_MINOR));
+    PyTuple_SET_ITEM(version, 2, PyLong_FromLong(ver % VERSION_OFFSET_MINOR));
     return version;
 }
 
@@ -1790,7 +1664,6 @@ MySQL_get_server_version(MySQL *self)
 
   @return   SSL cipher as string.
     @retval PyUnicode   Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 MySQL_get_ssl_cipher(MySQL *self)
@@ -1804,7 +1677,7 @@ MySQL_get_ssl_cipher(MySQL *self)
     {
         Py_RETURN_NONE;
     }
-    return PyStringFromString(name);
+    return PyUnicode_FromString(name);
 }
 
 /**
@@ -1818,7 +1691,6 @@ MySQL_get_ssl_cipher(MySQL *self)
 
   @return   Encoded string prefixed with X and quoted.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
 */
 PyObject*
 MySQL_hex_string(MySQL *self, PyObject *value)
@@ -1836,21 +1708,21 @@ MySQL_hex_string(MySQL *self, PyObject *value)
         return NULL;
     }
 
-    from_size= BytesSize(from);
-    to= BytesFromStringAndSize(NULL, from_size * 2 + 1);
+    from_size= PyBytes_Size(from);
+    to= PyBytes_FromStringAndSize(NULL, from_size * 2 + 1);
     if (!to)
     {
         return NULL;
     }
-    to_str= PyBytesAsString(to);
-    from_str= PyBytesAsString(from);
+    to_str= PyBytes_AsString(to);
+    from_str= PyBytes_AsString(from);
 
     Py_BEGIN_ALLOW_THREADS
     hexed_size= (Py_ssize_t)mysql_hex_string(to_str, from_str,
                                              (unsigned long)from_size);
     Py_END_ALLOW_THREADS
 
-    BytesResize(&to, hexed_size);
+    _PyBytes_Resize(&to, hexed_size);
 
     result= PyBytes_FromString("X'");
     PyBytes_Concat(&result, to);
@@ -1889,7 +1761,7 @@ MySQL_insert_id(MySQL *self)
     id= mysql_insert_id(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyIntFromULongLong(id);
+    return PyLong_FromUnsignedLongLong(id);
 }
 
 /**
@@ -1963,41 +1835,23 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         // None is SQL's NULL
         if (value == Py_None)
         {
-            PyTuple_SET_ITEM(prepared, i, PyBytesFromString("NULL"));
+            PyTuple_SET_ITEM(prepared, i, PyBytes_FromString("NULL"));
             continue;
         }
 
-        if (PyIntLong_Check(value) || PyFloat_Check(value))
+        if (PyLong_Check(value) || PyFloat_Check(value))
         {
-#ifdef PY3
             PyObject *str = PyObject_Str(value);
             PyTuple_SET_ITEM(prepared, i,
                              PyBytes_FromString(
                                 (const char *)PyUnicode_1BYTE_DATA(
                                 str)));
             Py_DECREF(str);
-#else
-            int tmp_size;
-            PyObject *numeric= PyObject_Repr(value);
-            char *tmp= PyString_AsString(numeric);
-            tmp_size= (int)PyString_Size(numeric);
-            if (tmp[tmp_size - 1] == 'L')
-            {
-                PyObject *new_num= PyString_FromStringAndSize(tmp, tmp_size);
-                _PyString_Resize(&new_num, tmp_size - 1);
-                PyTuple_SET_ITEM(prepared, i, new_num);
-                Py_DECREF(numeric);
-            }
-            else
-            {
-                PyTuple_SET_ITEM(prepared, i, numeric);
-            }
-#endif
             continue;
         }
 
         // All values that need to be quoted
-        if (PyString_Check(value)
+        if (PyUnicode_Check(value)
             || PyUnicode_Check(value)
             || PyBytes_Check(value))
         {
@@ -2018,15 +1872,9 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         else if (PyDelta_CheckExact(value))
         {
             new_value= pytomy_timedelta(value);
-#ifndef PY3
-        }
-        else if (strcmp((value)->ob_type->tp_name, "Decimal") == 0)
-        {
-#else
         }
         else if (strcmp((value)->ob_type->tp_name, "decimal.Decimal") == 0)
         {
-#endif
             new_value= pytomy_decimal(value);
         }
         else
@@ -2050,23 +1898,17 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         // Some conversions could return None instead of raising errors
         if (new_value == Py_None)
         {
-            PyTuple_SET_ITEM(prepared, i, PyBytesFromString("NULL"));
+            PyTuple_SET_ITEM(prepared, i, PyBytes_FromString("NULL"));
 
-#ifdef PY3
         }
         else if (PyBytes_Check(new_value))
         {
             PyObject *quoted= PyBytes_FromFormat("'%s'", PyBytes_AsString(new_value));
             PyTuple_SET_ITEM(prepared, i, quoted);
-#endif
         }
-        else if (PyString_Check(new_value))
+        else if (PyUnicode_Check(new_value))
         {
-#ifdef PY3
             PyObject *quoted= PyBytes_FromFormat("'%s'", PyUnicode_AS_DATA(new_value));
-#else
-            PyObject *quoted= PyString_FromFormat("'%s'", PyStringAsString(new_value));
-#endif
             PyTuple_SET_ITEM(prepared, i, quoted);
         }
         else
@@ -2193,7 +2035,7 @@ MySQL_thread_id(MySQL *self)
     thread_id= (unsigned long)mysql_thread_id(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyIntFromULong(thread_id);
+    return PyLong_FromUnsignedLong(thread_id);
 }
 
 /**
@@ -2225,7 +2067,7 @@ MySQL_select_db(MySQL *self, PyObject* value)
 	if (db)
 	{
         Py_BEGIN_ALLOW_THREADS
-        res= (int)mysql_select_db(&self->session, PyBytesAsString(db));
+        res= (int)mysql_select_db(&self->session, PyBytes_AsString(db));
         Py_END_ALLOW_THREADS
 
         if (res != 0)
@@ -2262,7 +2104,7 @@ MySQL_warning_count(MySQL *self)
     count= mysql_warning_count(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyIntFromULong(count);
+    return PyLong_FromUnsignedLong(count);
 }
 
 /**
@@ -2293,7 +2135,7 @@ MySQL_affected_rows(MySQL *self)
         affected= 0;
     }
 
-    return PyIntFromULongLong(affected);
+    return PyLong_FromUnsignedLongLong(affected);
 }
 
 /**
@@ -2316,7 +2158,7 @@ MySQL_field_count(MySQL *self)
     count= mysql_field_count(&self->session);
     Py_END_ALLOW_THREADS
 
-    return PyIntFromULong(count);
+    return PyLong_FromUnsignedLong(count);
 }
 
 /**
@@ -2491,7 +2333,7 @@ MySQL_fetch_fields(MySQL *self)
 
 	if (!self->result)
 	{
-        raise_with_string(PyString_FromString("No result"), NULL);
+        raise_with_string(PyUnicode_FromString("No result"), NULL);
         return NULL;
 	}
 
@@ -2596,8 +2438,8 @@ MySQL_fetch_row(MySQL *self)
             if (self->raw_as_string && self->raw_as_string == Py_True)
             {
                 PyTuple_SET_ITEM(result_row, i,
-    			                 PyStringFromStringAndSize(row[i],
-    			                                           field_lengths[i]));
+    			                 PyUnicode_FromStringAndSize(row[i],
+    			                                             field_lengths[i]));
             }
             else
             {
@@ -2625,7 +2467,7 @@ MySQL_fetch_row(MySQL *self)
             field_type == MYSQL_TYPE_LONGLONG ||
             field_type == MYSQL_TYPE_INT24 ||
             field_type == MYSQL_TYPE_YEAR) {
-    		PyTuple_SET_ITEM(result_row, i, PyInt_FromString(row[i], NULL, 0));
+    		PyTuple_SET_ITEM(result_row, i, PyLong_FromString(row[i], NULL, 0));
         }
         else if (field_type == MYSQL_TYPE_DATETIME ||
                  field_type == MYSQL_TYPE_TIMESTAMP)
@@ -2665,7 +2507,7 @@ MySQL_fetch_row(MySQL *self)
                     else
                     {
                         value= PySet_New(PyUnicode_Split(
-                                         value, PyStringFromString(","), -1));
+                                         value, PyUnicode_FromString(","), -1));
                     }
                     if (!value)
                     {
@@ -2681,7 +2523,7 @@ MySQL_fetch_row(MySQL *self)
             mod_decimal= PyImport_ImportModule("decimal");
             if (mod_decimal) {
                 dec_args= PyTuple_New(1);
-                PyTuple_SET_ITEM(dec_args, 0, PyStringFromString(row[i]));
+                PyTuple_SET_ITEM(dec_args, 0, PyUnicode_FromString(row[i]));
                 decimal= PyObject_GetAttrString(mod_decimal, "Decimal");
                 PyTuple_SET_ITEM(result_row, i,
                                  PyObject_Call(decimal, dec_args, NULL));
@@ -2716,7 +2558,7 @@ MySQL_fetch_row(MySQL *self)
         {
             if ((field_flags & BLOB_FLAG) && (field_flags & BINARY_FLAG))
             {
-                value= BytesFromStringAndSize(row[i], field_lengths[i]);
+                value= PyBytes_FromStringAndSize(row[i], field_lengths[i]);
             }
             else
             {
@@ -2765,7 +2607,7 @@ MySQL_num_rows(MySQL *self)
 
     if (!self->result)
     {
-        raise_with_string(PyString_FromString(
+        raise_with_string(PyUnicode_FromString(
                           "Statement did not return result set"), NULL);
         return NULL;
     }
@@ -2774,7 +2616,7 @@ MySQL_num_rows(MySQL *self)
     count= mysql_num_rows(self->result);
     Py_END_ALLOW_THREADS
 
-    return PyIntFromULongLong(count);
+    return PyLong_FromUnsignedLongLong(count);
 }
 
 /**
@@ -2801,7 +2643,7 @@ MySQL_num_fields(MySQL *self)
     count= mysql_num_fields(self->result);
     Py_END_ALLOW_THREADS
 
-    return PyIntFromULong(count);
+    return PyLong_FromUnsignedLong(count);
 }
 
 /**
@@ -2951,11 +2793,7 @@ MySQL_stat(MySQL *self)
     	return NULL;
     }
 
-#ifndef PY3
-    return PyByteArray_FromStringAndSize(stat, strlen(stat));
-#else
-    return PyBytesFromString(stat);
-#endif
+    return PyBytes_FromString(stat);
 }
 
 /**
@@ -2991,7 +2829,7 @@ MySQL_stmt_prepare(MySQL *self, PyObject *args)
     {
         return NULL;
     }
-    stmt_char= PyBytesAsString(stmt);
+    stmt_char= PyBytes_AsString(stmt);
     stmt_length= strlen(stmt_char);
 
     mysql= &self->session;
@@ -3158,9 +2996,9 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
         }
 
         /* LONG */
-        if (PyIntLong_Check(value))
+        if (PyLong_Check(value))
         {
-            pbind->buffer.l= PyIntAsLong(value);
+            pbind->buffer.l= PyLong_AsLong(value);
             mbind->buffer= &pbind->buffer.l;
 #if LONG_MAX >= INT64_T_MAX
             mbind->buffer_type= MYSQL_TYPE_LONGLONG;
@@ -3184,7 +3022,7 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
         }
 
         /* STRING */
-        if (PyString_Check(value) || PyUnicode_Check(value) || PyBytes_Check(value))
+        if (PyUnicode_Check(value) || PyUnicode_Check(value) || PyBytes_Check(value))
         {
             pbind->str_value= value;
             mbind->buffer_type= MYSQL_TYPE_STRING;
@@ -3271,11 +3109,7 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
             continue;
         }
         /* DECIMAL */
-#ifndef PY3
-        else if (strcmp((value)->ob_type->tp_name, "Decimal") == 0)
-#else
         else if (strcmp((value)->ob_type->tp_name, "decimal.Decimal") == 0)
-#endif
         {
             pbind->str_value= pytomy_decimal(value);
             mbind[i].buffer_type= MYSQL_TYPE_DECIMAL;
@@ -3303,7 +3137,6 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
             mbind->buffer_type= MYSQL_TYPE_NULL;
             mbind->is_null= (bool_ *)0;
         }
-#ifdef PY3
         else if (PyBytes_Check(pbind->str_value))
         {
             mbind->buffer= PyBytes_AsString(pbind->str_value);
@@ -3311,28 +3144,14 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
             mbind->length= &mbind->buffer_length;
             mbind->is_null= (bool_ *)0;
         }
-#endif
-        else if (PyString_Check(pbind->str_value))
+        else if (PyUnicode_Check(pbind->str_value))
         {
-#ifdef PY3
             Py_ssize_t len;
             mbind->buffer= PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
             mbind->buffer_length= (unsigned long)len;
-#else
-            mbind->buffer= PyString_AsString(pbind->str_value);
-            mbind->buffer_length= (unsigned long)PyString_Size(pbind->str_value);
-#endif
             mbind->length= &mbind->buffer_length;
             mbind->is_null= (bool_ *)0;
         }
-#ifndef PY3
-        else if (PyUnicode_Check(pbind->str_value))
-        {
-            PyObject *utf8_str= PyUnicode_AsUTF8String(pbind->str_value);
-            mbind->buffer= PyString_AsString(utf8_str);
-            mbind->buffer_length= (unsigned long)PyString_Size(utf8_str);
-        }
-#endif
         else
         {
             PyErr_SetString(PyExc_ValueError,
@@ -3593,7 +3412,7 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
 #endif
             case MYSQL_TYPE_YEAR:
                 PyTuple_SET_ITEM(
-                    row, i, PyInt_FromLong(self->cols[i].small_buffer.l));
+                    row, i, PyLong_FromLong(self->cols[i].small_buffer.l));
                 break;
             case MYSQL_TYPE_FLOAT:
                 PyTuple_SET_ITEM(
@@ -3609,8 +3428,8 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
             case MYSQL_TYPE_TIME:
             case MYSQL_TYPE_DECIMAL:
             case MYSQL_TYPE_NEWDECIMAL:
-                obj= BytesFromStringAndSize(NULL, self->cols[i].length);
-                self->bind[i].buffer= PyBytesAsString(obj);
+                obj= PyBytes_FromStringAndSize(NULL, self->cols[i].length);
+                self->bind[i].buffer= PyBytes_AsString(obj);
                 self->bind[i].buffer_length= self->cols[i].length;
 
                 Py_BEGIN_ALLOW_THREADS
@@ -3626,18 +3445,18 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
 
                 if (field->type == MYSQL_TYPE_DATE)
                 {
-                    PyTuple_SET_ITEM(row, i, mytopy_date(PyBytesAsString(obj)));
+                    PyTuple_SET_ITEM(row, i, mytopy_date(PyBytes_AsString(obj)));
                 }
                 else if (field->type == MYSQL_TYPE_TIME)
                 {
                     PyTuple_SET_ITEM(row, i,
-                        mytopy_time(PyBytesAsString(obj), self->cols[i].length));
+                        mytopy_time(PyBytes_AsString(obj), self->cols[i].length));
                 }
                 else if (field->type == MYSQL_TYPE_DATETIME ||
                          field->type == MYSQL_TYPE_TIMESTAMP)
                 {
                     PyTuple_SET_ITEM( row, i,
-                        mytopy_datetime(PyBytesAsString(obj), self->cols[i].length));
+                        mytopy_datetime(PyBytes_AsString(obj), self->cols[i].length));
                 }
                 else /* MYSQL_TYPE_DECIMAL or MYSQL_TYPE_NEWDECIMAL */
                 {
@@ -3646,7 +3465,7 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                     {
                         dec_args= PyTuple_New(1);
                         PyTuple_SET_ITEM(dec_args, 0,
-                            PyStringFromString(PyBytesAsString(obj)));
+                            PyUnicode_FromString(PyBytes_AsString(obj)));
                         decimal= PyObject_GetAttrString(mod_decimal, "Decimal");
                         PyTuple_SET_ITEM(row, i,
                             PyObject_Call(decimal, dec_args, NULL));
@@ -3666,8 +3485,8 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                     char *token;
                     PyObject* set= PySet_New(NULL);
 
-                    obj= BytesFromStringAndSize(NULL, self->cols[i].length);
-                    self->bind[i].buffer= PyBytesAsString(obj);
+                    obj= PyBytes_FromStringAndSize(NULL, self->cols[i].length);
+                    self->bind[i].buffer= PyBytes_AsString(obj);
                     self->bind[i].buffer_length= self->cols[i].length;
 
                     Py_BEGIN_ALLOW_THREADS
@@ -3681,7 +3500,7 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                         goto cleanup;
                     }
 
-                    for (token= strtok_r(PyBytesAsString(obj), ",", &rest);
+                    for (token= strtok_r(PyBytes_AsString(obj), ",", &rest);
                         token != NULL;
                         token= strtok_r(NULL, ",", &rest))
                     {
@@ -3713,8 +3532,8 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                 }
                 else
                 {
-                    obj= BytesFromStringAndSize(NULL, self->cols[i].length);
-                    self->bind[i].buffer= PyBytesAsString(obj);
+                    obj= PyBytes_FromStringAndSize(NULL, self->cols[i].length);
+                    self->bind[i].buffer= PyBytes_AsString(obj);
                     self->bind[i].buffer_length= self->cols[i].length;
 
                     Py_BEGIN_ALLOW_THREADS
@@ -3731,11 +3550,11 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                     if (field->type == MYSQL_TYPE_BIT)
                     {
                         PyTuple_SET_ITEM(row, i,
-                            mytopy_bit(PyBytesAsString(obj), self->cols[i].length));
+                            mytopy_bit(PyBytes_AsString(obj), self->cols[i].length));
                     }
                     else
                     {
-                        PyTuple_SET_ITEM(row, i, PyUnicode_FromString(PyBytesAsString(obj)));
+                        PyTuple_SET_ITEM(row, i, PyUnicode_FromString(PyBytes_AsString(obj)));
                     }
                     Py_XDECREF(obj);
                 }

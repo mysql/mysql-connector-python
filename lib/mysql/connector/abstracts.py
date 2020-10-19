@@ -42,12 +42,12 @@ except:
     # If import fails, we don't have SSL support.
     pass
 
-from .catch23 import make_abc, BYTE_TYPES, STRING_TYPES
 from .conversion import MySQLConverterBase
 from .constants import (ClientFlag, CharacterSet, CONN_ATTRS_DN,
                         DEFAULT_CONFIGURATION, OPENSSL_CS_NAMES,
                         TLS_CIPHER_SUITES, TLS_VERSIONS)
 from .optionfiles import MySQLOptionsParser
+from .utils import make_abc
 from . import errors
 
 NAMED_TUPLE_CACHE = weakref.WeakValueDictionary()
@@ -194,7 +194,7 @@ class MySQLConnectionAbstract(object):
         tls_ciphersuites = []
         tls_cs = self._ssl["tls_ciphersuites"]
 
-        if isinstance(tls_cs, STRING_TYPES):
+        if isinstance(tls_cs, str):
             if not (tls_cs.startswith("[") and
                     tls_cs.endswith("]")):
                 raise AttributeError("tls_ciphersuites must be a list, "
@@ -276,7 +276,7 @@ class MySQLConnectionAbstract(object):
         tls_versions = []
         tls_version = self._ssl["tls_versions"]
 
-        if isinstance(tls_version, STRING_TYPES):
+        if isinstance(tls_version, str):
             if not (tls_version.startswith("[") and tls_version.endswith("]")):
                 raise AttributeError("tls_versions must be a list, found: '{}'"
                                      "".format(tls_version))
@@ -585,7 +585,7 @@ class MySQLConnectionAbstract(object):
                 if attr_name in CONN_ATTRS_DN:
                     continue
                 # Validate name type
-                if not isinstance(attr_name, STRING_TYPES):
+                if not isinstance(attr_name, str):
                     raise errors.InterfaceError(
                         "Attribute name should be a string, found: '{}' in '{}'"
                         "".format(attr_name, self._conn_attrs))
@@ -601,7 +601,7 @@ class MySQLConnectionAbstract(object):
                         "'_', found: '{}'".format(attr_name))
                 # Validate value type
                 attr_value = self._conn_attrs[attr_name]
-                if not isinstance(attr_value, STRING_TYPES):
+                if not isinstance(attr_value, str):
                     raise errors.InterfaceError(
                         "Attribute '{}' value: '{}' must be a string type."
                         "".format(attr_name, attr_value))
@@ -641,7 +641,7 @@ class MySQLConnectionAbstract(object):
 
         Returns tuple
         """
-        if isinstance(server_version, BYTE_TYPES):
+        if isinstance(server_version, (bytearray, bytes)):
             server_version = server_version.decode()
 
         # pylint: disable=W1401

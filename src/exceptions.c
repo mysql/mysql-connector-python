@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -35,7 +35,6 @@
 #endif
 #include <mysql.h>
 
-#include "catch23.h"
 #include "exceptions.h"
 #include "mysql_connector.h"
 
@@ -73,15 +72,15 @@ raise_with_session(MYSQL *conn, PyObject *exc_type)
 
 	if (!err)
 	{
-		error_msg= PyString_FromString("MySQL server has gone away");
-        error_no= PyInt_FromLong(2006);
-        sqlstate= PyString_FromString("HY000");
+		error_msg= PyUnicode_FromString("MySQL server has gone away");
+        error_no= PyLong_FromLong(2006);
+        sqlstate= PyUnicode_FromString("HY000");
 	}
 	else
 	{
-		error_msg= PyString_FromString(mysql_error(conn));
-        error_no= PyInt_FromLong(err);
-        sqlstate= PyString_FromString(mysql_sqlstate(conn));
+		error_msg= PyUnicode_FromString(mysql_error(conn));
+        error_no= PyLong_FromLong(err);
+        sqlstate= PyUnicode_FromString(mysql_sqlstate(conn));
     }
 
 	err_object= PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
@@ -90,16 +89,16 @@ raise_with_session(MYSQL *conn, PyObject *exc_type)
         goto ERR;
     }
 
-    PyObject_SetAttr(err_object, PyString_FromString("sqlstate"), sqlstate);
-    PyObject_SetAttr(err_object, PyString_FromString("errno"), error_no);
-    PyObject_SetAttr(err_object, PyString_FromString("msg"), error_msg);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), sqlstate);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("errno"), error_no);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("msg"), error_msg);
 
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
 
     ERR:
         PyErr_SetObject(PyExc_RuntimeError,
-            PyString_FromString("Failed raising error."));
+            PyUnicode_FromString("Failed raising error."));
         goto CLEANUP;
     CLEANUP:
         Py_XDECREF(err_object);
@@ -139,15 +138,15 @@ raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type)
 
 	if (!err)
 	{
-		error_msg= PyString_FromString("MySQL server has gone away");
-        error_no= PyInt_FromLong(2006);
-        sqlstate= PyString_FromString("HY000");
+		error_msg= PyUnicode_FromString("MySQL server has gone away");
+        error_no= PyLong_FromLong(2006);
+        sqlstate= PyUnicode_FromString("HY000");
 	}
 	else
 	{
-		error_msg= PyString_FromString(mysql_stmt_error(stmt));
-        error_no= PyInt_FromLong(err);
-        sqlstate= PyString_FromString(mysql_stmt_sqlstate(stmt));
+		error_msg= PyUnicode_FromString(mysql_stmt_error(stmt));
+        error_no= PyLong_FromLong(err);
+        sqlstate= PyUnicode_FromString(mysql_stmt_sqlstate(stmt));
     }
 
 	err_object= PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
@@ -156,16 +155,16 @@ raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type)
         goto ERR;
     }
 
-    PyObject_SetAttr(err_object, PyString_FromString("sqlstate"), sqlstate);
-    PyObject_SetAttr(err_object, PyString_FromString("errno"), error_no);
-    PyObject_SetAttr(err_object, PyString_FromString("msg"), error_msg);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), sqlstate);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("errno"), error_no);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("msg"), error_msg);
 
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
 
     ERR:
         PyErr_SetObject(PyExc_RuntimeError,
-            PyString_FromString("Failed raising error."));
+            PyUnicode_FromString("Failed raising error."));
         goto CLEANUP;
     CLEANUP:
         Py_XDECREF(err_object);
@@ -189,7 +188,7 @@ void
 raise_with_string(PyObject *error_msg, PyObject *exc_type)
 {
    	PyObject *err_object= NULL;
-	PyObject *error_no= PyInt_FromLong(-1);
+	PyObject *error_no= PyLong_FromLong(-1);
 
     // default exception
 	if (!exc_type)
@@ -202,16 +201,16 @@ raise_with_string(PyObject *error_msg, PyObject *exc_type)
 	{
         goto ERR;
     }
-    PyObject_SetAttr(err_object, PyString_FromString("sqlstate"), Py_None);
-    PyObject_SetAttr(err_object, PyString_FromString("errno"), error_no);
-    PyObject_SetAttr(err_object, PyString_FromString("msg"), error_msg);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), Py_None);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("errno"), error_no);
+    PyObject_SetAttr(err_object, PyUnicode_FromString("msg"), error_msg);
 
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
 
     ERR:
         PyErr_SetObject(PyExc_RuntimeError,
-            PyString_FromString("Failed raising error."));
+            PyUnicode_FromString("Failed raising error."));
         goto CLEANUP;
     CLEANUP:
         Py_XDECREF(err_object);

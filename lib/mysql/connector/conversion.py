@@ -30,11 +30,12 @@
 """
 
 import datetime
+import struct
 import time
 from decimal import Decimal
 
 from .constants import FieldType, FieldFlag, CharacterSet
-from .catch23 import PY2, NUMERIC_TYPES, struct_unpack
+from .utils import NUMERIC_TYPES
 from .custom_types import HexLiteral
 
 CONVERT_ERROR = "Could not convert '{value}' to python {pytype}"
@@ -167,10 +168,6 @@ class MySQLConverter(MySQLConverterBase):
         Returns a bytearray object.
         """
         if isinstance(buf, NUMERIC_TYPES):
-            if PY2:
-                if isinstance(buf, float):
-                    return repr(buf)
-                return str(buf)
             return str(buf).encode('ascii')
         elif isinstance(buf, type(None)):
             return bytearray(b"NULL")
@@ -232,8 +229,6 @@ class MySQLConverter(MySQLConverterBase):
 
     def _str_to_mysql(self, value):
         """Convert value to string"""
-        if PY2:
-            return str(value)
         return self._unicode_to_mysql(value)
 
     def _unicode_to_mysql(self, value):
@@ -359,8 +354,6 @@ class MySQLConverter(MySQLConverterBase):
         else:
             result = fmt.format(hours, mins, secs)
 
-        if PY2:
-            return result
         return result.encode('ascii')
 
     def _decimal_to_mysql(self, value):
@@ -461,7 +454,7 @@ class MySQLConverter(MySQLConverterBase):
         int_val = value
         if len(int_val) < 8:
             int_val = b'\x00' * (8 - len(int_val)) + int_val
-        return struct_unpack('>Q', int_val)[0]
+        return struct.unpack('>Q', int_val)[0]
 
     def _DATE_to_python(self, value, dsc=None):  # pylint: disable=C0103
         """Converts TIME column MySQL to a python datetime.datetime type.
@@ -506,7 +499,7 @@ class MySQLConverter(MySQLConverterBase):
             mcs = 0
         try:
             (hours, mins, secs) = [int(d) for d in hms.split(b':')]
-            if value[0] == 45 or value[0] == '-':  # if PY3 or PY2
+            if value[0] == 45 or value[0] == '-':
                 mins, secs, mcs = -mins, -secs, -mcs
             return datetime.timedelta(hours=hours, minutes=mins,
                                       seconds=secs, microseconds=mcs)

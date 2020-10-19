@@ -33,7 +33,7 @@ import tests
 import unittest
 import warnings
 
-from mysql.connector import catch23, constants, errors
+from mysql.connector import constants, errors
 
 
 class Helpers(tests.MySQLConnectorTests):

@@ -3,22 +3,10 @@ Priority: extra
 Section: python
 Maintainer: MySQL Release Engineering <mysql-build@oss.oracle.com>
 Build-Depends:
- debhelper (>= 9.0.0), dh-python, python (>= 2.7.5) | python2 (>= 2.7.5)
+ debhelper (>= 9.0.0), dh-python, python (>= 3.5.0) | python3 (>= 3.5.0)
 Standards-Version: 3.9.8
 Homepage: http://dev.mysql.com/downloads/connector/python/
-X-Python3-Version: >= 3.4
-
-Package: mysql-connector-python
-Architecture: any
-Depends:
- ${python:Depends},
- ${python2-protobuf:Depends}
-Replaces: mysql-connector-python-cext (<< 8.0.22)
-Breaks: mysql-connector-python-cext (<< 8.0.22)
-Recommends: python-dnspython (>= 1.16.0)
-Conflicts: python-mysql.connector, mysql-connector-python-commercial
-Description: MySQL database driver written in pure Python
- @LICENSE@
+X-Python3-Version: >= 3.5
 
 Package: mysql-connector-python-py3
 Architecture: any

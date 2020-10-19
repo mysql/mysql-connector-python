@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -28,22 +28,6 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-#ifndef PY3
-
-#ifdef _DEBUG
-
-#undef _DEBUG
-#include <Python.h>
-#define _DEBUG
-
-#else
-
-#include <Python.h>
-
-#endif
-
-#else
-
 #include <Python.h>
 
 #define PyString_FromStringAndSize PyUnicode_FromStringAndSize
@@ -51,5 +35,3 @@
 #define PyString_AsString PyUnicode_AsUTF8
 #define PyString_FromString PyUnicode_FromString
 #define PyString_Size PyUnicode_GetSize
-
-#endif

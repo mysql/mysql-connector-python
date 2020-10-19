@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,7 +32,6 @@ import json
 import warnings
 
 from .dbdoc import DbDoc
-from .compat import STRING_TYPES
 from .errorcode import (ER_NO_SUCH_TABLE, ER_TABLE_EXISTS_ERROR,
                         ER_X_CMD_NUM_ARGUMENTS, ER_X_INVALID_ADMIN_COMMAND)
 from .errors import NotSupportedError, OperationalError, ProgrammingError

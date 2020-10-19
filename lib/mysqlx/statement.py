@@ -34,7 +34,6 @@ import warnings
 
 from .errors import ProgrammingError, NotSupportedError
 from .expr import ExprParser
-from .compat import INT_TYPES, STRING_TYPES
 from .constants import LockContention
 from .dbdoc import DbDoc
 from .helpers import deprecated
@@ -279,7 +278,7 @@ class FilterableStatement(Statement):
             self.bind(DbDoc(obj).as_str())
         elif isinstance(obj, DbDoc):
             self.bind(obj.as_str())
-        elif isinstance(obj, STRING_TYPES):
+        elif isinstance(obj, str):
             try:
                 res = json.loads(obj)
                 if not isinstance(res, dict):
@@ -485,7 +484,7 @@ class FilterableStatement(Statement):
         .. versionchanged:: 8.0.12
            The usage of ``offset`` was deprecated.
         """
-        if not isinstance(row_count, INT_TYPES) or row_count < 0:
+        if not isinstance(row_count, int) or row_count < 0:
             raise ValueError("The 'row_count' value must be a positive integer")
         if not self.has_limit:
             self._changed = bool(self._exec_counter == 0)
@@ -514,7 +513,7 @@ class FilterableStatement(Statement):
 
         .. versionadded:: 8.0.12
         """
-        if not isinstance(offset, INT_TYPES) or offset < 0:
+        if not isinstance(offset, int) or offset < 0:
             raise ValueError("The 'offset' value must be a positive integer")
         self._limit_offset = offset
         return self
