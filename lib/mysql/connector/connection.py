@@ -98,6 +98,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         self._ssl_active = False
         self._auth_plugin = None
+        self._krb_service_principal = None
         self._pool_config_version = None
 
         self._columns_desc = []
@@ -245,11 +246,15 @@ class MySQLConnection(MySQLConnectionAbstract):
             auth = get_auth_plugin(new_auth_plugin)(auth_data,
                  username=self._user, password=password,
                  ssl_enabled=self._ssl_active)
-            response = auth.auth_response()
-            _LOGGER.debug("# request size: %s", len(response))
+            if new_auth_plugin == "authentication_ldap_sasl_client":
+                _LOGGER.debug("# auth_data: %s", auth_data)
+                response = auth.auth_response(self._krb_service_principal)
+            else:
+                response = auth.auth_response()
+            _LOGGER.debug("# request: %s size: %s", response, len(response))
             self._socket.send(response)
             packet = self._socket.recv()
-            _LOGGER.debug("server response packet: %s", packet)
+            _LOGGER.debug("# server response packet: %s", packet)
             if new_auth_plugin == "authentication_ldap_sasl_client" \
                and len(packet) >= 6 and packet[5] == 114 and packet[6] == 61: # 'r' and '='
                 # Continue with sasl authentication
@@ -261,7 +266,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                     if auth.auth_finalize(packet[5:]):
                         # receive packed OK
                         packet = self._socket.recv()
-            elif new_auth_plugin == "authentication_ldap_sasl_client":
+            elif new_auth_plugin == "authentication_ldap_sasl_client" and \
+               auth_data == b'GSSAPI' and packet[4] != 255:
                 rcode_size = 5  # header size for the response status code.
                 _LOGGER.debug("# Continue with sasl GSSAPI authentication")
                 _LOGGER.debug("# response header: %s", packet[:rcode_size+1])

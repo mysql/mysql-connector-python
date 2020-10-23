@@ -62,6 +62,12 @@ TLS_VERSION_ERROR = ("The given tls_version: '{}' is not recognized as a valid "
 TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
                         "'tls-versions' list '{}'. ")
 
+KRB_SERVICE_PINCIPAL_ERROR = (
+    'Option "krb_service_principal" {error}, must be a string in the form '
+    '"primary/instance@realm" e.g "ldap/ldapauth@MYSQL.COM" where "@realm" '
+    'is optional and if it is not given will be assumed to belong to the '
+    'default realm, as configured in the krb5.conf file.')
+
 
 @make_abc(ABCMeta)
 class MySQLConnectionAbstract(object):
@@ -607,6 +613,18 @@ class MySQLConnectionAbstract(object):
 
         if self._client_flags & ClientFlag.CONNECT_ARGS:
             self._add_default_conn_attrs()
+        if "krb_service_principal" in config and \
+            config["krb_service_principal"] is not None:
+            self._krb_service_principal = config["krb_service_principal"]
+            if not isinstance(self._krb_service_principal, STRING_TYPES):
+                raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
+                    error="is not a string"))
+            if self._krb_service_principal == "":
+                raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
+                    error="can not be an empty string"))
+            if "/" not in self._krb_service_principal:
+                raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
+                    error="is incorrectly formatted"))
 
     def _add_default_conn_attrs(self):
         """Add the default connection attributes."""

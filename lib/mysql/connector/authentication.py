@@ -69,7 +69,7 @@ class BaseAuthPlugin(object):
     plugin_name = ''
 
     def __init__(self, auth_data, username=None, password=None, database=None,
-                 ssl_enabled=False):
+                 ssl_enabled=False, instance=None):
         """Initialization"""
         self._auth_data = auth_data
         self._username = username
@@ -295,6 +295,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
     client_nonce = None
     client_salt = None
     server_salt = None
+    krb_service_principal = None
     iterations = 0
     server_auth_var = None
 
@@ -404,7 +405,10 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
                    gssapi.RequirementFlag.delegate_to_peer
         )
 
-        service_principal = "ldap/ldapauth"
+        if self.krb_service_principal:
+            service_principal = self.krb_service_principal
+        else:
+            service_principal = "ldap/ldapauth"
         _LOGGER.debug("# service principal: %s", service_principal)
         servk = gssapi.Name(service_principal, name_type=gssapi.NameType.kerberos_principal)
         self.target_name = servk
@@ -496,12 +500,13 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
 
         return wraped.message
 
-    def auth_response(self):
+    def auth_response(self, krb_service_principal=None):
         """This method will prepare the fist message to the server.
 
         Returns bytes to send to the server as the first message.
         """
         auth_mechanism = self._auth_data.decode()
+        self.krb_service_principal = krb_service_principal
         _LOGGER.debug("read_method_name_from_server: %s", auth_mechanism)
         if auth_mechanism not in self.sasl_mechanisms:
             raise errors.InterfaceError(

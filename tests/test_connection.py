@@ -2548,7 +2548,7 @@ class WL13335(tests.MySQLConnectorTests):
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
                  "Authentication with ldap_simple not supported")
 #Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
+@unittest.skipIf(not tests.is_host_reachable("10.172.166.126"),
                  "ldap server is not reachable")
 @unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
                  "Plugin authentication_ldap_sasl not available")
@@ -2915,7 +2915,7 @@ class WL14263(tests.MySQLConnectorTests):
 
     @tests.foreach_cnx()
     def test_authentication_ldap_sasl_client(self):
-        """test_authentication_ldap_sasl_client_with_SCRAM-SHA-1"""
+        """test_authentication_ldap_sasl_client_with_SCRAM-SHA-256"""
         # Not running with c-ext if plugin libraries are not setup
         if self.cnx.__class__ == CMySQLConnection and \
            os.getenv('TEST_AUTHENTICATION_LDAP_SASL_CLIENT_CEXT', None) is None:
@@ -3152,6 +3152,7 @@ class WL14213(tests.MySQLConnectorTests):
             "host": self.config["host"],
             "port": self.config["port"],
             "password": "Testpw1",
+            "krb_service_principal": "ldap/ldapauth@MYSQL.LOCAL"
         }
 
         # Attempt connection with wrong password
@@ -3167,6 +3168,38 @@ class WL14213(tests.MySQLConnectorTests):
             self.assertIn("Unable to retrieve credentials with the given "
                           "password", context.exception.msg, "not the expected "
                           "error {}".format(context.exception.msg))
+
+        # Attempt connection with empty krb_service_principal
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["krb_service_principal"] = ""
+        with self.assertRaises((ProgrammingError, InterfaceError)) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        self.assertIn("can not be an empty string", context.exception.msg,
+                      "not the expected  error {}".format(context.exception.msg))
+
+        # Attempt connection with an incorrectly formatted krb_service_principal
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["krb_service_principal"] = "service_principal123"
+        with self.assertRaises((ProgrammingError, InterfaceError)) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        self.assertIn("incorrectly formatted", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+        # Attempt connection with an incorrectly formatted krb_service_principal
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["krb_service_principal"] = 3308
+        with self.assertRaises((ProgrammingError, InterfaceError)) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        self.assertIn("not a string", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
+
+        # Attempt connection with a false krb_service_principal
+        bad_pass_args = conn_args.copy()
+        bad_pass_args["krb_service_principal"] = "principal/instance@realm"
+        with self.assertRaises((ProgrammingError, InterfaceError)) as context:
+            _ = self.cnx.__class__(**bad_pass_args)
+        self.assertIn("Unable to initiate security context", context.exception.msg,
+                      "not the expected error {}".format(context.exception.msg))
 
         # Attempt connection with correct password
         cnx = self.cnx.__class__(**conn_args)

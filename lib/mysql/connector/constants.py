@@ -79,7 +79,8 @@ DEFAULT_CONFIGURATION = {
     'consume_results': False,
     'conn_attrs': None,
     'dns_srv': False,
-    'use_pure': False
+    'use_pure': False,
+    'krb_service_principal': None
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
