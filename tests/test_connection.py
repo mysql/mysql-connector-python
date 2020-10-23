@@ -1224,7 +1224,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         tries = 3
         results = []
-        reconnect_time = 12
+        reconnect_time = 45
         while tries:
             # Check the delay
             timer = timeit.Timer(_test_reconnect_delay)
@@ -1236,8 +1236,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             if results[0] < reconnect_time:
                 break
             tries -= 1
-        self.assertTrue(results[0] > 3 and results[0] < reconnect_time,
-                        "3 <= result < 12, was {0}".format(results))
+        self.assertTrue(results[0] < reconnect_time,
+                        "best time: {} > expected: {}, others: {}".format(
+                            results[0], reconnect_time, results))
 
         # Check reconnect stops when successful
         config = tests.get_mysql_config()
