@@ -29,7 +29,9 @@
 """Various MySQL constants and character sets
 """
 
+import six
 import ssl
+import warnings
 
 from .errors import ProgrammingError
 from .charsets import MYSQL_CHARACTER_SETS
@@ -95,6 +97,12 @@ def flag_is_set(flag, flags):
     if (flags & flag) > 0:
         return True
     return False
+
+
+def _obsolete_option(name, new_name, value):
+    warnings.warn('The option "{}" has been deprecated, use "{}" instead.'
+                  ''.format(name, new_name), category=DeprecationWarning)
+    return value
 
 
 class _Constants(object):
@@ -532,7 +540,14 @@ class ServerFlag(_Flags):
     }
 
 
-class RefreshOption(_Constants):
+class RefreshOption_meta(type):
+    @property
+    def SLAVE(self):
+        return _obsolete_option("RefreshOption.SLAVE", "RefreshOption.REPLICA",
+                                RefreshOption.REPLICA)
+
+
+class RefreshOption(six.with_metaclass(RefreshOption_meta, _Constants)):
     """MySQL Refresh command options
 
     Options used when sending the COM_REFRESH server command.
@@ -550,10 +565,11 @@ class RefreshOption(_Constants):
         'GRANT': (1 << 0, 'Refresh grant tables'),
         'LOG': (1 << 1, 'Start on new log file'),
         'TABLES': (1 << 2, 'close all tables'),
-        'HOSTS': (1 << 3, 'Flush host cache'),
+        'HOST': (1 << 3, 'Flush host cache'),
         'STATUS': (1 << 4, 'Flush status variables'),
         'THREADS': (1 << 5, 'Flush thread cache'),
         'REPLICA': (1 << 6, 'Reset source info and restart replica thread'),
+        'SLAVE': (1 << 6, 'Deprecated option; use REPLICA instead.'),
     }
 
 

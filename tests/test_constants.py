@@ -30,7 +30,10 @@
 """
 
 import tests
-from mysql.connector import constants, errors
+import unittest
+import warnings
+
+from mysql.connector import catch23, constants, errors
 
 
 class Helpers(tests.MySQLConnectorTests):
@@ -488,3 +491,34 @@ class ShutdownTypeTests(tests.MySQLConnectorTests):
             exp = value[1]
             res = constants.ShutdownType.get_desc(key)
             self.assertEqual(exp, res)
+
+
+class RefreshOptionTests(tests.MySQLConnectorTests):
+    """Tests for constants.RefreshOption"""
+    options = ["GRANT", "HOST", "LOG", "REPLICA", "STATUS", "TABLES",
+                   "THREADS", "SLAVE"]
+    def test_get_option(self):
+        """Get option flag by name"""
+        for opt_name in self.options:
+            self.assertIsNotNone(getattr(constants.RefreshOption, opt_name),
+                                 "with {}".format(opt_name))
+            self.assertIsInstance(getattr(constants.RefreshOption, opt_name), int,
+                                   "with {}".format(opt_name))
+
+    def test_get_desc(self):
+        """Get option description by name"""
+        for opt_name in self.options:
+            self.assertIsNotNone(constants.RefreshOption.get_desc(opt_name),
+                                 "with {}".format(opt_name))
+
+    def test_deprecated(self):
+        """Test deprecated warning is raised"""
+        with warnings.catch_warnings(record=True) as warn:
+            warnings.resetwarnings()
+            warnings.simplefilter("always")
+            getattr(constants.RefreshOption, "SLAVE")
+            constants.RefreshOption.SLAVE
+            self.assertGreaterEqual(len(warn), 1)
+            self.assertEqual(warn[-1].category, DeprecationWarning)
+            self.assertIn('"RefreshOption.SLAVE" has been deprecated',
+                          str(warn[-1].message))
