@@ -5781,3 +5781,30 @@ class BugOra29195610(tests.MySQLConnectorTests):
         with self.cnx.cursor(prepared=True) as cur:
             self.assertRaises(errors.NotSupportedError,
                               cur.callproc, 'sp_bug29195610', (2020,))
+
+
+class BugOra24938411(tests.MySQLConnectorTests):
+    """BUG#24938411: FIX MICROSECOND CONVERSION FROM MYSQL DATETIME TO PYTHON
+    DATETIME.
+    """
+
+    @tests.foreach_cnx()
+    def test_datetime_fractional(self):
+        with self.cnx.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS bug24938411")
+            cur.execute(
+                "CREATE TABLE bug24938411 "
+                "(mydate datetime(3) DEFAULT NULL) ENGINE=InnoDB"
+            )
+            cur.execute(
+                'INSERT INTO bug24938411 (mydate) '
+                'VALUES ("2020-01-01 01:01:01.543")'
+            )
+            cur.execute(
+                "SELECT mydate, CAST(mydate AS CHAR) AS mydate_char "
+                "FROM bug24938411"
+            )
+            row = cur.fetchone()
+            self.assertEqual(row[0], datetime(2020, 1, 1, 1, 1, 1, 543000))
+            self.assertEqual(row[1], "2020-01-01 01:01:01.543")
+            cur.execute("DROP TABLE IF EXISTS bug24938411")

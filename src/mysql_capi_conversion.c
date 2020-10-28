@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -453,7 +453,7 @@ mytopy_datetime(const char *data, const unsigned long length)
     if (data != end && end - data >= 2 && *data == '.')
     {
         // Fractional part
-        int field_length= 6;   // max fractional - 1
+        int field_length= 5;
         data++;
         value= (unsigned int)(*data - '0');
         while (data++ != end && isdigit(*data))
@@ -461,6 +461,13 @@ mytopy_datetime(const char *data, const unsigned long length)
             if (field_length-- > 0)
             {
                 value= (value * 10) + (unsigned int)(*data - '0');
+            }
+        }
+        if (field_length >= 0)
+        {
+            while (field_length-- > 0)
+            {
+                value*= 10;
             }
         }
         parts[6]= value;

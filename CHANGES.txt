@@ -17,6 +17,7 @@ v8.0.23
 - BUG#31882419: Fix error when getting the connection ID from a CMySQLConnection
 - BUG#29195610: Fix cursor.callproc() using namedtuple and dictionary cursors
 - BUG#26834307: Make cursor.fetchone() and cursor.fetchmany() PEP 249 compliant
+- BUG#24938411: Fix datetime microsecond conversion
 
 v8.0.22
 =======
