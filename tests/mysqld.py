@@ -571,8 +571,12 @@ class MySQLServer(MySQLServerBase):
                 for filename in script_files:
                     full_path = os.path.join(self._scriptdir, filename)
                     LOGGER.debug("Reading SQL from '%s'", full_path)
-                    with open(full_path, 'r') as fp:
-                        sql.extend([line.strip() for line in fp.readlines()])
+                    if sys.version_info[0] == 2:
+                        with open(full_path, 'r') as fp:
+                            sql.extend([line.strip() for line in fp.readlines()])
+                    else:
+                        with open(full_path, 'r', encoding="utf-8") as fp:
+                            sql.extend([line.strip() for line in fp.readlines()])
 
             fp_log = open(bootstrap_log, 'w')
             if self._version[0:2] < (8, 0) or self._version < (5, 7, 21):
