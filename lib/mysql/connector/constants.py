@@ -29,10 +29,10 @@
 """Various MySQL constants and character sets
 """
 
-import six
 import ssl
 import warnings
 
+from .catch23 import make_abc
 from .errors import ProgrammingError
 from .charsets import MYSQL_CHARACTER_SETS
 
@@ -546,8 +546,8 @@ class RefreshOption_meta(type):
         return _obsolete_option("RefreshOption.SLAVE", "RefreshOption.REPLICA",
                                 RefreshOption.REPLICA)
 
-
-class RefreshOption(six.with_metaclass(RefreshOption_meta, _Constants)):
+@make_abc(RefreshOption_meta)
+class RefreshOption(_Constants):
     """MySQL Refresh command options
 
     Options used when sending the COM_REFRESH server command.
