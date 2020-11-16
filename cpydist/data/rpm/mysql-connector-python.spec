@@ -133,12 +133,6 @@ Requires:      python
 Requires:      python2-dns >= %{wants_py_dnspython_version}
 %endif
 
-%if 0%{?byte_code_only:1}
-Requires: mysql%{?product_suffix}-client-plugins = %{version}
-%else
-Requires: mysql-community-client-plugins = %{version}
-%endif
-
 Obsoletes:   mysql-connector-python%{?product_suffix}-cext < %{version}-%{release}
 Provides:    mysql-connector-python%{?product_suffix}-cext = %{version}-%{release}
 
@@ -290,8 +284,9 @@ rm -rf %{buildroot}
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
-* Fri Oct 9 2020  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.23-1
+* Mon Nov 16 2020  Prashant Tekriwal <prashant.tekriwal@oracle.com> - 8.0.23-1
 - Updated for 8.0.23
+- Removed dependency on the Server "client-plugin" RPM
 
 * Mon Sep 07 2020  Kent Boortz <kent.boortz@oracle.com> - 8.0.22-1
 - Updated for 8.0.22
