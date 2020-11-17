@@ -14,7 +14,6 @@
      Platform="$(var.Platform)"/>
 
     <Property Id="PREVIOUSVERSIONSINSTALLED34" Secure="yes" />
-    <Property Id="PREVIOUSVERSIONSINSTALLED35" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED36" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
@@ -25,12 +24,6 @@
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED34"/>
-    </Upgrade>
-	<Upgrade Id="ebb1adfa-3a55-11e7-a9ba-0021f6bb00b4">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED35"/>
     </Upgrade>
 	<Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
@@ -75,28 +68,6 @@
       <?else?>
       <RegistrySearch Id="Python34InstallPathCurrent32" Root="HKCU" Type="raw"
        Key="Software\Python\PythonCore\3.4\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-
-    <!-- Python 3.5 -->
-    <Property Id="PYTHON35INSTALLPATH_ALL">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python35InstallPathAll64" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.5\InstallPath" Win64="yes"/>
-      <?else?>
-      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
-      <RegistrySearch Id="Python35InstallPathAll32" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.5-32\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-    <Property Id="PYTHON35INSTALLPATH_CURRENT">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python35InstallPathCurrent64" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.5\InstallPath" Win64="yes"/>
-      <?else?>
-      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
-      <RegistrySearch Id="Python35InstallPathCurrent32" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.5-32\InstallPath" Win64="no"/>
       <?endif?>
     </Property>
 
@@ -189,7 +160,7 @@
     </Property>
 
     <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
-      Installed OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON35INSTALLPATH_ALL OR PYTHON35INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT
+      Installed OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT
     </Condition>
 
     <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
@@ -211,29 +182,6 @@
                 <Directory Id="DjangoDir34" Name="django"/>
                 <Directory Id="ConnectorLocalesDir34" Name="locales">
                   <Directory Id="LocalesEngDir34" Name="eng"/>
-                </Directory>
-              </Directory>
-            </Directory>
-          </Directory>
-        </Directory>
-      </Directory>
-
-      <Directory Id="INSTALLDIRP35" Name="Python35">
-        <Directory Id="PythonLibDir35" Name="Lib">
-          <Directory Id="SitePackagesDir35" Name="site-packages">
-            <Directory Id="EggInfoDir35" Name="mysql_connector_python-$(var.FullVersion)-py3.5.egg-info"/>
-            <Directory Id="MySQLXPackageDir35" Name="mysqlx">
-              <Directory Id="MySQLXPB2Dir35" Name="protobuf"/>
-              <Directory Id="MySQLXLocalesDir35" Name="locales">
-                <Directory Id="MySQLXLocalesEngDir35" Name="eng"/>
-              </Directory>
-            </Directory>
-            <Directory Id="MySQLPackageDir35" Name="mysql">
-              <Directory Id="VendorDir35" Name="vendor"/>
-              <Directory Id="ConnectorPackageDir35" Name="connector">
-                <Directory Id="DjangoDir35" Name="django"/>
-                <Directory Id="ConnectorLocalesDir35" Name="locales">
-                  <Directory Id="LocalesEngDir35" Name="eng"/>
                 </Directory>
               </Directory>
             </Directory>
@@ -423,30 +371,6 @@
       </Feature>
       <?endif?>
 
-      <!-- Python 3.5 -->
-      <?if $(var.BDist35) != "" ?>
-      <Feature Id="Python35" Title="C/py for Python 3.5" Level="1"
-               ConfigurableDirectory="INSTALLDIRP35" Absent="allow">
-        <Condition Level='0'>Not PYTHON35INSTALLPATH_ALL AND Not PYTHON35INSTALLPATH_CURRENT AND Not Installed</Condition>
-        <ComponentRef Id="EggInfo35"/>
-        <ComponentRef Id="MySQLPackage35"/>
-        <?if $(var.HaveLdapLibs35) = 1 ?>
-        <ComponentRef Id="Vendor35"/>
-        <?endif?>
-        <ComponentRef Id="ConnectorPackage35"/>
-        <ComponentRef Id="ConnectorLocales35"/>
-        <ComponentRef Id="LocalesEng35"/>
-        <ComponentRef Id="DjangoBackend35"/>
-        <ComponentRef Id="MySQLXPackage35"/>
-        <ComponentRef Id="MySQLXPackagePB235"/>
-        <ComponentRef Id="MySQLXLocales35"/>
-        <ComponentRef Id="MySQLXLocalesEng35"/>
-        <?if $(var.HaveCExt35) = 1 ?>
-        <ComponentRef Id="CExtension35"/>
-        <?endif?>
-      </Feature>
-      <?endif?>
-
       <!-- Python 3.6 -->
       <?if $(var.BDist36) != "" ?>
       <Feature Id="Python36" Title="C/py for Python 3.6" Level="1"
@@ -549,10 +473,6 @@
     <CustomAction Id="SetInstallDirAllP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_ALL]"/>
     <CustomAction Id="ErrDebug34" Error="Installdir: [INSTALLDIRP34]"/>
 
-    <!-- Python 3.5 -->
-    <CustomAction Id="SetInstallDirCurrentP35" Property="INSTALLDIRP35" Value="[PYTHON35INSTALLPATH_CURRENT]"/>
-    <CustomAction Id="SetInstallDirAllP35" Property="INSTALLDIRP35" Value="[PYTHON35INSTALLPATH_ALL]"/>
-    <CustomAction Id="ErrDebug35" Error="Installdir: [INSTALLDIRP35]"/>
     <!-- Python 3.6 -->
     <CustomAction Id="SetInstallDirCurrentP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_ALL]"/>
@@ -586,9 +506,6 @@
       <!-- Python 3.4 -->
       <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
-      <!-- Python 3.5 -->
-      <Custom Action="SetInstallDirCurrentP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_ALL</Custom>
       <!-- Python 3.6 -->
       <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
@@ -608,9 +525,6 @@
       <!-- Python 3.4 -->
       <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
-      <!-- Python 3.5 -->
-      <Custom Action="SetInstallDirCurrentP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP35" After="AppSearch">NOT Installed AND PYTHON35INSTALLPATH_ALL</Custom>
       <!-- Python 3.6 -->
       <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
