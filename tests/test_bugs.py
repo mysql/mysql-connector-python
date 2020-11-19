@@ -5808,3 +5808,34 @@ class BugOra24938411(tests.MySQLConnectorTests):
             self.assertEqual(row[0], datetime(2020, 1, 1, 1, 1, 1, 543000))
             self.assertEqual(row[1], "2020-01-01 01:01:01.543")
             cur.execute("DROP TABLE IF EXISTS bug24938411")
+
+
+class BugOra32165864(tests.MySQLConnectorTests):
+    """BUG#32165864: SEGMENTATION FAULT WHEN TWO PREPARED STATEMENTS WITH
+    INCORRECT SQL SYNTAX ARE EXECUTED CONSECUTIVELY.
+    """
+
+    @foreach_cnx()
+    def test_segfault_prepared_statement(self):
+        with self.cnx.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS bug32165864")
+            cur.execute(
+                "CREATE TABLE bug32165864 "
+                "(id INT, name VARCHAR(10), address VARCHAR(20))"
+            )
+            cur.execute(
+                "INSERT INTO bug32165864 (id, name, address) VALUES "
+                "(1, 'Joe', 'Street 1'), (2, 'John', 'Street 2')"
+            )
+            self.cnx.commit()
+
+        stmt = "SELECT * FROM customer WHERE i = ? ?"
+
+        with self.cnx.cursor(prepared=True) as cur:
+            for _ in range(10):
+                self.assertRaises(
+                    errors.Error, cur.execute, stmt, (10, "Gabriela")
+                )
+
+        with self.cnx.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS bug32165864")

@@ -959,7 +959,8 @@ class CMySQLCursorPrepared(CMySQLCursor):
 
             try:
                 self._stmt = self._cnx.cmd_stmt_prepare(operation)
-            except (errors.Error, errors.ProgrammingError):
+            except errors.Error:
+                self._executed = None
                 self._stmt = None
                 raise
 

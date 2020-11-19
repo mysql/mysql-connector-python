@@ -2987,7 +2987,7 @@ MySQL_stmt_prepare(MySQL *self, PyObject *args)
 
     IS_CONNECTED(self);
 
-    if (!PyArg_ParseTuple(args, "O", &stmt))
+    if (!PyArg_ParseTuple(args, "S", &stmt))
     {
         return NULL;
     }
@@ -3033,7 +3033,6 @@ MySQL_stmt_prepare(MySQL *self, PyObject *args)
     return prep_stmt;
 
 error:
-    Py_XDECREF(stmt);
     Py_BEGIN_ALLOW_THREADS
     mysql_stmt_close(mysql_stmt);
     Py_END_ALLOW_THREADS
