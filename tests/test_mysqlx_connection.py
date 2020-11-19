@@ -49,7 +49,8 @@ from time import sleep
 from urllib.parse import quote_plus, quote
 
 from . import check_tls_versions_support
-from mysqlx.connection import SocketStream, TLS_V1_3_SUPPORTED, HAVE_DNSPYTHON
+from mysqlx.connection import (CONNECTION_CLOSED_ERROR, HAVE_DNSPYTHON,
+                               SocketStream, TLS_V1_3_SUPPORTED)
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
 from mysqlx.protocol import (Message, MessageReader, MessageWriter, Protocol,
                              HAVE_LZ4, HAVE_ZSTD)
@@ -2017,3 +2018,48 @@ class MySQLxCompressionTests(tests.MySQLxTests):
 
         # Restore the default compression algorithms
         self._set_compression_algorithms(default_algorithms)
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
+class MySQLxCloseNoticeTests(tests.MySQLxTests):
+    """Test close notifications from server"""
+
+    def _test_notice(self, warning):
+        connect_kwargs = tests.get_mysqlx_config()
+        session = mysqlx.get_session(connect_kwargs)
+        stm = session.sql("select CONNECTION_ID()")
+        res = stm.execute()
+        self.assertIsNotNone(res.fetch_all()[0][0], "session id is None")
+
+        error_msg = CONNECTION_CLOSED_ERROR[warning["code"]]
+        reason = ("Connection close: {}: {}".format(warning["msg"], error_msg),
+                  warning["code"])
+        session._connection.set_server_disconnected(reason)
+
+        with self.assertRaises(InterfaceError) as context:
+            stm = session.sql("select CONNECTION_ID()")
+            _ = stm.execute()
+        self.assertEqual(warning["code"], context.exception.errno)
+        self.assertIn(warning["msg"], context.exception.msg)
+
+        # Attempt reuse of closed session
+        with self.assertRaises(InterfaceError) as context:
+            stm = session.sql("select CONNECTION_ID()")
+            _ = stm.execute()
+        self.assertEqual(warning["code"], context.exception.errno)
+        self.assertIn(warning["msg"], context.exception.msg)
+
+    def test_read_timeout_notice(self):
+        """Test read_timeout notification."""
+        warning = {'level': 3, 'code': 1810, 'msg': 'IO Read error: read_timeout exceeded'}
+        self._test_notice(warning)
+
+    def test_session_killed_notice(self):
+        """Test session_killed notification."""
+        warning = {'level': 3, 'code': 3169, 'msg': 'Session was killed'}
+        self._test_notice(warning)
+
+    def test_shutdown_notice(self):
+        """Test shutdown notification."""
+        warning = {'level': 3, 'code': 1053, 'msg': 'Server shutdown in progress'}
+        self._test_notice(warning)

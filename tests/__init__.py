@@ -1069,3 +1069,28 @@ def check_tls_versions_support(tls_versions):
     except ImportError:
         pass
     return supported_tls
+
+
+def shutdown_mysql_server(server=None):
+    """Shutdown the given server using the classic restart command.
+
+    Attempts to shutdown the given server using the classic restart command.
+
+    :param: server to shutdown, if None default server will be shutdown.
+    """
+    def thread_cmd(server):
+        cnx = Connect(**server.client_config.copy())
+        cnx.cmd_query("SELECT USER()")
+        rows = cnx.get_rows()
+        print(rows)
+        cnx.cmd_query("shutdown")
+
+    from mysql.connector import Connect
+    from threading import Thread
+    import time
+
+    server = server if server else MYSQL_SERVERS[0]
+    worker = Thread(target=thread_cmd, args=[server])
+    worker.start()
+    worker.join()
+    time.sleep(.5)

@@ -29,6 +29,7 @@
 """Implementation of the X protocol for MySQL servers.
 """
 
+import logging
 import struct
 import zlib
 
@@ -57,6 +58,7 @@ from .protobuf import (CRUD_PREPARE_MAPPING, SERVER_MESSAGES,
 
 
 _COMPRESSION_THRESHOLD = 1000
+_LOGGER = logging.getLogger("mysqlx")
 
 
 class Compressor(object):
@@ -156,6 +158,7 @@ class MessageReader(object):
             return self._msg_queue.pop(0)
 
         frame_size, frame_type = struct.unpack("<LB", self._stream.read(5))
+
         if frame_type == 10:
             raise ProgrammingError("The connected server does not have the "
                                    "MySQL X protocol plugin enabled or "
@@ -294,6 +297,7 @@ class Protocol(object):
         self._reader = reader
         self._writer = writer
         self._compression_algorithm = None
+        self._warnings = []
 
     @property
     def compression_algorithm(self):
@@ -421,6 +425,9 @@ class Protocol(object):
         if msg["type"] == 1:
             warn_msg = Message.from_message("Mysqlx.Notice.Warning",
                                             msg["payload"])
+            self._warnings.append(warn_msg.msg)
+            _LOGGER.warning("Protocol.process_frame Received Warning Notice "
+                            "code %s: %s", warn_msg.code, warn_msg.msg)
             result.append_warning(warn_msg.level, warn_msg.code, warn_msg.msg)
         elif msg["type"] == 2:
             Message.from_message("Mysqlx.Notice.SessionVariableChanged",
@@ -458,7 +465,13 @@ class Protocol(object):
             result (Result): A `Result` based type object.
         """
         while True:
-            msg = self._reader.read_message()
+            try:
+                msg = self._reader.read_message()
+            except RuntimeError as err:
+                warnings = repr(result.get_warnings())
+                if warnings:
+                    raise RuntimeError(
+                        "{} reason: {}".format(err, warnings))
             if msg.type == "Mysqlx.Error":
                 raise OperationalError(msg["msg"], msg["code"])
             elif msg.type == "Mysqlx.Notice.Frame":

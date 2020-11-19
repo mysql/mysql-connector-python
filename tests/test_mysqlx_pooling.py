@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -39,10 +39,11 @@ import platform
 import re
 import socket
 
-from mysqlx.errors import InterfaceError, ProgrammingError
+from mysqlx.connection import update_timeout_penalties_by_error
+from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError, PoolError
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import VERSION, LICENSE
-from . import check_tls_versions_support
+from . import check_tls_versions_support, shutdown_mysql_server
 from .test_mysqlx_connection import build_uri
 from time import sleep
 from threading import Thread
@@ -330,7 +331,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # verify all sessions are closed
         for session in sessions:
-            with self.assertRaises(mysqlx.errors.OperationalError):
+            with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
                 session.sql("SELECT 1").execute()
             session.get_schema(settings["schema"])
 
@@ -347,7 +348,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         # Verify that clossing the session again does not raise eceptions
         session.close()
         # Verify that trying to use a closed session raises error
-        with self.assertRaises(mysqlx.errors.OperationalError):
+        with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
             session.sql("SELECT 1").execute()
         client.close()
         # Verify that clossing the client again does not raise eceptions
@@ -700,7 +701,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
 
         # Closing pools in client1 must not close connections in client2
         client1.close()
-        with self.assertRaises(mysqlx.errors.OperationalError):
+        with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
             session1.sql("SELECT 1").execute()
         session2.sql("SELECT 2").execute()
         session2.get_schema(settings["schema"])

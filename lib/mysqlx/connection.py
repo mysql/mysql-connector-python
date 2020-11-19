@@ -80,7 +80,7 @@ from .constants import SSLMode, Auth, COMPRESSION_ALGORITHMS
 from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
 from .protocol import (Protocol, MessageReader, MessageWriter, HAVE_LZ4,
                        HAVE_ZSTD)
-from .result import Result, RowResult, SqlResult, DocResult
+from .result import BaseResult, Result, RowResult, SqlResult, DocResult
 from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
 
@@ -109,6 +109,7 @@ _PENALTY_MAXED_OUT = 60
 _PENALTY_NO_ADD_INFO = 60 * 60
 _PENALTY_CONN_TIMEOUT = 60 * 60
 _PENALTY_WRONG_PASSW = 60 * 60 * 24
+_PENALTY_RESTARTING = 60
 _TIMEOUT_PENALTIES = {
     # Server denays service e.g Max connections reached
     "[WinError 10053]": _PENALTY_MAXED_OUT, # Established connection was aborted
@@ -124,7 +125,18 @@ _TIMEOUT_PENALTIES = {
     # Wrong Password
     "Access denied": _PENALTY_WRONG_PASSW
 }
-
+_TIMEOUT_PENALTIES_BY_ERR_NO = {
+    1053: _PENALTY_RESTARTING
+}
+CONNECTION_CLOSED_ERROR = {
+    1810: 'This session was closed because the connection has been idle for too '
+          'long. Use "mysqlx.getSession()" or "mysqlx.getClient()" to create a '
+          'new one.',
+    1053: 'This session was closed because the server is shutting down.',
+    3169: 'This session was closed because the connection has been killed in a '
+          'different session. Use "mysqlx.getSession()" or "mysqlx.getClient()" '
+          'to create a new one.',
+};
 _LOGGER = logging.getLogger("mysqlx")
 
 
@@ -155,6 +167,16 @@ def generate_pool_name(**kwargs):
 
     return "_".join(parts)
 
+
+def update_timeout_penalties_by_error(penalty_dict):
+    """Update the timeout penalties directory.
+
+    Update the timeout penalties by error dictionary used to deactivate a pool.
+    Args:
+        penalty_dict (dict): The dictionary with the new timeouts.
+    """
+    if penalty_dict and isinstance(penalty_dict, dict):
+        _TIMEOUT_PENALTIES_BY_ERR_NO.update(penalty_dict)
 
 class SocketStream(object):
     """Implements a socket stream."""
@@ -382,10 +404,46 @@ def catch_network_exception(func):
     def wrapper(self, *args, **kwargs):
         """Wrapper function."""
         try:
-            return func(self, *args, **kwargs)
-        except (socket.error, RuntimeError):
-            self.disconnect()
-            raise InterfaceError("Cannot connect to host")
+            if isinstance(self, (Connection, PooledConnection)) and \
+               self.is_server_disconnected():
+                raise InterfaceError(*self.get_disconnected_reason())
+            result = func(self, *args, **kwargs)
+            if isinstance(result, BaseResult):
+                warnings = result.get_warnings()
+                for warning in warnings:
+                    if warning["code"] in CONNECTION_CLOSED_ERROR:
+                        error_msg = CONNECTION_CLOSED_ERROR[warning["code"]]
+                        reason = ("Connection close: {}: {}"
+                                  "".format(warning["msg"], error_msg), warning["code"])
+                        if isinstance(self, (Connection, PooledConnection)):
+                            self.set_server_disconnected(reason)
+                        break
+            return result
+        except (socket.error, ConnectionResetError, ConnectionAbortedError, InterfaceError,
+                RuntimeError, TimeoutError) as err:
+            if func.__name__ == 'get_column_metadata' and args and \
+               isinstance(args[0], SqlResult):
+                warnings = args[0].get_warnings()
+                if warnings:
+                    warning = warnings[0]
+                    error_msg = CONNECTION_CLOSED_ERROR[warning["code"]]
+                    reason = ("Connection close: {}: {}"
+                              "".format(warning["msg"], error_msg), warning["code"])
+                    if isinstance(self, PooledConnection):
+                        self.pool.remove_connections()
+                        # pool must be listed as faulty if server is shutting down
+                        if warning["code"] == 1053:
+                            PoolsManager().set_pool_unavailable(self.pool, InterfaceError(*reason))
+                    if isinstance(self, (Connection, PooledConnection)):
+                        self.set_server_disconnected(reason)
+                    self.disconnect()
+                    raise InterfaceError(*reason)
+                else:
+                    self.disconnect()
+                    raise
+            else:
+                self.disconnect()
+                raise
     return wrapper
 
 
@@ -586,6 +644,8 @@ class Connection(object):
         self._stmt_counter = 0
         self._prepared_stmt_ids = []
         self._prepared_stmt_supported = True
+        self._server_disconnected = False
+        self._server_disconnected_reason = None
 
     def fetch_active_result(self):
         """Fetch active result."""
@@ -1142,6 +1202,32 @@ class Connection(object):
         """
         return self.stream.is_open()
 
+    def set_server_disconnected(self, reason):
+        """Set the disconnection message from the server.
+
+        Args:
+            reason (str): disconnection reason from the server.
+        """
+        self._server_disconnected = True
+        self._server_disconnected_reason = reason
+
+    def is_server_disconnected(self):
+        """Verify if the session has been disconnect from the server.
+
+        Returns:
+            bool: `True` if the connection has been closed from the server
+                  otherwise `False`.
+        """
+        return self._server_disconnected
+
+    def get_disconnected_reason(self):
+        """Get the disconnection message sent by the server.
+
+        Returns:
+            string: disconnection reason from the server.
+        """
+        return self._server_disconnected_reason
+
     def disconnect(self):
         """Disconnect from server."""
         if not self.is_open():
@@ -1352,6 +1438,22 @@ class ConnectionPool(queue.Queue):
         """
         self._connections_openned.remove(cnx)
 
+    def remove_connections(self):
+        """Removes all the connections from the pool."""
+        while self.qsize() > 0:
+            try:
+                cnx = self.get(block=True,
+                               timeout=self.queue_timeout)
+            except queue.Empty:
+                pass
+            else:
+                try:
+                    cnx.close_connection()
+                except (RuntimeError, socket.error, InterfaceError):
+                    pass
+                finally:
+                    self.remove_connection(cnx)
+
     def add_connection(self, cnx=None):
         """Adds a connection to this pool.
 
@@ -1388,6 +1490,9 @@ class ConnectionPool(queue.Queue):
             if not isinstance(cnx, PooledConnection):
                 raise PoolError(
                     "Connection instance not subclass of PooledSession.")
+            if cnx.is_server_disconnected():
+                self.remove_connections()
+                cnx.close()
 
         self.queue_connection(cnx)
 
@@ -1425,7 +1530,7 @@ class ConnectionPool(queue.Queue):
         return self.name
 
     def available(self):
-        """Returns if this pool is available for pool connectinos from it.
+        """Returns if this pool is available for pool connections from it.
 
         Returns:
             bool: True if this pool is available else False.
@@ -1438,12 +1543,15 @@ class ConnectionPool(queue.Queue):
 
         .. versionadded:: 8.0.20
         """
-        self._available = False
-        self._timeout_stamp = datetime.now()
-        self._timeout = time_out
+        if self._available:
+            _LOGGER.warning("ConnectionPool.set_unavailable pool: %s "
+                            "time_out: %s", self, time_out)
+            self._available = False
+            self._timeout_stamp = datetime.now()
+            self._timeout = time_out
 
     def set_available(self):
-        """Sets this pool available for pool connectinos from it.
+        """Sets this pool available for pool connections from it.
 
         .. versionadded:: 8.0.20
         """
@@ -1451,7 +1559,7 @@ class ConnectionPool(queue.Queue):
         self._timeout_stamp = datetime.now()
 
     def get_timeout_stamp(self):
-        """Returnds the penalized time (timeout) and the time at the penalty.
+        """Returns the penalized time (timeout) and the time at the penalty.
 
         Returns:
             tuple: penalty seconds (int), timestamp at penalty (datetime object)
@@ -1628,10 +1736,10 @@ class PoolsManager(object):
         else:
             # find the first pool that does not share the same priority
             for t_pool in pools:
-                if t_pool.priority != cur_priority:
+                if t_pool.available():
                     cur_priority = t_pool.priority
                     return cur_priority
-        return None
+        return pools[0].priority
 
     def _check_unavailable_pools(self, settings, revive=None):
         pools = self._get_pools(settings)
@@ -1669,13 +1777,13 @@ class PoolsManager(object):
         pools = self._get_pools(settings)
         cur_priority = settings.get("cur_priority", None)
         error_list = []
-
-        if cur_priority is None:
-            cur_priority = self._get_next_priority(pools, cur_priority)
-        settings["cur_priority"] = cur_priority
         self._check_unavailable_pools(settings)
+        cur_priority = self._get_next_priority(pools, cur_priority)
+        if cur_priority is None:
+            raise PoolError("Unable to connect to any of the target hosts. "
+                            "No pool is available.")
+        settings["cur_priority"] = cur_priority
         pool = self._get_next_pool(pools, cur_priority)
-
         while pool is not None:
             try:
                 # Check connections aviability in this pool
@@ -1689,6 +1797,8 @@ class PoolsManager(object):
                             raise PoolError(
                                 "Failed getting connection; pool exhausted")
                         try:
+                            if cnx.is_server_disconnected():
+                                pool.remove_connections()
                             # Only reset the connection by re-authentification
                             # if the connection was unable to keep open by the
                             # server
@@ -1763,15 +1873,7 @@ class PoolsManager(object):
                     # e.g a connection is returned to the pool.
                     pool.set_unavailable(2)
                 else:
-                    penalty = None
-                    for timeout_penalty in _TIMEOUT_PENALTIES:
-                        if timeout_penalty in err.msg:
-                            penalty = _TIMEOUT_PENALTIES[timeout_penalty]
-                    if penalty:
-                        pool.set_unavailable(penalty)
-                    else:
-                        # Other errors are severe punished
-                        pool.set_unavailable(100000)
+                    self.set_pool_unavailable(pool, err)
 
                 self._check_unavailable_pools(settings)
                 # Try next pool with the same priority
@@ -1786,6 +1888,8 @@ class PoolsManager(object):
                         raise PoolError("Unable to connect to any of the "
                                         "target hosts: [\n  {}\n]".format(msg))
                 continue
+
+        raise PoolError("Unable to connect to any of the target hosts")
 
     def close_pool(self, cnx_settings):
         """Closes the connections in the pools
@@ -1803,6 +1907,33 @@ class PoolsManager(object):
                     client_pools.remove(pool)
         return len(pools)
 
+    def set_pool_unavailable(self, pool, err):
+        """Sets a pool as unavailable.
+
+        The time a pool is set unavailable depends on the given error message
+        or the error number.
+
+        Args:
+            pool (ConnectionPool): The pool to set unavailable.
+            err (Exception): The raised exception raised by a connection belonging
+                             to the pool.
+        """
+        penalty = None
+        try:
+            err_no = err.errno
+            penalty = _TIMEOUT_PENALTIES_BY_ERR_NO[err_no]
+        except (AttributeError, KeyError):
+            pass
+        if not penalty:
+            err_msg = err.msg
+            for timeout_penalty in _TIMEOUT_PENALTIES:
+                if timeout_penalty in err_msg:
+                    penalty = _TIMEOUT_PENALTIES[timeout_penalty]
+        if penalty:
+            pool.set_unavailable(penalty)
+        else:
+            # Other errors are severe punished
+            pool.set_unavailable(100000)
 
 class Session(object):
     """Enables interaction with a X Protocol enabled MySQL Product.
