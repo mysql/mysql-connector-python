@@ -99,7 +99,7 @@ class PooledMySQLConnection(object):
     def __init__(self, pool, cnx):
         """Initialize
 
-        The pool argument must be an instance of MySQLConnectionPoll. cnx
+        The pool argument must be an instance of MySQLConnectionPool. cnx
         if an instance of MySQLConnection.
         """
         if not isinstance(pool, MySQLConnectionPool):
