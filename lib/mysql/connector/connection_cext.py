@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -76,7 +76,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._columns = []
         self._plugin_dir = os.path.join(
             os.path.dirname(os.path.abspath(_mysql_connector.__file__)),
-            "mysql", "vendor"
+            "mysql", "vendor", "plugin"
         )
         self.converter = None
         super(CMySQLConnection, self).__init__(**kwargs)
@@ -175,6 +175,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return self._server_status & ServerFlag.STATUS_IN_TRANS
 
     def _open_connection(self):
+        if (
+            self._auth_plugin == "authentication_kerberos_client"
+            and os.name == "nt"
+        ):
+            raise errors.ProgrammingError(
+                "The Kerberos authentication is not available on Windows"
+            )
         charset_name = CharacterSet.get_info(self._charset_id)[0]
         self._cmysql = _mysql_connector.MySQL(  # pylint: disable=E1101,I1101
             buffered=self._buffered,

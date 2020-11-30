@@ -238,15 +238,18 @@ class BaseCommand(Command):
         if self.with_mysql_capi:
             plugin_ext = "dll" if os.name == "nt" else "so"
             plugin_path = os.path.join(self.with_mysql_capi, "lib", "plugin")
-            plugin_name = ("authentication_ldap_sasl_client.{}"
-                           "".format(plugin_ext))
 
-            self.log.debug("ldap plugin_path: '{}'".format(
-                os.path.join(plugin_path, plugin_name)))
-            if os.path.exists(os.path.join(plugin_path, plugin_name)):
+            # authentication_ldap_sasl_client
+            plugin_name = (
+                "authentication_ldap_sasl_client.{}".format(plugin_ext)
+            )
+            plugin_full_path = os.path.join(plugin_path, plugin_name)
+            self.log.debug("ldap plugin_path: '%s'", plugin_full_path)
+            if os.path.exists(plugin_full_path):
                 bundle_plugin_libs = True
                 vendor_libs.append(
-                    (plugin_path, [plugin_name]))
+                    (plugin_path, [os.path.join("plugin", plugin_name)])
+                )
 
             if bundle_plugin_libs and os.name == "nt":
                 sasl_libs_path = os.path.join(self.with_mysql_capi, "bin")
@@ -254,19 +257,41 @@ class BaseCommand(Command):
                                     "libcrypto-1_1-x64.dll"]
                 vendor_libs.append((sasl_libs_path, sasl_plugin_libs))
 
+            # authentication_kerberos_client
+            plugin_name = (
+                "authentication_kerberos_client.{}".format(plugin_ext)
+            )
+            plugin_full_path = os.path.join(plugin_path, plugin_name)
+            self.log.debug("kerberos plugin_path: '%s'", plugin_full_path)
+            if os.path.exists(plugin_full_path):
+                bundle_plugin_libs = True
+                vendor_libs.append(
+                    (plugin_path, [os.path.join("plugin", plugin_name)])
+                )
+
         if not vendor_libs:
             return
 
+        # mysql/vendor
         if not os.path.exists(self.vendor_folder):
             mkpath(os.path.join(os.getcwd(), self.vendor_folder))
+
+        # mysql/vendor/plugin
+        if not os.path.exists(os.path.join(self.vendor_folder, "plugin")):
+            mkpath(os.path.join(os.getcwd(), self.vendor_folder, "plugin"))
+
+        # mysql/vendor/private
+        if not os.path.exists(os.path.join(self.vendor_folder, "private")):
+            mkpath(os.path.join(os.getcwd(), self.vendor_folder, "private"))
 
         # Copy vendor libraries to 'mysql/vendor' folder
         self.log.info("Copying vendor libraries")
         for src_folder, files in vendor_libs:
             self.log.info("Copying folder: %s", src_folder)
-            for filename in files:
+            for filepath in files:
+                dst_folder, filename = os.path.split(filepath)
                 src = os.path.join(src_folder, filename)
-                dst = os.path.join(os.getcwd(), self.vendor_folder)
+                dst = os.path.join(os.getcwd(), self.vendor_folder, dst_folder)
                 self.log.info("copying %s -> %s", src, dst)
                 shutil.copy(src, dst)
 
@@ -295,7 +320,7 @@ class BaseCommand(Command):
                     sasl_plugin_libs.append(os.path.basename(lib_path_entry))
             sasl_libs.append((sasl_libs_path, sasl_plugin_libs))
 
-            # Copy vendor libraries to 'mysql/vendor' folder
+            # Copy vendor libraries to 'mysql/vendor/private' folder
             self.log.info("Copying vendor libraries")
             for src_folder, files in sasl_libs:
                 self.log.info("Copying folder: %s", src_folder)
@@ -304,7 +329,11 @@ class BaseCommand(Command):
                     if not os.path.exists(src):
                         self.log.warn("Library not found: %s", src)
                         continue
-                    dst = os.path.join(os.getcwd(), self.vendor_folder)
+                    dst = os.path.join(
+                        os.getcwd(),
+                        self.vendor_folder,
+                        "private"
+                    )
                     self.log.info("copying %s -> %s", src, dst)
                     shutil.copy(src, dst)
 
@@ -335,10 +364,13 @@ class BaseCommand(Command):
 
             sasl2_libs.append((sasl2_libs_path, sasl2_scram_libs))
 
-            if not os.path.exists(os.path.join(self.vendor_folder, "sasl2")):
-                mkpath(os.path.join(os.getcwd(), self.vendor_folder, "sasl2"))
+            sasl2_libs_private_path = os.path.join(
+                self.vendor_folder, "private", "sasl2"
+            )
+            if not os.path.exists(sasl2_libs_private_path):
+                mkpath(sasl2_libs_private_path)
 
-            # Copy vendor libraries to 'mysql/vendor/sasl2' folder
+            # Copy vendor libraries to 'mysql/vendor/private/sasl2' folder
             self.log.info("Copying vendor libraries")
             for src_folder, files in sasl2_libs:
                 self.log.info("Copying folder: %s", src_folder)
@@ -347,14 +379,18 @@ class BaseCommand(Command):
                     if not os.path.exists(src):
                         self.log.warning("Library not found: %s", src)
                         continue
-                    dst = os.path.join(
-                        os.getcwd(),
-                        os.path.join(self.vendor_folder, "sasl2"))
+                    dst = os.path.join(os.getcwd(), sasl2_libs_private_path)
                     self.log.info("copying %s -> %s", src, dst)
                     shutil.copy(src, dst)
 
         self.distribution.package_data = {
-            "mysql": ["vendor/*", "vendor/sasl2/*"]}
+            "mysql": [
+                "vendor/*",
+                "vendor/plugin/*",
+                "vendor/private/*",
+                "vendor/private/sasl2/*"
+            ]
+        }
 
 
 class BuildExt(build_ext, BaseCommand):
