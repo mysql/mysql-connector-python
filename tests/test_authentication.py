@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,20 +32,36 @@
 
 """
 
+import getpass
 import inspect
-import sys
+import os
+import subprocess
+import tests
+import time
+import unittest
 
 import mysql.connector
 from mysql.connector import authentication
-from mysql.connector.errors import InterfaceError
+from mysql.connector.errors import (
+    DatabaseError,
+    InterfaceError,
+    OperationalError,
+    ProgrammingError,
+)
 
-import tests
-
+try:
+    from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+except ImportError:
+    # Test without C Extension
+    CMySQLConnection = None
+    HAVE_CMYSQL = False
 
 _STANDARD_PLUGINS = (
-    'mysql_native_password',
-    'mysql_clear_password',
-    'sha256_password',
+    "mysql_native_password",
+    "mysql_clear_password",
+    "sha256_password",
+    "authentication_ldap_sasl_client",
+    "authentication_kerberos_client",
 )
 
 
@@ -386,3 +402,543 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
                 bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
         self.assertIn("Unable to proof server identity", context.exception.msg,
                       "not the expected error {}".format(context.exception.msg))
+
+
+@unittest.skipIf(
+    os.getenv("TEST_AUTHENTICATION_KERBEROS") is None,
+    "Run tests only if the plugin is configured"
+)
+@unittest.skipIf(os.name == "nt", "Tests not available for Windows")
+@unittest.skipIf(
+    tests.MYSQL_VERSION < (8, 0, 24),
+    "Authentication with Kerberos not supported"
+)
+class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
+    """Test authentication.MySQLKerberosAuthPlugin.
+
+    Implemented by WL#14440: Support for authentication kerberos.
+    """
+
+    user = "test1"
+    password = "Testpw1"
+    other_user = "test3"
+    realm = "MYSQL.LOCAL"
+    badrealm = "MYSQL2.LOCAL"
+    default_config = {}
+    plugin_installed_and_active = False
+    skip_reason = None
+
+    @classmethod
+    def setUpClass(cls):
+        is_plugin_available = tests.is_plugin_available(
+            "authentication_kerberos",
+            config_vars=(
+                (
+                    "authentication_kerberos_service_principal",
+                    "mysql_service/kerberos_auth_host@MYSQL.LOCAL"
+                ),
+                (
+                    "authentication_kerberos_service_key_tab",
+                    os.path.join(
+                        os.path.dirname(os.path.realpath(__file__)),
+                        "data",
+                        "kerberos",
+                        "mysql.keytab",
+                    ),
+                ),
+            ),
+        )
+
+        if not is_plugin_available:
+            cls.skip_reason = "Plugin authentication_kerberos not available"
+            return
+
+        if not tests.is_host_reachable("100.103.18.98"):
+            cls.skip_reason = "Kerberos server is not reachable"
+            return
+
+        config = tests.get_mysql_config()
+        cls.default_config = {
+            "host": config["host"],
+            "port": config["port"],
+            "user": cls.user,
+            "password": cls.password,
+            "auth_plugin": "authentication_kerberos_client",
+        }
+
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP USER IF EXISTS'{cls.user}'")
+            cnx.cmd_query(
+                f"""
+                CREATE USER '{cls.user}'
+                IDENTIFIED WITH authentication_kerberos BY '{cls.realm}'
+                """
+            )
+            cnx.cmd_query(f"GRANT ALL ON *.* to '{cls.user}'")
+            cnx.cmd_query("FLUSH PRIVILEGES")
+
+    @classmethod
+    def tearDownClass(cls):
+        config = tests.get_mysql_config()
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user}'")
+            cnx.cmd_query("FLUSH PRIVILEGES")
+
+    def setUp(self):
+        self.plugin_class = authentication.MySQLKerberosAuthPlugin
+        if self.skip_reason is not None:
+            self.skipTest(self.skip_reason)
+
+    def _get_kerberos_tgt(
+        self, user=None, password=None, realm=None, expired=False
+    ):
+        """Obtain and cache Kerberos ticket-granting ticket.
+
+        Call `kinit` with a specified user and password for obtaining and
+        caching Kerberos ticket-granting ticket.
+        """
+        cmd = ["kinit", "{}@{}".format(user or self.user, realm or self.realm)]
+        if expired:
+            cmd.extend(["-l", "0:0:6"])
+
+        if password is None:
+            password = self.password
+
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL
+        )
+        _, err = proc.communicate(password.encode("utf-8"))
+
+        if err:
+            raise InterfaceError(
+                "Failing obtaining Kerberos ticket-granting ticket: {}"
+                "".format(err.decode("utf-8"))
+            )
+
+        if expired:
+            time.sleep(8)
+
+    def _test_connection(self, conn_class, config, fail=False):
+        """Test a MySQL connection.
+
+        Try to connect to a MySQL server using a specified connection class
+        and config.
+        """
+        if fail:
+            self.assertRaises(
+                (
+                    DatabaseError,
+                    InterfaceError,
+                    OperationalError,
+                    ProgrammingError,
+                ),
+                conn_class,
+                **config
+            )
+            return
+
+        with conn_class(**config) as cnx:
+            self.assertTrue(cnx.is_connected)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@version")
+                res = cur.fetchone()
+                self.assertIsNotNone(res[0])
+
+    def _test_with_tgt_cache(
+        self,
+        conn_class,
+        config,
+        user=None,
+        password=None,
+        realm=None,
+        expired=False,
+        fail=False,
+    ):
+        """Test with cached valid TGT."""
+        # Destroy Kerberos tickets
+        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+
+        # Obtain and cache Kerberos ticket-granting ticket
+        self._get_kerberos_tgt(
+            user=user, password=password, realm=realm, expired=expired
+        )
+
+        # Test connection
+        self._test_connection(conn_class, config, fail=fail)
+
+        # Destroy Kerberos tickets
+        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+
+    def _test_with_st_cache(self, conn_class, config, fail=False):
+        """Test with cached valid ST."""
+        # Destroy Kerberos tickets
+        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+
+        # Obtain and cache Kerberos ticket-granting ticket
+        self._get_kerberos_tgt()
+
+        # Obtain the service ticket
+        cnx = conn_class(**self.default_config)
+        cnx.close()
+
+        # Test connection
+        self._test_connection(conn_class, config, fail=fail)
+
+        # Destroy Kerberos tickets
+        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+
+    def test_class(self):
+        self.assertEqual(
+            "authentication_kerberos_client",
+            self.plugin_class.plugin_name
+        )
+        self.assertEqual(False, self.plugin_class.requires_ssl)
+
+    # Test with TGT in the cache
+
+    @tests.foreach_cnx()
+    def test_tgt_cache(self):
+        """Test with cached valid TGT."""
+        config = self.default_config.copy()
+        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_tgt_cache_wrongpassword(self):
+        """Test with cached valid TGT with a wrong password."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_tgt_cache_nouser(self):
+        """Test with cached valid TGT with no user."""
+        config = self.default_config.copy()
+        del config["user"]
+        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_tgt_cache_nouser_wrongpassword(self):
+        """Test with cached valid TGT with no user and a wrong password."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        del config["user"]
+        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_tgt_cache_nopassword(self):
+        """Test with cached valid TGT with no password."""
+        config = self.default_config.copy()
+        del config["password"]
+        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_tgt_cache_nouser_nopassword(self):
+        """Test with cached valid TGT with no user and no password."""
+        config = self.default_config.copy()
+        del config["user"]
+        del config["password"]
+        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+
+    # Tests with ST in the cache
+
+    @tests.foreach_cnx()
+    def test_st_cache(self):
+        """Test with cached valid ST."""
+        config = self.default_config.copy()
+        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_st_cache_wrongpassword(self):
+        """Test with cached valid ST with a wrong password."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_st_cache_nouser(self):
+        """Test with cached valid ST with no user."""
+        config = self.default_config.copy()
+        del config["user"]
+        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_st_cache_nouser_wrongpassword(self):
+        """Test with cached valid ST with no user and a wrong password."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        del config["user"]
+        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_st_cache_nopassword(self):
+        """Test with cached valid ST with no password."""
+        config = self.default_config.copy()
+        del config["password"]
+        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+
+    @tests.foreach_cnx()
+    def test_st_cache_nouser_nopassword(self):
+        """Test with cached valid ST with no user and no password."""
+        config = self.default_config.copy()
+        del config["user"]
+        del config["password"]
+        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+
+    # Tests with cache is present but contains expired TGT
+
+    @tests.foreach_cnx()
+    def test_tgt_expired(self):
+        """Test with cache expired."""
+        config = self.default_config.copy()
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            expired=True,
+            fail=False,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_expired_wrongpassword(self):
+        """Test with cache expired with a wrong password."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            expired=True,
+            fail=True,
+        )
+
+    @unittest.skipIf(not HAVE_CMYSQL, "C Extension not available")
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_tgt_expired_nouser(self):
+        """Test with cache expired with no user."""
+        config = self.default_config.copy()
+        del config["user"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            expired=True,
+            fail=False,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_expired_nouser_wrongpassword(self):
+        """Test with cache expired with no user and a wrong password."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        del config["user"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            expired=True,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_expired_nopassword(self):
+        """Test with cache expired with no password."""
+        config = self.default_config.copy()
+        del config["password"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            expired=True,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_expired_nouser_nopassword(self):
+        """Test with cache expired with no user and no password."""
+        config = self.default_config.copy()
+        del config["user"]
+        del config["password"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            expired=True,
+            fail=True,
+        )
+
+    # Tests with TGT in the cache for a different UPN
+
+    @tests.foreach_cnx()
+    def test_tgt_badupn(self):
+        """Test with cached valid TGT with a bad UPN."""
+        config = self.default_config.copy()
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.other_user,
+            fail=False,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badupn_wrongpassword(self):
+        """Test with cached valid TGT with a wrong password with a bad UPN."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.other_user,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badupn_nouser(self):
+        """Test with cached valid TGT with no user with a bad UPN."""
+        config = self.default_config.copy()
+        del config["user"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.other_user,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badupn_nouser_wrongpassword(self):
+        """Test with cached valid TGT with no user and a wrong password and
+        bad UPN."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        del config["user"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.other_user,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badupn_nopassword(self):
+        """Test with cached valid TGT with no password and bad UPN."""
+        config = self.default_config.copy()
+        del config["password"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.other_user,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badupn_nouser_nopassword(self):
+        """Test with cached valid TGT with no user and no password."""
+        config = self.default_config.copy()
+        del config["user"]
+        del config["password"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.other_user,
+            fail=True,
+        )
+
+    # Tests with TGT in the cache with for a different realm
+
+    @tests.foreach_cnx()
+    def test_tgt_badrealm(self):
+        """Test with cached valid TGT with a bad realm."""
+        config = self.default_config.copy()
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.user,
+            password=self.password,
+            realm=self.badrealm,
+            fail=False,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badrealm_wrongpassword(self):
+        """Test with cached valid TGT with a wrong password with a bad realm."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.user,
+            password=self.password,
+            realm=self.badrealm,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badrealm_nouser(self):
+        """Test with cached valid TGT with no user with a bad realm."""
+        config = self.default_config.copy()
+        del config["user"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.user,
+            password=self.password,
+            realm=self.badrealm,
+            fail=False,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badrealm_nouser_wrongpassword(self):
+        """Test with cached valid TGT with no user and a wrong password and
+        bad realm."""
+        config = self.default_config.copy()
+        config["password"] = "wrong_password"
+        del config["user"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.user,
+            password=self.password,
+            realm=self.badrealm,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badrealm_nopassword(self):
+        """Test with cached valid TGT with no password and bad realm."""
+        config = self.default_config.copy()
+        del config["password"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.user,
+            password=self.password,
+            realm=self.badrealm,
+            fail=True,
+        )
+
+    @tests.foreach_cnx()
+    def test_tgt_badrealm_nouser_nopassword(self):
+        """Test with cached valid TGT with no user and no password."""
+        config = self.default_config.copy()
+        del config["user"]
+        del config["password"]
+        self._test_with_tgt_cache(
+            self.cnx.__class__,
+            config,
+            user=self.user,
+            password=self.password,
+            realm=self.badrealm,
+            fail=True,
+        )
+
+    @unittest.skipIf(
+        getpass.getuser() != "test1",
+        "Test only available for system user 'test1'"
+    )
+    @tests.foreach_cnx()
+    def test_nocache_nouser(self):
+        """Test with no valid TGT cache, no user and with password."""
+        config = self.default_config.copy()
+        del config["user"]
+
+        # Destroy Kerberos tickets
+        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+
+        # Test connection
+        self._test_connection(self.cnx.__class__, config, fail=False)

@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -985,7 +985,7 @@ def is_host_reachable(host):
 
 @lru_cache(maxsize=10, typed=False)
 def is_plugin_available(plugin_name, config_vars=None, in_server=None):
-    """Checks if the plugin name is available
+    """Check if the plugin name is available.
 
     The given plugin must be able to be load in the server and his status must
     be "active" be mark as available, in either result Server will be restarted
@@ -1002,10 +1002,7 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
 
     ext = "dll" if os.name == "nt" else "so"
     plugin_full_name = "{name}.{ext}".format(name=plugin_name, ext=ext)
-
-    plugin_config = {
-        "plugin-load-add": plugin_full_name,
-    }
+    plugin_config = {"plugin-load-add": plugin_full_name}
     plugin_config.update(plugin_config_vars)
     cnf = "\n# is_plugin_available vars:"
     for key in plugin_config:
@@ -1024,21 +1021,18 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
         cnx.cmd_query("SHOW PLUGINS")
         res = cnx.get_rows()
         for row in res[0]:
-            if row[0] == plugin_name:
+            if row[0].lower() == plugin_name.lower():
                 if row[1] == "ACTIVE":
                     available = True
-        cnx.cmd_query("UNINSTALL PLUGIN {}".format(plugin_name))
         cnx.close()
-        return available
     except:
         LOGGER.warning("# Unable to load plugin '{}'.".format(plugin_name))
-    finally:
         server.stop()
         server.wait_down()
         server.start(my_cnf=server_cnf_bkp)
         server.wait_up()
         sleep(1)
-        return available
+    return available
 
 def check_tls_versions_support(tls_versions):
     """Check whether we can connect with given TLS version

@@ -54,6 +54,8 @@ from .protocol import MySQLProtocol
 from .utils import int4store, linux_distribution
 from .abstracts import MySQLConnectionAbstract
 
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -248,6 +250,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             if new_auth_plugin == "authentication_ldap_sasl_client":
                 _LOGGER.debug("# auth_data: %s", auth_data)
                 response = auth.auth_response(self._krb_service_principal)
+            elif new_auth_plugin == "authentication_kerberos_client":
+                _LOGGER.debug("# auth_data: %s", auth_data)
+                response = auth.auth_response(auth_data)
             else:
                 response = auth.auth_response()
             _LOGGER.debug("# request: %s size: %s", response, len(response))
@@ -301,6 +306,51 @@ class MySQLConnection(MySQLConnectionAbstract):
                 # receive OK packet from server.
                 packet = self._socket.recv()
                 _LOGGER.debug("<< ok packet from server: %s", packet)
+            elif (
+                new_auth_plugin == "authentication_kerberos_client"
+                and packet[4] != 255
+            ):
+                rcode_size = 5  # Reader size for the response status code
+                _LOGGER.debug("# Continue with GSSAPI authentication")
+                _LOGGER.debug("# Response header: %s", packet[:rcode_size + 1])
+                _LOGGER.debug("# Response size: %s", len(packet))
+                _LOGGER.debug("# Negotiate a service request")
+                complete = False
+                tries = 0
+
+                while not complete and tries < 5:
+                    _LOGGER.debug(
+                        "%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20
+                    )
+                    _LOGGER.debug("<< Server response: %s", packet)
+                    _LOGGER.debug(
+                        "# Response code: %s", packet[:rcode_size + 1]
+                    )
+                    token, complete = auth.auth_continue(packet[rcode_size:])
+                    if token:
+                        self._socket.send(token)
+                    if complete:
+                        break
+                    packet = self._socket.recv()
+
+                    _LOGGER.debug(">> Response to server: %s", token)
+                    tries += 1
+
+                if not complete:
+                    raise errors.InterfaceError(
+                        "Unable to fulfill server request after {} attempts. "
+                        "Last server response: {}".format(tries, packet)
+                    )
+
+                _LOGGER.debug(
+                    "Last response from server: %s length: %d",
+                    packet,
+                    len(packet),
+                )
+
+                # Receive OK packet from server.
+                packet = self._socket.recv()
+                _LOGGER.debug("<< Ok packet from server: %s", packet)
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)
@@ -344,6 +394,15 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Raises on errors.
         """
+        if self._auth_plugin == "authentication_kerberos_client":
+            if os.name == "nt":
+                raise errors.ProgrammingError(
+                    "The Kerberos authentication is not available on Windows"
+                )
+            if not self._user:
+                cls = get_auth_plugin(self._auth_plugin)
+                self._user = cls.get_user_from_credentials()
+
         self._protocol = MySQLProtocol()
         self._socket = self._get_connection()
         try:

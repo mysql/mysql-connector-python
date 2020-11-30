@@ -8,6 +8,10 @@ Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.25
+=======
+- WL#14440: Support for authentication_kerberos_client authentication plugin
+
 v8.0.24
 =======
 - WL#14424: Improve timeout error messages

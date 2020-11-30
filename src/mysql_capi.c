@@ -1351,19 +1351,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 		}
     }
 
-    /* Begin of test loading authentication_ldap_sasl_client plugin */
-    struct st_mysql_client_plugin *ldap_sasl_plugin_p= NULL;
-    ldap_sasl_plugin_p = mysql_client_find_plugin(
-        &self->session, "authentication_ldap_sasl_client",
-        MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
-    if (!ldap_sasl_plugin_p)
-    {
-        mysql_load_plugin(&self->session, "authentication_ldap_sasl_client",
-                          MYSQL_CLIENT_AUTHENTICATION_PLUGIN, 0);
-    }
-
-    /* End of test loading authentication_ldap_sasl_client plugin */
-
     Py_BEGIN_ALLOW_THREADS
     res= mysql_real_connect(&self->session, host, user, password, database,
                             port, unix_socket, client_flags);
