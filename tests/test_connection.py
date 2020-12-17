@@ -1259,6 +1259,36 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur.fetchall()
         cur.close()
 
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (8, 0, 24),
+        "MySQL 8.0.24+ is required for this test"
+    )
+    @tests.foreach_cnx()
+    def test_timeout(self):
+        """Test the improved timeout error messages when server disconnects.
+
+        Implemented by WL#14424."""
+        # Expected result
+        exp_err_no = 4033
+        exp_err_msg = (
+            "The client was disconnected by the server because of inactivity. "
+            "See wait_timeout and interactive_timeout for configuring this "
+            "behavior."
+        )
+
+        # Do not connect with unix_socket
+        config = tests.get_mysql_config()
+        del config["unix_socket"]
+
+        # Set a low value for wait_timeout and wait more
+        with self.cnx.__class__(**config) as cnx:
+            cnx.cmd_query("SET SESSION wait_timeout=1")
+            sleep(2)
+            with self.assertRaises(errors.DatabaseError) as context:
+                cnx.cmd_query("SELECT VERSION()")
+                self.assertEqual(context.exception.errno, exp_err_no)
+                self.assertEqual(context.exception.msg, exp_err_msg)
+
     def test_ping(self):
         """Ping the MySQL server"""
         supported_arguments = {
