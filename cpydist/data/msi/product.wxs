@@ -50,7 +50,7 @@
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED38"/>
     </Upgrade>
-	<Upgrade Id="ec8c52c3-ca72-4d59-a21b-6c40111393af">
+	<Upgrade Id="180e8431-7c58-4b72-b206-c6d7bd5487d6">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
