@@ -616,7 +616,7 @@ class MySQLConnectionAbstract(object):
         if "krb_service_principal" in config and \
             config["krb_service_principal"] is not None:
             self._krb_service_principal = config["krb_service_principal"]
-            if not isinstance(self._krb_service_principal, STRING_TYPES):
+            if not isinstance(self._krb_service_principal, str):
                 raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
                     error="is not a string"))
             if self._krb_service_principal == "":
