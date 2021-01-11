@@ -3949,10 +3949,16 @@ class BugOra21536507(tests.MySQLConnectorTests):
         select_stmt = "SELECT 'a'+'b'"
         cur.execute(select_stmt)
         self.assertRaises(errors.DatabaseError, cur.fetchall)
-        exp = [
-            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
-            ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
-        ]
+        if tests.MYSQL_VERSION >= (8, 0, 23) or os.name != 'nt':
+            exp = [
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
+            ]
+        else:
+            exp = [
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'b'"),
+                ('Warning', 1292, "Truncated incorrect DOUBLE value: 'a'"),
+            ]
         self.assertEqual(exp, cur.fetchwarnings())
         try:
             cur.close()
