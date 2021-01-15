@@ -134,7 +134,8 @@ python_characterset_name(const char* mysql_name)
         return "latin1"; // MySQL default
     }
 
-    if (strcmp(mysql_name, "utf8mb4") == 0) {
+    if ((strcmp(mysql_name, "utf8mb4") == 0) ^
+            (strcmp(mysql_name, "utf8mb3") == 0)){
         return "utf8";
     }
 

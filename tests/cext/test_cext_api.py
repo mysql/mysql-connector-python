@@ -277,11 +277,15 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy.set_character_set('utf8')
 
         exp = {'comment': '', 'name': 'utf8_general_ci',
-               'csname': 'utf8', 'mbmaxlen': 3, 'number': 33, 'mbminlen': 1}
+               'mbmaxlen': 3, 'number': 33, 'mbminlen': 1}
+        exp_csname = 'utf8'
         result = cmy.get_character_set_info()
         # make 'comment' deterministic
         result['comment'] = ''
+        r_csname = result.pop('csname')
+        self.maxDiff = None
         self.assertEqual(exp, result)
+        self.assertIn(exp_csname, r_csname)
 
     def test_get_proto_info(self):
         cmy = MySQL()
@@ -602,14 +606,16 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.set_character_set('utf8')
         charset = cmy1.character_set_name()
         self.assertNotEqual(orig, charset)
-        self.assertEqual('utf8', charset)
+        self.assertIn('utf8', charset)
 
         self.assertRaises(MySQLInterfaceError,
                           cmy1.set_character_set, 'ham_spam')
 
         variables = ('character_set_connection',)
-        exp = {b'character_set_connection': b'utf8',}
-        self.assertEqual(exp, get_variables(cmy1, variables=variables))
+        exp = b'utf8'
+        self.assertIn(
+            exp,
+            get_variables(cmy1, variables=variables)[b'character_set_connection'])
 
         exp = {b'character_set_connection': b'big5',}
         cmy1.set_character_set('big5')
