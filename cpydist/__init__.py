@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -155,16 +155,38 @@ class BaseCommand(Command):
             log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
         cmd_build_ext = self.distribution.get_command_obj("build_ext")
-        cmd_build_ext.with_mysql_capi = self.with_mysql_capi
-        cmd_build_ext.with_openssl_include_dir = self.with_openssl_include_dir
-        cmd_build_ext.with_openssl_lib_dir = self.with_openssl_lib_dir
-        cmd_build_ext.with_protobuf_include_dir = \
-            self.with_protobuf_include_dir
-        cmd_build_ext.with_protobuf_lib_dir = self.with_protobuf_lib_dir
-        cmd_build_ext.with_protoc = self.with_protoc
-        cmd_build_ext.extra_compile_args = self.extra_compile_args
-        cmd_build_ext.extra_link_args = self.extra_link_args
-
+        cmd_build_ext.with_mysql_capi = (
+            self.with_mysql_capi or
+            os.environ.get("MYSQL_CAPI")
+        )
+        cmd_build_ext.with_openssl_include_dir = (
+            self.with_openssl_include_dir or
+            os.environ.get("OPENSSL_INCLUDE_DIR")
+        )
+        cmd_build_ext.with_openssl_lib_dir = (
+            self.with_openssl_lib_dir or
+            os.environ.get("OPENSSL_LIB_DIR")
+        )
+        cmd_build_ext.with_protobuf_include_dir = (
+            self.with_protobuf_include_dir or
+            os.environ.get("PROTOBUF_INCLUDE_DIR")
+        )
+        cmd_build_ext.with_protobuf_lib_dir = (
+            self.with_protobuf_lib_dir or
+            os.environ.get("PROTOBUF_LIB_DIR")
+        )
+        cmd_build_ext.with_protoc = (
+            self.with_protoc or
+            os.environ.get("PROTOC")
+        )
+        cmd_build_ext.extra_compile_args = (
+            self.extra_compile_args or
+            os.environ.get("EXTRA_COMPILE_ARGS")
+        )
+        cmd_build_ext.extra_link_args = (
+            self.extra_link_args or
+            os.environ.get("EXTRA_LINK_ARGS")
+        )
         self._copy_vendor_libraries()
 
     def remove_temp(self):
