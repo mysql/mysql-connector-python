@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -110,6 +110,12 @@ class PooledMySQLConnection(object):
                 "cnx should be a MySQLConnection")
         self._cnx_pool = pool
         self._cnx = cnx
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     def __getattr__(self, attr):
         """Calls attributes of the MySQLConnection instance"""
