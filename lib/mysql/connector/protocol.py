@@ -156,7 +156,7 @@ class MySQLProtocol(object):
 
     def make_change_user(self, handshake, username=None, password=None,
                          database=None, charset=45, client_flags=0,
-                         ssl_enabled=False, auth_plugin=None):
+                         ssl_enabled=False, auth_plugin=None, conn_attrs=None):
         """Make a MySQL packet with the Change User command"""
 
         try:
@@ -187,6 +187,9 @@ class MySQLProtocol(object):
 
         if client_flags & ClientFlag.PLUGIN_AUTH:
             packet += auth_plugin.encode('utf8') + b'\x00'
+
+        if (client_flags & ClientFlag.CONNECT_ARGS) and conn_attrs is not None:
+            packet += self.make_conn_attrs(conn_attrs)
 
         return packet
 

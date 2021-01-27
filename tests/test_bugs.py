@@ -60,8 +60,8 @@ if tests.SSL_AVAILABLE:
 
 from tests import foreach_cnx, cnx_config
 from . import check_tls_versions_support
-from mysql.connector import (connection, cursor, conversion, protocol,
-                             errors, constants, pooling)
+from mysql.connector import (connection, constants, conversion, cursor,
+                             errors, MySQLConnection, pooling, protocol,)
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.pooling import PooledMySQLConnection
 import mysql.connector
@@ -5943,3 +5943,121 @@ class BugOra30416704(tests.MySQLConnectorTests):
             cursor=cursor.MySQLCursorPrepared,
             use_binary_charset=True,
         )
+
+
+class Bug32162928(tests.MySQLConnectorTests):
+    """BUG#32162928: change user command fails with pure python implementation.
+
+    The cmd_change_user() command fails with pure-python.
+    """
+    def setUp(self):
+        self.connect_kwargs = tests.get_mysql_config()
+        cnx = MySQLConnection(**self.connect_kwargs)
+        self.users = [
+            {'user': 'user_native1',
+             'host': self.connect_kwargs['host'],
+             'port': self.connect_kwargs['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'native1_pass',
+             'auth_plugin': 'mysql_native_password'},
+            {'user': 'user_native2',
+             'host': self.connect_kwargs['host'],
+             'port': self.connect_kwargs['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'native2_pass',
+             'auth_plugin': 'mysql_native_password'},
+            {'user': 'user_sha2561',
+             'host': self.connect_kwargs['host'],
+             'port': self.connect_kwargs['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'sha2561_pass',
+             'auth_plugin': 'sha256_password'},
+            {'user': 'user_sha2562',
+             'host': self.connect_kwargs['host'],
+             'port': self.connect_kwargs['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'sha2562_pass',
+             'auth_plugin': 'sha256_password'},
+            {'user': 'user_caching1',
+             'host': self.connect_kwargs['host'],
+             'port': self.connect_kwargs['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'caching1_pass',
+             'auth_plugin': 'caching_sha2_password'},
+            {'user': 'user_caching2',
+             'host': self.connect_kwargs['host'],
+             'port': self.connect_kwargs['port'],
+             'database': self.connect_kwargs['database'],
+             'password': 'caching2_pass',
+             'auth_plugin': 'caching_sha2_password'}]
+
+        # create users
+        if tests.MYSQL_VERSION < (8, 0, 0):
+            self.new_users = self.users[0:4]
+        else:
+            self.new_users = self.users
+
+        for new_user in self.new_users:
+            cnx.cmd_query("DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user))
+
+            stmt = ("CREATE USER IF NOT EXISTS '{user}'@'{host}' IDENTIFIED "
+                    "WITH {auth_plugin} BY '{password}'").format(**new_user)
+            cnx.cmd_query(stmt)
+
+            cnx.cmd_query("GRANT ALL PRIVILEGES ON {database}.* TO "
+                          "'{user}'@'{host}'".format(**new_user))
+
+    @foreach_cnx()
+    def test_change_user(self):
+        # test users can connect
+        for user in self.new_users:
+            conn_args = user.copy()
+            try:
+                self.connect_kwargs.pop('auth_plugin')
+            except:
+                pass
+            cnx_test = self.cnx.__class__(**conn_args)
+            cnx_test.cmd_query("SELECT USER()")
+            logged_user = cnx_test.get_rows()[0][0][0]
+            self.assertEqual(u"{user}@{host}".format(**user), logged_user)
+            cnx_test.close()
+
+        # tests change user
+        if tests.MYSQL_VERSION < (8, 0, 0):
+            # 5.6 does not support caching_sha2_password auth plugin
+            test_cases = [(0, 1), (1, 2), (2,3), (3, 0)]
+        else:
+            test_cases = [(0, 1), (1, 2), (2,3), (3, 0), (3, 4), (4, 5),
+                          (5, 3), (5, 0)]
+        for user1, user2 in test_cases:
+            conn_args_user1 = self.users[user1].copy()
+            try:
+                conn_args_user1.pop('auth_plugin')
+            except:
+                pass
+            if tests.MYSQL_VERSION < (8, 0, 0):
+                # change user does not work in 5.x with charset utf8mb4
+                conn_args_user1['charset'] = 'utf8'
+
+            cnx_test = self.cnx.__class__(**conn_args_user1)
+            cnx_test.cmd_query("SELECT USER()")
+            first_user = cnx_test.get_rows()[0][0][0]
+            self.assertEqual(
+                u"{user}@{host}".format(**self.users[user1]), first_user)
+
+            cnx_test.cmd_change_user(self.users[user2]['user'],
+                                     self.users[user2]['password'],
+                                     self.users[user2]['database'])
+            cnx_test.cmd_query("SELECT USER()")
+            rows = cnx_test.get_rows()
+            current_user = rows[0][0][0]
+            self.assertNotEqual(first_user, current_user)
+            self.assertEqual(
+                u"{user}@{host}".format(**self.users[user2]), current_user)
+            cnx_test.close()
+
+    def tearDown(self):
+        cnx = MySQLConnection(**self.connect_kwargs)
+        # cleanup users
+        for new_user in self.users:
+            cnx.cmd_query("DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user))

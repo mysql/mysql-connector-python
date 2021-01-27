@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -842,13 +842,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         if self._compress:
             raise errors.NotSupportedError("Change user is not supported with "
                                            "compression.")
-
         packet = self._protocol.make_change_user(
             handshake=self._handshake,
             username=username, password=password, database=database,
             charset=charset, client_flags=self._client_flags,
             ssl_enabled=self._ssl_active,
-            auth_plugin=self._auth_plugin)
+            auth_plugin=self._auth_plugin,
+            conn_attrs=self._conn_attrs)
         self._socket.send(packet, 0, 0)
 
         ok_packet = self._auth_switch_request(username, password)
