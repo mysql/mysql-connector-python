@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -30,6 +30,7 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 export DH_VERBOSE = 1
+export PYBUILD_DISABLE_python2=1
 
 PY3_BUILD_LIB_OPT = --build-lib=build/python3
 
@@ -69,20 +70,20 @@ endif
 
 # Check whether we have Python v3 support
 ifneq ($(shell which py3versions 2>/dev/null),)
-  WITHPYTHON="python3"
-  PYTHON3_SUPPORTED=$(shell py3versions -sv)
+    PYTHON3_SUPPORTED=$(shell py3versions -sv)
 endif
 
 ifneq ($(BYTE_CODE_ONLY),)
     BYTE_CODE_ONLY_OPT = --byte-code-only
-    EXTRA_OPTIONS_DH =
 else
     BYTE_CODE_ONLY_OPT =
-    EXTRA_OPTIONS_DH = --buildsystem=python_distutils --with $(WITHPYTHON)
 endif
 
 %:
-	dh $@ $(EXTRA_OPTIONS_DH)
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_test:
+	echo "skipping test"
 
 override_dh_auto_install:
 
