@@ -117,7 +117,7 @@ Provides:      mysql-connector-python3-cext = %{version}-%{release}
 Requires:      python3
 
 # There is no new enough python3-protobuf on some older Linux distros
-%if ! ( 0%{?rhel} == 7 || 0%{?rhel} == 8 || 0%{?suse_version} == 1315 )
+%if ! ( 0%{?rhel} == 7 || 0%{?suse_version} == 1315 )
 Requires:      python3-protobuf >= %{requires_py_protobuf_version}
 %endif
 
@@ -195,6 +195,10 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Mon Feb 1 2021 Sreedhar Sreedhargadda <sreedhar.sreedhargadda@oracle.com> - 8.0.24-2
+- Updated for 8.0.24
+- Fix for el8 pkgver_lite
+
 * Thu Dec 9 2020 Prashant Tekriwal <prashant.tekriwal@oracle.com> - 8.0.24-1
 - Updated for 8.0.24
 - Removed python2 support
