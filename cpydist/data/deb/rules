@@ -30,6 +30,7 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 export DH_VERBOSE = 1
+export PYBUILD_DISABLE=test
 export PYBUILD_DISABLE_python2=1
 
 PY3_BUILD_LIB_OPT = --build-lib=build/python3
@@ -82,9 +83,6 @@ endif
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
-override_dh_auto_test:
-	echo "skipping test"
-
 override_dh_auto_install:
 
 	set -xe; \
@@ -104,7 +102,9 @@ override_dh_auto_install:
 	done
 
 override_dh_python3:
-	dh_python3 --no-ext-rename
+ifeq ($(BYTE_CODE_ONLY),)
+	py3clean .
+endif
 
 ifneq ($(BYTE_CODE_ONLY),)
 override_dh_pysupport:
