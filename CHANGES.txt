@@ -15,6 +15,7 @@ v8.0.24
 - WL#14239: Remove Python 2.7 support
 - WL#14212: Support connection close notification
 - WL#14027: Add support for Python 3.9
+- BUG#32435181: Add support for Django 3.2
 - BUG#32029891: Add context manager support for pooled connections
 
 v8.0.23

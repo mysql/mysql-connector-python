@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -48,6 +48,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends.base.base import BaseDatabaseWrapper
+from django.db.backends.mysql.base import DatabaseWrapper as MySQLDatabaseWrapper
 from django.db import utils
 from django.utils.functional import cached_property
 from django.utils import dateparse, timezone
@@ -174,7 +175,7 @@ class CursorWrapper:
         return iter(self.cursor)
 
 
-class DatabaseWrapper(BaseDatabaseWrapper):
+class DatabaseWrapper(MySQLDatabaseWrapper):
     vendor = 'mysql'
     # This dictionary maps Field objects to their associated MySQL column
     # types, as strings. Column-type strings can contain format strings; they'll

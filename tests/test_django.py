@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -37,8 +37,10 @@ import tests
 # Load 3rd party _after_ loading tests
 try:
     from django.conf import settings
+    from django import VERSION as DJANGO_VERSION
 except ImportError:
     DJANGO_AVAILABLE = False
+    DJANGO_VERSION = (0, 0, 0)
 else:
     DJANGO_AVAILABLE = True
 
@@ -148,20 +150,37 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
 
     def test_get_table_description(self):
         cur = self.cnx.cursor()
-        exp = [
-            FieldInfo(name=u'id', type_code=3, display_size=None,
-                      internal_size=None, precision=10, scale=None,
-                      null_ok=0, default=None, extra=u'auto_increment',
-                      is_unsigned=0, has_json_constraint=False),
-            FieldInfo(name=u'c1', type_code=3, display_size=None,
-                      internal_size=None, precision=10, scale=None,
-                      null_ok=1, default=None, extra=u'', is_unsigned=0,
-                      has_json_constraint=False),
-            FieldInfo(name=u'c2', type_code=253, display_size=None,
-                      internal_size=20, precision=None, scale=None,
-                      null_ok=1, default=None, extra=u'', is_unsigned=0,
-                      has_json_constraint=False),
-        ]
+        if DJANGO_VERSION < (3, 2, 0):
+            exp = [
+                FieldInfo(name=u'id', type_code=3, display_size=None,
+                          internal_size=None, precision=10, scale=None,
+                          null_ok=0, default=None, extra=u'auto_increment',
+                          is_unsigned=0, has_json_constraint=False),
+                FieldInfo(name=u'c1', type_code=3, display_size=None,
+                          internal_size=None, precision=10, scale=None,
+                          null_ok=1, default=None, extra=u'', is_unsigned=0,
+                          has_json_constraint=False),
+                FieldInfo(name=u'c2', type_code=253, display_size=None,
+                          internal_size=20, precision=None, scale=None,
+                          null_ok=1, default=None, extra=u'', is_unsigned=0,
+                          has_json_constraint=False),
+            ]
+        else:
+            exp = [
+                FieldInfo(name=u'id', type_code=3, display_size=None,
+                          internal_size=None, precision=10, scale=None,
+                          null_ok=0, default=None, collation=None,
+                          extra=u'auto_increment',  is_unsigned=0,
+                          has_json_constraint=False),
+                FieldInfo(name=u'c1', type_code=3, display_size=None,
+                          internal_size=None, precision=10, scale=None,
+                          null_ok=1, default=None, collation=None,
+                          extra=u'', is_unsigned=0, has_json_constraint=False),
+                FieldInfo(name=u'c2', type_code=253, display_size=None,
+                          internal_size=20, precision=None, scale=None,
+                          null_ok=1, default=None, collation=None,
+                          extra=u'', is_unsigned=0, has_json_constraint=False),
+            ]
         res = self.introspect.get_table_description(cur, 'django_t1')
         self.assertEqual(exp, res)
 
@@ -213,6 +232,10 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
                       'type': 'idx',
                       'unique': False}
         }
+        if DJANGO_VERSION >= (3, 2, 0):
+            exp['PRIMARY']['orders'] = ['ASC']
+            exp['django_t2_ibfk_1']['orders'] = []
+            exp['id_t1']['orders'] = ['ASC']
         self.assertEqual(
             exp, self.introspect.get_constraints(cur, 'django_t2'))
 
