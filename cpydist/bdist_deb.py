@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -255,10 +255,13 @@ class DistDeb(BaseCommand):
                           "".format(copyright_file))
             with open(copyright_file, "r") as fp:
                 # Skip to line just before the text we want to copy
-                while not fp.readline().startswith("License: Commercial"):
-                    continue
-                # Read the rest of the text (add a space before each line)
-                lic_text = fp.read()
+                while True:
+                    line = fp.readline()
+                    if not line:
+                        break
+                    if line.startswith("License: Commercial"):
+                        # Read the rest of the text
+                        lic_text = fp.read()
 
         with open(control_file, "r") as fp:
             control_text = fp.read()

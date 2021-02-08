@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -332,6 +332,10 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         self.assertNotEqual(prev_thread_id, pcnx.connection_id)
         self.assertEqual(1, pcnx.autocommit)
         pcnx.close()
+
+        # Get connection from pool using a context manager
+        with cnxpool.get_connection() as pcnx:
+            self.assertTrue(isinstance(pcnx, pooling.PooledMySQLConnection))
 
     def test__remove_connections(self):
         dbconfig = tests.get_mysql_config()

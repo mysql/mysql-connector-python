@@ -1,5 +1,6 @@
 *.diff
 *.egg-info/
+*.so
 *.patch
 *.pyc
 *__pycache__*
