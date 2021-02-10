@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -265,7 +265,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             b'\x1a\x00\x00\x02\x03\x64\x65\x66\x00\x00\x00\x04'
             b'\x53\x70\x61\x6d\x00\x0c\x21\x00\x09\x00\x00\x00'
             b'\xfd\x01\x00\x1f\x00\x00')
-        exp = ('Spam', 253, None, None, None, None, 0, 1)
+        exp = ('Spam', 253, None, None, None, None, 0, 1, 33)
         res = self._protocol.parse_column(column_packet)
         self.assertEqual(exp, res)
 

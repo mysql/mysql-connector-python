@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -99,11 +99,11 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         (b'2008-05-07 22:34:10',
          ('datetime', constants.FieldType.DATETIME)),
         (b'val1,val2', ('set', constants.FieldType.SET, None,
-                        None, None, None, True, constants.FieldFlag.SET)),
+                        None, None, None, True, constants.FieldFlag.SET, 33)),
         ('2008', ('year', constants.FieldType.YEAR)),
         (b'\x80\x00\x00\x00', ('bit', constants.FieldType.BIT)),
         (b'\xc3\xa4 utf8 string', ('utf8', constants.FieldType.STRING,
-                 None, None, None, None, True, 0)),
+                 None, None, None, None, True, 0, 33)),
     ]
     _to_python_exp = (
         float(_to_python_data[0][0]),
@@ -467,7 +467,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         data = b'val1,val2'
         exp = set(['val1', 'val2'])
         desc = ('foo', constants.FieldType.STRING,
-                2, 3, 4, 5, 6, constants.FieldFlag.SET)
+                2, 3, 4, 5, 6, constants.FieldFlag.SET, 45)
         res = self.cnv._STRING_to_python(data, desc)
 
         self.assertEqual(exp, res)
@@ -502,7 +502,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         """Convert a STRING BINARY to Python bytes type"""
         data = b'\x33\xfd\x34\xed'
         desc = ('foo', constants.FieldType.STRING,
-                2, 3, 4, 5, 6, constants.FieldFlag.BINARY)
+                2, 3, 4, 5, 6, constants.FieldFlag.BINARY, 63)
         res = self.cnv._STRING_to_python(data, desc)
 
         self.assertEqual(data, res)
@@ -511,7 +511,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         """Convert a BLOB BINARY to Python bytes type"""
         data = b'\x33\xfd\x34\xed'
         desc = ('foo', constants.FieldType.BLOB,
-                2, 3, 4, 5, 6, constants.FieldFlag.BINARY)
+                2, 3, 4, 5, 6, constants.FieldFlag.BINARY, 63)
         res = self.cnv._BLOB_to_python(data, desc)
 
         self.assertEqual(data, res)

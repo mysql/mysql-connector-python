@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -287,7 +287,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.add_packets([COLUMNS_SINGLE, eof_packet])
         exp = {
             'eof': {'status_flag': 0, 'warning_count': 0},
-            'columns': [('1', 8, None, None, None, None, 0, 129)]
+            'columns': [('1', 8, None, None, None, None, 0, 129, 63)]
         }
         res = self.cnx._handle_result(COLUMNS_SINGLE_COUNT)
         self.assertEqual(exp, res)
@@ -451,7 +451,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.add_packets(packets)
         exp = {
             'eof': {'status_flag': 0, 'warning_count': 0},
-            'columns': [('1', 8, None, None, None, None, 0, 129)]
+            'columns': [('1', 8, None, None, None, None, 0, 129, 63)]
         }
         res = self.cnx.cmd_query("SELECT 1")
         self.assertEqual(exp, res)
@@ -490,7 +490,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             bytearray(b'\x05\x00\x00\x0b\xfe\x00\x00\x00\x00'),
         ]
         exp = [
-            {'columns': [('1', 8, None, None, None, None, 0, 129)],
+            {'columns': [('1', 8, None, None, None, None, 0, 129, 63)],
              'eof': {'status_flag': 8, 'warning_count': 0}},
             ([(1,)], {'status_flag': 8, 'warning_count': 0}),
             {'affected_rows': 1,
@@ -498,7 +498,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
              'insert_id': 0,
              'status_flag': 8,
              'warning_count': 0},
-            {'columns': [('2', 8, None, None, None, None, 0, 129)],
+            {'columns': [('2', 8, None, None, None, None, 0, 129, 63)],
              'eof': {'status_flag': 0, 'warning_count': 0}},
             ([(2,)], {'status_flag': 0, 'warning_count': 0}),
         ]
@@ -1647,12 +1647,12 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             'num_params': 2,
             'statement_id': 1,
             'parameters': [
-                ('?', 253, None, None, None, None, 1, 128),
-                ('?', 253, None, None, None, None, 1, 128)
+                ('?', 253, None, None, None, None, 1, 128, 63),
+                ('?', 253, None, None, None, None, 1, 128, 63)
             ],
             'warning_count': 0,
             'num_columns': 1,
-            'columns': [('c1', 253, None, None, None, None, 1, 128)]
+            'columns': [('c1', 253, None, None, None, None, 1, 128, 63)]
         }
         self.assertEqual(exp, self.cnx.cmd_stmt_prepare(stmt))
 
@@ -1711,7 +1711,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         ])
         exp = (
             1,
-            [('c1', 253, None, None, None, None, 0, 1)],
+            [('c1', 253, None, None, None, None, 0, 1, 33)],
             {'status_flag': 0, 'warning_count': 0}
         )
         self.assertEqual(
@@ -1735,9 +1735,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # prepare and execute
         self.cnx.cmd_stmt_prepare(stmt)
         if tests.MYSQL_VERSION < (8, 0, 22):
-            columns = [('c1', 253, None, None, None, None, 0, 1)]
+            columns = [('c1', 253, None, None, None, None, 0, 1, 45)]
         else:
-            columns = [('c1', 253, None, None, None, None, 1, 0)]
+            columns = [('c1', 253, None, None, None, None, 1, 0, 45)]
         exp = (
             1,
             columns,

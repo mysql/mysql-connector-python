@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -582,21 +582,15 @@ class MySQLConverter(MySQLConverterBase):
 
         Returns string typed columns as string type.
         """
+        if self.charset == "binary":
+            return value
         if dsc is not None:
-            # Check if we deal with a SET
+            if dsc[1] == FieldType.JSON and self.use_unicode:
+                return value.decode(self.charset)
             if dsc[7] & FieldFlag.SET:
                 return self._SET_to_python(value, dsc)
-            if dsc[7] & FieldFlag.BINARY:
-                if self.charset != 'binary' and not isinstance(value, str):
-                    try:
-                        return value.decode(self.charset)
-                    except (LookupError, UnicodeDecodeError):
-                        return value
-                else:
-                    return value
-
-        if self.charset == 'binary':
-            return value
+            if dsc[8] == 63:  # 'binary' charset
+                return value
         if isinstance(value, (bytes, bytearray)) and self.use_unicode:
             return value.decode(self.charset)
 

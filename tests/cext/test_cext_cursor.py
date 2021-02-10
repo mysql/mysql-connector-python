@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -128,7 +128,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         self.cnx.get_warnings = False
 
         cur.execute("SELECT BINARY 'ham'")
-        exp = [('ham',)]
+        exp = [(bytearray(b'ham'),)]
         self.assertEqual(exp, cur.fetchall())
         cur.close()
 
@@ -348,7 +348,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
 
         cur = self.cnx.cursor()
         cur.execute("SELECT BINARY 'ham'")
-        exp = ('ham',)
+        exp = (bytearray(b'ham'),)
         self.assertEqual(exp, cur.fetchone())
         self.assertEqual(None, cur.fetchone())
         cur.close()
@@ -714,7 +714,7 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         "x-large",
         bytearray(b"\x00\x00\x00\x00\x01\x01\x00\x00\x003333335"
                   b"@\x9a\x99\x99\x99\x99\x19A@"),
-        "random blob data"
+        bytearray(b"random blob data")
     )
 
     def setUp(self):

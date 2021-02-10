@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -266,7 +266,7 @@ class MySQLProtocol(object):
         except (struct.error, ValueError):
             raise errors.InterfaceError("Failed parsing column count")
 
-    def parse_column(self, packet, charset='utf-8'):
+    def parse_column(self, packet, encoding='utf-8'):
         """Parse a MySQL column-packet"""
         (packet, _) = utils.read_lc_string(packet[4:])  # catalog
         (packet, _) = utils.read_lc_string(packet)  # db
@@ -276,20 +276,26 @@ class MySQLProtocol(object):
         (packet, _) = utils.read_lc_string(packet)  # org_name
 
         try:
-            (_, _, field_type,
-             flags, _) = struct.unpack('<xHIBHBxx', packet)
+            (
+                charset,
+                _,
+                column_type,
+                flags,
+                _,
+            ) = struct.unpack('<xHIBHBxx', packet)
         except struct.error:
             raise errors.InterfaceError("Failed parsing column information")
 
         return (
-            name.decode(charset),
-            field_type,
+            name.decode(encoding),
+            column_type,
             None,  # display_size
             None,  # internal_size
             None,  # precision
             None,  # scale
             ~flags & FieldFlag.NOT_NULL,  # null_ok
             flags,  # MySQL specific
+            charset,
         )
 
     def parse_eof(self, packet):

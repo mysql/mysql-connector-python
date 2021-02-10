@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -327,7 +327,7 @@ class MySQLCursorTests(tests.TestsCursor):
         self.cur = cursor.MySQLCursor(self.cnx)
         self.assertRaises(StopIteration, self.cur.__next__)
         self.cur.execute("SELECT BINARY 'ham'")
-        exp = ('ham',)
+        exp = (bytearray(b'ham'),)
         self.assertEqual(exp, next(self.cur))
         self.cur.close()
 
@@ -560,7 +560,7 @@ class MySQLCursorTests(tests.TestsCursor):
         self.assertTrue(tests.cmp_result(exp, self.cur._warnings))
 
         self.cur.execute("SELECT BINARY 'ham'")
-        exp = [('ham',)]
+        exp = [(bytearray(b'ham'),)]
         self.assertEqual(exp, self.cur.fetchall())
         self.cur.close()
 
@@ -830,7 +830,7 @@ class MySQLCursorTests(tests.TestsCursor):
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
         self.cur = self.cnx.cursor()
         self.cur.execute("SELECT BINARY 'ham'")
-        exp = ('ham',)
+        exp = (bytearray(b'ham'),)
         self.assertEqual(exp, self.cur.fetchone())
         self.assertEqual(None, self.cur.fetchone())
         self.cur.close()
@@ -1163,11 +1163,11 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         cur.execute(stmt, (5,))
         self.assertEqual(stmt, cur._executed)
         if tests.MYSQL_VERSION < (8, 0, 22):
-            parameters = [('?', 253, None, None, None, None, 1, 128)]
-            columns = [('c1', 5, None, None, None, None, 1, 128)]
+            parameters = [('?', 253, None, None, None, None, 1, 128, 63)]
+            columns = [('c1', 5, None, None, None, None, 1, 128, 63)]
         else:
-            parameters = [('?', 8, None, None, None, None, 1, 128)]
-            columns = [('c1', 8, None, None, None, None, 1, 128)]
+            parameters = [('?', 8, None, None, None, None, 1, 128, 63)]
+            columns = [('c1', 8, None, None, None, None, 1, 128, 63)]
         exp = {
             'num_params': 1, 'statement_id': 1,
             'parameters': parameters,
@@ -1186,12 +1186,12 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         cur2.execute(stmt, (5,))
         self.assertEqual(stmt, cur2._executed)
         if tests.MYSQL_VERSION < (8, 0, 22):
-            parameters = [('?', 253, None, None, None, None, 1, 128)]
-            columns = [('c2', 5, None, None, None, None, 1, 128)]
+            parameters = [('?', 253, None, None, None, None, 1, 128, 63)]
+            columns = [('c2', 5, None, None, None, None, 1, 128, 63)]
             statement_id = 2
         else:
-            parameters = [('?', 8, None, None, None, None, 1, 128)]
-            columns = [('c2', 8, None, None, None, None, 1, 128)]
+            parameters = [('?', 8, None, None, None, None, 1, 128, 63)]
+            columns = [('c2', 8, None, None, None, None, 1, 128, 63)]
             statement_id = 3  # See BUG#31964167 about this change in 8.0.22
         exp = {
             'num_params': 1, 'statement_id': statement_id,

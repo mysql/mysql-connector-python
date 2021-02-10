@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -711,32 +711,40 @@ pytomy_decimal(PyObject *obj)
   Convert, and decode if needed, a string MySQL value to
   Python str or bytes.
 
-  @param    data        string to be converted
-  @param    length      length of data
-  @param    flags       field flags
-  @param    charset     character used for decoding
-  @param    use_unicode return Unicode
+  @param    data             string to be converted
+  @param    field_type       field type
+  @param    field_charsetnr  charset number
+  @param    field_length     length of data
+  @param    charset          character used for decoding
+  @param    use_unicode      use unicode
 
   @return   Converted string
-    @retval PyUnicode   if not BINARY_FLAG
-    @retval PyBytes     Python v3 if not use_unicode
-    @retval NULL    Exception
+    @retval PyUnicode   if use unicode
+    @retval PyBytes     if not use_unicode or charset is 'binary'
+    @retval NULL        Exception
  */
 PyObject*
-mytopy_string(const char *data, const unsigned long length,
-              const unsigned long flags, const char *charset,
+mytopy_string(const char *data,
+              enum_field_types field_type,
+              const unsigned int field_charsetnr,
+              const unsigned long field_length,
+              const char *charset,
               unsigned int use_unicode)
 {
     if (!charset || !data) {
         return NULL;
     }
 
-    if (!((flags != 0) & flags & BINARY_FLAG) && use_unicode && strcmp(charset, "binary") != 0)
+    if (strcmp(charset, "binary") == 0)
     {
-        return PyUnicode_Decode(data, length, charset, NULL);
+        return PyByteArray_FromStringAndSize(data, field_length);
     }
-    else
+
+    /* 'binary' charset = 63 */
+    if (use_unicode && (field_type == MYSQL_TYPE_JSON || field_charsetnr != 63))
     {
-        return PyBytes_FromStringAndSize(data, length);
+        return PyUnicode_Decode(data, field_length, charset, NULL);
     }
+
+    return PyByteArray_FromStringAndSize(data, field_length);
 }

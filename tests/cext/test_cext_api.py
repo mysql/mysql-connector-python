@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -337,12 +337,12 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy.select_db('mysql')
         cmy.query("SELECT DATABASE()")
-        self.assertEqual(b'mysql', cmy.fetch_row()[0])
+        self.assertEqual('mysql', cmy.fetch_row()[0])
         cmy.free_result()
 
         cmy.select_db('myconnpy')
         cmy.query("SELECT DATABASE()")
-        self.assertEqual(b'myconnpy', cmy.fetch_row()[0])
+        self.assertEqual('myconnpy', cmy.fetch_row()[0])
         cmy.free_result()
 
     def test_affected_rows(self):
@@ -612,12 +612,12 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                           cmy1.set_character_set, 'ham_spam')
 
         variables = ('character_set_connection',)
-        exp = b'utf8'
+        exp = 'utf8'
         self.assertIn(
             exp,
-            get_variables(cmy1, variables=variables)[b'character_set_connection'])
+            get_variables(cmy1, variables=variables)['character_set_connection'])
 
-        exp = {b'character_set_connection': b'big5',}
+        exp = {'character_set_connection': 'big5'}
         cmy1.set_character_set('big5')
         self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
@@ -681,7 +681,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                     fetched = fetch_rows(cmy)[0][0]
                 except UnicodeEncodeError:
                     self.fail("Could not encode {0}".format(encoding))
-                self.assertEqual(case, fetched.decode(encoding),
+                self.assertEqual(case, fetched,
                                  "Failed with case {0}/{1}".format(i, encoding))
 
         cmy.query("DROP TABLE IF EXISTS {0}".format(table))
@@ -838,9 +838,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             "SELECT 'SPAM'",
         )
         exp = [
-            [(b'HAM',)],
+            [('HAM',)],
             {'insert_id': 1, 'affected': 1},
-            [(b'SPAM',)]
+            [('SPAM',)]
         ]
 
         result = []

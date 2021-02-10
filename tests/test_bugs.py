@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -5827,3 +5827,119 @@ class BugOra32165864(tests.MySQLConnectorTests):
 
         with self.cnx.cursor() as cur:
             cur.execute("DROP TABLE IF EXISTS bug32165864")
+
+
+class BugOra30416704(tests.MySQLConnectorTests):
+    """BUG#30416704: BINARY COLUMNS RETURNED AS STRINGS."""
+
+    table_name = "BugOra30416704"
+    test_values = (
+        "BLOB",
+        '{"lat": "41.14961", "lon": "-8.61099", "name": "Porto"}',
+        "My TEXT",
+        "BIN",
+    )
+    exp_values = (
+        b"BLOB",
+        '{"lat": "41.14961", "lon": "-8.61099", "name": "Porto"}',
+        "My TEXT",
+        bytearray(b"BIN"),
+    )
+
+    exp_binary_values = (
+        bytearray(b"BLOB"),
+        bytearray(b'{"lat": "41.14961", "lon": "-8.61099", "name": "Porto"}'),
+        bytearray(b"My TEXT"),
+        bytearray(b"BIN"),
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        config = tests.get_mysql_config()
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {cls.table_name}")
+            cnx.cmd_query(
+                f"""
+                CREATE TABLE {cls.table_name} (
+                    my_blob BLOB,
+                    my_json JSON,
+                    my_text TEXT,
+                    my_binary BINARY(3)
+                ) CHARACTER SET utf8 COLLATE utf8_general_ci
+                """
+            )
+            values = "', '".join(cls.test_values)
+            cnx.cmd_query(f"INSERT INTO {cls.table_name} VALUES ('{values}')")
+            cnx.commit()
+
+    @classmethod
+    def tearDownClass(cls):
+        config = tests.get_mysql_config()
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {cls.table_name}")
+
+    def _test_result(self, cnx, exp_values, cursor=None, use_binary_charset=False):
+        with cnx.cursor() as cur:
+            cur = self.cnx.cursor(cursor)
+            cur.execute(
+                f"""
+                SELECT my_blob, my_json, my_text, my_binary
+                FROM {self.table_name}
+                """
+            )
+            res = cur.fetchone()
+            self.assertEqual(res, exp_values)
+
+            cur.execute("SELECT BINARY 'ham'")
+            res = cur.fetchone()
+            self.assertEqual(res, (bytearray(b"ham"),))
+
+    @foreach_cnx()
+    def test_binary_columns(self):
+        self._test_result(self.cnx, self.exp_values)
+
+    @foreach_cnx()
+    def test_binary_columns_cursor_prepared(self):
+        self._test_result(
+            self.cnx,
+            self.exp_values,
+            cursor=cursor.MySQLCursorPrepared,
+        )
+
+    @foreach_cnx()
+    def test_binary_charset(self):
+        self.cnx.set_charset_collation("binary")
+        self._test_result(
+            self.cnx,
+            self.exp_binary_values,
+            use_binary_charset=True
+        )
+
+    @foreach_cnx()
+    def test_binary_charset_cursor_prepared(self):
+        self.cnx.set_charset_collation("binary")
+        self._test_result(
+            self.cnx,
+            self.exp_binary_values,
+            cursor=cursor.MySQLCursorPrepared,
+            use_binary_charset=True,
+        )
+
+    @foreach_cnx()
+    def test_without_use_unicode(self):
+        self.cnx.set_unicode(False)
+        self._test_result(
+            self.cnx,
+            self.exp_binary_values,
+            use_binary_charset=True
+        )
+
+    @foreach_cnx()
+    def test_without_use_unicode_cursor_prepared(self):
+        self.cnx.set_unicode(False)
+        self._test_result(
+            self.cnx,
+            self.exp_binary_values,
+            cursor=cursor.MySQLCursorPrepared,
+            use_binary_charset=True,
+        )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -213,33 +213,57 @@ fetch_fields(MYSQL_RES *result, unsigned int num_fields, MY_CHARSET_INFO *cs,
     {
         field = PyTuple_New(11);
 
-        decoded= mytopy_string(myfs[i].catalog, myfs[i].catalog_length,
-                               myfs[i].flags, charset, use_unicode);
+        decoded= mytopy_string(myfs[i].catalog,
+                               myfs[i].type,
+                               45,
+                               myfs[i].catalog_length,
+                               charset,
+                               use_unicode);
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 0, decoded);
 
-        decoded= mytopy_string(myfs[i].db, myfs[i].db_length,
-                               myfs[i].flags, charset, use_unicode);
+        decoded= mytopy_string(myfs[i].db,
+                               myfs[i].type,
+                               45,
+                               myfs[i].db_length,
+                               charset,
+                               use_unicode);
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 1, decoded);
 
-        decoded= mytopy_string(myfs[i].table, myfs[i].table_length,
-                               myfs[i].flags, charset, use_unicode);
+        decoded= mytopy_string(myfs[i].table,
+                               myfs[i].type,
+                               45,
+                               myfs[i].table_length,
+                               charset,
+                               use_unicode);
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 2, decoded);
 
-        decoded= mytopy_string(myfs[i].org_table, myfs[i].org_table_length,
-                               myfs[i].flags, charset, use_unicode);
+        decoded= mytopy_string(myfs[i].org_table,
+                               myfs[i].type,
+                               45,
+                               myfs[i].org_table_length,
+                               charset,
+                               use_unicode);
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 3, decoded);
 
-        decoded= mytopy_string(myfs[i].name, myfs[i].name_length,
-                               myfs[i].flags, charset, use_unicode);
+        decoded= mytopy_string(myfs[i].name,
+                               myfs[i].type,
+                               45,
+                               myfs[i].name_length,
+                               charset,
+                               use_unicode);
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 4, decoded);
 
-        decoded= mytopy_string(myfs[i].org_name, myfs[i].org_name_length,
-                               myfs[i].flags, charset, use_unicode);
+        decoded= mytopy_string(myfs[i].org_name,
+                               myfs[i].type,
+                               45,
+                               myfs[i].org_name_length,
+                               charset,
+                               use_unicode);
         if (NULL == decoded) return NULL; // decode error
         PyTuple_SET_ITEM(field, 5, decoded);
 
@@ -383,13 +407,9 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
         self->raw= self->raw_at_connect;
     }
 
-    self->use_unicode= 0;
-    if (use_unicode)
+    if (use_unicode && use_unicode == Py_False)
     {
-        if (use_unicode == Py_True)
-        {
-            self->use_unicode= 1;
-        }
+        self->use_unicode= 0;
     }
 
     if (charset_name) {
@@ -2383,7 +2403,7 @@ MySQL_fetch_row(MySQL *self)
 	unsigned long *field_lengths;
 	unsigned int num_fields;
 	unsigned int i;
-	unsigned long field_type, field_flags;
+	unsigned long field_charsetnr, field_type, field_flags;
 	const char *charset= NULL;
 
     CHECK_SESSION(self);
@@ -2458,6 +2478,7 @@ MySQL_fetch_row(MySQL *self)
             Py_RETURN_NONE;
         }
 
+        field_charsetnr= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 6));
         field_type= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 8));
         field_flags= PyLong_AsUnsignedLong(PyTuple_GetItem(field_info, 9));
 
@@ -2491,8 +2512,12 @@ MySQL_fetch_row(MySQL *self)
                  field_type == MYSQL_TYPE_ENUM ||
                  field_type == MYSQL_TYPE_VAR_STRING)
         {
-            value= mytopy_string(row[i], field_lengths[i], field_flags,
-                                  charset, self->use_unicode);
+            value= mytopy_string(row[i],
+                                 field_type,
+                                 field_charsetnr,
+                                 field_lengths[i],
+                                 charset,
+                                 self->use_unicode);
             if (!value)
             {
                 goto error;
@@ -2563,8 +2588,12 @@ MySQL_fetch_row(MySQL *self)
             }
             else
             {
-                value= mytopy_string(row[i], field_lengths[i], field_flags,
-                                     charset, self->use_unicode);
+                value= mytopy_string(row[i],
+                                     field_type,
+                                     field_charsetnr,
+                                     field_lengths[i],
+                                     charset,
+                                     self->use_unicode);
             }
             PyTuple_SET_ITEM(result_row, i, value);
         }
@@ -2577,8 +2606,12 @@ MySQL_fetch_row(MySQL *self)
     	else
     	{
     	    // Do our best to convert whatever we got from MySQL to a str/bytes
-            value = mytopy_string(row[i], field_lengths[i], field_flags,
-                                  charset, self->use_unicode);
+            value = mytopy_string(row[i],
+                                  field_type,
+                                  field_charsetnr,
+                                  field_lengths[i],
+                                  charset,
+                                  self->use_unicode);
     		PyTuple_SET_ITEM(result_row, i, value);
     	}
     }
@@ -3552,6 +3585,10 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                     {
                         PyTuple_SET_ITEM(row, i,
                             mytopy_bit(PyBytes_AsString(obj), self->cols[i].length));
+                    }
+                    else if (field->charsetnr == 63) /* 'binary' charset */
+                    {
+                        PyTuple_SET_ITEM(row, i, PyByteArray_FromObject(obj));
                     }
                     else
                     {
