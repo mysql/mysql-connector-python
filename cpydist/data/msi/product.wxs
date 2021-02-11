@@ -9,22 +9,15 @@
 
     <Package Compressed="yes" InstallerVersion="200"
      Description="$(var.ProductName) Installer"
-     Comments="Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved."
+     Comments="Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved."
      InstallScope="perMachine"
      Platform="$(var.Platform)"/>
 
-    <Property Id="PREVIOUSVERSIONSINSTALLED34" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED36" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED39" Secure="yes" />
 
-	<Upgrade Id="d37ecc44-a317-4c2c-b90a-70b4dc67fb19">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED34"/>
-    </Upgrade>
 	<Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
        Minimum="1.0.0"
@@ -51,25 +44,6 @@
     </Upgrade>
 
     <!-- Obtain location of the Python interpreters installed on the system-->
-    <!-- Python 3.4 -->
-    <Property Id="PYTHON34INSTALLPATH_ALL">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python34InstallPathAll64" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="yes"/>
-      <?else?>
-      <RegistrySearch Id="Python34InstallPathAll32" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-    <Property Id="PYTHON34INSTALLPATH_CURRENT">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python34InstallPathCurrent64" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="yes"/>
-      <?else?>
-      <RegistrySearch Id="Python34InstallPathCurrent32" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.4\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
 
     <!-- Python 3.6 -->
     <Property Id="PYTHON36INSTALLPATH_ALL">
@@ -160,34 +134,13 @@
     </Property>
 
     <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
-      Installed OR PYTHON34INSTALLPATH_ALL OR PYTHON34INSTALLPATH_CURRENT OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT
+      Installed OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT
     </Condition>
 
     <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
 
     <!-- Definition of the folders used by the installed files-->
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="INSTALLDIRP34" Name="Python34">
-        <Directory Id="PythonLibDir34" Name="Lib">
-          <Directory Id="SitePackagesDir34" Name="site-packages">
-            <Directory Id="EggInfoDir34" Name="mysql_connector_python-$(var.FullVersion)-py3.4.egg-info"/>
-            <Directory Id="MySQLXPackageDir34" Name="mysqlx">
-              <Directory Id="MySQLXPB2Dir34" Name="protobuf"/>
-              <Directory Id="MySQLXLocalesDir34" Name="locales">
-                <Directory Id="MySQLXLocalesEngDir34" Name="eng"/>
-              </Directory>
-            </Directory>
-            <Directory Id="MySQLPackageDir34" Name="mysql">
-              <Directory Id="ConnectorPackageDir34" Name="connector">
-                <Directory Id="DjangoDir34" Name="django"/>
-                <Directory Id="ConnectorLocalesDir34" Name="locales">
-                  <Directory Id="LocalesEngDir34" Name="eng"/>
-                </Directory>
-              </Directory>
-            </Directory>
-          </Directory>
-        </Directory>
-      </Directory>
 
       <Directory Id="INSTALLDIRP36" Name="Python36">
         <Directory Id="PythonLibDir36" Name="Lib">
@@ -350,27 +303,6 @@
         <ComponentRef Id="MyConnPyExamples"/>
       </Feature>
 
-      <!-- Python 3.4 -->
-      <?if $(var.BDist34) != "" ?>
-      <Feature Id="Python34" Title="C/py for Python 3.4" Level="1"
-               ConfigurableDirectory ="INSTALLDIRP34" Absent="allow">
-        <Condition Level='0'>Not PYTHON34INSTALLPATH_ALL AND Not PYTHON34INSTALLPATH_CURRENT AND Not Installed</Condition>
-        <ComponentRef Id="EggInfo34"/>
-        <ComponentRef Id="MySQLPackage34"/>
-        <ComponentRef Id="ConnectorPackage34"/>
-        <ComponentRef Id="ConnectorLocales34"/>
-        <ComponentRef Id="LocalesEng34"/>
-        <ComponentRef Id="DjangoBackend34"/>
-        <ComponentRef Id="MySQLXPackage34"/>
-        <ComponentRef Id="MySQLXPackagePB234"/>
-        <ComponentRef Id="MySQLXLocales34"/>
-        <ComponentRef Id="MySQLXLocalesEng34"/>
-        <?if $(var.HaveCExt34) = 1 ?>
-        <ComponentRef Id="CExtension34"/>
-        <?endif?>
-      </Feature>
-      <?endif?>
-
       <!-- Python 3.6 -->
       <?if $(var.BDist36) != "" ?>
       <Feature Id="Python36" Title="C/py for Python 3.6" Level="1"
@@ -468,11 +400,6 @@
       <?endif?>
     </Feature>
 
-    <!-- Python 3.4 -->
-    <CustomAction Id="SetInstallDirCurrentP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_CURRENT]"/>
-    <CustomAction Id="SetInstallDirAllP34" Property="INSTALLDIRP34" Value="[PYTHON34INSTALLPATH_ALL]"/>
-    <CustomAction Id="ErrDebug34" Error="Installdir: [INSTALLDIRP34]"/>
-
     <!-- Python 3.6 -->
     <CustomAction Id="SetInstallDirCurrentP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_ALL]"/>
@@ -499,13 +426,10 @@
 
     <!-- Prevent downgrading -->
     <CustomAction Id="PreventDowngrading" Error="Newer version already installed." />
-  
+
     <InstallExecuteSequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
       <RemoveExistingProducts After="InstallInitialize" />
-      <!-- Python 3.4 -->
-      <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
       <!-- Python 3.6 -->
       <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
@@ -522,9 +446,6 @@
 
     <InstallUISequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
-      <!-- Python 3.4 -->
-      <Custom Action="SetInstallDirCurrentP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP34" After="AppSearch">NOT Installed AND PYTHON34INSTALLPATH_ALL</Custom>
       <!-- Python 3.6 -->
       <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
