@@ -2852,7 +2852,7 @@ MySQL_stmt_prepare(MySQL *self, PyObject *args)
     MYSQL_RES *mysql_res= NULL;
     int res= 0;
     const char *stmt_char= NULL;
-    unsigned int stmt_length= 0;
+    unsigned long stmt_length= 0;
     unsigned long param_count= 0;
     PyObject *stmt;
     PyObject *prep_stmt;
@@ -2865,7 +2865,6 @@ MySQL_stmt_prepare(MySQL *self, PyObject *args)
     }
     stmt_char= PyBytes_AsString(stmt);
     stmt_length= strlen(stmt_char);
-
     mysql= &self->session;
 
     Py_BEGIN_ALLOW_THREADS

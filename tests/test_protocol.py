@@ -503,6 +503,11 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
                           self._protocol.make_stmt_execute, statement_id,
                           ('ham', 'spam'), (1, 2, 3))
 
+        # Testing with no parameters
+        exp = bytearray(b'\x01\x00\x00\x00\x00\x01\x00\x00\x00')
+        res = self._protocol.make_stmt_execute(statement_id)
+        self.assertEqual(exp, res)
+
         data = ('ham', 'spam')
         exp = bytearray(
             b'\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x0f'

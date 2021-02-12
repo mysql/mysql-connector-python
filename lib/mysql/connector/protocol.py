@@ -727,17 +727,17 @@ class MySQLProtocol(object):
         packet = (
             utils.int4store(statement_id) +
             utils.int1store(0) +
-            utils.int4store(iteration_count) +
-            b''.join([struct.pack('B', bit) for bit in null_bitmap]) +
-            utils.int1store(1)
-        )
+            utils.int4store(iteration_count))
+        if len(parameters) > 0:
+            packet += (
+                b''.join([struct.pack('B', bit) for bit in null_bitmap]) +
+                utils.int1store(1))
 
-        for a_type in types:
-            packet += a_type
+            for a_type in types:
+                packet += a_type
 
-        for a_value in values:
-            packet += a_value
-
+            for a_value in values:
+                packet += a_value
         return packet
 
     def parse_auth_switch_request(self, packet):
