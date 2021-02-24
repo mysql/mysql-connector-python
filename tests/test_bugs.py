@@ -6061,3 +6061,30 @@ class Bug32162928(tests.MySQLConnectorTests):
         # cleanup users
         for new_user in self.users:
             cnx.cmd_query("DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user))
+
+
+class BugOra32497631(tests.MySQLConnectorTests):
+    """BUG#32497631: PREPARED STMT FAILS ON CEXT WHEN PARAMS ARE NOT GIVEN"""
+
+    table_name = "BugOra32497631"
+
+    @foreach_cnx()
+    def test_prepared_statement_parameters(self):
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cnx.cmd_query(
+            f"CREATE TABLE {self.table_name} (name VARCHAR(255))"
+        )
+        with self.cnx.cursor(prepared=True) as cur:
+            query = f"INSERT INTO {self.table_name} (name) VALUES (?)"
+            # If the query has placeholders and no parameters is given,
+            # the statement is prepared but not executed
+            cur.execute(query)
+
+            # Test with parameters
+            cur.execute(query, ("foo",))
+            cur.execute(query, ("bar",))
+
+            cur.execute(f"SELECT name FROM {self.table_name}")
+            rows = cur.fetchall()
+            self.assertEqual(2, len(rows))
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")

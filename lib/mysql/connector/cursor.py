@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1174,7 +1174,7 @@ class MySQLCursorPrepared(MySQLCursor):
             elif 'server_status' in result[2]:
                 self._handle_server_status(result[2]['server_status'])
 
-    def execute(self, operation, params=(), multi=False):  # multi is unused
+    def execute(self, operation, params=None, multi=False):  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
 
         This method will preare the given operation and execute it using
@@ -1211,12 +1211,14 @@ class MySQLCursorPrepared(MySQLCursor):
 
         if self._prepared['parameters'] and not params:
             return
-        elif len(self._prepared['parameters']) != len(params):
+        elif params and len(self._prepared['parameters']) != len(params):
             raise errors.ProgrammingError(
                 errno=1210,
                 msg="Incorrect number of arguments " \
                     "executing prepared statement")
 
+        if params is None:
+            params = ()
         res = self._connection.cmd_stmt_execute(
             self._prepared['statement_id'],
             data=params,

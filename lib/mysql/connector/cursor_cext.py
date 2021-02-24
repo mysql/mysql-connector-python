@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -911,7 +911,7 @@ class CMySQLCursorPrepared(CMySQLCursor):
             self._cnx.cmd_stmt_reset(self._stmt)
         super(CMySQLCursorPrepared, self).reset(free=free)
 
-    def execute(self, operation, params=(), multi=False):  # multi is unused
+    def execute(self, operation, params=None, multi=False):  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
 
         This method will preare the given operation and execute it using
@@ -956,12 +956,16 @@ class CMySQLCursorPrepared(CMySQLCursor):
 
         self._cnx.cmd_stmt_reset(self._stmt)
 
-        if params and self._stmt.param_count != len(params):
+        if self._stmt.param_count > 0 and not params:
+            return
+        elif params and self._stmt.param_count != len(params):
             raise errors.ProgrammingError(
                 errno=1210,
                 msg="Incorrect number of arguments executing prepared "
                     "statement")
 
+        if params is None:
+            params = ()
         res = self._cnx.cmd_stmt_execute(self._stmt, *params)
         if res:
             self._handle_result(res)
