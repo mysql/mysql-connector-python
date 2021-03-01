@@ -6,6 +6,7 @@ Tutorials
 
    tutorials/getting_started
    tutorials/collections
+   tutorials/connection_routers
    tutorials/connection_pooling
    tutorials/transactions
    tutorials/creating_indexes
