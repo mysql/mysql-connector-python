@@ -215,7 +215,11 @@ class WiX:
         print("cwd: {}".format(cwd))
         os.chdir(base_path)
         print("base_path: {}".format(base_path))
+        wxlfile = os.path.join(data_path, "cpydist\\data\\msi\\WixUI_en-us.wxl")
+        print("wxlfile loc file: {}".format(wxlfile))
+
         cmdargs = [
+            r'-loc {0}'.format(wxlfile),
             r"-ext WixUIExtension",
             r"-cultures:en-us",
             r"-nologo",
