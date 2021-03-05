@@ -64,7 +64,7 @@ class ErrorCodeTests(tests.MySQLxTests):
     def test_client_error_codes(self):
         cases = {
             "CR_UNKNOWN_ERROR": 2000,
-            "CR_PROBE_REPLICA_STATUS": 2022,
+            "CR_PROBE_SLAVE_STATUS": 2022,
             "CR_AUTH_PLUGIN_CANNOT_LOAD": 2059,
         }
 

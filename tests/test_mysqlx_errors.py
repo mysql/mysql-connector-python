@@ -120,12 +120,12 @@ class ErrorTest(tests.MySQLxTests):
         self.assertEqual("Unknown MySQL error", err.msg)
         self.assertEqual("2000: Unknown MySQL error", err._full_msg)
 
-        err = errors.Error(errno=2003, values=("/path/to/ham", 2))
+        err = errors.Error(errno=2003, values=("localhost", 3306, 2))
         self.assertEqual(
-            "2003: Can't connect to MySQL server on '/path/to/ham' (2)",
+            "2003: Can't connect to MySQL server on 'localhost:3306' (2)",
             err._full_msg)
         self.assertEqual(
-            "Can't connect to MySQL server on '/path/to/ham' (2)",
+            "Can't connect to MySQL server on 'localhost:3306' (2)",
             err.msg)
 
         err = errors.Error(errno=2001, values=("ham",))
@@ -134,7 +134,7 @@ class ErrorTest(tests.MySQLxTests):
 
         err = errors.Error(errno=2003, values=("ham",))
         self.assertEqual(
-            "2003: Can't connect to MySQL server on '%-.100s' (%s) "
+            "2003: Can't connect to MySQL server on '%-.100s:%u' (%s) "
             "(Warning: not enough arguments for format string)",
             err._full_msg)
 

@@ -574,6 +574,11 @@ class MySQLTCPSocket(BaseMySQLSocket):
             self.sock.connect(sockaddr)
         except IOError as err:
             raise errors.InterfaceError(
-                errno=2003, values=(self.get_address(), _strioerror(err)))
+                errno=2003, values=(
+                    self.server_host,
+                    self.server_port,
+                    _strioerror(err),
+                )
+            )
         except Exception as err:
             raise errors.OperationalError(str(err))

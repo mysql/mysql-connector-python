@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,14 +29,14 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 # This file was auto-generated.
-_GENERATED_ON = '2020-09-29'
-_MYSQL_VERSION = (8, 0, 23)
+_GENERATED_ON = '2021-03-05'
+_MYSQL_VERSION = (8, 0, 24)
 
 # Start MySQL Error messages
 CR_UNKNOWN_ERROR = u"Unknown MySQL error"
 CR_SOCKET_CREATE_ERROR = u"Can't create UNIX socket (%s)"
 CR_CONNECTION_ERROR = u"Can't connect to local MySQL server through socket '%-.100s' (%s)"
-CR_CONN_HOST_ERROR = u"Can't connect to MySQL server on '%-.100s' (%s)"
+CR_CONN_HOST_ERROR = u"Can't connect to MySQL server on '%-.100s:%u' (%s)"
 CR_IPSOCK_ERROR = u"Can't create TCP/IP socket (%s)"
 CR_UNKNOWN_HOST = u"Unknown MySQL server host '%-.100s' (%s)"
 CR_SERVER_GONE_ERROR = u"MySQL server has gone away"
@@ -55,10 +55,10 @@ CR_NAMEDPIPESETSTATE_ERROR = u"Can't set state of named pipe to host: %-.64s  pi
 CR_CANT_READ_CHARSET = u"Can't initialize character set %-.32s (path: %-.100s)"
 CR_NET_PACKET_TOO_LARGE = u"Got packet bigger than 'max_allowed_packet' bytes"
 CR_EMBEDDED_CONNECTION = u"Embedded server"
-CR_PROBE_REPLICA_STATUS = u"Error on SHOW REPLICA STATUS:"
-CR_PROBE_REPLICA_HOSTS = u"Error on SHOW REPLICA HOSTS:"
-CR_PROBE_REPLICA_CONNECT = u"Error connecting to replica:"
-CR_PROBE_SOURCE_CONNECT = u"Error connecting to source:"
+CR_PROBE_SLAVE_STATUS = u"Error on SHOW SLAVE STATUS:"
+CR_PROBE_SLAVE_HOSTS = u"Error on SHOW SLAVE HOSTS:"
+CR_PROBE_SLAVE_CONNECT = u"Error connecting to slave:"
+CR_PROBE_MASTER_CONNECT = u"Error connecting to master:"
 CR_SSL_CONNECTION_ERROR = u"SSL connection error: %-.100s"
 CR_MALFORMED_PACKET = u"Malformed packet"
 CR_WRONG_LICENSE = u"This client library is licensed only for use with MySQL servers having '%s' license"
