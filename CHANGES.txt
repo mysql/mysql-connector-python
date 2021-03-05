@@ -17,12 +17,14 @@ v8.0.24
 - WL#14027: Add support for Python 3.9
 - BUG#32532744: MSI destination folder page lacks details of what installs
 - BUG#32497631: Prepared statements fail when parameters are not given
+- BUG#32496788: Prepared statements accepts any type of parameters
 - BUG#32435181: Add support for Django 3.2
 - BUG#32162928: Change user command fails on pure python implementation
 - BUG#32120659: Prepared statements w/o parameters violates MySQL protocol
 - BUG#32039427: Remove python 3.4 support in MSI packaging
 - BUG#32029891: Add context manager support for pooled connections
 - BUG#31490101: Fix wrong cast of Python unicode to std::string
+- BUG#31315173: Added documentation for multi-host and failover
 - BUG#30416704: Binary columns returned as strings
 
 v8.0.23

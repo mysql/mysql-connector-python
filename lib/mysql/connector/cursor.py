@@ -1211,11 +1211,17 @@ class MySQLCursorPrepared(MySQLCursor):
 
         if self._prepared['parameters'] and not params:
             return
-        elif params and len(self._prepared['parameters']) != len(params):
-            raise errors.ProgrammingError(
-                errno=1210,
-                msg="Incorrect number of arguments " \
-                    "executing prepared statement")
+        elif params:
+            if not isinstance(params, (tuple, list)):
+                raise errors.ProgrammingError(
+                    errno=1210,
+                    msg="Incorrect type of argument, it must be of type tuple "
+                        "or list the argument given to the prepared statement")
+            if len(self._prepared['parameters']) != len(params):
+                raise errors.ProgrammingError(
+                    errno=1210,
+                    msg="Incorrect number of arguments " \
+                        "executing prepared statement")
 
         if params is None:
             params = ()

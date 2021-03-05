@@ -5945,6 +5945,85 @@ class BugOra30416704(tests.MySQLConnectorTests):
         )
 
 
+class Bug32496788(tests.MySQLConnectorTests):
+    """BUG#32496788: PREPARED STATEMETS ACCEPTS ANY TYPE OF PARAMETERS."""
+
+    table_name = "Bug32496788"
+    test_values = (
+        ("John", "", "Doe", 21, 77),
+        ["Jane", "", "Doe", 19, 7]
+    )
+    exp_values = (
+        [("John", "", "Doe", 21, 77)],
+        [("Jane", "", "Doe", 19, 7)]
+    )
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+            cnx.cmd_query(
+                f"""
+                CREATE TABLE {self.table_name} (
+                    column_first_name VARCHAR(30) DEFAULT '' NOT NULL,
+                    column_midle_name VARCHAR(30) DEFAULT '' NOT NULL,
+                    column_last_name VARCHAR(30) DEFAULT '' NOT NULL,
+                    age INT DEFAULT 0 NOT NULL,
+                    lucky_number INT DEFAULT 0 NOT NULL
+                ) CHARACTER SET utf8 COLLATE utf8_general_ci
+                """
+            )
+            cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_parameters_type(self):
+        stmt = f"SELECT * FROM  {self.table_name} WHERE age = ? and lucky_number = ?"
+        with self.cnx.cursor(prepared=True) as cur:
+            # Test incorrect types must raise error
+            for param in ["12", 12, 1.3, lambda : "1"+ "2"]:
+                self.assertRaises(errors.ProgrammingError, cur.execute, stmt, (param,))
+                with self.assertRaises(errors.ProgrammingError) as contex:
+                    cur.execute(stmt, param)
+                self.assertIn("Incorrect type of argument, it must be of type tuple or list",
+                              contex.exception.msg)
+
+        with self.cnx.cursor(prepared=True) as cur:
+            # Correct form with tuple
+            cur.execute("SELECT ?, ?", ("1", "2"))
+            self.assertEqual(cur.fetchall(),  [('1', '2')])
+
+            # Correct form with list
+            cur.execute("SELECT ?, ?", ["1", "2"])
+            self.assertEqual(cur.fetchall(),  [('1', '2')])
+
+        with self.cnx.cursor(prepared=True) as cur:
+            insert_stmt = f"INSERT INTO {self.table_name} VALUES (?, ?, ?, ?, ?)"
+            cur.execute(insert_stmt)
+            with self.assertRaises(errors.ProgrammingError) as contex:
+                cur.execute(insert_stmt, "JD")
+                self.assertIn("Incorrect type of argument, it must be of type tuple or list",
+                              contex.exception.msg)
+            self.assertRaises(errors.ProgrammingError, cur.execute, insert_stmt, ("JohnDo"))
+            cur.execute(insert_stmt, self.test_values[0])
+            cur.execute(insert_stmt, self.test_values[1])
+
+            select_stmt = f"SELECT * FROM {self.table_name} WHERE column_last_name=? and column_first_name=?"
+            self.assertRaises(errors.ProgrammingError, cur.execute, select_stmt, ("JD"))
+            with self.assertRaises(errors.ProgrammingError) as contex:
+                cur.execute(select_stmt, "JD")
+                self.assertIn("Incorrect type of argument, it must be of type tuple or list",
+                              contex.exception.msg)
+            cur.execute(select_stmt, ("Doe", "John"))
+            self.assertEqual(cur.fetchall(),  self.exp_values[0])
+            cur.execute(select_stmt, ("Doe", "Jane"))
+            self.assertEqual(cur.fetchall(),  self.exp_values[1])
+
+
 class Bug32162928(tests.MySQLConnectorTests):
     """BUG#32162928: change user command fails with pure python implementation.
 

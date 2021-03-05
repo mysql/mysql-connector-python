@@ -958,11 +958,17 @@ class CMySQLCursorPrepared(CMySQLCursor):
 
         if self._stmt.param_count > 0 and not params:
             return
-        elif params and self._stmt.param_count != len(params):
-            raise errors.ProgrammingError(
-                errno=1210,
-                msg="Incorrect number of arguments executing prepared "
-                    "statement")
+        elif params:
+            if not isinstance(params, (tuple, list)):
+                raise errors.ProgrammingError(
+                    errno=1210,
+                    msg="Incorrect type of argument, it must be of type tuple "
+                        "or list the argument given to the prepared statement")
+            if self._stmt.param_count != len(params):
+                raise errors.ProgrammingError(
+                    errno=1210,
+                    msg="Incorrect number of arguments executing prepared "
+                        "statement")
 
         if params is None:
             params = ()
