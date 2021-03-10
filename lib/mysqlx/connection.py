@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -58,6 +58,7 @@ import os
 import random
 import re
 import threading
+import warnings
 
 try:
     import dns.resolver
@@ -359,6 +360,16 @@ class SocketStream(object):
                                      "".format(", ".join(errs)))
 
         self._is_ssl = True
+
+        # Raise a deprecation warning if TLSv1 or TLSv1.1 is being used
+        tls_version = self._socket.version()
+        if tls_version in ("TLSv1", "TLSv1.1"):
+            warn_msg = (
+                f"This connection is using {tls_version} which is now "
+                "deprecated and will be removed in a future release of "
+                "MySQL Connector/Python"
+            )
+            warnings.warn(warn_msg, DeprecationWarning)
 
     def is_ssl(self):
         """Verifies if SSL is being used.
