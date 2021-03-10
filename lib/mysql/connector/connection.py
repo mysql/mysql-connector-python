@@ -35,6 +35,7 @@ import os
 import platform
 import socket
 import time
+import warnings
 
 from .authentication import get_auth_plugin
 from .constants import (
@@ -420,6 +421,21 @@ class MySQLConnection(MySQLConnectionAbstract):
             # close socket
             self.close()
             raise
+
+        if (
+            not self._ssl_disabled
+            and hasattr(self._socket.sock, "version")
+            and callable(self._socket.sock.version)
+        ):
+            # Raise a deprecation warning if TLSv1 or TLSv1.1 is being used
+            tls_version = self._socket.sock.version()
+            if tls_version in ("TLSv1", "TLSv1.1"):
+                warn_msg = (
+                    f"This connection is using {tls_version} which is now "
+                    "deprecated and will be removed in a future release of "
+                    "MySQL Connector/Python"
+                )
+                warnings.warn(warn_msg, DeprecationWarning)
 
     def shutdown(self):
         """Shut down connection to MySQL Server.
