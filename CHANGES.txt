@@ -8,6 +8,13 @@ Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.26
+=======
+
+- WL#14542: Deprecate TLS 1.0 and 1.1
+- WL#14440: Support for authentication_kerberos_client authentication plugin
+- WL#14237: Support query attributes
+
 v8.0.25
 =======
 

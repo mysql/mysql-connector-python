@@ -35,7 +35,7 @@ import datetime
 from decimal import Decimal
 
 from .constants import (
-    FieldFlag, ServerCmd, FieldType, ClientFlag)
+    FieldFlag, ServerCmd, FieldType, ClientFlag, PARAMETER_COUNT_AVAILABLE)
 from . import errors, utils
 from .authentication import get_auth_plugin
 from .errors import DatabaseError, get_exception
@@ -659,29 +659,38 @@ class MySQLProtocol(object):
         return packet
 
     def make_stmt_execute(self, statement_id, data=(), parameters=(),
-                          flags=0, long_data_used=None, charset='utf8'):
+                          flags=0, long_data_used=None, charset='utf8',
+                          query_attrs=None):
         """Make a MySQL packet with the Statement Execute command"""
         iteration_count = 1
         null_bitmap = [0] * ((len(data) + 7) // 8)
         values = []
         types = []
         packed = b''
+        data_len = len(data)
+        query_attr_names = []
+        flags = flags if not query_attrs else flags + PARAMETER_COUNT_AVAILABLE
         if charset == 'utf8mb4':
             charset = 'utf8'
         if long_data_used is None:
             long_data_used = {}
-        if parameters and data:
-            if len(data) != len(parameters):
+        if query_attrs:
+            data = list(data)
+            for _, attr_val in query_attrs:
+                data.append(attr_val)
+            null_bitmap = [0] * ((len(data) + 7) // 8)
+        if parameters or data:
+            if data_len != len(parameters):
                 raise errors.InterfaceError(
                     "Failed executing prepared statement: data values does not"
                     " match number of parameters")
-            for pos, _ in enumerate(parameters):
+            for pos, _ in enumerate(data):
                 value = data[pos]
-                flags = 0
+                _flags = 0
                 if value is None:
                     null_bitmap[(pos // 8)] |= 1 << (pos % 8)
                     types.append(utils.int1store(FieldType.NULL) +
-                                 utils.int1store(flags))
+                                 utils.int1store(_flags))
                     continue
                 elif pos in long_data_used:
                     if long_data_used[pos][0]:
@@ -692,7 +701,7 @@ class MySQLProtocol(object):
                         field_type = FieldType.STRING
                 elif isinstance(value, int):
                     (packed, field_type,
-                     flags) = self._prepare_binary_integer(value)
+                     _flags) = self._prepare_binary_integer(value)
                     values.append(packed)
                 elif isinstance(value, str):
                     value = value.encode(charset)
@@ -722,22 +731,47 @@ class MySQLProtocol(object):
                         "'{classname}' objects".format(
                             classname=value.__class__.__name__))
                 types.append(utils.int1store(field_type) +
-                             utils.int1store(flags))
-
+                             utils.int1store(_flags))
+                if query_attrs and pos+1 > data_len:
+                    name = query_attrs[pos - data_len][0].encode(charset)
+                    query_attr_names.append(
+                        utils.lc_int(len(name)) + name)
         packet = (
             utils.int4store(statement_id) +
-            utils.int1store(0) +
+            utils.int1store(flags) +
             utils.int4store(iteration_count))
-        if len(parameters) > 0:
+
+        # if (num_params > 0 || (CLIENT_QUERY_ATTRIBUTES \
+        #                        && (flags & PARAMETER_COUNT_AVAILABLE)) {
+        if query_attrs is not None:
+            parameter_count = data_len + len(query_attrs)
+        else:
+            parameter_count = data_len
+        if parameter_count:
+            # if CLIENT_QUERY_ATTRIBUTES is on
+            if query_attrs is not None:
+                packet += utils.lc_int(parameter_count)
+
             packet += (
                 b''.join([struct.pack('B', bit) for bit in null_bitmap]) +
                 utils.int1store(1))
-
+            count = 0
             for a_type in types:
                 packet += a_type
+                # if CLIENT_QUERY_ATTRIBUTES is on {
+                #    string<lenenc>    parameter_name    Name of the parameter
+                # or empty if not present
+                # } if CLIENT_QUERY_ATTRIBUTES is on
+                if query_attrs is not None:
+                    if count+1 > data_len:
+                        packet += query_attr_names[count - data_len]
+                    else:
+                        packet += b'\x00'
+                count+=1
 
             for a_value in values:
                 packet += a_value
+
         return packet
 
     def parse_auth_switch_request(self, packet):

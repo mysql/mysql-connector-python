@@ -1157,12 +1157,11 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
     def test_execute(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
         cur2 = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
-
         # No 1
         stmt = "SELECT (? * 2) AS c1"
         cur.execute(stmt, (5,))
         self.assertEqual(stmt, cur._executed)
-        if tests.MYSQL_VERSION < (8, 0, 22):
+        if tests.MYSQL_VERSION < (8, 0, 24):
             parameters = [('?', 253, None, None, None, None, 1, 128, 63)]
             columns = [('c1', 5, None, None, None, None, 1, 128, 63)]
         else:
@@ -1185,7 +1184,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         self.assertRaises(errors.ProgrammingError, cur2.execute, stmt, (1, 3))
         cur2.execute(stmt, (5,))
         self.assertEqual(stmt, cur2._executed)
-        if tests.MYSQL_VERSION < (8, 0, 22):
+        if tests.MYSQL_VERSION < (8, 0, 24):
             parameters = [('?', 253, None, None, None, None, 1, 128, 63)]
             columns = [('c2', 5, None, None, None, None, 1, 128, 63)]
             statement_id = 2
@@ -1208,7 +1207,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         stmt = "SELECT SQRT(POW(?, 2) + POW(?, 2)) AS hypotenuse"
         cur.execute(stmt, data)
         # See BUG#31964167 about this change in 8.0.22
-        statement_id = 3 if tests.MYSQL_VERSION < (8, 0, 22) else 5
+        statement_id = 3 if tests.MYSQL_VERSION < (8, 0, 24) else 5
         self.assertEqual(statement_id, cur._prepared['statement_id'])
         self.assertEqual(exp, cur.fetchall())
 

@@ -39,6 +39,8 @@ from .charsets import MYSQL_CHARACTER_SETS
 MAX_PACKET_LENGTH = 16777215
 NET_BUFFER_LENGTH = 8192
 MAX_MYSQL_TABLE_COLUMNS = 4096
+# Flag used to send the Query Attributes with 0 (or more) parameters.
+PARAMETER_COUNT_AVAILABLE = 8
 
 DEFAULT_CONFIGURATION = {
     'database': None,
@@ -424,6 +426,7 @@ class ClientFlag(_Flags):
     CAN_HANDLE_EXPIRED_PASSWORDS = 1 << 22
     SESION_TRACK = 1 << 23
     DEPRECATE_EOF = 1 << 24
+    CLIENT_QUERY_ATTRIBUTES = 1 << 27
     SSL_VERIFY_SERVER_CERT = 1 << 30
     REMEMBER_OPTIONS = 1 << 31
 
@@ -454,6 +457,7 @@ class ClientFlag(_Flags):
         'CAN_HANDLE_EXPIRED_PASSWORDS': (1 << 22, "Don't close the connection for a connection with expired password"),
         'SESION_TRACK': (1 << 23, 'Capable of handling server state change information'),
         'DEPRECATE_EOF': (1 << 24, 'Client no longer needs EOF packet'),
+        'CLIENT_QUERY_ATTRIBUTES': (1 << 27, 'Support optional extension for query parameters'),
         'SSL_VERIFY_SERVER_CERT': (1 << 30, ''),
         'REMEMBER_OPTIONS': (1 << 31, ''),
     }
@@ -467,7 +471,7 @@ class ClientFlag(_Flags):
         SECURE_CONNECTION,
         MULTI_STATEMENTS,
         MULTI_RESULTS,
-        CONNECT_ARGS
+        CONNECT_ARGS,
     ]
 
     @classmethod

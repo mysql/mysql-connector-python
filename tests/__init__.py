@@ -786,7 +786,7 @@ def test_skip(reason):
     Python v2.7 (and later) unittest.skip.
     """
     def decorator(test):
-        if not isinstance(test, (type, types.ClassType)):
+        if not isinstance(test, (type)):
             @wraps(test)
             def wrapper(*args, **kwargs):
                 raise SkipTest(reason)
