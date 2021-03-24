@@ -2580,21 +2580,6 @@ class MySQLxTableTests(tests.MySQLxTests):
         result = table.select("cast('{\"a\": 24}' as json) as test").execute()
         self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.JSON)
 
-        result = table.select("cast(age as signed) as test").execute()
-        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.INT)
-
-        result = table.select("cast(age as unsigned) as test").execute()
-        self.assertEqual(result.columns[0].get_type(),
-                         mysqlx.ColumnType.BIGINT)
-
-        result = table.select("cast(age as signed integer) as test").execute()
-        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.INT)
-
-        result = table.select("cast(age as unsigned integer) as "
-                              "test").execute()
-        self.assertEqual(result.columns[0].get_type(),
-                         mysqlx.ColumnType.BIGINT)
-
         result = table.select("cast('12:00:00' as time) as test").execute()
         self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.TIME)
 
