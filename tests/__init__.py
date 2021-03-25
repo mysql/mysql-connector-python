@@ -40,6 +40,7 @@ import platform
 import unittest
 import logging
 import shutil
+import struct
 import subprocess
 import errno
 import traceback
@@ -71,6 +72,7 @@ except ImportError:
     except ImportError:
         pass
 
+ARCH_64BIT = struct.calcsize("P") * 8 == 64
 LOGGER_NAME = "myconnpy_tests"
 LOGGER = logging.getLogger(LOGGER_NAME)
 _CACHED_TESTCASES = []
@@ -510,15 +512,43 @@ def foreach_cnx(*cnx_classes, **extra_config):
     return _use_cnx
 
 
+def foreach_session(**extra_config):
+    def _use_cnx(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            import mysqlx
+            if not hasattr(self, "config"):
+                self.config = get_mysqlx_config()
+            if extra_config:
+                for key, value in extra_config.items():
+                    self.config[key] = value
+            for use_pure in self.use_pure_options:
+                config = self.config.copy()
+                config["use_pure"] = use_pure
+                self.session = mysqlx.get_session(config)
+                self.schema = self.session.get_default_schema()
+                try:
+                    func(self, *args, **kwargs)
+                except Exception as exc:
+                    traceback.print_exc(file=sys.stdout)
+                    raise exc
+                finally:
+                    self.session.close()
+        return wrapper
+    return _use_cnx
+
+
 class MySQLConnectorTests(unittest.TestCase):
 
     def __init__(self, methodName='runTest'):
         from mysql.connector import connection
         self.all_cnx_classes = [connection.MySQLConnection]
+        self.use_pure_options = [True]
         self.maxDiff = 64
         try:
             import _mysql_connector
             from mysql.connector import connection_cext
+            self.use_pure_options.append(False)
         except ImportError:
             self.have_cext = False
         else:
@@ -624,6 +654,13 @@ class MySQLConnectorTests(unittest.TestCase):
             except AttributeError:
                 self.fail("Attribute '{0}' not part of namedtuple {1}".format(
                     attr, tocheck))
+
+    def get_clean_mysql_config(self):
+        config = get_mysql_config()
+        return {
+            opt: config[opt]
+            for opt in ["host", "port", "user", "password", "database"]
+        }
 
 
 class TestsCursor(MySQLConnectorTests):
@@ -745,6 +782,8 @@ class MySQLxTests(MySQLConnectorTests):
 
     def __init__(self, methodName="runTest"):
         super(MySQLxTests, self).__init__(methodName=methodName)
+        from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT
+        self.use_pure_options = [True, False] if HAVE_MYSQLXPB_CEXT else [True]
 
     def run(self, result=None):
         if sys.version_info[0:2] == (2, 6):
