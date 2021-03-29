@@ -41,7 +41,7 @@ from distutils.command.install import install
 from distutils.command.install_lib import install_lib
 from distutils.core import Command
 from distutils.dir_util import mkpath, remove_tree
-from distutils.sysconfig import get_python_version
+from distutils.sysconfig import get_config_vars, get_python_version
 from distutils.version import LooseVersion
 from subprocess import check_call, Popen, PIPE
 
@@ -56,6 +56,9 @@ EDITION = ""
 version_py = os.path.join("lib", "mysql", "connector", "version.py")
 with open(version_py, "rb") as fp:
     exec(compile(fp.read(), version_py, "exec"))
+
+if "MACOSX_DEPLOYMENT_TARGET" in get_config_vars():
+    get_config_vars()["MACOSX_DEPLOYMENT_TARGET"] = "11.0"
 
 COMMON_USER_OPTIONS = [
     ("byte-code-only", None,
