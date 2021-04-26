@@ -8,8 +8,15 @@ Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.25
+=======
+
+This release contains no functional changes and is published to align
+the version number with the MySQL Server 8.0.25 release.
+
 v8.0.24
 =======
+
 - WL#14424: Improve timeout error messages
 - WL#14240: Remove Python 3.5 support
 - WL#14239: Remove Python 2.7 support
@@ -29,6 +36,7 @@ v8.0.24
 
 v8.0.23
 =======
+
 - WL#14263: Add support for SCRAM-SHA-256
 - WL#14238: Deprecate Python 2.7 support
 - WL#14215: Replace language in APIs and source code/docs
