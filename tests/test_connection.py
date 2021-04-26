@@ -3479,7 +3479,7 @@ class WL14237(tests.MySQLConnectorTests):
             res = cur.fetchall()
             # Check that attribute values are correct
             exp = my_value if isinstance(my_value, str) else repr(my_value)
-            if exp == "3.14" and isinstance(self.cnx, CMySQLConnection):
+            if CMySQLConnection and exp == "3.14" and isinstance(self.cnx, CMySQLConnection):
                 exp = '3.140000104904175'
             self.assertIn(exp, res[0][0])
             cur.clear_attributes()
