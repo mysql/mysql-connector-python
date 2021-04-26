@@ -28,6 +28,7 @@
 
 import logging
 import os
+import tempfile
 import tests
 
 from mysql.connector import connect
@@ -214,3 +215,30 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, result)
 
         self.assertRaises(ValueError, connect, option_files='dummy_file.cnf')
+
+    def test_read_option_files_with_include(self):
+        my_cnf_name = 'my.cnf'
+        my_cnf = os.path.join(self.option_file_dir, my_cnf_name)
+        my_overwrite = os.path.join(self.option_file_dir, 'my_overwrite.cnf')
+
+        # Use a temporary file to change the relative path of
+        # include directive to an absolute path
+        my_overwrite_tf = tempfile.NamedTemporaryFile(delete=False)
+        with open(my_overwrite, 'r') as fp:
+            data = fp.read()
+            data = data.replace(my_cnf_name, my_cnf)
+            my_overwrite_tf.write(data.encode())
+
+        result = read_option_files(option_files=my_overwrite_tf.name,
+                                   option_groups='mysqld')
+
+        # option in the overwrite file
+        port_exp = 1002
+        self.assertEqual(port_exp, result['port'])
+
+        # option in the include file
+        user_exp = 'mysql'
+        self.assertEqual(user_exp, result['user'])
+
+        # delete temporary file
+        os.unlink(my_overwrite_tf.name)

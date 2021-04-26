@@ -202,6 +202,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                 raise ValueError("Failed reading file '{0}': {1}".format(
                     file_, str(exc)))
 
+        files.reverse()
         read_files = self.read(files)
         not_read_files = set(files) - set(read_files)
         if not_read_files:
@@ -224,6 +225,10 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                 out_file = io.StringIO()
                 for line in codecs.open(filename, encoding='utf-8'):
                     line = line.strip()
+                    # Skip lines that begin with "!includedir" or "!include"
+                    if line.startswith('!include'):
+                        continue
+
                     match_obj = self.OPTCRE.match(line)
                     if not self.SECTCRE.match(line) and match_obj:
                         optname, delimiter, optval = match_obj.group('option',
