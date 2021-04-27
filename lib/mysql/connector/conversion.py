@@ -274,7 +274,17 @@ class MySQLConverter(MySQLConverterBase):
         add this to support python type pendulum
         related issue to https://github.com/apache/airflow/issues/10795
         """
-        return _datetime_to_mysql(self, value)
+        if value.microsecond:
+            fmt = '{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}.{6:06d}'
+            return fmt.format(
+                value.year, value.month, value.day,
+                value.hour, value.minute, value.second,
+                value.microsecond).encode('ascii')
+
+        fmt = '{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}'
+        return fmt.format(
+            value.year, value.month, value.day,
+            value.hour, value.minute, value.second).encode('ascii')
 
 
     def _datetime_to_mysql(self, value):
