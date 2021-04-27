@@ -268,6 +268,15 @@ class MySQLConverter(MySQLConverterBase):
         """
         return None
 
+    def _pendulum_to_mysql(self, value):
+        """
+        pendulum just perform the same as datetime
+        add this to support python type pendulum
+        related issue to https://github.com/apache/airflow/issues/10795
+        """
+        return _datetime_to_mysql(self, value)
+
+
     def _datetime_to_mysql(self, value):
         """
         Converts a datetime instance to a string suitable for MySQL.
