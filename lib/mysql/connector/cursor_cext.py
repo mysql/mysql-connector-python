@@ -914,7 +914,7 @@ class CMySQLCursorPrepared(CMySQLCursor):
     def execute(self, operation, params=None, multi=False):  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
 
-        This method will preare the given operation and execute it using
+        This method will prepare the given operation and execute it using
         the given parameters.
 
         If the cursor instance already had a prepared statement, it is
