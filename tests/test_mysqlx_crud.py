@@ -1840,6 +1840,17 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.find("age = 21").execute().fetch_one()
         self.assertEqual("George", result["name"])
 
+        doc = {"_id": "5", "name": "Fred", "age": 21}
+        self.assertRaises(
+            mysqlx.ProgrammingError,
+            collection.replace_one, "1", doc
+        )
+        doc = mysqlx.DbDoc({"_id": "5", "name": "Fred", "age": 21})
+        self.assertRaises(
+            mysqlx.ProgrammingError,
+            collection.replace_one, "1", doc
+        )
+
         self.schema.drop_collection(collection_name)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 2), "Upsert not supported")
@@ -1863,11 +1874,22 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         result = collection.find("_id = 'new_id'").execute().fetch_all()
         self.assertEqual(0, len(result))
-        upsert = {"_id": "11", 'name': 'Melissandre', "age": 99999}
+        upsert = {'name': 'Melissandre', "age": 99999}
         collection.add_or_replace_one("new_id", upsert)
         result = collection.find("age = 99999").execute().fetch_one()
         self.assertEqual("Melissandre", result["name"])
         self.assertEqual("new_id", result["_id"])
+
+        doc = {"_id": "5", "name": "Fred", "age": 21}
+        self.assertRaises(
+            mysqlx.ProgrammingError,
+            collection.add_or_replace_one, "1", doc
+        )
+        doc = mysqlx.DbDoc({"_id": "5", "name": "Fred", "age": 21})
+        self.assertRaises(
+            mysqlx.ProgrammingError,
+            collection.add_or_replace_one, "1", doc
+        )
 
         self.schema.drop_collection(collection_name)
 

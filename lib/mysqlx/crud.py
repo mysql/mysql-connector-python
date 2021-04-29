@@ -551,6 +551,11 @@ class Collection(DatabaseObject):
             doc_id (str): Document ID
             doc (:class:`mysqlx.DbDoc` or `dict`): New Document
         """
+        if "_id" in doc and doc["_id"] != doc_id:
+            raise ProgrammingError(
+                "Replacement document has an _id that is different than the "
+                "matched document"
+            )
         return self.modify("_id = :id").set("$", doc) \
                    .bind("id", doc_id).execute()
 
@@ -562,6 +567,11 @@ class Collection(DatabaseObject):
             doc_id (str): Document ID
             doc (:class:`mysqlx.DbDoc` or dict): New Document
         """
+        if "_id" in doc and doc["_id"] != doc_id:
+            raise ProgrammingError(
+                "Replacement document has an _id that is different than the "
+                "matched document"
+            )
         if not isinstance(doc, DbDoc):
             doc = DbDoc(doc)
         return self.add(doc.copy(doc_id)).upsert(True).execute()
