@@ -16,6 +16,7 @@ v8.0.26
 - WL#14237: Support query attributes
 - BUG#32778827: Raise an error if the _id is different when replacing a document
 - BUG#32623479: The X DevAPI returns str for binary types values
+- BUG#32585611: Fix broken links in X DevAPI reference documentation search
 
 v8.0.25
 =======
