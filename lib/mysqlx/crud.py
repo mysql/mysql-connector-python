@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -61,7 +61,7 @@ class DatabaseObject(object):
     """
     def __init__(self, schema, name):
         self._schema = schema
-        self._name = name
+        self._name = name.decode() if isinstance(name, bytes) else name
         self._session = self._schema.get_session()
         self._connection = self._session.get_connection()
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,17 +31,21 @@
 """Unittests for mysqlx.crud
 """
 
+import datetime
+import decimal
 import gc
 import json
 import logging
-import unittest
+import sys
 import threading
 import time
-
+import unittest
 import tests
+
 import mysqlx
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
+ARCH_64BIT = sys.maxsize > 2**32 and sys.platform != "win32"
 
 _CREATE_TEST_TABLE_QUERY = "CREATE TABLE `{0}`.`{1}` (id INT)"
 _INSERT_TEST_TABLE_QUERY = "INSERT INTO `{0}`.`{1}` VALUES ({2})"
@@ -2906,6 +2910,123 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(result.columns, result.get_columns())
 
         drop_table(self.schema, "test")
+
+    def test_column_type(self):
+        self.session.use_pure = True
+        table_name = "column_types"
+        columns_names = (
+            "my_null",
+            "my_bit",
+            "my_tinyint",
+            "my_smallint",
+            "my_mediumint",
+            "my_int",
+            "my_bigint",
+            "my_decimal",
+            "my_float",
+            "my_double",
+            "my_date",
+            "my_time",
+            "my_datetime",
+            "my_year",
+            "my_char",
+            "my_varchar",
+            "my_varbinary",
+            "my_enum",
+            "my_geometry",
+            "my_blob",
+        )
+        create_table_stmt = (
+            f"CREATE TABLE {table_name} ("
+            "id INT NOT NULL AUTO_INCREMENT, "
+            "my_null INT, "
+            "my_bit BIT(7), "
+            "my_tinyint TINYINT, "
+            "my_smallint SMALLINT, "
+            "my_mediumint MEDIUMINT, "
+            "my_int INT, "
+            "my_bigint BIGINT, "
+            "my_decimal DECIMAL(20,10), "
+            "my_float FLOAT, "
+            "my_double DOUBLE, "
+            "my_date DATE, "
+            "my_time TIME, "
+            "my_datetime DATETIME, "
+            "my_year YEAR, "
+            "my_char CHAR(100), "
+            "my_varchar VARCHAR(100), "
+            "my_varbinary VARBINARY(100), "
+            "my_enum ENUM('x-small', 'small', 'medium', 'large', 'x-large'), "
+            "my_geometry GEOMETRY, "
+            "my_blob BLOB, "
+            "PRIMARY KEY (id))"
+        )
+        self.session.sql(create_table_stmt).execute()
+        table = self.schema.get_table(table_name)
+        table.insert(
+            *columns_names
+        ).values(
+            None,
+            124,
+            127,
+            32767,
+            8388607,
+            2147483647,
+            4294967295 if ARCH_64BIT else 2147483647,
+            "1.2",
+            3.14,
+            4.28,
+            "2018-12-31 00:00:00",
+            "12:13:14",
+            "2019-02-04 10:36:03",
+            2019,
+            "abc",
+            "abc",
+            "MySQL 🐬",
+            "x-large",
+            mysqlx.expr("ST_GeomFromText('POINT(21 34)')"),
+            "random blob data",
+        ).execute()
+
+        exp = [
+            None,
+            124,
+            127,
+            32767,
+            8388607,
+            2147483647,
+            4294967295 if ARCH_64BIT else 2147483647,
+            decimal.Decimal("1.2000000000"),
+            3.140000104904175,
+            4.28,
+            datetime.datetime(2018, 12, 31),
+            datetime.timedelta(0, 43994),
+            datetime.datetime(2019, 2, 4, 10, 36, 3),
+            2019,
+            "abc",
+            "abc",
+            b"MySQL \xf0\x9f\x90\xac",
+            b"x-large",
+            b"\x00\x00\x00\x00\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x005"
+            b"@\x00\x00\x00\x00\x00\x00A@",
+            b"random blob data",
+        ]
+
+        row = table.select(*columns_names).execute().fetch_one()
+        self.assertEqual([row[col] for col in columns_names], exp)
+
+        row = self.session.sql(
+            "SELECT {} FROM {}.{}".format(
+                ",".join(columns_names),
+                self.schema.name,
+                table_name,
+            )
+        ).execute().fetch_one()
+        self.assertEqual([row[col] for col in columns_names], exp)
+
+        self.session.sql(
+            f"DROP TABLE IF EXISTS {self.schema.name}.{table_name}"
+        ).execute()
 
     def test_is_view(self):
         table_name = "table_test"

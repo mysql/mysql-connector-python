@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -40,24 +40,17 @@ from .helpers import decode_from_bytes, deprecated
 
 
 # pylint: disable=C0111
-def from_protobuf(col_type, payload):
+def from_protobuf(column, payload):
     if len(payload) == 0:
         return None
 
+    if column.get_type() == ColumnType.STRING:
+        return decode_from_bytes(payload[:-1])  # Strip trailing char
+
     try:
-        return {
-            ColumnProtoType.SINT: varsint_from_protobuf,
-            ColumnProtoType.UINT: varint_from_protobuf,
-            ColumnProtoType.BYTES: bytes_from_protobuf,
-            ColumnProtoType.DATETIME: datetime_from_protobuf,
-            ColumnProtoType.TIME: time_from_protobuf,
-            ColumnProtoType.FLOAT: float_from_protobuf,
-            ColumnProtoType.DOUBLE: double_from_protobuf,
-            ColumnProtoType.BIT: varint_from_protobuf,
-            ColumnProtoType.SET: set_from_protobuf,
-            ColumnProtoType.ENUM: bytes_from_protobuf,
-            ColumnProtoType.DECIMAL: decimal_from_protobuf,
-        }[col_type](payload)
+        return ColumnProtoType.converter_map[
+            column.get_proto_type()
+        ](payload)
     except KeyError as err:
         sys.stderr.write("{0}".format(err))
         sys.stderr.write("{0}".format(payload.encode("hex")))
@@ -66,17 +59,17 @@ def from_protobuf(col_type, payload):
 
 def bytes_from_protobuf(payload):
     # Strip trailing char
-    return decode_from_bytes(payload[:-1])
+    return payload[:-1]
 
 
 def float_from_protobuf(payload):
     assert len(payload) == 4
-    return struct.unpack("<f", payload)
+    return struct.unpack("<f", payload)[0]
 
 
 def double_from_protobuf(payload):
     assert len(payload) == 8
-    return struct.unpack("<d", payload)
+    return struct.unpack("<d", payload)[0]
 
 
 def varint_from_protobuf_stream(payload):
@@ -327,6 +320,20 @@ class ColumnProtoType(object):
     ENUM = 16
     BIT = 17
     DECIMAL = 18
+
+    converter_map = {
+        SINT: varsint_from_protobuf,
+        UINT: varint_from_protobuf,
+        BYTES: bytes_from_protobuf,
+        DATETIME: datetime_from_protobuf,
+        TIME: time_from_protobuf,
+        FLOAT: float_from_protobuf,
+        DOUBLE: double_from_protobuf,
+        BIT: varint_from_protobuf,
+        SET: set_from_protobuf,
+        ENUM: bytes_from_protobuf,
+        DECIMAL: decimal_from_protobuf,
+    }
 
 
 class Flags(object):
@@ -961,9 +968,8 @@ class BufferingResult(BaseResult):
         item = [None] * len(row["field"])
         if not dumping:
             for key in range(len(row["field"])):
-                col = self._columns[key]
-                item[key] = from_protobuf(col.get_proto_type(),
-                                          row["field"][key])
+                column = self._columns[key]
+                item[key] = from_protobuf(column, row["field"][key])
         return Row(self, item)
 
     def _page_in_items(self):
