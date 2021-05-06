@@ -970,7 +970,7 @@ def check_c_extension(exc=None):
 
 
 @lru_cache(maxsize=10, typed=False)
-def is_host_reachable(host):
+def is_host_reachable(host, log=False):
     """Attempts to reach a host, by using the ping command.
     Returns True if success else False.
     """
@@ -978,7 +978,14 @@ def is_host_reachable(host):
     attemps = "1"
     command = ["ping", param_attemps, attemps, host]
     try:
-        return subprocess.call(command) == 0
+        if log:
+            top_dir = os.getcwd()
+            ping_log_path = os.path.join(top_dir, 'ping.log')
+            with open(ping_log_path, 'a+') as ping_log:
+                return subprocess.call(command, stdout=ping_log) == 0
+        else:
+            return subprocess.call(command, stdout=subprocess.DEVNULL) == 0
+
     except OSError:
         return False
 

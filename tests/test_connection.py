@@ -2571,17 +2571,18 @@ class WL13335(tests.MySQLConnectorTests):
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
-                 "Authentication with ldap_simple not supported")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("10.172.166.126"),
-                 "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
-                 "Plugin authentication_ldap_sasl not available")
+                 "Authentication with ldap_sasl not supported")
 class WL14110(tests.MySQLConnectorTests):
     """WL#14110: Add support for SCRAM-SHA-1
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("10.172.166.126"):
+            #Skip if remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket", None)
@@ -2614,24 +2615,31 @@ class WL14110(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_sasl":
+                    if row[1] == "ACTIVE":
+                        available = True
+            if not available:
+                self.skipTest("Plugin authentication_ldap_sasl not available")
 
-        try:
-            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
-            cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
-        except:
-            pass
+            try:
+                cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
+            except:
+                pass
 
-        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
-                      "WITH authentication_ldap_sasl"
-                      "".format(self.user, self.host))
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                          "WITH authentication_ldap_sasl"
+                          "".format(self.user, self.host))
 
-        cnx.cmd_query("CREATE USER '{}'@'{}'"
-                      "".format("common", self.host))
-        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
-                      "".format("common", self.host))
-
-        cnx.close()
+            cnx.cmd_query("CREATE USER '{}'@'{}'"
+                          "".format("common", self.host))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format("common", self.host))
 
     def tearDown(self):
         return
@@ -2645,7 +2653,7 @@ class WL14110(tests.MySQLConnectorTests):
         cnx.close()
 
     @tests.foreach_cnx()
-    def test_authentication_ldap_sasl_client(self):
+    def test_authentication_ldap_sasl_client_with_SCRAM_SHA_1(self):
         """test_authentication_ldap_sasl_client_with_SCRAM-SHA-1"""
         # Not running with c-ext if plugin libraries are not setup
         if self.cnx.__class__ == CMySQLConnection and \
@@ -2700,16 +2708,17 @@ class WL14110(tests.MySQLConnectorTests):
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
                  "Authentication with ldap_simple not supported")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_simple"),
-                 "Plugin authentication_ldap_simple not available")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
-                 "ldap server is not reachable")
 class WL13994(tests.MySQLConnectorTests):
     """WL#13994: Support clear text passwords
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("100.103.18.98"):
+            # Skip test, remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket", None)
@@ -2746,17 +2755,26 @@ class WL13994(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_simple":
+                    if row[1] == "ACTIVE":
+                        available = True
 
-        identified_by = "CN=test1,CN=Users,DC=mysql,DC=local"
+            if not available:
+                self.skipTest("Plugin authentication_ldap_simple not available")
 
-        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
-                      "WITH authentication_ldap_simple AS"
-                      "'{}'".format(self.user, self.host, identified_by))
-        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
-                      "".format(self.user, self.host))
-        cnx.cmd_query("FLUSH PRIVILEGES")
-        cnx.close()
+            identified_by = "CN=test1,CN=Users,DC=mysql,DC=local"
+
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                          "WITH authentication_ldap_simple AS"
+                          "'{}'".format(self.user, self.host, identified_by))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format(self.user, self.host))
+            cnx.cmd_query("FLUSH PRIVILEGES")
 
     def tearDown(self):
         cnx = connection.MySQLConnection(**self.config)
@@ -2862,20 +2880,19 @@ class WL13994(tests.MySQLConnectorTests):
         self.assertRaises(InterfaceError, self.cnx.__class__, **conn_args)
 
 
-plugin_opts = (("authentication_ldap_sasl_auth_method_name", "SCRAM-SHA-256"),)
-@unittest.skipIf(tests.MYSQL_VERSION < (8, 2, 22),
-                 "Authentication with ldap_simple not supported")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.19.5"),
-                 "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl",
-                                               plugin_opts),
-                 "Plugin authentication_ldap_simple not available")
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 22),
+                 "Authentication with ldap_sasl not supported")
 class WL14263(tests.MySQLConnectorTests):
     """WL#14110: Add support for SCRAM-SHA-256
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("100.103.19.5"):
+            # Skip if remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket", None)
@@ -2908,27 +2925,33 @@ class WL14263(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_sasl":
+                    if row[1] == "ACTIVE":
+                        available = True
+            if not available:
+                self.skipTest("Plugin authentication_ldap_sasl not available")
 
-        try:
-            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
-            cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
-        except:
-            pass
+            try:
+                cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
+            except:
+                pass
 
-        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
-                      "WITH authentication_ldap_sasl"
-                      "".format(self.user, self.host))
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                          "WITH authentication_ldap_sasl"
+                          "".format(self.user, self.host))
 
-        cnx.cmd_query("CREATE USER '{}'@'{}'"
-                      "".format("common", self.host))
-        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
-                      "".format("common", self.host))
-
-        cnx.close()
+            cnx.cmd_query("CREATE USER '{}'@'{}'"
+                          "".format("common", self.host))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format("common", self.host))
 
     def tearDown(self):
-        return
         cnx = connection.MySQLConnection(**self.config)
         try:
             cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
@@ -2939,7 +2962,7 @@ class WL14263(tests.MySQLConnectorTests):
         cnx.close()
 
     @tests.foreach_cnx()
-    def test_authentication_ldap_sasl_client(self):
+    def test_authentication_ldap_sasl_client_with_SCRAM_SHA_256(self):
         """test_authentication_ldap_sasl_client_with_SCRAM-SHA-256"""
         # Not running with c-ext if plugin libraries are not setup
         if self.cnx.__class__ == CMySQLConnection and \
@@ -3086,19 +3109,20 @@ class WL13334(tests.MySQLConnectorTests):
         _ = connect(**cnx_config)
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
-                 "Authentication with ldap_simple not supported")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
-                 "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
-                 "Plugin authentication_ldap_sasl not available")
-@unittest.skipIf(os.name == "nt", "Skipping due to GRANT PROXY issue")
+                 "Authentication with sasl GSSAPI not supported")
+@unittest.skipIf(os.name == "nt", "Not available on Windows")
 @unittest.skipIf(gssapi == None, "GSSAPI Module not installed")
 class WL14213(tests.MySQLConnectorTests):
     """WL#14213: Add support for Kerberos authentication.
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("100.103.18.98"):
+            # Skip if remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.user = "test3"
@@ -3133,26 +3157,33 @@ class WL14213(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_sasl":
+                    if row[1] == "ACTIVE":
+                        available = True
+            if not available:
+                self.skipTest("Plugin authentication_ldap_sasl not available")
 
-        try:
-            cnx.cmd_query("DROP USER '{}@{}'".format(self.user, self.host))
-            cnx.cmd_query("DROP USER '{}'".format("mysql_engineering"))
-        except:
-            pass
+            try:
+                cnx.cmd_query("DROP USER '{}@{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'".format("mysql_engineering"))
+            except:
+                pass
 
-        cnx.cmd_query("CREATE USER '{}@{}' IDENTIFIED "
-                      "WITH authentication_ldap_sasl "
-                      "BY \"#testgrp=mysql_engineering\""
-                      "".format(self.user, self.host))
+            cnx.cmd_query("CREATE USER '{}@{}' IDENTIFIED "
+                          "WITH authentication_ldap_sasl "
+                          "BY \"#testgrp=mysql_engineering\""
+                          "".format(self.user, self.host))
 
-        cnx.cmd_query("CREATE USER '{}'".format("mysql_engineering"))
-        cnx.cmd_query("GRANT ALL ON myconnpy.* TO '{}'"
-                      "".format("mysql_engineering"))
-        cnx.cmd_query("GRANT PROXY on '{}' TO '{}@{}'"
-                      "".format("mysql_engineering", self.user, self.host))
-
-        cnx.close()
+            cnx.cmd_query("CREATE USER '{}'".format("mysql_engineering"))
+            cnx.cmd_query("GRANT ALL ON myconnpy.* TO '{}'"
+                          "".format("mysql_engineering"))
+            cnx.cmd_query("GRANT PROXY on '{}' TO '{}@{}'"
+                          "".format("mysql_engineering", self.user, self.host))
 
     def tearDown(self):
         return
