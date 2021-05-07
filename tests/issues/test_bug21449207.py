@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,6 +31,7 @@
 import mysql.connector
 from tests import foreach_cnx, cnx_config
 import tests
+import unittest
 
 
 class Bug21449207(tests.MySQLConnectorTests):
@@ -41,7 +42,7 @@ class Bug21449207(tests.MySQLConnectorTests):
 
         create_table = (
             "CREATE TABLE {0} ("
-            "id INT PRIMARY KEY, "
+            "id INT PRIMARY KEY AUTO_INCREMENT, "
             "a LONGTEXT "
             ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
         cnx.cmd_query(create_table)
@@ -74,6 +75,10 @@ class Bug21449207(tests.MySQLConnectorTests):
         self.assertEqual(exp, row[0])
         self.assertEqual(row[0][-20:], exp[-20:])
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @foreach_cnx()
     def test_16M_compressed(self):
         cur = self.cnx.cursor()

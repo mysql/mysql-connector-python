@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -327,7 +327,7 @@ class TestsCursor(TestsDataTypes):
             "`t_date` DATE,"
             "`t_datetime` DATETIME,"
             "`t_time` TIME,"
-            "`t_timestamp` TIMESTAMP DEFAULT 0,"
+            "`t_timestamp` TIMESTAMP,"
             "`t_year_4` YEAR(4),"
             "PRIMARY KEY (id))"
             ).format(table=tbl)

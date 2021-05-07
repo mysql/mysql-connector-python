@@ -139,6 +139,12 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         # Test with special chars
         schema_name_1 = "myschema%"
         schema_name_2 = "myschema_"
+        schema_1 = self.session.get_schema(schema_name_1)
+        if schema_1.exists_in_database():
+            self.session.drop_schema(schema_name_1)
+        schema_2 = self.session.get_schema(schema_name_2)
+        if schema_2.exists_in_database():
+            self.session.drop_schema(schema_name_2)
         schema_1 = self.session.create_schema(schema_name_1)
         self.assertTrue(schema_1.exists_in_database())
         schema_2 = self.session.create_schema(schema_name_2)
@@ -297,7 +303,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             {"level": True, "schema": json_schema},
         ]
 
-        # Test Schema.create_schema() validation options
+        # Test Schema.create_collection() validation options
         for validation in invalid_options:
             self.assertRaises(mysqlx.ProgrammingError,
                               self.schema.create_collection,
@@ -2532,6 +2538,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_exists_in_database(self):
         table_name = "table_test"
+        drop_table(self.schema, table_name)
         try:
             sql = _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
             self.session.sql(sql).execute()
@@ -2543,6 +2550,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_select(self):
         table_name = "{0}.test".format(self.schema_name)
+        drop_table(self.schema, table_name)
 
         self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
                          "".format(table_name)).execute()
@@ -2627,8 +2635,13 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         self.schema.drop_collection("test")
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_having(self):
         table_name = "{0}.test".format(self.schema_name)
+        drop_table(self.schema, "test")
 
         self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50), "
                          "gender CHAR(1))".format(table_name)).execute()
@@ -2665,10 +2678,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test")
 
     def test_insert(self):
-        self.session.sql("CREATE TABLE {0}.test(age INT, name "
+        drop_table(self.schema, "test1")
+
+        self.session.sql("CREATE TABLE {0}.test1(age INT, name "
                          "VARCHAR(50), gender CHAR(1))"
                          "".format(self.schema_name)).execute()
-        table = self.schema.get_table("test")
+        table = self.schema.get_table("test1")
 
         result = table.insert("age", "name") \
             .values(21, 'Fred') \
@@ -2695,9 +2710,11 @@ class MySQLxTableTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(7, len(rows))
 
-        drop_table(self.schema, "test")
+        drop_table(self.schema, "test1")
 
     def test_update(self):
+        drop_table(self.schema, "test")
+
         self.session.sql("CREATE TABLE {0}.test(age INT, name "
                          "VARCHAR(50), gender CHAR(1), `info` json DEFAULT NULL)"
                          "".format(self.schema_name)).execute()
@@ -2731,6 +2748,10 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_delete(self):
         table_name = "table_test"
+        drop_table(self.schema, table_name)
+
+        drop_table(self.schema, table_name)
+
         self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
         self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
@@ -2753,6 +2774,8 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_count(self):
         table_name = "table_test"
+        drop_table(self.schema, table_name)
+
         self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
         self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
@@ -2765,6 +2788,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_results(self):
         table_name = "{0}.test".format(self.schema_name)
+        drop_table(self.schema, "test")
 
         self.session.sql("CREATE TABLE {0}(age INT, name VARCHAR(50))"
                          "".format(table_name)).execute()
@@ -2820,6 +2844,8 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test")
 
     def test_multiple_resultsets(self):
+        self.session.sql("DROP PROCEDURE IF EXISTS {0}.spProc"
+                         "".format(self.schema_name)).execute()
         self.session.sql("CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "
                          "SELECT 2; SELECT 'a'; END"
                          "".format(self.schema_name)).execute()
@@ -2844,6 +2870,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_auto_inc_value(self):
         table_name = "{0}.test".format(self.schema_name)
+        drop_table(self.schema, "test")
 
         self.session.sql(
             "CREATE TABLE {0}(id INT KEY AUTO_INCREMENT, name VARCHAR(50))"
@@ -2857,8 +2884,13 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         drop_table(self.schema, "test")
 
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (8, 0, 19),
+        "Time zones in TIMETAMP are only available in MySQL servers +8.0.19",
+    )
     def test_column_metadata(self):
         table_name = "{0}.test".format(self.schema_name)
+        drop_table(self.schema, "test")
 
         self.session.sql(
             "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
@@ -2934,8 +2966,11 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test")
 
     def test_column_type(self):
-        self.session.use_pure = True
         table_name = "column_types"
+        self.session.use_pure = True
+        self.session.sql(
+            f"DROP TABLE IF EXISTS {self.schema.name}.{table_name}"
+        ).execute()
         columns_names = (
             "my_null",
             "my_bit",
@@ -3053,6 +3088,9 @@ class MySQLxTableTests(tests.MySQLxTests):
     def test_is_view(self):
         table_name = "table_test"
         view_name = "view_test"
+        drop_table(self.schema, table_name)
+        drop_view(self.schema, view_name)
+
         self.session.sql(_CREATE_TEST_TABLE_QUERY.format(
             self.schema_name, table_name)).execute()
         self.session.sql(_INSERT_TEST_TABLE_QUERY.format(
@@ -3080,6 +3118,8 @@ class MySQLxTableTests(tests.MySQLxTests):
             stmt.repeated == repeated and stmt.exec_counter == exec_counter
 
         table_name = "prepared_table_test"
+        drop_table(schema, table_name)
+
         session.sql("CREATE TABLE {}.{}(id INT KEY AUTO_INCREMENT, "
                     "name VARCHAR(50), age INT)"
                     "".format(self.schema_name, table_name)).execute()
@@ -3237,6 +3277,8 @@ class MySQLxViewTests(tests.MySQLxTests):
         except mysqlx.Error as err:
             self.fail("{0}".format(err))
         self.schema = self.session.get_schema(self.schema_name)
+        drop_table(self.schema, self.table_name)
+        drop_view(self.schema, self.view_name)
 
     def tearDown(self):
         drop_table(self.schema, self.table_name)
@@ -3284,6 +3326,10 @@ class MySQLxViewTests(tests.MySQLxTests):
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_having(self):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 

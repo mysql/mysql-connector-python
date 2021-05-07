@@ -136,6 +136,7 @@ MESSAGES = {
 
 OPTIONS_INIT = False
 
+MYSQL_EXTERNAL_SERVER = False
 MYSQL_SERVERS_NEEDED = 1
 MYSQL_SERVERS = []
 MYSQL_VERSION = ()
@@ -1000,8 +1001,20 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
 
     Returns True if plugin an success else False.
     """
-    available = False
     server = in_server if in_server else MYSQL_SERVERS[0]
+    if MYSQL_EXTERNAL_SERVER:
+        from mysql.connector import MySQLConnection
+        config = server.client_config.copy()
+        del config["database"]
+        with MySQLConnection(**config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            for row in res[0]:
+                if row[0] == plugin_name and row[1] == "ACTIVE":
+                    return True
+        return False
+
+    available = False
     plugin_config_vars = config_vars if config_vars else []
     server_cnf = server._cnf
     server_cnf_bkp = server._cnf

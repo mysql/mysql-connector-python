@@ -463,6 +463,10 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_change_user(self):
         connect_kwargs = self.connect_kwargs.copy()
         cnx = CMySQLConnection(**connect_kwargs)
@@ -737,7 +741,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy.connect(**config)
 
-        if os.name == 'posix':
+        if os.name == 'posix' and not tests.MYSQL_EXTERNAL_SERVER:
             # On POSIX systems we would be connected by UNIX socket
             self.assertTrue('via UNIX socket' in cmy.get_host_info())
 

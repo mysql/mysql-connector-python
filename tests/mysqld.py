@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -834,6 +834,7 @@ class DummyMySQLRequestHandler(BaseRequestHandler):
         self._server_replies = self._server_replies[bufsize:]
         return res
 
+
 class DummyMySQLServer(ThreadingMixIn, TCPServer):
     """Class accepting connections for testing MySQL connections"""
 
@@ -863,3 +864,53 @@ class DummyMySQLServer(ThreadingMixIn, TCPServer):
 
     def get_address(self):
         return 'dummy'
+
+
+class MySQLExternalServer:
+    """Class for managing an external MySQL Server."""
+
+    def __init__(self, cnf, name):
+        self.cnf = cnf
+        self.name = name
+        self.version = None
+        self.license = None
+
+        self.bind_address = None
+        self.unix_socket = None
+        self.mysqlx_unix_socket = None
+        self.pid_file = None
+        self.client_config = {}
+        self.xplugin_config = {}
+
+    def _exit_with_unsupported_operation(self):
+        LOGGER.error(
+            "Operation not supported when using an external MySQL server"
+        )
+        sys.exit(1)
+
+    def bootstrap(self):
+        self._exit_with_unsupported_operation()
+
+    def check_running(self, pid=None):
+        self._exit_with_unsupported_operation()
+
+    def start(self, **kwargs):
+        self._exit_with_unsupported_operation()
+
+    def stop(self):
+        self._exit_with_unsupported_operation()
+
+    def remove(self):
+        self._exit_with_unsupported_operation()
+
+    def get_exec(self, exec_name):
+        self._exit_with_unsupported_operation()
+
+    def update_config(self, **kwargs):
+        self._exit_with_unsupported_operation()
+
+    def wait_up(self, tries=10, delay=1):
+        self._exit_with_unsupported_operation()
+
+    def wait_down(self, tries=10, delay=1):
+        self._exit_with_unsupported_operation()

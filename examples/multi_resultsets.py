@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -52,7 +52,7 @@ def main(config):
         "CREATE TABLE names ("
         "    id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT, "
         "    name VARCHAR(30) DEFAULT '' NOT NULL, "
-        "    info TEXT DEFAULT '', "
+        "    info TEXT, "
         "    age TINYINT UNSIGNED DEFAULT '30', "
         "    PRIMARY KEY (id))"
     )
