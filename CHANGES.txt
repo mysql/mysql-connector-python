@@ -10,11 +10,13 @@ Full release notes:
 
 v8.0.25
 =======
-- WL#14542: Deprecate TLS 1.0 and 1.1
-- WL#14440: Support for authentication_kerberos_client authentication plugin
+
+This release contains no functional changes and is published to align
+the version number with the MySQL Server 8.0.25 release.
 
 v8.0.24
 =======
+
 - WL#14424: Improve timeout error messages
 - WL#14240: Remove Python 3.5 support
 - WL#14239: Remove Python 2.7 support
@@ -34,6 +36,7 @@ v8.0.24
 
 v8.0.23
 =======
+
 - WL#14263: Add support for SCRAM-SHA-256
 - WL#14238: Deprecate Python 2.7 support
 - WL#14215: Replace language in APIs and source code/docs
