@@ -1959,24 +1959,203 @@ error:
 PyObject*
 MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
 {
-	PyObject *buffered= NULL, *raw= NULL, *raw_as_string= NULL;
+	PyObject *buffered= NULL, *raw= NULL, *raw_as_string= NULL,
+             *query_attrs= NULL, *retval= NULL;
 	int res= 0, stmt_length;
 	char *stmt= NULL;
 	static char *kwlist[]=
 	{
 	    "statement", "buffered", "raw",
-	    "raw_as_string", NULL
+	    "raw_as_string", "query_attrs", NULL
 	};
 
     IS_CONNECTED(self);
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O!O!O!", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O!O!O!O!", kwlist,
                                      &stmt, &stmt_length,
                                      &PyBool_Type, &buffered,
                                      &PyBool_Type, &raw,
-                                     &PyBool_Type, &raw_as_string))
+                                     &PyBool_Type, &raw_as_string,
+                                     &PyList_Type, &query_attrs))
     {
         return NULL;
+    }
+
+    MYSQL_BIND *mybinds = NULL;
+    struct MySQL_binding *bindings = NULL;
+    Py_ssize_t size = 0;
+    if ((query_attrs != NULL) && PyList_Size(query_attrs)) {
+        size = PyList_Size(query_attrs);
+        mybinds = calloc(size, sizeof(MYSQL_BIND));
+        bindings = calloc(size, sizeof(struct MySQL_binding));
+        const char **names = calloc(size, sizeof(char *));
+        PyObject *retval = NULL;
+        int i = 0, res = 0;
+
+        for (i = 0; i < (int) size; i++) {
+            struct MySQL_binding *pbind = &bindings[i];
+            MYSQL_BIND *mbind = &mybinds[i];
+            PyObject *attr_tuple = PyList_GetItem(query_attrs, i);
+            PyObject *attr_name = PyTuple_GetItem(attr_tuple, 0);
+            names[i] = PyUnicode_AsUTF8(attr_name);
+            PyObject *value = PyTuple_GetItem(attr_tuple, 1);
+
+            if (value == NULL) {
+                goto cleanup;
+            }
+
+            /* None is SQL's NULL */
+            if (value == Py_None) {
+                mbind->buffer_type = MYSQL_TYPE_NULL;
+                mbind->buffer = "NULL";
+                mbind->is_null = (bool_ *) 1;
+                continue;
+            }
+
+            /* LONG */
+            if (PyLong_Check(value)) {
+                pbind->buffer.l = PyLong_AsLong(value);
+                mbind->buffer = &pbind->buffer.l;
+#if LONG_MAX >= INT64_T_MAX
+                mbind->buffer_type = MYSQL_TYPE_LONGLONG;
+#else
+                mbind->buffer_type = MYSQL_TYPE_LONG;
+#endif
+                mbind->is_null = (bool_ *) 0;
+                mbind->length = sizeof(mbind->buffer_type);
+                continue;
+            }
+
+            /* FLOAT */
+            if (PyFloat_Check(value)) {
+                pbind->buffer.f = (float) PyFloat_AsDouble(value);
+                mbind->buffer = &pbind->buffer.f;
+                mbind->buffer_type = MYSQL_TYPE_FLOAT;
+                mbind->is_null = (bool_ *) 0;
+                mbind->length = 0;
+                continue;
+            }
+
+            /* STRING */
+            if (PyUnicode_Check(value) || PyUnicode_Check(value) || PyBytes_Check(value)) {
+                pbind->str_value = value;
+                mbind->buffer_type = MYSQL_TYPE_STRING;
+            }
+                /* DATETIME */
+            else if (PyDateTime_Check(value)) {
+                MYSQL_TIME *datetime = &pbind->buffer.t;
+                datetime->year = PyDateTime_GET_YEAR(value);
+                datetime->month = PyDateTime_GET_MONTH(value);
+                datetime->day = PyDateTime_GET_DAY(value);
+                datetime->hour = PyDateTime_DATE_GET_HOUR(value);
+                datetime->minute = PyDateTime_DATE_GET_MINUTE(value);
+                datetime->second = PyDateTime_DATE_GET_SECOND(value);
+                if (PyDateTime_DATE_GET_MICROSECOND(value)) {
+                    datetime->second_part = PyDateTime_DATE_GET_MICROSECOND(value);
+                } else {
+                    datetime->second_part = 0;
+                }
+
+                mbind->buffer_type = MYSQL_TYPE_DATETIME;
+                mbind->buffer = datetime;
+                mbind->is_null = (bool_ *) 0;
+                continue;
+            }
+                /* DATE */
+            else if (PyDate_CheckExact(value)) {
+                MYSQL_TIME *date = &pbind->buffer.t;
+                date->year = PyDateTime_GET_YEAR(value);
+                date->month = PyDateTime_GET_MONTH(value);
+                date->day = PyDateTime_GET_DAY(value);
+
+                mbind->buffer_type = MYSQL_TYPE_DATE;
+                mbind->buffer = date;
+                mbind->is_null = (bool_ *) 0;
+                continue;
+            }
+                /* TIME */
+            else if (PyTime_Check(value)) {
+                MYSQL_TIME *time = &pbind->buffer.t;
+                time->hour = PyDateTime_TIME_GET_HOUR(value);
+                time->minute = PyDateTime_TIME_GET_MINUTE(value);
+                time->second = PyDateTime_TIME_GET_SECOND(value);
+                if (PyDateTime_TIME_GET_MICROSECOND(value)) {
+                    time->second_part = PyDateTime_TIME_GET_MICROSECOND(value);
+                } else {
+                    time->second_part = 0;
+                }
+
+                mbind->buffer_type = MYSQL_TYPE_TIME;
+                mbind->buffer = time;
+                mbind->is_null = (bool_ *) 0;
+                mbind->length = 0;
+                continue;
+            }
+                /* datetime.timedelta is TIME */
+            else if (PyDelta_CheckExact(value)) {
+                MYSQL_TIME *time = &pbind->buffer.t;
+                time->hour = PyDateTime_TIME_GET_HOUR(value);
+                time->minute = PyDateTime_TIME_GET_MINUTE(value);
+                time->second = PyDateTime_TIME_GET_SECOND(value);
+                if (PyDateTime_TIME_GET_MICROSECOND(value)) {
+                    time->second_part = PyDateTime_TIME_GET_MICROSECOND(value);
+                } else {
+                    time->second_part = 0;
+                }
+
+                mbind->buffer_type = MYSQL_TYPE_TIME;
+                mbind->buffer = time;
+                mbind->is_null = (bool_ *) 0;
+                mbind->length = 0;
+                continue;
+            }
+                /* DECIMAL */
+            else if (strcmp((value)->ob_type->tp_name, "decimal.Decimal") == 0) {
+                pbind->str_value = pytomy_decimal(value);
+                mbind[i].buffer_type = MYSQL_TYPE_DECIMAL;
+            } else {
+                PyErr_Format(PyExc_ValueError,
+                             "Python type %s cannot be converted",
+                             (value)->ob_type->tp_name);
+                goto cleanup;
+            }
+
+            if (!pbind->str_value) {
+                PyErr_Format(PyExc_ValueError,
+                             "Failed converting Python '%s'",
+                             (value)->ob_type->tp_name);
+                goto cleanup;
+            }
+
+            /* Some conversions could return None instead of raising errors */
+            if (pbind->str_value == Py_None) {
+                mbind->buffer = "NULL";
+                mbind->buffer_type = MYSQL_TYPE_NULL;
+                mbind->is_null = (bool_ *) 0;
+            } else if (PyBytes_Check(pbind->str_value)) {
+                mbind->buffer = PyBytes_AsString(pbind->str_value);
+                mbind->buffer_length = (unsigned long) PyBytes_Size(pbind->str_value);
+                mbind->length = &mbind->buffer_length;
+                mbind->is_null = (bool_ *) 0;
+            } else if (PyUnicode_Check(pbind->str_value)) {
+                Py_ssize_t len;
+                mbind->buffer = PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
+                mbind->buffer_length = (unsigned long) len;
+                mbind->length = &mbind->buffer_length;
+                mbind->is_null = (bool_ *) 0;
+            } else {
+                PyErr_SetString(PyExc_ValueError,
+                                "Failed to bind query attribute");
+                goto cleanup;
+            }
+        }
+        int status;
+        /* bind attributes */
+        status = mysql_bind_param(&self->session, (int) size, mybinds, names);
+        if (status) {
+            PyErr_SetString(PyExc_ValueError,
+                            "Failed to bind query attributes");
+            goto cleanup;
+        }
     }
 
     Py_BEGIN_ALLOW_THREADS
@@ -2020,7 +2199,21 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
 	}
 
     mysql_get_character_set_info(&self->session, &self->cs);
-    return MySQL_handle_result(self);
+    retval = MySQL_handle_result(self);
+
+cleanup:
+    for (int i = 0; i < size; i++) {
+        switch (mybinds[i].buffer_type) {
+            case MYSQL_TYPE_DECIMAL:
+                Py_XDECREF(bindings[i].str_value);
+                break;
+            default:
+                break;
+        }
+    }
+    if (bindings != NULL) free(bindings);
+    if (mybinds != NULL) free(mybinds);
+    return retval;
 }
 
 /**
@@ -2993,7 +3186,6 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
     PyObject *value;
     PyObject *retval= NULL;
     int i= 0, res= 0;
-
 
     for (i= 0; i < size; i++)
     {

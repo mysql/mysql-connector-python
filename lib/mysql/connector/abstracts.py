@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,9 +29,11 @@
 """Module gathering all abstract base classes"""
 
 from abc import ABCMeta, abstractmethod, abstractproperty
+from decimal import Decimal
+from time import sleep
+from datetime import date, datetime, time, timedelta
 import os
 import re
-import time
 import weakref
 TLS_V1_3_SUPPORTED = False
 try:
@@ -67,6 +69,9 @@ KRB_SERVICE_PINCIPAL_ERROR = (
     '"primary/instance@realm" e.g "ldap/ldapauth@MYSQL.COM" where "@realm" '
     'is optional and if it is not given will be assumed to belong to the '
     'default realm, as configured in the krb5.conf file.')
+
+MYSQL_PY_TYPES = (
+    (int, str, bytes, Decimal, float, datetime, date, timedelta, time,))
 
 
 @make_abc(ABCMeta)
@@ -111,6 +116,7 @@ class MySQLConnectionAbstract(object):
             DEFAULT_CONFIGURATION["allow_local_infile_in_path"])
 
         self._prepared_statements = None
+        self._query_attrs = []
 
         self._ssl_active = False
         self._auth_plugin = None
@@ -1033,7 +1039,7 @@ class MySQLConnectionAbstract(object):
                           "attempt(s): {1}".format(attempts, str(err))
                     raise errors.InterfaceError(msg)
             if delay > 0:
-                time.sleep(delay)
+                sleep(delay)
 
     @abstractmethod
     def is_connected(self):
@@ -1453,3 +1459,30 @@ class MySQLCursorAbstract(object):
     def fetchwarnings(self):
         """Returns Warnings."""
         return self._warnings
+
+    def get_attributes(self):
+        """Get the added query attributes so far."""
+        if hasattr(self, "_cnx"):
+            return self._cnx._query_attrs
+        elif hasattr(self, "_connection"):
+            return self._connection._query_attrs
+
+    def add_attribute(self, name, value):
+        """Add a query attribute and his value."""
+        if not isinstance(name, str):
+            raise errors.ProgrammingError(
+                "Parameter `name` must be a string type.")
+        if value is not None and not isinstance(value, MYSQL_PY_TYPES):
+            raise errors.ProgrammingError(
+                f"Object {value} cannot be converted to a MySQL type.")
+        if hasattr(self, "_cnx"):
+            self._cnx._query_attrs.append((name, value))
+        elif hasattr(self, "_connection"):
+            self._connection._query_attrs.append((name, value))
+
+    def clear_attributes(self):
+        """Remove all the query attributes."""
+        if hasattr(self, "_cnx"):
+            self._cnx._query_attrs = []
+        elif hasattr(self, "_connection"):
+            self._connection._query_attrs = []

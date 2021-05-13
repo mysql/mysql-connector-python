@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1519,12 +1519,16 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Note that for an empty string "" value the server stores a Null value
         expected_attrs["quash"] = "None"
         for row in rows:
-            self.assertEqual(expected_attrs[row.get_string('ATTR_NAME')],
-                             row.get_string('ATTR_VALUE'),
+            attr_name, attr_value = (
+                row["ATTR_NAME"].decode(),
+                row["ATTR_VALUE"].decode() if row['ATTR_VALUE'] else "None",
+            )
+            self.assertEqual(expected_attrs[attr_name],
+                             attr_value,
                              "Attribute {} with value {} differs of {}".format(
-                                 row.get_string('ATTR_NAME'),
-                                 row.get_string('ATTR_VALUE'),
-                                 expected_attrs[row.get_string('ATTR_NAME')]))
+                                 attr_name,
+                                 attr_value,
+                                 expected_attrs[attr_name]))
 
         # Verify connection-attributes can be skiped to be set on server
         # by URI as "connection_attributes"=false

@@ -29,17 +29,20 @@
 """Implementing communication with MySQL servers.
 """
 
+from decimal import Decimal
 from io import IOBase
+import datetime
 import logging
 import os
 import platform
 import socket
+import struct
 import time
 import warnings
 
 from .authentication import get_auth_plugin
 from .constants import (
-    ClientFlag, ServerCmd, ServerFlag,
+    ClientFlag, ServerCmd, ServerFlag, FieldType,
     flag_is_set, ShutdownType, NET_BUFFER_LENGTH
 )
 
@@ -52,7 +55,7 @@ from .cursor import (
     MySQLCursorBufferedNamedTuple)
 from .network import MySQLUnixSocket, MySQLTCPSocket
 from .protocol import MySQLProtocol
-from .utils import int4store, linux_distribution
+from .utils import int1store, int4store, lc_int, linux_distribution
 from .abstracts import MySQLConnectionAbstract
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -102,6 +105,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._auth_plugin = None
         self._krb_service_principal = None
         self._pool_config_version = None
+        self._query_attrs_supported = False
 
         self._columns_desc = []
 
@@ -178,6 +182,10 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if handshake['capabilities'] & ClientFlag.PLUGIN_AUTH:
             self.set_client_flags([ClientFlag.PLUGIN_AUTH])
+
+        if handshake['capabilities'] & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
+            self._query_attrs_supported = True
+            self.set_client_flags([ClientFlag.CLIENT_QUERY_ATTRIBUTES])
 
         self._handshake = handshake
 
@@ -755,8 +763,85 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a tuple()
         """
-        if not isinstance(query, bytes):
-            query = query.encode('utf-8')
+        if not isinstance(query, bytearray):
+            if isinstance(query, str):
+                query = query.encode('utf-8')
+            query = bytearray(query)
+        # Prepare query attrs
+        charset = self.charset if self.charset != "utf8mb4" else "utf8"
+        packet = bytearray()
+        if not self._query_attrs_supported and self._query_attrs:
+            warnings.warn(
+                "This version of the server does not support Query Attributes",
+                category=Warning)
+        if self._client_flags & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
+            names = []
+            types = []
+            values = []
+            null_bitmap = [0] * ((len(self._query_attrs) + 7) // 8)
+            for pos, attr_tuple in enumerate(self._query_attrs):
+                value = attr_tuple[1]
+                flags = 0
+                if value is None:
+                    null_bitmap[(pos // 8)] |= 1 << (pos % 8)
+                    types.append(int1store(FieldType.NULL) +
+                                 int1store(flags))
+                    continue
+                elif isinstance(value, int):
+                    (packed, field_type,
+                     flags) = self._protocol._prepare_binary_integer(value)
+                    values.append(packed)
+                elif isinstance(value, str):
+                    value = value.encode(charset)
+                    values.append(lc_int(len(value)) + value)
+                    field_type = FieldType.VARCHAR
+                elif isinstance(value, bytes):
+                    values.append(lc_int(len(value)) + value)
+                    field_type = FieldType.BLOB
+                elif isinstance(value, Decimal):
+                    values.append(
+                        lc_int(len(str(value).encode(
+                            charset))) + str(value).encode(charset))
+                    field_type = FieldType.DECIMAL
+                elif isinstance(value, float):
+                    values.append(struct.pack('<d', value))
+                    field_type = FieldType.DOUBLE
+                elif isinstance(value, (datetime.datetime, datetime.date)):
+                    (packed, field_type) = \
+                       self._protocol._prepare_binary_timestamp(value)
+                    values.append(packed)
+                elif isinstance(value, (datetime.timedelta, datetime.time)):
+                    (packed, field_type) = \
+                       self._protocol._prepare_binary_time(value)
+                    values.append(packed)
+                else:
+                    raise errors.ProgrammingError(
+                        "MySQL binary protocol can not handle "
+                        "'{classname}' objects".format(
+                            classname=value.__class__.__name__))
+                types.append(int1store(field_type) +
+                             int1store(flags))
+                name = attr_tuple[0].encode(charset)
+                names.append(lc_int(len(name)) + name)
+
+            # int<lenenc>    parameter_count    Number of parameters
+            packet.extend(lc_int(len(self._query_attrs)))
+            # int<lenenc>    parameter_set_count    Number of parameter sets.
+            # Currently always 1
+            packet.extend(lc_int(1))
+            if values:
+                packet.extend(
+                    b''.join([struct.pack('B', bit) for bit in null_bitmap]) +
+                    int1store(1))
+                for _type, name in zip(types, names):
+                    packet.extend(_type)
+                    packet.extend(name)
+
+                for value in values:
+                    packet.extend(value)
+
+        packet.extend(query)
+        query = bytes(packet)
         try:
             result = self._handle_result(self._send_cmd(ServerCmd.QUERY, query))
         except errors.ProgrammingError as err:
@@ -789,13 +874,23 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a generator.
         """
+        packet = bytearray()
         if not isinstance(statements, bytearray):
             if isinstance(statements, str):
                 statements = statements.encode('utf8')
             statements = bytearray(statements)
 
+        if self._client_flags & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
+            # int<lenenc>    parameter_count    Number of parameters
+            packet.extend(lc_int(0))
+            # int<lenenc>    parameter_set_count    Number of parameter sets.
+            # Currently always 1
+            packet.extend(lc_int(1))
+
+        packet.extend(statements)
+        query = bytes(packet)
         # Handle the first query result
-        yield self._handle_result(self._send_cmd(ServerCmd.QUERY, statements))
+        yield self._handle_result(self._send_cmd(ServerCmd.QUERY, query))
 
         # Handle next results, if any
         while self._have_next_result:
@@ -1266,10 +1361,18 @@ class MySQLConnection(MySQLConnectionAbstract):
                     self.cmd_stmt_send_long_data(statement_id, param_id,
                                                  data[param_id])
                     long_data_used[param_id] = (binary,)
-
-        execute_packet = self._protocol.make_stmt_execute(
-            statement_id, data, tuple(parameters), flags,
-            long_data_used, self.charset)
+        if not self._query_attrs_supported and self._query_attrs:
+            warnings.warn(
+                "This version of the server does not support Query Attributes",
+                category=Warning)
+        if self._client_flags & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
+            execute_packet = self._protocol.make_stmt_execute(
+                statement_id, data, tuple(parameters), flags,
+                long_data_used, self.charset, self._query_attrs)
+        else:
+            execute_packet = self._protocol.make_stmt_execute(
+                statement_id, data, tuple(parameters), flags,
+                long_data_used, self.charset)
         packet = self._send_cmd(ServerCmd.STMT_EXECUTE, packet=execute_packet)
         result = self._handle_binary_result(packet)
         return result

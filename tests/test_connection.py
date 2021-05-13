@@ -35,12 +35,14 @@ import logging
 import platform
 import timeit
 import unittest
-from decimal import Decimal
 import io
 import socket
 import subprocess
 import sys
+import warnings
 from time import sleep
+from datetime import datetime, time
+from decimal import Decimal
 
 try:
     import gssapi
@@ -59,8 +61,8 @@ except ImportError:
     HAVE_CMYSQL = False
 
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
-from mysql.connector import (connect, connection, network, errors,
-                             constants, cursor, abstracts, HAVE_DNSPYTHON)
+from mysql.connector import (abstracts, connect, connection, constants, cursor,
+                              errors, HAVE_DNSPYTHON, network, MySQLConnection)
 from mysql.connector.errors import InterfaceError, ProgrammingError
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.network import TLS_V1_3_SUPPORTED
@@ -2569,17 +2571,18 @@ class WL13335(tests.MySQLConnectorTests):
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
-                 "Authentication with ldap_simple not supported")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("10.172.166.126"),
-                 "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
-                 "Plugin authentication_ldap_sasl not available")
+                 "Authentication with ldap_sasl not supported")
 class WL14110(tests.MySQLConnectorTests):
     """WL#14110: Add support for SCRAM-SHA-1
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("10.172.166.126"):
+            #Skip if remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket", None)
@@ -2612,24 +2615,31 @@ class WL14110(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_sasl":
+                    if row[1] == "ACTIVE":
+                        available = True
+            if not available:
+                self.skipTest("Plugin authentication_ldap_sasl not available")
 
-        try:
-            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
-            cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
-        except:
-            pass
+            try:
+                cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
+            except:
+                pass
 
-        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
-                      "WITH authentication_ldap_sasl"
-                      "".format(self.user, self.host))
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                          "WITH authentication_ldap_sasl"
+                          "".format(self.user, self.host))
 
-        cnx.cmd_query("CREATE USER '{}'@'{}'"
-                      "".format("common", self.host))
-        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
-                      "".format("common", self.host))
-
-        cnx.close()
+            cnx.cmd_query("CREATE USER '{}'@'{}'"
+                          "".format("common", self.host))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format("common", self.host))
 
     def tearDown(self):
         return
@@ -2643,7 +2653,7 @@ class WL14110(tests.MySQLConnectorTests):
         cnx.close()
 
     @tests.foreach_cnx()
-    def test_authentication_ldap_sasl_client(self):
+    def test_authentication_ldap_sasl_client_with_SCRAM_SHA_1(self):
         """test_authentication_ldap_sasl_client_with_SCRAM-SHA-1"""
         # Not running with c-ext if plugin libraries are not setup
         if self.cnx.__class__ == CMySQLConnection and \
@@ -2698,16 +2708,17 @@ class WL14110(tests.MySQLConnectorTests):
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
                  "Authentication with ldap_simple not supported")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_simple"),
-                 "Plugin authentication_ldap_simple not available")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
-                 "ldap server is not reachable")
 class WL13994(tests.MySQLConnectorTests):
     """WL#13994: Support clear text passwords
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("100.103.18.98"):
+            # Skip test, remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket", None)
@@ -2744,17 +2755,26 @@ class WL13994(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_simple":
+                    if row[1] == "ACTIVE":
+                        available = True
 
-        identified_by = "CN=test1,CN=Users,DC=mysql,DC=local"
+            if not available:
+                self.skipTest("Plugin authentication_ldap_simple not available")
 
-        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
-                      "WITH authentication_ldap_simple AS"
-                      "'{}'".format(self.user, self.host, identified_by))
-        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
-                      "".format(self.user, self.host))
-        cnx.cmd_query("FLUSH PRIVILEGES")
-        cnx.close()
+            identified_by = "CN=test1,CN=Users,DC=mysql,DC=local"
+
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                          "WITH authentication_ldap_simple AS"
+                          "'{}'".format(self.user, self.host, identified_by))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format(self.user, self.host))
+            cnx.cmd_query("FLUSH PRIVILEGES")
 
     def tearDown(self):
         cnx = connection.MySQLConnection(**self.config)
@@ -2860,20 +2880,19 @@ class WL13994(tests.MySQLConnectorTests):
         self.assertRaises(InterfaceError, self.cnx.__class__, **conn_args)
 
 
-plugin_opts = (("authentication_ldap_sasl_auth_method_name", "SCRAM-SHA-256"),)
-@unittest.skipIf(tests.MYSQL_VERSION < (8, 2, 22),
-                 "Authentication with ldap_simple not supported")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.19.5"),
-                 "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl",
-                                               plugin_opts),
-                 "Plugin authentication_ldap_simple not available")
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 22),
+                 "Authentication with ldap_sasl not supported")
 class WL14263(tests.MySQLConnectorTests):
     """WL#14110: Add support for SCRAM-SHA-256
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("100.103.19.5"):
+            # Skip if remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket", None)
@@ -2906,27 +2925,33 @@ class WL14263(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_sasl":
+                    if row[1] == "ACTIVE":
+                        available = True
+            if not available:
+                self.skipTest("Plugin authentication_ldap_sasl not available")
 
-        try:
-            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
-            cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
-        except:
-            pass
+            try:
+                cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
+            except:
+                pass
 
-        cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
-                      "WITH authentication_ldap_sasl"
-                      "".format(self.user, self.host))
+            cnx.cmd_query("CREATE USER '{}'@'{}' IDENTIFIED "
+                          "WITH authentication_ldap_sasl"
+                          "".format(self.user, self.host))
 
-        cnx.cmd_query("CREATE USER '{}'@'{}'"
-                      "".format("common", self.host))
-        cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
-                      "".format("common", self.host))
-
-        cnx.close()
+            cnx.cmd_query("CREATE USER '{}'@'{}'"
+                          "".format("common", self.host))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'"
+                          "".format("common", self.host))
 
     def tearDown(self):
-        return
         cnx = connection.MySQLConnection(**self.config)
         try:
             cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
@@ -2937,7 +2962,7 @@ class WL14263(tests.MySQLConnectorTests):
         cnx.close()
 
     @tests.foreach_cnx()
-    def test_authentication_ldap_sasl_client(self):
+    def test_authentication_ldap_sasl_client_with_SCRAM_SHA_256(self):
         """test_authentication_ldap_sasl_client_with_SCRAM-SHA-256"""
         # Not running with c-ext if plugin libraries are not setup
         if self.cnx.__class__ == CMySQLConnection and \
@@ -3084,19 +3109,20 @@ class WL13334(tests.MySQLConnectorTests):
         _ = connect(**cnx_config)
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7),
-                 "Authentication with ldap_simple not supported")
-#Skip if remote ldap server is not reachable.
-@unittest.skipIf(not tests.is_host_reachable("100.103.18.98"),
-                 "ldap server is not reachable")
-@unittest.skipIf(not tests.is_plugin_available("authentication_ldap_sasl"),
-                 "Plugin authentication_ldap_sasl not available")
-@unittest.skipIf(os.name == "nt", "Skipping due to GRANT PROXY issue")
+                 "Authentication with sasl GSSAPI not supported")
+@unittest.skipIf(os.name == "nt", "Not available on Windows")
 @unittest.skipIf(gssapi == None, "GSSAPI Module not installed")
 class WL14213(tests.MySQLConnectorTests):
     """WL#14213: Add support for Kerberos authentication.
     """
     def setUp(self):
         self.server = tests.MYSQL_SERVERS[0]
+        if not "com" in self.server.license:
+            self.skipTest("Plugin not available in this version")
+        if not tests.is_host_reachable("100.103.18.98"):
+            # Skip if remote ldap server is not reachable.
+            self.skipTest("Remote ldap server is not reachable")
+
         self.server_cnf = self.server._cnf
         self.config = tests.get_mysql_config()
         self.user = "test3"
@@ -3131,26 +3157,33 @@ class WL14213(tests.MySQLConnectorTests):
         self.server.wait_up()
         sleep(1)
 
-        cnx = connection.MySQLConnection(**self.config)
+        with connection.MySQLConnection(**self.config) as cnx:
+            cnx.cmd_query("SHOW PLUGINS")
+            res = cnx.get_rows()
+            available = False
+            for row in res[0]:
+                if row[0].lower() == "authentication_ldap_sasl":
+                    if row[1] == "ACTIVE":
+                        available = True
+            if not available:
+                self.skipTest("Plugin authentication_ldap_sasl not available")
 
-        try:
-            cnx.cmd_query("DROP USER '{}@{}'".format(self.user, self.host))
-            cnx.cmd_query("DROP USER '{}'".format("mysql_engineering"))
-        except:
-            pass
+            try:
+                cnx.cmd_query("DROP USER '{}@{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'".format("mysql_engineering"))
+            except:
+                pass
 
-        cnx.cmd_query("CREATE USER '{}@{}' IDENTIFIED "
-                      "WITH authentication_ldap_sasl "
-                      "BY \"#testgrp=mysql_engineering\""
-                      "".format(self.user, self.host))
+            cnx.cmd_query("CREATE USER '{}@{}' IDENTIFIED "
+                          "WITH authentication_ldap_sasl "
+                          "BY \"#testgrp=mysql_engineering\""
+                          "".format(self.user, self.host))
 
-        cnx.cmd_query("CREATE USER '{}'".format("mysql_engineering"))
-        cnx.cmd_query("GRANT ALL ON myconnpy.* TO '{}'"
-                      "".format("mysql_engineering"))
-        cnx.cmd_query("GRANT PROXY on '{}' TO '{}@{}'"
-                      "".format("mysql_engineering", self.user, self.host))
-
-        cnx.close()
+            cnx.cmd_query("CREATE USER '{}'".format("mysql_engineering"))
+            cnx.cmd_query("GRANT ALL ON myconnpy.* TO '{}'"
+                          "".format("mysql_engineering"))
+            cnx.cmd_query("GRANT PROXY on '{}' TO '{}@{}'"
+                          "".format("mysql_engineering", self.user, self.host))
 
     def tearDown(self):
         return
@@ -3254,3 +3287,374 @@ class WL14213(tests.MySQLConnectorTests):
         res = cnx.get_rows()[0][0][0]
         self.assertIn(self.user, res, "not the expected user {}".format(res))
         cnx.close()
+
+
+@unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 23),
+                 "Query Attributes are supported, req. ver <8.0.23")
+class WL14237_not_supported(tests.MySQLConnectorTests):
+    """WL#14213: Add support for Query Attributes. not supported scenario.
+    """
+
+    def _test_query_attrs_not_supported_behavior(self, prepared=False):
+        """Verify a warning is raised if QA are given but not supported by the server.
+        """
+        with connection.MySQLConnection(**self.config) as cnx:
+            with cnx.cursor(prepared=prepared) as cur:
+                self.assertListEqual([], cur.get_attributes())
+                cur.add_attribute("attr_1", "attr_val")
+                # verify get_attributes returns a single attribute that was set
+                self.assertListEqual([("attr_1", "attr_val")], cur.get_attributes())
+
+                with warnings.catch_warnings(record=True) as warn:
+                    warnings.resetwarnings()
+                    warnings.simplefilter("always")
+                    if prepared:
+                        cur.execute(
+                            "SELECT ? as 'PS'", ("some_parameter",))
+                    else:
+                        cur.execute("SELECT 'some_parameter'")
+                    self.assertGreaterEqual(len(warn), 1)
+                    self.assertEqual(warn[-1].category, Warning)
+                    self.assertIn(
+                        "This version of the server does not support Query "
+                        "Attributes", str(warn[-1].message))
+
+                res = cur.fetchall()
+                # Check that attribute values are correct
+                self.assertIn("some_parameter", res[0][0])
+                cur.clear_attributes()
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_1_test_query_attrs_not_supported_behavior(self):
+        "Check warning if QA are given but not supported by the server."
+        self._test_query_attrs_not_supported_behavior()
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_2_test_query_attrs_not_supported_behavior(self):
+        "Check warning if QA are given but not supported by the server."
+        self._test_query_attrs_not_supported_behavior(prepared=True)
+
+@unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25),
+                 "Query Attributes not supported, req. ver >=8.0.25")
+class WL14237(tests.MySQLConnectorTests):
+    """WL#14213: Add support for Query Attributes.
+    """
+
+    query_insert = """
+        INSERT INTO {test_table} (name, value)
+        VALUES ('{attr_name}', mysql_query_attribute_string('{attr_name}'))
+        """
+
+    @classmethod
+    def setUpClass(cls):
+        test_table = "wl14237"
+        with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute('INSTALL COMPONENT "file://component_query_attributes"')
+                cur.execute(f"DROP TABLE IF EXISTS {test_table}")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {test_table} (
+                        id INT AUTO_INCREMENT KEY,
+                        name VARCHAR(50),
+                        value VARCHAR(50)
+                    )
+                    """
+                )
+
+    @classmethod
+    def tearDownClass(cls):
+        test_table = "wl14237"
+        with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute('UNINSTALL COMPONENT "file://component_query_attributes"')
+                cur.execute(f"DROP TABLE {test_table}")
+
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.test_table = "wl14237"
+
+        self.test_attributes = [
+            ("attr1", "foo", "foo"),
+            ("attr2", 7, "7"),
+            ("attr3", 3.14, "3.14"),
+            ("attr4", datetime(2021, 3, 11, 19, 27,30),
+             "2021-03-11 19:27:30.000000"),
+            ("attr5", time(19,27,30), "19:27:30.000000"),
+            ("attr6", b'\x31\x32\x61\x62', "12ab"),
+        ]
+
+    def _empty_table(self):
+        with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute(f"DROP TABLE {self.test_table}")
+                cur.execute(f"""
+                    CREATE TABLE {self.test_table} (
+                        id INT AUTO_INCREMENT KEY,
+                        name VARCHAR(50),
+                        value VARCHAR(50)
+                    )"""
+                )
+            cnx.commit()
+
+    def _check_attribute_values_are_correct(self, attr_name, attr_val):
+        with connection.MySQLConnection(**self.config) as cnx:
+            with cnx.cursor() as cur_check:
+                cur_check.execute(
+                    f"SELECT count(*) FROM {self.test_table} "
+                    f"WHERE name = '{attr_name}' and value like '{attr_val}%'"
+                )
+                self.assertEqual([(1,)], cur_check.fetchall(),
+                                 f"Not found {attr_name}: {attr_val}")
+
+    def _test_1_query_attr_individual_send(self, prepared=False):
+        "Test query_attributes are send individually."
+        with self.cnx.__class__(**self.config) as cnx:
+            with cnx.cursor(prepared=prepared) as cur:
+                for attr_name, attr_val, my_value in self.test_attributes:
+                    self.assertListEqual([], cur.get_attributes())
+                    cur.add_attribute(attr_name, attr_val)
+                    # verify get_attributes returns the single attribute set
+                    self.assertListEqual(
+                        [(attr_name, attr_val)], cur.get_attributes())
+                    cur.execute(self.query_insert.format(
+                        test_table=self.test_table, attr_name=attr_name,
+                        attr_val=attr_val))
+                    cnx.commit()
+                    # Check that attribute values are correct
+                    self._check_attribute_values_are_correct(
+                        attr_name, my_value)
+                    cur.clear_attributes()
+
+        self._empty_table()
+
+    def _test_2_query_attr_group_send(self, prepared=False):
+        "Test query_attributes are send in group."
+        with self.cnx.__class__(**self.config) as cnx:
+            cur = cnx.cursor(prepared=prepared)
+            added_attrs = []
+            for attr_name, attr_val, my_value in self.test_attributes:
+                cur.add_attribute(attr_name, attr_val)
+                added_attrs.append((attr_name, attr_val))
+                self.assertListEqual(added_attrs, cur.get_attributes())
+                cur.execute(self.query_insert.format(
+                    test_table=self.test_table, attr_name=attr_name,
+                    attr_val=attr_val))
+                cnx.commit()
+                # Check the number of attributes values sent so far
+                cur.execute(
+                    "SELECT count(*) FROM wl14237 WHERE value IS NOT NULL")
+                self.assertEqual([(len(added_attrs),)], cur.fetchall())
+                # Check that attribute values are correct
+                self._check_attribute_values_are_correct(attr_name, my_value)
+                # verify that `get_attributes()` returns an empty list
+            cur.clear_attributes()
+            self.assertListEqual([], cur.get_attributes())
+
+        self._empty_table()
+
+    def _test_3_query_attr_add_attribute_error_bad_name_par(self, prepared=False):
+        "Test add_attribute() invalid name parameter."
+        attr_name_invalid = [1, 1.5, ["invalid"], b"invalid", object]
+        attr_val = "valid"
+
+        cnx = self.cnx.__class__(**self.config)
+        cur = cnx.cursor(prepared=prepared)
+        for attr_name in attr_name_invalid:
+            with self.assertRaises(ProgrammingError) as context:
+                cur.add_attribute(name=attr_name, value=attr_val)
+            self.assertIn(
+                "`name` must be a string type.", context.exception.msg,
+                "Unexpected message found: {}".format(context.exception))
+
+            self.assertRaises(
+                ProgrammingError, cur.add_attribute, name=attr_name, value=attr_val)
+
+    def _test_4_query_attr_add_attribute_error_bad_value_par(self, prepared=False):
+        "Test add_attribute() invalid value parameter."
+        attr_name = "invalid"
+        attr_values_not_supported = [
+            ["l", "i", "s", "t"],
+            ("t","p","l","e"),
+            {"d":"ict"},
+            object
+        ]
+
+        cnx = self.cnx.__class__(**self.config)
+        cur = cnx.cursor(prepared=prepared)
+        for attr_val in attr_values_not_supported:
+            with self.assertRaises(ProgrammingError) as context:
+                cur.add_attribute(**{"name": attr_name, "value": attr_val})
+            self.assertIn(
+                "cannot be converted to a MySQL type.", context.exception.msg,
+                "Unexpected message found: {}".format(context.exception))
+
+    def _test_5_query_attr_individual_send_simple_check(self, prepared=False):
+        "Test query_attributes are send individually and simple recover."
+        cnx = self.cnx.__class__(**self.config)
+        cur = cnx.cursor(prepared=prepared)
+        for attr_name, attr_val, my_value in self.test_attributes:
+            self.assertListEqual([], cur.get_attributes())
+            cur.add_attribute(attr_name, attr_val)
+            # verify get_attributes returns a single attribute that was set
+            self.assertListEqual([(attr_name, attr_val)], cur.get_attributes())
+            if prepared:
+                cur.execute(
+                    f"SELECT "
+                    f" mysql_query_attribute_string('{attr_name}') AS 'QA',"
+                    f" ? as 'PS'", (f"parameter-{attr_name}",))
+            else:
+                cur.execute(
+                    f"SELECT"
+                    f" mysql_query_attribute_string('{attr_name}') AS 'QA'")
+            res = cur.fetchall()
+            # Check that attribute values are correct
+            exp = my_value if isinstance(my_value, str) else repr(my_value)
+            if CMySQLConnection and exp == "3.14" and isinstance(self.cnx, CMySQLConnection):
+                exp = '3.140000104904175'
+            self.assertIn(exp, res[0][0])
+            cur.clear_attributes()
+
+    def _check_two_cursor_can_have_different_query_attrs(self, prepared=False):
+        "Check No strange QA values are returned for other cursor"
+        cnx1 = self.cnx.__class__(**self.config)
+        cnx2 = self.cnx.__class__(**self.config)
+        cur1 = cnx1.cursor(prepared=prepared)
+        cur2 = cnx2.cursor(prepared=prepared)
+
+        cur1.add_attribute("attr_1", 1)
+        cur2.add_attribute("attr_2", 2)
+        cur1.add_attribute("attr_3", 3)
+
+        self.assertListEqual([("attr_1", 1), ("attr_3", 3)], cur1.get_attributes())
+
+        self.assertListEqual([("attr_2", 2)], cur2.get_attributes())
+
+        cur1.execute(
+            f"SELECT"
+            f" mysql_query_attribute_string('attr_1') AS 'QA1',"
+            f" mysql_query_attribute_string('attr_3') AS 'QA2'")
+
+        cur2.execute(
+            f"SELECT"
+            f" mysql_query_attribute_string('attr_2') AS 'QA1'")
+
+        res = cur1.fetchall()
+        # Check that attribute values are correct in cur1
+        self.assertEqual(('1', '3'), res[0])
+
+        res = cur2.fetchall()
+        # Check that attribute values are correct in cur2
+        self.assertEqual(('2', ), res[0])
+
+    def _check_query_attrs_names_not_checked_for_uniqueness(self, prepared=False):
+        "Check attribute names are not checked for uniqueness"
+        with self.cnx.__class__(**self.config) as cnx:
+            cur = cnx.cursor(prepared=prepared)
+            cur.add_attribute("attr_1", 1)
+            cur.add_attribute("attr_2", 2)
+            cur.add_attribute("attr_1", 3)
+
+            cur.execute(
+                f"SELECT"
+                f" mysql_query_attribute_string('attr_1') AS 'QA1',"
+                f" mysql_query_attribute_string('attr_2') AS 'QA2'")
+
+            res = cur.fetchall()
+            # Check that attribute values are correct in cur1
+            self.assertEqual(('1', '2'), res[0])
+
+    def _check_expected_behavior_for_unnamed_query_attrs(self, prepared=False):
+        "Check behavior add_attribute() and get_attributes() when the name is ''"
+        with self.cnx.__class__(**self.config) as cnx:
+            cur = cnx.cursor(prepared=prepared)
+            cur.add_attribute("", 1)
+            cur.add_attribute("attr_1", 3)
+
+            cur.execute(
+                f"SELECT"
+                f" mysql_query_attribute_string('attr_1') AS 'QA'")
+
+            res = cur.fetchall()
+            # Check that attribute values are correct in cur1
+            self.assertEqual(('3',), res[0])
+
+    @tests.foreach_cnx()
+    def test_1_query_attr_individual_send(self):
+        "Test query_attributes are send individually."
+        self._test_1_query_attr_individual_send()
+
+    @tests.foreach_cnx()
+    def test_2_query_attr_group_send(self):
+        "Test query_attributes are send in group."
+        self._test_2_query_attr_group_send()
+
+    @tests.foreach_cnx()
+    def test_3_query_attr_add_attribute_error_bad_name_par(self):
+        "Test add_attribute() invalid name parameter."
+        self._test_3_query_attr_add_attribute_error_bad_name_par()
+
+    @tests.foreach_cnx()
+    def test_4_query_attr_add_attribute_error_bad_value_par(self):
+        "Test add_attribute() invalid value parameter."
+        self._test_4_query_attr_add_attribute_error_bad_value_par()
+
+    @tests.foreach_cnx()
+    def test_5_query_attr_individual_send_simple_check(self):
+        "Test query_attributes are send individually and simple recover."
+        self._test_5_query_attr_individual_send_simple_check()
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_6_query_attr_individual_send_prepared_cur(self):
+        "Test query_attributes are send individually, prepared stmt."
+        self._test_1_query_attr_individual_send(prepared=True)
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_7_query_attr_group_send_prepared_cur(self):
+        "Test query_attributes are send in group, prepared stmt."
+        self._test_2_query_attr_group_send(prepared=True)
+
+    @tests.foreach_cnx()
+    def test_8_query_attr_add_attribute_error_bad_name_par_prepared_cur(self):
+        "Test add_attribute() invalid name parameter, prepared stmt."
+        self._test_3_query_attr_add_attribute_error_bad_name_par(prepared=True)
+
+    @tests.foreach_cnx()
+    def test_9_query_attr_add_attribute_error_bad_value_par_prepared_cur(self):
+        "Test add_attribute() invalid value parameter, prepared stmt."
+        self._test_4_query_attr_add_attribute_error_bad_value_par(prepared=True)
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_10_query_attr_individual_send_simple_check_prepared_cur(self):
+        "Test query_attributes are send individually and simple recover."
+        self._test_5_query_attr_individual_send_simple_check(prepared=True)
+
+    @tests.foreach_cnx()
+    def test_11_check_two_cursor_can_have_different_query_attrs(self):
+        "Check No strange QA values are returned for other cursor"
+        self._check_two_cursor_can_have_different_query_attrs()
+
+    @tests.foreach_cnx()
+    def test_12__check_query_attrs_names_not_checked_for_uniqueness(self):
+        "Check attribute names are not checked for uniqueness"
+        self._check_query_attrs_names_not_checked_for_uniqueness()
+
+    @tests.foreach_cnx()
+    def test_13_check_expected_behavior_for_unnamed_query_attrs(self):
+        "Check behavior add_attribute() and get_attributes() when the name is ''"
+        self._check_expected_behavior_for_unnamed_query_attrs()
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_14_check_two_cursor_can_have_different_query_attrs_prepared_cur(self):
+        "Check No strange QA values are returned for other cursor"
+        self._check_two_cursor_can_have_different_query_attrs(prepared=True)
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_15__check_query_attrs_names_not_checked_for_uniqueness_prepared_cur(self):
+        "Check attribute names are not checked for uniqueness"
+        self._check_query_attrs_names_not_checked_for_uniqueness(prepared=True)
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_16_check_expected_behavior_for_unnamed_query_attrs_prepared_cur(self):
+        "Check behavior add_attribute() and get_attributes() when the name is ''"
+        self._check_expected_behavior_for_unnamed_query_attrs(prepared=True)

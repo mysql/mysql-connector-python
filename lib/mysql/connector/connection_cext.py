@@ -205,7 +205,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             'ssl_disabled': True,
             "conn_attrs": self._conn_attrs,
             "local_infile": self._allow_local_infile,
-            "load_data_local_dir": self._allow_local_infile_in_path
+            "load_data_local_dir": self._allow_local_infile_in_path,
         }
 
         tls_versions = self._ssl.get('tls_versions')
@@ -512,7 +512,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 query = query.encode('utf-8')
             self._cmysql.query(query,
                                raw=raw, buffered=buffered,
-                               raw_as_string=raw_as_string)
+                               raw_as_string=raw_as_string,
+                               query_attrs=self._query_attrs)
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(exc.errno, msg=exc.msg,
                                              sqlstate=exc.sqlstate)
