@@ -137,14 +137,20 @@
     <DirectoryRef Id="VendorDir37">
       <?if $(var.HaveLdapLibs37) = 1 ?>
       <Component Id="Vendor37" Guid="103f2914-be39-11ea-98b1-04ea56793316" Win64="$(var.Win64)">
-        <File Id="authentication_ldap_sasl_client37" Name="authentication_ldap_sasl_client.dll"
-         Source="$(var.BDist37)\mysql\vendor\authentication_ldap_sasl_client.dll" DiskId="1"/>
         <File Id="libsasl37" Name="libsasl.dll"
          Source="$(var.BDist37)\mysql\vendor\libsasl.dll" DiskId="1"/>
         <File Id="libcrypto_1_137" Name="libcrypto-1_1-x64.dll"
          Source="$(var.BDist37)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
         <File Id="saslSCRAM37" Name="saslSCRAM.dll"
          Source="$(var.BDist37)\mysql\vendor\saslSCRAM.dll" DiskId="1"/>
+      </Component>
+      <?endif?>
+    </DirectoryRef>
+    <DirectoryRef Id="VendorPluginDir37">
+      <?if $(var.HaveLdapLibs37) = 1 ?>
+      <Component Id="VendorPlugin37" Guid="7c487c4b-0fc4-4a20-a307-48eda80da147" Win64="$(var.Win64)">
+        <File Id="authentication_ldap_sasl_client37" Name="authentication_ldap_sasl_client.dll"
+         Source="$(var.BDist37)\mysql\vendor\plugin\authentication_ldap_sasl_client.dll" DiskId="1"/>
       </Component>
       <?endif?>
     </DirectoryRef>

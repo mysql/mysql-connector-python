@@ -153,7 +153,9 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir36" Name="mysql">
-              <Directory Id="VendorDir36" Name="vendor"/>
+              <Directory Id="VendorDir36" Name="vendor">
+                <Directory Id="VendorPluginDir36" Name="plugin"/>
+              </Directory>
               <Directory Id="ConnectorPackageDir36" Name="connector">
                 <Directory Id="DjangoDir36" Name="django"/>
                 <Directory Id="ConnectorLocalesDir36" Name="locales">
@@ -176,7 +178,9 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir37" Name="mysql">
-              <Directory Id="VendorDir37" Name="vendor"/>
+              <Directory Id="VendorDir37" Name="vendor">
+                <Directory Id="VendorPluginDir37" Name="plugin"/>
+              </Directory>
               <Directory Id="ConnectorPackageDir37" Name="connector">
                 <Directory Id="DjangoDir37" Name="django"/>
                 <Directory Id="ConnectorLocalesDir37" Name="locales">
@@ -199,7 +203,9 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir38" Name="mysql">
-              <Directory Id="VendorDir38" Name="vendor"/>
+              <Directory Id="VendorDir38" Name="vendor">
+                <Directory Id="VendorPluginDir38" Name="plugin"/>
+              </Directory>
               <Directory Id="ConnectorPackageDir38" Name="connector">
                 <Directory Id="DjangoDir38" Name="django"/>
                 <Directory Id="ConnectorLocalesDir38" Name="locales">
@@ -222,7 +228,9 @@
               </Directory>
             </Directory>
             <Directory Id="MySQLPackageDir39" Name="mysql">
-              <Directory Id="VendorDir39" Name="vendor"/>
+              <Directory Id="VendorDir39" Name="vendor">
+                <Directory Id="VendorPluginDir39" Name="plugin"/>
+              </Directory>
               <Directory Id="ConnectorPackageDir39" Name="connector">
                 <Directory Id="DjangoDir39" Name="django"/>
                 <Directory Id="ConnectorLocalesDir39" Name="locales">
@@ -312,6 +320,7 @@
         <ComponentRef Id="MySQLPackage36"/>
         <?if $(var.HaveLdapLibs36) = 1 ?>
         <ComponentRef Id="Vendor36"/>
+        <ComponentRef Id="VendorPlugin36"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage36"/>
         <ComponentRef Id="ConnectorLocales36"/>
@@ -336,6 +345,7 @@
         <ComponentRef Id="MySQLPackage37"/>
         <?if $(var.HaveLdapLibs37) = 1 ?>
         <ComponentRef Id="Vendor37"/>
+        <ComponentRef Id="VendorPlugin37"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage37"/>
         <ComponentRef Id="ConnectorLocales37"/>
@@ -360,6 +370,7 @@
         <ComponentRef Id="MySQLPackage38"/>
         <?if $(var.HaveLdapLibs38) = 1 ?>
         <ComponentRef Id="Vendor38"/>
+        <ComponentRef Id="VendorPlugin38"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage38"/>
         <ComponentRef Id="ConnectorLocales38"/>
@@ -384,6 +395,7 @@
         <ComponentRef Id="MySQLPackage39"/>
         <?if $(var.HaveLdapLibs39) = 1 ?>
         <ComponentRef Id="Vendor39"/>
+        <ComponentRef Id="VendorPlugin39"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage39"/>
         <ComponentRef Id="ConnectorLocales39"/>

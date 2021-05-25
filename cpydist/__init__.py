@@ -293,11 +293,10 @@ class BaseCommand(Command):
                 src = os.path.join(src_folder, filename)
                 dst = os.path.join(os.getcwd(), self.vendor_folder, dst_folder)
                 self.log.info("copying %s -> %s", src, dst)
-                shutil.copy(src, dst)
+                self.log.info("shutil res: %s", shutil.copy(src, dst))
 
         if os.name == "nt":
-            self.distribution.package_data = {"mysql": ["vendor/*"]}
-            return
+            self.distribution.package_data = {"mysql": ["vendor/plugin/*"]}
         elif bundle_plugin_libs:
             # Bundle SASL libs
             sasl_libs_path = os.path.join(self.with_mysql_capi, "lib",
