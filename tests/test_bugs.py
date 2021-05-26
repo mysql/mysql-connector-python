@@ -6265,3 +6265,37 @@ class BugOra32497631(tests.MySQLConnectorTests):
             rows = cur.fetchall()
             self.assertEqual(2, len(rows))
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+
+class BugOra31528783(tests.MySQLConnectorTests):
+    """BUG#31528783: ZEROFILL NOT HANDLED BY THE PYTHON CONNECTOR."""
+
+    table_name = "BugOra31528783"
+
+    @foreach_cnx()
+    def test_number_zerofill(self):
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cnx.cmd_query(
+            f"""
+                CREATE TABLE {self.table_name} (
+                    value INT(4) UNSIGNED ZEROFILL NOT NULL,
+                    PRIMARY KEY(value)
+                )
+            """
+        )
+        with self.cnx.cursor() as cur:
+            values = [1, 10, 100, 1000]
+            # Insert data
+            for value in values:
+                cur.execute(
+                    f"INSERT INTO {self.table_name} (value) VALUES ({value})"
+                )
+
+            # Test values
+            for value in values:
+                cur.execute(
+                    f"SELECT value FROM {self.table_name} WHERE value={value}"
+                )
+                res = cur.fetchone()
+                self.assertEqual(res[0], value)
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")

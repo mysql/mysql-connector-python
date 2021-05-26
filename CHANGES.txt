@@ -19,6 +19,7 @@ v8.0.26
 - BUG#32740486: Fix typo in docstring
 - BUG#32623479: The X DevAPI returns str for binary types values
 - BUG#32585611: Fix broken links in X DevAPI reference documentation search
+- BUG#31528783: Fix number with ZEROFILL not handled by C extension
 
 v8.0.25
 =======

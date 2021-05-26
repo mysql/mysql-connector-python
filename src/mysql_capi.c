@@ -2669,7 +2669,13 @@ MySQL_fetch_row(MySQL *self)
             field_type == MYSQL_TYPE_LONGLONG ||
             field_type == MYSQL_TYPE_INT24 ||
             field_type == MYSQL_TYPE_YEAR) {
-    		PyTuple_SET_ITEM(result_row, i, PyLong_FromString(row[i], NULL, 0));
+            if (field_flags && ZEROFILL_FLAG) {
+                PyTuple_SET_ITEM(result_row, i, PyLong_FromString(row[i], NULL, 10));
+            }
+            else
+            {
+                PyTuple_SET_ITEM(result_row, i, PyLong_FromString(row[i], NULL, 0));
+            }
         }
         else if (field_type == MYSQL_TYPE_DATETIME ||
                  field_type == MYSQL_TYPE_TIMESTAMP)
