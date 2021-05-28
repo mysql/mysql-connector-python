@@ -400,7 +400,7 @@ class DistMSI(BaseCommand):
                     params["HaveCExt{}{}".format(*ver)] = 1
                 if os.path.exists(
                     os.path.join(self.pyver_bdist_paths[py_ver],
-                                 "mysql", "vendor",
+                                 "mysql", "vendor", "plugin",
                                  "authentication_ldap_sasl_client.dll")):
                     params["HaveLdapLibs{}{}".format(*ver)] = 1
 
