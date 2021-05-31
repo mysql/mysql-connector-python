@@ -48,7 +48,6 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.db.backends.mysql.base import DatabaseWrapper as MySQLDatabaseWrapper
 from django.db import utils
 from django.utils.functional import cached_property
 from django.utils import dateparse, timezone
@@ -175,7 +174,7 @@ class CursorWrapper:
         return iter(self.cursor)
 
 
-class DatabaseWrapper(MySQLDatabaseWrapper):
+class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = 'mysql'
     # This dictionary maps Field objects to their associated MySQL column
     # types, as strings. Column-type strings can contain format strings; they'll
@@ -457,6 +456,30 @@ class DatabaseWrapper(MySQLDatabaseWrapper):
         return {}
 
     @cached_property
+    def mysql_server_data(self):
+        with self.temporary_connection() as cursor:
+            # Select some server variables and test if the time zone
+            # definitions are installed. CONVERT_TZ returns NULL if 'UTC'
+            # timezone isn't loaded into the mysql.time_zone table.
+            cursor.execute("""
+                SELECT VERSION(),
+                       @@sql_mode,
+                       @@default_storage_engine,
+                       @@sql_auto_is_null,
+                       @@lower_case_table_names,
+                       CONVERT_TZ('2001-01-01 01:00:00', 'UTC', 'UTC') IS NOT NULL
+            """)
+            row = cursor.fetchone()
+        return {
+            'version': row[0],
+            'sql_mode': row[1],
+            'default_storage_engine': row[2],
+            'sql_auto_is_null': bool(row[3]),
+            'lower_case_table_names': bool(row[4]),
+            'has_zoneinfo_database': bool(row[5]),
+        }
+
+    @cached_property
     def mysql_server_info(self):
         with self.temporary_connection() as cursor:
             cursor.execute('SELECT VERSION()')
@@ -479,7 +502,6 @@ class DatabaseWrapper(MySQLDatabaseWrapper):
     @property
     def use_pure(self):
         return self._use_pure
-        # return not HAVE_CEXT or self._use_pure
 
 
 class DjangoMySQLConverter(MySQLConverter):
