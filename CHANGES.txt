@@ -16,6 +16,7 @@ v8.0.26
 - WL#14440: Support for authentication_kerberos_client authentication plugin
 - WL#14237: Support query attributes
 - BUG#32947160: Remove MySQLdb module dependency from Django backend
+- BUG#32838010: Fix option files parsing with include directive
 - BUG#32789076: MSI is missing required libraries to use auth_ldap_client plugin
 - BUG#32778827: Raise an error if the _id is different when replacing a document
 - BUG#32740486: Fix typo in docstring
