@@ -1,0 +1,74 @@
+[client]
+
+user=root
+password=mypass
+database=cli_data
+join_buffer_size = 128M
+sort_buffer_size = 2M
+read_rnd_buffer_size = 2M
+
+[connector_python]
+user=root
+password=
+database=cpy_data
+use_unicode=True
+charset=latin7
+collation= latin7_general_ci
+autocommit=True
+pool_size=1
+pool_name=mypool
+sql_mode=ANSI
+get_warnings=True
+raise_on_warnings=True
+connection_timeout=10
+buffered=True
+raw=True
+force_ipv6=False
+
+[my_group]
+
+user=root
+password=
+database=mygroup_data
+use_unicode=True
+charset=latin7
+collation= latin7_general_ci
+autocommit=True
+sql_mode=ANSI
+get_warnings=True
+raise_on_warnings=True
+connection_timeout=10
+buffered=True
+raw=True
+force_ipv6=False
+
+[my_explicit]
+user=root
+password=
+database=cpy_data
+use_unicode=True
+charset=latin7
+collation= latin7_general_ci
+autocommit=True
+sql_mode=ANSI
+get_warnings=True
+raise_on_warnings=True
+connection_timeout=10
+buffered=True
+raw=True
+force_ipv6=False
+
+
+
+[invalid_group]
+
+user=root
+password=mypass
+database=mygroup_data
+host=localhost
+use_unicode=True
+charse=latin7
+
+
+
+

@@ -31,10 +31,16 @@
 import mysql.connector
 from tests import foreach_cnx
 import tests
+import unittest
 
 # using "/" (slash) to avoid windows scape characters
 DATA_FILE = "/".join(['tests', 'data', 'random_big_bin.csv'])
 
+
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class Bug21449996(tests.MySQLConnectorTests):
 
     def setUp(self):

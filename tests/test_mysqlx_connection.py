@@ -444,6 +444,16 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     def test_auth(self):
         sess = mysqlx.get_session(self.connect_kwargs)
+
+        try:
+            sess.sql("DROP USER 'native'@'%'").execute()
+        except mysqlx.errors.OperationalError:
+            pass
+        try:
+            sess.sql("DROP USER 'sha256'@'%'").execute()
+        except mysqlx.errors.OperationalError:
+            pass
+
         sess.sql("CREATE USER 'native'@'%' IDENTIFIED WITH "
                  "mysql_native_password BY 'test'").execute()
         sess.sql("CREATE USER 'sha256'@'%' IDENTIFIED WITH "
@@ -507,6 +517,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         sess.sql("DROP USER 'caching'@'%'").execute()
         sess.close()
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 15), "--mysqlx-socket option"
                      " tests not available for this MySQL version")
     @unittest.skipIf(os.name == 'nt', "sockets not available"
@@ -649,9 +663,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Multi-host scenarios
         # Connect to a secondary host if the primary fails
+        config = self.connect_kwargs.copy()
         routers = [
             {"host": unreach_hosts[0], "port": config["port"], "priority": 100},
-            {"host": "127.0.0.1", "port": config["port"], "priority": 90}
+            {"host": config["host"], "port": config["port"], "priority": 90}
         ]
         uri = build_uri(user=config["user"], password=config["password"],
                         connect_timeout=2000, routers=routers)
@@ -678,7 +693,6 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Trying to establish a connection with a wrong password should not
         # wait for timeout
-        config["host"] = "127.0.0.1"
         config["password"] = "invalid_password"
         config["connect-timeout"] = 2000
         time_start = time.time()
@@ -708,6 +722,9 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     def test_get_schemas(self):
         schema_name = "test_get_schemas"
+        schema = self.session.get_schema(schema_name)
+        if schema.exists_in_database():
+            self.session.drop_schema(schema_name)
         self.session.create_schema(schema_name)
         schemas = self.session.get_schemas()
         self.assertIsInstance(schemas, list)
@@ -793,12 +810,18 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
     def test_drop_schema(self):
         test_schema = 'mysql_session_test_drop_schema'
+        schema = self.session.get_schema(test_schema)
+        if schema.exists_in_database():
+            self.session.drop_schema(test_schema)
         schema = self.session.create_schema(test_schema)
-
+        self.assertTrue(schema.exists_in_database())
         self.session.drop_schema(test_schema)
         self.assertFalse(schema.exists_in_database())
 
     def test_create_schema(self):
+        schema = self.session.get_schema(self.schema_name)
+        if schema.exists_in_database():
+            self.session.drop_schema(self.schema_name)
         schema = self.session.create_schema(self.schema_name)
         self.assertTrue(schema.exists_in_database())
 
@@ -816,8 +839,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         table_name = "t2"
         schema = self.session.get_schema(self.schema_name)
 
-        if not schema.exists_in_database():
-            self.session.create_schema(self.schema_name)
+        if schema.exists_in_database():
+            self.session.drop_schema(self.schema_name)
+
+        self.session.create_schema(self.schema_name)
 
         stmt = "CREATE TABLE {0}.{1}(_id INT)"
         self.session.sql(stmt.format(self.schema_name, table_name)).execute()
@@ -837,8 +862,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         table_name = "t2"
         schema = self.session.get_schema(self.schema_name)
 
-        if not schema.exists_in_database():
-            self.session.create_schema(self.schema_name)
+        if schema.exists_in_database():
+            self.session.drop_schema(self.schema_name)
+
+        self.session.create_schema(self.schema_name)
 
         stmt = "CREATE TABLE {0}.{1}(_id INT)"
         self.session.sql(stmt.format(self.schema_name, table_name)).execute()
@@ -934,6 +961,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         session.close()
         self.assertRaises(mysqlx.OperationalError, schema.exists_in_database)
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
                      "not available for Python versions < 2.7.9.")
     def test_ssl_connection(self):
@@ -1591,6 +1622,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertFalse(session.is_open())
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 20), "XPlugin not compatible")
 class MySQLxInnitialNoticeTests(tests.MySQLxTests):
 
@@ -1747,8 +1782,8 @@ class MySQLxInnitialNoticeTests(tests.MySQLxTests):
     @unittest.skipIf(HAVE_MYSQLXPB_CEXT == False, "C Extension not available")
     def test_initial_empty_notice_cext(self):
         connect_kwargs = self.connect_kwargs.copy()
-        host = "localhost"
-        port = connect_kwargs["port"] + 10
+        host = connect_kwargs["host"]
+        port = connect_kwargs["port"] + 15
         worker1 = Thread(target=self._server_thread, args=[host, port, 1])
         worker1.daemon = True
         worker1.start()
@@ -1971,7 +2006,9 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         config["compression-algorithms"] = []
         session = mysqlx.get_session(config)
         algorithm = session.get_connection().protocol.compression_algorithm
-        if HAVE_LZ4:
+        if HAVE_ZSTD:
+            self.assertEqual("zstd_stream", algorithm)
+        elif HAVE_LZ4:
             self.assertEqual("lz4_message", algorithm)
         else:
             self.assertEqual("deflate_stream", algorithm)

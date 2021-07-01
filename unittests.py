@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -66,7 +66,9 @@ import sys
 import shutil
 import platform
 import time
+import re
 import unittest
+
 try:
     from urlparse import urlsplit
 except ImportError:
@@ -302,20 +304,45 @@ _UNITTESTS_CMD_ARGS = {
     },
 
     ('-H', '--host'): {
-        'dest': 'host', 'metavar': 'NAME', 'default': '127.0.0.1',
-        'help': 'Hostname or IP address for TCP/IP connections.'
+        'dest': 'host',
+        'metavar': 'NAME',
+        'default': os.environ.get('MYSQL_HOST', '127.0.0.1'),
+        'help': 'Hostname or IP address for TCP/IP connections to use in a '
+                'bootstrapped server or to use with an external server.'
     },
 
     ('-P', '--port'): {
-        'dest': 'port', 'metavar': 'NUMBER', 'default': 33770, 'type': int,
-        'help': 'First TCP/IP port to use.',
+        'dest': 'port',
+        'metavar': 'NUMBER',
+        'default': os.environ.get('MYSQL_PORT', 3306),
+        'type': int,
+        'help': 'First TCP/IP port to use in a bootstrapped server or to use '
+                'with an external server.',
         'type_optparse': int,
     },
 
     ('', '--mysqlx-port'): {
-        'dest': 'mysqlx_port', 'metavar': 'NUMBER', 'default': 33060,
-        'type': int, 'help': 'First TCP/IP port to use for mysqlx protocol.',
+        'dest': 'mysqlx_port',
+        'metavar': 'NUMBER',
+        'default': os.environ.get('MYSQLX_PORT', 33060),
+        'type': int,
+        'help': 'First TCP/IP port to use for the mysqlx protocol in a '
+                'bootstrapped server or to use with an external server.',
         'type_optparse': int,
+    },
+
+    ('', '--user'): {
+        'dest': 'user',
+        'default': os.environ.get('MYSQL_USER', 'root'),
+        'metavar': 'NAME',
+        'help': "User to use with an external server."
+    },
+
+    ('', '--password'): {
+        'dest': 'password',
+        'default': os.environ.get('MYSQL_PASSWORD', ''),
+        'metavar': 'PASSWORD',
+        'help': "Password to use with an external server."
     },
 
     ('', '--unix-socket'): {
@@ -346,6 +373,13 @@ _UNITTESTS_CMD_ARGS = {
         'help': (
             'Skip installation of Connector/Python, reuse previous.'
         ),
+    },
+
+    ('', '--use-external-server'): {
+        'dest': 'use_external_server',
+        'action': 'store_true',
+        'default': False,
+        'help': 'Use an external server instead of bootstrap a server.',
     },
 
     ('', '--with-mysql-capi'): {
@@ -836,7 +870,90 @@ def main():
             sys.exit(1)
 
     # We have to at least run 1 MySQL server
-    init_mysql_server(port=(options.port), options=options)
+    if options.use_external_server:
+        name = "server{}".format(len(tests.MYSQL_SERVERS) + 1)
+        mysql_server = mysqld.MySQLExternalServer(MY_CNF, name)
+        mysql_server.client_config = {
+            'host': options.host,
+            'port': options.port,
+            'unix_socket': mysql_server.unix_socket,
+            'user': options.user,
+            'password': options.password,
+            'database': 'myconnpy',
+            'connection_timeout': 60,
+            'unix_socket': None,
+        }
+
+        mysql_server.xplugin_config = {
+            'host': options.host,
+            'port': options.mysqlx_port,
+            'user': options.user,
+            'password': options.password,
+            'schema': 'myconnpy',
+            'socket': None,
+        }
+
+        tests.MYSQL_SERVERS.append(mysql_server)
+        tests.MYSQL_EXTERNAL_SERVER = True
+
+        version_re = re.compile(r"^(\d+)\.(\d+)\.(\d+)+", re.ASCII)
+        try:
+            import mysql.connector
+            with mysql.connector.connect(
+                    host=options.host,
+                    port=options.port,
+                    user=options.user,
+                    password=options.password
+            ) as cnx:
+                with cnx.cursor() as cur:
+                    cur = cnx.cursor()
+                    # Create database for testing
+                    LOGGER.info("Creating 'myconnpy' database")
+                    cur.execute("DROP DATABASE IF EXISTS myconnpy")
+                    cur.execute(
+                        "CREATE DATABASE myconnpy CHARACTER SET utf8mb4"
+                    )
+
+                    # Version
+                    cur.execute("SELECT VERSION()")
+                    res = cur.fetchone()
+                    match = version_re.match(res[0])
+                    if not match:
+                        raise ValueError(
+                            "Invalid version number '{}'".format(res[0])
+                        )
+                    ver = tuple(map(int, match.groups()))
+
+                    # License
+                    cur.execute("SHOW VARIABLES LIKE 'license'")
+                    res = cur.fetchone()
+                    lic = res[1]
+
+                    mysql_server.version = ver
+                    mysql_server.license = lic
+
+                    # Socket
+                    cur.execute("SHOW VARIABLES LIKE 'socket'")
+                    res = cur.fetchone()
+                    mysql_server.unix_socket = res[1]
+
+                    # MySQL X Socket
+                    cur.execute("SHOW VARIABLES LIKE 'mysqlx_socket'")
+                    res = cur.fetchone()
+                    if res:
+                        mysql_server.mysqlx_unix_socket = res[1]
+
+            tests.MYSQL_VERSION = mysql_server.version
+            tests.MYSQL_LICENSE = mysql_server.license
+            tests.MYSQL_VERSION_TXT = ".".join(map(str, mysql_server.version))
+        except Exception as err:
+            LOGGER.error(
+                "Failed connecting to the external MySQL server: %s", err
+            )
+            sys.exit(1)
+    else:
+        # Bootstrap MySQL server
+        init_mysql_server(port=(options.port), options=options)
 
     tests.MYSQL_CAPI = options.mysql_capi
     if not options.skip_install:
@@ -911,8 +1028,9 @@ def main():
         sys.exit(1)
 
     # Initialize the other MySQL Servers
-    for i in range(1, tests.MYSQL_SERVERS_NEEDED):
-        init_mysql_server(port=(options.port + i), options=options)
+    if not options.use_external_server:
+        for i in range(1, tests.MYSQL_SERVERS_NEEDED):
+            init_mysql_server(port=(options.port + i), options=options)
 
     LOGGER.info("Using MySQL server version %s %s",
                 '.'.join([str(v) for v in tests.MYSQL_VERSION[0:3]]),
@@ -967,25 +1085,32 @@ def main():
     except:
         # Is OK when failed
         pass
-    for mysql_server in tests.MYSQL_SERVERS:
-        name = mysql_server.name
-        if not options.keep:
-            mysql_server.stop()
-            if not mysql_server.wait_down():
-                LOGGER.error("Failed stopping MySQL server '%s'", name)
+
+    if not options.use_external_server:
+        for mysql_server in tests.MYSQL_SERVERS:
+            name = mysql_server.name
+            if not options.keep:
+                mysql_server.stop()
+                if not mysql_server.wait_down():
+                    LOGGER.error("Failed stopping MySQL server '%s'", name)
+                else:
+                    mysql_server.remove()
+                    LOGGER.info(
+                        "MySQL server '%s' stopped and cleaned up",
+                        name,
+                    )
+            elif not mysql_server.check_running():
+                mysql_server.start()
+                if not mysql_server.wait_up():
+                    LOGGER.error(
+                        "MySQL could not be kept running; failed to restart",
+                    )
             else:
-                mysql_server.remove()
-                LOGGER.info("MySQL server '%s' stopped and cleaned up", name)
-        elif not mysql_server.check_running():
-            mysql_server.start()
-            if not mysql_server.wait_up():
-                LOGGER.error("MySQL could not be kept running; "
-                             "failed to restart")
-        else:
-            LOGGER.info("MySQL server kept running on %s:%d",
-                        mysql_server.bind_address,
-                        mysql_server.port
-            )
+                LOGGER.info(
+                    "MySQL server kept running on %s:%d",
+                    mysql_server.bind_address,
+                    mysql_server.port,
+                )
 
     # Make sure the DEVNULL file is closed
     try:

@@ -1,0 +1,4 @@
+!include tests/data/option_files/my.cnf
+
+[mysqld]
+port=1002

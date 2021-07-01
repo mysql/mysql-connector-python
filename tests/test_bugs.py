@@ -1116,6 +1116,10 @@ class BugOra15916486(tests.MySQLConnectorTests):
             results.append(result.fetchall())
         self.assertEqual(exp, results)
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(os.name == 'nt',
                  "Cannot test error handling when doing handshake on Windows")
 @unittest.skipIf(tests.MYSQL_VERSION > (8, 0, 4),
@@ -1192,6 +1196,10 @@ class BugOra16217743(tests.MySQLConnectorTests):
         self.assertEqual(exp, cur.fetchone())
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(not tests.SSL_AVAILABLE,
                  "BugOra16217667 test failed. Python lacks SSL support.")
 class BugOra16217667(tests.MySQLConnectorTests):
@@ -1252,6 +1260,10 @@ class BugOra16217667(tests.MySQLConnectorTests):
         self.assertTrue(self.cnx.get_rows()[0][0] != '')
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(not tests.SSL_AVAILABLE,
                  "BugOra16316049 test failed. Python lacks SSL support.")
 class BugOra16316049(tests.MySQLConnectorTests):
@@ -1744,6 +1756,10 @@ class BugOra17022399(tests.MySQLConnectorTests):
             self.assertEqual(2055, exc.errno, 'Was: ' + str(exc))
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra16369511(tests.MySQLConnectorTests):
     """BUG#16369511: LOAD DATA LOCAL INFILE IS MISSING
     """
@@ -1806,6 +1822,10 @@ class BugOra16369511(tests.MySQLConnectorTests):
                 'Was: ' + str(exc))
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra17002411(tests.MySQLConnectorTests):
     """BUG#17002411: LOAD DATA LOCAL INFILE FAILS WITH BIGGER FILES
     """
@@ -1848,6 +1868,10 @@ class BugOra17002411(tests.MySQLConnectorTests):
         self.assertEqual(self.exp_rows, cur.fetchone()[0])
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
                  "BugOra17422299 not tested with MySQL version >= 8.0.1")
 @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1),
@@ -1952,6 +1976,10 @@ class BugOra17414258(tests.MySQLConnectorTests):
                           mysql.connector.connect, **newconfig)
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
                  "Pool not supported with with MySQL version 5.6")
 class Bug17578937(tests.MySQLConnectorTests):
@@ -2254,6 +2282,10 @@ class BugOra17965619(tests.MySQLConnectorTests):
         cur.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra17054848(tests.MySQLConnectorTests):
     """BUG#17054848: USE OF SSL SHOULD NOT REQUIRE SSL_CERT AND SSL_KEY
     """
@@ -2318,6 +2350,10 @@ class BugOra17054848(tests.MySQLConnectorTests):
         self.assertTrue(res != '')
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0),
                  "BugOra16217765 not tested with MySQL version < 5.6.7. "
                  "Not working with cross version MySQL lib< 8.0.")
@@ -2401,12 +2437,19 @@ class BugOra16217765(tests.MySQLConnectorTests):
         for key, user in self.users.items():
             self._drop_user(self.admin_cnx, user['username'], self.host)
 
-    @unittest.skipIf(tests.MYSQL_VERSION < (5, 6, 6),
-                     "MySQL {0} does not support sha256_password auth".format(
-                         tests.MYSQL_VERSION_TXT))
     @unittest.skipIf(
-        not tests.SSL_AVAILABLE,
-        "BugOra16217765.test_sha256 test skipped: SSL support not available")
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (5, 6, 6),
+        "MySQL {0} does not support sha256_password auth"
+        "".format(tests.MYSQL_VERSION_TXT)
+    )
+    @unittest.skipUnless(
+         tests.SSL_AVAILABLE,
+        "BugOra16217765.test_sha256 test skipped: SSL support not available"
+    )
     def test_sha256(self):
         config = tests.get_mysql_config()
         config['unix_socket'] = None
@@ -2608,6 +2651,7 @@ class BugOra18389196(tests.MySQLConnectorTests):
 
         cur.close()
 
+
 @unittest.skipIf(tests.MYSQL_VERSION >= (5, 7, 5),
                  "MySQL {0} does not support old password auth".format(
                      tests.MYSQL_VERSION_TXT))
@@ -2789,6 +2833,10 @@ class BugOra18220593(tests.MySQLConnectorTests):
         self.cnx.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra14843456(tests.MySQLConnectorTests):
     """BUG#14843456: UNICODE USERNAME AND/OR PASSWORD FAILS
     """
@@ -2810,6 +2858,11 @@ class BugOra14843456(tests.MySQLConnectorTests):
             (u'\u0141owicz', u'\u0141owicz'),
         ]
         for user, password in self._credentials:
+            try:
+                self.cursor.execute(u"DROP USER '{user}'@'{host}'".format(
+                    user=user, host=self.host))
+            except errors.DatabaseError:
+                pass
             self.cursor.execute(grant.format(
                 user=user, host=self.host, password=password))
 
@@ -3506,9 +3559,11 @@ class BugOra20407036(tests.MySQLConnectorTests):
         self.tbl = 'Bug20407036'
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
-        create = ("CREATE TABLE {0} ( id int(10) unsigned NOT NULL, "
-                  "text VARCHAR(70000) CHARACTER SET utf8 NOT NULL, "
-                  "rooms tinyint(3) unsigned NOT NULL) "
+        create = ("CREATE TABLE {0} ( "
+                  "id int(10) unsigned NOT NULL AUTO_INCREMENT, "
+                  "text TEXT CHARACTER SET utf8 NOT NULL, "
+                  "rooms tinyint(3) unsigned NOT NULL, "
+                  "PRIMARY KEY (id)) "
                   "ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 "
                   "COLLATE=utf8_unicode_ci".format(self.tbl))
         self.cur.execute(create)
@@ -3528,11 +3583,11 @@ class BugOra20407036(tests.MySQLConnectorTests):
         cur.execute(sql, ('a'*65535, 5))
 
         exp = [
-            (0, 'a'*252, 1),
-            (0, 'a'*253, 2),
-            (0, 'a'*255, 3),
-            (0, 'a'*251, 4),
-            (0, 'a'*65535, 5),
+            (1, 'a'*252, 1),
+            (2, 'a'*253, 2),
+            (3, 'a'*255, 3),
+            (4, 'a'*251, 4),
+            (5, 'a'*65535, 5),
         ]
 
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
@@ -3584,6 +3639,10 @@ class BugOra20301989(tests.MySQLConnectorTests):
         self.assertEqual(exp, cur.fetchall())
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra20462427(tests.MySQLConnectorTests):
     """BUG#20462427: BYTEARRAY INDEX OUT OF RANGE
     """
@@ -3596,7 +3655,7 @@ class BugOra20462427(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = ("CREATE TABLE {0} ("
-                  "id INT PRIMARY KEY, "
+                  "id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
                   "a LONGTEXT "
                   ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
 
@@ -4008,6 +4067,10 @@ class BugOra21420633(tests.MySQLConnectorTests):
         cur.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra21492428(tests.MySQLConnectorTests):
     """BUG#21492428: CONNECT FAILS WHEN PASSWORD STARTS OR ENDS WITH SPACES
     """
@@ -4040,6 +4103,11 @@ class BugOra21492428(tests.MySQLConnectorTests):
 
 
         for user, password in self._credentials:
+            try:
+                self.cursor.execute(u"DROP USER '{user}'@'{host}'".format(
+                    user=user, host=self.host))
+            except errors.DatabaseError:
+                pass
             self.cursor.execute(grant.format(
                 user=user, host=self.host, password=password))
 
@@ -4206,6 +4274,10 @@ class BugOra21492815(tests.MySQLConnectorTests):
         cur.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
 class BugOra21656282(tests.MySQLConnectorTests):
     """BUG#21656282: CONNECT FAILURE WITH C-EXT WHEN PASSWORD CONTAINS UNICODE
@@ -4294,10 +4366,14 @@ class BugOra21530841(tests.MySQLConnectorTests):
         cur.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(sys.version_info < (2, 7, 9),
                  "Python 2.7.9+ is required for SSL")
 class BugOra25397650(tests.MySQLConnectorTests):
-    """BUG#25397650: CERTIFICATE VALIDITY NOT VERIFIED 
+    """BUG#25397650: CERTIFICATE VALIDITY NOT VERIFIED
     """
     def setUp(self):
         self.config = tests.get_mysql_config().copy()
@@ -4324,14 +4400,14 @@ class BugOra25397650(tests.MySQLConnectorTests):
         config['ssl_verify_cert'] = False
         mysql.connector.connect(**config)
 
-    def test_pure_verify_server_certifcate(self):
+    def test_pure_verify_server_certificate(self):
         config = self.config.copy()
         config['use_pure'] = True
 
         self._verify_cert(config)
 
     @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
-    def test_cext_verify_server_certifcate(self):
+    def test_cext_verify_server_certificate(self):
         config = self.config.copy()
         config['use_pure'] = False
 
@@ -4389,6 +4465,10 @@ class Bug28133321(tests.MySQLConnectorTests):
             pass
         cnx.close()
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_columns_name_are_not_bytearray(self):
         sql_statement = ["SELECT",
                          "  dish_id,",
@@ -4445,6 +4525,10 @@ class Bug28133321(tests.MySQLConnectorTests):
                             "".format(col_name))
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra21947091(tests.MySQLConnectorTests):
     """BUG#21947091: """
     def setUp(self):
@@ -4552,6 +4636,10 @@ class BugOra25589496(tests.MySQLConnectorTests):
         cursor.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class BugOra25383644(tests.MySQLConnectorTests):
     """BUG#25383644: LOST SERVER CONNECTION LEAKS POOLED CONNECTIONS
     """
@@ -4575,7 +4663,7 @@ class BugOra25383644(tests.MySQLConnectorTests):
                     cur.close()
                     cnx.close()
                 except mysql.connector.errors.OperationalError:
-                    pass                  
+                    pass
             finally:
                 i -= 1
                 if not self.mysql_server.check_running():
@@ -4597,7 +4685,7 @@ class BugOra25383644(tests.MySQLConnectorTests):
         config["use_pure"] = False
         config['pool_name'] = 'BugOra25383644-c-ext'
         cnxpool = pooling.MySQLConnectionPool(**config)
-        self.run_test(cnxpool)    
+        self.run_test(cnxpool)
 
 
 class BugOra25558885(tests.MySQLConnectorTests):
@@ -5359,10 +5447,12 @@ class BugOra28188883(tests.MySQLConnectorTests):
         self.cnx.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 23),
                  "MySQL 5.7.23+ is required for VERIFY_IDENTITY")
-@unittest.skipIf(sys.version_info < (2, 7, 9),
-                 "Python 2.7.9+ is required for SSL")
 class BugOra27434751(tests.MySQLConnectorTests):
     """BUG#27434751: MYSQL.CONNECTOR HAS NO TLS/SSL OPTION TO VERIFY SERVER NAME
     """
@@ -5589,6 +5679,10 @@ class BugOra25349794(tests.MySQLConnectorTests):
         conn.close()
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 8), "No JSON support")
 class BugOra29808262(tests.MySQLConnectorTests):
     """BUG#229808262: TEXT COLUMN WITH ONLY DIGITS READS IN AS INT.
@@ -6024,6 +6118,10 @@ class Bug32496788(tests.MySQLConnectorTests):
             self.assertEqual(cur.fetchall(),  self.exp_values[1])
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class Bug32162928(tests.MySQLConnectorTests):
     """BUG#32162928: change user command fails with pure python implementation.
 
@@ -6166,4 +6264,38 @@ class BugOra32497631(tests.MySQLConnectorTests):
             cur.execute(f"SELECT name FROM {self.table_name}")
             rows = cur.fetchall()
             self.assertEqual(2, len(rows))
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+
+class BugOra31528783(tests.MySQLConnectorTests):
+    """BUG#31528783: ZEROFILL NOT HANDLED BY THE PYTHON CONNECTOR."""
+
+    table_name = "BugOra31528783"
+
+    @foreach_cnx()
+    def test_number_zerofill(self):
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cnx.cmd_query(
+            f"""
+                CREATE TABLE {self.table_name} (
+                    value INT(4) UNSIGNED ZEROFILL NOT NULL,
+                    PRIMARY KEY(value)
+                )
+            """
+        )
+        with self.cnx.cursor() as cur:
+            values = [1, 10, 100, 1000]
+            # Insert data
+            for value in values:
+                cur.execute(
+                    f"INSERT INTO {self.table_name} (value) VALUES ({value})"
+                )
+
+            # Test values
+            for value in values:
+                cur.execute(
+                    f"SELECT value FROM {self.table_name} WHERE value={value}"
+                )
+                res = cur.fetchone()
+                self.assertEqual(res[0], value)
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")

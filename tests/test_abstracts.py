@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -225,6 +225,10 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.cnx.cmd_quit()
         self.assertFalse(self.cnx.is_connected())
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
                      "As of MySQL 8.0.1, CMD_SHUTDOWN is not recognized.")
     @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1),

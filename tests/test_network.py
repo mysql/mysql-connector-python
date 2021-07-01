@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -256,6 +256,10 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, self.cnx._connection_timeout)
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(os.name == 'nt', "Skip UNIX Socket tests on Windows")
 class MySQLUnixSocketTests(tests.MySQLConnectorTests):
 
@@ -296,6 +300,10 @@ class MySQLUnixSocketTests(tests.MySQLConnectorTests):
             except errors.Error as err:
                 self.fail(str(err))
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @unittest.skipIf(not tests.SSL_AVAILABLE,
                      "Could not test switch to SSL. Make sure Python supports "
                      "SSL.")

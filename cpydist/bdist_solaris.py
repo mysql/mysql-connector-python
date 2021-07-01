@@ -311,7 +311,8 @@ class DistSolaris(bdist, BaseCommand):
         sun_root = os.path.join(build_base, "sun_pure")
         cmd_install = self.reinitialize_command("install",
                                                 reinit_subcommands=1)
-        cmd_install.compile = False
+        cmd_install.byte_code_only = self.byte_code_only
+        cmd_install.compile = self.byte_code_only
         cmd_install.distribution.metadata.name = metadata_name
         cmd_install.with_mysql_capi = None
         cmd_install.root = os.path.join(sun_root, self.dstroot)

@@ -1142,6 +1142,10 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(cnx._ssl['cert'], 'dummyCert')
         self.assertEqual(cnx._ssl['key'], 'dummyKey')
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test__get_connection(self):
         """Get connection based on configuration"""
         if os.name != 'nt':
@@ -1844,6 +1848,10 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS local_data")
         cur.close()
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @tests.foreach_cnx(allow_local_infile=True)
     def test_allow_local_infile(self):
         cur = self.cnx.cursor()
@@ -1863,6 +1871,10 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS local_data")
         cur.close()
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @tests.foreach_cnx()
     def test_allow_local_infile_in_path(self):
         if isinstance(self.cnx, connection.MySQLConnection):
@@ -2534,6 +2546,10 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertFalse(conn.is_connected())
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class WL13335(tests.MySQLConnectorTests):
     """WL#13335: Avoid set config values with flag CAN_HANDLE_EXPIRED_PASSWORDS
     """
@@ -3073,6 +3089,10 @@ class WL13334(tests.MySQLConnectorTests):
         with self.assertRaises(InterfaceError):
             _ = connect(**settings)
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_failover(self):
         cnx_config = tests.get_mysql_config()
         user = cnx_config['user']

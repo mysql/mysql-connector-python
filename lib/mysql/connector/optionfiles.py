@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -166,12 +166,14 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         Raises ValueError if any of the included or file given in arguments
         is not readable.
         """
+        initial_files = files[:]
+        files = []
         index = 0
         err_msg = "Option file '{0}' being included again in file '{1}'"
 
-        for file_ in files:
+        for file_ in initial_files:
             try:
-                if file_ in files[index+1:]:
+                if file_ in initial_files[index+1:]:
                     raise ValueError("Same option file '{0}' occurring more "
                                      "than once in the list".format(file_))
                 with open(file_, 'r') as op_file:
@@ -186,7 +188,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                                         entry, file_))
                                 if (os.path.isfile(entry) and
                                         entry.endswith(self.default_extension)):
-                                    files.insert(index+1, entry)
+                                    files.append(entry)
 
                         elif line.startswith('!include'):
                             _, filename = line.split(None, 1)
@@ -194,10 +196,10 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                             if filename in files:
                                 raise ValueError(err_msg.format(
                                     filename, file_))
-                            files.insert(index+1, filename)
+                            files.append(filename)
 
                     index += 1
-
+                    files.append(file_)
             except (IOError, OSError) as exc:
                 raise ValueError("Failed reading file '{0}': {1}".format(
                     file_, str(exc)))
@@ -224,6 +226,10 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                 out_file = io.StringIO()
                 for line in codecs.open(filename, encoding='utf-8'):
                     line = line.strip()
+                    # Skip lines that begin with "!includedir" or "!include"
+                    if line.startswith('!include'):
+                        continue
+
                     match_obj = self.OPTCRE.match(line)
                     if not self.SECTCRE.match(line) and match_obj:
                         optname, delimiter, optval = match_obj.group('option',

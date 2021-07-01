@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -214,3 +214,27 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, result)
 
         self.assertRaises(ValueError, connect, option_files='dummy_file.cnf')
+
+    def test_read_option_files_with_include(self):
+        top_dir = os.path.dirname(os.path.realpath(__file__))
+        my_cnf_name = 'my.cnf'
+        my_cnf = os.path.join(self.option_file_dir, my_cnf_name)
+        my_overwrite = os.path.join(
+            top_dir,
+            "..",
+            self.option_file_dir,
+            'my_include_override.cnf'
+        )
+
+        result = read_option_files(
+            option_files=my_overwrite,
+            option_groups='mysqld'
+        )
+
+        # option in the overwrite file
+        port_exp = 1002
+        self.assertEqual(port_exp, result['port'])
+
+        # option in the include file
+        user_exp = 'mysql'
+        self.assertEqual(user_exp, result['user'])

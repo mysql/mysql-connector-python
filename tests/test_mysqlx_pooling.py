@@ -231,6 +231,10 @@ class MySQLxClientTests(tests.MySQLxTests):
             self.assertEqual(client.max_size, 25)
             client.close()
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_get_session(self):
         """Test get_session() opens new connections."""
         # Auxiliary session to query server
@@ -283,6 +287,10 @@ class MySQLxClientTests(tests.MySQLxTests):
         open_connections = wait_for_connections(old_session, self.users[0][0], 0)
         self.assertEqual(open_connections, 0)
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_max_pool_size(self):
         """Test exausted pool behavior"""
         # Initial pool limit size
@@ -622,6 +630,10 @@ class MySQLxClientTests(tests.MySQLxTests):
             self.assertFalse(session.is_open())
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
 class MySQLxClientPoolingTests(tests.MySQLxTests):
     def setUp(self):
@@ -865,6 +877,10 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
             self.session.sql(DROP_USER.format(user=self.user,
                                               host=host)).execute()
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     def test_pools_recycle(self):
         settings = tests.get_mysqlx_config()
         pooling_dict = {"max_size": 1, "max_idle_time": 3000,

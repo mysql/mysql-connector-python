@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -52,6 +52,11 @@ TEST_SSL = {
 
 OPTION_FILE = os.path.join('tests', 'data', 'option_files', 'my.cnf')
 
+
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 class Bug21449996(tests.MySQLConnectorTests):
 
     @cnx_config(ssl_ca=TEST_SSL['ca'], ssl_cert=TEST_SSL['cert'], ssl_key=TEST_SSL['key'],
