@@ -342,6 +342,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self->use_unicode=          1;
 	self->auth_plugin=          PyUnicode_FromString("mysql_native_password");
 	self->plugin_dir=           PyUnicode_FromString(".");
+	self->converter_str_fallback = Py_False;
 
 	return (PyObject *)self;
 }
@@ -1885,6 +1886,14 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         {
             new_value= pytomy_decimal(value);
         }
+        else if (self->converter_str_fallback == Py_True)
+        {
+            PyObject *str= PyObject_Str(value);
+            new_value= PyBytes_FromString(
+                (const char *)PyUnicode_1BYTE_DATA(str)
+            );
+            Py_DECREF(str);
+        }
         else
         {
             PyOS_snprintf(error, 100,
@@ -3331,6 +3340,15 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
         {
             pbind->str_value= pytomy_decimal(value);
             mbind[i].buffer_type= MYSQL_TYPE_DECIMAL;
+        }
+        else if (self->converter_str_fallback == Py_True)
+        {
+            PyObject *str= PyObject_Str(value);
+            pbind->str_value= PyBytes_FromString(
+                (const char *)PyUnicode_1BYTE_DATA(str)
+            );
+            mbind->buffer_type= MYSQL_TYPE_STRING;
+            Py_DECREF(str);
         }
         else
         {

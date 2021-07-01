@@ -37,7 +37,33 @@ import time
 import uuid
 
 import tests
-from mysql.connector import conversion, constants
+
+from mysql.connector import conversion, constants, MySQLConnection
+from mysql.connector.errors import InterfaceError, ProgrammingError
+
+try:
+    from _mysql_connector import MySQLInterfaceError
+except ImportError:
+    MySQLInterfaceError = InterfaceError
+
+
+class CustomType:
+    """Example of a custom type."""
+
+    def __str__(self):
+        return "This is a custom type"
+
+
+class CustomConverter(conversion.MySQLConverter):
+    """A custom MySQL converter class with a CustomType converter."""
+
+    def _customtype_to_mysql(self, value):
+        return str(value).encode()
+
+
+class DummyConverter(conversion.MySQLConverter):
+    """A dummy MySQL converter class that doesn't implement any conversion."""
+    ...
 
 
 class MySQLConverterBaseTests(tests.MySQLConnectorTests):
@@ -515,3 +541,95 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         res = self.cnv._BLOB_to_python(data, desc)
 
         self.assertEqual(data, res)
+
+    def test_str_fallback(self):
+        """Test str fallback for unsupported types."""
+        custom_type = CustomType()
+        self.assertRaises(TypeError, self.cnv.to_mysql, custom_type)
+        exp = b"This is a custom type"
+        self.cnv.str_fallback = True
+        self.assertEqual(exp, self.cnv.to_mysql(custom_type))
+        self.cnv.str_fallback = False
+
+
+class MySQLConverterStrFallbackTests(tests.MySQLConnectorTests):
+
+    table_name = "converter_table"
+
+    @classmethod
+    def setUpClass(cls):
+        config = tests.get_mysql_config()
+        with MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {cls.table_name}")
+            cnx.cmd_query(
+                f"""
+                CREATE TABLE {cls.table_name} (
+                    id int NOT NULL AUTO_INCREMENT,
+                    name VARCHAR(255),
+                    PRIMARY KEY(id)
+                )
+                """
+            )
+            cnx.commit()
+
+    @classmethod
+    def tearDownClass(cls):
+        config = tests.get_mysql_config()
+        with MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {cls.table_name}")
+
+    @tests.foreach_cnx()
+    def test_converter_str_fallback(self):
+        """Test the `converter_str_fallback` connection option.
+
+        Scenarios:
+
+          - Using the default connection options.
+          - Using the default connection options with prepared statements.
+          - Using `converter_str_fallback=True`.
+          - Using `converter_str_fallback=True` with prepared statements.
+          - Using `converter_str_fallback=False`.
+          - Using `converter_str_fallback=False` with prepared statements.
+          - Using `converter_str_fallback=True` with a dummy converter class.
+          - Using `converter_str_fallback=True` with prepared statements with
+            a dummy converter class.
+          - Using `converter_str_fallback=False` with a dummy converter class.
+          - Using `converter_str_fallback=False` with prepared statements with
+            a dummy converter class.
+        """
+        def _run_test(prepared=False, converter_class=None):
+            custom_type = CustomType()
+            config = tests.get_mysql_config()
+            if converter_class:
+                config["converter_class"] = converter_class
+            with self.cnx.__class__(**config) as cnx:
+                with cnx.cursor(prepared=prepared) as cur:
+                    self.assertRaises(
+                        (
+                            TypeError,
+                            InterfaceError,
+                            ProgrammingError,
+                            MySQLInterfaceError,
+                        ),
+                        cur.execute,
+                        f"INSERT INTO {self.table_name} (name) VALUES (%s)",
+                        (custom_type,),
+                    )
+
+            config["converter_str_fallback"] = True
+
+            with self.cnx.__class__(**config) as cnx:
+                with cnx.cursor(prepared=prepared) as cur:
+                    cur.execute(
+                        f"INSERT INTO {self.table_name} (name) VALUES (%s)",
+                        (custom_type,)
+                    )
+                    cur.execute(f"SELECT name FROM {self.table_name}")
+                    res = cur.fetchall()
+                    exp = str(custom_type)
+                    self.assertEqual(exp, res[0][0])
+
+        _run_test(prepared=False)
+        _run_test(prepared=True)
+        _run_test(prepared=False, converter_class=DummyConverter)
+        _run_test(prepared=True, converter_class=DummyConverter)

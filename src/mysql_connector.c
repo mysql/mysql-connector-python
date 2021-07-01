@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -71,6 +71,8 @@ static PyMemberDef MySQL_members[]=
 {
     {"have_result_set", T_OBJECT, offsetof(MySQL, have_result_set), 0,
      "True if current session has result set"},
+    {"converter_str_fallback", T_OBJECT, offsetof(MySQL, converter_str_fallback), 0,
+     "True for fallback to converting unsupported types to str"},
     {NULL}  /* Sentinel */
 };
 
@@ -306,6 +308,8 @@ static PyMemberDef MySQLPrepStmt_members[]=
      "True if statement has result set"},
     {"param_count", T_LONG, offsetof(MySQLPrepStmt, param_count), 1,
      "Returns the number of parameter markers present in the prepared statement"},
+    {"converter_str_fallback", T_OBJECT, offsetof(MySQLPrepStmt, converter_str_fallback), 0,
+     "True for fallback to converting unsupported types to str"},
     {NULL}  /* Sentinel */
 };
 

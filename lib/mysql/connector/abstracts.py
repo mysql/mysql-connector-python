@@ -123,6 +123,7 @@ class MySQLConnectionAbstract(object):
         self._pool_config_version = None
         self.converter = None
         self._converter_class = None
+        self._converter_str_fallback = False
         self._compress = False
 
         self._consume_results = False
@@ -1173,6 +1174,7 @@ class MySQLConnectionAbstract(object):
             charset_name = CharacterSet.get_info(self._charset_id)[0]
             self._converter_class = convclass
             self.converter = convclass(charset_name, self._use_unicode)
+            self.converter.str_fallback = self._converter_str_fallback
         else:
             raise TypeError("Converter class should be a subclass "
                             "of conversion.MySQLConverterBase.")

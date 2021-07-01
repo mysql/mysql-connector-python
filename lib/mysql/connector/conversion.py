@@ -48,14 +48,15 @@ class MySQLConverterBase(object):
     be a subclass of this class.
     """
 
-    def __init__(self, charset='utf8', use_unicode=True):
+    def __init__(self, charset='utf8', use_unicode=True, str_fallback=False):
         self.python_types = None
         self.mysql_types = None
         self.charset = None
         self.charset_id = 0
         self.use_unicode = None
         self.set_charset(charset)
-        self.set_unicode(use_unicode)
+        self.use_unicode = use_unicode
+        self.str_fallback = str_fallback
         self._cache_field_types = {}
 
     def set_charset(self, charset):
@@ -126,8 +127,8 @@ class MySQLConverter(MySQLConverterBase):
 
     """
 
-    def __init__(self, charset=None, use_unicode=True):
-        MySQLConverterBase.__init__(self, charset, use_unicode)
+    def __init__(self, charset=None, use_unicode=True, str_fallback=False):
+        MySQLConverterBase.__init__(self, charset, use_unicode, str_fallback)
         self._cache_field_types = {}
 
     def escape(self, value):
@@ -179,6 +180,8 @@ class MySQLConverter(MySQLConverterBase):
         try:
             return getattr(self, "_{0}_to_mysql".format(type_name))(value)
         except AttributeError:
+            if self.str_fallback:
+                return str(value).encode()
             raise TypeError("Python '{0}' cannot be converted to a "
                             "MySQL type".format(type_name))
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -61,6 +61,7 @@ typedef struct {
     PyObject *fields;
     PyObject *auth_plugin;
     PyObject *plugin_dir;
+    PyObject *converter_str_fallback;
     MY_CHARSET_INFO cs;
     unsigned int connection_timeout;
     // class members
@@ -276,6 +277,7 @@ typedef struct {
     struct column_info *cols;
     PyObject *have_result_set;
     PyObject *fields;
+    PyObject *converter_str_fallback;
     MY_CHARSET_INFO cs;
 } MySQLPrepStmt;
 

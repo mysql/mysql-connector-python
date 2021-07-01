@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -94,13 +94,13 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         exp = {
             'eof': {'status_flag': 32, 'warning_count': 0},
             'columns': [
-                ['Variable_name', 253, None, None, None, None, 0, 1],
-                ('Value', 253, None, None, None, None, 1, 0)
+                ['Variable_name', 253, None, None, None, None, None, 0, 1],
+                ('Value', 253, None, None, None, None, None, 1, 0)
             ]
         }
 
         if tests.MYSQL_VERSION >= (5, 7, 10):
-            exp['columns'][0][7] = 4097
+            exp['columns'][0][8] = 4097
             exp['eof']['status_flag'] = 16385
 
         exp['columns'][0] = tuple(exp['columns'][0])

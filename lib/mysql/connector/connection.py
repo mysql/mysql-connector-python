@@ -1368,11 +1368,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         if self._client_flags & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
             execute_packet = self._protocol.make_stmt_execute(
                 statement_id, data, tuple(parameters), flags,
-                long_data_used, self.charset, self._query_attrs)
+                long_data_used, self.charset, self._query_attrs,
+                self._converter_str_fallback)
         else:
             execute_packet = self._protocol.make_stmt_execute(
                 statement_id, data, tuple(parameters), flags,
-                long_data_used, self.charset)
+                long_data_used, self.charset,
+                converter_str_fallback=self._converter_str_fallback)
         packet = self._send_cmd(ServerCmd.STMT_EXECUTE, packet=execute_packet)
         result = self._handle_binary_result(packet)
         return result

@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -660,7 +660,7 @@ class MySQLProtocol(object):
 
     def make_stmt_execute(self, statement_id, data=(), parameters=(),
                           flags=0, long_data_used=None, charset='utf8',
-                          query_attrs=None):
+                          query_attrs=None, converter_str_fallback=False):
         """Make a MySQL packet with the Statement Execute command"""
         iteration_count = 1
         null_bitmap = [0] * ((len(data) + 7) // 8)
@@ -725,6 +725,10 @@ class MySQLProtocol(object):
                 elif isinstance(value, (datetime.timedelta, datetime.time)):
                     (packed, field_type) = self._prepare_binary_time(value)
                     values.append(packed)
+                elif converter_str_fallback:
+                    value = str(value).encode(charset)
+                    values.append(utils.lc_int(len(value)) + value)
+                    field_type = FieldType.STRING
                 else:
                     raise errors.ProgrammingError(
                         "MySQL binary protocol can not handle "

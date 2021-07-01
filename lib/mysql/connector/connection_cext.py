@@ -237,6 +237,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         try:
             self._cmysql.connect(**cnx_kwargs)
+            self._cmysql.converter_str_fallback = self._converter_str_fallback
+            if self.converter:
+                self.converter.str_fallback = self._converter_str_fallback
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
@@ -437,6 +440,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 None,
                 None,
                 None,
+                None,
                 ~int(col[9]) & FieldFlag.NOT_NULL,
                 int(col[9])
             ))
@@ -468,7 +472,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise errors.OperationalError("MySQL Connection not available")
 
         try:
-            return self._cmysql.stmt_prepare(statement)
+            stmt = self._cmysql.stmt_prepare(statement)
+            stmt.converter_str_fallback = self._converter_str_fallback
+            return stmt
         except MySQLInterfaceError as err:
             raise errors.InterfaceError(str(err))
 
@@ -650,11 +656,28 @@ class CMySQLConnection(MySQLConnectionAbstract):
         Returns dict.
         """
         if isinstance(params, (list, tuple)):
-            result = self._cmysql.convert_to_mysql(*params)
+            if self.converter:
+                result = [
+                    self.converter.quote(
+                        self.converter.escape(
+                            self.converter.to_mysql(value)
+                        )
+                    ) for value in params
+                ]
+            else:
+                result = self._cmysql.convert_to_mysql(*params)
         elif isinstance(params, dict):
             result = {}
-            for key, value in params.items():
-                result[key] = self._cmysql.convert_to_mysql(value)[0]
+            if self.converter:
+                for key, value in params.items():
+                    result[key] = self.converter.quote(
+                        self.converter.escape(
+                            self.converter.to_mysql(value)
+                        )
+                    )
+            else:
+                for key, value in params.items():
+                    result[key] = self._cmysql.convert_to_mysql(value)[0]
         else:
             raise ValueError("Could not process parameters")
 

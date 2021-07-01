@@ -1062,18 +1062,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         # Test converter class
         class TestConverter(MySQLConverterBase):
-
-            def __init__(self, charset=None, unicode=True):
-                pass
+            ...
 
         self.cnx.config(converter_class=TestConverter)
         self.assertTrue(isinstance(self.cnx.converter, TestConverter))
         self.assertEqual(self.cnx._converter_class, TestConverter)
 
         class TestConverterWrong(object):
-
-            def __init__(self, charset, unicode):
-                pass
+            ...
 
         self.assertRaises(AttributeError,
                           self.cnx.config, converter_class=TestConverterWrong)
@@ -1316,15 +1312,13 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         """Set the converter class"""
 
         class TestConverterWrong(object):
-            def __init__(self, charset, unicode):
-                pass
+            ...
 
         self.assertRaises(TypeError,
                           self.cnx.set_converter_class, TestConverterWrong)
 
         class TestConverter(MySQLConverterBase):
-            def __init__(self, charset, unicode):
-                pass
+            ...
 
         self.cnx.set_converter_class(TestConverter)
         self.assertTrue(isinstance(self.cnx.converter, TestConverter))
