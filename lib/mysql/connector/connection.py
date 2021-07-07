@@ -403,6 +403,11 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Raises on errors.
         """
+        if any((self._password1, self._password2, self._password3)):
+            raise errors.NotSupportedError(
+                "The Multi Factor Authentication is not supported by the "
+                "pure Python implementation"
+            )
         if self._auth_plugin == "authentication_kerberos_client":
             if os.name == "nt":
                 raise errors.ProgrammingError(
@@ -999,7 +1004,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         return self._handle_ok(self._send_cmd(ServerCmd.PING))
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=45):
+                        charset=45, password1='', password2='', password3=''):
         """Change the current logged in user
 
         This method allows to change the current logged in user information.
@@ -1009,6 +1014,11 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         self.handle_unread_result()
 
+        if any((password1, password2, password3)):
+            raise errors.NotSupportedError(
+                "The Multi Factor Authentication is not supported by the "
+                "pure Python implementation"
+            )
         if self._compress:
             raise errors.NotSupportedError("Change user is not supported with "
                                            "compression.")
@@ -1090,7 +1100,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             self.cmd_reset_connection()
         except errors.NotSupportedError:
             self.cmd_change_user(self._user, self._password,
-                                 self._database, self._charset_id)
+                                 self._database, self._charset_id,
+                                 self._password1, self._password2,
+                                 self._password3)
 
         cur = self.cursor()
         if user_variables:

@@ -34,6 +34,8 @@
 
 import getpass
 import inspect
+import itertools
+import logging
 import os
 import subprocess
 import tests
@@ -55,6 +57,8 @@ except ImportError:
     # Test without C Extension
     CMySQLConnection = None
     HAVE_CMYSQL = False
+
+LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
 _STANDARD_PLUGINS = (
     "mysql_native_password",
@@ -942,3 +946,220 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
         # Test connection
         self._test_connection(self.cnx.__class__, config, fail=False)
+
+
+@unittest.skipIf(
+    tests.MYSQL_VERSION < (8, 0, 27),
+    "Multi Factor Authentication not supported"
+)
+@unittest.skipUnless(HAVE_CMYSQL, "C Extension not available")
+class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
+    """Test Multi Factor Authentication.
+
+    Implemented by WL#14667: Support for MFA authentication.
+
+    The initialization of the passwords permutations creates a tuple with
+    two values:
+       - The first is a tuple with the passwords to be set:
+         + True: Valid password provided
+         + False: Invalid password provived
+         + None: No password provided
+       - The second is the expected connection result:
+         + True: Connection established
+         + False: Connection denied
+    """
+
+    user_1f = "user_1f"
+    user_2f = "user_2f"
+    user_3f = "user_3f"
+    password1 = "Testpw1"
+    password2 = "Testpw2"
+    password3 = "Testpw3"
+    base_config = {}
+    skip_reason = None
+
+    @classmethod
+    def setUpClass(cls):
+        config = tests.get_mysql_config()
+        cls.base_config = {
+            "host": config["host"],
+            "port": config["port"],
+            "auth_plugin": "mysql_clear_password",
+        }
+        plugin_ext = "dll" if os.name == "nt" else "so"
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            try:
+                cnx.cmd_query("UNINSTALL PLUGIN cleartext_plugin_server")
+            except ProgrammingError:
+                pass
+            try:
+                cnx.cmd_query(
+                    f"""
+                    INSTALL PLUGIN cleartext_plugin_server
+                    SONAME 'auth_test_plugin.{plugin_ext}'
+                    """
+                )
+            except DatabaseError:
+                cls.skip_reason = (
+                    "Plugin cleartext_plugin_server not available"
+                )
+                return
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_1f}'")
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_2f}'")
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_3f}'")
+            cnx.cmd_query(
+                f"""
+                CREATE USER '{cls.user_1f}'
+                IDENTIFIED WITH cleartext_plugin_server BY '{cls.password1}'
+                """
+            )
+            try:
+                cnx.cmd_query(
+                    f"""
+                    CREATE USER '{cls.user_2f}'
+                    IDENTIFIED WITH cleartext_plugin_server BY '{cls.password1}'
+                    AND
+                    IDENTIFIED WITH cleartext_plugin_server BY '{cls.password2}'
+                    """
+                )
+                cnx.cmd_query(
+                    f"""
+                    CREATE USER '{cls.user_3f}'
+                    IDENTIFIED WITH cleartext_plugin_server BY '{cls.password1}'
+                    AND
+                    IDENTIFIED WITH cleartext_plugin_server BY '{cls.password2}'
+                    AND
+                    IDENTIFIED WITH cleartext_plugin_server BY '{cls.password3}'
+                    """
+                )
+            except ProgrammingError:
+                cls.skip_reason = "Multi Factor Authentication not supported"
+                return
+
+    @classmethod
+    def tearDownClass(cls):
+        config = tests.get_mysql_config()
+        with mysql.connector.connection.MySQLConnection(**config) as cnx:
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_1f}'")
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_2f}'")
+            cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_3f}'")
+            try:
+                cnx.cmd_query("UNINSTALL PLUGIN cleartext_plugin_server")
+            except ProgrammingError:
+                pass
+
+    def setUp(self):
+        if self.skip_reason is not None:
+            self.skipTest(self.skip_reason)
+
+    def _test_connection(self, cls, permutations, user):
+        """Helper method for testing connection with MFA."""
+        LOGGER.debug("Running %d permutations...", len(permutations))
+        for perm, valid in permutations:
+            config = self.base_config.copy()
+            config["user"] = user
+            if perm[0] is not None:
+                config["password"] = self.password1 if perm[0] else "invalid"
+            if perm[1] is not None:
+                config["password1"] = self.password1 if perm[1] else "invalid"
+            if perm[2] is not None:
+                config["password2"] = self.password2 if perm[2] else "invalid"
+            if perm[3] is not None:
+                config["password3"] = self.password3 if perm[3] else "invalid"
+            LOGGER.debug(
+                "Test connection with user '%s' using '%s'. (Expected %s)",
+                user, perm, "SUCCESS" if valid else "FAIL",
+            )
+            if valid:
+                with cls(**config) as cnx:
+                    self.assertTrue(cnx.is_connected())
+                    cnx.cmd_query("SELECT @@version")
+                    res = cnx.get_rows()
+                    self.assertIsNotNone(res[0][0][0])
+            else:
+                self.assertRaises(ProgrammingError, cls, **config)
+
+    def _test_change_user(self, cls, permutations, user):
+        """Helper method for testing cnx.cmd_change_user() with MFA."""
+        LOGGER.debug("Running %d permutations...", len(permutations))
+        for perm, valid in permutations:
+            # Connect with 'user_1f'
+            config = self.base_config.copy()
+            config["user"] = self.user_1f
+            config["password"] = self.password1
+            with cls(**config) as cnx:
+                cnx.cmd_query("SELECT @@version")
+                res = cnx.get_rows()
+                self.assertIsNotNone(res[0][0][0])
+                # Create kwargs options for the provided user
+                kwargs = {"username": user}
+                if perm[0] is not None:
+                    kwargs["password"] = self.password1 if perm[0] else "invalid"
+                if perm[1] is not None:
+                    kwargs["password1"] = self.password1 if perm[1] else "invalid"
+                if perm[2] is not None:
+                    kwargs["password2"] = self.password2 if perm[2] else "invalid"
+                if perm[3] is not None:
+                    kwargs["password3"] = self.password3 if perm[3] else "invalid"
+                LOGGER.debug(
+                    "Test change user to '%s' using '%s'. (Expected %s)",
+                    user, perm, "SUCCESS" if valid else "FAIL",
+                )
+                # Change user to the provided user
+                if valid:
+                    cnx.cmd_change_user(**kwargs)
+                    cnx.cmd_query("SELECT @@version")
+                    res = cnx.get_rows()
+                    self.assertIsNotNone(res[0][0][0])
+                else:
+                    self.assertRaises(
+                        (DatabaseError, OperationalError, ProgrammingError),
+                        cnx.cmd_change_user,
+                        **kwargs,
+                    )
+
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_user_1f(self):
+        """Test connection 'user_1f' password permutations."""
+        permutations = []
+        for perm in itertools.product([True, False, None], repeat=4):
+            permutations.append(
+                (perm, perm[1] or (perm[0] and perm[1] is None))
+            )
+        self._test_connection(self.cnx.__class__, permutations, self.user_1f)
+
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_user_2f(self):
+        """Test connection and change user 'user_2f' password permutations."""
+        permutations = []
+        for perm in itertools.product([True, False, None], repeat=4):
+            permutations.append(
+                (
+                    perm,
+                    perm[2] and
+                    (
+                        (perm[0] and perm[1] is not False) or perm[1]
+                    ),
+                )
+            )
+        self._test_connection(self.cnx.__class__, permutations, self.user_2f)
+        # The cmd_change_user() tests are temporarily disabled due to server BUG#33110621
+        # self._test_change_user(self.cnx.__class__, permutations, self.user_2f)
+
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_user_3f(self):
+        """Test connection and change user 'user_3f' password permutations."""
+        permutations = []
+        for perm in itertools.product([True, False, None], repeat=4):
+            permutations.append(
+                (
+                    perm,
+                    perm[2] and perm[3] and
+                    (
+                        (perm[0] and perm[1] is not False) or perm[1]
+                    ),
+                )
+            )
+        self._test_connection(self.cnx.__class__, permutations, self.user_3f)
+        # The cmd_change_user() tests are temporarily disabled due to server BUG#33110621
+        # self._test_change_user(self.cnx.__class__, permutations, self.user_2f)

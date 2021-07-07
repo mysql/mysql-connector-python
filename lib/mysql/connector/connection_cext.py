@@ -197,6 +197,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             'host': self._host,
             'user': self._user,
             'password': self._password,
+            'password1': self._password1,
+            'password2': self._password2,
+            'password3': self._password3,
             'database': self._database,
             'port': self._port,
             'client_flags': self._client_flags,
@@ -691,10 +694,17 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._cmysql.consume_result()
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=45):
+                        charset=45, password1='', password2='', password3=''):
         """Change the current logged in user"""
         try:
-            self._cmysql.change_user(username, password, database)
+            self._cmysql.change_user(
+                username,
+                password,
+                database,
+                password1,
+                password2,
+                password3,
+            )
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
@@ -810,7 +820,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     "version 5.7.2 or earlier.")
             else:
                 self.cmd_change_user(self._user, self._password,
-                                     self._database, self._charset_id)
+                                     self._database, self._charset_id,
+                                     self._password1, self._password2,
+                                     self._password3)
 
         if user_variables or session_variables:
             cur = self.cursor()

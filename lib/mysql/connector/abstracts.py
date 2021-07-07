@@ -92,6 +92,9 @@ class MySQLConnectionAbstract(object):
 
         self._user = ''
         self._password = ''
+        self._password1 = ''
+        self._password2 = ''
+        self._password3 = ''
         self._database = ''
         self._host = '127.0.0.1'
         self._port = 3306
@@ -1239,7 +1242,7 @@ class MySQLConnectionAbstract(object):
         raise NotImplementedError
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=45):
+                        charset=45, password1='', password2='', password3=''):
         """Change the current logged in user"""
         raise NotImplementedError
 

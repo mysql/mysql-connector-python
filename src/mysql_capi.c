@@ -910,18 +910,49 @@ PyObject*
 MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	char *user= NULL, *database= NULL;
-    char *password = NULL;
+    char *password= NULL, *password1=NULL, *password2= NULL, *password3= NULL;
+    unsigned int mfa_factor1= 1, mfa_factor2= 2, mfa_factor3= 3;
 	int res;
-	static char *kwlist[]= {"user", "password", "database", NULL};
+	static char *kwlist[]= {"user", "password", "database", "password1", "password2", "password3", NULL};
+#if MYSQL_VERSION_ID >= 80001
+    bool abool;
+#else
+    my_bool abool;
+#endif
 
     IS_CONNECTED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzz", kwlist,
-                                     &user, &password, &database
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzzz", kwlist,
+                                     &user, &password, &database, &password1, &password2, &password3
                                      ))
     {
         return NULL;
     }
+
+    if (strcmp(PyUnicode_AsUTF8(self->auth_plugin), "mysql_clear_password") == 0)
+    {
+        abool= 1;
+        mysql_options(&self->session, MYSQL_ENABLE_CLEARTEXT_PLUGIN, (char*)&abool);
+    }
+
+    // Multi Factor Authentication: 1-factor password
+    if (password1 && strlen(password1) > 0)
+    {
+        mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor1, password1);
+    }
+
+    // Multi Factor Authentication: 2-factor password
+    if (password2 && strlen(password2) > 0)
+    {
+        mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor2, password2);
+    }
+
+    // Multi Factor Authentication: 3-factor password
+    if (password3 && strlen(password3) > 0)
+    {
+        mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor3, password3);
+    }
+
     Py_BEGIN_ALLOW_THREADS
     res= mysql_change_user(&self->session, user, password, database);
     Py_END_ALLOW_THREADS
@@ -1132,24 +1163,36 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     my_bool abool;
     my_bool ssl_enabled= 0;
 #endif
-    char *password = NULL;
+    char *password= NULL, *password1= NULL, *password2= NULL, *password3= NULL;
+    unsigned int mfa_factor1= 1, mfa_factor2= 2, mfa_factor3= 3;
     MYSQL *res;
 
     static char *kwlist[]=
     {
-        "host", "user", "password", "database", "port", "unix_socket",
-        "client_flags", "ssl_ca", "ssl_cert", "ssl_key", "ssl_cipher_suites",
-        "tls_versions", "tls_cipher_suites", "ssl_verify_cert",
+        "host", "user", "password", "password1", "password2", "password3", "database",
+        "port", "unix_socket", "client_flags", "ssl_ca", "ssl_cert", "ssl_key",
+        "ssl_cipher_suites", "tls_versions", "tls_cipher_suites", "ssl_verify_cert",
         "ssl_verify_identity", "ssl_disabled", "compress", "conn_attrs",
         "local_infile", "load_data_local_dir",
         NULL
     };
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzkzkzzzzzzO!O!O!O!O!iz", kwlist,
-                                     &host, &user, &password, &database,
-                                     &port, &unix_socket,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!iz",
+                                     kwlist,
+                                     &host,
+                                     &user,
+                                     &password,
+                                     &password1,
+                                     &password2,
+                                     &password3,
+                                     &database,
+                                     &port,
+                                     &unix_socket,
                                      &client_flags,
-                                     &ssl_ca, &ssl_cert, &ssl_key,
-                                     &ssl_cipher_suites, &tls_versions,
+                                     &ssl_ca,
+                                     &ssl_cert,
+                                     &ssl_key,
+                                     &ssl_cipher_suites,
+                                     &tls_versions,
                                      &tls_cipher_suites,
                                      &PyBool_Type, &ssl_verify_cert,
                                      &PyBool_Type, &ssl_verify_identity,
@@ -1350,6 +1393,24 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 			Py_DECREF(str_name);
 			Py_DECREF(str_value);
 		}
+    }
+
+    // Multi Factor Authentication: 1-factor password
+    if (password1 && strlen(password1) > 0)
+    {
+        mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor1, password1);
+    }
+
+    // Multi Factor Authentication: 2-factor password
+    if (password2 && strlen(password2) > 0)
+    {
+        mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor2, password2);
+    }
+
+    // Multi Factor Authentication: 3-factor password
+    if (password3 && strlen(password3) > 0)
+    {
+        mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor3, password3);
     }
 
     Py_BEGIN_ALLOW_THREADS
