@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,7 +36,10 @@ from . import BaseCommand
 class DistWheel(bdist_wheel, BaseCommand):
     """Create a Wheel distribution."""
 
-    user_options = bdist_wheel.user_options + BaseCommand.user_options
+    user_options = bdist_wheel.user_options + BaseCommand.user_options + [
+        ("metadata-license=", None, "metadata license text"),
+    ]
+    metadata_license = ""
 
     def initialize_options(self):
         """Initialize the options."""
@@ -52,5 +55,7 @@ class DistWheel(bdist_wheel, BaseCommand):
 
     def run(self):
         """Run the command."""
+        if self.metadata_license:
+            self.distribution.metadata.license = self.metadata_license
         bdist_wheel.run(self)
         self.remove_temp()
