@@ -104,6 +104,7 @@ class MySQLConnectionAbstract(object):
         self._ssl = {}
         self._ssl_disabled = DEFAULT_CONFIGURATION["ssl_disabled"]
         self._force_ipv6 = False
+        self._oci_config_file = None
 
         self._use_unicode = True
         self._get_warnings = False

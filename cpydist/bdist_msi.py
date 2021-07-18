@@ -159,22 +159,32 @@ class DistMSI(BaseCommand):
         if not os.path.isdir(connc_loc):
             self.log.error("MySQL C API should be a directory")
             sys.exit(1)
-
+        self.log.info("# Locating OpeenSSL libraries")
         copy_tree(os.path.join(connc_loc, "lib"), self._connc_lib)
         copy_tree(os.path.join(connc_loc, "include"), self._connc_include)
 
+        self.log.info("# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir)
         if ARCH_64BIT:
-            for filename in ["libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll"]:
-                src = os.path.join(connc_loc, "bin", filename)
-                dst = self._connc_lib
-                self.log.info("copying {0} -> {1}".format(src, dst))
-                shutil.copy(src, dst)
+            openssl_files = ["libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll"]
         else:
-            for filename in ["libssl-1_1.dll", "libcrypto-1_1.dll"]:
+            openssl_files = ["libssl-1_1.dll", "libcrypto-1_1.dll"]
+
+        for filename in openssl_files:
+            if self.with_openssl_lib_dir:
+                openssl_lib_dir = os.path.abspath(self.with_openssl_lib_dir)
+                if os.path.basename(openssl_lib_dir) == "lib":
+                    openssl_lib_dir = os.path.split(openssl_lib_dir)[0]
+                if os.path.exists(openssl_lib_dir) and \
+                   os.path.exists(os.path.join(openssl_lib_dir, "bin")):
+                    openssl_lib_dir = os.path.join(openssl_lib_dir, "bin")
+                self.log.info("# openssl_lib_dir: %s", openssl_lib_dir)
+                src = os.path.join(openssl_lib_dir, filename)
+            else:
                 src = os.path.join(connc_loc, "bin", filename)
-                dst = self._connc_lib
-                self.log.info("copying {0} -> {1}".format(src, dst))
-                shutil.copy(src, dst)
+            self.log.info("Using %s: located in %s", filename, src)
+            dst = self._connc_lib
+            self.log.info("copying {0} -> {1}".format(src, dst))
+            shutil.copy(src, dst)
 
         for lib_file in os.listdir(self._connc_lib):
             if os.name == "posix" and not lib_file.endswith('.a'):
@@ -391,6 +401,7 @@ class DistMSI(BaseCommand):
             params["HaveCExt{}{}".format(*ver)] = 0
             params["HaveLdapLibs{}{}".format(*ver)] = 0
             params["HaveKerberosLibs{}{}".format(*ver)] = 0
+            params["HaveOCILibs{}{}".format(*ver)] = 0
             params["HavePlugin{}{}".format(*ver)] = 0
 
             if py_ver in self.pyver_bdist_paths:
@@ -412,6 +423,12 @@ class DistMSI(BaseCommand):
                                  "mysql", "vendor", "plugin",
                                  "authentication_kerberos_client.dll")):
                     params["HaveKerberosLibs{}{}".format(*ver)] = 1
+                    have_plugins = True
+                if os.path.exists(
+                    os.path.join(self.pyver_bdist_paths[py_ver],
+                                 "mysql", "vendor", "plugin",
+                                 "authentication_oci_client.dll")):
+                    params["HaveOCILibs{}{}".format(*ver)] = 1
                     have_plugins = True
                 if have_plugins:
                     params["HavePlugin{}{}".format(*ver)] = 1

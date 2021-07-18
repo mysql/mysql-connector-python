@@ -318,10 +318,8 @@
         <Condition Level='0'>Not PYTHON36INSTALLPATH_ALL AND Not PYTHON36INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo36"/>
         <ComponentRef Id="MySQLPackage36"/>
-        <?if $(var.HaveLdapLibs36) = 1 ?>
+        <?if $(var.HaveCExt36) = 1 ?>
         <ComponentRef Id="Vendor36"/>
-        <?endif?>
-        <?if $(var.HavePlugin36) = 1 ?>
         <ComponentRef Id="VendorPlugin36"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage36"/>
@@ -345,10 +343,8 @@
         <Condition Level='0'>Not PYTHON37INSTALLPATH_ALL AND Not PYTHON37INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo37"/>
         <ComponentRef Id="MySQLPackage37"/>
-        <?if $(var.HaveLdapLibs37) = 1 ?>
+        <?if $(var.HaveCExt37) = 1 ?>
         <ComponentRef Id="Vendor37"/>
-        <?endif?>
-        <?if $(var.HavePlugin37) = 1 ?>
         <ComponentRef Id="VendorPlugin37"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage37"/>
@@ -372,10 +368,8 @@
         <Condition Level='0'>Not PYTHON38INSTALLPATH_ALL AND Not PYTHON38INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo38"/>
         <ComponentRef Id="MySQLPackage38"/>
-        <?if $(var.HaveLdapLibs38) = 1 ?>
+        <?if $(var.HaveCExt38) = 1 ?>
         <ComponentRef Id="Vendor38"/>
-        <?endif?>
-        <?if $(var.HavePlugin38) = 1 ?>
         <ComponentRef Id="VendorPlugin38"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage38"/>
@@ -399,10 +393,8 @@
         <Condition Level='0'>Not PYTHON39INSTALLPATH_ALL AND Not PYTHON39INSTALLPATH_CURRENT AND Not Installed</Condition>
         <ComponentRef Id="EggInfo39"/>
         <ComponentRef Id="MySQLPackage39"/>
-        <?if $(var.HaveLdapLibs39) = 1 ?>
+        <?if $(var.HaveCExt39) = 1 ?>
         <ComponentRef Id="Vendor39"/>
-        <?endif?>
-        <?if $(var.HavePlugin39) = 1 ?>
         <ComponentRef Id="VendorPlugin39"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage39"/>

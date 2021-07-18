@@ -88,7 +88,8 @@ DEFAULT_CONFIGURATION = {
     'conn_attrs': None,
     'dns_srv': False,
     'use_pure': False,
-    'krb_service_principal': None
+    'krb_service_principal': None,
+    'oci_config_file': None
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')

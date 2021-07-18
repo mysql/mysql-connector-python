@@ -202,6 +202,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "conn_attrs": self._conn_attrs,
             "local_infile": self._allow_local_infile,
             "load_data_local_dir": self._allow_local_infile_in_path,
+            "oci_config_file": self._oci_config_file,
         }
 
         tls_versions = self._ssl.get('tls_versions')
@@ -687,7 +688,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._cmysql.consume_result()
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=45, password1='', password2='', password3=''):
+                        charset=45, password1='', password2='', password3='',
+                        oci_config_file=None):
         """Change the current logged in user"""
         try:
             self._cmysql.change_user(
@@ -697,7 +699,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 password1,
                 password2,
                 password3,
-            )
+                oci_config_file)
+
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
                                              sqlstate=exc.sqlstate)
@@ -815,7 +818,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 self.cmd_change_user(self._user, self._password,
                                      self._database, self._charset_id,
                                      self._password1, self._password2,
-                                     self._password3)
+                                     self._password3, self._oci_config_file)
 
         if user_variables or session_variables:
             cur = self.cursor()

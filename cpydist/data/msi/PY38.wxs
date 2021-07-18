@@ -135,14 +135,25 @@
     </DirectoryRef>
 
     <DirectoryRef Id="VendorDir38">
-      <?if $(var.HaveLdapLibs38) = 1 ?>
+      <?if $(var.HaveCExt38) = 1 ?>
       <Component Id="Vendor38" Guid="681a48cd-be38-11ea-84eb-04ea56793316" Win64="$(var.Win64)">
+        <?if "$(var.Platform)"="x64" ?>
+          <File Id="libcrypto_1_138" Name="libcrypto-1_1-x64.dll"
+           Source="$(var.BDist38)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
+          <File Id="libssl_1_138" Name="libssl-1_1-x64.dll"
+           Source="$(var.BDist38)\mysql\vendor\libssl-1_1-x64.dll" DiskId="1"/>
+        <?else?>
+          <File Id="libcrypto_1_138" Name="libcrypto-1_1.dll"
+           Source="$(var.BDist38)\mysql\vendor\libcrypto-1_1.dll" DiskId="1"/>
+          <File Id="libssl_1_138" Name="libssl-1_1.dll"
+           Source="$(var.BDist38)\mysql\vendor\libssl-1_1.dll" DiskId="1"/>
+        <?endif?>
+        <?if $(var.HaveLdapLibs38) = 1 ?>
         <File Id="libsasl38" Name="libsasl.dll"
          Source="$(var.BDist38)\mysql\vendor\libsasl.dll" DiskId="1"/>
-        <File Id="libcrypto_1_138" Name="libcrypto-1_1-x64.dll"
-         Source="$(var.BDist38)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
         <File Id="saslSCRAM38" Name="saslSCRAM.dll"
          Source="$(var.BDist38)\mysql\vendor\saslSCRAM.dll" DiskId="1"/>
+        <?endif?>
       </Component>
       <?endif?>
     </DirectoryRef>
@@ -156,6 +167,10 @@
           <?if $(var.HaveKerberosLibs38) = 1 ?>
             <File Id="authentication_kerberos_client38" Name="authentication_kerberos_client.dll"
              Source="$(var.BDist38)\mysql\vendor\plugin\authentication_kerberos_client.dll" DiskId="1"/>
+          <?endif?>
+          <?if $(var.HaveOCILibs38) = 1 ?>
+            <File Id="authentication_oci_client38" Name="authentication_oci_client.dll"
+             Source="$(var.BDist38)\mysql\vendor\plugin\authentication_oci_client.dll" DiskId="1"/>
           <?endif?>
         </Component>
       <?endif?>

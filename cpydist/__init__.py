@@ -45,7 +45,8 @@ from distutils.sysconfig import get_config_vars, get_python_version
 from distutils.version import LooseVersion
 from subprocess import check_call, Popen, PIPE
 
-from .utils import ARCH, mysql_c_api_info, write_info_src, write_info_bin
+from .utils import (ARCH, ARCH_64BIT, mysql_c_api_info, write_info_src,
+                    write_info_bin)
 
 
 # Load version information
@@ -251,12 +252,6 @@ class BaseCommand(Command):
                     (plugin_path, [os.path.join("plugin", plugin_name)])
                 )
 
-            if bundle_plugin_libs and os.name == "nt":
-                sasl_libs_path = os.path.join(self.with_mysql_capi, "bin")
-                sasl_plugin_libs = ["libsasl.dll", "saslSCRAM.dll",
-                                    "libcrypto-1_1-x64.dll"]
-                vendor_libs.append((sasl_libs_path, sasl_plugin_libs))
-
             # authentication_kerberos_client
             plugin_name = (
                 "authentication_kerberos_client.{}".format(plugin_ext)
@@ -269,8 +264,50 @@ class BaseCommand(Command):
                     (plugin_path, [os.path.join("plugin", plugin_name)])
                 )
 
+            # authentication_oci_client
+            plugin_name = (
+                "authentication_oci_client.{}".format(plugin_ext)
+            )
+            plugin_full_path = os.path.join(plugin_path, plugin_name)
+            self.log.debug("OCI IAM plugin_path: '%s'", plugin_full_path)
+            if os.path.exists(plugin_full_path):
+                bundle_plugin_libs = True
+                vendor_libs.append(
+                    (plugin_path, [os.path.join("plugin", plugin_name)])
+                )
+
+            # vendor libraries
+            if bundle_plugin_libs and os.name == "nt":
+                plugin_libs = []
+                libs_path = os.path.join(self.with_mysql_capi, "bin")
+                for lib_name in ["libsasl.dll", "saslSCRAM.dll"]:
+                    if os.path.exists(os.path.join(libs_path, lib_name)):
+                        plugin_libs.append(lib_name)
+                if plugin_libs:
+                    vendor_libs.append((libs_path, plugin_libs))
+
+                if ARCH_64BIT:
+                    openssl_libs = ["libssl-1_1-x64.dll",
+                                    "libcrypto-1_1-x64.dll"]
+                else:
+                    openssl_libs = ["libssl-1_1.dll", "libcrypto-1_1.dll"]
+                if self.with_openssl_lib_dir:
+                    openssl_libs_path = os.path.abspath(self.with_openssl_lib_dir)
+                    if os.path.basename(openssl_libs_path) == "lib":
+                        openssl_libs_path = os.path.split(openssl_libs_path)[0]
+                    if os.path.exists(openssl_libs_path) and \
+                       os.path.exists(os.path.join(openssl_libs_path, "bin")):
+                        openssl_libs_path = os.path.join(openssl_libs_path, "bin")
+                    self.log.info("# openssl_libs_path: %s", openssl_libs_path)
+                else:
+                    openssl_libs_path = os.path.join(
+                        self.with_mysql_capi, "bin")
+                vendor_libs.append((openssl_libs_path, openssl_libs))
+
         if not vendor_libs:
             return
+
+        self.log.debug("# vendor_libs: %s", vendor_libs)
 
         # mysql/vendor
         if not os.path.exists(self.vendor_folder):
@@ -597,6 +634,20 @@ class BuildExt(build_ext, BaseCommand):
             # Suppress unknown pragmas
             if os.name == "posix":
                 ext.extra_compile_args.append("-Wno-unknown-pragmas")
+
+        if os.name != "nt":
+            cmd_gcc_ver = ["gcc", "-v"]
+            self.log.info("Executing: {0}"
+                          "".format(" ".join(cmd_gcc_ver)))
+            proc = Popen(cmd_gcc_ver, stdout=PIPE,
+                         universal_newlines=True)
+            self.log.info(proc.communicate())
+            cmd_gpp_ver = ["g++", "-v"]
+            self.log.info("Executing: {0}"
+                          "".format(" ".join(cmd_gcc_ver)))
+            proc = Popen(cmd_gpp_ver, stdout=PIPE,
+                         universal_newlines=True)
+            self.log.info(proc.communicate())
 
         # Remove disabled extensions
         for ext in disabled:

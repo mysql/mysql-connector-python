@@ -32,6 +32,7 @@
 from decimal import Decimal
 from io import IOBase
 import datetime
+import getpass
 import logging
 import os
 import socket
@@ -207,6 +208,16 @@ class MySQLConnection(MySQLConnectionAbstract):
                                        ssl_options.get('tls_versions'))
             self._ssl_active = True
 
+        _LOGGER.debug(
+                "# _do_auth(): user: %s", username)
+        _LOGGER.debug(
+                "# _do_auth(): self._auth_plugin: %s", self._auth_plugin)
+        if self._auth_plugin.startswith("authentication_oci") and not username:
+            username = getpass.getuser()
+            _LOGGER.debug(
+                "MySQL user is empty, OS user: %s will be used for "
+                "authentication_oci_client", username)
+
         packet = self._protocol.make_auth(
             handshake=self._handshake,
             username=username, password=password, database=database,
@@ -250,6 +261,10 @@ class MySQLConnection(MySQLConnectionAbstract):
             elif new_auth_plugin == "authentication_kerberos_client":
                 _LOGGER.debug("# auth_data: %s", auth_data)
                 response = auth.auth_response(auth_data)
+            elif new_auth_plugin == "authentication_oci_client":
+                _LOGGER.debug("# oci configuration file path: %s",
+                              self._oci_config_file)
+                response = auth.auth_response(self._oci_config_file)
             else:
                 response = auth.auth_response()
             _LOGGER.debug("# request: %s size: %s", response, len(response))
@@ -992,7 +1007,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         return self._handle_ok(self._send_cmd(ServerCmd.PING))
 
     def cmd_change_user(self, username='', password='', database='',
-                        charset=45, password1='', password2='', password3=''):
+                        charset=45, password1='', password2='', password3='',
+                        oci_config_file=''):
         """Change the current logged in user
 
         This method allows to change the current logged in user information.
@@ -1018,6 +1034,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             auth_plugin=self._auth_plugin,
             conn_attrs=self._conn_attrs)
         self._socket.send(packet, 0, 0)
+
+        if oci_config_file:
+            self._oci_config_file = oci_config_file
 
         ok_packet = self._auth_switch_request(username, password)
 
@@ -1090,7 +1109,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             self.cmd_change_user(self._user, self._password,
                                  self._database, self._charset_id,
                                  self._password1, self._password2,
-                                 self._password3)
+                                 self._password3,
+                                 self._oci_config_file)
 
         cur = self.cursor()
         if user_variables:

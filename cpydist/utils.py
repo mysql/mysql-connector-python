@@ -182,6 +182,7 @@ def _mysql_c_api_info_win(mysql_capi):
         os.path.join(mysql_capi, "lib", "libmysql.dll"))
     LOGGER.debug("connc_64bit: {0}".format(connc_64bit))
     info["arch"] = "x86_64" if connc_64bit else "i386"
+    LOGGER.debug("# _mysql_c_api_info_win info: %s", info)
 
     return info
 

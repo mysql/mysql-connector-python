@@ -33,10 +33,20 @@ from hashlib import sha1, sha256
 import getpass
 import hmac
 import logging
+import os
 import struct
+
 
 from urllib.parse import quote
 from uuid import uuid4
+
+try:
+    from cryptography.exceptions import UnsupportedAlgorithm
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:
+    CRYPTOGRAPHY_AVAILABLE = False
 
 try:
     import gssapi
@@ -46,7 +56,6 @@ except:
 from . import errors
 from .utils import (normalize_unicode_string as norm_ustr,
                     validate_normalized_unicode_string as valid_norm)
-
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -892,6 +901,120 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         )
 
         return wraped.message
+
+
+class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
+    """Implement the MySQL OCI IAM authentication plugin."""
+
+    plugin_name = "authentication_oci_client"
+    requires_ssl = False
+    context = None
+
+    def _prepare_auth_response(self, signature, oci_config):
+        """Prepare client's authentication response
+
+        Prepares client's authentication response in JSON format
+        Args:
+            signature:  server's nonce to be signed by client.
+            oci_config: OCI configuration object.
+
+        Returns:
+            JSON_STRING {"fingerprint": string, "signature": string}
+        """
+        signature_64 = b64encode(signature)
+        auth_response = {
+            "fingerprint": oci_config["fingerprint"],
+            "signature": signature_64.decode()
+        }
+        return repr(auth_response).replace(" ", "").replace("'", '"')
+
+    def _get_private_key(self, key_path):
+        """Get the private_key form the given location"""
+        if not CRYPTOGRAPHY_AVAILABLE:
+            raise errors.ProgrammingError(
+                "Package 'cryptography' is not installed"
+            )
+        try:
+            with open(os.path.expanduser(key_path), "rb") as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=None,
+                )
+        except (TypeError, OSError, ValueError, UnsupportedAlgorithm) as err:
+            raise errors.ProgrammingError(
+                f'An error occurred while reading the API_KEY from "{key_path}":'
+                f" {err}")
+
+        return private_key
+
+    def _get_valid_oci_config(self, oci_path=None, profile_name="DEFAULT"):
+        """Get a valid OCI config from the given configuration file path"""
+        try:
+            from oci import config, exceptions
+        except ImportError:
+            raise errors.ProgrammingError(
+                'Package "oci" (Oracle Cloud Infrastructure Python SDK)'
+                ' is not installed.')
+        if not oci_path:
+            oci_path = config.DEFAULT_LOCATION
+
+        error_list = []
+        req_keys = {
+            "fingerprint": (lambda x: len(x) > 32),
+            "key_file": (lambda x: os.path.exists(os.path.expanduser(x)))
+        }
+
+        try:
+            # key_file is validated by oci.config if present
+            oci_config = config.from_file(oci_path, profile_name)
+            for req_key in req_keys:
+                try:
+                    # Verify parameter in req_key is present and valid
+                    if oci_config[req_key] \
+                       and not req_keys[req_key](oci_config[req_key]):
+                        error_list.append(f'Parameter "{req_key}" is invalid')
+                except KeyError as err:
+                    error_list.append(f'Does not contain parameter {req_key}')
+        except (
+            exceptions.ConfigFileNotFound,
+            exceptions.InvalidConfig,
+            exceptions.InvalidKeyFilePath,
+            exceptions.InvalidPrivateKey,
+            exceptions.MissingPrivateKeyPassphrase,
+            exceptions.ProfileNotFound
+        ) as err:
+            error_list.append(str(err))
+
+        # Raise errors if any
+        if error_list:
+            raise errors.ProgrammingError(
+                f'Invalid profile {profile_name} in: "{oci_path}". '
+                f" Errors found: {error_list}")
+
+        return oci_config
+
+    def auth_response(self, oci_path=None):
+        """Prepare authentication string for the server."""
+        if not CRYPTOGRAPHY_AVAILABLE:
+            raise errors.ProgrammingError(
+                "Package 'cryptography' is not installed"
+            )
+        _LOGGER.debug("server nonce: %s, len %d",
+                      self._auth_data, len(self._auth_data))
+        _LOGGER.debug("OCI configuration file location: %s", oci_path)
+
+        oci_config = self._get_valid_oci_config(oci_path)
+
+        private_key = self._get_private_key(oci_config['key_file'])
+        signature = private_key.sign(
+            self._auth_data,
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+
+        auth_response = self._prepare_auth_response(signature, oci_config)
+        _LOGGER.debug("authentication response: %s", auth_response)
+        return auth_response.encode()
 
 
 def get_auth_plugin(plugin_name):

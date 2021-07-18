@@ -52,6 +52,11 @@ from mysql.connector.errors import (
 )
 
 try:
+    import oci
+except ImportError:
+    oci = None
+
+try:
     from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
 except ImportError:
     # Test without C Extension
@@ -1163,3 +1168,26 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
         self._test_connection(self.cnx.__class__, permutations, self.user_3f)
         # The cmd_change_user() tests are temporarily disabled due to server BUG#33110621
         # self._test_change_user(self.cnx.__class__, permutations, self.user_2f)
+
+
+@unittest.skipIf(
+    tests.MYSQL_VERSION < (8, 0, 27),
+    "Authentication with OCI IAM not supported"
+)
+class MySQLIAMAuthPluginTests(tests.MySQLConnectorTests):
+    """Test authentication.MySQLKerberosAuthPlugin.
+
+    Implemented by WL#14710: Support for OCI IAM authentication.
+    """
+
+    @unittest.skipIf(oci, "Not testing with OCI is installed")
+    def test_OCI_SDK_not_installed_error(self):
+        # verify an error is raised due to missing OCI SDK
+        plugin_name = "authentication_oci_client"
+        auth_plugin_class = authentication.get_auth_plugin(plugin_name)
+        auth_plugin = auth_plugin_class("spam_auth_data")
+        self.assertIsInstance(auth_plugin, authentication.MySQL_OCI_AuthPlugin)
+        self.assertRaises(
+            ProgrammingError,
+            auth_plugin.auth_response
+        )
