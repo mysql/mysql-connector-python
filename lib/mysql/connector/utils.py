@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -35,11 +35,13 @@ from stringprep import (in_table_a1, in_table_b1, in_table_c11, in_table_c12,
                         in_table_c21_c22, in_table_c3, in_table_c4, in_table_c5,
                         in_table_c6, in_table_c7, in_table_c8, in_table_c9,
                         in_table_c12, in_table_d1, in_table_d2)
+import platform
 import struct
 import sys
 import unicodedata
 
 from decimal import Decimal
+from functools import lru_cache
 
 from .custom_types import HexLiteral
 
@@ -609,3 +611,24 @@ def init_bytearray(payload=b'', encoding='utf-8'):
 
     return bytearray(payload)
 
+
+@lru_cache()
+def get_platform():
+    """Return a dict with the platform arch and OS version."""
+    plat = {"arch": None, "version": None}
+    if os.name == "nt":
+        if "64" in platform.architecture()[0]:
+            plat["arch"] = "x86_64"
+        elif "32" in platform.architecture()[0]:
+            plat["arch"] = "i386"
+        else:
+            plat["arch"] = platform.architecture()
+        plat["version"] = "Windows-{}".format(platform.win32_ver()[1])
+    else:
+        plat["arch"] = platform.machine()
+        if platform.system() == "Darwin":
+            plat["version"] = "{}-{}".format("macOS", platform.mac_ver()[0])
+        else:
+            plat["version"] = "-".join(linux_distribution()[0:2])
+
+    return plat

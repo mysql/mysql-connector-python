@@ -34,7 +34,6 @@ from io import IOBase
 import datetime
 import logging
 import os
-import platform
 import socket
 import struct
 import time
@@ -55,7 +54,7 @@ from .cursor import (
     MySQLCursorBufferedNamedTuple)
 from .network import MySQLUnixSocket, MySQLTCPSocket
 from .protocol import MySQLProtocol
-from .utils import int1store, int4store, lc_int, linux_distribution
+from .utils import int1store, int4store, lc_int, get_platform
 from .abstracts import MySQLConnectionAbstract
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -120,21 +119,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
     def _add_default_conn_attrs(self):
         """Add the default connection attributes."""
-        if os.name == "nt":
-            if "64" in platform.architecture()[0]:
-                platform_arch = "x86_64"
-            elif "32" in platform.architecture()[0]:
-                platform_arch = "i386"
-            else:
-                platform_arch = platform.architecture()
-            os_ver = "Windows-{}".format(platform.win32_ver()[1])
-        else:
-            platform_arch = platform.machine()
-            if platform.system() == "Darwin":
-                os_ver = "{}-{}".format("macOS", platform.mac_ver()[0])
-            else:
-                os_ver = "-".join(linux_distribution()[0:2])
-
+        platform = get_platform()
         license_chunks = version.LICENSE.split(" ")
         if license_chunks[0] == "GPLv2":
             client_license = "GPL-2.0"
@@ -142,12 +127,15 @@ class MySQLConnection(MySQLConnectionAbstract):
             client_license = "Commercial"
         default_conn_attrs = {
             "_pid": str(os.getpid()),
-            "_platform": platform_arch,
+            "_platform": platform["arch"],
             "_source_host": socket.gethostname(),
             "_client_name": "mysql-connector-python",
             "_client_license": client_license,
-            "_client_version": ".".join([str(x) for x in version.VERSION[0:3]]),
-            "_os": os_ver}
+            "_client_version": ".".join(
+                [str(x) for x in version.VERSION[0:3]]
+            ),
+            "_os": platform["version"],
+        }
 
         self._conn_attrs.update((default_conn_attrs))
 
