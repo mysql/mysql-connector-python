@@ -320,6 +320,8 @@
         <ComponentRef Id="MySQLPackage36"/>
         <?if $(var.HaveLdapLibs36) = 1 ?>
         <ComponentRef Id="Vendor36"/>
+        <?endif?>
+        <?if $(var.HavePlugin36) = 1 ?>
         <ComponentRef Id="VendorPlugin36"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage36"/>
@@ -345,6 +347,8 @@
         <ComponentRef Id="MySQLPackage37"/>
         <?if $(var.HaveLdapLibs37) = 1 ?>
         <ComponentRef Id="Vendor37"/>
+        <?endif?>
+        <?if $(var.HavePlugin37) = 1 ?>
         <ComponentRef Id="VendorPlugin37"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage37"/>
@@ -370,6 +374,8 @@
         <ComponentRef Id="MySQLPackage38"/>
         <?if $(var.HaveLdapLibs38) = 1 ?>
         <ComponentRef Id="Vendor38"/>
+        <?endif?>
+        <?if $(var.HavePlugin38) = 1 ?>
         <ComponentRef Id="VendorPlugin38"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage38"/>
@@ -395,6 +401,8 @@
         <ComponentRef Id="MySQLPackage39"/>
         <?if $(var.HaveLdapLibs39) = 1 ?>
         <ComponentRef Id="Vendor39"/>
+        <?endif?>
+        <?if $(var.HavePlugin39) = 1 ?>
         <ComponentRef Id="VendorPlugin39"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage39"/>

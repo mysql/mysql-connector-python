@@ -147,11 +147,17 @@
       <?endif?>
     </DirectoryRef>
     <DirectoryRef Id="VendorPluginDir37">
-      <?if $(var.HaveLdapLibs37) = 1 ?>
-      <Component Id="VendorPlugin37" Guid="7c487c4b-0fc4-4a20-a307-48eda80da147" Win64="$(var.Win64)">
-        <File Id="authentication_ldap_sasl_client37" Name="authentication_ldap_sasl_client.dll"
-         Source="$(var.BDist37)\mysql\vendor\plugin\authentication_ldap_sasl_client.dll" DiskId="1"/>
-      </Component>
+      <?if $(var.HavePlugin37) = 1 ?>
+        <Component Id="VendorPlugin37" Guid="7c487c4b-0fc4-4a20-a307-48eda80da147" Win64="$(var.Win64)">
+          <?if $(var.HaveLdapLibs37) = 1 ?>
+            <File Id="authentication_ldap_sasl_client37" Name="authentication_ldap_sasl_client.dll"
+             Source="$(var.BDist37)\mysql\vendor\plugin\authentication_ldap_sasl_client.dll" DiskId="1"/>
+          <?endif?>
+          <?if $(var.HaveKerberosLibs37) = 1 ?>
+            <File Id="authentication_kerberos_client37" Name="authentication_kerberos_client.dll"
+             Source="$(var.BDist37)\mysql\vendor\plugin\authentication_kerberos_client.dll" DiskId="1"/>
+          <?endif?>
+        </Component>
       <?endif?>
     </DirectoryRef>
 
