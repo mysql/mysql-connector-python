@@ -175,13 +175,6 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return self._server_status & ServerFlag.STATUS_IN_TRANS
 
     def _open_connection(self):
-        if (
-            self._auth_plugin == "authentication_kerberos_client"
-            and os.name == "nt"
-        ):
-            raise errors.ProgrammingError(
-                "The Kerberos authentication is not available on Windows"
-            )
         charset_name = CharacterSet.get_info(self._charset_id)[0]
         self._cmysql = _mysql_connector.MySQL(  # pylint: disable=E1101,I1101
             buffered=self._buffered,
