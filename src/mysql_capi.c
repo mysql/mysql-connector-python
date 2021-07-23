@@ -935,6 +935,7 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
         mysql_options(&self->session, MYSQL_ENABLE_CLEARTEXT_PLUGIN, (char*)&abool);
     }
 
+#if MYSQL_VERSION_ID >= 80027
     // Multi Factor Authentication: 1-factor password
     if (password1 && strlen(password1) > 0)
     {
@@ -952,6 +953,7 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
     {
         mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor3, password3);
     }
+#endif
 
     Py_BEGIN_ALLOW_THREADS
     res= mysql_change_user(&self->session, user, password, database);
@@ -1395,6 +1397,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 		}
     }
 
+#if MYSQL_VERSION_ID >= 80027
     // Multi Factor Authentication: 1-factor password
     if (password1 && strlen(password1) > 0)
     {
@@ -1412,6 +1415,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     {
         mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor3, password3);
     }
+#endif
 
     Py_BEGIN_ALLOW_THREADS
     res= mysql_real_connect(&self->session, host, user, password, database,
