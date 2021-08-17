@@ -949,7 +949,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
 
 @unittest.skipIf(
-    tests.MYSQL_VERSION < (8, 0, 27),
+    tests.MYSQL_VERSION < (8, 0, 28),
     "Multi Factor Authentication not supported"
 )
 @unittest.skipUnless(HAVE_CMYSQL, "C Extension not available")
