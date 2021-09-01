@@ -2564,10 +2564,20 @@ class MySQLxTableTests(tests.MySQLxTests):
                          "".format(table_name)).execute()
 
         table = self.schema.get_table("test")
+
+        # test fetch_one()
+        result = table.select("age", "name").where("age = 21").execute()
+        row = result.fetch_one()
+        self.assertEqual(repr(row), repr([21, "Fred"]))
+
         result = table.select().order_by("age DESC").execute()
         rows = result.fetch_all()
         self.assertEqual(4, len(rows))
         self.assertEqual(67, rows[0]["age"])
+        self.assertEqual(
+            repr(rows),
+            repr([[67, "Betty"], [42, "Wilma"], [28, "Barney"], [21, "Fred"]])
+        )
 
         result = table.select("age").where("age = 42").execute()
         self.assertEqual(1, len(result.columns))

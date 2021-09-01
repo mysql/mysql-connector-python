@@ -766,6 +766,9 @@ class Row(object):
         self._fields = fields
         self._resultset = rs
 
+    def __repr__(self):
+        return repr(self._fields)
+
     def __getitem__(self, index):
         """Returns the value of a column by name or index.
 
