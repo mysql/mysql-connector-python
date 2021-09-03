@@ -29,8 +29,8 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 # This file was auto-generated.
-_GENERATED_ON = '2021-03-05'
-_MYSQL_VERSION = (8, 0, 24)
+_GENERATED_ON = '2021-08-11'
+_MYSQL_VERSION = (8, 0, 27)
 
 # Start MySQL Error messages
 CR_UNKNOWN_ERROR = u"Unknown MySQL error"
@@ -104,5 +104,7 @@ CR_KERBEROS_USER_NOT_FOUND = u"SSO user not found, Please perform SSO authentica
 CR_LOAD_DATA_LOCAL_INFILE_REJECTED = u"LOAD DATA LOCAL INFILE file request rejected due to restrictions on access."
 CR_LOAD_DATA_LOCAL_INFILE_REALPATH_FAIL = u"Determining the real path for '%s' failed with error (%s): %s"
 CR_DNS_SRV_LOOKUP_FAILED = u"DNS SRV lookup failed with error : %s"
+CR_MANDATORY_TRACKER_NOT_FOUND = u"Client does not recognise tracker type %s marked as mandatory by server."
+CR_INVALID_FACTOR_NO = u"Invalid first argument for MYSQL_OPT_USER_PASSWORD option. Valid value should be between 1 and 3 inclusive."
 # End MySQL Error messages
 
