@@ -1293,13 +1293,12 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
             mysql_options(&self->session,
                           MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*)&abool);
 #endif
-        } else {
 #if MYSQL_VERSION_ID >= 50711
-            if (ssl_verify_identity && ssl_verify_identity == Py_True) {
-                ssl_mode= SSL_MODE_VERIFY_IDENTITY;
-                mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
-            }
+        } else if (ssl_verify_identity && ssl_verify_identity == Py_True) {
+            ssl_mode= SSL_MODE_VERIFY_IDENTITY;
+            mysql_options(&self->session, MYSQL_OPT_SSL_MODE, &ssl_mode);
 #endif
+        } else {
             ssl_ca= NULL;
         }
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
