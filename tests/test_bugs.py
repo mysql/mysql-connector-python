@@ -51,6 +51,7 @@ from threading import Thread
 import traceback
 import time
 import unittest
+import platform
 import pickle
 import sys
 
@@ -575,6 +576,9 @@ class Bug809033(tests.MySQLConnectorTests):
         except:
             pass
 
+    @unittest.skipIf(
+        platform.machine() == "arm64", "Test not available for ARM64"
+    )
     @foreach_cnx()
     def test_lost_connection(self):
         self._setup()
@@ -3894,6 +3898,9 @@ class BugOra20653441(tests.MySQLConnectorTests):
         except:
             pass
 
+    @unittest.skipIf(
+        platform.machine() == "arm64", "Test not available for ARM64"
+    )
     @foreach_cnx()
     def test_kill_query(self):
 
