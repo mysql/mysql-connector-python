@@ -2520,6 +2520,54 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         schema.drop_collection(collection_name)
         session.close()
 
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 14),
+                     "Prepared statements not supported")
+    def test_prepared_statements_find_by_pk(self):
+        expected_stmt_attrs = (
+            lambda stmt, changed, prepared, repeated, exec_counter:
+            stmt.changed == changed and stmt.prepared == prepared and
+            stmt.repeated == repeated and stmt.exec_counter == exec_counter
+        )
+
+        session = mysqlx.get_session(self.connect_kwargs)
+        schema = session.get_schema(self.schema_name)
+
+        collection_name = "prepared_collection_test_by_pk"
+        collection = schema.get_collection(collection_name)
+        if collection.exists_in_database():
+            schema.drop_collection("mycoll")
+        collection = schema.create_collection(collection_name)
+
+        add_stmt = collection.add(
+            {"name": "Fred", "age": 21},
+            {"name": "Barney", "age": 28},
+            {"name": "Wilma", "age": 42},
+        ).execute()
+
+        ids = add_stmt.get_generated_ids()
+
+        # Find by primary key
+        find_stmt = collection.find("_id = :id").sort("age")
+        self.assertTrue(expected_stmt_attrs(find_stmt, True, False, False, 0))
+
+        # On the first call should: Crud::Find (without prepared statement)
+        doc = find_stmt.bind("id", ids[0]).execute().fetch_one()
+        self.assertEqual(doc["name"], "Fred")
+        self.assertTrue(expected_stmt_attrs(find_stmt, False, False, False, 1))
+
+        # On the second call should: Prepare::Prepare + Prepare::Execute
+        doc = find_stmt.bind("id", ids[1]).execute().fetch_one()
+        self.assertEqual(doc["name"], "Barney")
+        self.assertTrue(expected_stmt_attrs(find_stmt, False, True, True, 2))
+
+        # On subsequent calls should: Prepare::Execute
+        doc = find_stmt.bind("id", ids[2]).execute().fetch_one()
+        self.assertEqual(doc["name"], "Wilma")
+        self.assertTrue(expected_stmt_attrs(find_stmt, False, True, True, 3))
+
+        schema.drop_collection(collection_name)
+        session.close()
+
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class MySQLxTableTests(tests.MySQLxTests):
