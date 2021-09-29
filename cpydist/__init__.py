@@ -334,6 +334,16 @@ class BaseCommand(Command):
 
         if os.name == "nt":
             self.distribution.package_data = {"mysql": ["vendor/plugin/*"]}
+            site_packages_files = [
+                os.path.join(openssl_libs_path, lib_n) for lib_n in openssl_libs
+            ]
+            site_packages_files.append(
+                os.path.join(self.with_mysql_capi, "lib", "libmysql.dll"))
+            self.distribution.data_files = [(
+                'lib\\site-packages\\', site_packages_files
+            )]
+            self.log.debug("# site_packages_files: %s",
+                           self.distribution.data_files)
         elif bundle_plugin_libs:
             # Bundle SASL libs
             sasl_libs_path = os.path.join(self.with_mysql_capi, "lib",
