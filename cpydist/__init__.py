@@ -33,6 +33,7 @@ import os
 import platform
 import shutil
 import sys
+import tempfile
 
 from glob import glob
 from setuptools.command.build_ext import build_ext
@@ -603,6 +604,14 @@ class BuildExt(build_ext, BaseCommand):
                         "The '_mysqlxpb' C extension will not be built")
                     disabled.append(ext)
                     continue
+                if platform.system() == "Darwin":
+                    symbol_file = tempfile.NamedTemporaryFile()
+                    ext.extra_link_args.extend(
+                        ["-exported_symbols_list", symbol_file.name]
+                    )
+                    with open(symbol_file.name, "w") as fp:
+                        fp.write("_PyInit__mysqlxpb")
+                        fp.write("\n")
                 ext.include_dirs.append(self.with_protobuf_include_dir)
                 ext.library_dirs.append(self._build_protobuf_lib_dir)
                 ext.libraries.append(
