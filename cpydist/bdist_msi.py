@@ -85,7 +85,7 @@ class DistMSI(BaseCommand):
     _connc_lib = None
     _dist_path = {}
     _fix_txt_files = {}
-    _supported_versions = ["3.6", "3.7", "3.8", "3.9"]
+    _supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10"]
     _with_cext = False
     _wxs = None
 
@@ -98,7 +98,7 @@ class DistMSI(BaseCommand):
         self.dist_dir = None
         self.wix_install = wix.WIX_INSTALL_PATH
         self.wix_required_version = wix.WIX_REQUIRED_VERSION
-        self.python_version = get_python_version()[:3]
+        self.python_version = get_python_version()
         self.prepare_stage = False
         self.combine_stage = False
         self.edition = EDITION
@@ -114,7 +114,7 @@ class DistMSI(BaseCommand):
         if not self.prefix:
             self.prefix = os.path.join(
                 self.build_base, DIST_PATH_FORMAT.format(
-                    self.python_version[0], self.python_version[2]))
+                    self.python_version[0], self.python_version[2:]))
 
         for py_ver in self._supported_versions:
             self._dist_path[py_ver] = os.path.join(
@@ -122,8 +122,8 @@ class DistMSI(BaseCommand):
 
         if self.python_version not in self._supported_versions:
             raise DistutilsOptionError(
-                "The --python-version should be a supported version, one "
-                "of {}".format(",".join(self._supported_versions)))
+                "The --python-version {} should be a supported version, one "
+                "of {}".format(self.python_version, ",".join(self._supported_versions)))
 
         if self.python_version[0] != get_python_version()[0]:
             raise DistutilsError(

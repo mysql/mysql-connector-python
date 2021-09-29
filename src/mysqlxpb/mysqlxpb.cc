@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -27,6 +27,8 @@
  * along with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
+
+#define PY_SSIZE_T_CLEAN 1
 
 #include "python_cast.h"
 #include "python.h"
@@ -791,7 +793,7 @@ static PyObject* ParseMessage(PyObject* self, PyObject* args) {
   PyObject* result = NULL;
   const char* type_name;
   const char* data;
-  int data_size;
+  Py_ssize_t data_size;
 
   if (PyArg_ParseTuple(args, "ss#", &type_name, &data, &data_size))
     result = ParseMessageImpl(type_name, data, data_size);
@@ -849,7 +851,7 @@ static PyObject* ParseServerMessage(PyObject* self, PyObject* args) {
   PyObject* result = NULL;
   int type;
   const char* message_data;
-  int message_data_size;
+  Py_ssize_t message_data_size;
 
   if (PyArg_ParseTuple(args, "is#", &type, &message_data, &message_data_size))
   {

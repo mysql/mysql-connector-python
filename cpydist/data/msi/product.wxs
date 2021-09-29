@@ -17,6 +17,7 @@
     <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED39" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED310" Secure="yes" />
 
 	<Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
@@ -41,6 +42,12 @@
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED39"/>
+    </Upgrade>
+    <Upgrade Id="a0b2ca29-5516-4cb1-a076-178068896350">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED310"/>
     </Upgrade>
 
     <!-- Obtain location of the Python interpreters installed on the system-->
@@ -133,8 +140,30 @@
       <?endif?>
     </Property>
 
+    <!-- Python 3.10 -->
+    <Property Id="PYTHON310INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python310InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.10\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python310InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.10-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON310INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python310InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.10\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python310InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.10-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
     <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
-      Installed OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT
+      Installed OR PYTHON36INSTALLPATH_ALL OR PYTHON36INSTALLPATH_CURRENT OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT OR PYTHON310INSTALLPATH_ALL OR PYTHON310INSTALLPATH_CURRENT
     </Condition>
 
     <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
@@ -235,6 +264,31 @@
                 <Directory Id="DjangoDir39" Name="django"/>
                 <Directory Id="ConnectorLocalesDir39" Name="locales">
                   <Directory Id="LocalesEngDir39" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP310" Name="Python310">
+        <Directory Id="PythonLibDir310" Name="Lib">
+          <Directory Id="SitePackagesDir310" Name="site-packages">
+            <Directory Id="EggInfoDir310" Name="mysql_connector_python-$(var.FullVersion)-py3.10.egg-info"/>
+            <Directory Id="MySQLXPackageDir310" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir310" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir310" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir310" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir310" Name="mysql">
+              <Directory Id="VendorDir310" Name="vendor">
+                <Directory Id="VendorPluginDir310" Name="plugin"/>
+              </Directory>
+              <Directory Id="ConnectorPackageDir310" Name="connector">
+                <Directory Id="DjangoDir310" Name="django"/>
+                <Directory Id="ConnectorLocalesDir310" Name="locales">
+                  <Directory Id="LocalesEngDir310" Name="eng"/>
                 </Directory>
               </Directory>
             </Directory>
@@ -410,6 +464,31 @@
         <?endif?>
       </Feature>
       <?endif?>
+
+      <!-- Python 3.10 -->
+      <?if $(var.BDist310) != "" ?>
+      <Feature Id="Python310" Title="C/py for Python 3.10" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP310" Absent="allow">
+        <Condition Level='0'>Not PYTHON310INSTALLPATH_ALL AND Not PYTHON310INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo310"/>
+        <ComponentRef Id="MySQLPackage310"/>
+        <?if $(var.HaveCExt310) = 1 ?>
+        <ComponentRef Id="Vendor310"/>
+        <ComponentRef Id="VendorPlugin310"/>
+        <?endif?>
+        <ComponentRef Id="ConnectorPackage310"/>
+        <ComponentRef Id="ConnectorLocales310"/>
+        <ComponentRef Id="LocalesEng310"/>
+        <ComponentRef Id="DjangoBackend310"/>
+        <ComponentRef Id="MySQLXPackage310"/>
+        <ComponentRef Id="MySQLXPackagePB2310"/>
+        <ComponentRef Id="MySQLXLocales310"/>
+        <ComponentRef Id="MySQLXLocalesEng310"/>
+        <?if $(var.HaveCExt310) = 1 ?>
+        <ComponentRef Id="CExtension310"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
     </Feature>
 
     <!-- Python 3.6 -->
@@ -431,6 +510,11 @@
     <CustomAction Id="SetInstallDirCurrentP39" Property="INSTALLDIRP39" Value="[PYTHON39INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP39" Property="INSTALLDIRP39" Value="[PYTHON39INSTALLPATH_ALL]"/>
     <CustomAction Id="ErrDebug39" Error="Installdir: [INSTALLDIRP39]"/>
+
+    <!-- Python 3.10 -->
+    <CustomAction Id="SetInstallDirCurrentP310" Property="INSTALLDIRP310" Value="[PYTHON310INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP310" Property="INSTALLDIRP310" Value="[PYTHON310INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug310" Error="Installdir: [INSTALLDIRP310]"/>
 
     <UIRef Id="WixUI_CPY"/>
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
@@ -454,6 +538,9 @@
       <!-- Python 3.9 -->
       <Custom Action="SetInstallDirCurrentP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_ALL</Custom>
+      <!-- Python 3.10 -->
+      <Custom Action="SetInstallDirCurrentP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_ALL</Custom>
     </InstallExecuteSequence>
 
     <InstallUISequence>
@@ -470,6 +557,9 @@
       <!-- Python 3.9 -->
       <Custom Action="SetInstallDirCurrentP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP39" After="AppSearch">NOT Installed AND PYTHON39INSTALLPATH_ALL</Custom>
+      <!-- Python 3.10 -->
+      <Custom Action="SetInstallDirCurrentP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_ALL</Custom>
     </InstallUISequence>
   </Product>
 </Wix>

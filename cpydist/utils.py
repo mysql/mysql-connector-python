@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -581,6 +581,7 @@ def add_arch_dep_elems(xml_path, result_path, for32=False, add_vs_redist=True):
         result_path (str): Path to save the resulting xml.
         add_vs_redist (bool): Add the VS redistributable requirement.
     """
+    LOGGER.info("Adding arch_dep_elems xml to:%s", xml_path)
     dom_msi = parse(xml_path)
     if for32:
         LOGGER.info("No elements to add for 32bit msi")

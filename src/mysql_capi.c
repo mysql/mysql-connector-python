@@ -28,6 +28,8 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
+#define PY_SSIZE_T_CLEAN 1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -2086,7 +2088,8 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *buffered= NULL, *raw= NULL, *raw_as_string= NULL,
              *query_attrs= NULL, *retval= NULL;
-	int res= 0, stmt_length;
+	int res= 0;
+	Py_ssize_t stmt_length;
 	char *stmt= NULL;
 	static char *kwlist[]=
 	{
