@@ -2280,7 +2280,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                         "Unexpected exception message found: {}"
                         "".format(context.exception))
 
-        # Verify unkown cipher suite case?
+        # Verify unknown cipher suite case?
         settings["tls_ciphersuites"] = ["NOT-KNOWN"]
         settings["tls_versions"] = ["TLSv1.2"]
         with self.assertRaises(AttributeError) as context:
@@ -2295,7 +2295,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                         "Unexpected exception message found: {}"
                         "".format(context.exception))
 
-        # Verify unkown cipher suite case?
+        # Verify unknown cipher suite case?
         settings["tls_ciphersuites"] = ["NOT-KNOWN"]
         settings["tls_versions"] = ["TLSv1.2"]
         with self.assertRaises(AttributeError) as context:

@@ -2085,13 +2085,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         create_index = collection.create_index(index_name, index_desc)
         self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
 
-        # Required inner "field" is misstyped
+        # Required inner "field" is mistyped
         index_desc = {"fields": [{"field1": "$.myField", "type": "TEXT(10)"}],
                       "unique": False, "type":"INDEX"}
         create_index = collection.create_index(index_name, index_desc)
         self.assertRaises(mysqlx.ProgrammingError, create_index.execute)
 
-        # Required inner "field" is misstyped
+        # Required inner "field" is mistyped
         index_desc = {"fields": [{"01field1": "$.myField",
                                   "type": "TEXT(10)"}],
                       "unique": False, "type":"INDEX"}

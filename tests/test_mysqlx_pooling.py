@@ -270,7 +270,7 @@ class MySQLxClientTests(tests.MySQLxTests):
                         (total_connections - 2))
 
         if tests.MYSQL_VERSION < (8, 0, 16):
-            # Send reset message requires the user to re-authentificate
+            # Send reset message requires the user to re-authenticate
             # the connection user stays in unauthenticated user
             open_connections = wait_for_connections(old_session,
                                                     "unauthenticated user", 2)
@@ -292,7 +292,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         "Test not available for external MySQL servers",
     )
     def test_max_pool_size(self):
-        """Test exausted pool behavior"""
+        """Test exhausted pool behavior"""
         # Initial pool limit size
         pool_limit = 5
         # Setup a client to get sessions from.
@@ -325,7 +325,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         open_connections = connections.get(self.users[1][0], -1)
         self.assertEqual(len(open_connections), pool_limit)
 
-        # verify exception is raised if the pool is exausted
+        # verify exception is raised if the pool is exhausted
         with self.assertRaises(mysqlx.errors.PoolError):
             client.get_session()
 
@@ -353,13 +353,13 @@ class MySQLxClientTests(tests.MySQLxTests):
         session = client.get_session()
         session.get_schema(settings["schema"])
         session.close()
-        # Verify that clossing the session again does not raise eceptions
+        # Verify that clossing the session again does not raise exceptions
         session.close()
         # Verify that trying to use a closed session raises error
         with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
             session.sql("SELECT 1").execute()
         client.close()
-        # Verify that clossing the client again does not raise eceptions
+        # Verify that clossing the client again does not raise exceptions
         client.close()
 
     @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "not reset compatible")
@@ -435,7 +435,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Getting session 4
         session4 = client.get_session()
-        # Verify exception is raised if the pool is exausted
+        # Verify exception is raised if the pool is exhausted
         with self.assertRaises(mysqlx.errors.PoolError):
             client.get_session()
 
@@ -510,7 +510,7 @@ class MySQLxClientTests(tests.MySQLxTests):
                         "Unexpected exception message found: {}"
                         "".format(context.exception.msg))
 
-        # Verify unkown cipher suite case
+        # Verify unknown cipher suite case
         settings["tls-ciphersuites"] = ["NOT-KNOWN"]
         settings["tls-versions"] = ["TLSv1.2"]
         uri_settings = build_uri(**settings)
@@ -917,7 +917,7 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
         connections = get_current_connections(self.session)
         open_connections = connections.get("unauthenticated user", [])
         if tests.MYSQL_VERSION < (8, 0, 16):
-            # Send reset message requires the user to re-authentificate
+            # Send reset message requires the user to re-authenticate
             # the connection user stays in unauthenticated user
             self.assertTrue(len(open_connections) >= 1)
         else:

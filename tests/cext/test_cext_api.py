@@ -555,7 +555,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         # tests change user
         if tests.MYSQL_VERSION < (8, 0, 0):
-            # 5.6 does noy suport caching_sha2_password auth plugin
+            # 5.6 does noy support caching_sha2_password auth plugin
             test_cases = [(0, 1), (1, 2), (2,3), (3, 0)]
         else:
             test_cases = [(0, 1), (1, 2), (2,3), (3, 0), (3, 4), (4, 5), (5, 3),

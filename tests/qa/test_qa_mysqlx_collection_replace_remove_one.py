@@ -62,7 +62,7 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_collection_replace_one2(self):
-        """Test replacing multiple values of same doc usingi
+        """Test replacing multiple values of same doc using
         collection.replace_one."""
         self._drop_collection_if_exists("mycoll2")
         collection = self.schema.create_collection("mycoll2")

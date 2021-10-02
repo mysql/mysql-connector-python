@@ -607,7 +607,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                  "MySQL 8.0.13+ is required for connect timeout")
     def test_connect_timeout(self):
         config = self.connect_kwargs.copy()
-        # 0 ms disables timouts on socket connections
+        # 0 ms disables timeouts on socket connections
         config["connect-timeout"] = 0
         session = mysqlx.get_session(config)
         session.close()
@@ -1115,7 +1115,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                         "Unexpected exception message found: {}"
                         "".format(context.exception.msg))
 
-        # Verify unkown cipher suite case?
+        # Verify unknown cipher suite case?
         settings["tls-ciphersuites"] = ["NOT-KNOWN"]
         settings["tls-versions"] = ["TLSv1.2"]
         with self.assertRaises(InterfaceError) as context:
@@ -1225,7 +1225,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                         "Unexpected exception message found: {}"
                         "".format(context.exception.msg))
 
-        # Verify unkown cipher suite case?
+        # Verify unknown cipher suite case?
         settings["tls-ciphersuites"] = ["NOT-KNOWN"]
         settings["tls-versions"] = ["TLSv1.2"]
         uri_settings = build_uri(**settings)
