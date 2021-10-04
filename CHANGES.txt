@@ -8,6 +8,11 @@ Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.28
+=======
+
+- WL#14720: Support for Multi Factor authentication (pure Python)
+
 v8.0.27
 =======
 

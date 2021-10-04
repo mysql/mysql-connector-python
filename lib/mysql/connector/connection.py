@@ -108,6 +108,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._query_attrs_supported = False
 
         self._columns_desc = []
+        self._mfa_nfactor = 1
 
         if kwargs:
             try:
@@ -176,6 +177,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._query_attrs_supported = True
             self.set_client_flags([ClientFlag.CLIENT_QUERY_ATTRIBUTES])
 
+        if handshake['capabilities'] & ClientFlag.MULTI_FACTOR_AUTHENTICATION:
+            self.set_client_flags([ClientFlag.MULTI_FACTOR_AUTHENTICATION])
+
         self._handshake = handshake
 
     def _do_auth(self, username=None, password=None, database=None,
@@ -207,6 +211,9 @@ class MySQLConnection(MySQLConnectionAbstract):
                                        tls_ciphersuites,
                                        ssl_options.get('tls_versions'))
             self._ssl_active = True
+
+        if self._password1 and password != self._password1:
+            password = self._password1
 
         _LOGGER.debug(
                 "# _do_auth(): user: %s", username)
@@ -255,114 +262,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             auth = get_auth_plugin(new_auth_plugin)(auth_data,
                  username=self._user, password=password,
                  ssl_enabled=self._ssl_active)
-            if new_auth_plugin == "authentication_ldap_sasl_client":
-                _LOGGER.debug("# auth_data: %s", auth_data)
-                response = auth.auth_response(self._krb_service_principal)
-            elif new_auth_plugin == "authentication_kerberos_client":
-                _LOGGER.debug("# auth_data: %s", auth_data)
-                response = auth.auth_response(auth_data)
-            elif new_auth_plugin == "authentication_oci_client":
-                _LOGGER.debug("# oci configuration file path: %s",
-                              self._oci_config_file)
-                response = auth.auth_response(self._oci_config_file)
-            else:
-                response = auth.auth_response()
-            _LOGGER.debug("# request: %s size: %s", response, len(response))
-            self._socket.send(response)
-            packet = self._socket.recv()
-            _LOGGER.debug("# server response packet: %s", packet)
-            if new_auth_plugin == "authentication_ldap_sasl_client" \
-               and len(packet) >= 6 and packet[5] == 114 and packet[6] == 61: # 'r' and '='
-                # Continue with sasl authentication
-                dec_response = packet[5:]
-                cresponse = auth.auth_continue(dec_response)
-                self._socket.send(cresponse)
-                packet = self._socket.recv()
-                if packet[5] == 118 and packet[6] == 61: # 'v' and '='
-                    if auth.auth_finalize(packet[5:]):
-                        # receive packed OK
-                        packet = self._socket.recv()
-            elif new_auth_plugin == "authentication_ldap_sasl_client" and \
-               auth_data == b'GSSAPI' and packet[4] != 255:
-                rcode_size = 5  # header size for the response status code.
-                _LOGGER.debug("# Continue with sasl GSSAPI authentication")
-                _LOGGER.debug("# response header: %s", packet[:rcode_size+1])
-                _LOGGER.debug("# response size: %s", len(packet))
-
-                _LOGGER.debug("# Negotiate a service request")
-                complete = False
-                tries = 0  # To avoid a infinite loop attempt no more than feedback messages
-                while not complete and tries < 5:
-                    _LOGGER.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
-                    _LOGGER.debug("<< server response: %s", packet)
-                    _LOGGER.debug("# response code: %s", packet[:rcode_size + 1])
-                    step, complete = auth.auth_continue_krb(packet[rcode_size:])
-                    _LOGGER.debug(" >> response to server: %s", step)
-                    self._socket.send(step or b'')
-                    packet = self._socket.recv()
-                    tries += 1
-                if not complete:
-                    raise errors.InterfaceError(
-                        "Unable to fulfill server request after %s attempts. "
-                        "Last server response: %s", tries, packet)
-                _LOGGER.debug(" last GSSAPI response from server: %s length: %d",
-                              packet, len(packet))
-                last_step = auth.auth_accept_close_handshake(packet[rcode_size:])
-                _LOGGER.debug(" >> last response to server: %s length: %d",
-                              last_step, len(last_step))
-                self._socket.send(last_step)
-                # Receive final handshake from server
-                packet = self._socket.recv()
-                _LOGGER.debug("<< final handshake from server: %s", packet)
-
-                # receive OK packet from server.
-                packet = self._socket.recv()
-                _LOGGER.debug("<< ok packet from server: %s", packet)
-            elif (
-                new_auth_plugin == "authentication_kerberos_client"
-                and packet[4] != 255
-            ):
-                rcode_size = 5  # Reader size for the response status code
-                _LOGGER.debug("# Continue with GSSAPI authentication")
-                _LOGGER.debug("# Response header: %s", packet[:rcode_size + 1])
-                _LOGGER.debug("# Response size: %s", len(packet))
-                _LOGGER.debug("# Negotiate a service request")
-                complete = False
-                tries = 0
-
-                while not complete and tries < 5:
-                    _LOGGER.debug(
-                        "%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20
-                    )
-                    _LOGGER.debug("<< Server response: %s", packet)
-                    _LOGGER.debug(
-                        "# Response code: %s", packet[:rcode_size + 1]
-                    )
-                    token, complete = auth.auth_continue(packet[rcode_size:])
-                    if token:
-                        self._socket.send(token)
-                    if complete:
-                        break
-                    packet = self._socket.recv()
-
-                    _LOGGER.debug(">> Response to server: %s", token)
-                    tries += 1
-
-                if not complete:
-                    raise errors.InterfaceError(
-                        "Unable to fulfill server request after {} attempts. "
-                        "Last server response: {}".format(tries, packet)
-                    )
-
-                _LOGGER.debug(
-                    "Last response from server: %s length: %d",
-                    packet,
-                    len(packet),
-                )
-
-                # Receive OK packet from server.
-                packet = self._socket.recv()
-                _LOGGER.debug("<< Ok packet from server: %s", packet)
+            packet = self._auth_continue(auth, new_auth_plugin, auth_data)
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)
@@ -376,9 +276,180 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if packet[4] == 0:
             return self._handle_ok(packet)
+        elif packet[4] == 2:
+            return self._handle_mfa(packet)
         elif packet[4] == 255:
             raise errors.get_exception(packet)
         return None
+
+    def _handle_mfa(self, packet):
+        """Handle Multi Factor Authentication."""
+        self._mfa_nfactor += 1
+        if self._mfa_nfactor == 2:
+            password = self._password2
+        elif self._mfa_nfactor == 3:
+            password = self._password3
+        else:
+            raise errors.InterfaceError(
+                "Failed Multi Factor Authentication (invalid N factor)"
+            )
+
+        _LOGGER.debug("# MFA N Factor #%d", self._mfa_nfactor)
+
+        packet, auth_plugin = self._protocol.parse_auth_next_factor(
+            packet[4:]
+        )
+        auth = get_auth_plugin(auth_plugin)(
+            None,
+            username=self._user,
+            password=password,
+            ssl_enabled=self._ssl_active,
+        )
+        packet = self._auth_continue(auth, auth_plugin, packet)
+
+        if packet[4] == 1:
+            auth_data = self._protocol.parse_auth_more_data(packet)
+            auth = get_auth_plugin(auth_plugin)(
+                auth_data, password=password, ssl_enabled=self._ssl_active)
+            if auth_plugin == "caching_sha2_password":
+                response = auth.auth_response()
+                if response:
+                    self._socket.send(response)
+                packet = self._socket.recv()
+
+        if packet[4] == 0:
+            return self._handle_ok(packet)
+        elif packet[4] == 2:
+            return self._handle_mfa(packet)
+        elif packet[4] == 255:
+            raise errors.get_exception(packet)
+        return None
+
+    def _auth_continue(self, auth, auth_plugin, auth_data):
+        """Continue with the authentication."""
+        if auth_plugin == "authentication_ldap_sasl_client":
+            _LOGGER.debug("# auth_data: %s", auth_data)
+            response = auth.auth_response(self._krb_service_principal)
+        elif auth_plugin == "authentication_kerberos_client":
+            _LOGGER.debug("# auth_data: %s", auth_data)
+            response = auth.auth_response(auth_data)
+        elif auth_plugin == "authentication_oci_client":
+            _LOGGER.debug(
+                "# oci configuration file path: %s", self._oci_config_file
+            )
+            response = auth.auth_response(self._oci_config_file)
+        else:
+            response = auth.auth_response()
+
+        _LOGGER.debug("# request: %s size: %s", response, len(response))
+        self._socket.send(response)
+        packet = self._socket.recv()
+        _LOGGER.debug("# server response packet: %s", packet)
+        if (
+            auth_plugin == "authentication_ldap_sasl_client"
+            and len(packet) >= 6 and packet[5] == 114 and packet[6] == 61
+        ): # 'r' and '='
+            # Continue with sasl authentication
+            dec_response = packet[5:]
+            cresponse = auth.auth_continue(dec_response)
+            self._socket.send(cresponse)
+            packet = self._socket.recv()
+            if packet[5] == 118 and packet[6] == 61: # 'v' and '='
+                if auth.auth_finalize(packet[5:]):
+                    # receive packed OK
+                    packet = self._socket.recv()
+        elif (
+            auth_plugin == "authentication_ldap_sasl_client"
+            and auth_data == b'GSSAPI' and packet[4] != 255
+        ):
+            rcode_size = 5  # header size for the response status code.
+            _LOGGER.debug("# Continue with sasl GSSAPI authentication")
+            _LOGGER.debug("# response header: %s", packet[:rcode_size+1])
+            _LOGGER.debug("# response size: %s", len(packet))
+
+            _LOGGER.debug("# Negotiate a service request")
+            complete = False
+            tries = 0  # To avoid a infinite loop attempt no more than feedback messages
+            while not complete and tries < 5:
+                _LOGGER.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
+                _LOGGER.debug("<< server response: %s", packet)
+                _LOGGER.debug("# response code: %s", packet[:rcode_size + 1])
+                step, complete = auth.auth_continue_krb(packet[rcode_size:])
+                _LOGGER.debug(" >> response to server: %s", step)
+                self._socket.send(step or b'')
+                packet = self._socket.recv()
+                tries += 1
+            if not complete:
+                raise errors.InterfaceError(
+                    "Unable to fulfill server request after %s attempts. "
+                    "Last server response: %s", tries, packet,
+                )
+            _LOGGER.debug(
+                " last GSSAPI response from server: %s length: %d",
+                packet,
+                len(packet),
+            )
+            last_step = auth.auth_accept_close_handshake(packet[rcode_size:])
+            _LOGGER.debug(
+                " >> last response to server: %s length: %d",
+                last_step,
+                len(last_step),
+            )
+            self._socket.send(last_step)
+            # Receive final handshake from server
+            packet = self._socket.recv()
+            _LOGGER.debug("<< final handshake from server: %s", packet)
+
+            # receive OK packet from server.
+            packet = self._socket.recv()
+            _LOGGER.debug("<< ok packet from server: %s", packet)
+        elif (
+            auth_plugin == "authentication_kerberos_client"
+            and packet[4] != 255
+        ):
+            rcode_size = 5  # Reader size for the response status code
+            _LOGGER.debug("# Continue with GSSAPI authentication")
+            _LOGGER.debug("# Response header: %s", packet[:rcode_size + 1])
+            _LOGGER.debug("# Response size: %s", len(packet))
+            _LOGGER.debug("# Negotiate a service request")
+            complete = False
+            tries = 0
+
+            while not complete and tries < 5:
+                _LOGGER.debug(
+                    "%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20
+                )
+                _LOGGER.debug("<< Server response: %s", packet)
+                _LOGGER.debug(
+                    "# Response code: %s", packet[:rcode_size + 1]
+                )
+                token, complete = auth.auth_continue(packet[rcode_size:])
+                if token:
+                    self._socket.send(token)
+                if complete:
+                    break
+                packet = self._socket.recv()
+
+                _LOGGER.debug(">> Response to server: %s", token)
+                tries += 1
+
+            if not complete:
+                raise errors.InterfaceError(
+                    "Unable to fulfill server request after {} attempts. "
+                    "Last server response: {}".format(tries, packet)
+                )
+
+            _LOGGER.debug(
+                "Last response from server: %s length: %d",
+                packet,
+                len(packet),
+            )
+
+            # Receive OK packet from server.
+            packet = self._socket.recv()
+            _LOGGER.debug("<< Ok packet from server: %s", packet)
+
+        return packet
 
     def _get_connection(self, prtcls=None):
         """Get connection based on configuration
@@ -406,11 +477,6 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Raises on errors.
         """
-        if any((self._password1, self._password2, self._password3)):
-            raise errors.NotSupportedError(
-                "The Multi Factor Authentication is not supported by the "
-                "pure Python implementation"
-            )
         if self._auth_plugin == "authentication_kerberos_client":
             if os.name == "nt":
                 raise errors.ProgrammingError(
@@ -1016,13 +1082,18 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a dict()
         """
+        self._mfa_nfactor = 1
+        self._user = username
+        self._password = password
+        self._password1 = password1
+        self._password2 = password2
+        self._password3 = password3
+
+        if self._password1 and password != self._password1:
+            password = self._password1
+
         self.handle_unread_result()
 
-        if any((password1, password2, password3)):
-            raise errors.NotSupportedError(
-                "The Multi Factor Authentication is not supported by the "
-                "pure Python implementation"
-            )
         if self._compress:
             raise errors.NotSupportedError("Change user is not supported with "
                                            "compression.")

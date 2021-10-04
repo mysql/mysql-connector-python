@@ -241,6 +241,17 @@ class MySQLProtocol(object):
         res['capabilities'] = capabilities
         return res
 
+    def parse_auth_next_factor(self, packet):
+        """Parse a MySQL AuthNextFactor packet."""
+        packet, status = utils.read_int(packet, 1)
+        if not status == 2:
+            raise errors.InterfaceError(
+                "Failed parsing AuthNextFactor packet (invalid)"
+            )
+        packet, auth_plugin = utils.read_string(packet, end=b"\x00")
+        return packet, auth_plugin.decode("utf-8")
+
+
     def parse_ok(self, packet):
         """Parse a MySQL OK-packet"""
         if not packet[4] == 0:

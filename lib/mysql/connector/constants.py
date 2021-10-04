@@ -434,6 +434,7 @@ class ClientFlag(_Flags):
     CLIENT_QUERY_ATTRIBUTES = 1 << 27
     SSL_VERIFY_SERVER_CERT = 1 << 30
     REMEMBER_OPTIONS = 1 << 31
+    MULTI_FACTOR_AUTHENTICATION = 1 << 28
 
     desc = {
         'LONG_PASSWD': (1 << 0, 'New more secure passwords'),

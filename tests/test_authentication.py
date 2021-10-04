@@ -957,7 +957,6 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     tests.MYSQL_VERSION < (8, 0, 28),
     "Multi Factor Authentication not supported"
 )
-@unittest.skipUnless(HAVE_CMYSQL, "C Extension not available")
 class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
     """Test Multi Factor Authentication.
 
@@ -1123,7 +1122,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                         **kwargs,
                     )
 
-    @tests.foreach_cnx(CMySQLConnection)
+    @tests.foreach_cnx()
     def test_user_1f(self):
         """Test connection 'user_1f' password permutations."""
         permutations = []
@@ -1133,7 +1132,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
             )
         self._test_connection(self.cnx.__class__, permutations, self.user_1f)
 
-    @tests.foreach_cnx(CMySQLConnection)
+    @tests.foreach_cnx()
     def test_user_2f(self):
         """Test connection and change user 'user_2f' password permutations."""
         permutations = []
@@ -1151,7 +1150,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
         # The cmd_change_user() tests are temporarily disabled due to server BUG#33110621
         # self._test_change_user(self.cnx.__class__, permutations, self.user_2f)
 
-    @tests.foreach_cnx(CMySQLConnection)
+    @tests.foreach_cnx()
     def test_user_3f(self):
         """Test connection and change user 'user_3f' password permutations."""
         permutations = []

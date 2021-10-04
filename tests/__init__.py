@@ -1049,7 +1049,7 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
             cnx.cmd_query("SHOW PLUGINS")
             res = cnx.get_rows()
             for row in res[0]:
-                if row[0] == plugin_name and row[1] == "ACTIVE":
+                if row[0].lower() == plugin_name.lower() and row[1] == "ACTIVE":
                     return True
         return False
 
