@@ -46,8 +46,8 @@ except:
 
 from .conversion import MySQLConverterBase
 from .constants import (ClientFlag, CharacterSet, CONN_ATTRS_DN,
-                        DEFAULT_CONFIGURATION, OPENSSL_CS_NAMES,
-                        TLS_CIPHER_SUITES, TLS_VERSIONS)
+                        DEFAULT_CONFIGURATION, DEPRECATED_TLS_VERSIONS,
+                        OPENSSL_CS_NAMES, TLS_CIPHER_SUITES, TLS_VERSIONS)
 from .optionfiles import MySQLOptionsParser
 from .utils import make_abc
 from . import errors
@@ -60,6 +60,9 @@ DUPLICATED_IN_LIST_ERROR = (
 
 TLS_VERSION_ERROR = ("The given tls_version: '{}' is not recognized as a valid "
                      "TLS protocol version (should be one of {}).")
+
+TLS_VERSION_DEPRECATED_ERROR = ("The given tls_version: '{}' are no longer "
+                                "allowed (should be one of {}).")
 
 TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
                         "'tls-versions' list '{}'. ")
@@ -297,9 +300,6 @@ class MySQLConnectionAbstract(object):
                     tls_version = tls_ver.strip()
                     if tls_version == "":
                         continue
-                    elif tls_version not in TLS_VERSIONS:
-                        raise AttributeError(
-                            TLS_VERSION_ERROR.format(tls_version, TLS_VERSIONS))
                     elif tls_version in tls_versions:
                         raise AttributeError(
                             DUPLICATED_IN_LIST_ERROR.format(
@@ -314,10 +314,7 @@ class MySQLConnectionAbstract(object):
                     "At least one TLS protocol version must be specified in "
                     "'tls_versions' list.")
             for tls_ver in tls_version:
-                if tls_ver not in TLS_VERSIONS:
-                    raise AttributeError(
-                        TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
-                elif tls_ver in tls_versions:
+                if tls_ver in tls_versions:
                     raise AttributeError(
                         DUPLICATED_IN_LIST_ERROR.format(
                             list="tls_versions", value=tls_ver))
@@ -325,9 +322,6 @@ class MySQLConnectionAbstract(object):
                     tls_versions.append(tls_ver)
         elif isinstance(tls_version, set):
             for tls_ver in tls_version:
-                if tls_ver not in TLS_VERSIONS:
-                    raise AttributeError(
-                        TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
                 tls_versions.append(tls_ver)
         else:
             raise AttributeError(
@@ -338,11 +332,31 @@ class MySQLConnectionAbstract(object):
             raise AttributeError(
                 "At least one TLS protocol version must be specified "
                 "in 'tls_versions' list when this option is given.")
-        if tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
+
+        use_tls_versions = []
+        deprecated_tls_versions = []
+        invalid_tls_versions = []
+        for tls_ver in tls_versions:
+            if tls_ver in TLS_VERSIONS:
+                use_tls_versions.append(tls_ver)
+            if tls_ver in DEPRECATED_TLS_VERSIONS:
+                deprecated_tls_versions.append(tls_ver)
+            else:
+                invalid_tls_versions.append(tls_ver)
+
+        if use_tls_versions:
+            if use_tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
+                raise errors.NotSupportedError(
+                    TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))
+            use_tls_versions.sort()
+            self._ssl["tls_versions"] = use_tls_versions
+        elif deprecated_tls_versions:
+            raise errors.NotSupportedError(
+                TLS_VERSION_DEPRECATED_ERROR.format(deprecated_tls_versions,
+                                                    TLS_VERSIONS))
+        elif invalid_tls_versions:
             raise AttributeError(
-                TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))
-        tls_versions.sort()
-        self._ssl["tls_versions"] = tls_versions
+                TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
 
     @property
     def user(self):

@@ -50,7 +50,7 @@ except:
     gssapi = None
 
 import tests
-from . import check_tls_versions_support
+from . import check_tls_versions_support, get_scenarios_matrix
 
 try:
     from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
@@ -63,7 +63,7 @@ except ImportError:
 from mysql.connector.conversion import (MySQLConverterBase, MySQLConverter)
 from mysql.connector import (abstracts, connect, connection, constants, cursor,
                               errors, HAVE_DNSPYTHON, network, MySQLConnection)
-from mysql.connector.errors import InterfaceError, ProgrammingError
+from mysql.connector.errors import InterfaceError, NotSupportedError, ProgrammingError
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.network import TLS_V1_3_SUPPORTED
 from mysql.connector.utils import linux_distribution
@@ -2225,8 +2225,74 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                         "Unexpected exception message found: {}"
                         "".format(context.exception))
 
-        # Empty tls_version list
         settings.pop("ssl_disabled")
+        settings.pop("tls_ciphersuites")
+        list_a = ("TLSv1.2", "TLSv1.3", ("TLSv1.2", "TLSv1.3"), None)
+        list_b = ("TLSv1", "TLSv1.1", ("TLSv1", "TLSv1.1"), None)
+        list_c = ("foo", "bar", ("foo", "bar"), None)
+        scenarios = [list_a, list_b, list_c]
+
+        test_scenarios = get_scenarios_matrix(scenarios)
+        for scen in test_scenarios:
+            tls_versions_arg = [elem for elem in scen if elem]
+            settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA256"]
+            settings["tls_versions"] = tls_versions_arg
+
+            # The test should pass only if the following condition is hold:
+            # -  Contain one the following values  ["TLSv1.2", "TLSv1.3"]
+            if [arg for arg in ["TLSv1.2", "TLSv1.3"] if arg in tls_versions_arg]:
+                if not TLS_V1_3_SUPPORTED and "TLSv1.2" not in tls_versions_arg:
+                    with self.assertRaises(NotSupportedError) as context:
+                        _ = connector_class(**settings)
+                        self.assertIn("No supported TLS protocol version found",
+                                      str(context.exception),
+                                      "Unexpected exception message found: {}, "
+                                      "with tls_versions_arg: {}"
+                                      "".format(context.exception, tls_versions_arg))
+                else:
+                    cnx = connector_class(**settings)
+                    cur = cnx.cursor()
+                    cur.execute("SHOW STATUS LIKE 'Ssl_version%'")
+                    res = cur.fetchall()
+                    self.assertTrue(res[0][1] in ["TLSv1.2", "TLSv1.3"],
+                                    f"found {res} ")
+
+            # The test should fail with error indicating that TLSv1 and TLSv1.1
+            # are no longer allowed if the following conditions hold:
+            # - Does not contain one the following values  ["TLSv1.2", "TLSv1.3"]
+            # - Contain one the following values  ["TLSv1", "TLSv1.1"]
+            elif [arg for arg in ["TLSv1", "TLSv1.1"] if arg in tls_versions_arg]:
+                with self.assertRaises(NotSupportedError) as context:
+                    _ = connector_class(**settings)
+                self.assertTrue(("are no longer allowed" in str(context.exception)),
+                    "Unexpected exception message found: {}, with tls_versions_arg: {}"
+                            "".format(context.exception, tls_versions_arg))
+
+            # The test should fail with error indicating that the given values
+            # are not recognized as a valid TLS protocol version if the following
+            # conditions hold:
+            # - Does not contain one the following values  ["TLSv1.2", "TLSv1.3"]
+            # - Does not Contain one the following values  ["TLSv1", "TLSv1.1"]
+            elif tls_versions_arg:
+                with self.assertRaises(AttributeError) as context:
+                    _ = connector_class(**settings)
+                self.assertTrue(("not recognized" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+            # The test should fail with error indicating that at least one TLS
+            # protocol version must be specified in 'tls_versions' list if the
+            # following condition hold:
+            # - combination results in an empty list.
+            else:
+                with self.assertRaises(AttributeError) as context:
+                    _ = connector_class(**settings)
+                self.assertTrue(("At least one" in str(context.exception)),
+                                "Unexpected exception message found: {}"
+                                "".format(context.exception))
+
+
+        # Empty tls_version list
         settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
         settings["tls_versions"] = []
         with self.assertRaises(AttributeError) as context:
@@ -2237,7 +2303,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         # Empty tls_ciphersuites list using dict settings
         settings["tls_ciphersuites"] = []
-        settings["tls_versions"] = ["TLSv1"]
+        settings["tls_versions"] = ["TLSv1.2"]
         with self.assertRaises(AttributeError) as context:
             _ = connector_class(**settings)
         self.assertTrue(("No valid cipher suite" in str(context.exception)),
@@ -2385,8 +2451,16 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # Verify error when TLSv1.3 is not supported.
         if not TLS_V1_3_SUPPORTED:
             settings["tls_versions"] = ["TLSv1.3"]
-            with self.assertRaises(AttributeError) as context:
+            with self.assertRaises(NotSupportedError) as context:
                 _ = connector_class(**settings)
+        else:
+            settings["tls_versions"] = ["TLSv1.3"]
+            cnx = connector_class(**settings)
+            cur = cnx.cursor()
+            cur.execute("SHOW STATUS LIKE 'ssl_version%'")
+            res = cur.fetchall()
+            self.assertEqual(res[0][1], 'TLSv1.3', "Unexpected TLS version "
+                                "found: {}".format(res))
 
     def test_connection_attributes_user_defined(self):
         """Tests defined connection attributes"""

@@ -48,10 +48,11 @@ from threading import Thread
 from time import sleep
 from urllib.parse import quote_plus, quote
 
-from . import check_tls_versions_support
+from . import check_tls_versions_support, get_scenarios_matrix
 from mysqlx.connection import (CONNECTION_CLOSED_ERROR, HAVE_DNSPYTHON,
                                SocketStream, TLS_V1_3_SUPPORTED)
-from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError
+from mysqlx.errors import (InterfaceError, NotSupportedError, OperationalError,
+                           ProgrammingError)
 from mysqlx.protocol import (Message, MessageReader, MessageWriter, Protocol,
                              HAVE_LZ4, HAVE_ZSTD)
 from mysqlx.protobuf import (HAVE_MYSQLXPB_CEXT, HAVE_PROTOBUF, mysqlxpb_enum,
@@ -1075,6 +1076,73 @@ class MySQLxSessionTests(tests.MySQLxTests):
         settings.pop("schema")
         settings.pop("socket")
 
+        list_a = ("TLSv1.2", "TLSv1.3", ("TLSv1.2", "TLSv1.3"), None)
+        list_b = ("TLSv1", "TLSv1.1", ("TLSv1", "TLSv1.1"), None)
+        list_c = ("foo", "bar", ("foo", "bar"), None)
+        scenarios = [list_a, list_b, list_c]
+
+        test_scenarios = get_scenarios_matrix(scenarios)
+        for scen in test_scenarios:
+            tls_versions_arg = [elem for elem in scen if elem]
+            settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA256"]
+            settings["tls_versions"] = tls_versions_arg
+
+            # The test should pass only if the following condition is hold:
+            # -  Contain one the following values  ["TLSv1.2", "TLSv1.3"]
+            if [arg for arg in ["TLSv1.2", "TLSv1.3"] if arg in tls_versions_arg]:
+                if not TLS_V1_3_SUPPORTED and "TLSv1.2" not in tls_versions_arg:
+                    with self.assertRaises(NotSupportedError) as context:
+                        _ = mysqlx.get_session(settings)
+                    self.assertIn("No supported TLS protocol version found",
+                                  str(context.exception),
+                                  "Unexpected exception message found: {}, "
+                                  "with tls_versions_arg: {}"
+                                  "".format(context.exception, tls_versions_arg))
+                else:
+                    session = mysqlx.get_session(settings)
+                    status = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version%'"
+                                         ).execute().fetch_all()
+                    for row in status:
+                        if row.get_string("Variable_name") == 'Mysqlx_ssl_version':
+                            self.assertTrue(row.get_string("Value") in ["TLSv1.2", "TLSv1.3"],
+                                             "Unexpected TLS version found: {} for: {}"
+                                             "".format(row.get_string("Value"),
+                                                       tls_versions_arg))
+
+            # The test should fail with error indicating that TLSv1 and TLSv1.1
+            # are no longer allowed if the following conditions hold:
+            # - Does not contain one the following values  ["TLSv1.2", "TLSv1.3"]
+            # - Contain one the following values  ["TLSv1", "TLSv1.1"]
+            elif [arg for arg in ["TLSv1", "TLSv1.1"] if arg in tls_versions_arg]:
+                with self.assertRaises(NotSupportedError) as context:
+                    _ = mysqlx.get_session(settings)
+                self.assertTrue(("are no longer allowed" in str(context.exception)),
+                    "Unexpected exception message found: {}, with tls_versions_arg: {}"
+                            "".format(context.exception, tls_versions_arg))
+
+            # The test should fail with error indicating that the given values
+            # are not recognized as a valid TLS protocol version if the following
+            # conditions hold:
+            # - Does not contain one the following values  ["TLSv1.2", "TLSv1.3"]
+            # - Does not Contain one the following values  ["TLSv1", "TLSv1.1"]
+            elif tls_versions_arg:
+                with self.assertRaises(InterfaceError) as context:
+                    _ = mysqlx.get_session(settings)
+                self.assertTrue(("not recognized" in str(context.exception)),
+                        "Unexpected exception message found: {}"
+                        "".format(context.exception))
+
+            # The test should fail with error indicating that at least one TLS
+            # protocol version must be specified in 'tls_versions' list if the
+            # following condition hold:
+            # - combination results in an empty list.
+            else:
+                with self.assertRaises(InterfaceError) as context:
+                    _ = mysqlx.get_session(settings)
+                self.assertTrue(("At least one" in str(context.exception)),
+                                "Unexpected exception message found: {}"
+                                "".format(context.exception))
+
         # Dictionary connection settings tests using dict settings
         # Empty tls_version list
         settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
@@ -1087,7 +1155,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Empty tls_ciphersuites list using dict settings
         settings["tls-ciphersuites"] = []
-        settings["tls-versions"] = ["TLSv1"]
+        settings["tls-versions"] = ["TLSv1.2"]
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_session(settings)
         self.assertTrue(("No valid cipher suite" in context.exception.msg),
@@ -1171,7 +1239,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Empty tls_ciphersuites list
         settings["tls-ciphersuites"] = []
-        settings["tls-versions"] = ["TLSv1"]
+        settings["tls-versions"] = ["TLSv1.2"]
         uri_settings = build_uri(**settings)
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_session(uri_settings)
@@ -1234,7 +1302,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Verify that TLSv1.3 version is accepted (connection success)
         # even if it's unsupported.
-        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA256"]
         settings["tls-versions"] = ["TLSv1.3", "TLSv1.2"]
         uri_settings = build_uri(**settings)
         # Connection must be successfully by including another TLS version
@@ -1345,7 +1413,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         if not TLS_V1_3_SUPPORTED:
             settings["tls-versions"] = ["TLSv1.3"]
             for settings_case in [settings, build_uri(**settings)]:
-                with self.assertRaises(InterfaceError) as context:
+                with self.assertRaises(NotSupportedError) as context:
                     _ = mysqlx.get_session(settings_case)
 
     def test_disabled_x_protocol(self):

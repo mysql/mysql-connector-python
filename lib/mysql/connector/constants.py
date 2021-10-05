@@ -94,7 +94,9 @@ DEFAULT_CONFIGURATION = {
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
 
-TLS_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]
+TLS_VERSIONS = ["TLSv1.2", "TLSv1.3"]
+
+DEPRECATED_TLS_VERSIONS = ["TLSv1", "TLSv1.1"]
 
 
 def flag_is_set(flag, flags):

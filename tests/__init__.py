@@ -1147,3 +1147,29 @@ def shutdown_mysql_server(server=None):
     worker.start()
     worker.join()
     time.sleep(.5)
+
+
+def product_of(old_list, new_list):
+    product_res = []
+    if not old_list:
+        for new_element in new_list:
+            if isinstance(new_element, tuple):
+                product_res.append(list(new_element))
+            else:
+                product_res.append([new_element])
+    else:
+        for old_element in old_list:
+            for new_element in new_list:
+                if isinstance(new_element, tuple):
+                    product_res.append(old_element + list(new_element))
+                else:
+                    product_res.append(old_element + [new_element])
+
+    return product_res
+
+
+def get_scenarios_matrix(scenarios_lists):
+    res_matrix = []
+    for scenarios in scenarios_lists:
+        res_matrix = product_of(res_matrix, scenarios)
+    return res_matrix

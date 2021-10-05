@@ -471,7 +471,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Empty tls_ciphersuites list
         settings["tls-ciphersuites"] = []
-        settings["tls-versions"] = ["TLSv1"]
+        settings["tls-versions"] = ["TLSv1.2"]
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_client(settings, cnx_options)
         self.assertTrue(("No valid cipher" in context.exception.msg),
@@ -491,7 +491,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Empty tls_ciphersuites list
         settings["tls-ciphersuites"] = []
-        settings["tls-versions"] = ["TLSv1"]
+        settings["tls-versions"] = ["TLSv1.2"]
         uri_settings = build_uri(**settings)
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_client(uri_settings, cnx_options)
@@ -519,7 +519,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Verify unsupported TLSv1.3 version is ignored (connection success)
         # when is not supported, TLSv1.2 is used
-        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA256"]
         settings["tls-versions"] = ["TLSv1.3", "TLSv1.2"]
         uri_settings = build_uri(**settings)
         client = mysqlx.get_client(uri_settings, cnx_options)

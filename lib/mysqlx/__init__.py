@@ -80,10 +80,15 @@ DUPLICATED_IN_LIST_ERROR = (
 TLS_VERSION_ERROR = ("The given tls-version: '{}' is not recognized as a "
                      "valid TLS protocol version (should be one of {}).")
 
+TLS_VERSION_DEPRECATED_ERROR = ("The given tls_version: '{}' are no longer "
+                                "allowed (should be one of {}).")
+
 TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
                         "'tls-versions' list '{}'. ")
 
-TLS_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]
+TLS_VERSIONS = ["TLSv1.2", "TLSv1.3"]
+
+DEPRECATED_TLS_VERSIONS = ["TLSv1", "TLSv1.1"]
 
 TLS_V1_3_SUPPORTED = False
 if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3:
@@ -486,9 +491,6 @@ def _validate_tls_versions(settings):
                 tls_version = tls_ver.strip()
                 if tls_version == "":
                     continue
-                if tls_version not in TLS_VERSIONS:
-                    raise InterfaceError(TLS_VERSION_ERROR.format(tls_version,
-                                                                  TLS_VERSIONS))
                 else:
                     if tls_version in tls_versions:
                         raise InterfaceError(
@@ -500,10 +502,7 @@ def _validate_tls_versions(settings):
             raise InterfaceError("At least one TLS protocol version must be "
                                  "specified in 'tls-versions' list.")
         for tls_ver in tls_versions_settings:
-            if tls_ver not in TLS_VERSIONS:
-                raise InterfaceError(TLS_VERSION_ERROR.format(tls_ver,
-                                                              TLS_VERSIONS))
-            elif tls_ver in tls_versions:
+            if tls_ver in tls_versions:
                 raise InterfaceError(
                     DUPLICATED_IN_LIST_ERROR.format(list="tls_versions",
                                                     value=tls_ver))
@@ -512,11 +511,7 @@ def _validate_tls_versions(settings):
 
     elif isinstance(tls_versions_settings, set):
         for tls_ver in tls_versions_settings:
-            if tls_ver not in TLS_VERSIONS:
-                raise InterfaceError(TLS_VERSION_ERROR.format(tls_ver,
-                                                              TLS_VERSIONS))
-            else:
-                tls_versions.append(tls_ver)
+            tls_versions.append(tls_ver)
     else:
         raise InterfaceError("tls-versions should be a list with one or more "
                              "of versions in {}. found: '{}'"
@@ -526,11 +521,30 @@ def _validate_tls_versions(settings):
         raise InterfaceError("At least one TLS protocol version must be "
                              "specified in 'tls-versions' list.")
 
-    if tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
-            raise InterfaceError(
-                TLS_VER_NO_SUPPORTED.format(tls_versions, TLS_VERSIONS))
+    use_tls_versions = []
+    deprecated_tls_versions = []
+    not_tls_versions = []
+    for tls_ver in tls_versions:
+        if tls_ver in TLS_VERSIONS:
+            use_tls_versions.append(tls_ver)
+        if tls_ver in DEPRECATED_TLS_VERSIONS:
+            deprecated_tls_versions.append(tls_ver)
+        else:
+            not_tls_versions.append(tls_ver)
 
-    settings["tls-versions"] = tls_versions
+    if use_tls_versions:
+        if use_tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
+            raise NotSupportedError(
+                TLS_VER_NO_SUPPORTED.format(tls_versions, TLS_VERSIONS))
+        use_tls_versions.sort()
+        settings["tls-versions"] = use_tls_versions
+    elif deprecated_tls_versions:
+        raise NotSupportedError(
+            TLS_VERSION_DEPRECATED_ERROR.format(deprecated_tls_versions,
+                                                TLS_VERSIONS))
+    elif not_tls_versions:
+        raise InterfaceError(
+            TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
 
 
 def _validate_tls_ciphersuites(settings):
