@@ -89,7 +89,7 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
         plugin_classes = {}
         for name, obj in inspect.getmembers(authentication):
             if inspect.isclass(obj) and hasattr(obj, 'plugin_name'):
-                if obj.plugin_name:
+                if obj.plugin_name and name != "MySQLSSPIKerberosAuthPlugin":
                     plugin_classes[obj.plugin_name] = obj
         for plugin_name in _STANDARD_PLUGINS:
             self.assertEqual(plugin_classes[plugin_name],

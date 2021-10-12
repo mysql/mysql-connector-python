@@ -58,6 +58,7 @@ from .protocol import MySQLProtocol
 from .utils import int1store, int4store, lc_int, get_platform
 from .abstracts import MySQLConnectionAbstract
 
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 _LOGGER = logging.getLogger(__name__)
@@ -219,11 +220,16 @@ class MySQLConnection(MySQLConnectionAbstract):
                 "# _do_auth(): user: %s", username)
         _LOGGER.debug(
                 "# _do_auth(): self._auth_plugin: %s", self._auth_plugin)
-        if self._auth_plugin.startswith("authentication_oci") and not username:
+        if (self._auth_plugin.startswith("authentication_oci") or
+            (self._auth_plugin.startswith("authentication_kerberos") and
+             os.name == 'nt')) and not username:
             username = getpass.getuser()
             _LOGGER.debug(
-                "MySQL user is empty, OS user: %s will be used for "
-                "authentication_oci_client", username)
+                "MySQL user is empty, OS user: %s will be used for %s",
+                username, self._auth_plugin)
+
+        _LOGGER.debug("# _do_auth(): user: %s", username)
+        _LOGGER.debug("# _do_auth(): password: %s", password)
 
         packet = self._protocol.make_auth(
             handshake=self._handshake,
@@ -477,11 +483,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Raises on errors.
         """
-        if self._auth_plugin == "authentication_kerberos_client":
-            if os.name == "nt":
-                raise errors.ProgrammingError(
-                    "The Kerberos authentication is not available on Windows"
-                )
+        if self._auth_plugin == "authentication_kerberos_client" and os.name != 'nt':
             if not self._user:
                 cls = get_auth_plugin(self._auth_plugin)
                 self._user = cls.get_user_from_credentials()
