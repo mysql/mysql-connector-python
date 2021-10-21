@@ -195,7 +195,7 @@ pytomy_timedelta(PyObject *obj)
 
     if (micro_secs)
     {
-        strncpy(fmt, "%02d:%02d:%02d.%06d", 19);
+        strncpy(fmt, "%02d:%02d:%02d.%06d", 20);
         if (days < 0)
         {
             micro_secs= 1000000 - micro_secs;
@@ -204,7 +204,7 @@ pytomy_timedelta(PyObject *obj)
     }
     else
     {
-        strncpy(fmt, "%02d:%02d:%02d", 14);
+        strncpy(fmt, "%02d:%02d:%02d", 15);
     }
 
     if (days < 0)
@@ -699,10 +699,9 @@ PyObject*
 pytomy_decimal(PyObject *obj)
 {
     PyObject *str= PyObject_Str(obj);
-    PyObject *tmp= (const char *)PyUnicode_1BYTE_DATA(str);
-    PyObject *ret= PyBytes_FromString(tmp);
-    Py_DECREF(tmp);
-    return ret;
+    PyObject *bytes= PyUnicode_AsUTF8String(str);
+    Py_DECREF(str);
+    return bytes;
 }
 
 /**

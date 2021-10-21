@@ -28,7 +28,7 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-#define PY_SSIZE_T_CLEAN 1
+#define PY_SSIZE_T_CLEAN
 
 #include "python_cast.h"
 #include "python.h"
@@ -165,9 +165,12 @@ static PyObject* ConvertPbToPyRequired(
       return PyLong_FromLong(static_cast<long>(message.GetReflection()->
           GetInt64(message, &field)));
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
-  assert(false);
   return NULL;
 }
 
@@ -262,9 +265,12 @@ static PyObject* ConvertPbToPyRepeated(int index,
       return PyLong_FromLong(static_cast<long>(message.
           GetReflection()->GetRepeatedInt64(message, &field, index)));
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
-  assert(false);
   return NULL;
 };
 
@@ -379,9 +385,12 @@ static void ConvertPyToPbRequired(
           python_cast<google::protobuf::int64>(obj));
       return;
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
-  assert(false);
   throw std::runtime_error("Unknown Protobuf type.");
 }
 
@@ -391,14 +400,13 @@ static void AddPyListToMessageRepeatedField(
     google::protobuf::Message& message,
     const google::protobuf::FieldDescriptor& field,
     PyObject* list) {
-  google::protobuf::RepeatedField<T>* mutable_field =
-      message.GetReflection()->MutableRepeatedField<T>(&message, &field);
+  google::protobuf::MutableRepeatedFieldRef<T> mutable_field =
+      message.GetReflection()->GetMutableRepeatedFieldRef<T>(&message, &field);
   Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
-    mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      mutable_field->Add(python_cast<T>(PyList_GetItem(list, idx)));
+      mutable_field.Add(python_cast<T>(PyList_GetItem(list, idx)));
     }
   }
 }
@@ -409,20 +417,19 @@ static void AddPyListToMessageRepeatedMessage(
     const google::protobuf::FieldDescriptor& field,
     google::protobuf::DynamicMessageFactory& factory,
     PyObject* list) {
-  google::protobuf::RepeatedPtrField<google::protobuf::Message>* mutable_field =
+  google::protobuf::MutableRepeatedFieldRef<google::protobuf::Message> mutable_field =
       message.GetReflection()->
-      MutableRepeatedPtrField<google::protobuf::Message>(&message, &field);
+      GetMutableRepeatedFieldRef<google::protobuf::Message>(&message, &field);
   Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
-    mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
       google::protobuf::Message* msg = CreateMessage(PyList_GetItem(list, idx), factory);
       if (!msg) {
         // CreateMessage already reported an error, we can leave quietly
         return;
       }
-      mutable_field->AddAllocated(msg);
+      mutable_field.Add(*msg);
     }
   }
 }
@@ -432,15 +439,14 @@ static void AddPyListToMessageRepeatedString(
     google::protobuf::Message& message,
     const google::protobuf::FieldDescriptor& field,
     PyObject* list) {
-  google::protobuf::RepeatedPtrField<google::protobuf::string>* mutable_field =
+  google::protobuf::MutableRepeatedFieldRef<google::protobuf::string> mutable_field =
       message.GetReflection()->
-      MutableRepeatedPtrField<google::protobuf::string>(&message, &field);
+      GetMutableRepeatedFieldRef<google::protobuf::string>(&message, &field);
   Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
-    mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      mutable_field->AddAllocated(new google::protobuf::string(
+      mutable_field.Add(google::protobuf::string(
           python_cast<std::string>(PyList_GetItem(list, idx))));
     }
   }
@@ -569,6 +575,10 @@ static void ConvertPyToPbRepeated(
           message, field, list);
       return;
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
   assert(false);

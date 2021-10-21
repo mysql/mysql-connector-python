@@ -28,7 +28,7 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-#define PY_SSIZE_T_CLEAN 1
+#define PY_SSIZE_T_CLEAN
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -916,7 +916,6 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
     char *oci_config_file = NULL;
     unsigned int mfa_factor1= 1, mfa_factor2= 2, mfa_factor3= 3;
 	int res;
-    int option_set_res= 0;
 	static char *kwlist[]= {"user", "password", "database",
                             "password1", "password2", "password3",
                             "oci_config_file", NULL};
@@ -1334,7 +1333,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
             ssl_ca= NULL;
         }
         mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
-        char logout[100];
         if (tls_versions != NULL)
         {
             mysql_options(&self->session,
@@ -2043,7 +2041,7 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         }
         else if (PyUnicode_Check(new_value))
         {
-            PyObject *quoted= PyBytes_FromFormat("'%s'", PyUnicode_AS_DATA(new_value));
+            PyObject *quoted= PyBytes_FromFormat("'%s'", (const char *)PyUnicode_1BYTE_DATA(new_value));
             PyTuple_SET_ITEM(prepared, i, quoted);
         }
         else
@@ -2116,8 +2114,7 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
         mybinds = calloc(size, sizeof(MYSQL_BIND));
         bindings = calloc(size, sizeof(struct MySQL_binding));
         const char **names = calloc(size, sizeof(char *));
-        PyObject *retval = NULL;
-        int i = 0, res = 0;
+        int i = 0;
 
         for (i = 0; i < (int) size; i++) {
             struct MySQL_binding *pbind = &bindings[i];
@@ -2149,7 +2146,9 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
                 mbind->buffer_type = MYSQL_TYPE_LONG;
 #endif
                 mbind->is_null = (bool_ *) 0;
-                mbind->length = sizeof(mbind->buffer_type);
+                if (mbind->length) {
+                    *mbind->length = sizeof(mbind->buffer_type);
+                }
                 continue;
             }
 
@@ -2266,7 +2265,7 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
                 mbind->is_null = (bool_ *) 0;
             } else if (PyUnicode_Check(pbind->str_value)) {
                 Py_ssize_t len;
-                mbind->buffer = PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
+                mbind->buffer = (char *)PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
                 mbind->buffer_length = (unsigned long) len;
                 mbind->length = &mbind->buffer_length;
                 mbind->is_null = (bool_ *) 0;
@@ -3502,7 +3501,7 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
         else if (PyUnicode_Check(pbind->str_value))
         {
             Py_ssize_t len;
-            mbind->buffer= PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
+            mbind->buffer= (char *)PyUnicode_AsUTF8AndSize(pbind->str_value, &len);
             mbind->buffer_length= (unsigned long)len;
             mbind->length= &mbind->buffer_length;
             mbind->is_null= (bool_ *)0;
