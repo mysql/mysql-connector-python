@@ -676,7 +676,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 for key, value in params.items():
                     result[key] = self._cmysql.convert_to_mysql(value)[0]
         else:
-            raise ValueError("Could not process parameters")
+            raise errors.ProgrammingError(
+                f"Could not process parameters: {type(params).__name__}({params}),"
+                " it must be of type list, tuple or dict")
 
         return result
 

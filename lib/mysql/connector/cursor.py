@@ -558,6 +558,10 @@ class MySQLCursor(CursorBase):
                 if psub.remaining != 0:
                     raise errors.ProgrammingError(
                         "Not all parameters were used in the SQL statement")
+            else:
+                raise errors.ProgrammingError(
+                    f"Could not process parameters: {type(params).__name__}({params}),"
+                    " it must be of type list, tuple or dict")
 
         self._executed = stmt
         if multi:
@@ -1215,8 +1219,9 @@ class MySQLCursorPrepared(MySQLCursor):
             if not isinstance(params, (tuple, list)):
                 raise errors.ProgrammingError(
                     errno=1210,
-                    msg="Incorrect type of argument, it must be of type tuple "
-                        "or list the argument given to the prepared statement")
+                    msg=f"Incorrect type of argument: {type(params).__name__}({params})"
+                    ", it must be of type tuple or list the argument given to "
+                    "the prepared statement")
             if len(self._prepared['parameters']) != len(params):
                 raise errors.ProgrammingError(
                     errno=1210,

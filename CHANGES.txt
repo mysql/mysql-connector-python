@@ -14,6 +14,7 @@ v8.0.28
 - WL#14814: Remove support for TLS 1.0 and 1.1
 - WL#14813: Add support for Python 3.10
 - WL#14720: Support for Multi Factor authentication (pure Python)
+- BUG#27358941: Invalid types for params silently ignored in execute method
 
 v8.0.27
 =======

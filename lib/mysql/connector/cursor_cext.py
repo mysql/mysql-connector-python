@@ -962,8 +962,9 @@ class CMySQLCursorPrepared(CMySQLCursor):
             if not isinstance(params, (tuple, list)):
                 raise errors.ProgrammingError(
                     errno=1210,
-                    msg="Incorrect type of argument, it must be of type tuple "
-                        "or list the argument given to the prepared statement")
+                    msg=f"Incorrect type of argument: {type(params).__name__}({params})"
+                    ", it must be of type tuple or list the argument given to "
+                    "the prepared statement")
             if self._stmt.param_count != len(params):
                 raise errors.ProgrammingError(
                     errno=1210,

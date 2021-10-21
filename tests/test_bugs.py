@@ -5686,6 +5686,27 @@ class BugOra25349794(tests.MySQLConnectorTests):
         conn.close()
 
 
+class Bug27358941(tests.MySQLConnectorTests):
+    """BUG#27358941: INVALID TYPES FOR PARAMS SILENTLY IGNORED IN EXECUTE()
+    """
+    @foreach_cnx()
+    def test_invalid_types_not_get_ignored(self):
+        test_cases = ( 123, 123.456, "456.789")
+
+        for prepared in [False, True]:
+            cursor = self.cnx.cursor(prepared=prepared)
+            for params in test_cases:
+                with self.assertRaises(errors.ProgrammingError) as contex:
+                    cursor.execute("SELECT %s", params)
+                self.assertIn(f"{type(params).__name__}({params}), it must be of type",
+                              contex.exception.msg)
+
+            with self.assertRaises(errors.ProgrammingError) as contex:
+                cursor.executemany("SELECT %s", test_cases)
+            self.assertIn("it must be of type", contex.exception.msg)
+
+
+
 @unittest.skipIf(
     tests.MYSQL_EXTERNAL_SERVER,
     "Test not available for external MySQL servers",
@@ -6090,7 +6111,8 @@ class Bug32496788(tests.MySQLConnectorTests):
                 self.assertRaises(errors.ProgrammingError, cur.execute, stmt, (param,))
                 with self.assertRaises(errors.ProgrammingError) as contex:
                     cur.execute(stmt, param)
-                self.assertIn("Incorrect type of argument, it must be of type tuple or list",
+                self.assertIn(f"Incorrect type of argument: {type(param).__name__}({param}),"
+                              " it must be of type tuple or list",
                               contex.exception.msg)
 
         with self.cnx.cursor(prepared=True) as cur:
@@ -6107,7 +6129,8 @@ class Bug32496788(tests.MySQLConnectorTests):
             cur.execute(insert_stmt)
             with self.assertRaises(errors.ProgrammingError) as contex:
                 cur.execute(insert_stmt, "JD")
-                self.assertIn("Incorrect type of argument, it must be of type tuple or list",
+                self.assertIn(f"Incorrect type of argument: {type('JD')}({'JD'}),"
+                              "it must be of type tuple or list",
                               contex.exception.msg)
             self.assertRaises(errors.ProgrammingError, cur.execute, insert_stmt, ("JohnDo"))
             cur.execute(insert_stmt, self.test_values[0])
@@ -6117,7 +6140,8 @@ class Bug32496788(tests.MySQLConnectorTests):
             self.assertRaises(errors.ProgrammingError, cur.execute, select_stmt, ("JD"))
             with self.assertRaises(errors.ProgrammingError) as contex:
                 cur.execute(select_stmt, "JD")
-                self.assertIn("Incorrect type of argument, it must be of type tuple or list",
+                self.assertIn("Incorrect type of argument: {type('JD')}({'JD'}),"
+                              " it must be of type tuple or list",
                               contex.exception.msg)
             cur.execute(select_stmt, ("Doe", "John"))
             self.assertEqual(cur.fetchall(),  self.exp_values[0])

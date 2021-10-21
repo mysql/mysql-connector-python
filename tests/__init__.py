@@ -549,7 +549,8 @@ class MySQLConnectorTests(unittest.TestCase):
             import _mysql_connector
             from mysql.connector import connection_cext
             self.use_pure_options.append(False)
-        except ImportError:
+        except ImportError as err:
+            LOGGER.warn("The C-ext could not be imported: %s", err)
             self.have_cext = False
         else:
             self.have_cext = True
