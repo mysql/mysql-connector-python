@@ -46,6 +46,7 @@ import os
 import gc
 import tempfile
 from collections import namedtuple
+from decimal import Decimal
 from datetime import date, datetime, timedelta, time
 from threading import Thread
 import traceback
@@ -5705,6 +5706,64 @@ class Bug27358941(tests.MySQLConnectorTests):
                 cursor.executemany("SELECT %s", test_cases)
             self.assertIn("it must be of type", contex.exception.msg)
 
+
+class Bug33486094(tests.MySQLConnectorTests):
+    """BUG#33486094: Stored value in Decimal field returned as str instead of Decimal
+    """
+
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        self.tbl = 'Bug33486094'
+        with connection.MySQLConnection(**self.config) as cnx:
+            with cnx.cursor() as cursor:
+                cursor.execute("DROP TABLE IF EXISTS %s" % self.tbl)
+
+                create = (
+                    f"""CREATE TABLE {self.tbl} (
+                            col1 INT NOT NULL AUTO_INCREMENT,
+                            decimals_def DECIMAL,
+                            decimals_10 DECIMAL (10),
+                            decimals_5_2 DECIMAL (5,2),
+                            decimals_10_3 DECIMAL (10,3),
+                            numerics NUMERIC(10,2),
+                            PRIMARY KEY(col1)
+                    )"""
+                )
+                cursor.execute(create)
+
+                self.test_cases = (
+                    ("decimals_def", 1234567890),
+                    ("decimals_10", 9999999999),
+                    ("decimals_5_2", -999.99),
+                    ("decimals_10_3", 123),
+                    ("numerics", 12345678.90)
+                )
+                sql = f"INSERT INTO {self.tbl} ({{0}}) values ({{1}})"
+                for col, value in self.test_cases:
+                    cursor.execute(sql.format(col, value))
+                cnx.commit()
+
+    def tearDown(self):
+        with connection.MySQLConnection(**self.config) as cnx:
+            with cnx.cursor() as cursor:
+                cursor.execute(f"DROP TABLE IF EXISTS {self.tbl}")
+
+    @foreach_cnx()
+    def test_decimal_column_returns_decimal_objects(self):
+        for prepared in [False, True]:
+            cursor = self.cnx.cursor(prepared=prepared)
+
+            sql = f"select {{0}} from {self.tbl} where {{0}} IS NOT NULL"
+            for col, value in self.test_cases:
+                cursor.execute(sql.format(col))
+                row = cursor.fetchall()[0]
+                self.assertIsInstance(
+                    row[0], Decimal,
+                    f"value: {row[0]} is not of Decimal type: "
+                    f"{type(row[0]).__name__}")
+                self.assertAlmostEqual(
+                    row[0], Decimal(value), 3,
+                    f"value: {row[0]} is not the expected: {value}")
 
 
 @unittest.skipIf(

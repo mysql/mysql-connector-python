@@ -427,6 +427,11 @@ class MySQLProtocol(object):
 
         return (packet[length:], struct.unpack(format_, packet[0:length])[0])
 
+    def _parse_binary_new_decimal(self, packet, charset='utf8'):
+        """Parse a New Decimal from a binary packet"""
+        (packet, value) = utils.read_lc_string(packet)
+        return (packet, Decimal(value.decode(charset)))
+
     def _parse_binary_timestamp(self, packet, field):
         """Parse a timestamp from a binary packet"""
         length = packet[0]
@@ -487,6 +492,8 @@ class MySQLProtocol(object):
                 values.append(value)
             elif field[1] in (FieldType.DOUBLE, FieldType.FLOAT):
                 (packet, value) = self._parse_binary_float(packet, field)
+            elif field[1] == FieldType.NEWDECIMAL:
+                (packet, value) = self._parse_binary_new_decimal(packet, charset)
                 values.append(value)
             elif field[1] in (FieldType.DATETIME, FieldType.DATE,
                               FieldType.TIMESTAMP):
