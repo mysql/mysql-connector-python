@@ -411,8 +411,8 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
 
         # float/double are returned as DECIMAL by MySQL
         exp = ('abc',
-               '3.14',
-               '-3.14159',
+               decimal.Decimal('3.14'),
+               decimal.Decimal('-3.14159'),
                datetime.date(2003, 1, 31),
                datetime.datetime(1977, 6, 14, 21, 33, 14),
                datetime.timedelta(10, 58530, 230000),

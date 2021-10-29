@@ -492,6 +492,7 @@ class MySQLProtocol(object):
                 values.append(value)
             elif field[1] in (FieldType.DOUBLE, FieldType.FLOAT):
                 (packet, value) = self._parse_binary_float(packet, field)
+                values.append(value)
             elif field[1] == FieldType.NEWDECIMAL:
                 (packet, value) = self._parse_binary_new_decimal(packet, charset)
                 values.append(value)
