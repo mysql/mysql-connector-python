@@ -2086,7 +2086,7 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *buffered= NULL, *raw= NULL, *raw_as_string= NULL,
              *query_attrs= NULL, *retval= NULL;
-	int res= 0;
+	int i= 0, res= 0;
 	Py_ssize_t stmt_length;
 	char *stmt= NULL;
 	static char *kwlist[]=
@@ -2114,7 +2114,6 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
         mybinds = calloc(size, sizeof(MYSQL_BIND));
         bindings = calloc(size, sizeof(struct MySQL_binding));
         const char **names = calloc(size, sizeof(char *));
-        int i = 0;
 
         for (i = 0; i < (int) size; i++) {
             struct MySQL_binding *pbind = &bindings[i];
@@ -2329,7 +2328,7 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
     retval = MySQL_handle_result(self);
 
 cleanup:
-    for (int i = 0; i < size; i++) {
+    for (i = 0; i < size; i++) {
         switch (mybinds[i].buffer_type) {
             case MYSQL_TYPE_DECIMAL:
                 Py_XDECREF(bindings[i].str_value);
