@@ -35,6 +35,7 @@ from decimal import Decimal
 import datetime
 import time
 import uuid
+import sys
 
 import tests
 
@@ -45,6 +46,8 @@ try:
     from _mysql_connector import MySQLInterfaceError
 except ImportError:
     MySQLInterfaceError = InterfaceError
+
+ARCH_64BIT = sys.maxsize > 2**32 and sys.platform != "win32"
 
 
 class CustomType:
@@ -550,6 +553,119 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         self.cnv.str_fallback = True
         self.assertEqual(exp, self.cnv.to_mysql(custom_type))
         self.cnv.str_fallback = False
+
+
+class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
+    """Test the class converter integration."""
+
+    table_name = "converter_table"
+
+    create_table_stmt = (
+        "CREATE TABLE {} ("
+        "id INT PRIMARY KEY, "
+        "my_null INT, "
+        "my_bit BIT(7), "
+        "my_tinyint TINYINT, "
+        "my_smallint SMALLINT, "
+        "my_mediumint MEDIUMINT, "
+        "my_int INT, "
+        "my_bigint BIGINT, "
+        "my_decimal DECIMAL(20,10), "
+        "my_float FLOAT, "
+        "my_double DOUBLE, "
+        "my_date DATE, "
+        "my_time TIME, "
+        "my_datetime DATETIME, "
+        "my_year YEAR, "
+        "my_char CHAR(100), "
+        "my_varchar VARCHAR(100), "
+        "my_enum ENUM('x-small', 'small', 'medium', 'large', 'x-large'), "
+        "my_geometry POINT, "
+        "my_blob BLOB)"
+    )
+
+    insert_stmt = (
+        "INSERT INTO {} ("
+        "id, "
+        "my_null, "
+        "my_bit, "
+        "my_tinyint, "
+        "my_smallint, "
+        "my_mediumint, "
+        "my_int, "
+        "my_bigint, "
+        "my_decimal, "
+        "my_float, "
+        "my_double, "
+        "my_date, "
+        "my_time, "
+        "my_datetime, "
+        "my_year, "
+        "my_char, "
+        "my_varchar, "
+        "my_enum, "
+        "my_geometry, "
+        "my_blob) "
+        "VALUES (%s, %s, B'1111100', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "POINT(21.2, 34.2), %s)"
+    )
+
+    data = (
+        1,
+        None,
+        127,
+        32767,
+        8388607,
+        2147483647,
+        4294967295 if ARCH_64BIT else 2147483647,
+        Decimal("1.2"),
+        3.14,
+        4.28,
+        datetime.date(2018, 12, 31),
+        datetime.time(12, 13, 14),
+        datetime.datetime(2019, 2, 4, 10, 36, 00),
+        2019,
+        "abc",
+        u"MySQL 🐬",
+        "x-large",
+        b"random blob data",
+    )
+
+    exp = (
+        1,
+        None,
+        124,
+        127,
+        32767,
+        8388607,
+        2147483647,
+        4294967295 if ARCH_64BIT else 2147483647,
+        Decimal("1.2000000000"),
+        3.14,
+        4.28,
+        datetime.date(2018, 12, 31),
+        datetime.timedelta(0, 43994),
+        datetime.datetime(2019, 2, 4, 10, 36), 2019,
+        "abc",
+        u"MySQL \U0001f42c",
+        "x-large",
+        bytearray(b"\x00\x00\x00\x00\x01\x01\x00\x00\x003333335"
+                  b"@\x9a\x99\x99\x99\x99\x19A@"),
+        bytearray(b"random blob data"),
+    )
+
+    @tests.foreach_cnx()
+    def test_converter_class_integration(self):
+        self.cnx.set_converter_class(conversion.MySQLConverter)
+        with self.cnx.cursor() as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+            cur.execute(self.create_table_stmt.format(self.table_name))
+            cur.execute(self.insert_stmt.format(self.table_name), self.data)
+            cur.execute(f"SELECT * FROM {self.table_name}")
+            rows = cur.fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0], self.exp)
+            cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
 
 
 class MySQLConverterStrFallbackTests(tests.MySQLConnectorTests):

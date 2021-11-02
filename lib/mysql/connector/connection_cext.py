@@ -340,8 +340,16 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         counter = 0
         try:
-            row = prep_stmt.fetch_row() if prep_stmt \
-                else self._cmysql.fetch_row()
+            fetch_row = (
+                prep_stmt.fetch_row if prep_stmt
+                else self._cmysql.fetch_row
+            )
+            if self.converter:
+                # When using a converter class, the C extension should not
+                # convert the values. This can be accomplished by setting
+                # the raw option to True.
+                self._cmysql.raw(True)
+            row = fetch_row()
             while row:
                 if not self._raw and self.converter:
                     row = list(row)
@@ -354,8 +362,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 counter += 1
                 if count and counter == count:
                     break
-                row = prep_stmt.fetch_row() if prep_stmt \
-                        else self._cmysql.fetch_row()
+                row = fetch_row()
             if not row:
                 _eof = self.fetch_eof_columns(prep_stmt)['eof']
                 if prep_stmt:
@@ -437,9 +444,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 None,
                 None,
                 None,
-                None,
                 ~int(col[9]) & FieldFlag.NOT_NULL,
-                int(col[9])
+                int(col[9]),
+                int(col[6]),
             ))
 
         return {

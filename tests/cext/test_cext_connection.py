@@ -91,16 +91,17 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         query = "SHOW STATUS LIKE 'Aborted_c%'"
         info = self.cnx.cmd_query(query)
 
+        charset = 45 if tests.MYSQL_VERSION < (8, 0, 0) else 255
         exp = {
             'eof': {'status_flag': 32, 'warning_count': 0},
             'columns': [
-                ['Variable_name', 253, None, None, None, None, None, 0, 1],
-                ('Value', 253, None, None, None, None, None, 1, 0)
+                ['Variable_name', 253, None, None, None, None, 0, 1, charset],
+                ('Value', 253, None, None, None, None, 1, 0, charset)
             ]
         }
 
         if tests.MYSQL_VERSION >= (5, 7, 10):
-            exp['columns'][0][8] = 4097
+            exp['columns'][0][7] = 4097
             exp['eof']['status_flag'] = 16385
 
         exp['columns'][0] = tuple(exp['columns'][0])
