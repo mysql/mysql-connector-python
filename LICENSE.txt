@@ -10,7 +10,7 @@ Introduction
    third-party software which may be included in this distribution of
    MySQL Connector/Python 8.0.
 
-   Last updated: September 2021
+   Last updated: October 2021
 
 Licensing Information
 
