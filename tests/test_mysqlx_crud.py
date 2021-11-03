@@ -2446,11 +2446,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertTrue(expected_stmt_attrs(modify, False, True, True, 2))
 
         row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[1]
-        expected_sql_text = ("UPDATE `{}`.`{}` "
-                             "SET doc=JSON_SET(JSON_SET(doc,'$.age',18),"
-                             "'$._id',JSON_EXTRACT(`doc`,'$._id')) "
-                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?)"
-                             "".format(self.schema_name, collection_name))
+        expected_sql_text = (
+            "UPDATE `{}`.`{}` "
+            "SET doc=JSON_SET(JSON_SET(doc,'$.age',18),"
+            "'$._id',JSON_EXTRACT(`doc`,'$._id')) "
+            "WHERE (JSON_UNQUOTE(JSON_EXTRACT(doc,'$._id')) = ?)"
+            "".format(self.schema_name, collection_name)
+        )
         self.assertEqual(row[0], expected_sql_text)
         self.assertEqual(row[1], modify.exec_counter - 1)
 
@@ -2464,11 +2466,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertTrue(expected_stmt_attrs(modify, False, True, True, 2))
 
         row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[1]
-        expected_sql_text = ("UPDATE `{}`.`{}` "
-                             "SET doc=JSON_SET(JSON_SET(doc,'$.age',92),'$._id'"
-                             ",JSON_EXTRACT(`doc`,'$._id')) "
-                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?)"
-                             "".format(self.schema_name, collection_name))
+        expected_sql_text = (
+            "UPDATE `{}`.`{}` "
+            "SET doc=JSON_SET(JSON_SET(doc,'$.age',92),'$._id'"
+            ",JSON_EXTRACT(`doc`,'$._id')) "
+            "WHERE (JSON_UNQUOTE(JSON_EXTRACT(doc,'$._id')) = ?)"
+            "".format(self.schema_name, collection_name)
+        )
         self.assertEqual(row[0], expected_sql_text)
         self.assertEqual(row[1], modify.exec_counter - 1)
 
@@ -2490,9 +2494,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertTrue(expected_stmt_attrs(remove, False, True, True, 3))
 
         row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[2]
-        expected_sql_text = ("DELETE FROM `{}`.`{}` "
-                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?) LIMIT ?"
-                             "".format(self.schema_name, collection_name))
+        expected_sql_text = (
+            "DELETE FROM `{}`.`{}` "
+            "WHERE (JSON_UNQUOTE(JSON_EXTRACT(doc,'$._id')) = ?) LIMIT ?"
+            "".format(self.schema_name, collection_name)
+        )
         self.assertEqual(row[0], expected_sql_text)
         self.assertEqual(row[1], remove.exec_counter - 1)
 
@@ -2510,10 +2516,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertTrue(expected_stmt_attrs(remove, False, True, True, 3))
 
         row = session.sql(_PREP_STMT_QUERY).execute().fetch_all()[2]
-        expected_sql_text = ("DELETE FROM `{}`.`{}` "
-                             "WHERE (JSON_EXTRACT(doc,'$._id') = ?) "
-                             "ORDER BY JSON_EXTRACT(doc,'$._id') LIMIT ?"
-                             "".format(self.schema_name, collection_name))
+        expected_sql_text = (
+            "DELETE FROM `{}`.`{}` "
+            "WHERE (JSON_UNQUOTE(JSON_EXTRACT(doc,'$._id')) = ?) "
+            "ORDER BY JSON_EXTRACT(doc,'$._id') LIMIT ?"
+            "".format(self.schema_name, collection_name)
+        )
         self.assertEqual(row[0], expected_sql_text)
         self.assertEqual(row[1], remove.exec_counter - 1)
 
