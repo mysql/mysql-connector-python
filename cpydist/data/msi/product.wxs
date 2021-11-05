@@ -52,28 +52,6 @@
 
     <!-- Obtain location of the Python interpreters installed on the system-->
 
-    <!-- Python 3.6 -->
-    <Property Id="PYTHON36INSTALLPATH_ALL">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python36InstallPathAll64" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.6\InstallPath" Win64="yes"/>
-      <?else?>
-      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
-      <RegistrySearch Id="Python36InstallPathAll32" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.6-32\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-    <Property Id="PYTHON36INSTALLPATH_CURRENT">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python36InstallPathCurrent64" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.6\InstallPath" Win64="yes"/>
-      <?else?>
-      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
-      <RegistrySearch Id="Python36InstallPathCurrent32" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.6-32\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-
     <!-- Python 3.7 -->
     <Property Id="PYTHON37INSTALLPATH_ALL">
       <?if "$(var.Platform)"="x64" ?>
@@ -170,31 +148,6 @@
 
     <!-- Definition of the folders used by the installed files-->
     <Directory Id="TARGETDIR" Name="SourceDir">
-
-      <Directory Id="INSTALLDIRP36" Name="Python36">
-        <Directory Id="PythonLibDir36" Name="Lib">
-          <Directory Id="SitePackagesDir36" Name="site-packages">
-            <Directory Id="EggInfoDir36" Name="mysql_connector_python-$(var.FullVersion)-py3.6.egg-info"/>
-            <Directory Id="MySQLXPackageDir36" Name="mysqlx">
-              <Directory Id="MySQLXPB2Dir36" Name="protobuf"/>
-              <Directory Id="MySQLXLocalesDir36" Name="locales">
-                <Directory Id="MySQLXLocalesEngDir36" Name="eng"/>
-              </Directory>
-            </Directory>
-            <Directory Id="MySQLPackageDir36" Name="mysql">
-              <Directory Id="VendorDir36" Name="vendor">
-                <Directory Id="VendorPluginDir36" Name="plugin"/>
-              </Directory>
-              <Directory Id="ConnectorPackageDir36" Name="connector">
-                <Directory Id="DjangoDir36" Name="django"/>
-                <Directory Id="ConnectorLocalesDir36" Name="locales">
-                  <Directory Id="LocalesEngDir36" Name="eng"/>
-                </Directory>
-              </Directory>
-            </Directory>
-          </Directory>
-        </Directory>
-      </Directory>
 
       <Directory Id="INSTALLDIRP37" Name="Python37">
         <Directory Id="PythonLibDir37" Name="Lib">
@@ -365,31 +318,6 @@
         <ComponentRef Id="MyConnPyExamples"/>
       </Feature>
 
-      <!-- Python 3.6 -->
-      <?if $(var.BDist36) != "" ?>
-      <Feature Id="Python36" Title="C/py for Python 3.6" Level="1"
-               ConfigurableDirectory ="INSTALLDIRP36" Absent="allow">
-        <Condition Level='0'>Not PYTHON36INSTALLPATH_ALL AND Not PYTHON36INSTALLPATH_CURRENT AND Not Installed</Condition>
-        <ComponentRef Id="EggInfo36"/>
-        <ComponentRef Id="MySQLPackage36"/>
-        <?if $(var.HaveCExt36) = 1 ?>
-        <ComponentRef Id="Vendor36"/>
-        <ComponentRef Id="VendorPlugin36"/>
-        <?endif?>
-        <ComponentRef Id="ConnectorPackage36"/>
-        <ComponentRef Id="ConnectorLocales36"/>
-        <ComponentRef Id="LocalesEng36"/>
-        <ComponentRef Id="DjangoBackend36"/>
-        <ComponentRef Id="MySQLXPackage36"/>
-        <ComponentRef Id="MySQLXPackagePB236"/>
-        <ComponentRef Id="MySQLXLocales36"/>
-        <ComponentRef Id="MySQLXLocalesEng36"/>
-        <?if $(var.HaveCExt36) = 1 ?>
-        <ComponentRef Id="CExtension36"/>
-        <?endif?>
-      </Feature>
-      <?endif?>
-
       <!-- Python 3.7 -->
       <?if $(var.BDist37) != "" ?>
       <Feature Id="Python37" Title="C/py for Python 3.7" Level="1"
@@ -491,11 +419,6 @@
       <?endif?>
     </Feature>
 
-    <!-- Python 3.6 -->
-    <CustomAction Id="SetInstallDirCurrentP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_CURRENT]"/>
-    <CustomAction Id="SetInstallDirAllP36" Property="INSTALLDIRP36" Value="[PYTHON36INSTALLPATH_ALL]"/>
-    <CustomAction Id="ErrDebug36" Error="Installdir: [INSTALLDIRP36]"/>
-
     <!-- Python 3.7 -->
     <CustomAction Id="SetInstallDirCurrentP37" Property="INSTALLDIRP37" Value="[PYTHON37INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP37" Property="INSTALLDIRP37" Value="[PYTHON37INSTALLPATH_ALL]"/>
@@ -526,9 +449,6 @@
     <InstallExecuteSequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
       <RemoveExistingProducts After="InstallInitialize" />
-      <!-- Python 3.6 -->
-      <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
       <!-- Python 3.7 -->
       <Custom Action="SetInstallDirCurrentP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_ALL</Custom>
@@ -545,9 +465,6 @@
 
     <InstallUISequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
-      <!-- Python 3.6 -->
-      <Custom Action="SetInstallDirCurrentP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP36" After="AppSearch">NOT Installed AND PYTHON36INSTALLPATH_ALL</Custom>
       <!-- Python 3.7 -->
       <Custom Action="SetInstallDirCurrentP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_ALL</Custom>
