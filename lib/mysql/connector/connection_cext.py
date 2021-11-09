@@ -176,6 +176,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def _open_connection(self):
         charset_name = CharacterSet.get_info(self._charset_id)[0]
+        
+        # Don't know what exactly is the problem. But the whole python process hung from here and will never return. The problem start with 8.0.27. Could you help have a look?
         self._cmysql = _mysql_connector.MySQL(  # pylint: disable=E1101,I1101
             buffered=self._buffered,
             raw=self._raw,
