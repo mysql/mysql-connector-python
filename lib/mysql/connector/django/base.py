@@ -54,7 +54,7 @@ from django.utils import dateparse, timezone
 
 try:
     import mysql.connector
-    from mysql.connector.conversion import MySQLConverter, MySQLConverterBase
+    from mysql.connector.conversion import MySQLConverter
 except ImportError as err:
     raise ImproperlyConfigured(
         "Error loading mysql.connector module: {0}".format(err))
@@ -281,8 +281,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         except KeyError:
             self._use_pure = not HAVE_CEXT
 
-        self.converter = DjangoMySQLConverter() \
-            if self.use_pure else DjangoCMySQLConverter()
+        self.converter = DjangoMySQLConverter()
 
     def __getattr__(self, attr):
         if attr.startswith("mysql_is"):
@@ -328,9 +327,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return kwargs
 
     def get_new_connection(self, conn_params):
-        if not self.use_pure:
-            conn_params['converter_class'] = DjangoCMySQLConverter
-        else:
+        if not 'converter_class' in conn_params:
             conn_params['converter_class'] = DjangoMySQLConverter
         cnx = mysql.connector.connect(**conn_params)
 
@@ -505,7 +502,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
 
 class DjangoMySQLConverter(MySQLConverter):
-    """Custom converter for Django for MySQLConnection"""
+    """Custom converter for Django."""
     def _TIME_to_python(self, value, dsc=None):
         """Return MySQL TIME data type as datetime.time()
 
@@ -539,28 +536,3 @@ class DjangoMySQLConverter(MySQLConverter):
 
     def _safebytes_to_mysql(self, value):
         return self._bytes_to_mysql(value)
-
-
-class DjangoCMySQLConverter(MySQLConverterBase):
-    """Custom converter for Django for CMySQLConnection"""
-    def _TIME_to_python(self, value, dsc=None):
-        """Return MySQL TIME data type as datetime.time()
-
-        Returns datetime.time()
-        """
-        return dateparse.parse_time(str(value))
-
-    def __DATETIME_to_python(self, value, dsc=None):
-        """Connector/Python always returns naive datetime.datetime
-
-        Connector/Python always returns naive timestamps since MySQL has
-        no time zone support. Since Django needs non-naive, we need to add
-        the UTC time zone.
-
-        Returns datetime.datetime()
-        """
-        if not value:
-            return None
-        if settings.USE_TZ and timezone.is_naive(value):
-            value = value.replace(tzinfo=timezone.utc)
-        return value
