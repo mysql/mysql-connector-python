@@ -99,10 +99,13 @@ FOREIGN KEY (id_t1) REFERENCES django_t1(id) ON DELETE CASCADE
 # Have to load django.db to make importing db backend work for Django < 1.6
 import django.db  # pylint: disable=W0611
 from django.db.backends.signals import connection_created
+from django.db.utils import DEFAULT_DB_ALIAS, load_backend
 from django.utils.safestring import SafeText
 
 import mysql.connector
 from mysql.connector.django.introspection import FieldInfo
+from mysql.connector.conversion import MySQLConverter
+from mysql.connector.errors import ProgrammingError
 
 if DJANGO_AVAILABLE:
     from mysql.connector.django.base import (
@@ -354,6 +357,85 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
         self.assertEqual(None,
                          django_converter._DATETIME_to_python(value, dsc=None))
         settings.USE_TZ = False
+
+
+class CustomDjangoMySQLConverter(DjangoMySQLConverter):
+    """A custom Django MySQL converter."""
+
+    def _CUSTOMTYPE_to_python(self, value):
+        try:
+            return int(value)
+        except ValueError:
+            raise ValueError("Invalid value for CUSTOMTYPE conversion")
+
+
+class CustomDjangoMySQLConverterTests(tests.MySQLConnectorTests):
+    """Test the Django custom MySQL converter class."""
+
+    @staticmethod
+    def create_connection(alias=DEFAULT_DB_ALIAS):
+        django.db.connections.ensure_defaults(alias)
+        django.db.connections.prepare_test_settings(alias)
+        db = django.db.connections.databases[alias]
+        backend = load_backend(db['ENGINE'])
+        return backend.DatabaseWrapper(db, alias)
+
+    def test__TIME_to_python(self):
+        value = b'10:11:12'
+        django_converter = CustomDjangoMySQLConverter()
+        self.assertEqual(
+            datetime.time(10, 11, 12),
+            django_converter._TIME_to_python(value, dsc=None),
+        )
+
+    def test__DATETIME_to_python(self):
+        value = b'1990-11-12 00:00:00'
+        django_converter = CustomDjangoMySQLConverter()
+        self.assertEqual(
+            datetime.datetime(1990, 11, 12, 0, 0, 0),
+            django_converter._DATETIME_to_python(value, dsc=None),
+        )
+
+        settings.USE_TZ = True
+        value = b'0000-00-00 00:00:00'
+        django_converter = DjangoMySQLConverter()
+        self.assertEqual(
+            None,
+            django_converter._DATETIME_to_python(value, dsc=None),
+        )
+        settings.USE_TZ = False
+
+    def test__CUSTOMTYPE_to_python(self):
+        value = b'2021'
+        django_converter = CustomDjangoMySQLConverter()
+        self.assertEqual(
+            2021,
+            django_converter._CUSTOMTYPE_to_python(value),
+        )
+
+    def test_invalid__CUSTOMTYPE_to_python(self):
+        value = b'abc'
+        django_converter = CustomDjangoMySQLConverter()
+        self.assertRaises(
+            ValueError,
+            django_converter._CUSTOMTYPE_to_python,
+            value,
+        )
+
+    def test_invalid_converter_class(self):
+        settings.DATABASES['default']['OPTIONS'] = {
+            'converter_class': MySQLConverter,
+        }
+        self.assertRaises(ProgrammingError, self.create_connection)
+        del settings.DATABASES['default']['OPTIONS']
+
+    def test_converter_class(self):
+        settings.DATABASES['default']['OPTIONS'] = {
+            'converter_class': CustomDjangoMySQLConverter,
+        }
+        cnx = self.create_connection()
+        cnx.close()
+        del settings.DATABASES['default']['OPTIONS']
 
 
 class BugOra20106629(tests.MySQLConnectorTests):

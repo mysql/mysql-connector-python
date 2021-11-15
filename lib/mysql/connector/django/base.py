@@ -276,12 +276,22 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def __init__(self, *args, **kwargs):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
 
-        try:
-            self._use_pure = self.settings_dict['OPTIONS']['use_pure']
-        except KeyError:
-            self._use_pure = not HAVE_CEXT
-
-        self.converter = DjangoMySQLConverter()
+        options = self.settings_dict.get('OPTIONS')
+        if options:
+            self._use_pure = options.get('use_pure', not HAVE_CEXT)
+            converter_class = options.get(
+                'converter_class',
+                DjangoMySQLConverter,
+            )
+            if not issubclass(converter_class, DjangoMySQLConverter):
+                raise ProgrammingError(
+                    'Converter class should be a subclass of '
+                    'mysql.connector.django.base.DjangoMySQLConverter'
+                )
+            self.converter = converter_class()
+        else:
+             self.converter = DjangoMySQLConverter()
+             self._use_pure = not HAVE_CEXT
 
     def __getattr__(self, attr):
         if attr.startswith("mysql_is"):
