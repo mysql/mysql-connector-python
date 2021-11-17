@@ -1277,19 +1277,28 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             "See wait_timeout and interactive_timeout for configuring this "
             "behavior."
         )
+        # Expected result if the connection is closed before the error above is retrieved
+        exp_err_no2 = 2013
+        exp_err_msg2 = (
+            "Lost connection to MySQL server during query"
+        )
 
         # Do not connect with unix_socket
         config = tests.get_mysql_config()
         del config["unix_socket"]
 
+        exp_errors= (errors.DatabaseError, errors.InterfaceError)
+
         # Set a low value for wait_timeout and wait more
         with self.cnx.__class__(**config) as cnx:
             cnx.cmd_query("SET SESSION wait_timeout=1")
             sleep(2)
-            with self.assertRaises(errors.DatabaseError) as context:
+            with self.assertRaises(exp_errors) as context:
                 cnx.cmd_query("SELECT VERSION()")
-                self.assertEqual(context.exception.errno, exp_err_no)
-                self.assertEqual(context.exception.msg, exp_err_msg)
+                self.assertIn(
+                    context.exception.errno, [exp_err_no, exp_err_no2])
+                self.assertIn(
+                    context.exception.msg, [exp_err_msg, exp_err_msg2])
 
     def test_ping(self):
         """Ping the MySQL server"""
