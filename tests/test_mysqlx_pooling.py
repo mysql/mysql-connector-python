@@ -38,6 +38,7 @@ import os
 import platform
 import re
 import socket
+import sys
 
 from mysqlx.connection import update_timeout_penalties_by_error
 from mysqlx.errors import InterfaceError, OperationalError, ProgrammingError, PoolError
@@ -448,6 +449,10 @@ class MySQLxClientTests(tests.MySQLxTests):
         # No errors should raise from closing client.
         client.close()
 
+    @unittest.skipIf(
+        sys.platform == "darwin" and platform.mac_ver()[0].startswith("12"),
+        "This test fails due to a bug on macOS 12",
+    )
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 40), "TLSv1.1 incompatible")
     def test_get_client_with_tls_version(self):
         # Test None value is returned if no schema name is specified

@@ -2200,8 +2200,10 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                              "".format(attr_name, res_dict[attr_name],
                                        expected_attrs[attr_name]))
 
-    @unittest.skipIf(sys.version_info < (2, 7, 9), "The support for SSL is "
-                     "not available for Python versions < 2.7.9.")
+    @unittest.skipIf(
+        sys.platform == "darwin" and platform.mac_ver()[0].startswith("12"),
+        "This test fails due to a bug on macOS 12",
+    )
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 40), "TLSv1.1 incompatible")
     @tests.foreach_cnx()
     def test_get_connection_with_tls_version(self):
