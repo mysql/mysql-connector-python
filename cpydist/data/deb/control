@@ -3,7 +3,7 @@ Priority: extra
 Section: python
 Maintainer: MySQL Release Engineering <mysql-build@oss.oracle.com>
 Build-Depends:
- debhelper (>= 9.0.0), dh-python, python (>= 3.7.0) | python3 (>= 3.7.0)
+ debhelper (>= 9.0.0), dh-python, python (>= 3.7.0) | python3 (>= 3.7.0) | python3.7 (>= 3.7.0)
 Standards-Version: 3.9.8
 Homepage: http://dev.mysql.com/downloads/connector/python/
 X-Python3-Version: >= 3.7
