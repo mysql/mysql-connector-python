@@ -164,6 +164,10 @@ def file_uri(path, brackets=True):
     return "({0})".format(path)
 
 def build_uri(**kwargs):
+    _kwargs = {}
+    for key, val in kwargs.items():
+        _kwargs[key.replace("_", "-")] = val
+    kwargs = _kwargs
     uri = "mysqlx://{0}:{1}".format(kwargs["user"], kwargs["password"])
 
     if "host" in kwargs:
@@ -192,24 +196,24 @@ def build_uri(**kwargs):
         uri = "{0}/{1}".format(uri, kwargs["schema"])
 
     query = []
-    if "ssl_mode" in kwargs:
-        query.append("ssl-mode={0}".format(kwargs["ssl_mode"]))
-    if "ssl_ca" in kwargs:
-        query.append("ssl-ca={0}".format(kwargs["ssl_ca"]))
-    if "ssl_cert" in kwargs:
-        query.append("ssl-cert={0}".format(kwargs["ssl_cert"]))
-    if "ssl_key" in kwargs:
-        query.append("ssl-key={0}".format(kwargs["ssl_key"]))
-    if "use_pure" in kwargs:
-        query.append("use-pure={0}".format(kwargs["use_pure"]))
-    if "connect_timeout" in kwargs:
-        query.append("connect-timeout={0}".format(kwargs["connect_timeout"]))
-    if "connection_attributes" in kwargs:
-        conn_attrs = kwargs["connection_attributes"]
+    if "ssl-mode" in kwargs:
+        query.append("ssl-mode={0}".format(kwargs["ssl-mode"]))
+    if "ssl-ca" in kwargs:
+        query.append("ssl-ca={0}".format(kwargs["ssl-ca"]))
+    if "ssl-cert" in kwargs:
+        query.append("ssl-cert={0}".format(kwargs["ssl-cert"]))
+    if "ssl-key" in kwargs:
+        query.append("ssl-key={0}".format(kwargs["ssl-key"]))
+    if "use-pure" in kwargs:
+        query.append("use-pure={0}".format(kwargs["use-pure"]))
+    if "connect-timeout" in kwargs:
+        query.append("connect-timeout={0}".format(kwargs["connect-timeout"]))
+    if "connection-attributes" in kwargs:
+        conn_attrs = kwargs["connection-attributes"]
         if isinstance(conn_attrs, str) and \
            not (conn_attrs.startswith("[") and conn_attrs.endswith("]")):
             query.append("connection-attributes={}"
-                         "".format(kwargs["connection_attributes"]))
+                         "".format(kwargs["connection-attributes"]))
         else:
             attr_list = []
             for key in conn_attrs:
@@ -1041,12 +1045,6 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         session.close()
 
-        # Error if ssl-mode=disabled and ssl_* set
-        extra = [("ssl_mode", "disabled"),
-                 ("ssl_ca", "({0})".format(tests.SSL_CA))]
-        uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
-        self.assertRaises(InterfaceError, mysqlx.get_session, uri)
-
         # Error if invalid ssl-mode
         extra = [("ssl_mode", "invalid")]
         uri = build_uri(**dict(list(self.connect_kwargs.items()) + extra))
@@ -1205,6 +1203,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Empty tls_ciphersuites list without tls-versions
         settings["tls-ciphersuites"] = []
         settings.pop("tls-versions")
+        settings.pop("tls_versions")
+
         uri_settings = build_uri(**settings)
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_session(uri_settings)
@@ -1273,20 +1273,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_session(uri_settings)
 
-        # Repeated tls-versions on URI
-        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
-        settings["tls-versions"] = ["TLSv1.2", "TLSv1.3"]
-        uri_settings = build_uri(**settings)
-        uri_settings = "{}&{}".format(uri_settings,
-                                      "tls-versions=[TLSv1.1,TLSv1.2]")
-        with self.assertRaises(InterfaceError) as context:
-            _ = mysqlx.get_session(uri_settings)
-        self.assertTrue(("Duplicate option" in context.exception.msg),
-                        "Unexpected exception message found: {}"
-                        "".format(context.exception.msg))
-
         # Verify InterfaceError exception is raised With invalid TLS version
-        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA"]
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA256"]
         settings["tls-versions"] = ["TLSv8"]
         uri_settings = build_uri(**settings)
         with self.assertRaises(InterfaceError) as context:
@@ -2129,6 +2117,89 @@ class MySQLxCompressionTests(tests.MySQLxTests):
 
         # Restore the default compression algorithms
         self._set_compression_algorithms(default_algorithms)
+
+
+class WL14852(tests.MySQLxTests):
+    """WL#14852: Align TLS and SSL options checking and behavior
+    """
+
+    def setUp(self):
+        session = mysqlx.get_session(tests.get_mysqlx_config())
+        session.sql("CREATE USER 'native'@'%' IDENTIFIED WITH "
+                    "mysql_native_password BY 'test'").execute()
+        session.sql("grant all privileges on *.* to 'native'@'%'").execute()
+
+    def tearDown(self):
+        session = mysqlx.get_session(tests.get_mysqlx_config())
+        session.sql("DROP USER IF EXISTS 'native'@'%'").execute()
+
+    def _test_giving_ssl_disable_does_not_raise_error(self, use_uri=False):
+        """Verify no error with ssl-mode=disable and other TLS or SSL options.
+        """
+        config = tests.get_mysqlx_config()
+        config["ssl-mode"] = "DISABLED"
+        config["user"] = "native"
+        config["password"] = "test"
+        config["compression"] = "disabled"
+
+        sl_options = {
+            "ssl-ca": "",
+            "ssl-cert": "",
+            "ssl-key": "",
+            "tls-versions": ["TLSv1.2"],
+            "tls-ciphersuites": ["DHE-RSA-AES256-SHA256"],
+        }
+
+        for sl_option in sl_options:
+            settings = config.copy()
+            settings[sl_option] = sl_options[sl_option]
+            if "ssl-key" in settings:
+                settings["ssl-cert"] = ""
+            if use_uri:
+                uri_seetings = build_uri(**settings)
+                session = mysqlx.get_session(uri_seetings)
+            else:
+                session = mysqlx.get_session(settings)
+            stm = session.sql("SHOW STATUS LIKE 'ssl_version%'")
+            res = stm.execute()
+            self.assertIsNotNone(res.fetch_all()[0][0],
+                                 f"unexpected result: {res.fetch_all()[0][0]}")
+
+    def test_giving_ssl_disable_does_not_raise_error(self):
+        """Verify no error with ssl-mode=disable and other TLS or SSL options.
+        """
+        self._test_giving_ssl_disable_does_not_raise_error()
+
+    def test_giving_ssl_disable_does_not_raise_error_uri(self):
+        """Verify no error with ssl-mode=disable and other TLS/SSL options URI.
+        """
+        self._test_giving_ssl_disable_does_not_raise_error(use_uri=True)
+
+    def test_duplicated_options_in_uri_not_raise_error(self):
+        """Verify no error is raised when a duplicated option is given on URI.
+        """
+        _settings = tests.get_mysqlx_config()
+        settings = {
+            "host": _settings["host"],
+            "user": _settings["user"],
+            "password": _settings["password"],
+            "port": _settings["port"]
+        }
+        uri = build_uri(**settings)
+
+        dup_args = [
+            [("ssl-mode","DISABLED"), ("ssl-mode","REQUIRED")],
+            [("tls-versions", '[TLSv1.3]'), ("tls-versions", '[TLSv1.2]')],
+            [("compression", "enabled"), ("compression", "disabled")]
+        ]
+        for dup_arg in dup_args:
+            uri_dup = "{}?{}={}".format(uri, dup_arg[0][0], dup_arg[0][1])
+            uri_dup = "{}&{}={}".format(uri_dup, dup_arg[1][0], dup_arg[1][1])
+            session = mysqlx.get_session(uri_dup)
+            stm = session.sql("SHOW STATUS LIKE 'ssl_version%'")
+            res = stm.execute()
+            self.assertIsNotNone(res.fetch_all()[0][0],
+                                 f"unexpected result: {res.fetch_all()[0][0]}")
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")

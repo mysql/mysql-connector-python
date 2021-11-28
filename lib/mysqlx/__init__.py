@@ -158,8 +158,7 @@ def _parse_connection_uri(uri):
         MySQL server/farm.
 
     Raises:
-        :class:`mysqlx.InterfaceError`: If contains a duplicate option or
-                                        URI scheme is not valid.
+        :class:`mysqlx.InterfaceError`: If contains a invalid option.
     """
     settings = {"schema": ""}
 
@@ -197,8 +196,6 @@ def _parse_connection_uri(uri):
         opt = key.replace("_", "-").lower()
         if opt in invalid_options:
             raise InterfaceError("Invalid option: '{0}'".format(key))
-        if opt in settings:
-            raise InterfaceError("Duplicate option: '{0}'".format(key))
         if opt in _SSL_OPTS:
             settings[opt] = unquote(val.strip("()"))
         else:
@@ -242,9 +239,6 @@ def _validate_settings(settings):
         except (AttributeError, ValueError):
             raise InterfaceError("Invalid SSL Mode '{0}'"
                                  "".format(settings["ssl-mode"]))
-        if settings["ssl-mode"] == SSLMode.DISABLED and \
-            any(key in settings for key in _SSL_OPTS):
-            raise InterfaceError("SSL options used with ssl-mode 'disabled'")
 
     if "ssl-crl" in settings and not "ssl-ca" in settings:
         raise InterfaceError("CA Certificate not provided")
@@ -255,7 +249,7 @@ def _validate_settings(settings):
         in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
         raise InterfaceError("Cannot verify Server without CA")
     if "ssl-ca" in settings and settings.get("ssl-mode") \
-        not in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
+        not in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA, SSLMode.DISABLED]:
         raise InterfaceError("Must verify Server if CA is provided")
 
     if "auth" in settings:

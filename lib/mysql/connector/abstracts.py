@@ -593,15 +593,9 @@ class MySQLConnectionAbstract(object):
                 )
             if "tls_versions" in self._ssl and \
                self._ssl["tls_versions"] is not None:
-                if self._ssl_disabled:
-                    raise AttributeError("The tls_versions option can not be "
-                                         "used along with ssl_disabled.")
                 self._validate_tls_versions()
 
             if "tls_ciphersuites" in self._ssl and self._ssl["tls_ciphersuites"] is not None:
-                if self._ssl_disabled:
-                    raise AttributeError("The tls_ciphersuites option can not "
-                                         "be used along with ssl_disabled.")
                 self._validate_tls_ciphersuites()
 
         if self._conn_attrs is None:

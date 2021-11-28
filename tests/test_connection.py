@@ -2068,14 +2068,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         data_file = os.path.join("tests", "data", "local_data.csv")
         verify_load_success(cur, data_file, exp1)
 
-        # Changing allow_local_infile_in_path to dissallow upload
+        # Changing allow_local_infile_in_path to disallow upload
         cnx = connector_class(**settings)
         cur = cnx.cursor()
         cnx.set_allow_local_infile_in_path("")
         data_file = os.path.join("tests", "data", "local_data.csv")
         verify_load_fails(cur, data_file, "file request rejected")
 
-        # Changing dissabled allow_local_infile_in_path to allow upload
+        # Changing disabled allow_local_infile_in_path to allow upload
         settings["allow_local_infile_in_path"] = None
         cnx = connector_class(**settings)
         cur = cnx.cursor()
@@ -2220,27 +2220,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         if "unix_socket" in settings:
             settings.pop("unix_socket")
 
-        # tls_versions and ssl_disabled=True
-        settings["tls_versions"] = ["TLSv1"]
-        settings["ssl_disabled"] = True
-        with self.assertRaises(AttributeError) as context:
-            _ = connector_class(**settings)
-        self.assertTrue(("along with ssl_disabled" in str(context.exception)),
-                        "Unexpected exception message found: {}"
-                        "".format(context.exception))
-
-        # tls_versions and ssl_disabled=True
-        settings.pop("tls_versions")
-        settings["tls_ciphersuites"] = ["DHE-RSA-AES256-SHA"]
-        settings["ssl_disabled"] = True
-        with self.assertRaises(AttributeError) as context:
-            _ = connector_class(**settings)
-        self.assertTrue(("along with ssl_disabled" in str(context.exception)),
-                        "Unexpected exception message found: {}"
-                        "".format(context.exception))
-
-        settings.pop("ssl_disabled")
-        settings.pop("tls_ciphersuites")
         list_a = ("TLSv1.2", "TLSv1.3", ("TLSv1.2", "TLSv1.3"), None)
         list_b = ("TLSv1", "TLSv1.1", ("TLSv1", "TLSv1.1"), None)
         list_c = ("foo", "bar", ("foo", "bar"), None)
@@ -2899,7 +2878,7 @@ class WL13994(tests.MySQLConnectorTests):
         cnx.cmd_query('show variables like "have_ssl"')
         res = cnx.get_rows()[0][0]
         self.assertEqual(res, ('have_ssl', 'DISABLED'),
-                         "can not dissable ssl: {}".format(res))
+                         "can not disable ssl: {}".format(res))
 
     def _enable_ssl(self):
         self.server.stop()
@@ -3391,6 +3370,38 @@ class WL14213(tests.MySQLConnectorTests):
         cnx.close()
 
 
+class WL14852(tests.MySQLConnectorTests):
+    """WL#14852: Align TLS and SSL options checking and behavior
+    """
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_giving_ssl_disable_does_not_raise_error(self):
+        """Verify no error with ssl_disable and other TLS or SSL options.
+        """
+        config = self.config
+        config["ssl_disabled"] = True
+
+        sl_options = {
+            "ssl_ca": "",
+            "ssl_cert": "",
+            "ssl_key": "",
+            "tls_versions": "TLSv1",
+            "tls_ciphersuites": "DHE-RSA-AES256-SHA256",
+            "ssl_cipher": "",
+            "ssl_verify_cert": True,
+            "ssl_verify_identity": True
+        }
+
+        for sl_option in sl_options:
+            settings = config.copy()
+            settings[sl_option] = sl_options[sl_option]
+            with connection.MySQLConnection(**config) as cnx:
+                with cnx.cursor() as cur:
+                    cur.execute("SHOW STATUS LIKE 'ssl_version%'")
+                    res = cur.fetchall()
+                    self.assertEqual(res, [('Ssl_version', '')])
+
+
 @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 23),
                  "Query Attributes are supported, req. ver <8.0.23")
 class WL14237_not_supported(tests.MySQLConnectorTests):
@@ -3426,12 +3437,12 @@ class WL14237_not_supported(tests.MySQLConnectorTests):
                 self.assertIn("some_parameter", res[0][0])
                 cur.clear_attributes()
 
-    @tests.foreach_cnx(MySQLConnection)
+    @tests.foreach_cnx()
     def test_1_test_query_attrs_not_supported_behavior(self):
         "Check warning if QA are given but not supported by the server."
         self._test_query_attrs_not_supported_behavior()
 
-    @tests.foreach_cnx(MySQLConnection)
+    @tests.foreach_cnx()
     def test_2_test_query_attrs_not_supported_behavior(self):
         "Check warning if QA are given but not supported by the server."
         self._test_query_attrs_not_supported_behavior(prepared=True)

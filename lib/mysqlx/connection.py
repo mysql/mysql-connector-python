@@ -908,10 +908,10 @@ class Connection(object):
             # Try SHA256_MEMORY if MYSQL41 fails
             try:
                 self._authenticate_sha256_memory()
-            except InterfaceError:
+            except InterfaceError as err:
                 raise InterfaceError("Authentication failed using MYSQL41 and "
                                      "SHA256_MEMORY, check username and "
-                                     "password or try a secure connection")
+                                     f"password or try a secure connection err:{err}")
 
     def _authenticate_mysql41(self):
         """Authenticate with the MySQL server using `MySQL41AuthPlugin`."""
