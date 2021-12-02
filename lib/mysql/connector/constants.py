@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -89,7 +89,8 @@ DEFAULT_CONFIGURATION = {
     'dns_srv': False,
     'use_pure': False,
     'krb_service_principal': None,
-    'oci_config_file': None
+    'oci_config_file': None,
+    'fido_callback': None,
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1190,3 +1190,31 @@ class MySQLIAMAuthPluginTests(tests.MySQLConnectorTests):
             ProgrammingError,
             auth_plugin.auth_response
         )
+
+
+@unittest.skipIf(
+    tests.MYSQL_VERSION < (8, 0, 29),
+    "Authentication with FIDO not supported"
+)
+class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
+    """Test authentication.MySQLFIDOAuthPlugin.
+
+    Implemented by WL#14860: Support FIDO authentication (c-ext)
+    """
+
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_invalid_fido_callback(self):
+        """Test invalid 'fido_callback' option."""
+        def my_callback():
+            ...
+
+        test_cases = (
+            "abc",  # No callable named 'abc'
+            "abc.abc",  # module 'abc' has no attribute 'abc'
+            my_callback,  # 1 positional argument required
+        )
+        config = tests.get_mysql_config()
+        config["auth_plugin"] = "authentication_fido_client"
+        for case in test_cases:
+            config["fido_callback"] = case
+            self.assertRaises(ProgrammingError, self.cnx.__class__, **config)

@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -249,42 +249,34 @@ class BaseCommand(Command):
         if self.with_mysql_capi:
             plugin_ext = "dll" if os.name == "nt" else "so"
             plugin_path = os.path.join(self.with_mysql_capi, "lib", "plugin")
-
-            # authentication_ldap_sasl_client
-            plugin_name = (
-                "authentication_ldap_sasl_client.{}".format(plugin_ext)
-            )
-            plugin_full_path = os.path.join(plugin_path, plugin_name)
-            self.log.debug("ldap plugin_path: '%s'", plugin_full_path)
-            if os.path.exists(plugin_full_path):
-                bundle_plugin_libs = True
-                vendor_libs.append(
-                    (plugin_path, [os.path.join("plugin", plugin_name)])
+            plugin_list = [
+                (
+                    "LDAP",
+                    "authentication_ldap_sasl_client.{}".format(plugin_ext),
+                ),
+                (
+                    "Kerberos",
+                    "authentication_kerberos_client.{}".format(plugin_ext),
+                ),
+                (
+                    "OCI IAM",
+                    "authentication_oci_client.{}".format(plugin_ext),
+                ),
+                (
+                    "FIDO",
+                    "authentication_fido_client.{}".format(plugin_ext),
+                ),
+            ]
+            for plugin_name, plugin_file in plugin_list:
+                plugin_full_path = os.path.join(plugin_path, plugin_file)
+                self.log.debug(
+                    "%s plugin_path: '%s'", plugin_name, plugin_full_path,
                 )
-
-            # authentication_kerberos_client
-            plugin_name = (
-                "authentication_kerberos_client.{}".format(plugin_ext)
-            )
-            plugin_full_path = os.path.join(plugin_path, plugin_name)
-            self.log.debug("kerberos plugin_path: '%s'", plugin_full_path)
-            if os.path.exists(plugin_full_path):
-                bundle_plugin_libs = True
-                vendor_libs.append(
-                    (plugin_path, [os.path.join("plugin", plugin_name)])
-                )
-
-            # authentication_oci_client
-            plugin_name = (
-                "authentication_oci_client.{}".format(plugin_ext)
-            )
-            plugin_full_path = os.path.join(plugin_path, plugin_name)
-            self.log.debug("OCI IAM plugin_path: '%s'", plugin_full_path)
-            if os.path.exists(plugin_full_path):
-                bundle_plugin_libs = True
-                vendor_libs.append(
-                    (plugin_path, [os.path.join("plugin", plugin_name)])
-                )
+                if os.path.exists(plugin_full_path):
+                    bundle_plugin_libs = True
+                    vendor_libs.append(
+                        (plugin_path, [os.path.join("plugin", plugin_file)])
+                    )
 
             # vendor libraries
             if bundle_plugin_libs and os.name == "nt":
@@ -365,7 +357,9 @@ class BaseCommand(Command):
             sasl_plugin_libs_w = [
                 "libsasl2.*.*", "libgssapi_krb5.*.*", "libgssapi_krb5.*.*",
                 "libkrb5.*.*", "libk5crypto.*.*", "libkrb5support.*.*",
-                "libcrypto.*.*.*", "libssl.*.*.*", "libcom_err.*.*"]
+                "libcrypto.*.*.*", "libssl.*.*.*", "libcom_err.*.*",
+                "libfido2.*.*",
+            ]
             sasl_plugin_libs = []
             for sasl_lib in sasl_plugin_libs_w:
                 lib_path_entries = glob(os.path.join(

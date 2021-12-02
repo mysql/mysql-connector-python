@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,6 +32,8 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from decimal import Decimal
 from time import sleep
 from datetime import date, datetime, time, timedelta
+from inspect import signature
+import importlib
 import os
 import re
 import weakref
@@ -108,6 +110,7 @@ class MySQLConnectionAbstract(object):
         self._ssl_disabled = DEFAULT_CONFIGURATION["ssl_disabled"]
         self._force_ipv6 = False
         self._oci_config_file = None
+        self._fido_callback = None
 
         self._use_unicode = True
         self._get_warnings = False
@@ -650,6 +653,33 @@ class MySQLConnectionAbstract(object):
             if "/" not in self._krb_service_principal:
                 raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
                     error="is incorrectly formatted"))
+
+        if self._fido_callback:
+            # Import the callable if it's a str
+            if isinstance(self._fido_callback, str):
+                try:
+                    module, callback = self._fido_callback.rsplit(".", 1)
+                except ValueError:
+                    raise errors.ProgrammingError(
+                        f"No callable named '{self._fido_callback}'"
+                    )
+                try:
+                    module = importlib.import_module(module)
+                    self._fido_callback = getattr(module, callback)
+                except (AttributeError, ModuleNotFoundError) as err:
+                    raise errors.ProgrammingError(f"{err}")
+            # Check if it's a callable
+            if not callable(self._fido_callback):
+                raise errors.ProgrammingError(
+                    "Expected a callable for 'fido_callback'"
+                )
+            # Check the callable signature if has only 1 positional argument
+            params = len(signature(self._fido_callback).parameters)
+            if params != 1:
+                raise errors.ProgrammingError(
+                    "'fido_callback' requires 1 positional argument, but the "
+                    f"callback provided has {params}"
+                )
 
     def _add_default_conn_attrs(self):
         """Add the default connection attributes."""

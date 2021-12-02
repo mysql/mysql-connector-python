@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -212,6 +212,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "local_infile": self._allow_local_infile,
             "load_data_local_dir": self._allow_local_infile_in_path,
             "oci_config_file": self._oci_config_file,
+            "fido_callback": self._fido_callback,
         }
 
         tls_versions = self._ssl.get('tls_versions')

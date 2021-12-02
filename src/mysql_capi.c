@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -67,6 +67,29 @@ PyObject* MySQL_connected(MySQL *self);
 #define CONNECTION_TIMEOUT 13
 #define VERSION_OFFSET_MAJOR 10000
 #define VERSION_OFFSET_MINOR 100
+
+// Python FIDO messages callback
+static PyObject *fido_callback = NULL;
+
+void
+fido_messages_callback(const char *msg) {
+    if (fido_callback && fido_callback != Py_None)
+    {
+        PyGILState_STATE state = PyGILState_Ensure();
+        PyObject *args = Py_BuildValue("(z)", msg);
+        PyObject *result = PyObject_Call(fido_callback, args, NULL);
+        Py_DECREF(args);
+        if (result)
+        {
+            Py_DECREF(result);
+        }
+        PyGILState_Release(state);
+    }
+    else
+    {
+        printf("%s", msg);
+    }
+}
 
 /**
   Helper function printing a string as hexadecimal.
@@ -1204,11 +1227,11 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         "port", "unix_socket", "client_flags", "ssl_ca", "ssl_cert", "ssl_key",
         "ssl_cipher_suites", "tls_versions", "tls_cipher_suites", "ssl_verify_cert",
         "ssl_verify_identity", "ssl_disabled", "compress", "conn_attrs",
-        "local_infile", "load_data_local_dir", "oci_config_file",
+        "local_infile", "load_data_local_dir", "oci_config_file", "fido_callback",
         NULL
     };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izz",
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzO",
                                      kwlist,
                                      &host,
                                      &user,
@@ -1233,7 +1256,8 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                                      &PyDict_Type, &conn_attrs,
                                      &local_infile,
                                      &load_data_local_dir,
-                                     &oci_config_file))
+                                     &oci_config_file,
+                                     &fido_callback))
     {
         return NULL;
     }
@@ -1466,6 +1490,34 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                                      oci_config_file), NULL);
             return NULL;
         }
+    }
+
+    if (fido_callback && fido_callback != Py_None) {
+        /* load FIDO client authentication plugin if required */
+        struct st_mysql_client_plugin *fido_plugin =
+          mysql_client_find_plugin(&self->session, "authentication_fido_client",
+                                   MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
+        if (!fido_plugin)
+        {
+            raise_with_string(
+                PyUnicode_FromString(
+                    "The FIDO authentication plugin could not be loaded"), NULL
+                );
+            return NULL;
+        }
+
+        /* verify if the `fido_callback` is a proper callable */
+        if (!PyCallable_Check(fido_callback))
+        {
+            PyErr_SetString(
+                PyExc_TypeError, "Expected a callable for 'fido_callback'"
+            );
+            return NULL;
+        }
+
+        /* register callback */
+        mysql_plugin_options(fido_plugin, "fido_messages_callback",
+                             (const void *)(&fido_messages_callback));
     }
 
     Py_BEGIN_ALLOW_THREADS

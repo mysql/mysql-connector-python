@@ -11,6 +11,7 @@ Full release notes:
 v8.0.29
 =======
 
+- WL#14860: Support FIDO authentication (c-ext)
 - WL#14824: Remove Python 3.6 support
 - WL#14679: Allow custom class for data type conversion in Django backend
 - BUG#33729842: Character set 'utf8mb3' support
