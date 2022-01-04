@@ -346,6 +346,6 @@ MYSQL_CHARACTER_SETS = [
     ("utf8mb4", "utf8mb4_ru_0900_as_cs", False),  # 307
     ("utf8mb4", "utf8mb4_zh_0900_as_cs", False),  # 308
     ("utf8mb4", "utf8mb4_0900_bin", False),  # 309
-    ("utf8mb3", "utf8_general_ci", False),  # 310
+    ("utf8mb3", "utf8_general_ci", True),  # 310
 ]
 
