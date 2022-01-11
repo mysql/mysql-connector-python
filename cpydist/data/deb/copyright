@@ -3,7 +3,7 @@ Upstream-Name: mysql-connector-python
 Source: http://www.mysql.com/about/legal/licensing/foss-exception.html
 
 Files: *
-Copyright: 2009, 2020, Oracle and/or its affiliates.
+Copyright: 2009, 2022, Oracle and/or its affiliates.
 License: GPL-2+ (with FOSS License Exception)
  This is a release of MySQL Connector/Python, Oracle's dual-
  license Python Driver for MySQL. For the avoidance of
@@ -11,7 +11,7 @@ License: GPL-2+ (with FOSS License Exception)
  under the version 2 of the GNU General Public License.
  MySQL Connector/Python is brought to you by Oracle.
  .
- Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+ Copyright (c) 2009, 2022, Oracle and/or its affiliates.
  .
  License information can be found in the COPYING file.
  .
