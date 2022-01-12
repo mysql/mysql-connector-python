@@ -34,7 +34,7 @@
 
 import os
 import socket
-import sysconfig
+import platform
 
 from . import errors, version
 from .constants import (
@@ -78,6 +78,15 @@ class CMySQLConnection(MySQLConnectionAbstract):
             os.path.dirname(os.path.abspath(_mysql_connector.__file__)),
             "mysql", "vendor", "plugin"
         )
+        if platform.system() == "Linux":
+            # Use the authentication plugins from system if they aren't bundled
+            if not os.path.exists(self._plugin_dir):
+                self._plugin_dir = (
+                    "/usr/lib64/mysql/plugin"
+                    if os.path.exists("/usr/lib64/mysql/plugin")
+                    else "/usr/lib/mysql/plugin"
+                )
+
         self.converter = None
         super(CMySQLConnection, self).__init__(**kwargs)
 

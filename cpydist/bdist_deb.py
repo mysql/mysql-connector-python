@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -316,6 +316,7 @@ class DistDeb(BaseCommand):
         env["EXTRA_LINK_ARGS"] = self.extra_link_args or ""
         env["LABEL"] = self.label if self.label else "0"
         env["BYTE_CODE_ONLY"] = "1" if self.byte_code_only else ""
+        env["SKIP_VENDOR"] = "1" if self.skip_vendor else ""
         proc = subprocess.Popen(cmd,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,

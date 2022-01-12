@@ -92,7 +92,9 @@ CEXT_OPTIONS = [
     ("extra-compile-args=", None,
      "extra compile args"),
     ("extra-link-args=", None,
-     "extra link args")
+     "extra link args"),
+    ("skip-vendor", None,
+     "Skip bundling vendor libraries"),
 ]
 
 LOGGER = logging.getLogger(__name__)
@@ -108,7 +110,7 @@ class BaseCommand(Command):
     """Base command class for Connector/Python."""
 
     user_options = COMMON_USER_OPTIONS + CEXT_OPTIONS
-    boolean_options = ["debug", "byte_code_only", "keep-temp"]
+    boolean_options = ["debug", "byte_code_only", "keep_temp", "skip_vendor"]
 
     with_mysql_capi = None
     with_mysqlxpb_cext = False
@@ -128,6 +130,7 @@ class BaseCommand(Command):
     label = None
     debug = False
     keep_temp = False
+    skip_vendor = False
     build_base = None
     log = LOGGER
     vendor_folder = os.path.join("lib", "mysql", "vendor")
@@ -152,6 +155,7 @@ class BaseCommand(Command):
         self.label = None
         self.debug = False
         self.keep_temp = False
+        self.skip_vendor = False
 
     def finalize_options(self):
         """Finalize the options."""
@@ -192,7 +196,12 @@ class BaseCommand(Command):
             self.extra_link_args or
             os.environ.get("EXTRA_LINK_ARGS")
         )
-        self._copy_vendor_libraries()
+        cmd_build_ext.skip_vendor = (
+            self.skip_vendor or
+            os.environ.get("SKIP_VENDOR")
+        )
+        if not cmd_build_ext.skip_vendor:
+            self._copy_vendor_libraries()
 
     def remove_temp(self):
         """Remove temporary build files."""
@@ -352,8 +361,6 @@ class BaseCommand(Command):
             if not os.path.exists(sasl_libs_path):
                 self.log.info("sasl2 llibraries not found at %s",
                               sasl_libs_path)
-                self.distribution.package_data = {
-                    "mysql": ["vendor/*"]}
             sasl_libs = []
             sasl_plugin_libs_w = [
                 "libsasl2.*.*", "libgssapi_krb5.*.*", "libgssapi_krb5.*.*",
@@ -391,8 +398,6 @@ class BaseCommand(Command):
             if not os.path.exists(sasl2_libs_path):
                 self.log.info("sasl2 llibraries not found at %s",
                               sasl2_libs_path)
-                self.distribution.package_data = {"mysql": ["vendor/*"]}
-                return
             sasl2_libs_w = [
                 "libanonymous.*", "libcrammd5.*.*", "libdigestmd5.*.*.*.*",
                 "libgssapiv2.*", "libplain.*.*", "libscram.*.*.*.*",
@@ -633,7 +638,7 @@ class BuildExt(build_ext, BaseCommand):
                 if self.extra_link_args:
                     ext.extra_link_args.extend(self.extra_link_args.split())
                 # Add -rpath if the platform is Linux
-                if platform.system() == "Linux":
+                if platform.system() == "Linux" and not self.skip_vendor:
                     ext.extra_link_args.extend([
                         "-Wl,-rpath,$ORIGIN/mysql/vendor"])
                 # Add include dirs
