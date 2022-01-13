@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -623,6 +623,10 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         exp = {'character_set_connection': 'big5'}
         cmy1.set_character_set('big5')
+        self.assertEqual(exp, get_variables(cmy1, variables=variables))
+
+        exp = {'character_set_connection': 'utf8mb3'}
+        cmy1.set_character_set('utf8mb3')
         self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
     @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),

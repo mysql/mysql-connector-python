@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -384,7 +384,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
             'cp1257', 'latin5', 'armscii8', 'utf8', 'ucs2', 'cp866', 'keybcs2',
             'macce', 'macroman', 'cp852', 'utf8mb4','utf16', 'utf16le',
             'cp1256', 'utf32', 'binary', 'geostd8', 'cp932', 'eucjpms',
-            'gb18030',
+            'gb18030', 'utf8mb3',
         )
 
         self.assertEqual(exp, constants.CharacterSet.get_supported())
