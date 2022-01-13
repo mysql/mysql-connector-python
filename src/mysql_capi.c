@@ -2193,15 +2193,11 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
                 continue;
             }
 
-            /* LONG */
+            /* LONG AND LONGLONG */
             if (PyLong_Check(value)) {
-                pbind->buffer.l = PyLong_AsLong(value);
+                pbind->buffer.l = PyLong_AsLongLong(value);
                 mbind->buffer = &pbind->buffer.l;
-#if LONG_MAX >= INT64_T_MAX
                 mbind->buffer_type = MYSQL_TYPE_LONGLONG;
-#else
-                mbind->buffer_type = MYSQL_TYPE_LONG;
-#endif
                 mbind->is_null = (bool_ *) 0;
                 if (mbind->length) {
                     *mbind->length = sizeof(mbind->buffer_type);
@@ -3397,16 +3393,12 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
             continue;
         }
 
-        /* LONG */
+        /* LONG AND LONGLONG*/
         if (PyLong_Check(value))
         {
-            pbind->buffer.l= PyLong_AsLong(value);
+            pbind->buffer.l= PyLong_AsLongLong(value);
             mbind->buffer= &pbind->buffer.l;
-#if LONG_MAX >= INT64_T_MAX
             mbind->buffer_type= MYSQL_TYPE_LONGLONG;
-#else
-            mbind->buffer_type= MYSQL_TYPE_LONG;
-#endif
             mbind->is_null= (bool_ *)0;
             mbind->length= 0;
             continue;
@@ -3672,17 +3664,13 @@ MySQLPrepStmt_handle_result(MySQLPrepStmt *self)
                 break;
             case MYSQL_TYPE_TINY:
             case MYSQL_TYPE_SHORT:
-            case MYSQL_TYPE_LONG:
             case MYSQL_TYPE_INT24:
             case MYSQL_TYPE_YEAR:
-#if LONG_MAX >= INT64_T_MAX
+            case MYSQL_TYPE_LONG:
             case MYSQL_TYPE_LONGLONG:
                 self->bind[i].buffer_type= MYSQL_TYPE_LONGLONG;
-#else
-                self->bind[i].buffer_type= MYSQL_TYPE_LONG;
-#endif
                 self->bind[i].buffer= &self->cols[i].small_buffer.l;
-                self->bind[i].buffer_length= sizeof(long);
+                self->bind[i].buffer_length= sizeof(long long);
                 break;
             case MYSQL_TYPE_FLOAT:
                 self->bind[i].buffer_type= MYSQL_TYPE_FLOAT;
@@ -3717,7 +3705,6 @@ MySQLPrepStmt_handle_result(MySQLPrepStmt *self)
 
     mysql_field_seek(self->res, 0);
     self->fields= MySQLPrepStmt_fetch_fields(self);
-
     Py_RETURN_TRUE;
 }
 
@@ -3823,12 +3810,10 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
             case MYSQL_TYPE_SHORT:
             case MYSQL_TYPE_INT24:
             case MYSQL_TYPE_LONG:
-#if LONG_MAX >= INT64_T_MAX
             case MYSQL_TYPE_LONGLONG:
-#endif
             case MYSQL_TYPE_YEAR:
                 PyTuple_SET_ITEM(
-                    row, i, PyLong_FromLong(self->cols[i].small_buffer.l));
+                    row, i, PyLong_FromLongLong(self->cols[i].small_buffer.l));
                 break;
             case MYSQL_TYPE_FLOAT:
                 PyTuple_SET_ITEM(

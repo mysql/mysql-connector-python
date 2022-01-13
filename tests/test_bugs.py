@@ -6357,6 +6357,57 @@ class BugOra32497631(tests.MySQLConnectorTests):
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
 
 
+class BugOra30203754(tests.MySQLConnectorTests):
+    """BUG#30203754: PREPARED STMT FAILS ON CEXT with BIGINTS
+
+       BUG#33481203: OverflowError for MySQL BIGINT supported value
+                     9223372036854775807 on c-ext prep
+    """
+
+    table_name = "BugOra30203754"
+
+    @foreach_cnx()
+    def test_prepared_statement_bigints(self):
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cnx.cmd_query(
+            f"CREATE TABLE {self.table_name}"
+            " (indx INT key auto_increment, bigints BIGINT)"
+        )
+        test_cases = (
+            -9223372036854775808,
+            -9223372036854775807,
+            -922337203685477580,
+            -2147483648,
+            0,
+            2147483647,
+            2147483648,
+            922337203685477580,
+            9223372036854775806,
+            9223372036854775807,
+        )
+
+        prepared_options = [True, False]
+        for prepared in prepared_options:
+            with self.cnx.cursor(prepared=prepared) as cur:
+                for tc in test_cases:
+                    query = f"select %s"
+                    cur.execute(query, (tc,))
+                    rows = cur.fetchall()
+                    self.assertEqual(tc, rows[0][0])
+
+                for tc in test_cases:
+                    query = f"INSERT INTO {self.table_name} (bigints) VALUES (%s)"
+                    cur.execute(query, (tc,))
+                    self.cnx.commit()
+
+                for index, tc in enumerate (test_cases):
+                    query = f"SELECT bigints FROM {self.table_name} WHERE indx = '{index+1}'"
+                    cur.execute(query)
+                    rows = cur.fetchall()
+                    self.assertEqual(tc, rows[0][0])
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+
 class BugOra31528783(tests.MySQLConnectorTests):
     """BUG#31528783: ZEROFILL NOT HANDLED BY THE PYTHON CONNECTOR."""
 

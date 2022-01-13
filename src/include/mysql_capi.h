@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -248,7 +248,7 @@ MySQL_create_prep_stmt(MySQL *self);
 struct MySQL_binding {
     PyObject *str_value;
     union {
-        long l;
+        long long l;
         float f;
         MYSQL_TIME t;
     } buffer;
@@ -259,7 +259,7 @@ struct column_info {
     bool_ is_error;
     unsigned long length;
     union {
-        long l;
+        long long l;
         float f;
         double d;
     } small_buffer;

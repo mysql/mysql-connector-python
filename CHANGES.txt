@@ -19,6 +19,8 @@ v8.0.29
 - BUG#33861549: Replace SHOW VARIABLES inefficient statements
 - BUG#33747585: Fix error when using an expression as a column without an alias
 - BUG#33729842: Character set 'utf8mb3' support
+- BUG#33481203: OverflowError for MySQL BIGINT on c-ext
+- BUG#30203754: Prepared stmt fails on cext with BIGINTS
 - BUG#28877987: Return bytes or bytearray if decoding fails
 - BUG#27634914: Remove mention of unsupported functionality in Session docstring
 - BUG#23338623: Add support for Decimal parsing in protocol.py
