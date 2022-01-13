@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,6 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+import datetime
 import unittest
 
 import mysqlx
@@ -1130,7 +1131,8 @@ class CollectionAddTests(tests.MySQLxTests):
             mysqlx.expr('{"actors": {"MainActor": {"birthdate": Year(CURDATE())}}}'
         )).execute()
         result = collection.get_one("1234")
-        self.assertEqual(result["actors"]["MainActor"]["birthdate"], 2021)
+        current_year = datetime.date.today().year
+        self.assertEqual(result["actors"]["MainActor"]["birthdate"], current_year)
         collection.modify("true").patch(
             {"actors": {"MainActor": {"birthdate": "1 Jan 1983"}}}
         ).execute()
