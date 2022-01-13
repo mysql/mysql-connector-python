@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2015, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -159,6 +159,7 @@ COMMON_INSTALL_ARGS="\
     --with-protobuf-include-dir=%{with_protobuf_include_dir} \
     --with-protobuf-lib-dir=%{with_protobuf_lib_dir} \
     --with-protoc=%{with_protoc} \
+    --skip-vendor \
 "
 
 %if 0%{?extra_compile_args:1}
