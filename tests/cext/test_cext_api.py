@@ -627,7 +627,11 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         exp = {'character_set_connection': 'utf8mb3'}
         cmy1.set_character_set('utf8mb3')
-        self.assertEqual(exp, get_variables(cmy1, variables=variables))
+        if (tests.MYSQL_VERSION >= (8, 0, 0)):
+            self.assertEqual(exp, get_variables(cmy1, variables=variables))
+        else:
+            exp = {'character_set_connection': 'utf8'}
+            self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
     @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
                      "test_get_ssl_cipher not tested with MySQL version 5.7.4")
