@@ -196,7 +196,7 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
-* Tue Jan 18 2021  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.29-1
+* Tue Jan 18 2022  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.29-1
 - Updated for 8.0.29
 
 * Fri Oct 8 2021  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.28-1
