@@ -86,11 +86,9 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
                           authentication.get_auth_plugin, '')
 
         # Test using standard plugins
-        plugin_classes = {}
-        for name, obj in inspect.getmembers(authentication):
-            if inspect.isclass(obj) and hasattr(obj, 'plugin_name'):
-                if obj.plugin_name:
-                    plugin_classes[obj.plugin_name] = obj
+        plugin_classes = {obj.plugin_name: obj 
+                          for (name, obj) in inspect.getmembers(authentication) 
+                            if inspect.isclass(obj) and hasattr(obj, 'plugin_name') if obj.plugin_name}
         for plugin_name in _STANDARD_PLUGINS:
             self.assertEqual(plugin_classes[plugin_name],
                              authentication.get_auth_plugin(plugin_name),
