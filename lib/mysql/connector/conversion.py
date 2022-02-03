@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -30,6 +30,7 @@
 """
 
 import datetime
+import math
 import struct
 import time
 from decimal import Decimal
@@ -228,6 +229,8 @@ class MySQLConverter(MySQLConverterBase):
 
     def _float_to_mysql(self, value):
         """Convert value to float"""
+        if math.isnan(value):
+            return None
         return float(value)
 
     def _str_to_mysql(self, value):

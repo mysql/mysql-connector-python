@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -572,6 +572,7 @@ class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
         "my_bigint BIGINT, "
         "my_decimal DECIMAL(20,10), "
         "my_float FLOAT, "
+        "my_float_nan FLOAT, "
         "my_double DOUBLE, "
         "my_date DATE, "
         "my_time TIME, "
@@ -596,6 +597,7 @@ class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
         "my_bigint, "
         "my_decimal, "
         "my_float, "
+        "my_float_nan, "
         "my_double, "
         "my_date, "
         "my_time, "
@@ -606,7 +608,8 @@ class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
         "my_enum, "
         "my_geometry, "
         "my_blob) "
-        "VALUES (%s, %s, B'1111100', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "VALUES (%s, %s, B'1111100', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "%s, %s, %s, %s, %s, %s, "
         "POINT(21.2, 34.2), %s)"
     )
 
@@ -620,6 +623,7 @@ class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
         4294967295 if ARCH_64BIT else 2147483647,
         Decimal("1.2"),
         3.14,
+        float("NaN"),
         4.28,
         datetime.date(2018, 12, 31),
         datetime.time(12, 13, 14),
@@ -642,6 +646,7 @@ class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
         4294967295 if ARCH_64BIT else 2147483647,
         Decimal("1.2000000000"),
         3.14,
+        None,
         4.28,
         datetime.date(2018, 12, 31),
         datetime.timedelta(0, 43994),
