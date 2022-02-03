@@ -17,6 +17,7 @@ v8.0.29
 - WL#14679: Allow custom class for data type conversion in Django backend
 - WL#14665: SSPI Kerberos authentication for Windows (pure-python)
 - BUG#33729842: Character set 'utf8mb3' support
+- BUG#23338623: Add support for Decimal parsing in protocol.py
 
 v8.0.28
 =======

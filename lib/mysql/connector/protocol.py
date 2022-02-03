@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -493,7 +493,7 @@ class MySQLProtocol(object):
             elif field[1] in (FieldType.DOUBLE, FieldType.FLOAT):
                 (packet, value) = self._parse_binary_float(packet, field)
                 values.append(value)
-            elif field[1] == FieldType.NEWDECIMAL:
+            elif field[1] in (FieldType.DECIMAL, FieldType.NEWDECIMAL):
                 (packet, value) = self._parse_binary_new_decimal(packet, charset)
                 values.append(value)
             elif field[1] in (FieldType.DATETIME, FieldType.DATE,
