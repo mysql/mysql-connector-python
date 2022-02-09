@@ -6477,3 +6477,26 @@ class BugOra21528553(tests.MySQLConnectorTests):
             self.assertTrue(self.cnx.unread_result)
             self.assertTrue(self.cnx.is_connected())
             self.assertFalse(self.cnx.unread_result)
+
+
+class BugOra33747585(tests.MySQLConnectorTests):
+    """BUG#33747585: Fix error when using an expression as a column without an
+    alias (c-ext)."""
+
+    @foreach_cnx()
+    def test_expression_as_column_without_alias(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(
+                """
+                SELECT datediff(
+                  str_to_date((
+                    SELECT variable_value FROM performance_schema.global_status
+                    WHERE variable_name='Ssl_server_not_after'),
+                    "%b %d %T %Y GMT"),
+                  str_to_date((
+                    SELECT variable_value FROM performance_schema.global_status
+                    WHERE variable_name='Ssl_server_not_before'),
+                    "%b %d %T %Y GMT"))
+                """
+            )
+            _ = cur.fetchall()

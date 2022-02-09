@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -737,6 +737,11 @@ mytopy_string(const char *data,
     if (strcmp(charset, "binary") == 0)
     {
         return PyByteArray_FromStringAndSize(data, field_length);
+    }
+
+    if (data[0] == '\0')
+    {
+        return PyUnicode_FromString("");
     }
 
     /* 'binary' charset = 63 */
