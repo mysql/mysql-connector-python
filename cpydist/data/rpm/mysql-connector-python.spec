@@ -100,7 +100,7 @@ BuildRequires: python39-devel
 BuildRequires: python39-setuptools
 %endif
 
-if 0%{?rhel} == 7
+%if 0%{?rhel} == 7
 BuildRequires: rh-python38-python-devel
 BuildRequires: rh-python38-python-setuptools
 %endif
