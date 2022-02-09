@@ -134,6 +134,9 @@ class DistRPM(BaseCommand):
         if self.pre_release:
             cmd.extend(["--define", "pre_release 1"])
 
+        if self.python3_pkgversion:
+            cmd.extend(["--define", "python3_pkgversion {}".format(self.python3_pkgversion)])
+
         if VERSION_EXTRA:
             cmd.extend(["--define", "version_extra {}".format(VERSION_EXTRA)])
 

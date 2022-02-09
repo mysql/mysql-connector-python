@@ -258,7 +258,7 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 - Updated for 8.0.24
 - Fix for el8 pkgver_lite
 
-* Thu Dec 9 2020 Prashant Tekriwal <prashant.tekriwal@oracle.com> - 8.0.24-1
+* Wed Dec 9 2020 Prashant Tekriwal <prashant.tekriwal@oracle.com> - 8.0.24-1
 - Updated for 8.0.24
 - Removed python2 support
 - Follow updated package guidelines and style
