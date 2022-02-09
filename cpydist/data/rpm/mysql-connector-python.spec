@@ -37,14 +37,17 @@
 %if 0%{?suse_version} == 1500
 %global dist            .sl15
 %{!?__python3: %global __python3 /usr/bin/python3.9}
+%{!?python3_pkgversion: %global python3_pkgversion 39}
 %endif
 
 %if 0%{?rhel} == 7
 %{!?__python3: %global __python3 /opt/rh/rh-python38/root/usr/bin/python3}
+%{!?python3_pkgversion: %global python3_pkgversion 38}
 %endif
 
 %if 0%{?rhel} == 8
 %{!?__python3: %global __python3 /usr/bin/python3.8}
+%{!?python3_pkgversion: %global python3_pkgversion 38}
 %endif
 
 %{?mysql_capi: %global with_mysql_capi %{mysql_capi}}
