@@ -598,7 +598,10 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[8] == 63:  # 'binary' charset
                 return value
         if isinstance(value, (bytes, bytearray)) and self.use_unicode:
-            return value.decode(self.charset)
+            try:
+                return value.decode(self.charset)
+            except UnicodeDecodeError:
+                return value
 
         return value
 
