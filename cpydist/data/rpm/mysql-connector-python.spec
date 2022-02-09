@@ -36,6 +36,15 @@
 
 %if 0%{?suse_version} == 1500
 %global dist            .sl15
+%{!?__python3: %global __python3 /usr/bin/python3.9}
+%endif
+
+%if 0%{?rhel} == 7
+%{!?__python3: %global __python3 /opt/rh/rh-python38/root/usr/bin/python3}
+%endif
+
+%if 0%{?rhel} == 8
+%{!?__python3: %global __python3 /usr/bin/python3.8}
 %endif
 
 %{?mysql_capi: %global with_mysql_capi %{mysql_capi}}
@@ -81,8 +90,25 @@ Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-
 
 %{!?with_mysql_capi:BuildRequires: mysql-devel}
 
+%if 0%{?fedora}
 BuildRequires: python3-devel
 BuildRequires: python3-setuptools
+%endif
+
+%if 0%{?suse_version} == 1500
+BuildRequires: python39-devel
+BuildRequires: python39-setuptools
+%endif
+
+if 0%{?rhel} == 7
+BuildRequires: rh-python38-python-devel
+BuildRequires: rh-python38-python-setuptools
+%endif
+
+%if 0%{?rhel} == 8
+BuildRequires: python38-devel
+BuildRequires: python38-setuptools
+%endif
 
 %description
 MySQL Connector/Python enables Python programs to access MySQL
@@ -114,7 +140,21 @@ Obsoletes:     mysql-connector-python3-cext < %{version}-%{release}
 Provides:      mysql-connector-python3-cext = %{version}-%{release}
 %endif
 
+%if 0%{?fedora}
 Requires:      python3
+%endif
+
+%if 0%{?suse_version} == 1500
+Requires:      python39
+%endif
+
+%if 0%{?rhel} == 7
+Requires:      rh-python38-python
+%endif
+
+%if 0%{?rhel} == 8
+Requires:      python38
+%endif
 
 # There is no new enough python3-protobuf on some older Linux distros
 %if ! ( 0%{?rhel} == 7 || 0%{?suse_version} == 1315 )
@@ -124,7 +164,7 @@ Requires:      python3-protobuf >= %{requires_py_protobuf_version}
 # Some operations requires DNSPYTHON but this is not a strict
 # requirement for the RPM install as currently few RPM platforms has
 # the required version as RPMs. Users need to install using PIP.
-%if 0%{?fedora} >= 30
+%if 0%{?fedora}
 Requires:      python3-dns >= %{wants_py_dnspython_version}
 %endif
 
