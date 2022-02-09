@@ -1609,6 +1609,11 @@ MySQL_escape_string(MySQL *self, PyObject *value)
         from_size= PyBytes_Size(value);
         from_str= PyBytes_AsString(value);
     }
+    else if (PyByteArray_Check(value))
+    {
+        from_size= PyByteArray_Size(value);
+        from_str= PyByteArray_AsString(value);
+    }
     else
     {
         PyErr_SetString(PyExc_TypeError, "Argument must be str or bytes");
@@ -2030,7 +2035,8 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         // All values that need to be quoted
         if (PyUnicode_Check(value)
             || PyUnicode_Check(value)
-            || PyBytes_Check(value))
+            || PyBytes_Check(value)
+            || PyByteArray_Check(value))
         {
             new_value= MySQL_escape_string(self, value);
         }
@@ -3421,6 +3427,11 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
         if (PyUnicode_Check(value) || PyUnicode_Check(value) || PyBytes_Check(value))
         {
             pbind->str_value= value;
+            mbind->buffer_type= MYSQL_TYPE_STRING;
+        }
+        else if (PyByteArray_Check(value))
+        {
+            pbind->str_value= PyBytes_FromObject(value);
             mbind->buffer_type= MYSQL_TYPE_STRING;
         }
         /* DATETIME */

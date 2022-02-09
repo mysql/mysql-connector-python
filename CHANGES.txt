@@ -19,6 +19,7 @@ v8.0.29
 - BUG#33729842: Character set 'utf8mb3' support
 - BUG#23338623: Add support for Decimal parsing in protocol.py
 - BUG#21528553: Fix API inconsistency when using consume_results=True
+- BUG#21498719: Fix conversion of Python bytearray (c-ext)
 - BUG#20065830: NaN is not supported
 
 v8.0.28
