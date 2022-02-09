@@ -74,6 +74,11 @@ ifneq ($(shell which py3versions 2>/dev/null),)
     PYTHON3_SUPPORTED=$(shell py3versions -sv)
 endif
 
+# On Ubuntu 18 we want to use Python 3.7 instead of the default 3.6
+ifeq ($(shell lsb_release --short --codename),bionic)
+    PYTHON3_SUPPORTED=3.7
+endif
+
 ifneq ($(BYTE_CODE_ONLY),)
     BYTE_CODE_ONLY_OPT = --byte-code-only
 else
