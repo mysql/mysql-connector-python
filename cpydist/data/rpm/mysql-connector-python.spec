@@ -106,11 +106,13 @@ BuildRequires: python39-setuptools
 %if 0%{?rhel} == 7
 BuildRequires: rh-python38-python-devel
 BuildRequires: rh-python38-python-setuptools
+BuildRequires: rh-python38-python-rpm-macros
 %endif
 
 %if 0%{?rhel} == 8
 BuildRequires: python38-devel
 BuildRequires: python38-setuptools
+BuildRequires: python38-rpm-macros
 %endif
 
 %description

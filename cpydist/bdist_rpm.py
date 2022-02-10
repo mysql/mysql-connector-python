@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -60,12 +60,15 @@ class DistRPM(BaseCommand):
          "base directory for creating RPMs (default <bdist-dir>/rpm)"),
         ("pre-release", None,
          "this is a pre-release (changes RPM release number)"),
+        ("python3-pkgversion=", None,
+         "Python 3 PKG version"),
     ]
 
     build_base = None
     dist_dir = None
     rpm_base = None
     pre_release = None
+    python3_pkgversion = None
 
     _cmd_dist_tarball = "sdist"
     _rpm_dirs = {}
@@ -81,6 +84,9 @@ class DistRPM(BaseCommand):
         if not self.rpm_base:
             self.rpm_base = os.path.abspath(
                 os.path.join(self.build_base, "rpmbuild"))
+
+        if not self.python3_pkgversion:
+            self.python3_pkgversion = os.environ.get("PYTHON3_PKGVERSION")
 
     def _populate_rpm_topdir(self, rpm_base):
         """Create and populate the RPM topdir."""
