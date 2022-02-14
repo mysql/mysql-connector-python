@@ -271,6 +271,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def is_connected(self):
         """Reports whether the connection to MySQL Server is available"""
         if self._cmysql:
+            self.handle_unread_result()
             return self._cmysql.ping()
 
         return False
@@ -289,7 +290,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         Raises InterfaceError on errors.
         """
-        errmsg = "Connection to MySQL is not available"
+        self.handle_unread_result()
 
         try:
             connected = self._cmysql.ping()
@@ -302,7 +303,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if reconnect:
             self.reconnect(attempts=attempts, delay=delay)
         else:
-            raise errors.InterfaceError(errmsg)
+            raise errors.InterfaceError("Connection to MySQL is not available")
 
     def set_character_set_name(self, charset):
         """Sets the default character set name for current connection.
@@ -420,6 +421,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def commit(self):
         """Commit current transaction"""
         if self._cmysql:
+            self.handle_unread_result()
             self._cmysql.commit()
 
     def rollback(self):
@@ -747,6 +749,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def cmd_refresh(self, options):
         """Send the Refresh command to the MySQL server"""
         try:
+            self.handle_unread_result()
             self._cmysql.refresh(options)
         except MySQLInterfaceError as exc:
             raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -6389,3 +6389,91 @@ class BugOra31528783(tests.MySQLConnectorTests):
                 res = cur.fetchone()
                 self.assertEqual(res[0], value)
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+
+class BugOra21528553(tests.MySQLConnectorTests):
+    """BUG#21528553: INCONSISTENT BEHAVIOUR WITH C-EXT APIS WHEN
+    CONSUME_RESULTS=TRUE."""
+
+    table_name = "BugOra21528553"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+            cnx.cmd_query(
+                f"""
+                CREATE TABLE {self.table_name} (
+                    c1 CHAR(32),
+                    c2 LONGBLOB
+                ) CHARACTER SET utf8 COLLATE utf8_general_ci
+                """
+            )
+            cnx.cmd_query(
+                f"INSERT INTO {self.table_name} "
+                "VALUES ('1','1'),('2','2'),('3','3')"
+            )
+            cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @cnx_config(consume_results=True)
+    @foreach_cnx()
+    def test_cmd_refresh_with_consume_results(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SELECT * FROM {self.table_name}")
+            res = cur.fetchone()
+            self.assertEqual(len(res), 2)
+            self.assertTrue(self.cnx.unread_result)
+            refresh = (
+                constants.RefreshOption.LOG | constants.RefreshOption.THREADS
+            )
+            self.cnx.cmd_refresh(refresh)
+            self.assertFalse(self.cnx.unread_result)
+
+    @cnx_config(consume_results=True)
+    @foreach_cnx()
+    def test_reset_session_with_consume_results(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SELECT * FROM {self.table_name}")
+            res = cur.fetchone()
+            self.assertEqual(len(res), 2)
+            self.assertTrue(self.cnx.unread_result)
+            self.cnx.reset_session()
+            self.assertFalse(self.cnx.unread_result)
+
+    @cnx_config(consume_results=True)
+    @foreach_cnx()
+    def test_commit_with_consume_results(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SELECT * FROM {self.table_name}")
+            res = cur.fetchone()
+            self.assertEqual(len(res), 2)
+            self.assertTrue(self.cnx.unread_result)
+            self.cnx.commit()
+            self.assertFalse(self.cnx.unread_result)
+
+    @cnx_config(consume_results=True)
+    @foreach_cnx()
+    def test_ping_with_consume_results(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SELECT * FROM {self.table_name}")
+            res = cur.fetchone()
+            self.assertEqual(len(res), 2)
+            self.assertTrue(self.cnx.unread_result)
+            self.cnx.ping()
+            self.assertFalse(self.cnx.unread_result)
+
+    @cnx_config(consume_results=True)
+    @foreach_cnx()
+    def test_is_connected_with_consume_results(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SELECT * FROM {self.table_name}")
+            res = cur.fetchone()
+            self.assertEqual(len(res), 2)
+            self.assertTrue(self.cnx.unread_result)
+            self.assertTrue(self.cnx.is_connected())
+            self.assertFalse(self.cnx.unread_result)
