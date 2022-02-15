@@ -1952,7 +1952,6 @@ class Session(object):
 
     - Accessing available schemas.
     - Schema management operations.
-    - Enabling/disabling warning generation.
     - Retrieval of connection information.
 
     Args:
