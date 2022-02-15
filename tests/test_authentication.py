@@ -1196,6 +1196,7 @@ class MySQLIAMAuthPluginTests(tests.MySQLConnectorTests):
     tests.MYSQL_VERSION < (8, 0, 29),
     "Authentication with FIDO not supported"
 )
+@unittest.skipUnless(HAVE_CMYSQL, "C Extension not available")
 class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
     """Test authentication.MySQLFIDOAuthPlugin.
 
