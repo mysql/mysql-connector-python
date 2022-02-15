@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -96,7 +96,7 @@ _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS {0}"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS {0}"
 _SELECT_SCHEMA_NAME_QUERY = ("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA."
                              "SCHEMATA WHERE SCHEMA_NAME = '{}'")
-_SHOW_VERSION_QUERY = 'SHOW VARIABLES LIKE "VERSION"'
+_SELECT_VERSION_QUERY = "SELECT @@version"
 
 _CNX_POOL_MAXSIZE = 99
 _CNX_POOL_MAX_NAME_SIZE = 120
@@ -1490,8 +1490,7 @@ class ConnectionPool(queue.Queue):
         if not cnx:
             cnx = PooledConnection(self)
             # mysqlx_wait_timeout is only available on MySQL 8
-            ver = cnx.sql('show variables like "version"'
-                         ).execute().fetch_all()[0][1]
+            ver = cnx.sql(_SELECT_VERSION_QUERY).execute().fetch_all()[0][0]
             if tuple([int(n) for n in ver.split("-")[0].split(".")]) > \
                 (8, 0, 10):
                 cnx.sql("set mysqlx_wait_timeout = {}"
@@ -1778,7 +1777,7 @@ class PoolsManager(object):
             PooledConnection: A pooled connection object.
         """
         def set_mysqlx_wait_timeout(cnx):
-            ver = cnx.sql(_SHOW_VERSION_QUERY).execute().fetch_all()[0][1]
+            ver = cnx.sql(_SELECT_VERSION_QUERY).execute().fetch_all()[0][0]
             # mysqlx_wait_timeout is only available on MySQL 8
             if tuple([int(n) for n in
                       ver.split("-")[0].split(".")]) > (8, 0, 10):
