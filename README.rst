@@ -99,7 +99,7 @@ Additional Resources
 Contributing
 ------------
 
-There are a few ways to contribute to the Connector/Python code. Please refer to the `contributing guidelines <CONTRIBUTING.md>`_ for additional information.
+There are a few ways to contribute to the Connector/Python code. Please refer to the `contributing guidelines <CONTRIBUTING.rst>`_ for additional information.
 
 License
 -------
