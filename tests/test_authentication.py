@@ -33,16 +33,19 @@
 """
 
 import getpass
+import importlib
 import inspect
 import itertools
 import logging
 import os
+import pkgutil
 import subprocess
 import tests
 import time
 import unittest
 
 import mysql.connector
+import mysql.connector.plugins as plugins
 from mysql.connector import authentication
 from mysql.connector.errors import (
     DatabaseError,
@@ -50,6 +53,16 @@ from mysql.connector.errors import (
     OperationalError,
     ProgrammingError,
 )
+
+try:
+    import cryptography
+except ImportError:
+    cryptography = None
+
+try:
+    import gssapi
+except ImportError:
+    gssapi = None
 
 try:
     import oci
@@ -65,13 +78,11 @@ except ImportError:
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
-_STANDARD_PLUGINS = (
-    "mysql_native_password",
-    "mysql_clear_password",
-    "sha256_password",
-    "authentication_ldap_sasl_client",
-    "authentication_kerberos_client",
-)
+_PLUGINS_DEPENDENCIES = {
+    "authentication_kerberos_client": (gssapi,),
+    "authentication_ldap_sasl_client": (gssapi,),
+    "authentication_oci_client": (cryptography, oci),
+}
 
 
 class AuthenticationModuleTests(tests.MySQLConnectorTests):
@@ -86,52 +97,29 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
                           authentication.get_auth_plugin, '')
 
         # Test using standard plugins
+        plugin_list = []
         plugin_classes = {}
-        for name, obj in inspect.getmembers(authentication):
-            if inspect.isclass(obj) and hasattr(obj, 'plugin_name'):
-                if obj.plugin_name and name != "MySQLSSPIKerberosAuthPlugin":
-                    plugin_classes[obj.plugin_name] = obj
-        for plugin_name in _STANDARD_PLUGINS:
+        for module in pkgutil.iter_modules(plugins.__path__):
+            deps = _PLUGINS_DEPENDENCIES.get(module.name)
+            if deps and not all(deps):
+                LOGGER.warning(
+                    f"{module.name} authentication plugin has missing "
+                    "dependencies"
+                )
+                continue
+            else:
+                plugin_list.append(module.name)
+
+            plugin_module = importlib.import_module(f"mysql.connector.plugins.{module.name}")
+            if hasattr(plugin_module, "AUTHENTICATION_PLUGIN_CLASS"):
+                plugin_classes[module.name] = getattr(
+                    plugin_module,
+                    plugin_module.AUTHENTICATION_PLUGIN_CLASS
+                )
+        for plugin_name in plugin_list:
             self.assertEqual(plugin_classes[plugin_name],
                              authentication.get_auth_plugin(plugin_name),
                              "Failed getting class for {0}".format(plugin_name))
-
-
-class BaseAuthPluginTests(tests.MySQLConnectorTests):
-
-    """Tests authentication.BaseAuthPlugin"""
-
-    def test_class(self):
-        self.assertEqual('', authentication.BaseAuthPlugin.plugin_name)
-        self.assertEqual(False, authentication.BaseAuthPlugin.requires_ssl)
-
-    def test___init__(self):
-        base = authentication.BaseAuthPlugin('ham')
-        self.assertEqual('ham', base._auth_data)
-        self.assertEqual(None, base._username)
-        self.assertEqual(None, base._password)
-        self.assertEqual(None, base._database)
-        self.assertEqual(False, base._ssl_enabled)
-
-        base = authentication.BaseAuthPlugin(
-            'spam', username='ham', password='secret',
-            database='test', ssl_enabled=True)
-        self.assertEqual('spam', base._auth_data)
-        self.assertEqual('ham', base._username)
-        self.assertEqual('secret', base._password)
-        self.assertEqual('test', base._database)
-        self.assertEqual(True, base._ssl_enabled)
-
-    def test_prepare_password(self):
-        base = authentication.BaseAuthPlugin('ham')
-        self.assertRaises(NotImplementedError, base.prepare_password)
-
-    def test_auth_response(self):
-        base = authentication.BaseAuthPlugin('ham')
-        self.assertRaises(NotImplementedError, base.auth_response)
-
-        base.requires_ssl = True
-        self.assertRaises(mysql.connector.InterfaceError, base.auth_response)
 
 
 class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
@@ -139,7 +127,8 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLNativePasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLNativePasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin(
+            "mysql_native_password")
 
     def test_class(self):
         self.assertEqual('mysql_native_password', self.plugin_class.plugin_name)
@@ -178,7 +167,7 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLClearPasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLClearPasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin("mysql_clear_password")
 
     def test_class(self):
         self.assertEqual('mysql_clear_password', self.plugin_class.plugin_name)
@@ -196,7 +185,7 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLSHA256PasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLSHA256PasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin("sha256_password")
 
     def test_class(self):
         self.assertEqual('sha256_password', self.plugin_class.plugin_name)
@@ -209,11 +198,13 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(exp, auth_plugin.auth_response())
 
 
+@unittest.skipIf(gssapi is None, "Module gssapi is required")
 class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLLdapSaslPasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLLdapSaslPasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin(
+            "authentication_ldap_sasl_client")
 
     def test_class(self):
         self.assertEqual("authentication_ldap_sasl_client",
@@ -494,7 +485,8 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             cnx.cmd_query("FLUSH PRIVILEGES")
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLKerberosAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin(
+            "MySQLKerberosAuthPlugin")
         if self.skip_reason is not None:
             self.skipTest(self.skip_reason)
 
@@ -1173,24 +1165,6 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
     tests.MYSQL_VERSION < (8, 0, 27),
     "Authentication with OCI IAM not supported"
 )
-class MySQLIAMAuthPluginTests(tests.MySQLConnectorTests):
-    """Test authentication.MySQLKerberosAuthPlugin.
-
-    Implemented by WL#14710: Support for OCI IAM authentication.
-    """
-
-    @unittest.skipIf(oci, "Not testing with OCI is installed")
-    def test_OCI_SDK_not_installed_error(self):
-        # verify an error is raised due to missing OCI SDK
-        plugin_name = "authentication_oci_client"
-        auth_plugin_class = authentication.get_auth_plugin(plugin_name)
-        auth_plugin = auth_plugin_class("spam_auth_data")
-        self.assertIsInstance(auth_plugin, authentication.MySQL_OCI_AuthPlugin)
-        self.assertRaises(
-            ProgrammingError,
-            auth_plugin.auth_response
-        )
-
 
 @unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 29),

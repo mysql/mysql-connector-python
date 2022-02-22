@@ -3038,6 +3038,7 @@ class WL14263(tests.MySQLConnectorTests):
         cnx.cmd_query("UNINSTALL PLUGIN authentication_ldap_sasl")
         cnx.close()
 
+    @unittest.skipIf(gssapi is None, "Module gssapi is required")
     @tests.foreach_cnx()
     def test_authentication_ldap_sasl_client_with_SCRAM_SHA_256(self):
         """test_authentication_ldap_sasl_client_with_SCRAM-SHA-256"""

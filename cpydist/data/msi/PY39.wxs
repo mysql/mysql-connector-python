@@ -224,6 +224,27 @@
       </Component>
     </DirectoryRef>
 
+    <DirectoryRef Id="ConnectorPluginsDir39">
+      <Component Id="ConnectorPlugins39" Guid="33a76ce6-416f-49d9-9a8a-0e75132e1be4" Win64="$(var.Win64)">
+        <File Id="plugins_initpy39" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_kerberos_clientpy39" Name="authentication_kerberos_client.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\authentication_kerberos_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_ldap_sasl_clientpy39" Name="authentication_ldap_sasl_client.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\authentication_ldap_sasl_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_oci_clientpy39" Name="authentication_oci_client.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\authentication_oci_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="caching_sha2_passwordpy39" Name="caching_sha2_password.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\caching_sha2_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysql_clear_passwordpy39" Name="mysql_clear_password.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\mysql_clear_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysql_native_passwordpy39" Name="mysql_native_password.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\mysql_native_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="sha256_passwordpy39" Name="sha256_password.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\plugins\sha256_password.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
     <DirectoryRef Id="ConnectorLocalesDir39">
       <Component Id="ConnectorLocales39" Guid="0dd62277-691e-4507-a13a-4ac601b2b013" Win64="$(var.Win64)">
         <File Id="locales_initpy39" Name="__init__.$(var.PyExt)"

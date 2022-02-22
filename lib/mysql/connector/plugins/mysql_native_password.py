@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,47 +26,50 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implementing support for MySQL Authentication Plugins"""
-
 import logging
-import importlib
-from functools import lru_cache
-
-from . import errors
+import struct
+from hashlib import sha1
+from .. import errors
+from . import BaseAuthPlugin
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_PLUGINS_PKG = "mysql.connector.plugins"
+AUTHENTICATION_PLUGIN_CLASS = "MySQLNativePasswordAuthPlugin"
 
 
-@lru_cache(maxsize=10, typed=False)
-def get_auth_plugin(plugin_name):
-    """Return authentication class based on plugin name
+class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
+    """Class implementing the MySQL Native Password authentication plugin"""
 
-    This function returns the class for the authentication plugin plugin_name.
-    The returned class is a subclass of BaseAuthPlugin.
+    requires_ssl = False
+    plugin_name = 'mysql_native_password'
 
-    Raises errors.NotSupportedError when plugin_name is not supported.
+    def prepare_password(self):
+        """Prepares and returns password as native MySQL 4.1+ password"""
+        if not self._auth_data:
+            raise errors.InterfaceError("Missing authentication data (seed)")
 
-    Returns subclass of BaseAuthPlugin.
-    """
-    package = DEFAULT_PLUGINS_PKG
-    if plugin_name:
+        if not self._password:
+            return b''
+        password = self._password
+
+        if isinstance(self._password, str):
+            password = self._password.encode('utf-8')
+        else:
+            password = self._password
+
+        auth_data = self._auth_data
+
+        hash4 = None
         try:
-            _LOGGER.info(f"package: {package}")
-            _LOGGER.info(f"plugin_name: {plugin_name}")
-            plugin_module = importlib.import_module(f".{plugin_name}", package)
-            _LOGGER.info(
-                "AUTHENTICATION_PLUGIN_CLASS: "
-                f"{plugin_module.AUTHENTICATION_PLUGIN_CLASS}"
-            )
-            return getattr(plugin_module,
-                           plugin_module.AUTHENTICATION_PLUGIN_CLASS)
-        except ModuleNotFoundError as err:
-            _LOGGER.warn(f"Requested Module was not found: {err}")
-        except ValueError as err:
-            raise errors.ProgrammingError(f"Invalid module name: {err}")
-    raise errors.NotSupportedError(
-        "Authentication plugin '{0}' is not supported".format(plugin_name))
+            hash1 = sha1(password).digest()
+            hash2 = sha1(hash1).digest()
+            hash3 = sha1(auth_data + hash2).digest()
+            xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
+            hash4 = struct.pack('20B', *xored)
+        except Exception as exc:
+            raise errors.InterfaceError(
+                "Failed scrambling password; {0}".format(exc))
+
+        return hash4

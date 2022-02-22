@@ -224,6 +224,27 @@
       </Component>
     </DirectoryRef>
 
+    <DirectoryRef Id="ConnectorPluginsDir310">
+      <Component Id="ConnectorPlugins310" Guid="ba7a3779-c890-4581-b7a2-665834184b85" Win64="$(var.Win64)">
+        <File Id="plugins_initpy310" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_kerberos_clientpy310" Name="authentication_kerberos_client.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\authentication_kerberos_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_ldap_sasl_clientpy310" Name="authentication_ldap_sasl_client.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\authentication_ldap_sasl_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_oci_clientpy310" Name="authentication_oci_client.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\authentication_oci_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="caching_sha2_passwordpy310" Name="caching_sha2_password.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\caching_sha2_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysql_clear_passwordpy310" Name="mysql_clear_password.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\mysql_clear_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysql_native_passwordpy310" Name="mysql_native_password.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\mysql_native_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="sha256_passwordpy310" Name="sha256_password.$(var.PyExt)"
+         Source="$(var.BDist310)\mysql\connector\plugins\sha256_password.$(var.PyExt)" DiskId="1"/>
+      </Component>
+    </DirectoryRef>
+
     <DirectoryRef Id="ConnectorLocalesDir310">
       <Component Id="ConnectorLocales310" Guid="2aff6dea-1e7b-4230-93b8-3b76766e9fb7" Win64="$(var.Win64)">
         <File Id="locales_initpy310" Name="__init__.$(var.PyExt)"
