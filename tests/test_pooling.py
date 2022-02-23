@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -52,8 +52,7 @@ from mysql.connector.constants import ClientFlag
 MYSQL_CNX_CLASS = ((MySQLConnection) if CMySQLConnection is None else
                    (MySQLConnection, CMySQLConnection))
 
-@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
-                 "Pool not supported with with MySQL version 5.6")
+
 class PoolingTests(tests.MySQLConnectorTests):
 
     def tearDown(self):
@@ -77,8 +76,6 @@ class PoolingTests(tests.MySQLConnectorTests):
                          pooling.generate_pool_name(**config))
 
 
-@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
-                 "Pool not supported with with MySQL version 5.6")
 class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def tearDown(self):
@@ -154,8 +151,6 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.PoolError, cnx.config, user='spam')
 
 
-@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
-                 "Pool not supported with with MySQL version 5.6")
 class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
 
     def tearDown(self):
@@ -352,8 +347,6 @@ class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
         self.assertRaises(errors.PoolError, cnxpool.get_connection)
 
 
-@unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 2),
-                 "Pool not supported with with MySQL version 5.6")
 class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
 
     """Testing MySQL Connector module pooling functionality"""

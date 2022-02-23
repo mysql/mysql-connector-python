@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1176,14 +1176,15 @@ class MySQLConnection(MySQLConnectionAbstract):
         if not self.is_connected():
             raise errors.OperationalError("MySQL Connection not available.")
 
-        try:
-            self.cmd_reset_connection()
-        except errors.NotSupportedError:
-            self.cmd_change_user(self._user, self._password,
-                                 self._database, self._charset_id,
-                                 self._password1, self._password2,
-                                 self._password3,
-                                 self._oci_config_file)
+        if not self.cmd_reset_connection():
+            try:
+                self.cmd_change_user(self._user, self._password,
+                                     self._database, self._charset_id,
+                                     self._password1, self._password2,
+                                     self._password3,
+                                     self._oci_config_file)
+            except errors.ProgrammingError:
+                self.reconnect()
 
         cur = self.cursor()
         if user_variables:
@@ -1530,17 +1531,17 @@ class MySQLConnection(MySQLConnectionAbstract):
     def cmd_reset_connection(self):
         """Resets the session state without re-authenticating
 
-        Works only for MySQL server 5.7.3 or later.
-        The result is a dictionary with OK packet information.
+        Reset command only works on MySQL server 5.7.3 or later.
+        The result is True for a successful reset otherwise False.
 
-        Returns a dict()
+        Returns bool
         """
-        if self._server_version < (5, 7, 3):
-            raise errors.NotSupportedError("MySQL version 5.7.2 and "
-                                           "earlier does not support "
-                                           "COM_RESET_CONNECTION.")
-        self._handle_ok(self._send_cmd(ServerCmd.RESET_CONNECTION))
-        self._post_connection()
+        try:
+            self._handle_ok(self._send_cmd(ServerCmd.RESET_CONNECTION))
+            self._post_connection()
+            return True
+        except (errors.NotSupportedError, errors.OperationalError):
+            return False
 
     def handle_unread_result(self):
         """Check whether there is an unread result"""

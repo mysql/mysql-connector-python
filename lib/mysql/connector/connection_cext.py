@@ -732,19 +732,15 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def cmd_reset_connection(self):
         """Resets the session state without re-authenticating
 
-        Works only for MySQL server 5.7.3 or later.
-        """
-        if self._server_version < (5, 7, 3):
-            raise errors.NotSupportedError("MySQL version 5.7.2 and "
-                                           "earlier does not support "
-                                           "COM_RESET_CONNECTION.")
-        try:
-            self._cmysql.reset_connection()
-        except MySQLInterfaceError as exc:
-            raise errors.get_mysql_exception(msg=exc.msg, errno=exc.errno,
-                                             sqlstate=exc.sqlstate)
+        Reset command only works on MySQL server 5.7.3 or later.
+        The result is True for a successful reset otherwise False.
 
-        self._post_connection()
+        Returns bool
+        """
+        res = self._cmysql.reset_connection()
+        if res:
+            self._post_connection()
+        return res
 
     def cmd_refresh(self, options):
         """Send the Refresh command to the MySQL server"""
@@ -825,22 +821,14 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if not self.is_connected():
             raise errors.OperationalError("MySQL Connection not available.")
 
-        try:
-            self.cmd_reset_connection()
-        except (errors.NotSupportedError, NotImplementedError):
-            if self._compress:
-                raise errors.NotSupportedError(
-                    "Reset session is not supported with compression for "
-                    "MySQL server version 5.7.2 or earlier.")
-            elif self._server_version < (5, 7, 3):
-                raise errors.NotSupportedError(
-                    "Reset session is not supported with MySQL server "
-                    "version 5.7.2 or earlier.")
-            else:
+        if not self.cmd_reset_connection():
+            try:
                 self.cmd_change_user(self._user, self._password,
                                      self._database, self._charset_id,
                                      self._password1, self._password2,
                                      self._password3, self._oci_config_file)
+            except errors.ProgrammingError:
+                self.reconnect()
 
         if user_variables or session_variables:
             cur = self.cursor()

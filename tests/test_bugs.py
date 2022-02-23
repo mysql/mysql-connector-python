@@ -5817,38 +5817,41 @@ class BugOra29808262(tests.MySQLConnectorTests):
         cur.close()
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
-                 "MySQL >= 5.7.3 is required for reset command")
-@unittest.skipIf(CMySQLConnection is None,
-                 "CMySQLConnection is required but is not available")
 class Bug27489937(tests.MySQLConnectorTests):
     """BUG#27489937: SUPPORT C EXTENSION FOR CONNECTION POOLS
+
+       BUG#33203161: EXCEPTION IS THROWN ON CLOSE CONNECTION WITH POOLING
     """
 
-    def setUp(self):
+    def _setUp(self, conn_class):
         self.config = tests.get_mysql_config()
         self.config['pool_name'] = 'Bug27489937'
         self.config['pool_size'] = 3
-        self.config['use_pure'] = False
+        if self.cnx.__class__ == mysql.connector.connection.MySQLConnection:
+            self.config['use_pure'] = True
+        else:
+            self.config['use_pure'] = False
         try:
             del mysql.connector._CONNECTION_POOLS[self.config['pool_name']]
         except:
             pass
 
-    def tearDown(self):
+    def _tearDown(self):
         # Remove pools created by test
         del mysql.connector._CONNECTION_POOLS[self.config['pool_name']]
 
+    @foreach_cnx()
     def test_cext_pool_support(self):
         """Basic pool tests"""
+        self._setUp(self.cnx.__class__)
         cnx_list = []
         session_ids = []
         for _ in range(self.config['pool_size']):
             cnx = mysql.connector.connect(**self.config)
             self.assertIsInstance(cnx, PooledMySQLConnection,
                                   "Expected a CMySQLConnection instance")
-            self.assertIsInstance(cnx._cnx, CMySQLConnection,
-                                  "Expected a CMySQLConnection instance")
+            self.assertIsInstance(cnx._cnx, self.cnx.__class__,
+                                  f"Expected a {self.cnx.__class__} instance")
             cnx_list.append(cnx)
             exp_session_id = cnx.connection_id
             session_ids.append(exp_session_id)
@@ -5873,6 +5876,7 @@ class Bug27489937(tests.MySQLConnectorTests):
 
         exp = (b'2',)
         self.assertNotEqual(exp, cnx.get_rows()[0][0])
+        self._tearDown()
 
 
 class BugOra29195610(tests.MySQLConnectorTests):
