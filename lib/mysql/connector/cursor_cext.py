@@ -168,7 +168,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         """Handles the result after statement execution"""
         if 'columns' in result:
             self._description = result['columns']
-            self._rowcount = 0
+            self._rowcount = -1
             self._handle_resultset()
         else:
             self._insert_id = result['insert_id']
@@ -515,7 +515,10 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._handle_eof()
             return []
 
-        self._rowcount += len(rows[0])
+        rowcount = len(rows[0])
+        if rowcount >= 0 and self._rowcount == -1:
+            self._rowcount = 0
+        self._rowcount += rowcount
         self._handle_eof()
         #self._cnx.handle_unread_result()
         return rows[0]
@@ -545,7 +548,10 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._handle_eof()
             return []
 
-        self._rowcount += len(rows)
+        rowcount = len(rows)
+        if rowcount >= 0 and self._rowcount == -1:
+            self._rowcount = 0
+        self._rowcount += rowcount
         return rows
 
     def fetchone(self):
@@ -562,7 +568,10 @@ class CMySQLCursor(MySQLCursorAbstract):
         else:
             self._handle_eof()
             return None
-        self._rowcount += 1
+        if self._rowcount == -1:
+            self._rowcount = 1
+        else:
+            self._rowcount += 1
         return row[0]
 
     def __iter__(self):
@@ -839,7 +848,7 @@ class CMySQLCursorPrepared(CMySQLCursor):
     def __init__(self, connection):
         super(CMySQLCursorPrepared, self).__init__(connection)
         self._rows = None
-        self._rowcount = 0
+        self._rowcount = -1
         self._next_row = 0
         self._binary = True
         self._stmt = None
@@ -1041,6 +1050,9 @@ class CMySQLCursorPrepared(CMySQLCursor):
             self._handle_eof()
             return []
 
-        self._rowcount += len(rows[0])
+        rowcount = len(rows[0])
+        if rowcount >= 0 and self._rowcount == -1:
+            self._rowcount = 0
+        self._rowcount += rowcount
         self._handle_eof()
         return rows[0]
