@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,8 +28,9 @@
 
 """Implementing support for MySQL Authentication Plugins"""
 
-import logging
 import importlib
+import logging
+
 from functools import lru_cache
 
 from . import errors
@@ -62,11 +63,13 @@ def get_auth_plugin(plugin_name):
                 "AUTHENTICATION_PLUGIN_CLASS: "
                 f"{plugin_module.AUTHENTICATION_PLUGIN_CLASS}"
             )
-            return getattr(plugin_module,
-                           plugin_module.AUTHENTICATION_PLUGIN_CLASS)
+            return getattr(
+                plugin_module, plugin_module.AUTHENTICATION_PLUGIN_CLASS
+            )
         except ModuleNotFoundError as err:
             _LOGGER.warn(f"Requested Module was not found: {err}")
         except ValueError as err:
             raise errors.ProgrammingError(f"Invalid module name: {err}")
     raise errors.NotSupportedError(
-        "Authentication plugin '{0}' is not supported".format(plugin_name))
+        f"Authentication plugin '{plugin_name}' is not supported"
+    )

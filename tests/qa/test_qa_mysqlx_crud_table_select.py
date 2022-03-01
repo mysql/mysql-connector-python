@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,7 +36,7 @@ import tests
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
 class TableSelectTests(tests.MySQLxTests):
-    """Tests for table.select(). """
+    """Tests for table.select()."""
 
     @tests.foreach_session()
     def test_table_select1(self):

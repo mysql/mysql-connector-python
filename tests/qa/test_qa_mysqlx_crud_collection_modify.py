@@ -1,4 +1,4 @@
-# Copyright (c) 2021, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1082,11 +1082,15 @@ class CollectionAddTests(tests.MySQLxTests):
             }
         ).execute()
         collection.modify("true").patch(
-            mysqlx.expr('{"actors": {"MainActor": {"birthdate": "11 Nov 1975"}}}'
-        )).execute()
+            mysqlx.expr(
+                '{"actors": {"MainActor": {"birthdate": "11 Nov 1975"}}}'
+            )
+        ).execute()
         collection.modify("true").patch(
-            mysqlx.expr('{"additionalinfo": {"director": {"title": CONCAT(UPPER($.additionalinfo.director.awards.FirstAward.award), " OF THE YEAR")}}}'
-        )).execute()
+            mysqlx.expr(
+                '{"additionalinfo": {"director": {"title": CONCAT(UPPER($.additionalinfo.director.awards.FirstAward.award), " OF THE YEAR")}}}'
+            )
+        ).execute()
         result = collection.get_one("1234")
         self.assertEqual(
             result["additionalinfo"]["director"]["title"],
@@ -1122,17 +1126,20 @@ class CollectionAddTests(tests.MySQLxTests):
                         )
                     }
                 }
-
             }
         ).execute()
         result = collection.get_one("1234")
         self.assertEqual(result["actors"]["MainActor"]["age"], 35)
         collection.modify("true").patch(
-            mysqlx.expr('{"actors": {"MainActor": {"birthdate": Year(CURDATE())}}}'
-        )).execute()
+            mysqlx.expr(
+                '{"actors": {"MainActor": {"birthdate": Year(CURDATE())}}}'
+            )
+        ).execute()
         result = collection.get_one("1234")
         current_year = datetime.date.today().year
-        self.assertEqual(result["actors"]["MainActor"]["birthdate"], current_year)
+        self.assertEqual(
+            result["actors"]["MainActor"]["birthdate"], current_year
+        )
         collection.modify("true").patch(
             {"actors": {"MainActor": {"birthdate": "1 Jan 1983"}}}
         ).execute()

@@ -37,7 +37,7 @@ try:
     import gssapi
 except ImportError:
     gssapi = None
-    if os.name != 'nt':
+    if os.name != "nt":
         raise errors.ProgrammingError(
             "Module gssapi is required for GSSAPI authentication "
             "mechanism but was not found. Unable to authenticate "
@@ -88,17 +88,12 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         )
 
         username = gssapi.raw.names.import_name(
-            upn.encode("utf-8"),
-            name_type=gssapi.NameType.user
+            upn.encode("utf-8"), name_type=gssapi.NameType.user
         )
 
         try:
-            acquire_cred_result = (
-                gssapi.raw.acquire_cred_with_password(
-                    username,
-                    self._password.encode("utf-8"),
-                    usage="initiate"
-                )
+            acquire_cred_result = gssapi.raw.acquire_cred_with_password(
+                username, self._password.encode("utf-8"), usage="initiate"
             )
         except gssapi.raw.misc.GSSError as err:
             raise errors.ProgrammingError(
@@ -189,8 +184,9 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
                 if self._password is not None:
                     creds = self._acquire_cred_with_password(upn)
             if (
-                creds_realm and creds_realm != realm and
-                self._password is not None
+                creds_realm
+                and creds_realm != realm
+                and self._password is not None
             ):
                 creds = self._acquire_cred_with_password(upn)
         except gssapi.raw.exceptions.ExpiredCredentialsError as err:
@@ -209,18 +205,12 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         flags = (
             gssapi.RequirementFlag.mutual_authentication,
             gssapi.RequirementFlag.extended_error,
-            gssapi.RequirementFlag.delegate_to_peer
+            gssapi.RequirementFlag.delegate_to_peer,
         )
-        name = gssapi.Name(
-            spn,
-            name_type=gssapi.NameType.kerberos_principal
-        )
+        name = gssapi.Name(spn, name_type=gssapi.NameType.kerberos_principal)
         cname = name.canonicalize(gssapi.MechType.kerberos)
         self.context = gssapi.SecurityContext(
-            name=cname,
-            creds=creds,
-            flags=sum(flags),
-            usage="initiate"
+            name=cname, creds=creds, flags=sum(flags), usage="initiate"
         )
 
         try:
@@ -308,7 +298,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug(
             "Wrapped message response: %s, length: %d",
             wraped[0],
-            len(wraped[0])
+            len(wraped[0]),
         )
 
         return wraped.message
@@ -365,12 +355,10 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         if sspicon is None or sspi is None:
             raise errors.ProgrammingError(
                 'Package "pywin32" (Python for Win32 (pywin32) extensions)'
-                ' is not installed.')
+                " is not installed."
+            )
 
-        flags = (
-            sspicon.ISC_REQ_MUTUAL_AUTH,
-            sspicon.ISC_REQ_DELEGATE
-        )
+        flags = (sspicon.ISC_REQ_MUTUAL_AUTH, sspicon.ISC_REQ_DELEGATE)
 
         if self._username and self._password:
             _auth_info = (self._username, realm, self._password)
@@ -382,15 +370,21 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug("_auth_info is None: %s", _auth_info is None)
 
         self.clientauth = sspi.ClientAuth(
-            'Kerberos', targetspn=targetspn, auth_info=_auth_info,
-            scflags=sum(flags), datarep=sspicon.SECURITY_NETWORK_DREP)
+            "Kerberos",
+            targetspn=targetspn,
+            auth_info=_auth_info,
+            scflags=sum(flags),
+            datarep=sspicon.SECURITY_NETWORK_DREP,
+        )
 
         try:
             data = None
             err, out_buf = self.clientauth.authorize(data)
             _LOGGER.debug("Context step err: %s", err)
             _LOGGER.debug("Context step out_buf: %s", out_buf)
-            _LOGGER.debug("Context completed?: %s", self.clientauth.authenticated)
+            _LOGGER.debug(
+                "Context completed?: %s", self.clientauth.authenticated
+            )
             initial_client_token = out_buf[0].Buffer
             _LOGGER.debug("pkg_info: %s", self.clientauth.pkg_info)
         except Exception as err:
@@ -429,5 +423,5 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         return resp, self.clientauth.authenticated
 
 
-if os.name == 'nt':
+if os.name == "nt":
     MySQLKerberosAuthPlugin = MySQLSSPIKerberosAuthPlugin

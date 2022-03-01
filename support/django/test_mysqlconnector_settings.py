@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -27,39 +27,39 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'mysql.connector.django',
-        'NAME': 'cpydjango1',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': '127.0.0.1',
-        'PORT': 13001,
-        'TEST_CHARSET': 'utf8',
-        'TEST_COLLATION': 'utf8_general_ci',
-        'TEST': {
-            'CHARSET': 'utf8',
-            'COLLATION': 'utf8_general_ci',
-        }
+    "default": {
+        "ENGINE": "mysql.connector.django",
+        "NAME": "cpydjango1",
+        "USER": "root",
+        "PASSWORD": "",
+        "HOST": "127.0.0.1",
+        "PORT": 13001,
+        "TEST_CHARSET": "utf8",
+        "TEST_COLLATION": "utf8_general_ci",
+        "TEST": {
+            "CHARSET": "utf8",
+            "COLLATION": "utf8_general_ci",
+        },
     },
-    'other': {
-        'ENGINE': 'mysql.connector.django',
-        'NAME': 'cpydjango1',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': '127.0.0.1',
-        'PORT': 13002,
-        'TEST_CHARSET': 'utf8',
-        'TEST_COLLATION': 'utf8_general_ci',
-        'TEST_MIRROR': 'default',
-        'TEST': {
-            'CHARSET': 'utf8',
-            'COLLATION': 'utf8_general_ci',
-            'MIRROR': 'default',
-        }
-    }
+    "other": {
+        "ENGINE": "mysql.connector.django",
+        "NAME": "cpydjango1",
+        "USER": "root",
+        "PASSWORD": "",
+        "HOST": "127.0.0.1",
+        "PORT": 13002,
+        "TEST_CHARSET": "utf8",
+        "TEST_COLLATION": "utf8_general_ci",
+        "TEST_MIRROR": "default",
+        "TEST": {
+            "CHARSET": "utf8",
+            "COLLATION": "utf8_general_ci",
+            "MIRROR": "default",
+        },
+    },
 }
 
 SECRET_KEY = "django_tests_secret_key"
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 USE_TZ = False
 SOUTH_TESTS_MIGRATE = False

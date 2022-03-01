@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -37,9 +37,8 @@ import warnings
 from .constants import TLS_CIPHER_SUITES, TLS_VERSIONS
 from .errors import InterfaceError
 
-
-BYTE_TYPES = (bytearray, bytes,)
-NUMERIC_TYPES = (int, float, decimal.Decimal,)
+BYTE_TYPES = (bytearray, bytes)
+NUMERIC_TYPES = (int, float, decimal.Decimal)
 
 
 def encode_to_bytes(value, encoding="utf-8"):
@@ -91,6 +90,7 @@ def escape(*args):
     Returns:
         str: The value if not a string, or the escaped string.
     """
+
     def _escape(value):
         """Escapes special characters."""
         if value is None:
@@ -98,20 +98,21 @@ def escape(*args):
         elif isinstance(value, NUMERIC_TYPES):
             return value
         if isinstance(value, (bytes, bytearray)):
-            value = value.replace(b'\\', b'\\\\')
-            value = value.replace(b'\n', b'\\n')
-            value = value.replace(b'\r', b'\\r')
-            value = value.replace(b'\047', b'\134\047')  # single quotes
-            value = value.replace(b'\042', b'\134\042')  # double quotes
-            value = value.replace(b'\032', b'\134\032')  # for Win32
+            value = value.replace(b"\\", b"\\\\")
+            value = value.replace(b"\n", b"\\n")
+            value = value.replace(b"\r", b"\\r")
+            value = value.replace(b"\047", b"\134\047")  # single quotes
+            value = value.replace(b"\042", b"\134\042")  # double quotes
+            value = value.replace(b"\032", b"\134\032")  # for Win32
         else:
-            value = value.replace('\\', '\\\\')
-            value = value.replace('\n', '\\n')
-            value = value.replace('\r', '\\r')
-            value = value.replace('\047', '\134\047')  # single quotes
-            value = value.replace('\042', '\134\042')  # double quotes
-            value = value.replace('\032', '\134\032')  # for Win32
+            value = value.replace("\\", "\\\\")
+            value = value.replace("\n", "\\n")
+            value = value.replace("\r", "\\r")
+            value = value.replace("\047", "\134\047")  # single quotes
+            value = value.replace("\042", "\134\042")  # double quotes
+            value = value.replace("\032", "\134\032")  # for Win32
         return value
+
     if len(args) > 1:
         return [_escape(arg) for arg in args]
     return _escape(args[0])
@@ -150,8 +151,10 @@ def deprecated(version=None, reason=None):
        def deprecated_function(x, y):
            return x + y
     """
+
     def decorate(func):
         """Decorate function."""
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             """Wrapper function.
@@ -166,12 +169,16 @@ def deprecated(version=None, reason=None):
             if reason:
                 message.append(". {}".format(reason))
             frame = inspect.currentframe().f_back
-            warnings.warn_explicit("".join(message),
-                                   category=DeprecationWarning,
-                                   filename=inspect.getfile(frame.f_code),
-                                   lineno=frame.f_lineno)
+            warnings.warn_explicit(
+                "".join(message),
+                category=DeprecationWarning,
+                filename=inspect.getfile(frame.f_code),
+                lineno=frame.f_lineno,
+            )
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorate
 
 
@@ -184,7 +191,7 @@ def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
     """
     translated_names = []
 
-    cipher_suites = {}#TLS_CIPHER_SUITES[TLS_version]
+    cipher_suites = {}  # TLS_CIPHER_SUITES[TLS_version]
 
     # Find the previews TLS versions of the given on TLS_version
     for index in range(TLS_VERSIONS.index(tls_version) + 1):
@@ -196,8 +203,10 @@ def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
         elif name in cipher_suites:
             translated_names.append(cipher_suites[name])
         else:
-            raise InterfaceError("The '{}' in cipher suites is not a valid "
-                                 "cipher suite".format(name))
+            raise InterfaceError(
+                "The '{}' in cipher suites is not a valid "
+                "cipher suite".format(name)
+            )
     return translated_names
 
 

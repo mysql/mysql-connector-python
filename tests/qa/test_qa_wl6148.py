@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -161,7 +161,9 @@ class WL6148Tests(tests.MySQLConnectorTests):
         """
         cursor = self.cnx.cursor(prepared=True)
         cursor.execute("DROP TABLE IF EXISTS customer")
-        cursor.execute("CREATE TABLE customer2 (i INT,name varchar(10),age int)")
+        cursor.execute(
+            "CREATE TABLE customer2 (i INT,name varchar(10),age int)"
+        )
         cursor.execute(
             "INSERT INTO customer2 (i,name,age) VALUES"
             "(10,'Joshi',30),(20,'Kiran',30),(30,'Raja',30)"

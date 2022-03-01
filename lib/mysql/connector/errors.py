@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -85,7 +85,8 @@ def custom_error_exception(error=None, exception=None):
 
     if not isinstance(error, (int, dict)):
         raise ValueError(
-            "The error argument should be either an integer or dictionary")
+            "The error argument should be either an integer or dictionary"
+        )
 
     if isinstance(error, int):
         error = {error: exception}
@@ -102,6 +103,7 @@ def custom_error_exception(error=None, exception=None):
 
     return _CUSTOM_ERROR_EXCEPTIONS
 
+
 def get_mysql_exception(errno, msg=None, sqlstate=None):
     """Get the exception matching the MySQL error
 
@@ -115,14 +117,16 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
     """
     try:
         return _CUSTOM_ERROR_EXCEPTIONS[errno](
-            msg=msg, errno=errno, sqlstate=sqlstate)
+            msg=msg, errno=errno, sqlstate=sqlstate
+        )
     except KeyError:
         # Error was not mapped to particular exception
         pass
 
     try:
         return _ERROR_EXCEPTIONS[errno](
-            msg=msg, errno=errno, sqlstate=sqlstate)
+            msg=msg, errno=errno, sqlstate=sqlstate
+        )
     except KeyError:
         # Error was not mapped to particular exception
         pass
@@ -132,10 +136,12 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
 
     try:
         return _SQLSTATE_CLASS_EXCEPTION[sqlstate[0:2]](
-            msg=msg, errno=errno, sqlstate=sqlstate)
+            msg=msg, errno=errno, sqlstate=sqlstate
+        )
     except KeyError:
         # Return default InterfaceError
         return DatabaseError(msg=msg, errno=errno, sqlstate=sqlstate)
+
 
 def get_exception(packet):
     """Returns an exception object based on the MySQL error
@@ -160,13 +166,13 @@ def get_exception(packet):
         if packet[0] != 35:
             # Error without SQLState
             if isinstance(packet, (bytes, bytearray)):
-                errmsg = packet.decode('utf8')
+                errmsg = packet.decode("utf8")
             else:
                 errmsg = packet
         else:
             (packet, sqlstate) = utils.read_bytes(packet[1:], 5)
-            sqlstate = sqlstate.decode('utf8')
-            errmsg = packet.decode('utf8')
+            sqlstate = sqlstate.decode("utf8")
+            errmsg = packet.decode("utf8")
     except Exception as err:  # pylint: disable=W0703
         return InterfaceError("Failed getting Error information (%r)" % err)
     else:
@@ -175,6 +181,7 @@ def get_exception(packet):
 
 class Error(Exception):
     """Exception that is base class for all other error exceptions"""
+
     def __init__(self, msg=None, errno=None, values=None, sqlstate=None):
         super(Error, self).__init__()
         self.msg = msg
@@ -190,18 +197,15 @@ class Error(Exception):
                 except TypeError as err:
                     self.msg = "{0} (Warning: {1})".format(self.msg, str(err))
         elif not self.msg:
-            self._full_msg = self.msg = 'Unknown error'
+            self._full_msg = self.msg = "Unknown error"
 
         if self.msg and self.errno != -1:
-            fields = {
-                'errno': self.errno,
-                'msg': self.msg
-            }
+            fields = {"errno": self.errno, "msg": self.msg}
             if self.sqlstate:
-                fmt = '{errno} ({state}): {msg}'
-                fields['state'] = self.sqlstate
+                fmt = "{errno} ({state}): {msg}"
+                fields["state"] = self.sqlstate
             else:
-                fmt = '{errno}: {msg}'
+                fmt = "{errno}: {msg}"
             self._full_msg = fmt.format(**fields)
 
         self.args = (self.errno, self._full_msg, self.sqlstate)
@@ -212,86 +216,96 @@ class Error(Exception):
 
 class Warning(Exception):  # pylint: disable=W0622
     """Exception for important warnings"""
+
     pass
 
 
 class InterfaceError(Error):
     """Exception for errors related to the interface"""
+
     pass
 
 
 class DatabaseError(Error):
     """Exception for errors related to the database"""
+
     pass
 
 
 class InternalError(DatabaseError):
     """Exception for errors internal database errors"""
+
     pass
 
 
 class OperationalError(DatabaseError):
     """Exception for errors related to the database's operation"""
+
     pass
 
 
 class ProgrammingError(DatabaseError):
     """Exception for errors programming errors"""
+
     pass
 
 
 class IntegrityError(DatabaseError):
     """Exception for errors regarding relational integrity"""
+
     pass
 
 
 class DataError(DatabaseError):
     """Exception for errors reporting problems with processed data"""
+
     pass
 
 
 class NotSupportedError(DatabaseError):
     """Exception for errors when an unsupported database feature was used"""
+
     pass
 
 
 class PoolError(Error):
     """Exception for errors relating to connection pooling"""
+
     pass
 
 
 _SQLSTATE_CLASS_EXCEPTION = {
-    '02': DataError,  # no data
-    '07': DatabaseError,  # dynamic SQL error
-    '08': OperationalError,  # connection exception
-    '0A': NotSupportedError,  # feature not supported
-    '21': DataError,  # cardinality violation
-    '22': DataError,  # data exception
-    '23': IntegrityError,  # integrity constraint violation
-    '24': ProgrammingError,  # invalid cursor state
-    '25': ProgrammingError,  # invalid transaction state
-    '26': ProgrammingError,  # invalid SQL statement name
-    '27': ProgrammingError,  # triggered data change violation
-    '28': ProgrammingError,  # invalid authorization specification
-    '2A': ProgrammingError,  # direct SQL syntax error or access rule violation
-    '2B': DatabaseError,  # dependent privilege descriptors still exist
-    '2C': ProgrammingError,  # invalid character set name
-    '2D': DatabaseError,  # invalid transaction termination
-    '2E': DatabaseError,  # invalid connection name
-    '33': DatabaseError,  # invalid SQL descriptor name
-    '34': ProgrammingError,  # invalid cursor name
-    '35': ProgrammingError,  # invalid condition number
-    '37': ProgrammingError,  # dynamic SQL syntax error or access rule violation
-    '3C': ProgrammingError,  # ambiguous cursor name
-    '3D': ProgrammingError,  # invalid catalog name
-    '3F': ProgrammingError,  # invalid schema name
-    '40': InternalError,  # transaction rollback
-    '42': ProgrammingError,  # syntax error or access rule violation
-    '44': InternalError,   # with check option violation
-    'HZ': OperationalError,  # remote database access
-    'XA': IntegrityError,
-    '0K': OperationalError,
-    'HY': DatabaseError,  # default when no SQLState provided by MySQL server
+    "02": DataError,  # no data
+    "07": DatabaseError,  # dynamic SQL error
+    "08": OperationalError,  # connection exception
+    "0A": NotSupportedError,  # feature not supported
+    "21": DataError,  # cardinality violation
+    "22": DataError,  # data exception
+    "23": IntegrityError,  # integrity constraint violation
+    "24": ProgrammingError,  # invalid cursor state
+    "25": ProgrammingError,  # invalid transaction state
+    "26": ProgrammingError,  # invalid SQL statement name
+    "27": ProgrammingError,  # triggered data change violation
+    "28": ProgrammingError,  # invalid authorization specification
+    "2A": ProgrammingError,  # direct SQL syntax error or access rule violation
+    "2B": DatabaseError,  # dependent privilege descriptors still exist
+    "2C": ProgrammingError,  # invalid character set name
+    "2D": DatabaseError,  # invalid transaction termination
+    "2E": DatabaseError,  # invalid connection name
+    "33": DatabaseError,  # invalid SQL descriptor name
+    "34": ProgrammingError,  # invalid cursor name
+    "35": ProgrammingError,  # invalid condition number
+    "37": ProgrammingError,  # dynamic SQL syntax error or access rule violation
+    "3C": ProgrammingError,  # ambiguous cursor name
+    "3D": ProgrammingError,  # invalid catalog name
+    "3F": ProgrammingError,  # invalid schema name
+    "40": InternalError,  # transaction rollback
+    "42": ProgrammingError,  # syntax error or access rule violation
+    "44": InternalError,  # with check option violation
+    "HZ": OperationalError,  # remote database access
+    "XA": IntegrityError,
+    "0K": OperationalError,
+    "HY": DatabaseError,  # default when no SQLState provided by MySQL server
 }
 
 _ERROR_EXCEPTIONS = {

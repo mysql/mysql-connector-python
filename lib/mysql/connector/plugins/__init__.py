@@ -35,7 +35,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 _LOGGER = logging.getLogger(__name__)
 
 
-class BaseAuthPlugin(object):
+class BaseAuthPlugin:
     """Base class for authentication plugins
 
 
@@ -50,10 +50,17 @@ class BaseAuthPlugin(object):
     """
 
     requires_ssl = False
-    plugin_name = ''
+    plugin_name = ""
 
-    def __init__(self, auth_data, username=None, password=None, database=None,
-                 ssl_enabled=False, instance=None):
+    def __init__(
+        self,
+        auth_data,
+        username=None,
+        password=None,
+        database=None,
+        ssl_enabled=False,
+        instance=None,
+    ):
         """Initialization"""
         self._auth_data = auth_data
         self._username = username
@@ -80,6 +87,7 @@ class BaseAuthPlugin(object):
         Returns str
         """
         if self.requires_ssl and not self._ssl_enabled:
-            raise errors.InterfaceError("{name} requires SSL".format(
-                name=self.plugin_name))
+            raise errors.InterfaceError(
+                "{name} requires SSL".format(name=self.plugin_name)
+            )
         return self.prepare_password()

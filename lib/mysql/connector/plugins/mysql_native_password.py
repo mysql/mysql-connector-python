@@ -28,7 +28,9 @@
 
 import logging
 import struct
+
 from hashlib import sha1
+
 from .. import errors
 from . import BaseAuthPlugin
 
@@ -43,7 +45,7 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Native Password authentication plugin"""
 
     requires_ssl = False
-    plugin_name = 'mysql_native_password'
+    plugin_name = "mysql_native_password"
 
     def prepare_password(self):
         """Prepares and returns password as native MySQL 4.1+ password"""
@@ -51,11 +53,11 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             raise errors.InterfaceError("Missing authentication data (seed)")
 
         if not self._password:
-            return b''
+            return b""
         password = self._password
 
         if isinstance(self._password, str):
-            password = self._password.encode('utf-8')
+            password = self._password.encode("utf-8")
         else:
             password = self._password
 
@@ -67,9 +69,10 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             hash2 = sha1(hash1).digest()
             hash3 = sha1(auth_data + hash2).digest()
             xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
-            hash4 = struct.pack('20B', *xored)
+            hash4 = struct.pack("20B", *xored)
         except Exception as exc:
             raise errors.InterfaceError(
-                "Failed scrambling password; {0}".format(exc))
+                "Failed scrambling password; {0}".format(exc)
+            )
 
         return hash4

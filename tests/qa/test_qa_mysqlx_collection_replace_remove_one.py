@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -97,8 +97,7 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         result["name"] = "abc"
         result["company"] = "mnc"
         self.assertRaises(
-            mysqlx.ProgrammingError,
-            collection.replace_one, "1", result
+            mysqlx.ProgrammingError, collection.replace_one, "1", result
         )
         self.schema.drop_collection("mycoll3")
 
@@ -294,13 +293,11 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertEqual(result["name"], "joy")
         result["name"] = "abc"
         self.assertRaises(
-            mysqlx.ProgrammingError,
-            collection.replace_one, None, result
+            mysqlx.ProgrammingError, collection.replace_one, None, result
         )
         result["name"] = "new"
         self.assertRaises(
-            mysqlx.ProgrammingError,
-            collection.replace_one, "", result
+            mysqlx.ProgrammingError, collection.replace_one, "", result
         )
         self.schema.drop_collection("mycoll1")
 

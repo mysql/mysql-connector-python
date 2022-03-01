@@ -38,9 +38,11 @@ import unittest
 
 import tests
 
-from mysql.connector.constants import ServerFlag, ClientFlag
+from mysql.connector.constants import ClientFlag, ServerFlag
+
 try:
     from _mysql_connector import MySQL, MySQLError, MySQLInterfaceError
+
     from mysql.connector import CMySQLConnection
 except ImportError:
     CEXT_MYSQL_AVAILABLE = False
@@ -65,23 +67,23 @@ def get_variables(cnx, pattern=None, variables=None, global_vars=False):
     """
 
     format_vars = {
-        'where_clause': '',
-        'where': '',
+        "where_clause": "",
+        "where": "",
     }
     ver = cnx.get_server_version()
     if ver >= (5, 7, 6):
-        table_global_vars = 'global_variables'
-        table_session_vars = 'session_variables'
-        format_vars['schema'] = 'performance_schema'
+        table_global_vars = "global_variables"
+        table_session_vars = "session_variables"
+        format_vars["schema"] = "performance_schema"
     else:
-        table_global_vars = 'GLOBAL_VARIABLES'
-        table_session_vars = 'SESSION_VARIABLES'
-        format_vars['schema'] = 'INFORMATION_SCHEMA'
+        table_global_vars = "GLOBAL_VARIABLES"
+        table_session_vars = "SESSION_VARIABLES"
+        format_vars["schema"] = "INFORMATION_SCHEMA"
 
     if global_vars is True:
-        format_vars['table'] = table_global_vars
+        format_vars["table"] = table_global_vars
     else:
-        format_vars['table'] = table_session_vars
+        format_vars["table"] = table_session_vars
 
     query = "SELECT * FROM {schema}.{table} {where} {where_clause}"
 
@@ -89,13 +91,15 @@ def get_variables(cnx, pattern=None, variables=None, global_vars=False):
     if pattern:
         where.append('VARIABLE_NAME LIKE "{0}"'.format(pattern))
     if variables:
-        where.append('VARIABLE_NAME IN ({0})'.format(
-            ','.join([ "'{0}'".format(name) for name in variables ])
-        ))
+        where.append(
+            "VARIABLE_NAME IN ({0})".format(
+                ",".join(["'{0}'".format(name) for name in variables])
+            )
+        )
 
     if where:
-        format_vars['where'] = 'WHERE'
-        format_vars['where_clause'] = ' OR '.join(where)
+        format_vars["where"] = "WHERE"
+        format_vars["where_clause"] = " OR ".join(where)
 
     cnx.query(query.format(**format_vars))
     result = {}
@@ -107,6 +111,7 @@ def get_variables(cnx, pattern=None, variables=None, global_vars=False):
 
     cnx.free_result()
     return result
+
 
 def fetch_rows(cnx, query=None):
     """Execute query and fetch first result set
@@ -135,6 +140,7 @@ def fetch_rows(cnx, query=None):
     cnx.free_result()
     return rows
 
+
 @unittest.skipIf(CEXT_MYSQL_AVAILABLE == False, "C Extension not available")
 class CExtMySQLTests(tests.MySQLConnectorTests):
     """Test the MySQL class in the C Extension"""
@@ -143,16 +149,21 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.config = tests.get_mysql_config()
 
         connect_args = [
-            "host", "user", "password", "database",
-            "port", "unix_socket", "client_flags"
+            "host",
+            "user",
+            "password",
+            "database",
+            "port",
+            "unix_socket",
+            "client_flags",
         ]
         self.connect_kwargs = {}
         for key, value in self.config.items():
             if key in connect_args:
                 self.connect_kwargs[key] = value
 
-        if 'client_flags' not in self.connect_kwargs:
-            self.connect_kwargs['client_flags'] = ClientFlag.get_default()
+        if "client_flags" not in self.connect_kwargs:
+            self.connect_kwargs["client_flags"] = ClientFlag.get_default()
 
     def test___init__(self):
         cmy = MySQL()
@@ -163,7 +174,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertEqual(True, cmy.buffered())
         self.assertEqual(True, cmy.raw())
 
-        exp = 'gbk'
+        exp = "gbk"
         cmy = MySQL(charset_name=exp)
         cmy.connect(**self.connect_kwargs)
         self.assertEqual(exp, cmy.character_set_name())
@@ -176,7 +187,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy.buffered(False)
         self.assertEqual(False, cmy.buffered())
 
-        self.assertRaises(TypeError, cmy.buffered, 'a')
+        self.assertRaises(TypeError, cmy.buffered, "a")
 
     def test_raw(self):
         cmy = MySQL()
@@ -186,7 +197,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy.raw(False)
         self.assertEqual(False, cmy.raw())
 
-        self.assertRaises(TypeError, cmy.raw, 'a')
+        self.assertRaises(TypeError, cmy.raw, "a")
 
     def test_connected(self):
         config = self.connect_kwargs.copy()
@@ -208,7 +219,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertTrue(cmy.ping())
 
         # Using TCP
-        config['unix_socket'] = None
+        config["unix_socket"] = None
         cmy.connect(**config)
         self.assertTrue(cmy.ping())
 
@@ -236,29 +247,31 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
     def test_escape_string(self):
         cases = [
-            ('new\nline', b'new\\nline'),
-            ('carriage\rreturn', b'carriage\\rreturn'),
-            ('control\x1aZ', b'control\\ZZ'),
+            ("new\nline", b"new\\nline"),
+            ("carriage\rreturn", b"carriage\\rreturn"),
+            ("control\x1aZ", b"control\\ZZ"),
             ("single'quote", b"single\\'quote"),
             ('double"quote', b'double\\"quote'),
-            ('back\slash', b'back\\\\slash'),
-            ('nul\0char', b'nul\\0char'),
-            (u"Kangxi⽃\0⽇", b'Kangxi\xe2\xbd\x83\\0\xe2\xbd\x87'),
-            (b'bytes\0ob\'j\n"ct\x1a', b'bytes\\0ob\\\'j\\n\\"ct\\Z'),
+            ("back\slash", b"back\\\\slash"),
+            ("nul\0char", b"nul\\0char"),
+            ("Kangxi⽃\0⽇", b"Kangxi\xe2\xbd\x83\\0\xe2\xbd\x87"),
+            (b"bytes\0ob'j\n\"ct\x1a", b"bytes\\0ob\\'j\\n\\\"ct\\Z"),
         ]
 
         cmy = MySQL()
         cmy.connect(**self.connect_kwargs)
 
-        unicode_string = u"Kangxi⽃\0⽇"
-        self.assertRaises(UnicodeEncodeError, cmy.escape_string, unicode_string)
+        unicode_string = "Kangxi⽃\0⽇"
+        self.assertRaises(
+            UnicodeEncodeError, cmy.escape_string, unicode_string
+        )
 
         cmy.set_character_set("UTF8")
 
         for value, exp in cases:
             self.assertEqual(exp, cmy.escape_string(value))
 
-        self.assertRaises(TypeError, cmy.escape_string, 1234);
+        self.assertRaises(TypeError, cmy.escape_string, 1234)
 
     def test_get_character_set_info(self):
         cmy = MySQL()
@@ -266,23 +279,34 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy.connect(**self.connect_kwargs)
 
         # We go by the default of MySQL, which is latin1/swedish_ci
-        exp = {'comment': '', 'name': 'latin1_swedish_ci',
-               'csname': 'latin1', 'mbmaxlen': 1, 'number': 8, 'mbminlen': 1}
+        exp = {
+            "comment": "",
+            "name": "latin1_swedish_ci",
+            "csname": "latin1",
+            "mbmaxlen": 1,
+            "number": 8,
+            "mbminlen": 1,
+        }
         result = cmy.get_character_set_info()
         # make 'comment' deterministic
-        result['comment'] = ''
+        result["comment"] = ""
         self.assertEqual(exp, result)
 
         cmy.query("SET NAMES utf8")
-        cmy.set_character_set('utf8')
+        cmy.set_character_set("utf8")
 
-        exp = {'comment': '', 'name': 'utf8_general_ci',
-               'mbmaxlen': 3, 'number': 33, 'mbminlen': 1}
-        exp_csname = 'utf8'
+        exp = {
+            "comment": "",
+            "name": "utf8_general_ci",
+            "mbmaxlen": 3,
+            "number": 33,
+            "mbminlen": 1,
+        }
+        exp_csname = "utf8"
         result = cmy.get_character_set_info()
         # make 'comment' deterministic
-        result['comment'] = ''
-        r_csname = result.pop('csname')
+        result["comment"] = ""
+        r_csname = result.pop("csname")
         self.maxDiff = None
         self.assertEqual(exp, result)
         self.assertIn(exp_csname, r_csname)
@@ -302,7 +326,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         version = cmy.get_server_version()
         info = cmy.get_server_info()
         self.assertIsInstance(info, str)
-        self.assertTrue(info.startswith('.'.join([str(v) for v in version])))
+        self.assertTrue(info.startswith(".".join([str(v) for v in version])))
 
     def test_get_server_version(self):
         cmy = MySQL()
@@ -335,14 +359,14 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy = MySQL(buffered=True)
         cmy.connect(**self.connect_kwargs)
 
-        cmy.select_db('mysql')
+        cmy.select_db("mysql")
         cmy.query("SELECT DATABASE()")
-        self.assertEqual('mysql', cmy.fetch_row()[0])
+        self.assertEqual("mysql", cmy.fetch_row()[0])
         cmy.free_result()
 
-        cmy.select_db('myconnpy')
+        cmy.select_db("myconnpy")
         cmy.query("SELECT DATABASE()")
-        self.assertEqual('myconnpy', cmy.fetch_row()[0])
+        self.assertEqual("myconnpy", cmy.fetch_row()[0])
         cmy.free_result()
 
     def test_affected_rows(self):
@@ -351,12 +375,14 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         table = "affected_rows"
 
-        cmy.select_db('myconnpy')
+        cmy.select_db("myconnpy")
         cmy.query("DROP TABLE IF EXISTS {0}".format(table))
         cmy.query("CREATE TABLE {0} (c1 INT, c2 INT)".format(table))
 
-        cmy.query("INSERT INTO {0} (c1, c2) VALUES "
-                  "(1, 10), (2, 20), (3, 30)".format(table))
+        cmy.query(
+            "INSERT INTO {0} (c1, c2) VALUES "
+            "(1, 10), (2, 20), (3, 30)".format(table)
+        )
         self.assertEqual(3, cmy.affected_rows())
 
         cmy.query("UPDATE {0} SET c2 = c2 + 1 WHERE c1 < 3".format(table))
@@ -373,7 +399,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         table = "field_count"
 
-        cmy.select_db('myconnpy')
+        cmy.select_db("myconnpy")
         cmy.query("DROP TABLE IF EXISTS {0}".format(table))
         cmy.query("CREATE TABLE {0} (c1 INT, c2 INT, c3 INT)".format(table))
 
@@ -381,8 +407,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertEqual(3, cmy.field_count())
         cmy.free_result()
 
-        cmy.query("INSERT INTO {0} (c1, c2, c3) VALUES "
-                  "(1, 10, 100)".format(table))
+        cmy.query(
+            "INSERT INTO {0} (c1, c2, c3) VALUES " "(1, 10, 100)".format(table)
+        )
         cmy.commit()
 
         cmy.query("SELECT * FROM {0}".format(table))
@@ -397,7 +424,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy2 = MySQL(buffered=True)
         cmy2.connect(**self.connect_kwargs)
 
-        self.assertRaises(ValueError, cmy1.autocommit, 'ham')
+        self.assertRaises(ValueError, cmy1.autocommit, "ham")
         self.assertRaises(ValueError, cmy1.autocommit, 1)
         self.assertRaises(ValueError, cmy1.autocommit, None)
 
@@ -415,8 +442,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         # Turn AUTOCOMMIT on
         cmy1.autocommit(True)
-        cmy1.query("INSERT INTO {0} (c1) VALUES "
-                   "(1), (2), (3)".format(table))
+        cmy1.query(
+            "INSERT INTO {0} (c1) VALUES " "(1), (2), (3)".format(table)
+        )
 
         cmy2.query("SELECT * FROM {0}".format(table))
         self.assertEqual(3, cmy2.num_rows())
@@ -424,8 +452,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         # Turn AUTOCOMMIT off
         cmy1.autocommit(False)
-        cmy1.query("INSERT INTO {0} (c1) VALUES "
-                   "(4), (5), (6)".format(table))
+        cmy1.query(
+            "INSERT INTO {0} (c1) VALUES " "(4), (5), (6)".format(table)
+        )
 
         cmy2.query("SELECT * FROM {0} WHERE c1 > 3".format(table))
         self.assertEqual([], fetch_rows(cmy2))
@@ -450,8 +479,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
 
         cmy1.query("START TRANSACTION")
-        cmy1.query("INSERT INTO {0} (c1) VALUES "
-                   "(1), (2), (3)".format(table))
+        cmy1.query(
+            "INSERT INTO {0} (c1) VALUES " "(1), (2), (3)".format(table)
+        )
 
         cmy2.query("SELECT * FROM {0}".format(table))
         self.assertEqual([], fetch_rows(cmy2))
@@ -471,42 +501,55 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         connect_kwargs = self.connect_kwargs.copy()
         cnx = CMySQLConnection(**connect_kwargs)
         users = [
-            {'user': 'user_native1',
-             'host': self.config['host'],
-             'port': self.config['port'],
-             'database': self.connect_kwargs['database'],
-             'password': 'native1_pass',
-             'auth_plugin': 'mysql_native_password'},
-            {'user': 'user_native2',
-             'host': self.config['host'],
-             'port': self.config['port'],
-             'database': self.connect_kwargs['database'],
-             'password': 'native2_pass',
-             'auth_plugin': 'mysql_native_password'},
-            {'user': 'user_sha2561',
-             'host': self.config['host'],
-             'port': self.config['port'],
-             'database': self.connect_kwargs['database'],
-             'password': 'sha2561_pass',
-             'auth_plugin': 'sha256_password'},
-            {'user': 'user_sha2562',
-             'host': self.config['host'],
-             'port': self.config['port'],
-             'database': self.connect_kwargs['database'],
-             'password': 'sha2562_pass',
-             'auth_plugin': 'sha256_password'},
-            {'user': 'user_caching1',
-             'host': self.config['host'],
-             'port': self.config['port'],
-             'database': self.connect_kwargs['database'],
-             'password': 'caching1_pass',
-             'auth_plugin': 'caching_sha2_password'},
-            {'user': 'user_caching2',
-             'host': self.config['host'],
-             'port': self.config['port'],
-             'database': self.connect_kwargs['database'],
-             'password': 'caching2_pass',
-             'auth_plugin': 'caching_sha2_password'}]
+            {
+                "user": "user_native1",
+                "host": self.config["host"],
+                "port": self.config["port"],
+                "database": self.connect_kwargs["database"],
+                "password": "native1_pass",
+                "auth_plugin": "mysql_native_password",
+            },
+            {
+                "user": "user_native2",
+                "host": self.config["host"],
+                "port": self.config["port"],
+                "database": self.connect_kwargs["database"],
+                "password": "native2_pass",
+                "auth_plugin": "mysql_native_password",
+            },
+            {
+                "user": "user_sha2561",
+                "host": self.config["host"],
+                "port": self.config["port"],
+                "database": self.connect_kwargs["database"],
+                "password": "sha2561_pass",
+                "auth_plugin": "sha256_password",
+            },
+            {
+                "user": "user_sha2562",
+                "host": self.config["host"],
+                "port": self.config["port"],
+                "database": self.connect_kwargs["database"],
+                "password": "sha2562_pass",
+                "auth_plugin": "sha256_password",
+            },
+            {
+                "user": "user_caching1",
+                "host": self.config["host"],
+                "port": self.config["port"],
+                "database": self.connect_kwargs["database"],
+                "password": "caching1_pass",
+                "auth_plugin": "caching_sha2_password",
+            },
+            {
+                "user": "user_caching2",
+                "host": self.config["host"],
+                "port": self.config["port"],
+                "database": self.connect_kwargs["database"],
+                "password": "caching2_pass",
+                "auth_plugin": "caching_sha2_password",
+            },
+        ]
 
         # create users
         if tests.MYSQL_VERSION < (8, 0, 0):
@@ -520,69 +563,89 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             except:
                 pass
             if tests.MYSQL_VERSION > (5, 7, 0):
-                stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED "
-                        "WITH {auth_plugin} BY '{password}'").format(**new_user)
+                stmt = (
+                    "CREATE USER '{user}'@'{host}' IDENTIFIED "
+                    "WITH {auth_plugin} BY '{password}'"
+                ).format(**new_user)
                 cnx.cmd_query(stmt)
             else:
-                stmt = ("CREATE USER '{user}'@'{host}' IDENTIFIED "
-                        "WITH {auth_plugin}").format(**new_user)
+                stmt = (
+                    "CREATE USER '{user}'@'{host}' IDENTIFIED "
+                    "WITH {auth_plugin}"
+                ).format(**new_user)
                 cnx.cmd_query(stmt)
-                if new_user["auth_plugin"] == 'mysql_native_password':
+                if new_user["auth_plugin"] == "mysql_native_password":
                     cnx.cmd_query("SET old_passwords = 0")
                 else:
                     cnx.cmd_query("SET old_passwords = 2")
-                cnx.cmd_query("SET PASSWORD FOR '{user}'@'{host}' = "
-                              "PASSWORD('{password}')".format(**new_user))
+                cnx.cmd_query(
+                    "SET PASSWORD FOR '{user}'@'{host}' = "
+                    "PASSWORD('{password}')".format(**new_user)
+                )
 
-            stmt = ("CREATE USER IF NOT EXISTS '{user}'@'{host}' IDENTIFIED "
-                    "WITH {auth_plugin} BY '{password}'").format(**new_user)
+            stmt = (
+                "CREATE USER IF NOT EXISTS '{user}'@'{host}' IDENTIFIED "
+                "WITH {auth_plugin} BY '{password}'"
+            ).format(**new_user)
 
-            cnx.cmd_query("GRANT ALL PRIVILEGES ON {database}.* TO '{user}'@'{host}'"
-                          "".format(**new_user))
+            cnx.cmd_query(
+                "GRANT ALL PRIVILEGES ON {database}.* TO '{user}'@'{host}'"
+                "".format(**new_user)
+            )
 
         # test users connect
         for user in new_users:
             conn_args = user.copy()
             try:
-                connect_kwargs.pop('auth_plugin')
+                connect_kwargs.pop("auth_plugin")
             except:
                 pass
             cnx_test = CMySQLConnection(**conn_args)
             cnx_test.cmd_query("SELECT USER()")
             current_user = cnx_test.get_rows()[0][0][0]
-            self.assertTrue(u"{user}@".format(**user) in current_user)
+            self.assertTrue("{user}@".format(**user) in current_user)
             cnx_test.close()
 
         # tests change user
         if tests.MYSQL_VERSION < (8, 0, 0):
             # 5.6 does noy suport caching_sha2_password auth plugin
-            test_cases = [(0, 1), (1, 2), (2,3), (3, 0)]
+            test_cases = [(0, 1), (1, 2), (2, 3), (3, 0)]
         else:
-            test_cases = [(0, 1), (1, 2), (2,3), (3, 0), (3, 4), (4, 5), (5, 3),
-                          (5, 0)]
+            test_cases = [
+                (0, 1),
+                (1, 2),
+                (2, 3),
+                (3, 0),
+                (3, 4),
+                (4, 5),
+                (5, 3),
+                (5, 0),
+            ]
         for user1, user2 in test_cases:
             conn_args_user1 = users[user1].copy()
             try:
-                conn_args_user1.pop('auth_plugin')
+                conn_args_user1.pop("auth_plugin")
             except:
                 pass
             if tests.MYSQL_VERSION < (8, 0, 0):
                 # change user does not work in 5.x with charset utf8mb4
-                conn_args_user1['charset'] = 'utf8'
+                conn_args_user1["charset"] = "utf8"
 
             cnx_test = CMySQLConnection(**conn_args_user1)
             cnx_test.cmd_query("SELECT USER()")
             current_user = cnx_test.get_rows()[0][0][0]
-            self.assertTrue(u"{user}@".format(**users[user1]) in current_user)
+            self.assertTrue("{user}@".format(**users[user1]) in current_user)
 
-            cnx_test.cmd_change_user(users[user2]['user'],
-                                     users[user2]['password'],
-                                     users[user2]['database'])
+            cnx_test.cmd_change_user(
+                users[user2]["user"],
+                users[user2]["password"],
+                users[user2]["database"],
+            )
             cnx_test.cmd_query("SELECT USER()")
             rows = cnx_test.get_rows()
             current_user = rows[0][0][0]
-            self.assertNotEqual(user['user'], current_user)
-            self.assertTrue(u"{user}@".format(**users[user2]) in current_user)
+            self.assertNotEqual(user["user"], current_user)
+            self.assertTrue("{user}@".format(**users[user2]) in current_user)
             cnx_test.close()
 
         # cleanup users
@@ -598,43 +661,51 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy1.connect(**self.connect_kwargs)
 
-        self.assertEqual('latin1', cmy1.character_set_name())
+        self.assertEqual("latin1", cmy1.character_set_name())
 
     def test_set_character_set(self):
         cmy1 = MySQL(buffered=True)
-        self.assertRaises(MySQLInterfaceError, cmy1.set_character_set, 'latin2')
+        self.assertRaises(
+            MySQLInterfaceError, cmy1.set_character_set, "latin2"
+        )
 
         cmy1.connect(**self.connect_kwargs)
         orig = cmy1.character_set_name()
 
-        cmy1.set_character_set('utf8')
+        cmy1.set_character_set("utf8")
         charset = cmy1.character_set_name()
         self.assertNotEqual(orig, charset)
-        self.assertIn('utf8', charset)
+        self.assertIn("utf8", charset)
 
-        self.assertRaises(MySQLInterfaceError,
-                          cmy1.set_character_set, 'ham_spam')
+        self.assertRaises(
+            MySQLInterfaceError, cmy1.set_character_set, "ham_spam"
+        )
 
-        variables = ('character_set_connection',)
-        exp = 'utf8'
+        variables = ("character_set_connection",)
+        exp = "utf8"
         self.assertIn(
             exp,
-            get_variables(cmy1, variables=variables)['character_set_connection'])
+            get_variables(cmy1, variables=variables)[
+                "character_set_connection"
+            ],
+        )
 
-        exp = {'character_set_connection': 'big5'}
-        cmy1.set_character_set('big5')
+        exp = {"character_set_connection": "big5"}
+        cmy1.set_character_set("big5")
         self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
-        exp = {'character_set_connection': 'utf8mb3'}
-        cmy1.set_character_set('utf8mb3')
-        if (tests.MYSQL_VERSION >= (8, 0, 0)):
+        exp = {"character_set_connection": "utf8mb3"}
+        cmy1.set_character_set("utf8mb3")
+        if tests.MYSQL_VERSION >= (8, 0, 0):
             self.assertEqual(exp, get_variables(cmy1, variables=variables))
         else:
-            exp = {'character_set_connection': 'utf8'}
+            exp = {"character_set_connection": "utf8"}
             self.assertEqual(exp, get_variables(cmy1, variables=variables))
 
-    @unittest.skipIf(tests.MYSQL_VERSION == (5, 7, 4),
-                     "test_get_ssl_cipher not tested with MySQL version 5.7.4")
+    @unittest.skipIf(
+        tests.MYSQL_VERSION == (5, 7, 4),
+        "test_get_ssl_cipher not tested with MySQL version 5.7.4",
+    )
     def test_get_ssl_cipher(self):
         cmy1 = MySQL(buffered=True)
         self.assertRaises(MySQLInterfaceError, cmy1.get_ssl_cipher)
@@ -649,22 +720,20 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         table = "hex_string"
 
         cases = {
-            'utf8': [
-                (u'ham', b"X'68616D'"),
+            "utf8": [
+                ("ham", b"X'68616D'"),
             ],
-            'big5': [
-                (u'\u5C62', b"X'B9F0'")
+            "big5": [("\u5C62", b"X'B9F0'")],
+            "sjis": [
+                ("\u005c", b"X'5C'"),
             ],
-            'sjis': [
-                (u'\u005c', b"X'5C'"),
+            "gbk": [
+                ("赵孟頫", b"X'D5D4C3CFEE5C'"),
+                ("赵\孟\頫\\", b"X'D5D45CC3CF5CEE5C5C'"),
+                ("遜", b"X'DF64'"),
             ],
-            'gbk': [
-                (u'赵孟頫', b"X'D5D4C3CFEE5C'"),
-                (u'赵\孟\頫\\', b"X'D5D45CC3CF5CEE5C5C'"),
-                (u'遜', b"X'DF64'")
-            ],
-            'ascii': [
-                ('\x5c\x00\x5c', b"X'5C005C'"),
+            "ascii": [
+                ("\x5c\x00\x5c", b"X'5C005C'"),
             ],
         }
 
@@ -672,12 +741,14 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         def create_table(charset):
             cmy.query("DROP TABLE IF EXISTS {0}".format(table))
-            cmy.query("CREATE TABLE {0} (id INT, "
-                      "c1 VARCHAR(400)) CHARACTER SET {1}".format(
-                table, charset))
+            cmy.query(
+                "CREATE TABLE {0} (id INT, "
+                "c1 VARCHAR(400)) CHARACTER SET {1}".format(table, charset)
+            )
 
         insert = "INSERT INTO {0} (id, c1) VALUES ({{id}}, {{hex}})".format(
-            table)
+            table
+        )
         select = "SELECT c1 FROM {0} WHERE id = {{id}}".format(table)
 
         for encoding, data in cases.items():
@@ -693,8 +764,11 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                     fetched = fetch_rows(cmy)[0][0]
                 except UnicodeEncodeError:
                     self.fail("Could not encode {0}".format(encoding))
-                self.assertEqual(case, fetched,
-                                 "Failed with case {0}/{1}".format(i, encoding))
+                self.assertEqual(
+                    case,
+                    fetched,
+                    "Failed with case {0}/{1}".format(i, encoding),
+                )
 
         cmy.query("DROP TABLE IF EXISTS {0}".format(table))
 
@@ -740,7 +814,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         version = cmy.get_client_version()
         self.assertTrue(isinstance(version, tuple))
-        self.assertTrue(all([ isinstance(v, int) for v in version]))
+        self.assertTrue(all([isinstance(v, int) for v in version]))
 
     def test_get_host_info(self):
         config = self.connect_kwargs.copy()
@@ -749,14 +823,14 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy.connect(**config)
 
-        if os.name == 'posix' and not tests.MYSQL_EXTERNAL_SERVER:
+        if os.name == "posix" and not tests.MYSQL_EXTERNAL_SERVER:
             # On POSIX systems we would be connected by UNIX socket
-            self.assertTrue('via UNIX socket' in cmy.get_host_info())
+            self.assertTrue("via UNIX socket" in cmy.get_host_info())
 
         # Connect using TCP/IP
-        config['unix_socket'] = None
+        config["unix_socket"] = None
         cmy.connect(**config)
-        self.assertTrue('via TCP/IP' in cmy.get_host_info())
+        self.assertTrue("via TCP/IP" in cmy.get_host_info())
 
     def test_query(self):
         config = self.connect_kwargs.copy()
@@ -767,11 +841,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         self.assertRaises(MySQLInterfaceError, cmy.query, "SELECT spam")
 
-
         self.assertTrue(cmy.query("SET @ham = 4"))
         self.assertEqual(None, cmy.num_fields())
         self.assertEqual(0, cmy.field_count())
-
 
         self.assertTrue(cmy.query("SELECT @ham"))
         self.assertEqual(4, cmy.fetch_row()[0])
@@ -781,7 +853,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertTrue(cmy.query("SELECT 'ham', 'spam', 5", raw=True))
         row = cmy.fetch_row()
         self.assertTrue(isinstance(row[0], bytearray))
-        self.assertEqual(bytearray(b'spam'), row[1])
+        self.assertEqual(bytearray(b"spam"), row[1])
         self.assertEqual(None, cmy.fetch_row())
         cmy.free_result()
 
@@ -792,18 +864,14 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertEqual(0, cmy.st_server_status())
 
         cmy.connect(**config)
-        self.assertTrue(
-            cmy.st_server_status() & ServerFlag.STATUS_AUTOCOMMIT)
+        self.assertTrue(cmy.st_server_status() & ServerFlag.STATUS_AUTOCOMMIT)
         cmy.autocommit(False)
-        self.assertFalse(
-            cmy.st_server_status() & ServerFlag.STATUS_AUTOCOMMIT)
+        self.assertFalse(cmy.st_server_status() & ServerFlag.STATUS_AUTOCOMMIT)
 
         cmy.query("START TRANSACTION")
-        self.assertTrue(
-            cmy.st_server_status() & ServerFlag.STATUS_IN_TRANS)
+        self.assertTrue(cmy.st_server_status() & ServerFlag.STATUS_IN_TRANS)
         cmy.query("ROLLBACK")
-        self.assertFalse(
-            cmy.st_server_status() & ServerFlag.STATUS_IN_TRANS)
+        self.assertFalse(cmy.st_server_status() & ServerFlag.STATUS_IN_TRANS)
 
     def test_rollback(self):
         cmy1 = MySQL(buffered=True)
@@ -817,16 +885,18 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
 
         cmy1.query("START TRANSACTION")
-        cmy1.query("INSERT INTO {0} (c1) VALUES "
-                   "(1), (2), (3)".format(table))
+        cmy1.query(
+            "INSERT INTO {0} (c1) VALUES " "(1), (2), (3)".format(table)
+        )
         cmy1.commit()
 
         cmy2.query("SELECT * FROM {0}".format(table))
         self.assertEqual([(1,), (2,), (3,)], fetch_rows(cmy2))
 
         cmy1.query("START TRANSACTION")
-        cmy1.query("INSERT INTO {0} (c1) VALUES "
-                   "(4), (5), (6)".format(table))
+        cmy1.query(
+            "INSERT INTO {0} (c1) VALUES " "(4), (5), (6)".format(table)
+        )
         cmy1.rollback()
 
         cmy2.query("SELECT * FROM {0}".format(table))
@@ -849,14 +919,10 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             "INSERT INTO {0} () VALUES ()".format(table),
             "SELECT 'SPAM'",
         )
-        exp = [
-            [('HAM',)],
-            {'insert_id': 1, 'affected': 1},
-            [('SPAM',)]
-        ]
+        exp = [[("HAM",)], {"insert_id": 1, "affected": 1}, [("SPAM",)]]
 
         result = []
-        have_more = cmy.query(';'.join(queries))
+        have_more = cmy.query(";".join(queries))
         self.assertTrue(have_more)
         while have_more:
             if cmy.have_result_set:
@@ -867,10 +933,12 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                     row = cmy.fetch_row()
                 result.append(rows)
             else:
-                result.append({
-                    "affected": cmy.affected_rows(),
-                    "insert_id": cmy.insert_id()
-                })
+                result.append(
+                    {
+                        "affected": cmy.affected_rows(),
+                        "insert_id": cmy.insert_id(),
+                    }
+                )
             have_more = cmy.next_result()
 
         self.assertEqual(exp, result)

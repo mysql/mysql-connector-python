@@ -30,11 +30,13 @@
 
 try:
     import ssl
+
     SSL_AVAILABLE = True
     TLS_VERSIONS = {
         "TLSv1": ssl.PROTOCOL_TLSv1,
         "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
-        "TLSv1.2": ssl.PROTOCOL_TLSv1_2}
+        "TLSv1.2": ssl.PROTOCOL_TLSv1_2,
+    }
     # TLSv1.3 included in PROTOCOL_TLS, but PROTOCOL_TLS is not included on 3.4
     if hasattr(ssl, "PROTOCOL_TLS"):
         TLS_VERSIONS["TLSv1.3"] = ssl.PROTOCOL_TLS  # pylint: disable=E1101
@@ -48,21 +50,21 @@ except:
     SSL_AVAILABLE = False
     TLS_V1_3_SUPPORTED = False
 
-import sys
-import socket
 import logging
-import uuid
+import os
 import platform
 import queue
-import os
 import random
 import re
+import socket
+import sys
 import threading
+import uuid
 import warnings
 
 try:
-    import dns.resolver
     import dns.exception
+    import dns.resolver
 except ImportError:
     HAVE_DNSPYTHON = False
 else:
@@ -71,36 +73,52 @@ else:
 from datetime import datetime, timedelta
 from functools import wraps
 
-from .authentication import (MySQL41AuthPlugin, PlainAuthPlugin,
-                             Sha256MemoryAuthPlugin)
-# pylint: disable=W0622
-from .errors import (InterfaceError, NotSupportedError, OperationalError,
-                     PoolError, ProgrammingError, TimeoutError)
+from .authentication import (
+    MySQL41AuthPlugin,
+    PlainAuthPlugin,
+    Sha256MemoryAuthPlugin,
+)
+from .constants import COMPRESSION_ALGORITHMS, Auth, SSLMode
 from .crud import Schema
-from .constants import SSLMode, Auth, COMPRESSION_ALGORITHMS
+
+# pylint: disable=W0622
+from .errors import (
+    InterfaceError,
+    NotSupportedError,
+    OperationalError,
+    PoolError,
+    ProgrammingError,
+    TimeoutError,
+)
 from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
-from .protocol import (Protocol, MessageReader, MessageWriter, HAVE_LZ4,
-                       HAVE_ZSTD)
-from .result import BaseResult, Result, RowResult, SqlResult, DocResult
-from .statement import SqlStatement, AddStatement, quote_identifier
 from .protobuf import Protobuf
+from .protocol import (
+    HAVE_LZ4,
+    HAVE_ZSTD,
+    MessageReader,
+    MessageWriter,
+    Protocol,
+)
+from .result import BaseResult, DocResult, Result, RowResult, SqlResult
+from .statement import AddStatement, SqlStatement, quote_identifier
 
 # pylint: disable=C0411,C0413
 sys.path.append("..")
 from mysql.connector.utils import linux_distribution
-from mysql.connector.version import VERSION, LICENSE
-
+from mysql.connector.version import LICENSE, VERSION
 
 _CONNECT_TIMEOUT = 10000  # Default connect timeout in milliseconds
 _DROP_DATABASE_QUERY = "DROP DATABASE IF EXISTS {0}"
 _CREATE_DATABASE_QUERY = "CREATE DATABASE IF NOT EXISTS {0}"
-_SELECT_SCHEMA_NAME_QUERY = ("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA."
-                             "SCHEMATA WHERE SCHEMA_NAME = '{}'")
+_SELECT_SCHEMA_NAME_QUERY = (
+    "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA."
+    "SCHEMATA WHERE SCHEMA_NAME = '{}'"
+)
 _SELECT_VERSION_QUERY = "SELECT @@version"
 
 _CNX_POOL_MAXSIZE = 99
 _CNX_POOL_MAX_NAME_SIZE = 120
-_CNX_POOL_NAME_REGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')
+_CNX_POOL_NAME_REGEX = re.compile(r"[^a-zA-Z0-9._:\-*$#]")
 _CNX_POOL_MAX_IDLE_TIME = 2147483
 _CNX_POOL_QUEUE_TIMEOUT = 2147483
 
@@ -113,31 +131,29 @@ _PENALTY_WRONG_PASSW = 60 * 60 * 24
 _PENALTY_RESTARTING = 60
 _TIMEOUT_PENALTIES = {
     # Server denays service e.g Max connections reached
-    "[WinError 10053]": _PENALTY_MAXED_OUT, # Established connection was aborted
-    "[Errno 32]": _PENALTY_MAXED_OUT, # Broken pipe
+    "[WinError 10053]": _PENALTY_MAXED_OUT,  # Established connection was aborted
+    "[Errno 32]": _PENALTY_MAXED_OUT,  # Broken pipe
     # Server is Offline
-    "[WinError 10061]": _PENALTY_SERVER_OFFLINE, # Target machine actively refused it
-    "[Errno 111]": _PENALTY_SERVER_OFFLINE, # Connection refused
+    "[WinError 10061]": _PENALTY_SERVER_OFFLINE,  # Target machine actively refused it
+    "[Errno 111]": _PENALTY_SERVER_OFFLINE,  # Connection refused
     # Host is offline:
-    "[WinError 10060]": _PENALTY_CONN_TIMEOUT, # Not respond after a period of time
+    "[WinError 10060]": _PENALTY_CONN_TIMEOUT,  # Not respond after a period of time
     # No route to Host:
-    "[Errno 11001]": _PENALTY_NO_ADD_INFO,# getaddrinfo failed
-    "[Errno -2]": _PENALTY_NO_ADD_INFO, # Name or service not known
+    "[Errno 11001]": _PENALTY_NO_ADD_INFO,  # getaddrinfo failed
+    "[Errno -2]": _PENALTY_NO_ADD_INFO,  # Name or service not known
     # Wrong Password
-    "Access denied": _PENALTY_WRONG_PASSW
+    "Access denied": _PENALTY_WRONG_PASSW,
 }
-_TIMEOUT_PENALTIES_BY_ERR_NO = {
-    1053: _PENALTY_RESTARTING
-}
+_TIMEOUT_PENALTIES_BY_ERR_NO = {1053: _PENALTY_RESTARTING}
 CONNECTION_CLOSED_ERROR = {
-    1810: 'This session was closed because the connection has been idle for too '
-          'long. Use "mysqlx.getSession()" or "mysqlx.getClient()" to create a '
-          'new one.',
-    1053: 'This session was closed because the server is shutting down.',
-    3169: 'This session was closed because the connection has been killed in a '
-          'different session. Use "mysqlx.getSession()" or "mysqlx.getClient()" '
-          'to create a new one.',
-};
+    1810: "This session was closed because the connection has been idle for too "
+    'long. Use "mysqlx.getSession()" or "mysqlx.getClient()" to create a '
+    "new one.",
+    1053: "This session was closed because the server is shutting down.",
+    3169: "This session was closed because the connection has been killed in a "
+    'different session. Use "mysqlx.getSession()" or "mysqlx.getClient()" '
+    "to create a new one.",
+}
 _LOGGER = logging.getLogger("mysqlx")
 
 
@@ -179,8 +195,10 @@ def update_timeout_penalties_by_error(penalty_dict):
     if penalty_dict and isinstance(penalty_dict, dict):
         _TIMEOUT_PENALTIES_BY_ERR_NO.update(penalty_dict)
 
-class SocketStream(object):
+
+class SocketStream:
     """Implements a socket stream."""
+
     def __init__(self):
         self._socket = None
         self._is_ssl = False
@@ -259,8 +277,16 @@ class SocketStream(object):
     def __del__(self):
         self.close()
 
-    def set_ssl(self, ssl_protos, ssl_mode, ssl_ca, ssl_crl, ssl_cert, ssl_key,
-                ssl_ciphers):
+    def set_ssl(
+        self,
+        ssl_protos,
+        ssl_mode,
+        ssl_ca,
+        ssl_crl,
+        ssl_cert,
+        ssl_key,
+        ssl_ciphers,
+    ):
         """Set SSL parameters.
 
         Args:
@@ -290,8 +316,11 @@ class SocketStream(object):
         else:
             ssl_protos.sort(reverse=True)
             tls_version = ssl_protos[0]
-            if not TLS_V1_3_SUPPORTED and \
-               tls_version == "TLSv1.3" and len(ssl_protos) > 1:
+            if (
+                not TLS_V1_3_SUPPORTED
+                and tls_version == "TLSv1.3"
+                and len(ssl_protos) > 1
+            ):
                 tls_version = ssl_protos[1]
             ssl_protocol = TLS_VERSIONS[tls_version]
             context = ssl.SSLContext(ssl_protocol)
@@ -328,20 +357,23 @@ class SocketStream(object):
                 raise InterfaceError("Invalid Certificate/Key: {}".format(err))
 
         if ssl_ciphers:
-            context.set_ciphers(":".join(iani_to_openssl_cs_name(ssl_protos[0],
-                                                                 ssl_ciphers)))
+            context.set_ciphers(
+                ":".join(iani_to_openssl_cs_name(ssl_protos[0], ssl_ciphers))
+            )
         try:
-            self._socket = context.wrap_socket(self._socket,
-                                               server_hostname=self._host)
+            self._socket = context.wrap_socket(
+                self._socket, server_hostname=self._host
+            )
         except ssl.CertificateError as err:
             raise InterfaceError(str(err))
         if ssl_mode == SSLMode.VERIFY_IDENTITY:
             context.check_hostname = True
             hostnames = []
             # Windows does not return loopback aliases on gethostbyaddr
-            if os.name == 'nt' and (self._host == 'localhost' or \
-               self._host == '127.0.0.1'):
-                hostnames = ['localhost', '127.0.0.1']
+            if os.name == "nt" and (
+                self._host == "localhost" or self._host == "127.0.0.1"
+            ):
+                hostnames = ["localhost", "127.0.0.1"]
             aliases = socket.gethostbyaddr(self._host)
             hostnames.extend([aliases[0]] + aliases[1])
             match_found = False
@@ -356,8 +388,10 @@ class SocketStream(object):
                     break
             if not match_found:
                 self.close()
-                raise InterfaceError("Unable to verify server identity: {}"
-                                     "".format(", ".join(errs)))
+                raise InterfaceError(
+                    "Unable to verify server identity: {}"
+                    "".format(", ".join(errs))
+                )
 
         self._is_ssl = True
 
@@ -411,12 +445,15 @@ def catch_network_exception(func):
         :class:`mysqlx.InterfaceError`: If `socket.Error` or `RuntimeError`
                                         is raised.
     """
+
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         """Wrapper function."""
         try:
-            if isinstance(self, (Connection, PooledConnection)) and \
-               self.is_server_disconnected():
+            if (
+                isinstance(self, (Connection, PooledConnection))
+                and self.is_server_disconnected()
+            ):
                 raise InterfaceError(*self.get_disconnected_reason())
             result = func(self, *args, **kwargs)
             if isinstance(result, BaseResult):
@@ -424,27 +461,44 @@ def catch_network_exception(func):
                 for warning in warnings:
                     if warning["code"] in CONNECTION_CLOSED_ERROR:
                         error_msg = CONNECTION_CLOSED_ERROR[warning["code"]]
-                        reason = ("Connection close: {}: {}"
-                                  "".format(warning["msg"], error_msg), warning["code"])
+                        reason = (
+                            "Connection close: {}: {}"
+                            "".format(warning["msg"], error_msg),
+                            warning["code"],
+                        )
                         if isinstance(self, (Connection, PooledConnection)):
                             self.set_server_disconnected(reason)
                         break
             return result
-        except (socket.error, ConnectionResetError, ConnectionAbortedError, InterfaceError,
-                RuntimeError, TimeoutError) as err:
-            if func.__name__ == 'get_column_metadata' and args and \
-               isinstance(args[0], SqlResult):
+        except (
+            socket.error,
+            ConnectionResetError,
+            ConnectionAbortedError,
+            InterfaceError,
+            RuntimeError,
+            TimeoutError,
+        ) as err:
+            if (
+                func.__name__ == "get_column_metadata"
+                and args
+                and isinstance(args[0], SqlResult)
+            ):
                 warnings = args[0].get_warnings()
                 if warnings:
                     warning = warnings[0]
                     error_msg = CONNECTION_CLOSED_ERROR[warning["code"]]
-                    reason = ("Connection close: {}: {}"
-                              "".format(warning["msg"], error_msg), warning["code"])
+                    reason = (
+                        "Connection close: {}: {}"
+                        "".format(warning["msg"], error_msg),
+                        warning["code"],
+                    )
                     if isinstance(self, PooledConnection):
                         self.pool.remove_connections()
                         # pool must be listed as faulty if server is shutting down
                         if warning["code"] == 1053:
-                            PoolsManager().set_pool_unavailable(self.pool, InterfaceError(*reason))
+                            PoolsManager().set_pool_unavailable(
+                                self.pool, InterfaceError(*reason)
+                            )
                     if isinstance(self, (Connection, PooledConnection)):
                         self.set_server_disconnected(reason)
                     self.disconnect()
@@ -455,6 +509,7 @@ def catch_network_exception(func):
             else:
                 self.disconnect()
                 raise
+
     return wrapper
 
 
@@ -465,6 +520,7 @@ class Router(dict):
        settings (dict): Dictionary with connection settings
     .. versionadded:: 8.0.20
     """
+
     def __init__(self, connection_params):
         self.update(connection_params)
         self["available"] = self.get("available", True)
@@ -478,8 +534,7 @@ class Router(dict):
         return self["available"]
 
     def set_unavailable(self):
-        """Sets this Router unavailable to open connections.
-        """
+        """Sets this Router unavailable to open connections."""
         self["available"] = False
 
     def get_connection_params(self):
@@ -493,7 +548,7 @@ class Router(dict):
         return (self["host"], self["port"])
 
 
-class RouterManager():
+class RouterManager:
     """Manages the connection parameters of all the routers.
 
     Args:
@@ -501,6 +556,7 @@ class RouterManager():
         settings (dict): Dictionary with connection settings.
     .. versionadded:: 8.0.20
     """
+
     def __init__(self, routers, settings):
         self._routers = routers
         self._settings = settings
@@ -525,13 +581,17 @@ class RouterManager():
                 priority_count += 1
                 router["priority"] = 100
             elif priority > 100:
-                raise ProgrammingError("The priorities must be between 0 and "
-                                       "100", 4007)
+                raise ProgrammingError(
+                    "The priorities must be between 0 and " "100", 4007
+                )
 
         if 0 < priority_count < len(self._routers):
-            raise ProgrammingError("You must either assign no priority to any "
-                                   "of the routers or give a priority for "
-                                   "every router", 4000)
+            raise ProgrammingError(
+                "You must either assign no priority to any "
+                "of the routers or give a priority for "
+                "every router",
+                4000,
+            )
 
         self._routers.sort(key=lambda x: x["priority"], reverse=True)
 
@@ -598,17 +658,23 @@ class RouterManager():
         while search:
             router = self._get_random_connection_params(cur_priority)
 
-            if router is not None or \
-               self._cur_priority_idx >= routers_priority_len:
-                if self._cur_priority_idx == routers_priority_len -1 and \
-                    len(self._get_available_routers(cur_priority)) < 2:
+            if (
+                router is not None
+                or self._cur_priority_idx >= routers_priority_len
+            ):
+                if (
+                    self._cur_priority_idx == routers_priority_len - 1
+                    and len(self._get_available_routers(cur_priority)) < 2
+                ):
                     self._can_failover = False
                 break
 
             # Search on next group
             self._cur_priority_idx += 1
             if self._cur_priority_idx < routers_priority_len:
-                cur_priority = self.routers_priority_list[self._cur_priority_idx]
+                cur_priority = self.routers_priority_list[
+                    self._cur_priority_idx
+                ]
 
         return router
 
@@ -621,12 +687,13 @@ class RouterManager():
         return self._routers_directory
 
 
-class Connection(object):
+class Connection:
     """Connection to a MySQL Server.
 
     Args:
         settings (dict): Dictionary with connection settings.
     """
+
     def __init__(self, settings):
         self.settings = settings
         self.stream = SocketStream()
@@ -639,14 +706,17 @@ class Connection(object):
         self._routers = settings.get("routers", [])
 
         if "host" in settings and settings["host"]:
-            self._routers.append({
-                "host": settings.get("host"),
-                "port": settings.get("port", None)
-            })
+            self._routers.append(
+                {
+                    "host": settings.get("host"),
+                    "port": settings.get("port", None),
+                }
+            )
 
         self.router_manager = RouterManager(self._routers, settings)
-        self._connect_timeout = settings.get("connect-timeout",
-                                             _CONNECT_TIMEOUT)
+        self._connect_timeout = settings.get(
+            "connect-timeout", _CONNECT_TIMEOUT
+        )
         if self._connect_timeout == 0:
             # None is assigned if connect timeout is 0, which disables timeouts
             # on socket operations
@@ -688,17 +758,22 @@ class Connection(object):
         while self.router_manager.can_failover():
             try:
                 router = self.router_manager.get_next_router()
-                self.stream.connect(router.get_connection_params(),
-                                    self._connect_timeout)
+                self.stream.connect(
+                    router.get_connection_params(), self._connect_timeout
+                )
                 reader = MessageReader(self.stream)
                 writer = MessageWriter(self.stream)
                 self.protocol = Protocol(reader, writer)
 
                 caps_data = self.protocol.get_capabilites().capabilities
-                caps = {
-                    get_item_or_attr(cap, "name").lower():
-                        cap for cap in caps_data
-                } if caps_data else {}
+                caps = (
+                    {
+                        get_item_or_attr(cap, "name").lower(): cap
+                        for cap in caps_data
+                    }
+                    if caps_data
+                    else {}
+                )
 
                 # Set TLS capabilities
                 self._set_tls_capabilities(caps)
@@ -707,15 +782,19 @@ class Connection(object):
                 if "attributes" in self.settings:
                     conn_attrs = self.settings["attributes"]
                     self.protocol.set_capabilities(
-                        session_connect_attrs=conn_attrs)
+                        session_connect_attrs=conn_attrs
+                    )
 
                 # Set compression capabilities
                 compression = self.settings.get("compression", "preferred")
                 algorithms = self.settings.get("compression-algorithms")
-                algorithm = None if compression == "disabled" \
-                    else self._set_compression_capabilities(caps,
-                                                            compression,
-                                                            algorithms)
+                algorithm = (
+                    None
+                    if compression == "disabled"
+                    else self._set_compression_capabilities(
+                        caps, compression, algorithms
+                    )
+                )
                 self._authenticate()
                 self.protocol.set_compression(algorithm)
                 return
@@ -728,16 +807,21 @@ class Connection(object):
         # or errno.EINPROGRESS (115) if connect-timeout value is too low
         if error is not None and isinstance(error, socket.timeout):
             if len(self._routers) <= 1:
-                raise TimeoutError("Connection attempt to the server was "
-                                   "aborted. Timeout of {0} ms was exceeded"
-                                   "".format(self._connect_timeout))
-            raise TimeoutError("All server connection attempts were aborted. "
-                               "Timeout of {0} ms was exceeded for each "
-                               "selected server".format(self._connect_timeout))
+                raise TimeoutError(
+                    "Connection attempt to the server was "
+                    "aborted. Timeout of {0} ms was exceeded"
+                    "".format(self._connect_timeout)
+                )
+            raise TimeoutError(
+                "All server connection attempts were aborted. "
+                "Timeout of {0} ms was exceeded for each "
+                "selected server".format(self._connect_timeout)
+            )
         if len(self._routers) <= 1:
             raise InterfaceError("Cannot connect to host: {0}".format(error))
-        raise InterfaceError("Unable to connect to any of the target hosts",
-                             4001)
+        raise InterfaceError(
+            "Unable to connect to any of the target hosts", 4001
+        )
 
     def _set_tls_capabilities(self, caps):
         """Set the TLS capabilities.
@@ -769,30 +853,36 @@ class Connection(object):
         if platform.system() == "Linux":
             distname, version, _ = linux_distribution()
             try:
-                is_ol7 = "Oracle Linux" in distname and \
-                    version.split(".")[0] == "7"
+                is_ol7 = (
+                    "Oracle Linux" in distname and version.split(".")[0] == "7"
+                )
             except IndexError:
                 is_ol7 = False
 
         if sys.version_info < (2, 7, 9) and not is_ol7:
             self.close_connection()
-            raise RuntimeError("The support for SSL is not available for "
-                               "this Python version")
+            raise RuntimeError(
+                "The support for SSL is not available for "
+                "this Python version"
+            )
 
         self.protocol.set_capabilities(tls=True)
-        self.stream.set_ssl(self.settings.get("tls-versions", None),
-                            self.settings.get("ssl-mode", SSLMode.REQUIRED),
-                            self.settings.get("ssl-ca"),
-                            self.settings.get("ssl-crl"),
-                            self.settings.get("ssl-cert"),
-                            self.settings.get("ssl-key"),
-                            self.settings.get("tls-ciphersuites"))
+        self.stream.set_ssl(
+            self.settings.get("tls-versions", None),
+            self.settings.get("ssl-mode", SSLMode.REQUIRED),
+            self.settings.get("ssl-ca"),
+            self.settings.get("ssl-crl"),
+            self.settings.get("ssl-cert"),
+            self.settings.get("ssl-key"),
+            self.settings.get("tls-ciphersuites"),
+        )
         if "attributes" in self.settings:
             conn_attrs = self.settings["attributes"]
             self.protocol.set_capabilities(session_connect_attrs=conn_attrs)
 
-    def _set_compression_capabilities(self, caps, compression,
-                                      algorithms=None):
+    def _set_compression_capabilities(
+        self, caps, compression, algorithms=None
+    ):
         """Set the compression capabilities.
 
         If compression is available, negociates client and server algorithms.
@@ -847,19 +937,21 @@ class Connection(object):
         if algorithms:
             # Resolve compression algorithms aliases and ignore unsupported
             client_algorithms = [
-                COMPRESSION_ALGORITHMS[item] for item in algorithms
+                COMPRESSION_ALGORITHMS[item]
+                for item in algorithms
                 if item in COMPRESSION_ALGORITHMS
             ]
             matched = [
-                item for item in client_algorithms
-                if item in server_algorithms
+                item for item in client_algorithms if item in server_algorithms
             ]
             if matched:
                 algorithm = COMPRESSION_ALGORITHMS.get(matched[0])
             elif compression == "required":
-                raise InterfaceError("The connection compression is set as "
-                                     "required, but none of the provided "
-                                     "compression algorithms are supported.")
+                raise InterfaceError(
+                    "The connection compression is set as "
+                    "required, but none of the provided "
+                    "compression algorithms are supported."
+                )
             else:
                 return None  # Disable compression
 
@@ -874,8 +966,10 @@ class Connection(object):
                 algorithm = "deflate_stream"
 
         if algorithm not in server_algorithms:
-            msg = ("Compression requested but the compression algorithm "
-                   "negotiation failed")
+            msg = (
+                "Compression requested but the compression algorithm "
+                "negotiation failed"
+            )
             if compression == "required":
                 raise InterfaceError(msg)
             _LOGGER.warning(msg)
@@ -909,9 +1003,11 @@ class Connection(object):
             try:
                 self._authenticate_sha256_memory()
             except InterfaceError as err:
-                raise InterfaceError("Authentication failed using MYSQL41 and "
-                                     "SHA256_MEMORY, check username and "
-                                     f"password or try a secure connection err:{err}")
+                raise InterfaceError(
+                    "Authentication failed using MYSQL41 and "
+                    "SHA256_MEMORY, check username and "
+                    f"password or try a secure connection err:{err}"
+                )
 
     def _authenticate_mysql41(self):
         """Authenticate with the MySQL server using `MySQL41AuthPlugin`."""
@@ -924,11 +1020,14 @@ class Connection(object):
     def _authenticate_plain(self):
         """Authenticate with the MySQL server using `PlainAuthPlugin`."""
         if not self.stream.is_secure():
-            raise InterfaceError("PLAIN authentication is not allowed via "
-                                 "unencrypted connection")
+            raise InterfaceError(
+                "PLAIN authentication is not allowed via "
+                "unencrypted connection"
+            )
         plugin = PlainAuthPlugin(self._user, self._password)
-        self.protocol.send_auth_start(plugin.auth_name(),
-                                      auth_data=plugin.auth_data())
+        self.protocol.send_auth_start(
+            plugin.auth_name(), auth_data=plugin.auth_data()
+        )
         self.protocol.read_auth_ok()
 
     def _authenticate_sha256_memory(self):
@@ -1034,8 +1133,7 @@ class Connection(object):
         if not isinstance(sql, str):
             raise ProgrammingError("The SQL statement is not a valid string")
         else:
-            msg_type, msg = self.protocol.build_execute_statement(
-                "sql", sql)
+            msg_type, msg = self.protocol.build_execute_statement("sql", sql)
         self.protocol.send_msg_without_ps(msg_type, msg, statement)
         return SqlResult(self)
 
@@ -1122,8 +1220,9 @@ class Connection(object):
             :class:`mysqlx.Result`: The result object.
         """
         try:
-            msg_type, msg = \
-                self.protocol.build_execute_statement(namespace, cmd, fields)
+            msg_type, msg = self.protocol.build_execute_statement(
+                namespace, cmd, fields
+            )
             self.protocol.send_msg(msg_type, msg)
             return Result(self)
         except OperationalError:
@@ -1162,8 +1261,9 @@ class Connection(object):
         Returns:
             :class:`mysqlx.RowResult`: The result object.
         """
-        msg_type, msg = \
-            self.protocol.build_execute_statement("mysqlx", cmd, fields)
+        msg_type, msg = self.protocol.build_execute_statement(
+            "mysqlx", cmd, fields
+        )
         self.protocol.send_msg(msg_type, msg)
         return RowResult(self)
 
@@ -1262,8 +1362,10 @@ class Connection(object):
             self.protocol.send_close()
             self.protocol.read_ok()
         except (InterfaceError, OperationalError, OSError) as err:
-            _LOGGER.warning("Warning: An error occurred while attempting to "
-                            "close the connection: {}".format(err))
+            _LOGGER.warning(
+                "Warning: An error occurred while attempting to "
+                "close the connection: {}".format(err)
+            )
         finally:
             # The remote connection with the server has been lost,
             # close the connection locally.
@@ -1278,8 +1380,10 @@ class Connection(object):
         try:
             self.keep_open = self.protocol.send_reset(self.keep_open)
         except (InterfaceError, OperationalError) as err:
-            _LOGGER.warning("Warning: An error occurred while attempting to "
-                            "reset the session: {}".format(err))
+            _LOGGER.warning(
+                "Warning: An error occurred while attempting to "
+                "reset the session: {}".format(err)
+            )
 
     def close_connection(self):
         """Announce to the server that the client wants to close the
@@ -1312,6 +1416,7 @@ class PooledConnection(Connection):
 
     .. versionadded:: 8.0.13
     """
+
     def __init__(self, pool):
         if not isinstance(pool, ConnectionPool):
             raise AttributeError("pool should be a ConnectionPool object")
@@ -1341,8 +1446,7 @@ class PooledConnection(Connection):
         self.pool.add_connection(self)
 
     def reconnect(self):
-        """Reconnect this connection.
-        """
+        """Reconnect this connection."""
         if self._active_result is not None:
             self._active_result.fetch_all()
         self._authenticate()
@@ -1395,6 +1499,7 @@ class ConnectionPool(queue.Queue):
 
     .. versionadded:: 8.0.13
     """
+
     def __init__(self, name, **kwargs):
         self._set_pool_name(name)
         self._open_sessions = 0
@@ -1411,8 +1516,8 @@ class ConnectionPool(queue.Queue):
         self.queue_timeout = kwargs.get("queue_timeout", 25)
         self.priority = kwargs.get("priority", 0)
         self.cnx_config = kwargs
-        self.host = kwargs['host']
-        self.port = kwargs['port']
+        self.host = kwargs["host"]
+        self.port = kwargs["port"]
 
     def _set_pool_name(self, pool_name):
         r"""Set the name of the pool.
@@ -1429,16 +1534,17 @@ class ConnectionPool(queue.Queue):
         """
         if _CNX_POOL_NAME_REGEX.search(pool_name):
             raise AttributeError(
-                "Pool name '{0}' contains illegal characters".format(pool_name))
+                "Pool name '{0}' contains illegal characters".format(pool_name)
+            )
         if len(pool_name) > _CNX_POOL_MAX_NAME_SIZE:
             raise AttributeError(
-                "Pool name '{0}' is too long".format(pool_name))
+                "Pool name '{0}' is too long".format(pool_name)
+            )
         self.name = pool_name
 
     @property
     def open_connections(self):
-        """Returns the number of open connections that can return to this pool.
-        """
+        """Returns the number of open connections that can return to this pool."""
         return len(self._connections_openned)
 
     def remove_connection(self, cnx=None):
@@ -1453,8 +1559,7 @@ class ConnectionPool(queue.Queue):
         """Removes all the connections from the pool."""
         while self.qsize() > 0:
             try:
-                cnx = self.get(block=True,
-                               timeout=self.queue_timeout)
+                cnx = self.get(block=True, timeout=self.queue_timeout)
             except queue.Empty:
                 pass
             else:
@@ -1491,15 +1596,21 @@ class ConnectionPool(queue.Queue):
             cnx = PooledConnection(self)
             # mysqlx_wait_timeout is only available on MySQL 8
             ver = cnx.sql(_SELECT_VERSION_QUERY).execute().fetch_all()[0][0]
-            if tuple([int(n) for n in ver.split("-")[0].split(".")]) > \
-                (8, 0, 10):
-                cnx.sql("set mysqlx_wait_timeout = {}"
-                        "".format(self.max_idle_time)).execute()
+            if tuple([int(n) for n in ver.split("-")[0].split(".")]) > (
+                8,
+                0,
+                10,
+            ):
+                cnx.sql(
+                    "set mysqlx_wait_timeout = {}"
+                    "".format(self.max_idle_time)
+                ).execute()
             self._connections_openned.append(cnx)
         else:
             if not isinstance(cnx, PooledConnection):
                 raise PoolError(
-                    "Connection instance not subclass of PooledSession.")
+                    "Connection instance not subclass of PooledSession."
+                )
             if cnx.is_server_disconnected():
                 self.remove_connections()
                 cnx.close()
@@ -1521,7 +1632,8 @@ class ConnectionPool(queue.Queue):
         """
         if not isinstance(cnx, PooledConnection):
             raise PoolError(
-                "Connection instance not subclass of PooledSession.")
+                "Connection instance not subclass of PooledSession."
+            )
 
         # Reset the connection
         if self.reset_session:
@@ -1532,8 +1644,7 @@ class ConnectionPool(queue.Queue):
             PoolError("Failed adding connection; queue is full")
 
     def track_connection(self, connection):
-        """Tracks connection in order of close it when client.close() is invoke.
-        """
+        """Tracks connection in order of close it when client.close() is invoke."""
         self._connections_openned.append(connection)
 
     def __str__(self):
@@ -1554,8 +1665,11 @@ class ConnectionPool(queue.Queue):
         .. versionadded:: 8.0.20
         """
         if self._available:
-            _LOGGER.warning("ConnectionPool.set_unavailable pool: %s "
-                            "time_out: %s", self, time_out)
+            _LOGGER.warning(
+                "ConnectionPool.set_unavailable pool: %s " "time_out: %s",
+                self,
+                time_out,
+            )
             self._available = False
             self._timeout_stamp = datetime.now()
             self._timeout = time_out
@@ -1578,19 +1692,19 @@ class ConnectionPool(queue.Queue):
         return (self._timeout, self._timeout_stamp)
 
     def close(self):
-        """Empty this ConnectionPool.
-        """
+        """Empty this ConnectionPool."""
         for cnx in self._connections_openned:
             cnx.close_connection()
 
 
-class PoolsManager(object):
+class PoolsManager:
     """Manages a pool of connections for a host or hosts in routers.
 
     This class handles all the pools of Connections.
 
     .. versionadded:: 8.0.13
     """
+
     __instance = None
     __pools = {}
 
@@ -1657,10 +1771,14 @@ class PoolsManager(object):
         if "routers" in pool_settings:
             pool_settings.pop("routers")
         if "host" in pool_settings and "port" in pool_settings:
-            routers.append({"priority": 100,
-                            "weight": 0,
-                            "host": pool_settings["host"],
-                            "port": pool_settings["port"]})
+            routers.append(
+                {
+                    "priority": 100,
+                    "weight": 0,
+                    "host": pool_settings["host"],
+                    "port": pool_settings["port"],
+                }
+            )
         # Order routers
         routers.sort(key=lambda x: (x["priority"], -x.get("weight", 0)))
         for router in routers:
@@ -1670,8 +1788,11 @@ class PoolsManager(object):
             connection_settings["priority"] = router["priority"]
             connection_settings["weight"] = router.get("weight", 0)
             connections_settings.append(
-                (generate_pool_name(**connection_settings),
-                 connection_settings))
+                (
+                    generate_pool_name(**connection_settings),
+                    connection_settings,
+                )
+            )
         return connections_settings
 
     def create_pool(self, cnx_settings):
@@ -1691,12 +1812,14 @@ class PoolsManager(object):
 
         # Create a pool for each router
         for router_name, settings in connections_settings:
-            if self._pool_exists(cnx_settings.get("client_id", "No id"),
-                                 router_name):
+            if self._pool_exists(
+                cnx_settings.get("client_id", "No id"), router_name
+            ):
                 continue
             else:
-                pool = self.__pools.get(cnx_settings.get("client_id", "No id"),
-                                        [])
+                pool = self.__pools.get(
+                    cnx_settings.get("client_id", "No id"), []
+                )
                 pool.append(ConnectionPool(router_name, **settings))
 
     def _get_random_pool(self, pool_list):
@@ -1776,13 +1899,19 @@ class PoolsManager(object):
         Returns:
             PooledConnection: A pooled connection object.
         """
+
         def set_mysqlx_wait_timeout(cnx):
             ver = cnx.sql(_SELECT_VERSION_QUERY).execute().fetch_all()[0][0]
             # mysqlx_wait_timeout is only available on MySQL 8
-            if tuple([int(n) for n in
-                      ver.split("-")[0].split(".")]) > (8, 0, 10):
-                cnx.sql("set mysqlx_wait_timeout = {}"
-                        "".format(pool.max_idle_time)).execute()
+            if tuple([int(n) for n in ver.split("-")[0].split(".")]) > (
+                8,
+                0,
+                10,
+            ):
+                cnx.sql(
+                    "set mysqlx_wait_timeout = {}"
+                    "".format(pool.max_idle_time)
+                ).execute()
 
         pools = self._get_pools(settings)
         cur_priority = settings.get("cur_priority", None)
@@ -1790,8 +1919,10 @@ class PoolsManager(object):
         self._check_unavailable_pools(settings)
         cur_priority = self._get_next_priority(pools, cur_priority)
         if cur_priority is None:
-            raise PoolError("Unable to connect to any of the target hosts. "
-                            "No pool is available.")
+            raise PoolError(
+                "Unable to connect to any of the target hosts. "
+                "No pool is available."
+            )
         settings["cur_priority"] = cur_priority
         pool = self._get_next_pool(pools, cur_priority)
         while pool is not None:
@@ -1801,11 +1932,13 @@ class PoolsManager(object):
                     # We have connections in pool, try to return a working one
                     with threading.RLock():
                         try:
-                            cnx = pool.get(block=True,
-                                           timeout=pool.queue_timeout)
+                            cnx = pool.get(
+                                block=True, timeout=pool.queue_timeout
+                            )
                         except queue.Empty:
                             raise PoolError(
-                                "Failed getting connection; pool exhausted")
+                                "Failed getting connection; pool exhausted"
+                            )
                         try:
                             if cnx.is_server_disconnected():
                                 pool.remove_connections()
@@ -1819,7 +1952,11 @@ class PoolsManager(object):
                             # Unable to reset connection, close and remove
                             try:
                                 cnx.close_connection()
-                            except (RuntimeError, socket.error, InterfaceError):
+                            except (
+                                RuntimeError,
+                                socket.error,
+                                InterfaceError,
+                            ):
                                 pass
                             finally:
                                 pool.remove_connection(cnx)
@@ -1827,14 +1964,19 @@ class PoolsManager(object):
                             # same endpoint should be removed from the pool.
                             while pool.qsize() > 0:
                                 try:
-                                    cnx = pool.get(block=True,
-                                                   timeout=pool.queue_timeout)
+                                    cnx = pool.get(
+                                        block=True, timeout=pool.queue_timeout
+                                    )
                                 except queue.Empty:
                                     pass
                                 else:
                                     try:
                                         cnx.close_connection()
-                                    except (RuntimeError, socket.error, InterfaceError):
+                                    except (
+                                        RuntimeError,
+                                        socket.error,
+                                        InterfaceError,
+                                    ):
                                         pass
                                     finally:
                                         pool.remove_connection(cnx)
@@ -1844,18 +1986,28 @@ class PoolsManager(object):
                                 pool.track_connection(cnx)
                                 cnx.connect()
                                 set_mysqlx_wait_timeout(cnx)
-                            except (RuntimeError, socket.error, InterfaceError):
+                            except (
+                                RuntimeError,
+                                socket.error,
+                                InterfaceError,
+                            ):
                                 pass
                             finally:
                                 # Server must be down, take down idle
                                 # connections from this pool
                                 while pool.qsize() > 0:
                                     try:
-                                        cnx = pool.get(block=True,
-                                                       timeout=pool.queue_timeout)
+                                        cnx = pool.get(
+                                            block=True,
+                                            timeout=pool.queue_timeout,
+                                        )
                                         cnx.close_connection()
                                         pool.remove_connection(cnx)
-                                    except (RuntimeError, socket.error, InterfaceError):
+                                    except (
+                                        RuntimeError,
+                                        socket.error,
+                                        InterfaceError,
+                                    ):
                                         pass
                         return cnx
                 elif pool.open_connections < pool.pool_max_size:
@@ -1869,8 +2021,9 @@ class PoolsManager(object):
                     # Pool is exaust so the client needs to wait
                     with threading.RLock():
                         try:
-                            cnx = pool.get(block=True,
-                                           timeout=pool.queue_timeout)
+                            cnx = pool.get(
+                                block=True, timeout=pool.queue_timeout
+                            )
                             cnx.reset()
                             set_mysqlx_wait_timeout(cnx)
                             return cnx
@@ -1895,8 +2048,10 @@ class PoolsManager(object):
                     pool = self._get_next_pool(pools, cur_priority)
                     if pool is None:
                         msg = "\n  ".join(error_list)
-                        raise PoolError("Unable to connect to any of the "
-                                        "target hosts: [\n  {}\n]".format(msg))
+                        raise PoolError(
+                            "Unable to connect to any of the "
+                            "target hosts: [\n  {}\n]".format(msg)
+                        )
                 continue
 
         raise PoolError("Unable to connect to any of the target hosts")
@@ -1945,7 +2100,8 @@ class PoolsManager(object):
             # Other errors are severe punished
             pool.set_unavailable(100000)
 
-class Session(object):
+
+class Session:
     """Enables interaction with a X Protocol enabled MySQL Product.
 
     The functionality includes:
@@ -1965,25 +2121,33 @@ class Session(object):
         # Check for DNS SRV
         if settings.get("host") and settings.get("dns-srv"):
             if not HAVE_DNSPYTHON:
-                raise InterfaceError("MySQL host configuration requested DNS "
-                                     "SRV. This requires the Python dnspython "
-                                     "module. Please refer to documentation")
+                raise InterfaceError(
+                    "MySQL host configuration requested DNS "
+                    "SRV. This requires the Python dnspython "
+                    "module. Please refer to documentation"
+                )
             try:
                 srv_records = dns.resolver.query(settings["host"], "SRV")
             except dns.exception.DNSException:
-                raise InterfaceError("Unable to locate any hosts for '{0}'"
-                                     "".format(settings["host"]))
+                raise InterfaceError(
+                    "Unable to locate any hosts for '{0}'"
+                    "".format(settings["host"])
+                )
             self._settings["routers"] = []
             for srv in srv_records:
-                self._settings["routers"].append({
-                    "host": srv.target.to_text(omit_final_dot=True),
-                    "port": srv.port,
-                    "priority": srv.priority,
-                    "weight": srv.weight
-                })
+                self._settings["routers"].append(
+                    {
+                        "host": srv.target.to_text(omit_final_dot=True),
+                        "port": srv.port,
+                        "priority": srv.priority,
+                        "weight": srv.weight,
+                    }
+                )
 
-        if "connection-attributes" not in self._settings or \
-           self._settings["connection-attributes"] != False:
+        if (
+            "connection-attributes" not in self._settings
+            or self._settings["connection-attributes"] != False
+        ):
             self._settings["attributes"] = {}
             self._init_attributes()
 
@@ -2003,8 +2167,11 @@ class Session(object):
                 self.sql("USE {}".format(quote_identifier(schema))).execute()
             except OperationalError as err:
                 # Access denied for user will raise err.errno = 1044
-                errmsg = err.msg if err.errno == 1044 \
+                errmsg = (
+                    err.msg
+                    if err.errno == 1044
                     else "Default schema '{}' does not exists".format(schema)
+                )
                 raise InterfaceError(errmsg, err.errno)
 
     def __enter__(self):
@@ -2017,9 +2184,9 @@ class Session(object):
         """Setup default and user defined connection-attributes."""
         if os.name == "nt":
             if "64" in platform.architecture()[0]:
-                platform_arch = 'x86_64'
+                platform_arch = "x86_64"
             elif "32" in platform.architecture()[0]:
-                platform_arch = 'i386'
+                platform_arch = "i386"
             else:
                 platform_arch = platform.architecture()
             os_ver = "Windows-{}".format(platform.win32_ver()[1])
@@ -2030,7 +2197,7 @@ class Session(object):
             else:
                 os_ver = "-".join(linux_distribution()[0:2])
 
-        license_chunks = LICENSE.split(' ')
+        license_chunks = LICENSE.split(" ")
         if license_chunks[0] == "GPLv2":
             client_license = "GPL-2.0"
         else:
@@ -2050,7 +2217,7 @@ class Session(object):
             # Client's version
             "_client_version": ".".join([str(x) for x in VERSION[0:3]]),
             # Client's License identifier
-            "_client_license": client_license
+            "_client_license": client_license,
         }
         self._settings["attributes"].update(default_attributes)
 
@@ -2059,36 +2226,45 @@ class Session(object):
                 attr_value = self._settings["connection-attributes"][attr_name]
                 # Validate name type
                 if not isinstance(attr_name, str):
-                    raise InterfaceError("Attribute name '{}' must be a string "
-                                         "type".format(attr_name))
+                    raise InterfaceError(
+                        "Attribute name '{}' must be a string "
+                        "type".format(attr_name)
+                    )
                 # Validate attribute name limit 32 characters
                 if len(attr_name) > 32:
-                    raise InterfaceError("Attribute name '{}' exceeds 32 "
-                                         "characters limit size"
-                                         "".format(attr_name))
+                    raise InterfaceError(
+                        "Attribute name '{}' exceeds 32 "
+                        "characters limit size"
+                        "".format(attr_name)
+                    )
                 # Validate names in connection-attributes cannot start with "_"
                 if attr_name.startswith("_"):
-                    raise InterfaceError("Key names in 'session-connect-"
-                                         "attributes' cannot start with '_', "
-                                         "found: {}".format(attr_name))
+                    raise InterfaceError(
+                        "Key names in 'session-connect-"
+                        "attributes' cannot start with '_', "
+                        "found: {}".format(attr_name)
+                    )
                 # Validate value type
                 if not isinstance(attr_value, str):
-                    raise InterfaceError("Attribute name '{}' value '{}' must "
-                                         "be a string type"
-                                         "".format(attr_name, attr_value))
+                    raise InterfaceError(
+                        "Attribute name '{}' value '{}' must "
+                        "be a string type"
+                        "".format(attr_name, attr_value)
+                    )
 
                 # Validate attribute value limit 1024 characters
                 if len(attr_value) > 1024:
-                    raise InterfaceError("Attribute name '{}' value: '{}' "
-                                         "exceeds 1024 characters limit size"
-                                         "".format(attr_name, attr_value))
+                    raise InterfaceError(
+                        "Attribute name '{}' value: '{}' "
+                        "exceeds 1024 characters limit size"
+                        "".format(attr_name, attr_value)
+                    )
 
                 self._settings["attributes"][attr_name] = attr_value
 
     @property
     def use_pure(self):
-        """bool: `True` to use pure Python Protobuf implementation.
-        """
+        """bool: `True` to use pure Python Protobuf implementation."""
         return Protobuf.use_pure
 
     @use_pure.setter
@@ -2163,15 +2339,18 @@ class Session(object):
         """
         schema = self._connection.settings.get("schema")
         if schema:
-            res = self.sql(
-                _SELECT_SCHEMA_NAME_QUERY.format(escape(schema))
-            ).execute().fetch_all()
+            res = (
+                self.sql(_SELECT_SCHEMA_NAME_QUERY.format(escape(schema)))
+                .execute()
+                .fetch_all()
+            )
             try:
                 if res[0][0] == schema:
                     return Schema(self, schema)
             except IndexError:
                 raise ProgrammingError(
-                    "Default schema '{}' does not exists".format(schema))
+                    "Default schema '{}' does not exists".format(schema)
+                )
         return None
 
     def drop_schema(self, name):
@@ -2181,7 +2360,8 @@ class Session(object):
             name (string): The name of the Schema object to be retrieved.
         """
         self._connection.execute_nonquery(
-            "sql", _DROP_DATABASE_QUERY.format(quote_identifier(name)), True)
+            "sql", _DROP_DATABASE_QUERY.format(quote_identifier(name)), True
+        )
 
     def create_schema(self, name):
         """Creates a schema on the database and returns the corresponding
@@ -2191,7 +2371,8 @@ class Session(object):
             name (string): A string value indicating the schema name.
         """
         self._connection.execute_nonquery(
-            "sql", _CREATE_DATABASE_QUERY.format(quote_identifier(name)), True)
+            "sql", _CREATE_DATABASE_QUERY.format(quote_identifier(name)), True
+        )
         return Schema(self, name)
 
     def start_transaction(self):
@@ -2226,9 +2407,9 @@ class Session(object):
             name = "{0}".format(uuid.uuid1())
         elif not isinstance(name, str) or len(name.strip()) == 0:
             raise ProgrammingError("Invalid SAVEPOINT name")
-        self._connection.execute_nonquery("sql", "SAVEPOINT {0}"
-                                          "".format(quote_identifier(name)),
-                                          True)
+        self._connection.execute_nonquery(
+            "sql", "SAVEPOINT {0}" "".format(quote_identifier(name)), True
+        )
         return name
 
     def rollback_to(self, name):
@@ -2239,9 +2420,11 @@ class Session(object):
         """
         if not isinstance(name, str) or len(name.strip()) == 0:
             raise ProgrammingError("Invalid SAVEPOINT name")
-        self._connection.execute_nonquery("sql", "ROLLBACK TO SAVEPOINT {0}"
-                                          "".format(quote_identifier(name)),
-                                          True)
+        self._connection.execute_nonquery(
+            "sql",
+            "ROLLBACK TO SAVEPOINT {0}" "".format(quote_identifier(name)),
+            True,
+        )
 
     def release_savepoint(self, name):
         """Release a transaction savepoint with the given name.
@@ -2251,9 +2434,11 @@ class Session(object):
         """
         if not isinstance(name, str) or len(name.strip()) == 0:
             raise ProgrammingError("Invalid SAVEPOINT name")
-        self._connection.execute_nonquery("sql", "RELEASE SAVEPOINT {0}"
-                                          "".format(quote_identifier(name)),
-                                          True)
+        self._connection.execute_nonquery(
+            "sql",
+            "RELEASE SAVEPOINT {0}" "".format(quote_identifier(name)),
+            True,
+        )
 
     def close(self):
         """Closes the session."""
@@ -2266,16 +2451,17 @@ class Session(object):
         self._connection.close_connection()
 
 
-class Client(object):
+class Client:
     """Class defining a client, it stores a connection configuration.
 
-       Args:
-           connection_dict (dict): The connection information to connect to a
-                                   MySQL server.
-           options_dict (dict): The options to configure this client.
+    Args:
+        connection_dict (dict): The connection information to connect to a
+                                MySQL server.
+        options_dict (dict): The options to configure this client.
 
-       .. versionadded:: 8.0.13
+    .. versionadded:: 8.0.13
     """
+
     def __init__(self, connection_dict, options_dict=None):
         self.settings = connection_dict
         if options_dict is None:
@@ -2312,11 +2498,16 @@ class Client(object):
             :class:`AttributeError`: If the pool_size value is not an integer
                                      greater or equal to 0.
         """
-        if isinstance(pool_size, bool) or not isinstance(pool_size, int) or \
-           not pool_size > 0:
-            raise AttributeError("Pool max_size value must be an integer "
-                                 "greater than 0, the given value {} "
-                                 "is not valid.".format(pool_size))
+        if (
+            isinstance(pool_size, bool)
+            or not isinstance(pool_size, int)
+            or not pool_size > 0
+        ):
+            raise AttributeError(
+                "Pool max_size value must be an integer "
+                "greater than 0, the given value {} "
+                "is not valid.".format(pool_size)
+            )
 
         self.max_size = _CNX_POOL_MAXSIZE if pool_size == 0 else pool_size
 
@@ -2333,15 +2524,23 @@ class Client(object):
             :class:`AttributeError`: If the max_idle_time value is not an
                                      integer greater or equal to 0.
         """
-        if isinstance(max_idle_time, bool) or \
-           not isinstance(max_idle_time, int) or not max_idle_time > -1:
-            raise AttributeError("Connection max_idle_time value must be an "
-                                 "integer greater or equal to 0, the given "
-                                 "value {} is not valid.".format(max_idle_time))
+        if (
+            isinstance(max_idle_time, bool)
+            or not isinstance(max_idle_time, int)
+            or not max_idle_time > -1
+        ):
+            raise AttributeError(
+                "Connection max_idle_time value must be an "
+                "integer greater or equal to 0, the given "
+                "value {} is not valid.".format(max_idle_time)
+            )
 
         self.max_idle_time = max_idle_time
-        self.settings["max_idle_time"] = _CNX_POOL_MAX_IDLE_TIME \
-            if max_idle_time == 0 else int(max_idle_time / 1000)
+        self.settings["max_idle_time"] = (
+            _CNX_POOL_MAX_IDLE_TIME
+            if max_idle_time == 0
+            else int(max_idle_time / 1000)
+        )
 
     def _set_pool_enabled(self, enabled):
         """Set if the pool is enabled.
@@ -2371,15 +2570,23 @@ class Client(object):
             :class:`AttributeError`: If the queue_timeout value is not an
                                      integer greater or equal to 0.
         """
-        if isinstance(queue_timeout, bool) or \
-           not isinstance(queue_timeout, int) or not queue_timeout > -1:
-            raise AttributeError("Connection queue_timeout value must be an "
-                                 "integer greater or equal to 0, the given "
-                                 "value {} is not valid.".format(queue_timeout))
+        if (
+            isinstance(queue_timeout, bool)
+            or not isinstance(queue_timeout, int)
+            or not queue_timeout > -1
+        ):
+            raise AttributeError(
+                "Connection queue_timeout value must be an "
+                "integer greater or equal to 0, the given "
+                "value {} is not valid.".format(queue_timeout)
+            )
 
         self.queue_timeout = queue_timeout
-        self.settings["queue_timeout"] = _CNX_POOL_QUEUE_TIMEOUT \
-            if queue_timeout == 0 else int(queue_timeout / 1000)
+        self.settings["queue_timeout"] = (
+            _CNX_POOL_QUEUE_TIMEOUT
+            if queue_timeout == 0
+            else int(queue_timeout / 1000)
+        )
         # To avoid a connection stall waiting for the server, if the
         # connect-timeout is not given, use the queue_timeout
         if not "connect-timeout" in self.settings:
@@ -2396,8 +2603,7 @@ class Client(object):
         return session
 
     def close(self):
-        """Closes the sessions opened by this client.
-        """
+        """Closes the sessions opened by this client."""
         PoolsManager().close_pool(self.settings)
         for session in self.sessions:
             session.close_connections()

@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -42,12 +42,14 @@ from distutils.sysconfig import get_python_version
 from distutils.util import get_platform
 from distutils.version import LooseVersion
 
-from . import BaseCommand, EDITION, VERSION, VERSION_EXTRA, VERSION_TEXT, wix
-from .utils import (ARCH_64BIT,
-                    add_arch_dep_elems,
-                    get_magic_tag,
-                    write_info_bin, write_info_src)
-
+from . import EDITION, VERSION, VERSION_EXTRA, VERSION_TEXT, BaseCommand, wix
+from .utils import (
+    ARCH_64BIT,
+    add_arch_dep_elems,
+    get_magic_tag,
+    write_info_bin,
+    write_info_src,
+)
 
 MSIDATA_ROOT = os.path.join("cpydist", "data", "msi")
 DIST_PATH_FORMAT = "wininst_{}{}"
@@ -56,28 +58,43 @@ DIST_PATH_FORMAT = "wininst_{}{}"
 class DistMSI(BaseCommand):
     """Create a MSI distribution."""
 
-    description = 'create a MSI distribution'
+    description = "create a MSI distribution"
     user_options = BaseCommand.user_options + [
-        ("bdist-dir=", "d",
-         "temporary directory for creating the distribution"),
-        ("dist-dir=", "d",
-         "directory to put final built distributions in"),
-        ("wix-install=", None,
-         "location of the Windows Installer XML installation"
-         "(default: {})".format(wix.WIX_INSTALL_PATH)),
-        ("wix-required-version=", None,
-         "required version the Windows Installer XML installation"
-         "(default: {})".format(wix.WIX_REQUIRED_VERSION)),
-        ("python-version=", None,
-         "target Python version"),
-        ("prepare-stage", "p",
-         "only stage installation for this python {} version, used later for"
-         "a single msi".format(get_python_version()[:3])),
-        ("combine-stage", "c",
-         "unify the prepared msi stages to only one single msi"),
+        (
+            "bdist-dir=",
+            "d",
+            "temporary directory for creating the distribution",
+        ),
+        ("dist-dir=", "d", "directory to put final built distributions in"),
+        (
+            "wix-install=",
+            None,
+            "location of the Windows Installer XML installation"
+            "(default: {})".format(wix.WIX_INSTALL_PATH),
+        ),
+        (
+            "wix-required-version=",
+            None,
+            "required version the Windows Installer XML installation"
+            "(default: {})".format(wix.WIX_REQUIRED_VERSION),
+        ),
+        ("python-version=", None, "target Python version"),
+        (
+            "prepare-stage",
+            "p",
+            "only stage installation for this python {} version, used later for"
+            "a single msi".format(get_python_version()[:3]),
+        ),
+        (
+            "combine-stage",
+            "c",
+            "unify the prepared msi stages to only one single msi",
+        ),
     ]
     boolean_options = BaseCommand.user_options + [
-        "include-sources", "prepare-stage", "combine-stage"
+        "include-sources",
+        "prepare-stage",
+        "combine-stage",
     ]
     negative_opt = {}
 
@@ -106,41 +123,53 @@ class DistMSI(BaseCommand):
     def finalize_options(self):
         """Finalize the options."""
         BaseCommand.finalize_options(self)
-        self.set_undefined_options("build",
-                                   ("build_base", "build_base"))
-        self.set_undefined_options("bdist",
-                                   ("dist_dir", "dist_dir"))
+        self.set_undefined_options("build", ("build_base", "build_base"))
+        self.set_undefined_options("bdist", ("dist_dir", "dist_dir"))
 
         if not self.prefix:
             self.prefix = os.path.join(
-                self.build_base, DIST_PATH_FORMAT.format(
-                    self.python_version[0], self.python_version[2:]))
+                self.build_base,
+                DIST_PATH_FORMAT.format(
+                    self.python_version[0], self.python_version[2:]
+                ),
+            )
 
         for py_ver in self._supported_versions:
             self._dist_path[py_ver] = os.path.join(
-                self.build_base, DIST_PATH_FORMAT.format(*py_ver.split(".")))
+                self.build_base, DIST_PATH_FORMAT.format(*py_ver.split("."))
+            )
 
         if self.python_version not in self._supported_versions:
             raise DistutilsOptionError(
                 "The --python-version {} should be a supported version, one "
-                "of {}".format(self.python_version, ",".join(self._supported_versions)))
+                "of {}".format(
+                    self.python_version, ",".join(self._supported_versions)
+                )
+            )
 
         if self.python_version[0] != get_python_version()[0]:
             raise DistutilsError(
                 "Python v3 distributions need to be build with a "
-                "supported Python v3 installation.")
+                "supported Python v3 installation."
+            )
 
-        self._with_cext = any((self.with_mysql_capi,
-                               self.with_protobuf_include_dir,
-                               self.with_protobuf_lib_dir,
-                               self.with_protoc))
+        self._with_cext = any(
+            (
+                self.with_mysql_capi,
+                self.with_protobuf_include_dir,
+                self.with_protobuf_lib_dir,
+                self.with_protoc,
+            )
+        )
 
         if self._with_cext:
             cmd_build = self.get_finalized_command("build")
             self._connc_lib = os.path.join(
-                cmd_build.build_temp, "connc", "lib")
+                cmd_build.build_temp, "connc", "lib"
+            )
             self._connc_include = os.path.join(
-                cmd_build.build_temp, "connc", "include")
+                cmd_build.build_temp, "connc", "include"
+            )
             self._finalize_connector_c(self.with_mysql_capi)
 
         self._wxs = self._finalize_msi_descriptor()
@@ -163,7 +192,9 @@ class DistMSI(BaseCommand):
         copy_tree(os.path.join(connc_loc, "lib"), self._connc_lib)
         copy_tree(os.path.join(connc_loc, "include"), self._connc_include)
 
-        self.log.info("# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir)
+        self.log.info(
+            "# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir
+        )
         if ARCH_64BIT:
             openssl_files = ["libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll"]
         else:
@@ -174,8 +205,9 @@ class DistMSI(BaseCommand):
                 openssl_lib_dir = os.path.abspath(self.with_openssl_lib_dir)
                 if os.path.basename(openssl_lib_dir) == "lib":
                     openssl_lib_dir = os.path.split(openssl_lib_dir)[0]
-                if os.path.exists(openssl_lib_dir) and \
-                   os.path.exists(os.path.join(openssl_lib_dir, "bin")):
+                if os.path.exists(openssl_lib_dir) and os.path.exists(
+                    os.path.join(openssl_lib_dir, "bin")
+                ):
                     openssl_lib_dir = os.path.join(openssl_lib_dir, "bin")
                 self.log.info("# openssl_lib_dir: %s", openssl_lib_dir)
                 src = os.path.join(openssl_lib_dir, filename)
@@ -187,35 +219,41 @@ class DistMSI(BaseCommand):
             shutil.copy(src, dst)
 
         for lib_file in os.listdir(self._connc_lib):
-            if os.name == "posix" and not lib_file.endswith('.a'):
+            if os.name == "posix" and not lib_file.endswith(".a"):
                 os.unlink(os.path.join(self._connc_lib, lib_file))
 
     def _finalize_msi_descriptor(self):
         """Return the finalized and customized path of the msi descriptor."""
         base_xml_path = os.path.join(MSIDATA_ROOT, "product.wxs")
-        result_xml_path = os.path.join(MSIDATA_ROOT, 'cpy_product_desc.wxs')
+        result_xml_path = os.path.join(MSIDATA_ROOT, "cpy_product_desc.wxs")
 
         if get_platform() == "win32":
-            add_arch_dep_elems(base_xml_path, result_xml_path, for32=True,
-                               add_vs_redist=False)
+            add_arch_dep_elems(
+                base_xml_path, result_xml_path, for32=True, add_vs_redist=False
+            )
         else:
-            add_arch_dep_elems(base_xml_path, result_xml_path,
-                               add_vs_redist=self._with_cext)
+            add_arch_dep_elems(
+                base_xml_path, result_xml_path, add_vs_redist=self._with_cext
+            )
 
         return result_xml_path
 
     def _get_wixobj_name(self, myc_version=None):
         """Get the name for the wixobj-file."""
         mycver = myc_version or self.distribution.metadata.version
-        name_fmt = ("mysql-connector-python{label}-{conver}{version_extra}"
-                    "{edition}-{arch}.wixobj")
+        name_fmt = (
+            "mysql-connector-python{label}-{conver}{version_extra}"
+            "{edition}-{arch}.wixobj"
+        )
         return name_fmt.format(
-            label= "-{}".format(self.label) if self.label else "",
+            label="-{}".format(self.label) if self.label else "",
             conver=mycver,
             edition=self.edition,
             version_extra="-{0}".format(VERSION_EXTRA)
-                          if VERSION_EXTRA else "",
-            arch="windows-x86-64bit" if ARCH_64BIT else "windows-x86-32bit")
+            if VERSION_EXTRA
+            else "",
+            arch="windows-x86-64bit" if ARCH_64BIT else "windows-x86-32bit",
+        )
 
     def _find_bdist_paths(self):
         """Find compressed distribution files or valid distribution paths."""
@@ -225,9 +263,12 @@ class DistMSI(BaseCommand):
         for py_ver in self._supported_versions:
             bdist_paths[py_ver] = os.path.join(
                 os.path.abspath(self._dist_path[py_ver]),
-                "Lib", "site-packages")
+                "Lib",
+                "site-packages",
+            )
             zip_fn = "{}.zip".format(
-                DIST_PATH_FORMAT.format(*py_ver.split(".")))
+                DIST_PATH_FORMAT.format(*py_ver.split("."))
+            )
 
             self.log.info("Locating zip: %s at %s", zip_fn, os.path.curdir)
             bdist_path = None
@@ -235,18 +276,21 @@ class DistMSI(BaseCommand):
                 with zipfile.ZipFile(zip_fn) as zip_f:
                     zip_f.extractall()
             else:
-                self.log.warning("Unable to find zip: %s at %s",
-                                 zip_fn, os.path.curdir)
+                self.log.warning(
+                    "Unable to find zip: %s at %s", zip_fn, os.path.curdir
+                )
             if bdist_path is None:
                 bdist_path = bdist_paths[py_ver]
-                self.log.info("Checking for extracted distribution at %s",
-                              bdist_path)
+                self.log.info(
+                    "Checking for extracted distribution at %s", bdist_path
+                )
             if os.path.exists(bdist_path):
                 valid_bdist_paths[py_ver] = bdist_path
                 self.log.info("Distribution path found at %s", bdist_path)
             else:
-                self.log.warning("Unable to find distribution path for %s",
-                                 py_ver)
+                self.log.warning(
+                    "Unable to find distribution path for %s", py_ver
+                )
 
         return valid_bdist_paths
 
@@ -278,20 +322,24 @@ class DistMSI(BaseCommand):
                 "No upgrade code found for version v{cpy_ver}, "
                 "Python v{py_ver}".format(cpy_ver=mycver, py_ver=pyver)
             )
-        self.log.info("upgrade code for v%s, Python v%s: %s",
-                      mycver, pyver, upgrade_code)
+        self.log.info(
+            "upgrade code for v%s, Python v%s: %s", mycver, pyver, upgrade_code
+        )
 
         self.pyver_bdist_paths = self._find_bdist_paths()
 
         # wixobj's basename is the name of the installer
         wixobj = self._get_wixobj_name()
         msi = os.path.abspath(
-            os.path.join(self.dist_dir, wixobj.replace(".wixobj", ".msi")))
-        wixer = wix.WiX(self._wxs,
-                        out=wixobj,
-                        msi_out=msi,
-                        base_path=self.build_base,
-                        install=self.wix_install)
+            os.path.join(self.dist_dir, wixobj.replace(".wixobj", ".msi"))
+        )
+        wixer = wix.WiX(
+            self._wxs,
+            out=wixobj,
+            msi_out=msi,
+            base_path=self.build_base,
+            install=self.wix_install,
+        )
 
         # correct newlines and version in text files
         self.log.info("Fixing newlines in text files")
@@ -306,8 +354,9 @@ class DistMSI(BaseCommand):
                 content = content.replace(b"\n", b"\r\n")
                 open(txt_fixed, "wb").write(content)
             else:
-                self.log.info("not converting newlines in %s, this is odd",
-                              txt_fixed)
+                self.log.info(
+                    "not converting newlines in %s, this is odd", txt_fixed
+                )
                 open(txt_fixed, "wb").write(content)
 
         digit_needle = r"Connector/Python \d{1,2}.\d{1,2}"
@@ -318,21 +367,22 @@ class DistMSI(BaseCommand):
             with open(info_file, "r+") as fp:
                 content = fp.readlines()
                 for idx, line in enumerate(content):
-                    content[idx] = re.sub(digit_needle,
-                                          xy_sub.format(*VERSION[0:2]),
-                                          line)
+                    content[idx] = re.sub(
+                        digit_needle, xy_sub.format(*VERSION[0:2]), line
+                    )
                     line = content[idx]
-                    content[idx] = re.sub(xy_needle,
-                                          xy_sub.format(*VERSION[0:2]),
-                                          line)
+                    content[idx] = re.sub(
+                        xy_needle, xy_sub.format(*VERSION[0:2]), line
+                    )
                 fp.seek(0)
                 fp.write("".join(content))
 
         plat_type = "x64" if ARCH_64BIT else "x86"
         win64 = "yes" if ARCH_64BIT else "no"
         pyd_arch = "win_amd64" if ARCH_64BIT else "win32"
-        directory_id = "ProgramFiles64Folder" if ARCH_64BIT else \
-                       "ProgramFilesFolder"
+        directory_id = (
+            "ProgramFiles64Folder" if ARCH_64BIT else "ProgramFilesFolder"
+        )
 
         # For 3.5 the driver names are pretty complex, see
         # https://www.python.org/dev/peps/pep-0425/
@@ -344,14 +394,18 @@ class DistMSI(BaseCommand):
         if self._connc_lib:
             if ARCH_64BIT:
                 libcrypto_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libcrypto-1_1-x64.dll")
+                    os.path.abspath(self._connc_lib), "libcrypto-1_1-x64.dll"
+                )
                 libssl_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libssl-1_1-x64.dll")
+                    os.path.abspath(self._connc_lib), "libssl-1_1-x64.dll"
+                )
             else:
                 libcrypto_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libcrypto-1_1.dll")
+                    os.path.abspath(self._connc_lib), "libcrypto-1_1.dll"
+                )
                 libssl_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libssl-1_1.dll")
+                    os.path.abspath(self._connc_lib), "libssl-1_1.dll"
+                )
         else:
             libcrypto_dll_path = ""
             libssl_dll_path = ""
@@ -371,15 +425,19 @@ class DistMSI(BaseCommand):
             "PythonInstallDir": "Python%s" % pyver.replace(".", ""),
             "PyExt": "pyc" if self.byte_code_only else "py",
             "ManualPDF": os.path.abspath(
-                os.path.join("docs", "mysql-connector-python.pdf")),
+                os.path.join("docs", "mysql-connector-python.pdf")
+            ),
             "ManualHTML": os.path.abspath(
-                os.path.join("docs", "mysql-connector-python.html")),
+                os.path.join("docs", "mysql-connector-python.html")
+            ),
             "UpgradeCode": upgrade_code,
             "MagicTag": get_magic_tag(),
             "BuildDir": os.path.abspath(self.build_base),
             "LibMySQLDLL": os.path.join(
                 os.path.abspath(self._connc_lib), "libmysql.dll"
-            ) if self._connc_lib else "",
+            )
+            if self._connc_lib
+            else "",
             "LIBcryptoDLL": libcrypto_dll_path,
             "LIBSSLDLL": libssl_dll_path,
             "Win64": win64,
@@ -389,15 +447,17 @@ class DistMSI(BaseCommand):
             ver = py_ver.split(".")
             params["BDist{}{}".format(*ver)] = ""
 
-            if ver[0] == '3' and int(ver[1]) >= 5:
+            if ver[0] == "3" and int(ver[1]) >= 5:
                 pyd_ext = ".cp%s%s-%s.pyd" % (ver[0], ver[1], pyd_arch)
             else:
                 pyd_ext = ".pyd"
 
-            params["CExtLibName{}{}".format(*ver)] = \
-                "_mysql_connector{}".format(pyd_ext)
-            params["CExtXPBName{}{}".format(*ver)] = \
-                "_mysqlxpb{}".format(pyd_ext)
+            params[
+                "CExtLibName{}{}".format(*ver)
+            ] = "_mysql_connector{}".format(pyd_ext)
+            params["CExtXPBName{}{}".format(*ver)] = "_mysqlxpb{}".format(
+                pyd_ext
+            )
             params["HaveCExt{}{}".format(*ver)] = 0
             params["HaveLdapLibs{}{}".format(*ver)] = 0
             params["HaveKerberosLibs{}{}".format(*ver)] = 0
@@ -405,29 +465,48 @@ class DistMSI(BaseCommand):
             params["HavePlugin{}{}".format(*ver)] = 0
 
             if py_ver in self.pyver_bdist_paths:
-                params["BDist{}{}".format(*ver)] = \
-                   self.pyver_bdist_paths[py_ver]
+                params["BDist{}{}".format(*ver)] = self.pyver_bdist_paths[
+                    py_ver
+                ]
                 if os.path.exists(
-                    os.path.join(self.pyver_bdist_paths[py_ver],
-                                 params["CExtLibName{}{}".format(*ver)])):
+                    os.path.join(
+                        self.pyver_bdist_paths[py_ver],
+                        params["CExtLibName{}{}".format(*ver)],
+                    )
+                ):
                     params["HaveCExt{}{}".format(*ver)] = 1
                 have_plugins = False
                 if os.path.exists(
-                    os.path.join(self.pyver_bdist_paths[py_ver],
-                                 "mysql", "vendor", "plugin",
-                                 "authentication_ldap_sasl_client.dll")):
+                    os.path.join(
+                        self.pyver_bdist_paths[py_ver],
+                        "mysql",
+                        "vendor",
+                        "plugin",
+                        "authentication_ldap_sasl_client.dll",
+                    )
+                ):
                     params["HaveLdapLibs{}{}".format(*ver)] = 1
                     have_plugins = True
                 if os.path.exists(
-                    os.path.join(self.pyver_bdist_paths[py_ver],
-                                 "mysql", "vendor", "plugin",
-                                 "authentication_kerberos_client.dll")):
+                    os.path.join(
+                        self.pyver_bdist_paths[py_ver],
+                        "mysql",
+                        "vendor",
+                        "plugin",
+                        "authentication_kerberos_client.dll",
+                    )
+                ):
                     params["HaveKerberosLibs{}{}".format(*ver)] = 1
                     have_plugins = True
                 if os.path.exists(
-                    os.path.join(self.pyver_bdist_paths[py_ver],
-                                 "mysql", "vendor", "plugin",
-                                 "authentication_oci_client.dll")):
+                    os.path.join(
+                        self.pyver_bdist_paths[py_ver],
+                        "mysql",
+                        "vendor",
+                        "plugin",
+                        "authentication_oci_client.dll",
+                    )
+                ):
                     params["HaveOCILibs{}{}".format(*ver)] = 1
                     have_plugins = True
                 if have_plugins:
@@ -455,22 +534,24 @@ class DistMSI(BaseCommand):
         self.log.info("Renaming pycached files in %s", start_dir)
         for base, _, files in os.walk(start_dir):
             for filename in files:
-                if base.endswith('__pycache__') and filename.endswith('.pyc'):
+                if base.endswith("__pycache__") and filename.endswith(".pyc"):
                     file_path = os.path.join(base, filename)
-                    new_name = filename.split('.')[0] + '.pyc'
-                    new_name_path = os.path.join(base, '..', new_name)
-                    self.log.info("  renaming file: %s to: %s",
-                                  filename, new_name_path)
+                    new_name = filename.split(".")[0] + ".pyc"
+                    new_name_path = os.path.join(base, "..", new_name)
+                    self.log.info(
+                        "  renaming file: %s to: %s", filename, new_name_path
+                    )
                     os.rename(file_path, new_name_path)
 
         for base, _, _ in os.walk(start_dir):
-            if base.endswith('__pycache__'):
+            if base.endswith("__pycache__"):
                 os.rmdir(base)
 
     def _prepare(self):
         self.log.info("Preparing installation in %s", self.build_base)
-        cmd_install = self.reinitialize_command("install",
-                                                reinit_subcommands=1)
+        cmd_install = self.reinitialize_command(
+            "install", reinit_subcommands=1
+        )
         cmd_install.prefix = self.prefix
         cmd_install.with_mysql_capi = self.with_mysql_capi
         cmd_install.with_protobuf_include_dir = self.with_protobuf_include_dir
@@ -490,9 +571,9 @@ class DistMSI(BaseCommand):
     def _get_mysql_version(self):
         mysql_version = None
         if self.with_mysql_capi and os.path.isdir(self.with_mysql_capi):
-            mysql_version_h = os.path.join(self.with_mysql_capi,
-                                           "include",
-                                           "mysql_version.h")
+            mysql_version_h = os.path.join(
+                self.with_mysql_capi, "include", "mysql_version.h"
+            )
             with open(mysql_version_h, "rb") as fp:
                 for line in fp.readlines():
                     if b"#define LIBMYSQL_VERSION" in line:
@@ -505,9 +586,10 @@ class DistMSI(BaseCommand):
 
     def run(self):
         """Run the command."""
-        if os.name != 'nt':
-            self.log.info("This command is only useful on Windows. "
-                          "Forcing dry run.")
+        if os.name != "nt":
+            self.log.info(
+                "This command is only useful on Windows. " "Forcing dry run."
+            )
             self.dry_run = True
 
         self.log.info("generating INFO_SRC and INFO_BIN files")
@@ -519,7 +601,8 @@ class DistMSI(BaseCommand):
 
         if self.prepare_stage:
             zip_fn = os.path.join(
-                self.dist_dir, "{}.zip".format(os.path.abspath(self.prefix)))
+                self.dist_dir, "{}.zip".format(os.path.abspath(self.prefix))
+            )
             self.log.info("generating stage: %s", zip_fn)
             with zipfile.ZipFile(zip_fn, "w", zipfile.ZIP_DEFLATED) as zip_f:
                 # Read all directory, subdirectories and file lists
@@ -534,7 +617,8 @@ class DistMSI(BaseCommand):
             wix.check_wix_install(
                 wix_install_path=self.wix_install,
                 wix_required_version=self.wix_required_version,
-                dry_run=self.dry_run)
+                dry_run=self.dry_run,
+            )
 
             # create the Windows Installer
             msi_file = self._create_msi(dry_run=self.dry_run)

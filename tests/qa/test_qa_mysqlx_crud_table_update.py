@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,7 +34,7 @@ import tests
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
 class TableUpdateTests(tests.MySQLxTests):
-    """Tests for table.update(). """
+    """Tests for table.update()."""
 
     @tests.foreach_session()
     def test_table_update1(self):
@@ -451,7 +451,7 @@ class TableUpdateTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_overlaps_table_update4(self):
-        """"OVERLAPS operator with dict on LHS and dict on RHS."""
+        """ "OVERLAPS operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t4").execute()
         self.session.sql(
             "create table t4(id JSON, n JSON, a JSON, addinfo JSON)"

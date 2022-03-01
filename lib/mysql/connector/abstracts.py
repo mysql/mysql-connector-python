@@ -28,59 +28,86 @@
 
 """Module gathering all abstract base classes"""
 
-from abc import ABCMeta, abstractmethod, abstractproperty
-from decimal import Decimal
-from time import sleep
-from datetime import date, datetime, time, timedelta
-from inspect import signature
 import importlib
 import os
 import re
 import weakref
+
+from abc import ABCMeta, abstractmethod, abstractproperty
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from inspect import signature
+from time import sleep
+
 TLS_V1_3_SUPPORTED = False
 try:
     import ssl
-    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3: 
+
+    if hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3:
         TLS_V1_3_SUPPORTED = True
 except:
     # If import fails, we don't have SSL support.
     pass
 
+from . import errors
+from .constants import (
+    CONN_ATTRS_DN,
+    DEFAULT_CONFIGURATION,
+    DEPRECATED_TLS_VERSIONS,
+    OPENSSL_CS_NAMES,
+    TLS_CIPHER_SUITES,
+    TLS_VERSIONS,
+    CharacterSet,
+    ClientFlag,
+)
 from .conversion import MySQLConverterBase
-from .constants import (ClientFlag, CharacterSet, CONN_ATTRS_DN,
-                        DEFAULT_CONFIGURATION, DEPRECATED_TLS_VERSIONS,
-                        OPENSSL_CS_NAMES, TLS_CIPHER_SUITES, TLS_VERSIONS)
 from .optionfiles import MySQLOptionsParser
 from .utils import make_abc
-from . import errors
 
 NAMED_TUPLE_CACHE = weakref.WeakValueDictionary()
 
 DUPLICATED_IN_LIST_ERROR = (
     "The '{list}' list must not contain repeated values, the value "
-    "'{value}' is duplicated.")
+    "'{value}' is duplicated."
+)
 
-TLS_VERSION_ERROR = ("The given tls_version: '{}' is not recognized as a valid "
-                     "TLS protocol version (should be one of {}).")
+TLS_VERSION_ERROR = (
+    "The given tls_version: '{}' is not recognized as a valid "
+    "TLS protocol version (should be one of {})."
+)
 
-TLS_VERSION_DEPRECATED_ERROR = ("The given tls_version: '{}' are no longer "
-                                "allowed (should be one of {}).")
+TLS_VERSION_DEPRECATED_ERROR = (
+    "The given tls_version: '{}' are no longer "
+    "allowed (should be one of {})."
+)
 
-TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
-                        "'tls-versions' list '{}'. ")
+TLS_VER_NO_SUPPORTED = (
+    "No supported TLS protocol version found in the "
+    "'tls-versions' list '{}'. "
+)
 
 KRB_SERVICE_PINCIPAL_ERROR = (
     'Option "krb_service_principal" {error}, must be a string in the form '
     '"primary/instance@realm" e.g "ldap/ldapauth@MYSQL.COM" where "@realm" '
-    'is optional and if it is not given will be assumed to belong to the '
-    'default realm, as configured in the krb5.conf file.')
+    "is optional and if it is not given will be assumed to belong to the "
+    "default realm, as configured in the krb5.conf file."
+)
 
 MYSQL_PY_TYPES = (
-    (int, str, bytes, Decimal, float, datetime, date, timedelta, time,))
+    Decimal,
+    bytes,
+    date,
+    datetime,
+    float,
+    int,
+    str,
+    time,
+    timedelta,
+)
 
 
 @make_abc(ABCMeta)
-class MySQLConnectionAbstract(object):
+class MySQLConnectionAbstract:
 
     """Abstract class for classes connecting to a MySQL server"""
 
@@ -95,16 +122,16 @@ class MySQLConnectionAbstract(object):
         self._handshake = None
         self._conn_attrs = {}
 
-        self._user = ''
-        self._password = ''
-        self._password1 = ''
-        self._password2 = ''
-        self._password3 = ''
-        self._database = ''
-        self._host = '127.0.0.1'
+        self._user = ""
+        self._password = ""
+        self._password1 = ""
+        self._password2 = ""
+        self._password3 = ""
+        self._database = ""
+        self._host = "127.0.0.1"
         self._port = 3306
         self._unix_socket = None
-        self._client_host = ''
+        self._client_host = ""
         self._client_port = 0
         self._ssl = {}
         self._ssl_disabled = DEFAULT_CONFIGURATION["ssl_disabled"]
@@ -122,8 +149,9 @@ class MySQLConnectionAbstract(object):
         self._raw = False
         self._in_transaction = False
         self._allow_local_infile = DEFAULT_CONFIGURATION["allow_local_infile"]
-        self._allow_local_infile_in_path = (
-            DEFAULT_CONFIGURATION["allow_local_infile_in_path"])
+        self._allow_local_infile_in_path = DEFAULT_CONFIGURATION[
+            "allow_local_infile_in_path"
+        ]
 
         self._prepared_statements = None
         self._query_attrs = []
@@ -159,68 +187,78 @@ class MySQLConnectionAbstract(object):
         Checks if connection arguments contain option file arguments, and then
         reads option files accordingly.
         """
-        if 'option_files' in config:
+        if "option_files" in config:
             try:
-                if isinstance(config['option_groups'], str):
-                    config['option_groups'] = [config['option_groups']]
-                groups = config['option_groups']
-                del config['option_groups']
+                if isinstance(config["option_groups"], str):
+                    config["option_groups"] = [config["option_groups"]]
+                groups = config["option_groups"]
+                del config["option_groups"]
             except KeyError:
-                groups = ['client', 'connector_python']
+                groups = ["client", "connector_python"]
 
-            if isinstance(config['option_files'], str):
-                config['option_files'] = [config['option_files']]
-            option_parser = MySQLOptionsParser(list(config['option_files']),
-                                               keep_dashes=False)
-            del config['option_files']
+            if isinstance(config["option_files"], str):
+                config["option_files"] = [config["option_files"]]
+            option_parser = MySQLOptionsParser(
+                list(config["option_files"]), keep_dashes=False
+            )
+            del config["option_files"]
 
             config_from_file = option_parser.get_groups_as_dict_with_priority(
-                *groups)
+                *groups
+            )
             config_options = {}
             for group in groups:
                 try:
                     for option, value in config_from_file[group].items():
                         try:
-                            if option == 'socket':
-                                option = 'unix_socket'
+                            if option == "socket":
+                                option = "unix_socket"
                             # pylint: disable=W0104
                             DEFAULT_CONFIGURATION[option]
                             # pylint: enable=W0104
 
-                            if (option not in config_options or
-                                    config_options[option][1] <= value[1]):
+                            if (
+                                option not in config_options
+                                or config_options[option][1] <= value[1]
+                            ):
                                 config_options[option] = value
                         except KeyError:
-                            if group == 'connector_python':
-                                raise AttributeError("Unsupported argument "
-                                                     "'{0}'".format(option))
+                            if group == "connector_python":
+                                raise AttributeError(
+                                    "Unsupported argument "
+                                    "'{0}'".format(option)
+                                )
                 except KeyError:
                     continue
 
             for option, value in config_options.items():
                 if option not in config:
                     try:
-                        config[option] = eval(value[0])  # pylint: disable=W0123
+                        config[option] = eval(
+                            value[0]
+                        )  # pylint: disable=W0123
                     except (NameError, SyntaxError):
                         config[option] = value[0]
         return config
 
     def _validate_tls_ciphersuites(self):
-        """Validates the tls_ciphersuites option.
-        """
+        """Validates the tls_ciphersuites option."""
         tls_ciphersuites = []
         tls_cs = self._ssl["tls_ciphersuites"]
 
         if isinstance(tls_cs, str):
-            if not (tls_cs.startswith("[") and
-                    tls_cs.endswith("]")):
-                raise AttributeError("tls_ciphersuites must be a list, "
-                                     "found: '{}'".format(tls_cs))
+            if not (tls_cs.startswith("[") and tls_cs.endswith("]")):
+                raise AttributeError(
+                    "tls_ciphersuites must be a list, "
+                    "found: '{}'".format(tls_cs)
+                )
             else:
                 tls_css = tls_cs[1:-1].split(",")
                 if not tls_css:
-                    raise AttributeError("No valid cipher suite found "
-                                         "in 'tls_ciphersuites' list.")
+                    raise AttributeError(
+                        "No valid cipher suite found "
+                        "in 'tls_ciphersuites' list."
+                    )
                 for _tls_cs in tls_css:
                     _tls_cs = tls_cs.strip().upper()
                     if _tls_cs:
@@ -236,10 +274,14 @@ class MySQLConnectionAbstract(object):
         else:
             raise AttributeError(
                 "tls_ciphersuites should be a list with one or more "
-                "ciphersuites. Found: '{}'".format(tls_cs))
+                "ciphersuites. Found: '{}'".format(tls_cs)
+            )
 
-        tls_versions = TLS_VERSIONS[:] if self._ssl.get("tls_versions", None) \
-           is None else self._ssl["tls_versions"][:]
+        tls_versions = (
+            TLS_VERSIONS[:]
+            if self._ssl.get("tls_versions", None) is None
+            else self._ssl["tls_versions"][:]
+        )
 
         # A newer TLS version can use a cipher introduced on
         # an older version.
@@ -247,13 +289,13 @@ class MySQLConnectionAbstract(object):
         newer_tls_ver = tls_versions[0]
         # translated_names[0] belongs to TLSv1, TLSv1.1 and TLSv1.2
         # translated_names[1] are TLSv1.3 only
-        translated_names = [[],[]]
+        translated_names = [[], []]
         iani_cipher_suites_names = {}
         ossl_cipher_suites_names = []
 
         # Old ciphers can work with new TLS versions.
         # Find all the ciphers introduced on previous TLS versions.
-        for tls_ver in TLS_VERSIONS[:TLS_VERSIONS.index(newer_tls_ver) + 1]:
+        for tls_ver in TLS_VERSIONS[: TLS_VERSIONS.index(newer_tls_ver) + 1]:
             iani_cipher_suites_names.update(TLS_CIPHER_SUITES[tls_ver])
             ossl_cipher_suites_names.extend(OPENSSL_CS_NAMES[tls_ver])
 
@@ -268,35 +310,45 @@ class MySQLConnectionAbstract(object):
                 if translated_name in translated_names:
                     raise AttributeError(
                         DUPLICATED_IN_LIST_ERROR.format(
-                            list="tls_ciphersuites", value=translated_name))
+                            list="tls_ciphersuites", value=translated_name
+                        )
+                    )
                 else:
                     if name in TLS_CIPHER_SUITES["TLSv1.3"]:
                         translated_names[1].append(
-                            iani_cipher_suites_names[name])
+                            iani_cipher_suites_names[name]
+                        )
                     else:
                         translated_names[0].append(
-                            iani_cipher_suites_names[name])
+                            iani_cipher_suites_names[name]
+                        )
             else:
                 raise AttributeError(
                     "The value '{}' in tls_ciphersuites is not a valid "
-                    "cipher suite".format(name))
+                    "cipher suite".format(name)
+                )
         if not translated_names[0] and not translated_names[1]:
-            raise AttributeError("No valid cipher suite found in the "
-                                 "'tls_ciphersuites' list.")
-        translated_names = [":".join(translated_names[0]),
-                            ":".join(translated_names[1])]
+            raise AttributeError(
+                "No valid cipher suite found in the "
+                "'tls_ciphersuites' list."
+            )
+        translated_names = [
+            ":".join(translated_names[0]),
+            ":".join(translated_names[1]),
+        ]
         self._ssl["tls_ciphersuites"] = translated_names
 
     def _validate_tls_versions(self):
-        """Validates the tls_versions option.
-        """
+        """Validates the tls_versions option."""
         tls_versions = []
         tls_version = self._ssl["tls_versions"]
 
         if isinstance(tls_version, str):
             if not (tls_version.startswith("[") and tls_version.endswith("]")):
-                raise AttributeError("tls_versions must be a list, found: '{}'"
-                                     "".format(tls_version))
+                raise AttributeError(
+                    "tls_versions must be a list, found: '{}'"
+                    "".format(tls_version)
+                )
             else:
                 tls_vers = tls_version[1:-1].split(",")
                 for tls_ver in tls_vers:
@@ -306,21 +358,27 @@ class MySQLConnectionAbstract(object):
                     elif tls_version in tls_versions:
                         raise AttributeError(
                             DUPLICATED_IN_LIST_ERROR.format(
-                                list="tls_versions", value=tls_version))
+                                list="tls_versions", value=tls_version
+                            )
+                        )
                     tls_versions.append(tls_version)
                 if tls_vers == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
-                        raise AttributeError(
-                            TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))
+                    raise AttributeError(
+                        TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS)
+                    )
         elif isinstance(tls_version, list):
             if not tls_version:
                 raise AttributeError(
                     "At least one TLS protocol version must be specified in "
-                    "'tls_versions' list.")
+                    "'tls_versions' list."
+                )
             for tls_ver in tls_version:
                 if tls_ver in tls_versions:
                     raise AttributeError(
                         DUPLICATED_IN_LIST_ERROR.format(
-                            list="tls_versions", value=tls_ver))
+                            list="tls_versions", value=tls_ver
+                        )
+                    )
                 else:
                     tls_versions.append(tls_ver)
         elif isinstance(tls_version, set):
@@ -329,12 +387,14 @@ class MySQLConnectionAbstract(object):
         else:
             raise AttributeError(
                 "tls_versions should be a list with one or more of versions in "
-                "{}. found: '{}'".format(", ".join(TLS_VERSIONS), tls_versions))
+                "{}. found: '{}'".format(", ".join(TLS_VERSIONS), tls_versions)
+            )
 
         if not tls_versions:
             raise AttributeError(
                 "At least one TLS protocol version must be specified "
-                "in 'tls_versions' list when this option is given.")
+                "in 'tls_versions' list when this option is given."
+            )
 
         use_tls_versions = []
         deprecated_tls_versions = []
@@ -350,16 +410,20 @@ class MySQLConnectionAbstract(object):
         if use_tls_versions:
             if use_tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
                 raise errors.NotSupportedError(
-                    TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS))
+                    TLS_VER_NO_SUPPORTED.format(tls_version, TLS_VERSIONS)
+                )
             use_tls_versions.sort()
             self._ssl["tls_versions"] = use_tls_versions
         elif deprecated_tls_versions:
             raise errors.NotSupportedError(
-                TLS_VERSION_DEPRECATED_ERROR.format(deprecated_tls_versions,
-                                                    TLS_VERSIONS))
+                TLS_VERSION_DEPRECATED_ERROR.format(
+                    deprecated_tls_versions, TLS_VERSIONS
+                )
+            )
         elif invalid_tls_versions:
             raise AttributeError(
-                TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
+                TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS)
+            )
 
     @property
     def user(self):
@@ -404,7 +468,7 @@ class MySQLConnectionAbstract(object):
         Raises on errors.
         """
         config = kwargs.copy()
-        if 'dsn' in config:
+        if "dsn" in config:
             raise errors.NotSupportedError("Data source name is not supported")
 
         # Read option files
@@ -412,51 +476,57 @@ class MySQLConnectionAbstract(object):
 
         # Configure how we handle MySQL warnings
         try:
-            self.get_warnings = config['get_warnings']
-            del config['get_warnings']
+            self.get_warnings = config["get_warnings"]
+            del config["get_warnings"]
         except KeyError:
             pass  # Leave what was set or default
         try:
-            self.raise_on_warnings = config['raise_on_warnings']
-            del config['raise_on_warnings']
+            self.raise_on_warnings = config["raise_on_warnings"]
+            del config["raise_on_warnings"]
         except KeyError:
             pass  # Leave what was set or default
 
         # Configure client flags
         try:
             default = ClientFlag.get_default()
-            self.set_client_flags(config['client_flags'] or default)
-            del config['client_flags']
+            self.set_client_flags(config["client_flags"] or default)
+            del config["client_flags"]
         except KeyError:
             pass  # Missing client_flags-argument is OK
 
         try:
-            if config['compress']:
+            if config["compress"]:
                 self._compress = True
                 self.set_client_flags([ClientFlag.COMPRESS])
         except KeyError:
             pass  # Missing compress argument is OK
 
         self._allow_local_infile = config.get(
-            'allow_local_infile', DEFAULT_CONFIGURATION['allow_local_infile'])
+            "allow_local_infile", DEFAULT_CONFIGURATION["allow_local_infile"]
+        )
         self._allow_local_infile_in_path = config.get(
-            'allow_local_infile_in_path',
-            DEFAULT_CONFIGURATION['allow_local_infile_in_path'])
+            "allow_local_infile_in_path",
+            DEFAULT_CONFIGURATION["allow_local_infile_in_path"],
+        )
         infile_in_path = None
         if self._allow_local_infile_in_path:
             infile_in_path = os.path.abspath(self._allow_local_infile_in_path)
-            if infile_in_path and os.path.exists(infile_in_path) and \
-               not os.path.isdir(infile_in_path) or \
-               os.path.islink(infile_in_path):
-                raise AttributeError("allow_local_infile_in_path must be a "
-                                     "directory")
+            if (
+                infile_in_path
+                and os.path.exists(infile_in_path)
+                and not os.path.isdir(infile_in_path)
+                or os.path.islink(infile_in_path)
+            ):
+                raise AttributeError(
+                    "allow_local_infile_in_path must be a " "directory"
+                )
         if self._allow_local_infile or self._allow_local_infile_in_path:
             self.set_client_flags([ClientFlag.LOCAL_FILES])
         else:
             self.set_client_flags([-ClientFlag.LOCAL_FILES])
 
         try:
-            if not config['consume_results']:
+            if not config["consume_results"]:
                 self._consume_results = False
             else:
                 self._consume_results = True
@@ -465,43 +535,46 @@ class MySQLConnectionAbstract(object):
 
         # Configure auth_plugin
         try:
-            self._auth_plugin = config['auth_plugin']
-            del config['auth_plugin']
+            self._auth_plugin = config["auth_plugin"]
+            del config["auth_plugin"]
         except KeyError:
-            self._auth_plugin = ''
+            self._auth_plugin = ""
 
         # Configure character set and collation
-        if 'charset' in config or 'collation' in config:
+        if "charset" in config or "collation" in config:
             try:
-                charset = config['charset']
-                del config['charset']
+                charset = config["charset"]
+                del config["charset"]
             except KeyError:
                 charset = None
             try:
-                collation = config['collation']
-                del config['collation']
+                collation = config["collation"]
+                del config["collation"]
             except KeyError:
                 collation = None
-            self._charset_id = CharacterSet.get_charset_info(charset,
-                                                             collation)[0]
+            self._charset_id = CharacterSet.get_charset_info(
+                charset, collation
+            )[0]
 
         # Set converter class
         try:
-            self.set_converter_class(config['converter_class'])
+            self.set_converter_class(config["converter_class"])
         except KeyError:
             pass  # Using default converter class
         except TypeError:
-            raise AttributeError("Converter class should be a subclass "
-                                 "of conversion.MySQLConverterBase.")
+            raise AttributeError(
+                "Converter class should be a subclass "
+                "of conversion.MySQLConverterBase."
+            )
 
         # Compatible configuration with other drivers
         compat_map = [
             # (<other driver argument>,<translates to>)
-            ('db', 'database'),
-            ('username', 'user'),
-            ('passwd', 'password'),
-            ('connect_timeout', 'connection_timeout'),
-            ('read_default_file', 'option_files'),
+            ("db", "database"),
+            ("username", "user"),
+            ("passwd", "password"),
+            ("connect_timeout", "connection_timeout"),
+            ("read_default_file", "option_files"),
         ]
         for compat, translate in compat_map:
             try:
@@ -512,39 +585,42 @@ class MySQLConnectionAbstract(object):
                 pass  # Missing compat argument is OK
 
         # Configure login information
-        if 'user' in config or 'password' in config:
+        if "user" in config or "password" in config:
             try:
-                user = config['user']
-                del config['user']
+                user = config["user"]
+                del config["user"]
             except KeyError:
                 user = self._user
             try:
-                password = config['password']
-                del config['password']
+                password = config["password"]
+                del config["password"]
             except KeyError:
                 password = self._password
             self.set_login(user, password)
 
         # Configure host information
-        if 'host' in config and config['host']:
-            self._host = config['host']
+        if "host" in config and config["host"]:
+            self._host = config["host"]
 
         # Check network locations
         try:
-            self._port = int(config['port'])
-            del config['port']
+            self._port = int(config["port"])
+            del config["port"]
         except KeyError:
             pass  # Missing port argument is OK
         except ValueError:
             raise errors.InterfaceError(
-                "TCP/IP port number should be an integer")
+                "TCP/IP port number should be an integer"
+            )
 
         if "ssl_disabled" in config:
             self._ssl_disabled = config.pop("ssl_disabled")
 
         if self._ssl_disabled and self._auth_plugin == "mysql_clear_password":
-            raise errors.InterfaceError("Clear password authentication is not "
-                                        "supported over insecure channels")
+            raise errors.InterfaceError(
+                "Clear password authentication is not "
+                "supported over insecure channels"
+            )
 
         # Other configuration
         set_ssl_flag = False
@@ -554,54 +630,60 @@ class MySQLConnectionAbstract(object):
             except KeyError:
                 raise AttributeError("Unsupported argument '{0}'".format(key))
             # SSL Configuration
-            if key.startswith('ssl_'):
+            if key.startswith("ssl_"):
                 set_ssl_flag = True
-                self._ssl.update({key.replace('ssl_', ''): value})
-            elif key.startswith('tls_'):
+                self._ssl.update({key.replace("ssl_", ""): value})
+            elif key.startswith("tls_"):
                 set_ssl_flag = True
                 self._ssl.update({key: value})
             else:
-                attribute = '_' + key
+                attribute = "_" + key
                 try:
                     setattr(self, attribute, value.strip())
                 except AttributeError:
                     setattr(self, attribute, value)
 
         if set_ssl_flag:
-            if 'verify_cert' not in self._ssl:
-                self._ssl['verify_cert'] = \
-                    DEFAULT_CONFIGURATION['ssl_verify_cert']
-            if 'verify_identity' not in self._ssl:
-                self._ssl['verify_identity'] = \
-                    DEFAULT_CONFIGURATION['ssl_verify_identity']
+            if "verify_cert" not in self._ssl:
+                self._ssl["verify_cert"] = DEFAULT_CONFIGURATION[
+                    "ssl_verify_cert"
+                ]
+            if "verify_identity" not in self._ssl:
+                self._ssl["verify_identity"] = DEFAULT_CONFIGURATION[
+                    "ssl_verify_identity"
+                ]
             # Make sure both ssl_key/ssl_cert are set, or neither (XOR)
-            if 'ca' not in self._ssl or self._ssl['ca'] is None:
-                self._ssl['ca'] = ""
-            if bool('key' in self._ssl) != bool('cert' in self._ssl):
+            if "ca" not in self._ssl or self._ssl["ca"] is None:
+                self._ssl["ca"] = ""
+            if bool("key" in self._ssl) != bool("cert" in self._ssl):
                 raise AttributeError(
                     "ssl_key and ssl_cert need to be both "
                     "specified, or neither."
                 )
             # Make sure key/cert are set to None
-            elif not set(('key', 'cert')) <= set(self._ssl):
-                self._ssl['key'] = None
-                self._ssl['cert'] = None
-            elif (self._ssl['key'] is None) != (self._ssl['cert'] is None):
+            elif not set(("key", "cert")) <= set(self._ssl):
+                self._ssl["key"] = None
+                self._ssl["cert"] = None
+            elif (self._ssl["key"] is None) != (self._ssl["cert"] is None):
                 raise AttributeError(
-                    "ssl_key and ssl_cert need to be both "
-                    "set, or neither."
+                    "ssl_key and ssl_cert need to be both " "set, or neither."
                 )
-            if "tls_versions" in self._ssl and \
-               self._ssl["tls_versions"] is not None:
+            if (
+                "tls_versions" in self._ssl
+                and self._ssl["tls_versions"] is not None
+            ):
                 self._validate_tls_versions()
 
-            if "tls_ciphersuites" in self._ssl and self._ssl["tls_ciphersuites"] is not None:
+            if (
+                "tls_ciphersuites" in self._ssl
+                and self._ssl["tls_ciphersuites"] is not None
+            ):
                 self._validate_tls_ciphersuites()
 
         if self._conn_attrs is None:
             self._conn_attrs = {}
         elif not isinstance(self._conn_attrs, dict):
-            raise errors.InterfaceError('conn_attrs must be of type dict.')
+            raise errors.InterfaceError("conn_attrs must be of type dict.")
         else:
             for attr_name in self._conn_attrs:
                 if attr_name in CONN_ATTRS_DN:
@@ -610,43 +692,57 @@ class MySQLConnectionAbstract(object):
                 if not isinstance(attr_name, str):
                     raise errors.InterfaceError(
                         "Attribute name should be a string, found: '{}' in '{}'"
-                        "".format(attr_name, self._conn_attrs))
+                        "".format(attr_name, self._conn_attrs)
+                    )
                 # Validate attribute name limit 32 characters
                 if len(attr_name) > 32:
                     raise errors.InterfaceError(
                         "Attribute name '{}' exceeds 32 characters limit size."
-                        "".format(attr_name))
+                        "".format(attr_name)
+                    )
                 # Validate names in connection attributes cannot start with "_"
                 if attr_name.startswith("_"):
                     raise errors.InterfaceError(
                         "Key names in connection attributes cannot start with "
-                        "'_', found: '{}'".format(attr_name))
+                        "'_', found: '{}'".format(attr_name)
+                    )
                 # Validate value type
                 attr_value = self._conn_attrs[attr_name]
                 if not isinstance(attr_value, str):
                     raise errors.InterfaceError(
                         "Attribute '{}' value: '{}' must be a string type."
-                        "".format(attr_name, attr_value))
+                        "".format(attr_name, attr_value)
+                    )
                 # Validate attribute value limit 1024 characters
                 if len(attr_value) > 1024:
                     raise errors.InterfaceError(
                         "Attribute '{}' value: '{}' exceeds 1024 characters "
-                        "limit size".format(attr_name, attr_value))
+                        "limit size".format(attr_name, attr_value)
+                    )
 
         if self._client_flags & ClientFlag.CONNECT_ARGS:
             self._add_default_conn_attrs()
-        if "krb_service_principal" in config and \
-            config["krb_service_principal"] is not None:
+        if (
+            "krb_service_principal" in config
+            and config["krb_service_principal"] is not None
+        ):
             self._krb_service_principal = config["krb_service_principal"]
             if not isinstance(self._krb_service_principal, str):
-                raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
-                    error="is not a string"))
+                raise errors.InterfaceError(
+                    KRB_SERVICE_PINCIPAL_ERROR.format(error="is not a string")
+                )
             if self._krb_service_principal == "":
-                raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
-                    error="can not be an empty string"))
+                raise errors.InterfaceError(
+                    KRB_SERVICE_PINCIPAL_ERROR.format(
+                        error="can not be an empty string"
+                    )
+                )
             if "/" not in self._krb_service_principal:
-                raise errors.InterfaceError(KRB_SERVICE_PINCIPAL_ERROR.format(
-                    error="is incorrectly formatted"))
+                raise errors.InterfaceError(
+                    KRB_SERVICE_PINCIPAL_ERROR.format(
+                        error="is incorrectly formatted"
+                    )
+                )
 
         if self._fido_callback:
             # Import the callable if it's a str
@@ -703,7 +799,8 @@ class MySQLConnectionAbstract(object):
         version = tuple([int(v) for v in match.groups()[0:3]])
         if version < (4, 1):
             raise errors.InterfaceError(
-                "MySQL Version '{0}' is not supported.".format(server_version))
+                "MySQL Version '{0}' is not supported.".format(server_version)
+            )
 
         return version
 
@@ -726,7 +823,7 @@ class MySQLConnectionAbstract(object):
         Returns a string or None.
         """
         try:
-            return self._handshake['server_version_original']
+            return self._handshake["server_version_original"]
         except (TypeError, KeyError):
             return None
 
@@ -761,7 +858,8 @@ class MySQLConnectionAbstract(object):
                     self._client_flags |= flag
         else:
             raise errors.ProgrammingError(
-                "set_client_flags expect integer (>0) or set")
+                "set_client_flags expect integer (>0) or set"
+            )
         return self._client_flags
 
     def isset_client_flag(self, flag):
@@ -799,7 +897,7 @@ class MySQLConnectionAbstract(object):
           cnx.sql_mode = [SQLMode.NO_ZERO_DATE, SQLMode.REAL_AS_FLOAT]
         """
         if isinstance(value, (list, tuple)):
-            value = ','.join(value)
+            value = ",".join(value)
         self.cmd_query("SET @@session.sql_mode = '{0}'".format(value))
         self._sql_mode = value
 
@@ -817,11 +915,11 @@ class MySQLConnectionAbstract(object):
         if username is not None:
             self._user = username.strip()
         else:
-            self._user = ''
+            self._user = ""
         if password is not None:
             self._password = password
         else:
-            self._password = ''
+            self._password = ""
 
     def set_unicode(self, value=True):
         """Toggle unicode mode
@@ -842,7 +940,7 @@ class MySQLConnectionAbstract(object):
     @autocommit.setter
     def autocommit(self, value):
         """Toggle autocommit"""
-        switch = 'ON' if value else 'OFF'
+        switch = "ON" if value else "OFF"
         self.cmd_query("SET @@session.autocommit = {0}".format(switch))
         self._autocommit = value
 
@@ -899,7 +997,6 @@ class MySQLConnectionAbstract(object):
         self._raise_on_warnings = value
         self._get_warnings = value
 
-
     @property
     def unread_result(self):
         """Get whether there is an unread result
@@ -948,8 +1045,8 @@ class MySQLConnectionAbstract(object):
         Returns a string.
         """
         encoding = CharacterSet.get_info(self._charset_id)[0]
-        if encoding in ('utf8mb4', 'binary'):
-            return 'utf8'
+        if encoding in ("utf8mb4", "binary"):
+            return "utf8"
         return encoding
 
     def set_charset_collation(self, charset=None, collation=None):
@@ -971,20 +1068,33 @@ class MySQLConnectionAbstract(object):
         """
         if charset:
             if isinstance(charset, int):
-                (self._charset_id, charset_name, collation_name) = \
-                    CharacterSet.get_charset_info(charset)
+                (
+                    self._charset_id,
+                    charset_name,
+                    collation_name,
+                ) = CharacterSet.get_charset_info(charset)
             elif isinstance(charset, str):
-                (self._charset_id, charset_name, collation_name) = \
-                    CharacterSet.get_charset_info(charset, collation)
+                (
+                    self._charset_id,
+                    charset_name,
+                    collation_name,
+                ) = CharacterSet.get_charset_info(charset, collation)
             else:
                 raise ValueError(
-                    "charset should be either integer, string or None")
+                    "charset should be either integer, string or None"
+                )
         elif collation:
-            (self._charset_id, charset_name, collation_name) = \
-                    CharacterSet.get_charset_info(collation=collation)
+            (
+                self._charset_id,
+                charset_name,
+                collation_name,
+            ) = CharacterSet.get_charset_info(collation=collation)
 
-        self._execute_query("SET NAMES '{0}' COLLATE '{1}'".format(
-            charset_name, collation_name))
+        self._execute_query(
+            "SET NAMES '{0}' COLLATE '{1}'".format(
+                charset_name, collation_name
+            )
+        )
 
         try:
             # Required for C Extension
@@ -1036,6 +1146,7 @@ class MySQLConnectionAbstract(object):
     def disconnect(self):
         """Disconnect from the MySQL server"""
         pass
+
     close = disconnect
 
     def connect(self, **kwargs):
@@ -1078,8 +1189,10 @@ class MySQLConnectionAbstract(object):
                     break
             except Exception as err:  # pylint: disable=W0703
                 if counter == attempts:
-                    msg = "Can not reconnect to MySQL after {0} "\
-                          "attempt(s): {1}".format(attempts, str(err))
+                    msg = (
+                        "Can not reconnect to MySQL after {0} "
+                        "attempt(s): {1}".format(attempts, str(err))
+                    )
                     raise errors.InterfaceError(msg)
             if delay > 0:
                 sleep(delay)
@@ -1100,8 +1213,15 @@ class MySQLConnectionAbstract(object):
         pass
 
     @abstractmethod
-    def cursor(self, buffered=None, raw=None, prepared=None, cursor_class=None,
-               dictionary=None, named_tuple=None):
+    def cursor(
+        self,
+        buffered=None,
+        raw=None,
+        prepared=None,
+        cursor_class=None,
+        dictionary=None,
+        named_tuple=None,
+    ):
         """Instantiates and returns a cursor"""
         pass
 
@@ -1115,8 +1235,9 @@ class MySQLConnectionAbstract(object):
         """Rollback current transaction"""
         pass
 
-    def start_transaction(self, consistent_snapshot=False,
-                          isolation_level=None, readonly=None):
+    def start_transaction(
+        self, consistent_snapshot=False, isolation_level=None, readonly=None
+    ):
         """Start a transaction
 
         This method explicitly starts a transaction sending the
@@ -1138,29 +1259,35 @@ class MySQLConnectionAbstract(object):
             raise errors.ProgrammingError("Transaction already in progress")
 
         if isolation_level:
-            level = isolation_level.strip().replace('-', ' ').upper()
-            levels = ['READ UNCOMMITTED', 'READ COMMITTED', 'REPEATABLE READ',
-                      'SERIALIZABLE']
+            level = isolation_level.strip().replace("-", " ").upper()
+            levels = [
+                "READ UNCOMMITTED",
+                "READ COMMITTED",
+                "REPEATABLE READ",
+                "SERIALIZABLE",
+            ]
 
             if level not in levels:
                 raise ValueError(
-                    'Unknown isolation level "{0}"'.format(isolation_level))
+                    'Unknown isolation level "{0}"'.format(isolation_level)
+                )
 
             self._execute_query(
-                "SET TRANSACTION ISOLATION LEVEL {0}".format(level))
+                "SET TRANSACTION ISOLATION LEVEL {0}".format(level)
+            )
 
         if readonly is not None:
             if self._server_version < (5, 6, 5):
                 raise ValueError(
                     "MySQL server version {0} does not support "
-                    "this feature".format(self._server_version))
+                    "this feature".format(self._server_version)
+                )
 
             if readonly:
-                access_mode = 'READ ONLY'
+                access_mode = "READ ONLY"
             else:
-                access_mode = 'READ WRITE'
-            self._execute_query(
-                "SET TRANSACTION {0}".format(access_mode))
+                access_mode = "READ WRITE"
+            self._execute_query("SET TRANSACTION {0}".format(access_mode))
 
         query = "START TRANSACTION"
         if consistent_snapshot:
@@ -1192,10 +1319,15 @@ class MySQLConnectionAbstract(object):
             if self._compress:
                 raise errors.NotSupportedError(
                     "Reset session is not supported with compression for "
-                    "MySQL server version 5.7.2 or earlier.")
+                    "MySQL server version 5.7.2 or earlier."
+                )
             else:
-                self.cmd_change_user(self._user, self._password,
-                                     self._database, self._charset_id)
+                self.cmd_change_user(
+                    self._user,
+                    self._password,
+                    self._database,
+                    self._charset_id,
+                )
 
         if user_variables or session_variables:
             cur = self.cursor()
@@ -1218,12 +1350,15 @@ class MySQLConnectionAbstract(object):
             self.converter = convclass(charset_name, self._use_unicode)
             self.converter.str_fallback = self._converter_str_fallback
         else:
-            raise TypeError("Converter class should be a subclass "
-                            "of conversion.MySQLConverterBase.")
+            raise TypeError(
+                "Converter class should be a subclass "
+                "of conversion.MySQLConverterBase."
+            )
 
     @abstractmethod
-    def get_rows(self, count=None, binary=False, columns=None, raw=None,
-                 prep_stmt=None):
+    def get_rows(
+        self, count=None, binary=False, columns=None, raw=None, prep_stmt=None
+    ):
         """Get all rows returned by the MySQL server"""
         pass
 
@@ -1266,7 +1401,8 @@ class MySQLConnectionAbstract(object):
         Raises NotSupportedError exception
         """
         raise errors.NotSupportedError(
-            "Not implemented. Use SHOW PROCESSLIST or INFORMATION_SCHEMA")
+            "Not implemented. Use SHOW PROCESSLIST or INFORMATION_SCHEMA"
+        )
 
     def cmd_process_kill(self, mysql_pid):
         """Kill a MySQL process"""
@@ -1280,8 +1416,16 @@ class MySQLConnectionAbstract(object):
         """Send the PING command"""
         raise NotImplementedError
 
-    def cmd_change_user(self, username='', password='', database='',
-                        charset=45, password1='', password2='', password3=''):
+    def cmd_change_user(
+        self,
+        username="",
+        password="",
+        database="",
+        charset=45,
+        password1="",
+        password2="",
+        password3="",
+    ):
         """Change the current logged in user"""
         raise NotImplementedError
 
@@ -1311,12 +1455,13 @@ class MySQLConnectionAbstract(object):
 
 
 @make_abc(ABCMeta)
-class MySQLCursorAbstract(object):
+class MySQLCursorAbstract:
     """Abstract cursor class
 
     Abstract class defining cursor class with method and members
     required by the Python Database API Specification v2.0.
     """
+
     def __init__(self):
         """Initialization"""
         self._description = None
@@ -1515,10 +1660,12 @@ class MySQLCursorAbstract(object):
         """Add a query attribute and his value."""
         if not isinstance(name, str):
             raise errors.ProgrammingError(
-                "Parameter `name` must be a string type.")
+                "Parameter `name` must be a string type."
+            )
         if value is not None and not isinstance(value, MYSQL_PY_TYPES):
             raise errors.ProgrammingError(
-                f"Object {value} cannot be converted to a MySQL type.")
+                f"Object {value} cannot be converted to a MySQL type."
+            )
         if hasattr(self, "_cnx"):
             self._cnx._query_attrs.append((name, value))
         elif hasattr(self, "_connection"):

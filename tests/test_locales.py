@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2012, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,19 +32,19 @@
 from datetime import datetime
 
 import tests
+
 from mysql.connector import errorcode, locales
 
 
 def _get_client_errors():
     errors = {}
     for name in dir(errorcode):
-        if name.startswith('CR_'):
+        if name.startswith("CR_"):
             errors[name] = getattr(errorcode, name)
     return errors
 
 
 class LocalesModulesTests(tests.MySQLConnectorTests):
-
     def test_defaults(self):
         # There should always be 'eng'
         try:
@@ -56,30 +56,33 @@ class LocalesModulesTests(tests.MySQLConnectorTests):
         some_error = None
         try:
             from mysql.connector.locales.eng import client_error
+
             some_error = client_error.CR_UNKNOWN_ERROR
         except ImportError:
             self.fail("locales.eng.client_error could not be imported")
-        some_error = some_error + ''  # fool pylint
+        some_error = some_error + ""  # fool pylint
 
     def test_get_client_error(self):
         try:
-            locales.get_client_error(2000, language='spam')
+            locales.get_client_error(2000, language="spam")
         except ImportError as err:
-            self.assertEqual("No localization support for language 'spam'",
-                             str(err))
+            self.assertEqual(
+                "No localization support for language 'spam'", str(err)
+            )
         else:
             self.fail("ImportError not raised")
 
         exp = "Unknown MySQL error"
         self.assertEqual(exp, locales.get_client_error(2000))
-        self.assertEqual(exp, locales.get_client_error('CR_UNKNOWN_ERROR'))
+        self.assertEqual(exp, locales.get_client_error("CR_UNKNOWN_ERROR"))
 
         try:
             locales.get_client_error(tuple())
         except ValueError as err:
             self.assertEqual(
                 "error argument needs to be either an integer or string",
-                str(err))
+                str(err),
+            )
         else:
             self.fail("ValueError not raised")
 
@@ -109,7 +112,7 @@ class LocalesEngClientErrorTests(tests.MySQLConnectorTests):
 
         count = 0
         for name in dir(client_error):
-            if name.startswith('CR_'):
+            if name.startswith("CR_"):
                 count += 1
         self.assertEqual(len(errors), count)
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -50,11 +50,16 @@ def get_client_error(error, language="eng"):
     Returns a string or None.
     """
     try:
-        tmp = __import__("mysqlx.locales.{0}".format(language),
-                         globals(), locals(), ["client_error"])
+        tmp = __import__(
+            "mysqlx.locales.{0}".format(language),
+            globals(),
+            locals(),
+            ["client_error"],
+        )
     except ImportError:
-        raise ImportError("No localization support for language '{0}'"
-                          "".format(language))
+        raise ImportError(
+            "No localization support for language '{0}'" "".format(language)
+        )
     client_error = tmp.client_error
 
     if isinstance(error, int):

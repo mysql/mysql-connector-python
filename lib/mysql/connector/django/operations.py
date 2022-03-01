@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,8 +26,10 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-from django.db.backends.mysql.operations import DatabaseOperations as MySQLDatabaseOperations
 from django.conf import settings
+from django.db.backends.mysql.operations import (
+    DatabaseOperations as MySQLDatabaseOperations,
+)
 from django.utils import timezone
 
 try:
@@ -43,11 +45,11 @@ class DatabaseOperations(MySQLDatabaseOperations):
 
     def regex_lookup(self, lookup_type):
         if self.connection.mysql_version < (8, 0, 0):
-            if lookup_type == 'regex':
-                return '%s REGEXP BINARY %s'
-            return '%s REGEXP %s'
+            if lookup_type == "regex":
+                return "%s REGEXP BINARY %s"
+            return "%s REGEXP %s"
 
-        match_option = 'c' if lookup_type == 'regex' else 'i'
+        match_option = "c" if lookup_type == "regex" else "i"
         return "REGEXP_LIKE(%s, %s, '%s')" % match_option
 
     def adapt_datetimefield_value(self, value):
@@ -79,8 +81,9 @@ class DatabaseOperations(MySQLDatabaseOperations):
 
         # MySQL doesn't support tz-aware times
         if timezone.is_aware(value):
-            raise ValueError("MySQL backend does not support timezone-aware "
-                             "times.")
+            raise ValueError(
+                "MySQL backend does not support timezone-aware " "times."
+            )
 
         if not self.connection.use_pure:
             return time_to_mysql(value)

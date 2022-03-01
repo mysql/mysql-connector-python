@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,7 +34,7 @@ import tests
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
 class TableDeleteTests(tests.MySQLxTests):
-    """Tests for table.delete(). """
+    """Tests for table.delete()."""
 
     @tests.foreach_session()
     def test_table_delete1(self):
@@ -457,5 +457,5 @@ class TableDeleteTests(tests.MySQLxTests):
         self.assertEqual(result.get_affected_items_count(), 2)
         self.assertEqual(result1.get_affected_items_count(), 1)
         self.assertEqual(result2.get_affected_items_count(), 1)
-        self.assertEqual(result3.get_affected_items_count(),  0)
+        self.assertEqual(result3.get_affected_items_count(), 0)
         self.session.sql("drop table if exists t4").execute()

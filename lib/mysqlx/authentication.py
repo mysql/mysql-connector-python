@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -49,8 +49,9 @@ def xor_string(hash1, hash2, hash_size):
     return struct.pack("{0}B".format(hash_size), *xored)
 
 
-class BaseAuthPlugin(object):
+class BaseAuthPlugin:
     """Base class for implementing the authentication plugins."""
+
     def __init__(self, username=None, password=None):
         self._username = username
         self._password = password
@@ -74,6 +75,7 @@ class BaseAuthPlugin(object):
 
 class MySQL41AuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Native Password authentication plugin."""
+
     def name(self):
         """Returns the plugin name.
 
@@ -100,17 +102,23 @@ class MySQL41AuthPlugin(BaseAuthPlugin):
             str: The authentication response.
         """
         if self._password:
-            password = self._password.encode("utf-8") \
-                if isinstance(self._password, str) else self._password
+            password = (
+                self._password.encode("utf-8")
+                if isinstance(self._password, str)
+                else self._password
+            )
             hash1 = hashlib.sha1(password).digest()
             hash2 = hashlib.sha1(hash1).digest()
             xored = xor_string(hash1, hashlib.sha1(data + hash2).digest(), 20)
-            return "{0}\0{1}\0*{2}\0".format("", self._username, hexlify(xored))
+            return "{0}\0{1}\0*{2}\0".format(
+                "", self._username, hexlify(xored)
+            )
         return "{0}\0{1}\0".format("", self._username)
 
 
 class PlainAuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Plain authentication plugin."""
+
     def name(self):
         """Returns the plugin name.
 
@@ -138,6 +146,7 @@ class PlainAuthPlugin(BaseAuthPlugin):
 
 class Sha256MemoryAuthPlugin(BaseAuthPlugin):
     """Class implementing the SHA256_MEMORY authentication plugin."""
+
     def name(self):
         """Returns the plugin name.
 
@@ -166,8 +175,11 @@ class Sha256MemoryAuthPlugin(BaseAuthPlugin):
         Returns:
             str: The authentication response.
         """
-        password = self._password.encode("utf-8") \
-            if isinstance(self._password, str) else self._password
+        password = (
+            self._password.encode("utf-8")
+            if isinstance(self._password, str)
+            else self._password
+        )
         hash1 = hashlib.sha256(password).digest()
         hash2 = hashlib.sha256(hashlib.sha256(hash1).digest() + data).digest()
         xored = xor_string(hash2, hash1, 32)

@@ -35,12 +35,12 @@ from distutils.dir_util import mkpath
 from distutils.errors import DistutilsError
 from distutils.file_util import copy_file
 
-from . import BaseCommand, EDITION, VERSION, VERSION_EXTRA
+from . import EDITION, VERSION, VERSION_EXTRA, BaseCommand
 from .utils import linux_distribution
 
-
-RPM_SPEC = os.path.join("cpydist", "data", "rpm",
-                        "mysql-connector-python.spec")
+RPM_SPEC = os.path.join(
+    "cpydist", "data", "rpm", "mysql-connector-python.spec"
+)
 LINUX_DIST = linux_distribution()
 VERSION_TEXT_SHORT = "{0}.{1}.{2}".format(*VERSION[0:3])
 
@@ -50,18 +50,24 @@ class DistRPM(BaseCommand):
 
     description = "create a RPM distribution"
     user_options = BaseCommand.user_options + [
-        ("build-base=", "d",
-         "base directory for build library"),
-        ("dist-dir=", "d",
-         "directory to put final built distributions in"),
-        ('pre-release', None,
-         "this is a pre-release (changes RPM release number)"),
-        ("rpm-base=", "d",
-         "base directory for creating RPMs (default <bdist-dir>/rpm)"),
-        ("pre-release", None,
-         "this is a pre-release (changes RPM release number)"),
-        ("python3-pkgversion=", None,
-         "Python 3 PKG version"),
+        ("build-base=", "d", "base directory for build library"),
+        ("dist-dir=", "d", "directory to put final built distributions in"),
+        (
+            "pre-release",
+            None,
+            "this is a pre-release (changes RPM release number)",
+        ),
+        (
+            "rpm-base=",
+            "d",
+            "base directory for creating RPMs (default <bdist-dir>/rpm)",
+        ),
+        (
+            "pre-release",
+            None,
+            "this is a pre-release (changes RPM release number)",
+        ),
+        ("python3-pkgversion=", None, "Python 3 PKG version"),
     ]
 
     build_base = None
@@ -76,14 +82,15 @@ class DistRPM(BaseCommand):
     def finalize_options(self):
         """Finalize the options."""
         BaseCommand.finalize_options(self)
-        self.set_undefined_options("build",
-                                   ("build_base", "build_base"))
-        self.set_undefined_options(self._cmd_dist_tarball,
-                                   ("dist_dir", "dist_dir"))
+        self.set_undefined_options("build", ("build_base", "build_base"))
+        self.set_undefined_options(
+            self._cmd_dist_tarball, ("dist_dir", "dist_dir")
+        )
 
         if not self.rpm_base:
             self.rpm_base = os.path.abspath(
-                os.path.join(self.build_base, "rpmbuild"))
+                os.path.join(self.build_base, "rpmbuild")
+            )
 
         if not self.python3_pkgversion:
             self.python3_pkgversion = os.environ.get("PYTHON3_PKGVERSION")
@@ -104,11 +111,17 @@ class DistRPM(BaseCommand):
         """
         try:
             devnull = open(os.devnull, "w")
-            subprocess.Popen(["rpmbuild", "--version"],
-                             stdin=devnull, stdout=devnull, stderr=devnull)
+            subprocess.Popen(
+                ["rpmbuild", "--version"],
+                stdin=devnull,
+                stdout=devnull,
+                stderr=devnull,
+            )
         except OSError:
-            raise DistutilsError("Could not execute rpmbuild. Make sure "
-                                 "it is installed and in your PATH")
+            raise DistutilsError(
+                "Could not execute rpmbuild. Make sure "
+                "it is installed and in your PATH"
+            )
 
     def _create_rpm(self, rpm_name, spec):
         """Create RPM."""
@@ -118,10 +131,13 @@ class DistRPM(BaseCommand):
         cmd = [
             "rpmbuild",
             "-ba",
-            "--define", macro_bdist_dir,
-            "--define", "_topdir {}".format(os.path.abspath(self.rpm_base)),
-            "--define", "version {}".format(VERSION_TEXT_SHORT),
-            spec
+            "--define",
+            macro_bdist_dir,
+            "--define",
+            "_topdir {}".format(os.path.abspath(self.rpm_base)),
+            "--define",
+            "version {}".format(VERSION_TEXT_SHORT),
+            spec,
         ]
 
         if not self.verbose:
@@ -141,29 +157,61 @@ class DistRPM(BaseCommand):
             cmd.extend(["--define", "pre_release 1"])
 
         if self.python3_pkgversion:
-            cmd.extend(["--define", "python3_pkgversion {}".format(self.python3_pkgversion)])
+            cmd.extend(
+                [
+                    "--define",
+                    "python3_pkgversion {}".format(self.python3_pkgversion),
+                ]
+            )
 
         if VERSION_EXTRA:
             cmd.extend(["--define", "version_extra {}".format(VERSION_EXTRA)])
 
         cmd.extend(["--define", "mysql_capi {}".format(self.with_mysql_capi)])
         if self.with_openssl_include_dir:
-            cmd.extend(["--define", "openssl_include_dir {}"
-                                "".format(self.with_openssl_include_dir)])
-            cmd.extend(["--define", "openssl_lib_dir {}"
-                                "".format(self.with_openssl_lib_dir)])
-        cmd.extend(["--define", "protobuf_include_dir {}"
-                                "".format(self.with_protobuf_include_dir)])
-        cmd.extend(["--define", "protobuf_lib_dir {}"
-                                "".format(self.with_protobuf_lib_dir)])
+            cmd.extend(
+                [
+                    "--define",
+                    "openssl_include_dir {}"
+                    "".format(self.with_openssl_include_dir),
+                ]
+            )
+            cmd.extend(
+                [
+                    "--define",
+                    "openssl_lib_dir {}" "".format(self.with_openssl_lib_dir),
+                ]
+            )
+        cmd.extend(
+            [
+                "--define",
+                "protobuf_include_dir {}"
+                "".format(self.with_protobuf_include_dir),
+            ]
+        )
+        cmd.extend(
+            [
+                "--define",
+                "protobuf_lib_dir {}" "".format(self.with_protobuf_lib_dir),
+            ]
+        )
         cmd.extend(["--define", "protoc {}".format(self.with_protoc)])
 
         if self.extra_compile_args:
-            cmd.extend(["--define", "extra_compile_args '{0}'"
-                                    "".format(self.extra_compile_args)])
+            cmd.extend(
+                [
+                    "--define",
+                    "extra_compile_args '{0}'"
+                    "".format(self.extra_compile_args),
+                ]
+            )
         if self.extra_link_args:
-            cmd.extend(["--define",
-                        "extra_link_args '{0}'".format(self.extra_link_args)])
+            cmd.extend(
+                [
+                    "--define",
+                    "extra_link_args '{0}'".format(self.extra_link_args),
+                ]
+            )
 
         self.spawn(cmd)
 
@@ -186,8 +234,9 @@ class DistRPM(BaseCommand):
         cmd_sdist.label = self.label
         cmd_sdist.run()
 
-        rpm_name = "mysql-connector-python-{}".format("-{}".format(self.label)
-                                                      if self.label else "")
+        rpm_name = "mysql-connector-python-{}".format(
+            "-{}".format(self.label) if self.label else ""
+        )
         self._create_rpm(rpm_name=rpm_name, spec=RPM_SPEC)
 
         self.remove_temp()

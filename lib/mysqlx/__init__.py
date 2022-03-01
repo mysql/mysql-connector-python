@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,9 +28,9 @@
 
 """MySQL X DevAPI Python implementation"""
 
-import re
 import json
 import logging
+import re
 import ssl
 
 from urllib.parse import parse_qsl, unquote, urlparse
@@ -41,50 +41,111 @@ except ImportError:
     JSONDecodeError = ValueError
 
 from .connection import Client, Session
-from .constants import (Auth, LockContention, OPENSSL_CS_NAMES, SSLMode,
-                        TLS_VERSIONS, TLS_CIPHER_SUITES)
-from .crud import Schema, Collection, Table, View
+from .constants import (
+    OPENSSL_CS_NAMES,
+    TLS_CIPHER_SUITES,
+    TLS_VERSIONS,
+    Auth,
+    LockContention,
+    SSLMode,
+)
+from .crud import Collection, Schema, Table, View
 from .dbdoc import DbDoc
-# pylint: disable=W0622
-from .errors import (Error, InterfaceError, DatabaseError, NotSupportedError,
-                     DataError, IntegrityError, ProgrammingError,
-                     OperationalError, InternalError, PoolError, TimeoutError)
-from .result import (Column, Row, Result, BufferingResult, RowResult,
-                     SqlResult, DocResult, ColumnType)
-from .statement import (Statement, FilterableStatement, SqlStatement,
-                        FindStatement, AddStatement, RemoveStatement,
-                        ModifyStatement, SelectStatement, InsertStatement,
-                        DeleteStatement, UpdateStatement,
-                        CreateCollectionIndexStatement, Expr, ReadStatement,
-                        WriteStatement)
-from .expr import ExprParser as expr
 
+# pylint: disable=W0622
+from .errors import (
+    DatabaseError,
+    DataError,
+    Error,
+    IntegrityError,
+    InterfaceError,
+    InternalError,
+    NotSupportedError,
+    OperationalError,
+    PoolError,
+    ProgrammingError,
+    TimeoutError,
+)
+from .expr import ExprParser as expr
+from .result import (
+    BufferingResult,
+    Column,
+    ColumnType,
+    DocResult,
+    Result,
+    Row,
+    RowResult,
+    SqlResult,
+)
+from .statement import (
+    AddStatement,
+    CreateCollectionIndexStatement,
+    DeleteStatement,
+    Expr,
+    FilterableStatement,
+    FindStatement,
+    InsertStatement,
+    ModifyStatement,
+    ReadStatement,
+    RemoveStatement,
+    SelectStatement,
+    SqlStatement,
+    Statement,
+    UpdateStatement,
+    WriteStatement,
+)
 
 _SPLIT_RE = re.compile(r",(?![^\(\)]*\))")
 _PRIORITY_RE = re.compile(r"^\(address=(.+),priority=(\d+)\)$", re.VERBOSE)
 _ROUTER_RE = re.compile(r"^\(address=(.+)[,]*\)$", re.VERBOSE)
 _URI_SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+\-.]+)://(.*)")
-_SSL_OPTS = ["ssl-cert", "ssl-ca", "ssl-key", "ssl-crl", "tls-versions",
-             "tls-ciphersuites"]
-_SESS_OPTS = _SSL_OPTS + ["user", "password", "schema", "host", "port",
-                          "routers", "socket", "ssl-mode", "auth", "use-pure",
-                          "connect-timeout", "connection-attributes",
-                          "compression", "compression-algorithms", "dns-srv"]
+_SSL_OPTS = [
+    "ssl-cert",
+    "ssl-ca",
+    "ssl-key",
+    "ssl-crl",
+    "tls-versions",
+    "tls-ciphersuites",
+]
+_SESS_OPTS = _SSL_OPTS + [
+    "user",
+    "password",
+    "schema",
+    "host",
+    "port",
+    "routers",
+    "socket",
+    "ssl-mode",
+    "auth",
+    "use-pure",
+    "connect-timeout",
+    "connection-attributes",
+    "compression",
+    "compression-algorithms",
+    "dns-srv",
+]
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 DUPLICATED_IN_LIST_ERROR = (
     "The '{list}' list must not contain repeated values, the value "
-    "'{value}' is duplicated.")
+    "'{value}' is duplicated."
+)
 
-TLS_VERSION_ERROR = ("The given tls-version: '{}' is not recognized as a "
-                     "valid TLS protocol version (should be one of {}).")
+TLS_VERSION_ERROR = (
+    "The given tls-version: '{}' is not recognized as a "
+    "valid TLS protocol version (should be one of {})."
+)
 
-TLS_VERSION_DEPRECATED_ERROR = ("The given tls_version: '{}' are no longer "
-                                "allowed (should be one of {}).")
+TLS_VERSION_DEPRECATED_ERROR = (
+    "The given tls_version: '{}' are no longer "
+    "allowed (should be one of {})."
+)
 
-TLS_VER_NO_SUPPORTED = ("No supported TLS protocol version found in the "
-                        "'tls-versions' list '{}'. ")
+TLS_VER_NO_SUPPORTED = (
+    "No supported TLS protocol version found in the "
+    "'tls-versions' list '{}'. "
+)
 
 TLS_VERSIONS = ["TLSv1.2", "TLSv1.3"]
 
@@ -106,9 +167,11 @@ def _parse_address_list(path):
         specified.
     """
     path = path.replace(" ", "")
-    array = not("," not in path and path.count(":") > 1
-                and path.count("[") == 1) and path.startswith("[") \
-                and path.endswith("]")
+    array = (
+        not ("," not in path and path.count(":") > 1 and path.count("[") == 1)
+        and path.startswith("[")
+        and path.endswith("]")
+    )
 
     routers = []
     address_list = _SPLIT_RE.split(path[1:-1] if array else path)
@@ -139,9 +202,12 @@ def _parse_address_list(path):
         routers.append(router)
 
     if 0 < priority_count < len(address_list):
-        raise ProgrammingError("You must either assign no priority to any "
-                               "of the routers or give a priority for "
-                               "every router", 4000)
+        raise ProgrammingError(
+            "You must either assign no priority to any "
+            "of the routers or give a priority for "
+            "every router",
+            4000,
+        )
 
     return {"routers": routers} if array else routers[0]
 
@@ -223,8 +289,9 @@ def _validate_settings(settings):
     """
     invalid_opts = set(settings.keys()).difference(_SESS_OPTS)
     if invalid_opts:
-        raise InterfaceError("Invalid option(s): '{0}'"
-                             "".format("', '".join(invalid_opts)))
+        raise InterfaceError(
+            "Invalid option(s): '{0}'" "".format("', '".join(invalid_opts))
+        )
 
     if "routers" in settings:
         for router in settings["routers"]:
@@ -237,19 +304,25 @@ def _validate_settings(settings):
             settings["ssl-mode"] = settings["ssl-mode"].lower()
             SSLMode.index(settings["ssl-mode"])
         except (AttributeError, ValueError):
-            raise InterfaceError("Invalid SSL Mode '{0}'"
-                                 "".format(settings["ssl-mode"]))
+            raise InterfaceError(
+                "Invalid SSL Mode '{0}'" "".format(settings["ssl-mode"])
+            )
 
     if "ssl-crl" in settings and not "ssl-ca" in settings:
         raise InterfaceError("CA Certificate not provided")
     if "ssl-key" in settings and not "ssl-cert" in settings:
         raise InterfaceError("Client Certificate not provided")
 
-    if not "ssl-ca" in settings and settings.get("ssl-mode") \
-        in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA]:
+    if not "ssl-ca" in settings and settings.get("ssl-mode") in [
+        SSLMode.VERIFY_IDENTITY,
+        SSLMode.VERIFY_CA,
+    ]:
         raise InterfaceError("Cannot verify Server without CA")
-    if "ssl-ca" in settings and settings.get("ssl-mode") \
-        not in [SSLMode.VERIFY_IDENTITY, SSLMode.VERIFY_CA, SSLMode.DISABLED]:
+    if "ssl-ca" in settings and settings.get("ssl-mode") not in [
+        SSLMode.VERIFY_IDENTITY,
+        SSLMode.VERIFY_CA,
+        SSLMode.DISABLED,
+    ]:
         raise InterfaceError("Must verify Server if CA is provided")
 
     if "auth" in settings:
@@ -265,21 +338,26 @@ def _validate_settings(settings):
             raise InterfaceError(
                 "The connection property 'compression' acceptable values are: "
                 "'preferred', 'required', or 'disabled'. The value '{0}' is "
-                "not acceptable".format(settings["compression"]))
+                "not acceptable".format(settings["compression"])
+            )
         settings["compression"] = compression
 
     if "compression-algorithms" in settings:
         if isinstance(settings["compression-algorithms"], str):
-            compression_algorithms = \
+            compression_algorithms = (
                 settings["compression-algorithms"].strip().strip("[]")
+            )
             if compression_algorithms:
-                settings["compression-algorithms"] = \
-                    compression_algorithms.split(",")
+                settings[
+                    "compression-algorithms"
+                ] = compression_algorithms.split(",")
             else:
                 settings["compression-algorithms"] = None
         elif not isinstance(settings["compression-algorithms"], (list, tuple)):
-            raise InterfaceError("Invalid type of the connection property "
-                                 "'compression-algorithms'")
+            raise InterfaceError(
+                "Invalid type of the connection property "
+                "'compression-algorithms'"
+            )
         if settings.get("compression") == "disabled":
             settings["compression-algorithms"] = None
 
@@ -290,25 +368,35 @@ def _validate_settings(settings):
         try:
             if isinstance(settings["connect-timeout"], str):
                 settings["connect-timeout"] = int(settings["connect-timeout"])
-            if not isinstance(settings["connect-timeout"], int) \
-               or settings["connect-timeout"] < 0:
+            if (
+                not isinstance(settings["connect-timeout"], int)
+                or settings["connect-timeout"] < 0
+            ):
                 raise ValueError
         except ValueError:
-            raise TypeError("The connection timeout value must be a positive "
-                            "integer (including 0)")
+            raise TypeError(
+                "The connection timeout value must be a positive "
+                "integer (including 0)"
+            )
 
     if "dns-srv" in settings:
         if not isinstance(settings["dns-srv"], bool):
             raise InterfaceError("The value of 'dns-srv' must be a boolean")
         if settings.get("socket"):
-            raise InterfaceError("Using Unix domain sockets with DNS SRV "
-                                 "lookup is not allowed")
+            raise InterfaceError(
+                "Using Unix domain sockets with DNS SRV "
+                "lookup is not allowed"
+            )
         if settings.get("port"):
-            raise InterfaceError("Specifying a port number with DNS SRV "
-                                 "lookup is not allowed")
+            raise InterfaceError(
+                "Specifying a port number with DNS SRV "
+                "lookup is not allowed"
+            )
         if settings.get("routers"):
-            raise InterfaceError("Specifying multiple hostnames with DNS "
-                                 "SRV look up is not allowed")
+            raise InterfaceError(
+                "Specifying multiple hostnames with DNS "
+                "SRV look up is not allowed"
+            )
     elif "host" in settings and not settings.get("port"):
         settings["port"] = 33060
 
@@ -333,13 +421,16 @@ def _validate_hosts(settings, default_port=None):
         try:
             settings["priority"] = int(settings["priority"])
             if settings["priority"] < 0 or settings["priority"] > 100:
-                raise ProgrammingError("Invalid priority value, "
-                                       "must be between 0 and 100", 4007)
+                raise ProgrammingError(
+                    "Invalid priority value, " "must be between 0 and 100",
+                    4007,
+                )
         except NameError:
             raise ProgrammingError("Invalid priority", 4007)
         except ValueError:
             raise ProgrammingError(
-                "Invalid priority: {}".format(settings["priority"]), 4007)
+                "Invalid priority: {}".format(settings["priority"]), 4007
+            )
 
     if "port" in settings and settings["port"]:
         try:
@@ -369,13 +460,16 @@ def _validate_connection_attributes(settings):
         if conn_attrs == "":
             settings["connection-attributes"] = {}
             return
-        if not (conn_attrs.startswith("[") and conn_attrs.endswith("]")) and \
-           not conn_attrs in ['False', "false", "True", "true"]:
-            raise InterfaceError("The value of 'connection-attributes' must "
-                                 "be a boolean or a list of key-value pairs, "
-                                 "found: '{}'".format(conn_attrs))
-        elif conn_attrs in ['False', "false", "True", "true"]:
-            if conn_attrs in ['False', "false"]:
+        if not (
+            conn_attrs.startswith("[") and conn_attrs.endswith("]")
+        ) and not conn_attrs in ["False", "false", "True", "true"]:
+            raise InterfaceError(
+                "The value of 'connection-attributes' must "
+                "be a boolean or a list of key-value pairs, "
+                "found: '{}'".format(conn_attrs)
+            )
+        elif conn_attrs in ["False", "false", "True", "true"]:
+            if conn_attrs in ["False", "false"]:
                 settings["connection-attributes"] = False
             else:
                 settings["connection-attributes"] = {}
@@ -385,13 +479,15 @@ def _validate_connection_attributes(settings):
             for attr in conn_attributes:
                 if attr == "":
                     continue
-                attr_name_val = attr.split('=')
+                attr_name_val = attr.split("=")
                 attr_name = attr_name_val[0]
                 attr_val = attr_name_val[1] if len(attr_name_val) > 1 else ""
                 if attr_name in attributes:
-                    raise InterfaceError("Duplicate key '{}' used in "
-                                         "connection-attributes"
-                                         "".format(attr_name))
+                    raise InterfaceError(
+                        "Duplicate key '{}' used in "
+                        "connection-attributes"
+                        "".format(attr_name)
+                    )
                 else:
                     attributes[attr_name] = attr_val
     elif isinstance(conn_attrs, dict):
@@ -413,19 +509,23 @@ def _validate_connection_attributes(settings):
         for attr in conn_attrs:
             if attr == "":
                 continue
-            attr_name_val = attr.split('=')
+            attr_name_val = attr.split("=")
             attr_name = attr_name_val[0]
             attr_val = attr_name_val[1] if len(attr_name_val) > 1 else ""
             if attr_name in attributes:
-                raise InterfaceError("Duplicate key '{}' used in "
-                                     "connection-attributes"
-                                     "".format(attr_name))
+                raise InterfaceError(
+                    "Duplicate key '{}' used in "
+                    "connection-attributes"
+                    "".format(attr_name)
+                )
             else:
                 attributes[attr_name] = attr_val
     elif not isinstance(conn_attrs, bool):
-        raise InterfaceError("connection-attributes must be Boolean or a list "
-                             "of key-value pairs, found: '{}'"
-                             "".format(conn_attrs))
+        raise InterfaceError(
+            "connection-attributes must be Boolean or a list "
+            "of key-value pairs, found: '{}'"
+            "".format(conn_attrs)
+        )
 
     if attributes:
         for attr_name in attributes:
@@ -433,28 +533,38 @@ def _validate_connection_attributes(settings):
 
             # Validate name type
             if not isinstance(attr_name, str):
-                raise InterfaceError("Attribute name '{}' must be a string"
-                                     "type".format(attr_name))
+                raise InterfaceError(
+                    "Attribute name '{}' must be a string"
+                    "type".format(attr_name)
+                )
             # Validate attribute name limit 32 characters
             if len(attr_name) > 32:
-                raise InterfaceError("Attribute name '{}' exceeds 32 "
-                                     "characters limit size".format(attr_name))
+                raise InterfaceError(
+                    "Attribute name '{}' exceeds 32 "
+                    "characters limit size".format(attr_name)
+                )
             # Validate names in connection-attributes cannot start with "_"
             if attr_name.startswith("_"):
-                raise InterfaceError("Key names in connection-attributes "
-                                     "cannot start with '_', found: '{}'"
-                                     "".format(attr_name))
+                raise InterfaceError(
+                    "Key names in connection-attributes "
+                    "cannot start with '_', found: '{}'"
+                    "".format(attr_name)
+                )
 
             # Validate value type
             if not isinstance(attr_value, str):
-                raise InterfaceError("Attribute '{}' value: '{}' must "
-                                     "be a string type"
-                                     "".format(attr_name, attr_value))
+                raise InterfaceError(
+                    "Attribute '{}' value: '{}' must "
+                    "be a string type"
+                    "".format(attr_name, attr_value)
+                )
             # Validate attribute value limit 1024 characters
             if len(attr_value) > 1024:
-                raise InterfaceError("Attribute '{}' value: '{}' "
-                                     "exceeds 1024 characters limit size"
-                                     "".format(attr_name, attr_value))
+                raise InterfaceError(
+                    "Attribute '{}' value: '{}' "
+                    "exceeds 1024 characters limit size"
+                    "".format(attr_name, attr_value)
+                )
 
     settings["connection-attributes"] = attributes
 
@@ -475,10 +585,14 @@ def _validate_tls_versions(settings):
     tls_versions_settings = settings["tls-versions"]
 
     if isinstance(tls_versions_settings, str):
-        if not (tls_versions_settings.startswith("[") and
-                tls_versions_settings.endswith("]")):
-            raise InterfaceError("tls-versions must be a list, found: '{}'"
-                                 "".format(tls_versions_settings))
+        if not (
+            tls_versions_settings.startswith("[")
+            and tls_versions_settings.endswith("]")
+        ):
+            raise InterfaceError(
+                "tls-versions must be a list, found: '{}'"
+                "".format(tls_versions_settings)
+            )
         else:
             tls_vers = tls_versions_settings[1:-1].split(",")
             for tls_ver in tls_vers:
@@ -489,17 +603,23 @@ def _validate_tls_versions(settings):
                     if tls_version in tls_versions:
                         raise InterfaceError(
                             DUPLICATED_IN_LIST_ERROR.format(
-                                list="tls_versions", value=tls_version))
+                                list="tls_versions", value=tls_version
+                            )
+                        )
                     tls_versions.append(tls_version)
     elif isinstance(tls_versions_settings, list):
         if not tls_versions_settings:
-            raise InterfaceError("At least one TLS protocol version must be "
-                                 "specified in 'tls-versions' list.")
+            raise InterfaceError(
+                "At least one TLS protocol version must be "
+                "specified in 'tls-versions' list."
+            )
         for tls_ver in tls_versions_settings:
             if tls_ver in tls_versions:
                 raise InterfaceError(
-                    DUPLICATED_IN_LIST_ERROR.format(list="tls_versions",
-                                                    value=tls_ver))
+                    DUPLICATED_IN_LIST_ERROR.format(
+                        list="tls_versions", value=tls_ver
+                    )
+                )
             else:
                 tls_versions.append(tls_ver)
 
@@ -507,13 +627,17 @@ def _validate_tls_versions(settings):
         for tls_ver in tls_versions_settings:
             tls_versions.append(tls_ver)
     else:
-        raise InterfaceError("tls-versions should be a list with one or more "
-                             "of versions in {}. found: '{}'"
-                             "".format(", ".join(TLS_VERSIONS), tls_versions))
+        raise InterfaceError(
+            "tls-versions should be a list with one or more "
+            "of versions in {}. found: '{}'"
+            "".format(", ".join(TLS_VERSIONS), tls_versions)
+        )
 
     if not tls_versions:
-        raise InterfaceError("At least one TLS protocol version must be "
-                             "specified in 'tls-versions' list.")
+        raise InterfaceError(
+            "At least one TLS protocol version must be "
+            "specified in 'tls-versions' list."
+        )
 
     use_tls_versions = []
     deprecated_tls_versions = []
@@ -529,16 +653,18 @@ def _validate_tls_versions(settings):
     if use_tls_versions:
         if use_tls_versions == ["TLSv1.3"] and not TLS_V1_3_SUPPORTED:
             raise NotSupportedError(
-                TLS_VER_NO_SUPPORTED.format(tls_versions, TLS_VERSIONS))
+                TLS_VER_NO_SUPPORTED.format(tls_versions, TLS_VERSIONS)
+            )
         use_tls_versions.sort()
         settings["tls-versions"] = use_tls_versions
     elif deprecated_tls_versions:
         raise NotSupportedError(
-            TLS_VERSION_DEPRECATED_ERROR.format(deprecated_tls_versions,
-                                                TLS_VERSIONS))
+            TLS_VERSION_DEPRECATED_ERROR.format(
+                deprecated_tls_versions, TLS_VERSIONS
+            )
+        )
     elif not_tls_versions:
-        raise InterfaceError(
-            TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
+        raise InterfaceError(TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
 
 
 def _validate_tls_ciphersuites(settings):
@@ -557,34 +683,46 @@ def _validate_tls_ciphersuites(settings):
     tls_ciphersuites_settings = settings["tls-ciphersuites"]
 
     if isinstance(tls_ciphersuites_settings, str):
-        if not (tls_ciphersuites_settings.startswith("[") and
-                tls_ciphersuites_settings.endswith("]")):
-            raise InterfaceError("tls-ciphersuites must be a list, found: '{}'"
-                                 "".format(tls_ciphersuites_settings))
+        if not (
+            tls_ciphersuites_settings.startswith("[")
+            and tls_ciphersuites_settings.endswith("]")
+        ):
+            raise InterfaceError(
+                "tls-ciphersuites must be a list, found: '{}'"
+                "".format(tls_ciphersuites_settings)
+            )
         else:
             tls_css = tls_ciphersuites_settings[1:-1].split(",")
             if not tls_css:
-                raise InterfaceError("No valid cipher suite found in the "
-                                     "'tls-ciphersuites' list.")
+                raise InterfaceError(
+                    "No valid cipher suite found in the "
+                    "'tls-ciphersuites' list."
+                )
             for tls_cs in tls_css:
                 tls_cs = tls_cs.strip().upper()
                 if tls_cs:
                     tls_ciphersuites.append(tls_cs)
     elif isinstance(tls_ciphersuites_settings, list):
-        tls_ciphersuites = [tls_cs for tls_cs in tls_ciphersuites_settings
-                            if tls_cs]
+        tls_ciphersuites = [
+            tls_cs for tls_cs in tls_ciphersuites_settings if tls_cs
+        ]
 
     elif isinstance(tls_ciphersuites_settings, set):
         for tls_cs in tls_ciphersuites:
             if tls_cs:
                 tls_ciphersuites.append(tls_cs)
     else:
-        raise InterfaceError("tls-ciphersuites should be a list with one or "
-                             "more ciphersuites. Found: '{}'"
-                             "".format(tls_ciphersuites_settings))
+        raise InterfaceError(
+            "tls-ciphersuites should be a list with one or "
+            "more ciphersuites. Found: '{}'"
+            "".format(tls_ciphersuites_settings)
+        )
 
-    tls_versions = TLS_VERSIONS[:] if settings.get("tls-versions", None) \
-       is None else settings["tls-versions"][:]
+    tls_versions = (
+        TLS_VERSIONS[:]
+        if settings.get("tls-versions", None) is None
+        else settings["tls-versions"][:]
+    )
 
     # A newer TLS version can use a cipher introduced on
     # an older version.
@@ -597,7 +735,7 @@ def _validate_tls_ciphersuites(settings):
 
     # Old ciphers can work with new TLS versions.
     # Find all the ciphers introduced on previous TLS versions
-    for tls_ver in TLS_VERSIONS[:TLS_VERSIONS.index(newer_tls_ver) + 1]:
+    for tls_ver in TLS_VERSIONS[: TLS_VERSIONS.index(newer_tls_ver) + 1]:
         iani_cipher_suites_names.update(TLS_CIPHER_SUITES[tls_ver])
         ossl_cipher_suites_names.extend(OPENSSL_CS_NAMES[tls_ver])
 
@@ -609,17 +747,21 @@ def _validate_tls_ciphersuites(settings):
             if translated_name in translated_names:
                 raise AttributeError(
                     DUPLICATED_IN_LIST_ERROR.format(
-                        list="tls_ciphersuites", value=translated_name))
+                        list="tls_ciphersuites", value=translated_name
+                    )
+                )
             else:
                 translated_names.append(translated_name)
         else:
             raise InterfaceError(
                 "The value '{}' in cipher suites is not a valid "
-                "cipher suite".format(name))
+                "cipher suite".format(name)
+            )
 
     if not translated_names:
-        raise InterfaceError("No valid cipher suite found in the "
-                             "'tls-ciphersuites' list.")
+        raise InterfaceError(
+            "No valid cipher suite found in the " "'tls-ciphersuites' list."
+        )
 
     settings["tls-ciphersuites"] = translated_names
 
@@ -739,65 +881,105 @@ def get_client(connection_string, options_string):
         try:
             options_dict = json.loads(options_string)
         except JSONDecodeError:
-            raise InterfaceError("'pooling' options must be given in the form "
-                                 "of a document or dict")
+            raise InterfaceError(
+                "'pooling' options must be given in the form "
+                "of a document or dict"
+            )
     else:
         options_dict = {}
         for key, value in options_string.items():
             options_dict[key.replace("-", "_")] = value
 
     if not isinstance(options_dict, dict):
-        raise InterfaceError("'pooling' options must be given in the form of a "
-                             "document or dict")
+        raise InterfaceError(
+            "'pooling' options must be given in the form of a "
+            "document or dict"
+        )
     pooling_options_dict = {}
     if "pooling" in options_dict:
         pooling_options = options_dict.pop("pooling")
         if not isinstance(pooling_options, (dict)):
-            raise InterfaceError("'pooling' options must be given in the form "
-                                 "document or dict")
+            raise InterfaceError(
+                "'pooling' options must be given in the form "
+                "document or dict"
+            )
         # Fill default pooling settings
         pooling_options_dict["enabled"] = pooling_options.pop("enabled", True)
         pooling_options_dict["max_size"] = pooling_options.pop("max_size", 25)
-        pooling_options_dict["max_idle_time"] = \
-            pooling_options.pop("max_idle_time", 0)
-        pooling_options_dict["queue_timeout"] = \
-            pooling_options.pop("queue_timeout", 0)
+        pooling_options_dict["max_idle_time"] = pooling_options.pop(
+            "max_idle_time", 0
+        )
+        pooling_options_dict["queue_timeout"] = pooling_options.pop(
+            "queue_timeout", 0
+        )
 
         # No other options besides pooling are supported
         if len(pooling_options) > 0:
-            raise InterfaceError("Unrecognized pooling options: {}"
-                                 "".format(pooling_options))
+            raise InterfaceError(
+                "Unrecognized pooling options: {}" "".format(pooling_options)
+            )
         # No other options besides pooling are supported
         if len(options_dict) > 0:
-            raise InterfaceError("Unrecognized connection options: {}"
-                                 "".format(options_dict.keys()))
+            raise InterfaceError(
+                "Unrecognized connection options: {}"
+                "".format(options_dict.keys())
+            )
 
     return Client(settings_dict, pooling_options_dict)
 
 
 __all__ = [
     # mysqlx.connection
-    "Client", "Session", "get_client", "get_session", "expr",
-
+    "Client",
+    "Session",
+    "get_client",
+    "get_session",
+    "expr",
     # mysqlx.constants
-    "Auth", "LockContention", "SSLMode",
-
+    "Auth",
+    "LockContention",
+    "SSLMode",
     # mysqlx.crud
-    "Schema", "Collection", "Table", "View",
-
+    "Schema",
+    "Collection",
+    "Table",
+    "View",
     # mysqlx.errors
-    "Error", "InterfaceError", "DatabaseError", "NotSupportedError",
-    "DataError", "IntegrityError", "ProgrammingError", "OperationalError",
-    "InternalError", "PoolError", "TimeoutError",
-
+    "Error",
+    "InterfaceError",
+    "DatabaseError",
+    "NotSupportedError",
+    "DataError",
+    "IntegrityError",
+    "ProgrammingError",
+    "OperationalError",
+    "InternalError",
+    "PoolError",
+    "TimeoutError",
     # mysqlx.result
-    "Column", "Row", "Result", "BufferingResult", "RowResult",
-    "SqlResult", "DocResult", "ColumnType",
-
+    "Column",
+    "Row",
+    "Result",
+    "BufferingResult",
+    "RowResult",
+    "SqlResult",
+    "DocResult",
+    "ColumnType",
     # mysqlx.statement
-    "DbDoc", "Statement", "FilterableStatement", "SqlStatement",
-    "FindStatement", "AddStatement", "RemoveStatement", "ModifyStatement",
-    "SelectStatement", "InsertStatement", "DeleteStatement", "UpdateStatement",
-    "ReadStatement", "WriteStatement", "CreateCollectionIndexStatement",
+    "DbDoc",
+    "Statement",
+    "FilterableStatement",
+    "SqlStatement",
+    "FindStatement",
+    "AddStatement",
+    "RemoveStatement",
+    "ModifyStatement",
+    "SelectStatement",
+    "InsertStatement",
+    "DeleteStatement",
+    "UpdateStatement",
+    "ReadStatement",
+    "WriteStatement",
+    "CreateCollectionIndexStatement",
     "Expr",
 ]

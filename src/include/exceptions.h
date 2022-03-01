@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -33,8 +33,11 @@
 
 #include <Python.h>
 
-void raise_with_session(MYSQL *conn, PyObject *exc_type);
-void raise_with_string(PyObject *error_msg, PyObject *exc_type);
-void raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type);
+void
+raise_with_session(MYSQL *conn, PyObject *exc_type);
+void
+raise_with_string(PyObject *error_msg, PyObject *exc_type);
+void
+raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type);
 
 #endif /* MYCONNPY_EXCEPTIONS_H */

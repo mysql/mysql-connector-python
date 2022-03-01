@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,23 +34,24 @@ import os
 import platform
 import re
 import shlex
-import subprocess
 import struct
+import subprocess
 import sys
 import tarfile
 
 from datetime import datetime
-from distutils.errors import DistutilsInternalError
 from distutils.dir_util import mkpath
+from distutils.errors import DistutilsInternalError
 from distutils.file_util import copy_file
 from distutils.spawn import find_executable
 from distutils.sysconfig import get_python_version
 from distutils.version import LooseVersion
-from subprocess import Popen, PIPE
+from subprocess import PIPE, Popen
 from xml.dom.minidom import parse, parseString
 
 try:
     from dateutil.tz import tzlocal
+
     NOW = datetime.now(tzlocal())
 except ImportError:
     NOW = datetime.now()
@@ -68,29 +69,29 @@ LOGGER = logging.getLogger("cpydist")
 
 # 64bit Conditional check, only includes VCPPREDIST2015 property
 VC_RED_64 = (
-    '<Product>'
-    '<!-- Check Visual c++ Redistributable is Installed -->'
+    "<Product>"
+    "<!-- Check Visual c++ Redistributable is Installed -->"
     '<Property Id="VS14REDIST">'
     '  <RegistrySearch Id="FindRedistVS14" Root="HKLM"'
     '   Key="SOFTWARE\\Microsoft\\DevDiv\\vc\\Servicing\\14.0\\RuntimeMinimum"'
     '   Name="Version" Type="raw" />'
-    '</Property>'
+    "</Property>"
     '<Condition Message="This application requires Visual Studio 2015'
-    ' Redistributable. Please install the Redistributable then run this'
+    " Redistributable. Please install the Redistributable then run this"
     ' installer again.">'
-    '  Installed OR VS14REDIST'
-    '</Condition>'
-    '</Product>'
+    "  Installed OR VS14REDIST"
+    "</Condition>"
+    "</Product>"
 )
 
 # 64bit Conditional check, only install if OS is 64bit. Used in MSI-64
 ONLY_64bit = (
-    '<Product>'
+    "<Product>"
     '<Condition Message="This version of the installer is only suitable to'
     ' run on 64 bit operating systems.">'
-    '<![CDATA[Installed OR (VersionNT64 >=600)]]>'
-    '</Condition>'
-    '</Product>'
+    "<![CDATA[Installed OR (VersionNT64 >=600)]]>"
+    "</Condition>"
+    "</Product>"
 )
 
 
@@ -156,8 +157,9 @@ def _mysql_c_api_info_win(mysql_capi):
     mysql_version_h = os.path.join(mysql_capi, "include", "mysql_version.h")
 
     if not os.path.exists(mysql_version_h):
-        LOGGER.error("Invalid MySQL C API installation "
-                     "(mysql_version.h not found)")
+        LOGGER.error(
+            "Invalid MySQL C API installation " "(mysql_version.h not found)"
+        )
         sys.exit(1)
 
     # Get MySQL version
@@ -165,11 +167,13 @@ def _mysql_c_api_info_win(mysql_capi):
         for line in fp.readlines():
             if b"#define LIBMYSQL_VERSION" in line:
                 version = LooseVersion(
-                    line.split()[2].replace(b'"', b'').decode()
+                    line.split()[2].replace(b'"', b"").decode()
                 ).version
                 if tuple(version) < MYSQL_C_API_MIN_VERSION:
-                    LOGGER.error("MySQL C API {} or later required"
-                                 "".format(MYSQL_C_API_MIN_VERSION))
+                    LOGGER.error(
+                        "MySQL C API {} or later required"
+                        "".format(MYSQL_C_API_MIN_VERSION)
+                    )
                     sys.exit(1)
                 break
 
@@ -179,7 +183,8 @@ def _mysql_c_api_info_win(mysql_capi):
 
     # Get libmysql.dll arch
     connc_64bit = _win_dll_is64bit(
-        os.path.join(mysql_capi, "lib", "libmysql.dll"))
+        os.path.join(mysql_capi, "lib", "libmysql.dll")
+    )
     LOGGER.debug("connc_64bit: {0}".format(connc_64bit))
     info["arch"] = "x86_64" if connc_64bit else "i386"
     LOGGER.debug("# _mysql_c_api_info_win info: %s", info)
@@ -204,8 +209,9 @@ def mysql_c_api_info(mysql_config):
     process = Popen([mysql_config], stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate()
     if not stdout:
-        raise ValueError("Error executing command: {} ({})"
-                         "".format(mysql_config, stderr))
+        raise ValueError(
+            "Error executing command: {} ({})" "".format(mysql_config, stderr)
+        )
 
     # Parse the output. Try to be future safe in case new options
     # are added. This might of course fail.
@@ -213,7 +219,8 @@ def mysql_c_api_info(mysql_config):
 
     for line in stdout.splitlines():
         re_obj = re.search(
-            r"^\s+(?:--)?(\w+)\s+\[\s*(.*?)\s*\]", line.decode("utf-8"))
+            r"^\s+(?:--)?(\w+)\s+\[\s*(.*?)\s*\]", line.decode("utf-8")
+        )
         if re_obj:
             mc_key = re_obj.group(1)
             mc_val = re_obj.group(2)
@@ -238,18 +245,36 @@ def mysql_c_api_info(mysql_config):
                 info["include_dirs"] = include_dirs
                 LOGGER.debug("include_dirs: %s", " ".join(include_dirs))
             elif mc_key == "libs_r":
-                info["link_dirs"] = [val for key, val in parsed_line
-                                     if key in ("L", "library-path",)]
-                info["libraries"] = [val for key, val in parsed_line
-                                     if key in ("l", "library",)]
+                info["link_dirs"] = [
+                    val
+                    for key, val in parsed_line
+                    if key
+                    in (
+                        "L",
+                        "library-path",
+                    )
+                ]
+                info["libraries"] = [
+                    val
+                    for key, val in parsed_line
+                    if key
+                    in (
+                        "l",
+                        "library",
+                    )
+                ]
                 LOGGER.debug("link_dirs: %s", " ".join(info["link_dirs"]))
                 LOGGER.debug("libraries: %s", " ".join(info["libraries"]))
 
     # Try to figure out the architecture
     info["arch"] = "x86_64" if sys.maxsize > 2**32 else "i386"
     # Return a tuple for version instead of a string
-    info["version"] = tuple([int(num) if num.isdigit() else num
-                             for num in info["version"].split(".")])
+    info["version"] = tuple(
+        [
+            int(num) if num.isdigit() else num
+            for num in info["version"].split(".")
+        ]
+    )
     return info
 
 
@@ -267,12 +292,24 @@ def get_git_info():
         is_git_repo = proc.returncode == 0
 
     if is_git_repo:
-        cmd = ["git", "log", "-n", "1", "--date=iso",
-               "--pretty=format:'branch=%D&date=%ad&commit=%H&short=%h'"]
+        cmd = [
+            "git",
+            "log",
+            "-n",
+            "1",
+            "--date=iso",
+            "--pretty=format:'branch=%D&date=%ad&commit=%H&short=%h'",
+        ]
         proc = Popen(cmd, stdout=PIPE, universal_newlines=True)
         stdout, _ = proc.communicate()
-        git_info = dict(parse_qsl(stdout.replace("'", "").replace("+", "%2B")
-                                  .split(",")[-1:][0].strip()))
+        git_info = dict(
+            parse_qsl(
+                stdout.replace("'", "")
+                .replace("+", "%2B")
+                .split(",")[-1:][0]
+                .strip()
+            )
+        )
         try:
             git_info["branch"] = stdout.split(",")[0].split("->")[1].strip()
         except IndexError:
@@ -286,7 +323,7 @@ def get_git_info():
             "branch": branch_src.split()[-1],
             "date": None,
             "commit": push_rev,
-            "short": push_rev[:7]
+            "short": push_rev[:7],
         }
         return git_info
     return None
@@ -360,7 +397,8 @@ def _parse_lsb_release_command():
     with open(os.devnull, "w") as devnull:
         try:
             stdout = subprocess.check_output(
-                ("lsb_release", "-a"), stderr=devnull)
+                ("lsb_release", "-a"), stderr=devnull
+            )
         except OSError:
             return None
         lines = stdout.decode(sys.getfilesystemencoding()).splitlines()
@@ -386,27 +424,39 @@ def linux_distribution():
     """
     distro = _parse_release_file(os.path.join("/etc", "lsb-release"))
     if distro:
-        return (distro.get("distrib_id", ""),
-                distro.get("distrib_release", ""),
-                distro.get("distrib_codename", ""))
+        return (
+            distro.get("distrib_id", ""),
+            distro.get("distrib_release", ""),
+            distro.get("distrib_codename", ""),
+        )
 
     distro = _parse_lsb_release_command()
     if distro:
-        return (distro.get("distributor_id", ""),
-                distro.get("release", ""),
-                distro.get("codename", ""))
+        return (
+            distro.get("distributor_id", ""),
+            distro.get("release", ""),
+            distro.get("codename", ""),
+        )
 
     distro = _parse_release_file(os.path.join("/etc", "os-release"))
     if distro:
-        return (distro.get("name", ""),
-                distro.get("version_id", ""),
-                distro.get("version_codename", ""))
+        return (
+            distro.get("name", ""),
+            distro.get("version_id", ""),
+            distro.get("version_codename", ""),
+        )
 
     return ("", "", "")
 
 
-def get_dist_name(distribution, source_only_dist=False, platname=None,
-                  python_version=None, label="", edition=""):
+def get_dist_name(
+    distribution,
+    source_only_dist=False,
+    platname=None,
+    python_version=None,
+    label="",
+    edition="",
+):
     """Get the distribution name.
 
     Get the distribution name usually used for creating the egg file. The
@@ -451,10 +501,10 @@ def unarchive_targz(tarball):
     if dstdir:
         os.chdir(dstdir)
 
-    if '.gz' in tarball_name:
-        new_file = tarball_name.replace('.gz', '')
+    if ".gz" in tarball_name:
+        new_file = tarball_name.replace(".gz", "")
         gz = gzip.GzipFile(tarball_name)
-        tar = open(new_file, 'wb')
+        tar = open(new_file, "wb")
         tar.write(gz.read())
         tar.close()
         tarball_name = new_file
@@ -474,20 +524,22 @@ def add_docs(doc_path, doc_files=None):
 
     if not doc_files:
         doc_files = [
-            'mysql-connector-python.pdf',
-            'mysql-connector-python.html',
-            'mysql-html.css',
+            "mysql-connector-python.pdf",
+            "mysql-connector-python.html",
+            "mysql-html.css",
         ]
     for file_name in doc_files:
         # Check if we have file in docs/
-        doc_file = os.path.join('docs', file_name)
+        doc_file = os.path.join("docs", file_name)
         if not os.path.exists(doc_file):
             # it might be in build/
-            doc_file = os.path.join('build', file_name)
+            doc_file = os.path.join("build", file_name)
             if not os.path.exists(doc_file):
                 # we do not have it, create a fake one
-                LOGGER.warning("documentation '%s' does not exist; creating"
-                               " empty", doc_file)
+                LOGGER.warning(
+                    "documentation '%s' does not exist; creating" " empty",
+                    doc_file,
+                )
                 open(doc_file, "w").close()
 
         if not os.path.exists(doc_file):
@@ -497,6 +549,7 @@ def add_docs(doc_path, doc_files=None):
 
 # Windows MSI descriptor parser
 # Customization utility functions for the C/py product msi descriptor
+
 
 def _win_dll_is64bit(dll_file):
     """Check if a Windows DLL is 64 bit or not.
@@ -515,7 +568,7 @@ def _win_dll_is64bit(dll_file):
     with open(dll_file, "rb") as fp:
         # IMAGE_DOS_HEADER
         e_magic = fp.read(2)
-        if e_magic != b'MZ':
+        if e_magic != b"MZ":
             raise ValueError("Wrong magic in header")
 
         fp.seek(60)
@@ -525,7 +578,7 @@ def _win_dll_is64bit(dll_file):
         fp.seek(offset)
         file_header = fp.read(6)
         (_, machine) = struct.unpack("<4sH", file_header)
-        if machine == 0x014c:  # IMAGE_FILE_MACHINE_I386
+        if machine == 0x014C:  # IMAGE_FILE_MACHINE_I386
             return False
         elif machine in (0x8664, 0x2000):  # IMAGE_FILE_MACHINE_I386/AMD64
             return True
@@ -543,8 +596,9 @@ def _append_child_from_unparsed_xml(father_node, unparsed_xml):
                 father_node.appendChild(childNode)
             return
 
-    raise DistutilsInternalError("Could not Append append elements to "
-                                 "the Windows msi descriptor.")
+    raise DistutilsInternalError(
+        "Could not Append append elements to " "the Windows msi descriptor."
+    )
 
 
 def _get_element(dom_msi, tag_name, name=None, id_=None):
@@ -553,11 +607,13 @@ def _get_element(dom_msi, tag_name, name=None, id_=None):
     elements = product.getElementsByTagName(tag_name)
     for element in elements:
         if name and id_:
-            if element.getAttribute('Name') == name and \
-               element.getAttribute('Id') == id_:
+            if (
+                element.getAttribute("Name") == name
+                and element.getAttribute("Id") == id_
+            ):
                 return element
         elif id_:
-            if element.getAttribute('Id') == id_:
+            if element.getAttribute("Id") == id_:
                 return element
 
 
@@ -589,8 +645,9 @@ def add_arch_dep_elems(xml_path, result_path, for32=False, add_vs_redist=True):
         LOGGER.info("Adding 64bit elements")
         _add_64bit_elements(dom_msi, add_vs_redist)
 
-    LOGGER.info("Saving xml to:%s working directory:%s",
-                result_path, os.getcwd())
+    LOGGER.info(
+        "Saving xml to:%s working directory:%s", result_path, os.getcwd()
+    )
     with open(result_path, "w+") as fp:
         fp.write(dom_msi.toprettyxml())
         fp.flush()

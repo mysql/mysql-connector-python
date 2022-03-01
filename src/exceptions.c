@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -56,36 +56,31 @@ extern PyObject *MySQLInterfaceError;
 void
 raise_with_session(MYSQL *conn, PyObject *exc_type)
 {
-	PyObject *err_object= NULL;
-	PyObject *error_msg, *error_no, *sqlstate;
-	int err= 0;
+    PyObject *err_object = NULL;
+    PyObject *error_msg, *error_no, *sqlstate;
+    int err = 0;
 
     // default exception
-	if (!exc_type)
-	{
-	    exc_type= MySQLInterfaceError;
-	}
-
-    Py_BEGIN_ALLOW_THREADS
-	err= mysql_errno(conn);
-    Py_END_ALLOW_THREADS
-
-	if (!err)
-	{
-		error_msg= PyUnicode_FromString("MySQL server has gone away");
-        error_no= PyLong_FromLong(2006);
-        sqlstate= PyUnicode_FromString("HY000");
-	}
-	else
-	{
-		error_msg= PyUnicode_FromString(mysql_error(conn));
-        error_no= PyLong_FromLong(err);
-        sqlstate= PyUnicode_FromString(mysql_sqlstate(conn));
+    if (!exc_type) {
+        exc_type = MySQLInterfaceError;
     }
 
-	err_object= PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
-	if (!err_object)
-	{
+    Py_BEGIN_ALLOW_THREADS err = mysql_errno(conn);
+    Py_END_ALLOW_THREADS
+
+    if (!err) {
+        error_msg = PyUnicode_FromString("MySQL server has gone away");
+        error_no = PyLong_FromLong(2006);
+        sqlstate = PyUnicode_FromString("HY000");
+    }
+    else {
+        error_msg = PyUnicode_FromString(mysql_error(conn));
+        error_no = PyLong_FromLong(err);
+        sqlstate = PyUnicode_FromString(mysql_sqlstate(conn));
+    }
+
+    err_object = PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
+    if (!err_object) {
         goto ERR;
     }
 
@@ -96,15 +91,14 @@ raise_with_session(MYSQL *conn, PyObject *exc_type)
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
 
-    ERR:
-        PyErr_SetObject(PyExc_RuntimeError,
-            PyUnicode_FromString("Failed raising error."));
-        goto CLEANUP;
-    CLEANUP:
-        Py_XDECREF(err_object);
-        Py_XDECREF(error_msg);
-        Py_XDECREF(error_no);
-        Py_XDECREF(sqlstate);
+ERR:
+    PyErr_SetObject(PyExc_RuntimeError, PyUnicode_FromString("Failed raising error."));
+    goto CLEANUP;
+CLEANUP:
+    Py_XDECREF(err_object);
+    Py_XDECREF(error_msg);
+    Py_XDECREF(error_no);
+    Py_XDECREF(sqlstate);
 }
 
 /**
@@ -122,36 +116,31 @@ raise_with_session(MYSQL *conn, PyObject *exc_type)
 void
 raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type)
 {
-	PyObject *err_object= NULL;
-	PyObject *error_msg, *error_no, *sqlstate;
-	int err= 0;
+    PyObject *err_object = NULL;
+    PyObject *error_msg, *error_no, *sqlstate;
+    int err = 0;
 
     // default exception
-	if (!exc_type)
-	{
-	    exc_type = MySQLInterfaceError;
-	}
-
-    Py_BEGIN_ALLOW_THREADS
-	err= mysql_stmt_errno(stmt);
-    Py_END_ALLOW_THREADS
-
-	if (!err)
-	{
-		error_msg= PyUnicode_FromString("MySQL server has gone away");
-        error_no= PyLong_FromLong(2006);
-        sqlstate= PyUnicode_FromString("HY000");
-	}
-	else
-	{
-		error_msg= PyUnicode_FromString(mysql_stmt_error(stmt));
-        error_no= PyLong_FromLong(err);
-        sqlstate= PyUnicode_FromString(mysql_stmt_sqlstate(stmt));
+    if (!exc_type) {
+        exc_type = MySQLInterfaceError;
     }
 
-	err_object= PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
-	if (!err_object)
-	{
+    Py_BEGIN_ALLOW_THREADS err = mysql_stmt_errno(stmt);
+    Py_END_ALLOW_THREADS
+
+    if (!err) {
+        error_msg = PyUnicode_FromString("MySQL server has gone away");
+        error_no = PyLong_FromLong(2006);
+        sqlstate = PyUnicode_FromString("HY000");
+    }
+    else {
+        error_msg = PyUnicode_FromString(mysql_stmt_error(stmt));
+        error_no = PyLong_FromLong(err);
+        sqlstate = PyUnicode_FromString(mysql_stmt_sqlstate(stmt));
+    }
+
+    err_object = PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
+    if (!err_object) {
         goto ERR;
     }
 
@@ -162,15 +151,14 @@ raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type)
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
 
-    ERR:
-        PyErr_SetObject(PyExc_RuntimeError,
-            PyUnicode_FromString("Failed raising error."));
-        goto CLEANUP;
-    CLEANUP:
-        Py_XDECREF(err_object);
-        Py_XDECREF(error_msg);
-        Py_XDECREF(error_no);
-        Py_XDECREF(sqlstate);
+ERR:
+    PyErr_SetObject(PyExc_RuntimeError, PyUnicode_FromString("Failed raising error."));
+    goto CLEANUP;
+CLEANUP:
+    Py_XDECREF(err_object);
+    Py_XDECREF(error_msg);
+    Py_XDECREF(error_no);
+    Py_XDECREF(sqlstate);
 }
 
 /**
@@ -187,18 +175,16 @@ raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type)
 void
 raise_with_string(PyObject *error_msg, PyObject *exc_type)
 {
-   	PyObject *err_object= NULL;
-	PyObject *error_no= PyLong_FromLong(-1);
+    PyObject *err_object = NULL;
+    PyObject *error_no = PyLong_FromLong(-1);
 
     // default exception
-	if (!exc_type)
-	{
-	    exc_type= MySQLInterfaceError;
-	}
+    if (!exc_type) {
+        exc_type = MySQLInterfaceError;
+    }
 
-	err_object= PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
-	if (!err_object)
-	{
+    err_object = PyObject_CallFunctionObjArgs(exc_type, error_msg, NULL);
+    if (!err_object) {
         goto ERR;
     }
     PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), Py_None);
@@ -208,11 +194,10 @@ raise_with_string(PyObject *error_msg, PyObject *exc_type)
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
 
-    ERR:
-        PyErr_SetObject(PyExc_RuntimeError,
-            PyUnicode_FromString("Failed raising error."));
-        goto CLEANUP;
-    CLEANUP:
-        Py_XDECREF(err_object);
-        Py_XDECREF(error_no);
+ERR:
+    PyErr_SetObject(PyExc_RuntimeError, PyUnicode_FromString("Failed raising error."));
+    goto CLEANUP;
+CLEANUP:
+    Py_XDECREF(err_object);
+    Py_XDECREF(error_no);
 }

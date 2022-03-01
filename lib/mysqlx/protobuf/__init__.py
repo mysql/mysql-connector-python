@@ -207,7 +207,7 @@ try:
     HAVE_PROTOBUF = True
     HAVE_PROTOBUF_ERROR = None
 
-    class _mysqlxpb_pure(object):
+    class _mysqlxpb_pure:
         """This class implements the methods in pure Python used by the
         _mysqlxpb C++ extension."""
 
@@ -267,7 +267,7 @@ CRUD_PREPARE_MAPPING = {
 }
 
 
-class Protobuf(object):
+class Protobuf:
     """Protobuf class acts as a container of the Protobuf message class.
     It allows the switch between the C extension and pure Python implementation
     message handlers, by patching the `mysqlxpb` class attribute.
@@ -291,7 +291,7 @@ class Protobuf(object):
         Protobuf.use_pure = use_pure
 
 
-class Message(object):
+class Message:
     """Helper class for interfacing with the MySQL X Protobuf extension.
 
     Args:

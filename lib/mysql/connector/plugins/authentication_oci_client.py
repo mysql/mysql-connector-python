@@ -38,9 +38,7 @@ try:
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
 except ImportError:
-    raise errors.ProgrammingError(
-        "Package 'cryptography' is not installed"
-    )
+    raise errors.ProgrammingError("Package 'cryptography' is not installed")
 
 try:
     from oci import config, exceptions
@@ -80,7 +78,7 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
         signature_64 = b64encode(signature)
         auth_response = {
             "fingerprint": oci_config["fingerprint"],
-            "signature": signature_64.decode()
+            "signature": signature_64.decode(),
         }
         return repr(auth_response).replace(" ", "").replace("'", '"')
 
@@ -95,7 +93,8 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
         except (TypeError, OSError, ValueError, UnsupportedAlgorithm) as err:
             raise errors.ProgrammingError(
                 f'An error occurred while reading the API_KEY from "{key_path}":'
-                f" {err}")
+                f" {err}"
+            )
 
         return private_key
 
@@ -107,7 +106,7 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
         error_list = []
         req_keys = {
             "fingerprint": (lambda x: len(x) > 32),
-            "key_file": (lambda x: os.path.exists(os.path.expanduser(x)))
+            "key_file": (lambda x: os.path.exists(os.path.expanduser(x))),
         }
 
         try:
@@ -116,18 +115,19 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
             for req_key in req_keys:
                 try:
                     # Verify parameter in req_key is present and valid
-                    if oci_config[req_key] \
-                       and not req_keys[req_key](oci_config[req_key]):
+                    if oci_config[req_key] and not req_keys[req_key](
+                        oci_config[req_key]
+                    ):
                         error_list.append(f'Parameter "{req_key}" is invalid')
                 except KeyError as err:
-                    error_list.append(f'Does not contain parameter {req_key}')
+                    error_list.append(f"Does not contain parameter {req_key}")
         except (
             exceptions.ConfigFileNotFound,
             exceptions.InvalidConfig,
             exceptions.InvalidKeyFilePath,
             exceptions.InvalidPrivateKey,
             exceptions.MissingPrivateKeyPassphrase,
-            exceptions.ProfileNotFound
+            exceptions.ProfileNotFound,
         ) as err:
             error_list.append(str(err))
 
@@ -135,23 +135,23 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
         if error_list:
             raise errors.ProgrammingError(
                 f'Invalid profile {profile_name} in: "{oci_path}". '
-                f" Errors found: {error_list}")
+                f" Errors found: {error_list}"
+            )
 
         return oci_config
 
     def auth_response(self, oci_path=None):
         """Prepare authentication string for the server."""
-        _LOGGER.debug("server nonce: %s, len %d",
-                      self._auth_data, len(self._auth_data))
+        _LOGGER.debug(
+            "server nonce: %s, len %d", self._auth_data, len(self._auth_data)
+        )
         _LOGGER.debug("OCI configuration file location: %s", oci_path)
 
         oci_config = self._get_valid_oci_config(oci_path)
 
-        private_key = self._get_private_key(oci_config['key_file'])
+        private_key = self._get_private_key(oci_config["key_file"])
         signature = private_key.sign(
-            self._auth_data,
-            padding.PKCS1v15(),
-            hashes.SHA256()
+            self._auth_data, padding.PKCS1v15(), hashes.SHA256()
         )
 
         auth_response = self._prepare_auth_response(signature, oci_config)

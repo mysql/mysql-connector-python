@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,10 +31,11 @@
 """Unittests for mysqlx coding style
 """
 
-import os
-import tests
 import logging
+import os
 import unittest
+
+import tests
 
 _CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 _BASE_PATH, _ = os.path.split(_CURRENT_PATH)
@@ -84,19 +85,25 @@ class LintTests(tests.MySQLConnectorTests):
                     current_path = os.path.join(root, filename)
                     lint_args = [
                         current_path,
-                        "--rcfile={0}".format(self.pylint_rc_path)
+                        "--rcfile={0}".format(self.pylint_rc_path),
                     ]
-                    lint_run = lint.Run(lint_args, reporter=txtreporter,
-                                        exit=False)
-
-                    if lint_run.linter.stats["by_msg"]:
+                    lint_run = lint.Run(
+                        lint_args, reporter=txtreporter, exit=False
+                    )
+                    if lint_run.linter.stats.by_msg:
                         rel_file_path = os.path.join(
-                            os.path.relpath(root, _BASE_PATH), filename)
+                            os.path.relpath(root, _BASE_PATH), filename
+                        )
                         self.failed_files.append(rel_file_path)
 
         if self.failed_files:
-            self.fail("Lint tests failed on following files{0}{1}{2}{3}"
-                      "For more information check {4}.".format(
-                          os.linesep, os.linesep.join(self.failed_files),
-                          os.linesep, os.linesep,
-                          os.path.relpath(self.output_file_path, _BASE_PATH)))
+            self.fail(
+                "Lint tests failed on following files{0}{1}{2}{3}"
+                "For more information check {4}.".format(
+                    os.linesep,
+                    os.linesep.join(self.failed_files),
+                    os.linesep,
+                    os.linesep,
+                    os.path.relpath(self.output_file_path, _BASE_PATH),
+                )
+            )

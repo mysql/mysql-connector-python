@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -30,6 +30,7 @@ import unittest
 
 import mysql.connector
 import tests
+
 from mysql.connector.errors import DatabaseError, PoolError
 
 
@@ -71,7 +72,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
             self.assertRaises(
                 mysql.connector.errors.PoolError,
                 mysql.connector.connect,
-                **config
+                **config,
             )
 
     def test_negative_poolsize(self):
@@ -86,7 +87,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
             self.assertRaises(
                 mysql.connector.errors.PoolError,
                 mysql.connector.connect,
-                **config
+                **config,
             )
 
     def test_spchar_name(self):

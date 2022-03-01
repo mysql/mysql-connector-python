@@ -39,15 +39,15 @@ class MySQLSHA256PasswordAuthPlugin(BaseAuthPlugin):
     """
 
     requires_ssl = True
-    plugin_name = 'sha256_password'
+    plugin_name = "sha256_password"
 
     def prepare_password(self):
         """Returns password as as clear text"""
         if not self._password:
-            return b'\x00'
+            return b"\x00"
         password = self._password
 
         if isinstance(password, str):
-            password = password.encode('utf8')
+            password = password.encode("utf8")
 
-        return password + b'\x00'
+        return password + b"\x00"

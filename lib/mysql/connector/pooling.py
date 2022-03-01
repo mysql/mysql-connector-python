@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -30,7 +30,9 @@
 """
 
 import re
+
 from uuid import uuid4
+
 # pylint: disable=F0401
 try:
     import queue
@@ -41,20 +43,22 @@ except ImportError:
 import threading
 
 try:
-    from mysql.connector.connection_cext import (CMySQLConnection)
+    from mysql.connector.connection_cext import CMySQLConnection
 except ImportError:
     CMySQLConnection = None
 
-from . import errors
-from . import Connect
+from . import Connect, errors
 from .connection import MySQLConnection
 
 CONNECTION_POOL_LOCK = threading.RLock()
 CNX_POOL_MAXSIZE = 32
 CNX_POOL_MAXNAMESIZE = 64
-CNX_POOL_NAMEREGEX = re.compile(r'[^a-zA-Z0-9._:\-*$#]')
-MYSQL_CNX_CLASS = ((MySQLConnection) if CMySQLConnection is None else
-                   (MySQLConnection, CMySQLConnection))
+CNX_POOL_NAMEREGEX = re.compile(r"[^a-zA-Z0-9._:\-*$#]")
+MYSQL_CNX_CLASS = (
+    MySQLConnection
+    if CMySQLConnection is None
+    else (MySQLConnection, CMySQLConnection)
+)
 
 
 def generate_pool_name(**kwargs):
@@ -69,7 +73,7 @@ def generate_pool_name(**kwargs):
     Returns a string.
     """
     parts = []
-    for key in ('host', 'port', 'user', 'database'):
+    for key in ("host", "port", "user", "database"):
         try:
             parts.append(str(kwargs[key]))
         except KeyError:
@@ -77,12 +81,13 @@ def generate_pool_name(**kwargs):
 
     if not parts:
         raise errors.PoolError(
-            "Failed generating pool name; specify pool_name")
+            "Failed generating pool name; specify pool_name"
+        )
 
-    return '_'.join(parts)
+    return "_".join(parts)
 
 
-class PooledMySQLConnection(object):
+class PooledMySQLConnection:
     """Class holding a MySQL Connection in a pool
 
     PooledMySQLConnection is used by MySQLConnectionPool to return an
@@ -96,6 +101,7 @@ class PooledMySQLConnection(object):
     method set_config(). Using config() on pooled connection will raise a
     PoolError.
     """
+
     def __init__(self, pool, cnx):
         """Initialize
 
@@ -103,11 +109,9 @@ class PooledMySQLConnection(object):
         if an instance of MySQLConnection.
         """
         if not isinstance(pool, MySQLConnectionPool):
-            raise AttributeError(
-                "pool should be a MySQLConnectionPool")
+            raise AttributeError("pool should be a MySQLConnectionPool")
         if not isinstance(cnx, MYSQL_CNX_CLASS):
-            raise AttributeError(
-                "cnx should be a MySQLConnection")
+            raise AttributeError("cnx should be a MySQLConnection")
         self._cnx_pool = pool
         self._cnx = cnx
 
@@ -152,10 +156,12 @@ class PooledMySQLConnection(object):
         return self._cnx_pool.pool_name
 
 
-class MySQLConnectionPool(object):
+class MySQLConnectionPool:
     """Class defining a pool of MySQL connections"""
-    def __init__(self, pool_size=5, pool_name=None, pool_reset_session=True,
-                 **kwargs):
+
+    def __init__(
+        self, pool_size=5, pool_name=None, pool_reset_session=True, **kwargs
+    ):
         """Initialize
 
         Initialize a MySQL connection pool with a maximum number of
@@ -214,7 +220,8 @@ class MySQLConnectionPool(object):
                 self._config_version = uuid4()
             except AttributeError as err:
                 raise errors.PoolError(
-                    "Connection configuration not valid: {0}".format(err))
+                    "Connection configuration not valid: {0}".format(err)
+                )
 
     def _set_pool_size(self, pool_size):
         """Set the size of the pool
@@ -227,7 +234,8 @@ class MySQLConnectionPool(object):
         if pool_size <= 0 or pool_size > CNX_POOL_MAXSIZE:
             raise AttributeError(
                 "Pool size should be higher than 0 and "
-                "lower or equal to {0}".format(CNX_POOL_MAXSIZE))
+                "lower or equal to {0}".format(CNX_POOL_MAXSIZE)
+            )
         self._pool_size = pool_size
 
     def _set_pool_name(self, pool_name):
@@ -240,10 +248,12 @@ class MySQLConnectionPool(object):
         """
         if CNX_POOL_NAMEREGEX.search(pool_name):
             raise AttributeError(
-                "Pool name '{0}' contains illegal characters".format(pool_name))
+                "Pool name '{0}' contains illegal characters".format(pool_name)
+            )
         if len(pool_name) > CNX_POOL_MAXNAMESIZE:
             raise AttributeError(
-                "Pool name '{0}' is too long".format(pool_name))
+                "Pool name '{0}' is too long".format(pool_name)
+            )
         self._pool_name = pool_name
 
     def _queue_connection(self, cnx):
@@ -257,7 +267,8 @@ class MySQLConnectionPool(object):
         """
         if not isinstance(cnx, MYSQL_CNX_CLASS):
             raise errors.PoolError(
-                "Connection instance not subclass of MySQLConnection.")
+                "Connection instance not subclass of MySQLConnection."
+            )
 
         try:
             self._cnx_queue.put(cnx, block=False)
@@ -280,22 +291,29 @@ class MySQLConnectionPool(object):
         with CONNECTION_POOL_LOCK:
             if not self._cnx_config:
                 raise errors.PoolError(
-                    "Connection configuration not available")
+                    "Connection configuration not available"
+                )
 
             if self._cnx_queue.full():
                 raise errors.PoolError(
-                    "Failed adding connection; queue is full")
+                    "Failed adding connection; queue is full"
+                )
 
             if not cnx:
                 cnx = Connect(**self._cnx_config)
                 try:
-                    if (self._reset_session and self._cnx_config['compress']
-                            and cnx.get_server_version() < (5, 7, 3)):
-                        raise errors.NotSupportedError("Pool reset session is "
-                                                       "not supported with "
-                                                       "compression for MySQL "
-                                                       "server version 5.7.2 "
-                                                       "or earlier.")
+                    if (
+                        self._reset_session
+                        and self._cnx_config["compress"]
+                        and cnx.get_server_version() < (5, 7, 3)
+                    ):
+                        raise errors.NotSupportedError(
+                            "Pool reset session is "
+                            "not supported with "
+                            "compression for MySQL "
+                            "server version 5.7.2 "
+                            "or earlier."
+                        )
                 except KeyError:
                     pass
 
@@ -305,7 +323,8 @@ class MySQLConnectionPool(object):
             else:
                 if not isinstance(cnx, MYSQL_CNX_CLASS):
                     raise errors.PoolError(
-                        "Connection instance not subclass of MySQLConnection.")
+                        "Connection instance not subclass of MySQLConnection."
+                    )
 
             self._queue_connection(cnx)
 
@@ -327,11 +346,14 @@ class MySQLConnectionPool(object):
                 cnx = self._cnx_queue.get(block=False)
             except queue.Empty:
                 raise errors.PoolError(
-                    "Failed getting connection; pool exhausted")
+                    "Failed getting connection; pool exhausted"
+                )
 
             # pylint: disable=W0201,W0212
-            if not cnx.is_connected() \
-                    or self._config_version != cnx._pool_config_version:
+            if (
+                not cnx.is_connected()
+                or self._config_version != cnx._pool_config_version
+            ):
                 cnx.config(**self._cnx_config)
                 try:
                     cnx.reconnect()

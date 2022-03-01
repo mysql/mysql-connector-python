@@ -86,161 +86,161 @@ MySQL_raw(MySQL *self, PyObject *args);
 PyObject *
 MySQL_connected(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_affected_rows(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_client_flag(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_field_count(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_insert_id(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_server_capabilities(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_server_status(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_st_warning_count(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_convert_to_mysql(MySQL *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQL_handle_result(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_consume_result(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_reset_result(MySQL *self);
 
 /*
  * MySQL C API functions mapping
  */
 
-PyObject*
+PyObject *
 MySQL_autocommit(MySQL *self, PyObject *mode);
 
-PyObject*
+PyObject *
 MySQL_affected_rows(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds);
 
-PyObject*
+PyObject *
 MySQL_character_set_name(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_commit(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds);
 
-PyObject*
+PyObject *
 MySQL_close(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_escape_string(MySQL *self, PyObject *value);
 
-PyObject*
+PyObject *
 MySQL_fetch_fields(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_fetch_row(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_field_count(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_free_result(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_character_set_info(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_client_info(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_client_version(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_host_info(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_proto_info(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_server_info(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_server_version(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_get_ssl_cipher(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_hex_string(MySQL *self, PyObject *value);
 
-PyObject*
+PyObject *
 MySQL_insert_id(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_next_result(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_num_fields(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_num_rows(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_more_results(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_ping(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_query(MySQL *self, PyObject *args, PyObject *kwds);
 
-PyObject*
+PyObject *
 MySQL_refresh(MySQL *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQL_reset_connection(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_rollback(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_select_db(MySQL *self, PyObject *db);
 
-PyObject*
+PyObject *
 MySQL_set_character_set(MySQL *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQL_set_load_data_local_infile_option(MySQL *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQL_shutdown(MySQL *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQL_stat(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_thread_id(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_use_unicode(MySQL *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQL_warning_count(MySQL *self);
 
-PyObject*
+PyObject *
 MySQL_create_prep_stmt(MySQL *self);
 
 /* MySQLPrepStmt */
@@ -270,7 +270,7 @@ typedef struct {
     MYSQL_BIND *bind;
     MYSQL_RES *res;
     MYSQL_STMT *stmt;
-	const char *charset;
+    const char *charset;
     unsigned int use_unicode;
     unsigned long param_count;
     unsigned int column_count;
@@ -290,25 +290,25 @@ MySQLPrepStmt_init(MySQLPrepStmt *self, PyObject *args, PyObject *kwds);
 void
 MySQLPrepStmt_dealloc(MySQLPrepStmt *self);
 
-PyObject*
+PyObject *
 MySQL_stmt_prepare(MySQL *self, PyObject *stmt);
 
-PyObject*
+PyObject *
 MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args);
 
-PyObject*
+PyObject *
 MySQLPrepStmt_handle_result(MySQLPrepStmt *self);
 
-PyObject*
+PyObject *
 MySQLPrepStmt_fetch_row(MySQLPrepStmt *self);
 
-PyObject*
+PyObject *
 MySQLPrepStmt_fetch_fields(MySQLPrepStmt *self);
 
-PyObject*
+PyObject *
 MySQLPrepStmt_reset(MySQLPrepStmt *self);
 
-PyObject*
+PyObject *
 MySQLPrepStmt_close(MySQLPrepStmt *self);
 
 PyObject *

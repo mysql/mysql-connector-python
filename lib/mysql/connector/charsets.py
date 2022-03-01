@@ -29,7 +29,7 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 # This file was auto-generated.
-_GENERATED_ON = '2022-01-10'
+_GENERATED_ON = "2022-01-10"
 _MYSQL_VERSION = (8, 0, 28)
 
 """This module contains the MySQL Server Character Sets"""
@@ -348,4 +348,3 @@ MYSQL_CHARACTER_SETS = [
     ("utf8mb4", "utf8mb4_0900_bin", False),  # 309
     ("utf8mb3", "utf8_general_ci", True),  # 310 deprecated as of 8.0.28
 ]
-

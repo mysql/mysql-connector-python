@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,6 +36,7 @@ from .errors import ProgrammingError
 class ExprJSONEncoder(json.JSONEncoder):
     """A :class:`json.JSONEncoder` subclass, which enables encoding of
     :class:`mysqlx.ExprParser` objects."""
+
     def default(self, o):  # pylint: disable=E0202
         if hasattr(o, "expr"):
             return "{0}".format(o)
@@ -43,7 +44,7 @@ class ExprJSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-class DbDoc(object):
+class DbDoc:
     """Represents a generic document in JSON format.
 
     Args:
@@ -52,6 +53,7 @@ class DbDoc(object):
     Raises:
         ValueError: If ``value`` type is not a basestring or dict.
     """
+
     def __init__(self, value):
         if isinstance(value, dict):
             self.__dict__ = value

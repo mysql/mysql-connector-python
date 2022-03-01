@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,8 +34,8 @@ import sys
 
 from datetime import datetime, timedelta
 
-from .dbdoc import DbDoc
 from .charsets import MYSQL_CHARACTER_SETS
+from .dbdoc import DbDoc
 from .helpers import decode_from_bytes, deprecated
 
 
@@ -48,9 +48,7 @@ def from_protobuf(column, payload):
         return decode_from_bytes(payload[:-1])  # Strip trailing char
 
     try:
-        return ColumnProtoType.converter_map[
-            column.get_proto_type()
-        ](payload)
+        return ColumnProtoType.converter_map[column.get_proto_type()](payload)
     except KeyError as err:
         sys.stderr.write("{0}".format(err))
         sys.stderr.write("{0}".format(payload.encode("hex")))
@@ -83,11 +81,11 @@ def varint_from_protobuf_stream(payload):
     for item in payload:
         char = item if isinstance(item, int) else ord(item)
         eos = (char & 0x80) == 0
-        cur_bits = (char & 0x7f)
+        cur_bits = char & 0x7F
         cur_bits <<= shift
         i |= cur_bits
         if eos:
-            return i, payload[cur + 1:]
+            return i, payload[cur + 1 :]
         cur += 1
         shift += 7
 
@@ -110,10 +108,10 @@ def varsint_from_protobuf(payload):
     # Zigzag encoded, revert it
     if i & 0x1:
         i = ~i
-        i = (i >> 1)
+        i = i >> 1
         i |= 1 << 63
     else:
-        i = (i >> 1)
+        i = i >> 1
 
     return i
 
@@ -147,25 +145,25 @@ def decimal_from_protobuf(payload):
 
     for item in payload:
         char = item if isinstance(item, int) else ord(item)
-        high_bcd = (char & 0xf0) >> 4
-        low_bcd = char & 0x0f
-        if high_bcd < 0x0a:
+        high_bcd = (char & 0xF0) >> 4
+        low_bcd = char & 0x0F
+        if high_bcd < 0x0A:
             digits.append(high_bcd)
-            if low_bcd < 0x0a:
+            if low_bcd < 0x0A:
                 digits.append(low_bcd)
-            elif low_bcd == 0x0c:
+            elif low_bcd == 0x0C:
                 sign = 0
                 break
-            elif low_bcd == 0x0d:
+            elif low_bcd == 0x0D:
                 sign = 1
                 break
             else:
                 raise ValueError("Invalid BCD")
-        elif high_bcd == 0x0c:
+        elif high_bcd == 0x0C:
             sign = 0
             assert low_bcd == 0x00
             break
-        elif high_bcd == 0x0d:
+        elif high_bcd == 0x0D:
             sign = 1
             assert low_bcd == 0x00
             break
@@ -224,15 +222,16 @@ def time_from_protobuf(payload):
         elif useconds:
             useconds *= -1
 
-    return timedelta(hours=hour, minutes=minutes, seconds=seconds,
-                     microseconds=useconds)
+    return timedelta(
+        hours=hour, minutes=minutes, seconds=seconds, microseconds=useconds
+    )
 
 
-class Collations(object):
+class Collations:
     UTF8_GENERAL_CI = 33
 
 
-class ColumnType(object):
+class ColumnType:
     BIT = 1
     TINYINT = 2
     SMALLINT = 3
@@ -282,33 +281,57 @@ class ColumnType(object):
 
     @classmethod
     def is_char(cls, col_type):
-        return col_type in (cls.CHAR, cls.VARCHAR,)
+        return col_type in (
+            cls.CHAR,
+            cls.VARCHAR,
+        )
 
     @classmethod
     def is_binary(cls, col_type):
-        return col_type in (cls.BINARY, cls.VARBINARY,)
+        return col_type in (
+            cls.BINARY,
+            cls.VARBINARY,
+        )
 
     @classmethod
     def is_text(cls, col_type):
-        return col_type in (cls.TEXT, cls.TINYTEXT, cls.MEDIUMTEXT,
-                            cls.LONGTEXT,)
+        return col_type in (
+            cls.TEXT,
+            cls.TINYTEXT,
+            cls.MEDIUMTEXT,
+            cls.LONGTEXT,
+        )
 
     @classmethod
     def is_decimals(cls, col_type):
-        return col_type in (cls.REAL, cls.DOUBLE, cls.FLOAT, cls.DECIMAL,
-                            cls.NUMERIC,)
+        return col_type in (
+            cls.REAL,
+            cls.DOUBLE,
+            cls.FLOAT,
+            cls.DECIMAL,
+            cls.NUMERIC,
+        )
 
     @classmethod
     def is_numeric(cls, col_type):
-        return col_type in (cls.BIT, cls.TINYINT, cls.SMALLINT, cls.MEDIUMINT,
-                            cls.INT, cls.BIGINT,)
+        return col_type in (
+            cls.BIT,
+            cls.TINYINT,
+            cls.SMALLINT,
+            cls.MEDIUMINT,
+            cls.INT,
+            cls.BIGINT,
+        )
 
     @classmethod
     def is_finite_set(cls, col_type):
-        return col_type in (cls.SET, cls.ENUM,)
+        return col_type in (
+            cls.SET,
+            cls.ENUM,
+        )
 
 
-class ColumnProtoType(object):
+class ColumnProtoType:
     SINT = 1
     UINT = 2
     DOUBLE = 5
@@ -336,7 +359,7 @@ class ColumnProtoType(object):
     }
 
 
-class Flags(object):
+class Flags:
     def __init__(self, value):
         self._allowed_flags = {}
         self._flag_names = {}
@@ -407,10 +430,12 @@ class BytesContentType(ColumnFlags):
     GEOMETRY = 0x0001
     JSON = 0x0002
     XML = 0x0003
+
+
 # pylint: enable=C0111
 
 
-class Column(object):
+class Column:
     """Represents meta data for a table column.
 
     Args:
@@ -429,10 +454,22 @@ class Column(object):
 
     .. versionchanged:: 8.0.12
     """
-    def __init__(self, col_type, catalog=None, schema=None, table=None,
-                 original_table=None, name=None, original_name=None,
-                 length=None, collation=None, fractional_digits=None,
-                 flags=None, content_type=None):
+
+    def __init__(
+        self,
+        col_type,
+        catalog=None,
+        schema=None,
+        table=None,
+        original_table=None,
+        name=None,
+        original_name=None,
+        length=None,
+        collation=None,
+        fractional_digits=None,
+        flags=None,
+        content_type=None,
+    ):
         self._schema = decode_from_bytes(schema)
         self._name = decode_from_bytes(name)
         self._original_name = decode_from_bytes(original_name)
@@ -456,25 +493,35 @@ class Column(object):
 
         if self._collation > 0:
             if self._collation >= len(MYSQL_CHARACTER_SETS):
-                raise ValueError("No mapping found for collation {0}"
-                                 "".format(self._collation))
+                raise ValueError(
+                    "No mapping found for collation {0}"
+                    "".format(self._collation)
+                )
             info = MYSQL_CHARACTER_SETS[self._collation]
             self._character_set_name = info[0]
             self._collation_name = info[1]
-            self._is_binary = ("binary" in self._collation_name or
-                               "_bin" in self._collation_name)
+            self._is_binary = (
+                "binary" in self._collation_name
+                or "_bin" in self._collation_name
+            )
         self._map_type()
         self._is_bytes = self._col_type in (
-            ColumnType.GEOMETRY, ColumnType.JSON, ColumnType.XML,
-            ColumnType.BYTES, ColumnType.STRING)
+            ColumnType.GEOMETRY,
+            ColumnType.JSON,
+            ColumnType.XML,
+            ColumnType.BYTES,
+            ColumnType.STRING,
+        )
 
     def __str__(self):
-        return str({
-            "col_type": self._col_type,
-            "schema": self._schema,
-            "table": self._table,
-            "flags": str(self._flags),
-        })
+        return str(
+            {
+                "col_type": self._col_type,
+                "schema": self._schema,
+                "table": self._table,
+                "flags": str(self._flags),
+            }
+        )
 
     def _map_bytes(self):
         """Map bytes."""
@@ -537,16 +584,19 @@ class Column(object):
             self._map_uint_type()
         elif self._proto_type == ColumnProtoType.FLOAT:
             self._col_type = ColumnType.FLOAT
-            self._is_number_signed = \
-                (self._flags & FloatColumnFlags.UNSIGNED) == 0
+            self._is_number_signed = (
+                self._flags & FloatColumnFlags.UNSIGNED
+            ) == 0
         elif self._proto_type == ColumnProtoType.DECIMAL:
             self._col_type = ColumnType.DECIMAL
-            self._is_number_signed = \
-                (self._flags & FloatColumnFlags.UNSIGNED) == 0
+            self._is_number_signed = (
+                self._flags & FloatColumnFlags.UNSIGNED
+            ) == 0
         elif self._proto_type == ColumnProtoType.DOUBLE:
             self._col_type = ColumnType.DOUBLE
-            self._is_number_signed = \
-                (self._flags & FloatColumnFlags.UNSIGNED) == 0
+            self._is_number_signed = (
+                self._flags & FloatColumnFlags.UNSIGNED
+            ) == 0
         elif self._proto_type == ColumnProtoType.BYTES:
             self._map_bytes()
         elif self._proto_type == ColumnProtoType.TIME:
@@ -560,7 +610,9 @@ class Column(object):
         elif self._proto_type == ColumnProtoType.BIT:
             self._col_type = ColumnType.BIT
         else:
-            raise ValueError("Unknown column type {0}".format(self._proto_type))
+            raise ValueError(
+                "Unknown column type {0}".format(self._proto_type)
+            )
 
     @property
     def schema_name(self):
@@ -755,13 +807,14 @@ class Column(object):
         return self._is_bytes
 
 
-class Row(object):
+class Row:
     """Represents a row element returned from a SELECT query.
 
     Args:
         rs (mysqlx.SqlResult or mysqlx.RowResult): The result set.
         fields (`list`): The list of fields.
     """
+
     def __init__(self, rs, fields):
         self._fields = fields
         self._resultset = rs
@@ -774,8 +827,11 @@ class Row(object):
 
         .. versionchanged:: 8.0.12
         """
-        int_index = self._resultset.index_of(index) \
-            if isinstance(index, str) else index
+        int_index = (
+            self._resultset.index_of(index)
+            if isinstance(index, str)
+            else index
+        )
         if int_index == -1 and isinstance(index, str):
             raise ValueError("Column name '{0}' not found".format(index))
         if int_index >= len(self._fields) or int_index < 0:
@@ -799,12 +855,13 @@ class Row(object):
         return str(self._fields[int_index])
 
 
-class BaseResult(object):
+class BaseResult:
     """Provides base functionality for result objects.
 
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
     """
+
     def __init__(self, connection):
         self._connection = connection
         self._closed = False
@@ -844,8 +901,7 @@ class BaseResult(object):
         return len(self._warnings)
 
     def set_closed(self, flag):
-        """Sets if resultset fetch is done.
-        """
+        """Sets if resultset fetch is done."""
         self._closed = flag
 
     def append_warning(self, level, code, msg):
@@ -859,18 +915,15 @@ class BaseResult(object):
         self._warnings.append({"level": level, "code": code, "msg": msg})
 
     def set_generated_ids(self, generated_ids):
-        """Sets the generated ids.
-        """
+        """Sets the generated ids."""
         self._generated_ids = generated_ids
 
     def set_generated_insert_id(self, generated_id):
-        """Sets the generated insert id.
-        """
+        """Sets the generated insert id."""
         self._generated_id = generated_id
 
     def set_rows_affected(self, total):
-        """Sets the number of rows affected.
-        """
+        """Sets the number of rows affected."""
         self._rows_affected = total
 
 
@@ -882,6 +935,7 @@ class Result(BaseResult):
         connection (mysqlx.connection.Connection): The Connection object.
                                                    ids (`list`): A list of IDs.
     """
+
     def __init__(self, connection=None, ids=None):
         super(Result, self).__init__(connection)
         self._ids = ids
@@ -916,8 +970,7 @@ class Result(BaseResult):
         return self._generated_id
 
     def get_generated_ids(self):
-        """Returns the generated ids.
-        """
+        """Returns the generated ids."""
         return self._generated_ids
 
 
@@ -928,6 +981,7 @@ class BufferingResult(BaseResult):
         connection (mysqlx.connection.Connection): The Connection object.
                                                    ids (`list`): A list of IDs.
     """
+
     def __init__(self, connection):
         super(BufferingResult, self).__init__(connection)
         self._columns = []
@@ -953,8 +1007,9 @@ class BufferingResult(BaseResult):
         self._items = []
         self._page_size = 20
         self._position = -1
-        self._connection.set_active_result(self if self._has_more_data
-                                           else None)
+        self._connection.set_active_result(
+            self if self._has_more_data else None
+        )
 
     def _read_item(self, dumping):
         """Read item.
@@ -1052,6 +1107,7 @@ class RowResult(BufferingResult):
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
     """
+
     def __init__(self, connection):
         super(RowResult, self).__init__(connection)
 
@@ -1077,6 +1133,7 @@ class SqlResult(RowResult):
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
     """
+
     def __init__(self, connection):
         super(SqlResult, self).__init__(connection)
 
@@ -1110,6 +1167,7 @@ class SqlResult(RowResult):
         """
         return self._has_data
 
+
 class DocResult(BufferingResult):
     """Allows traversing the DbDoc objects returned by a Collection.find
     operation.
@@ -1117,6 +1175,7 @@ class DocResult(BufferingResult):
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
     """
+
     def __init__(self, connection):
         super(DocResult, self).__init__(connection)
 

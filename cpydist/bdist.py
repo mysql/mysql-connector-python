@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,18 +31,18 @@
 Creates a binary distribution.
 """
 
-import os
 import logging
+import os
 
 from distutils import log
-from distutils.util import byte_compile
-from distutils.dir_util import remove_tree, mkpath, copy_tree
+from distutils.command.bdist import bdist
+from distutils.dir_util import copy_tree, mkpath, remove_tree
 from distutils.file_util import copy_file
 from distutils.sysconfig import get_python_version
-from distutils.command.bdist import bdist
+from distutils.util import byte_compile
 
-from . import COMMON_USER_OPTIONS, VERSION_TEXT, EDITION, LOGGER
-from .utils import add_docs, write_info_src, write_info_bin
+from . import COMMON_USER_OPTIONS, EDITION, LOGGER, VERSION_TEXT
+from .utils import add_docs, write_info_bin, write_info_src
 
 
 class DistBinary(bdist):
@@ -53,10 +53,12 @@ class DistBinary(bdist):
 
     description = "create a built (binary) distribution"
     user_options = COMMON_USER_OPTIONS + [
-        ("bdist-dir=", "d",
-         "temporary directory for creating the distribution"),
-        ("dist-dir=", "d",
-         "directory to put final built distributions in"),
+        (
+            "bdist-dir=",
+            "d",
+            "temporary directory for creating the distribution",
+        ),
+        ("dist-dir=", "d", "directory to put final built distributions in"),
     ]
     boolean_options = ["debug", "byte-code-only", "keep-temp"]
     log = LOGGER
@@ -77,20 +79,25 @@ class DistBinary(bdist):
 
         def _get_fullname():
             label = "-{}".format(self.label) if self.label else ""
-            python_version = "-py{}".format(get_python_version()) \
-                if self.byte_code_only else ""
+            python_version = (
+                "-py{}".format(get_python_version())
+                if self.byte_code_only
+                else ""
+            )
             return "{name}{label}-{version}{edition}{pyver}".format(
                 name=self.distribution.get_name(),
                 label=label,
                 version=self.distribution.get_version(),
                 edition=self.edition or "",
-                pyver=python_version)
+                pyver=python_version,
+            )
 
         self.distribution.get_fullname = _get_fullname
 
         if self.bdist_dir is None:
-            self.bdist_dir = os.path.join(self.dist_dir,
-                                          "bdist.{}".format(self.plat_name))
+            self.bdist_dir = os.path.join(
+                self.dist_dir, "bdist.{}".format(self.plat_name)
+            )
         if self.debug:
             self.log.setLevel(logging.DEBUG)
             log.set_threshold(1)  # Set Distutils logging level to DEBUG
@@ -125,16 +132,18 @@ class DistBinary(bdist):
 
         dist_name = self.distribution.get_fullname()
         self.dist_target = os.path.join(self.dist_dir, dist_name)
-        self.log.info("Distribution will be available as '%s'",
-                      self.dist_target)
+        self.log.info(
+            "Distribution will be available as '%s'", self.dist_target
+        )
 
         # build command: just to get the build_base
         cmdbuild = self.get_finalized_command("build")
         self.build_base = cmdbuild.build_base
 
         # install command
-        install = self.reinitialize_command("install_lib",
-                                            reinit_subcommands=1)
+        install = self.reinitialize_command(
+            "install_lib", reinit_subcommands=1
+        )
         install.compile = False
         install.warn_dir = 0
         install.install_dir = self.bdist_dir
@@ -151,10 +160,14 @@ class DistBinary(bdist):
 
         # compile and remove sources
         if self.byte_code_only:
-            byte_compile(installed_files, optimize=0, force=True,
-                         prefix=install.install_dir)
+            byte_compile(
+                installed_files,
+                optimize=0,
+                force=True,
+                prefix=install.install_dir,
+            )
             self._remove_sources()
-            if get_python_version().startswith('3'):
+            if get_python_version().startswith("3"):
                 self.log.info("Copying byte code from __pycache__")
                 self._copy_from_pycache(os.path.join(self.bdist_dir, "mysql"))
                 self._copy_from_pycache(os.path.join(self.bdist_dir, "mysqlx"))
@@ -175,8 +188,9 @@ class DistBinary(bdist):
             if dst is None:
                 dest_name, _ = copy_file(src, self.dist_target)
             else:
-                dest_name, _ = copy_file(src,
-                                         os.path.join(self.dist_target, dst))
+                dest_name, _ = copy_file(
+                    src, os.path.join(self.dist_target, dst)
+                )
 
         add_docs(os.path.join(self.dist_target, "docs"))
 

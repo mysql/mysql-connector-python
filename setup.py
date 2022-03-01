@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,6 +31,8 @@
 
 import os
 import sys
+
+sys.path.insert(0, ".")
 
 from setuptools import Extension, find_packages, setup
 
@@ -72,32 +74,36 @@ if DistWheel is not None:
 
 # C extensions
 EXTENSIONS = [
-    Extension("_mysql_connector",
-              sources=[
-                  "src/exceptions.c",
-                  "src/mysql_capi.c",
-                  "src/mysql_capi_conversion.c",
-                  "src/mysql_connector.c",
-                  "src/force_cpp_linkage.cc",
-              ],
-              include_dirs=["src/include"]),
-    Extension(name="_mysqlxpb",
-              define_macros=[("PY3", 1,)] if sys.version_info[0] == 3 else [],
-              sources=[
-                  "src/mysqlxpb/mysqlx/mysqlx.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_connection.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_crud.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_cursor.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_datatypes.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_expect.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_expr.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_notice.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_prepare.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_resultset.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_session.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_sql.pb.cc",
-                  "src/mysqlxpb/mysqlxpb.cc",
-              ])
+    Extension(
+        "_mysql_connector",
+        sources=[
+            "src/exceptions.c",
+            "src/mysql_capi.c",
+            "src/mysql_capi_conversion.c",
+            "src/mysql_connector.c",
+            "src/force_cpp_linkage.cc",
+        ],
+        include_dirs=["src/include"],
+    ),
+    Extension(
+        name="_mysqlxpb",
+        define_macros=[("PY3", 1)] if sys.version_info[0] == 3 else [],
+        sources=[
+            "src/mysqlxpb/mysqlx/mysqlx.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_connection.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_crud.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_cursor.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_datatypes.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_expect.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_expr.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_notice.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_prepare.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_resultset.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_session.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_sql.pb.cc",
+            "src/mysqlxpb/mysqlxpb.cc",
+        ],
+    ),
 ]
 
 LONG_DESCRIPTION = """
@@ -134,7 +140,7 @@ setup(
         "Topic :: Database",
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
-        "Topic :: Software Development :: Libraries :: Python Modules"
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     ext_modules=EXTENSIONS,
     cmdclass=COMMAND_CLASSES,
@@ -143,5 +149,5 @@ setup(
         "dns-srv": ["dnspython>=1.16.0"],
         "compression": ["lz4>=2.1.6", "zstandard>=0.12.0"],
         "gssapi": ["gssapi>=1.6.9"],
-    }
+    },
 )

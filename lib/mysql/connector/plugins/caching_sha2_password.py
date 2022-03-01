@@ -27,6 +27,7 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 import struct
+
 from hashlib import sha256
 
 from .. import errors
@@ -41,13 +42,14 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
     Note that encrypting using RSA is not supported since the Python
     Standard Library does not provide this OpenSSL functionality.
     """
+
     requires_ssl = False
-    plugin_name = 'caching_sha2_password'
+    plugin_name = "caching_sha2_password"
     perform_full_authentication = 4
     fast_auth_success = 3
 
     def _scramble(self):
-        """ Returns a scramble of the password using a Nonce sent by the
+        """Returns a scramble of the password using a Nonce sent by the
         server.
 
         The scramble is of the form:
@@ -57,10 +59,13 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
             raise errors.InterfaceError("Missing authentication data (seed)")
 
         if not self._password:
-            return b''
+            return b""
 
-        password = self._password.encode('utf-8') \
-            if isinstance(self._password, str) else self._password
+        password = (
+            self._password.encode("utf-8")
+            if isinstance(self._password, str)
+            else self._password
+        )
         auth_data = self._auth_data
 
         hash1 = sha256(password).digest()
@@ -69,7 +74,7 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
         hash2.update(auth_data)
         hash2 = hash2.digest()
         xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
-        hash3 = struct.pack('32B', *xored)
+        hash3 = struct.pack("32B", *xored)
 
         return hash3
 
@@ -83,14 +88,15 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
     def _full_authentication(self):
         """Returns password as as clear text"""
         if not self._ssl_enabled:
-            raise errors.InterfaceError("{name} requires SSL".format(
-                name=self.plugin_name))
+            raise errors.InterfaceError(
+                "{name} requires SSL".format(name=self.plugin_name)
+            )
 
         if not self._password:
-            return b'\x00'
+            return b"\x00"
         password = self._password
 
         if isinstance(password, str):
-            password = password.encode('utf8')
+            password = password.encode("utf8")
 
-        return password + b'\x00'
+        return password + b"\x00"

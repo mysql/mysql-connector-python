@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,26 +32,27 @@ import copy
 import json
 import warnings
 
-from .errors import ProgrammingError, NotSupportedError
-from .expr import ExprParser
 from .constants import LockContention
 from .dbdoc import DbDoc
+from .errors import NotSupportedError, ProgrammingError
+from .expr import ExprParser
 from .helpers import deprecated
-from .result import Result
 from .protobuf import mysqlxpb_enum
+from .result import Result
 
 ERR_INVALID_INDEX_NAME = 'The given index name "{}" is not valid'
 
 
-class Expr(object):
+class Expr:
     """Expression wrapper."""
+
     def __init__(self, expr):
         self.expr = expr
 
 
 def flexible_params(*values):
     """Parse flexible parameters."""
-    if len(values) == 1 and isinstance(values[0], (list, tuple,)):
+    if len(values) == 1 and isinstance(values[0], (list, tuple)):
         return values[0]
     return values
 
@@ -67,8 +68,9 @@ def is_quoted_identifier(identifier, sql_mode=""):
         `True` if the identifier has backtick quotes, and False otherwise.
     """
     if "ANSI_QUOTES" in sql_mode:
-        return ((identifier[0] == "`" and identifier[-1] == "`") or
-                (identifier[0] == '"' and identifier[-1] == '"'))
+        return (identifier[0] == "`" and identifier[-1] == "`") or (
+            identifier[0] == '"' and identifier[-1] == '"'
+        )
     return identifier[0] == "`" and identifier[-1] == "`"
 
 
@@ -100,8 +102,9 @@ def quote_multipart_identifier(identifiers, sql_mode=""):
     Returns:
         A string with the multi-part identifier quoted with backticks.
     """
-    return ".".join([quote_identifier(identifier, sql_mode)
-                     for identifier in identifiers])
+    return ".".join(
+        [quote_identifier(identifier, sql_mode) for identifier in identifiers]
+    )
 
 
 def parse_table_name(default_schema, table_name, sql_mode=""):
@@ -118,11 +121,13 @@ def parse_table_name(default_schema, table_name, sql_mode=""):
     quote = '"' if "ANSI_QUOTES" in sql_mode else "`"
     delimiter = ".{0}".format(quote) if quote in table_name else "."
     temp = table_name.split(delimiter, 1)
-    return (default_schema if len(temp) == 1 else temp[0].strip(quote),
-            temp[-1].strip(quote),)
+    return (
+        default_schema if len(temp) == 1 else temp[0].strip(quote),
+        temp[-1].strip(quote),
+    )
 
 
-class Statement(object):
+class Statement:
     """Provides base functionality for statement objects.
 
     Args:
@@ -130,6 +135,7 @@ class Statement(object):
                          :class:`mysqlx.Collection` or :class:`mysqlx.Table`.
         doc_based (bool): `True` if it is document based.
     """
+
     def __init__(self, target, doc_based=True):
         self._target = target
         self._doc_based = doc_based
@@ -188,14 +194,12 @@ class Statement(object):
 
     @property
     def repeated(self):
-        """bool: `True` if this statement was executed more than once.
-        """
+        """bool: `True` if this statement was executed more than once."""
         return self._exec_counter > 1
 
     @property
     def deallocate_prepare_execute(self):
-        """bool: `True` to deallocate + prepare + execute statement.
-        """
+        """bool: `True` to deallocate + prepare + execute statement."""
         return self._deallocate_prepare_execute
 
     @deallocate_prepare_execute.setter
@@ -238,9 +242,11 @@ class FilterableStatement(Statement):
         condition (Optional[str]): Sets the search condition to filter
                                    documents or records.
     """
+
     def __init__(self, target, doc_based=True, condition=None):
-        super(FilterableStatement, self).__init__(target=target,
-                                                  doc_based=doc_based)
+        super(FilterableStatement, self).__init__(
+            target=target, doc_based=doc_based
+        )
         self._binding_map = {}
         self._bindings = {}
         self._having = None
@@ -301,8 +307,9 @@ class FilterableStatement(Statement):
         """
         self.has_sort = True
         self._sort_str = ",".join(flexible_params(*clauses))
-        self._sort_expr = ExprParser(self._sort_str,
-                                     not self._doc_based).parse_order_spec()
+        self._sort_expr = ExprParser(
+            self._sort_str, not self._doc_based
+        ).parse_order_spec()
         self._changed = True
         return self
 
@@ -336,8 +343,9 @@ class FilterableStatement(Statement):
         fields = flexible_params(*fields)
         self.has_group_by = True
         self._grouping_str = ",".join(fields)
-        self._grouping = ExprParser(self._grouping_str,
-                                    not self._doc_based).parse_expr_list()
+        self._grouping = ExprParser(
+            self._grouping_str, not self._doc_based
+        ).parse_expr_list()
         self._changed = True
 
     def _set_having(self, condition):
@@ -363,8 +371,8 @@ class FilterableStatement(Statement):
         self.has_projection = True
         self._projection_str = ",".join(fields)
         self._projection_expr = ExprParser(
-            self._projection_str,
-            not self._doc_based).parse_table_select_projection()
+            self._projection_str, not self._doc_based
+        ).parse_table_select_projection()
         self._changed = True
         return self
 
@@ -485,18 +493,25 @@ class FilterableStatement(Statement):
            The usage of ``offset`` was deprecated.
         """
         if not isinstance(row_count, int) or row_count < 0:
-            raise ValueError("The 'row_count' value must be a positive integer")
+            raise ValueError(
+                "The 'row_count' value must be a positive integer"
+            )
         if not self.has_limit:
             self._changed = bool(self._exec_counter == 0)
-            self._deallocate_prepare_execute = bool(not self._exec_counter == 0)
+            self._deallocate_prepare_execute = bool(
+                not self._exec_counter == 0
+            )
 
         self._limit_row_count = row_count
         self.has_limit = True
         if offset:
             self.offset(offset)
-            warnings.warn("'limit(row_count, offset)' is deprecated, please "
-                          "use 'offset(offset)' to set the number of items to "
-                          "skip", category=DeprecationWarning)
+            warnings.warn(
+                "'limit(row_count, offset)' is deprecated, please "
+                "use 'offset(offset)' to set the number of items to "
+                "skip",
+                category=DeprecationWarning,
+            )
         return self
 
     def offset(self, offset):
@@ -558,6 +573,7 @@ class SqlStatement(Statement):
         connection (mysqlx.connection.Connection): Connection object.
         sql (string): The sql statement to be executed.
     """
+
     def __init__(self, connection, sql):
         super(SqlStatement, self).__init__(target=None, doc_based=False)
         self._connection = connection
@@ -617,8 +633,8 @@ class SqlStatement(Statement):
 
 
 class WriteStatement(Statement):
-    """Provide common write operation attributes.
-    """
+    """Provide common write operation attributes."""
+
     def __init__(self, target, doc_based):
         super(WriteStatement, self).__init__(target, doc_based)
         self._values = []
@@ -646,6 +662,7 @@ class AddStatement(WriteStatement):
     Args:
         collection (mysqlx.Collection): The Collection object.
     """
+
     def __init__(self, collection):
         super(AddStatement, self).__init__(collection, True)
         self._upsert = False
@@ -698,7 +715,7 @@ class AddStatement(WriteStatement):
         return self._connection.send_insert(self)
 
 
-class UpdateSpec(object):
+class UpdateSpec:
     """Update specification class implementation.
 
     Args:
@@ -706,17 +723,20 @@ class UpdateSpec(object):
         source (str): The source.
         value (Optional[str]): The value.
     """
+
     def __init__(self, update_type, source, value=None):
         if update_type == mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.SET"):
+            "Mysqlx.Crud.UpdateOperation.UpdateType.SET"
+        ):
             self._table_set(source, value)
         else:
             self.update_type = update_type
             self.source = source
-            if len(source) > 0 and source[0] == '$':
+            if len(source) > 0 and source[0] == "$":
                 self.source = source[1:]
-            self.source = ExprParser(self.source,
-                                     False).document_field().identifier
+            self.source = (
+                ExprParser(self.source, False).document_field().identifier
+            )
             self.value = value
 
     def _table_set(self, source, value):
@@ -727,7 +747,8 @@ class UpdateSpec(object):
             value (str): The value.
         """
         self.update_type = mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.SET")
+            "Mysqlx.Crud.UpdateOperation.UpdateType.SET"
+        )
         self.source = ExprParser(source, True).parse_table_update_field()
         self.value = value
 
@@ -743,9 +764,11 @@ class ModifyStatement(FilterableStatement):
     .. versionchanged:: 8.0.12
        The ``condition`` parameter is now mandatory.
     """
+
     def __init__(self, collection, condition):
-        super(ModifyStatement, self).__init__(target=collection,
-                                              condition=condition)
+        super(ModifyStatement, self).__init__(
+            target=collection, condition=condition
+        )
         self._update_ops = {}
 
     def sort(self, *clauses):
@@ -777,9 +800,11 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops[doc_path] = UpdateSpec(mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_SET"),
-                                                doc_path, value)
+        self._update_ops[doc_path] = UpdateSpec(
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_SET"),
+            doc_path,
+            value,
+        )
         self._changed = True
         return self
 
@@ -797,9 +822,13 @@ class ModifyStatement(FilterableStatement):
 
         .. deprecated:: 8.0.12
         """
-        self._update_ops[doc_path] = UpdateSpec(mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"),
-                                                doc_path, value)
+        self._update_ops[doc_path] = UpdateSpec(
+            mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"
+            ),
+            doc_path,
+            value,
+        )
         self._changed = True
         return self
 
@@ -814,8 +843,12 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         for item in flexible_params(*doc_paths):
-            self._update_ops[item] = UpdateSpec(mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REMOVE"), item)
+            self._update_ops[item] = UpdateSpec(
+                mysqlxpb_enum(
+                    "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REMOVE"
+                ),
+                item,
+            )
         self._changed = True
         return self
 
@@ -831,9 +864,13 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops[field] = UpdateSpec(mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"),
-                                             field, value)
+        self._update_ops[field] = UpdateSpec(
+            mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"
+            ),
+            field,
+            value,
+        )
         self._changed = True
         return self
 
@@ -850,9 +887,13 @@ class ModifyStatement(FilterableStatement):
         Returns:
             mysqlx.ModifyStatement: ModifyStatement object.
         """
-        self._update_ops[doc_path] = UpdateSpec(mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"),
-                                                doc_path, value)
+        self._update_ops[doc_path] = UpdateSpec(
+            mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"
+            ),
+            doc_path,
+            value,
+        )
         self._changed = True
         return self
 
@@ -869,14 +910,19 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         if doc is None:
-            doc = ''
+            doc = ""
         if not isinstance(doc, (ExprParser, dict, DbDoc, str)):
             raise ProgrammingError(
                 "Invalid data for update operation on document collection "
-                "table")
+                "table"
+            )
         self._update_ops["patch"] = UpdateSpec(
-            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
-            '', doc.expr() if isinstance(doc, ExprParser) else doc)
+            mysqlxpb_enum(
+                "Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"
+            ),
+            "",
+            doc.expr() if isinstance(doc, ExprParser) else doc,
+        )
         self._changed = True
         return self
 
@@ -905,6 +951,7 @@ class ReadStatement(FilterableStatement):
         condition (Optional[str]): Sets the search condition to filter
                                    documents or records.
     """
+
     def __init__(self, target, doc_based=True, condition=None):
         super(ReadStatement, self).__init__(target, doc_based, condition)
         self._lock_exclusive = False
@@ -929,8 +976,10 @@ class ReadStatement(FilterableStatement):
             # Check if is a valid lock contention value
             _ = LockContention.index(lock_contention)
         except ValueError:
-            raise ProgrammingError("Invalid lock contention mode. Use 'NOWAIT' "
-                                   "or 'SKIP_LOCKED'")
+            raise ProgrammingError(
+                "Invalid lock contention mode. Use 'NOWAIT' "
+                "or 'SKIP_LOCKED'"
+            )
         self._lock_contention = lock_contention
 
     def is_lock_exclusive(self):
@@ -1018,6 +1067,7 @@ class FindStatement(ReadStatement):
                                    all the documents will be included on the
                                    result unless a limit is set.
     """
+
     def __init__(self, collection, condition=None):
         super(FindStatement, self).__init__(collection, True, condition)
 
@@ -1052,6 +1102,7 @@ class SelectStatement(ReadStatement):
         table (mysqlx.Table): The Table object.
         *fields: The fields to be retrieved.
     """
+
     def __init__(self, table, *fields):
         super(SelectStatement, self).__init__(table, False)
         self._set_projection(*fields)
@@ -1085,20 +1136,35 @@ class SelectStatement(ReadStatement):
             str: The generated SQL.
         """
         where = " WHERE {0}".format(self._where_str) if self.has_where else ""
-        group_by = " GROUP BY {0}".format(self._grouping_str) if \
-            self.has_group_by else ""
-        having = " HAVING {0}".format(self._having) if self.has_having else ""
-        order_by = " ORDER BY {0}".format(self._sort_str) if self.has_sort \
+        group_by = (
+            " GROUP BY {0}".format(self._grouping_str)
+            if self.has_group_by
             else ""
-        limit = " LIMIT {0} OFFSET {1}".format(self._limit_row_count,
-                                               self._limit_offset) \
-                                               if self.has_limit else ""
-        stmt = ("SELECT {select} FROM {schema}.{table}{where}{group}{having}"
-                "{order}{limit}".format(select=self._projection_str or "*",
-                                        schema=self.schema.name,
-                                        table=self.target.name, limit=limit,
-                                        where=where, group=group_by,
-                                        having=having, order=order_by))
+        )
+        having = " HAVING {0}".format(self._having) if self.has_having else ""
+        order_by = (
+            " ORDER BY {0}".format(self._sort_str) if self.has_sort else ""
+        )
+        limit = (
+            " LIMIT {0} OFFSET {1}".format(
+                self._limit_row_count, self._limit_offset
+            )
+            if self.has_limit
+            else ""
+        )
+        stmt = (
+            "SELECT {select} FROM {schema}.{table}{where}{group}{having}"
+            "{order}{limit}".format(
+                select=self._projection_str or "*",
+                schema=self.schema.name,
+                table=self.target.name,
+                limit=limit,
+                where=where,
+                group=group_by,
+                having=having,
+                order=order_by,
+            )
+        )
         return stmt
 
 
@@ -1109,6 +1175,7 @@ class InsertStatement(WriteStatement):
         table (mysqlx.Table): The Table object.
         *fields: The fields to be inserted.
     """
+
     def __init__(self, table, *fields):
         super(InsertStatement, self).__init__(table, False)
         self._fields = flexible_params(*fields)
@@ -1143,6 +1210,7 @@ class UpdateStatement(FilterableStatement):
     .. versionchanged:: 8.0.12
        The ``fields`` parameters were removed.
     """
+
     def __init__(self, table):
         super(UpdateStatement, self).__init__(target=table, doc_based=False)
         self._update_ops = {}
@@ -1187,8 +1255,11 @@ class UpdateStatement(FilterableStatement):
         Returns:
             mysqlx.UpdateStatement: UpdateStatement object.
         """
-        self._update_ops[field] = UpdateSpec(mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.SET"), field, value)
+        self._update_ops[field] = UpdateSpec(
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.SET"),
+            field,
+            value,
+        )
         self._changed = True
         return self
 
@@ -1217,9 +1288,11 @@ class RemoveStatement(FilterableStatement):
     .. versionchanged:: 8.0.12
        The ``condition`` parameter was added.
     """
+
     def __init__(self, collection, condition):
-        super(RemoveStatement, self).__init__(target=collection,
-                                              condition=condition)
+        super(RemoveStatement, self).__init__(
+            target=collection, condition=condition
+        )
 
     def sort(self, *clauses):
         """Sets the sorting criteria.
@@ -1255,6 +1328,7 @@ class DeleteStatement(FilterableStatement):
     .. versionchanged:: 8.0.12
        The ``condition`` parameter was removed.
     """
+
     def __init__(self, table):
         super(DeleteStatement, self).__init__(target=table, doc_based=False)
 
@@ -1316,6 +1390,7 @@ class CreateCollectionIndexStatement(Statement):
                                             ],
                                 "type": type}
     """
+
     def __init__(self, collection, index_name, index_desc):
         super(CreateCollectionIndexStatement, self).__init__(target=collection)
         self._index_desc = copy.deepcopy(index_desc)
@@ -1331,35 +1406,44 @@ class CreateCollectionIndexStatement(Statement):
         # Validate index name is a valid identifier
         if self._index_name is None:
             raise ProgrammingError(
-                ERR_INVALID_INDEX_NAME.format(self._index_name))
+                ERR_INVALID_INDEX_NAME.format(self._index_name)
+            )
         try:
             parsed_ident = ExprParser(self._index_name).expr().get_message()
 
             # The message is type dict when the Protobuf cext is used
             if isinstance(parsed_ident, dict):
                 if parsed_ident["type"] != mysqlxpb_enum(
-                        "Mysqlx.Expr.Expr.Type.IDENT"):
+                    "Mysqlx.Expr.Expr.Type.IDENT"
+                ):
                     raise ProgrammingError(
-                        ERR_INVALID_INDEX_NAME.format(self._index_name))
+                        ERR_INVALID_INDEX_NAME.format(self._index_name)
+                    )
             else:
                 if parsed_ident.type != mysqlxpb_enum(
-                        "Mysqlx.Expr.Expr.Type.IDENT"):
+                    "Mysqlx.Expr.Expr.Type.IDENT"
+                ):
                     raise ProgrammingError(
-                        ERR_INVALID_INDEX_NAME.format(self._index_name))
+                        ERR_INVALID_INDEX_NAME.format(self._index_name)
+                    )
 
         except (ValueError, AttributeError):
             raise ProgrammingError(
-                ERR_INVALID_INDEX_NAME.format(self._index_name))
+                ERR_INVALID_INDEX_NAME.format(self._index_name)
+            )
 
         # Validate members that constraint the index
         if not self._fields_desc:
-            raise ProgrammingError("Required member 'fields' not found in "
-                                   "the given index description: {}"
-                                   "".format(self._index_desc))
+            raise ProgrammingError(
+                "Required member 'fields' not found in "
+                "the given index description: {}"
+                "".format(self._index_desc)
+            )
 
         if not isinstance(self._fields_desc, list):
-            raise ProgrammingError("Required member 'fields' must contain a "
-                                   "list.")
+            raise ProgrammingError(
+                "Required member 'fields' must contain a " "list."
+            )
 
         args = {}
         args["name"] = self._index_name
@@ -1376,8 +1460,9 @@ class CreateCollectionIndexStatement(Statement):
         args["constraint"] = []
 
         if self._index_desc:
-            raise ProgrammingError("Unidentified fields: {}"
-                                   "".format(self._index_desc))
+            raise ProgrammingError(
+                "Unidentified fields: {}" "".format(self._index_desc)
+            )
 
         try:
             for field_desc in self._fields_desc:
@@ -1390,22 +1475,29 @@ class CreateCollectionIndexStatement(Statement):
                     raise TypeError("Field member 'required' must be Boolean")
                 if not isinstance(constraint["array"], bool):
                     raise TypeError("Field member 'array' must be Boolean")
-                if args["type"].upper() == "SPATIAL" and \
-                   not constraint["required"]:
+                if (
+                    args["type"].upper() == "SPATIAL"
+                    and not constraint["required"]
+                ):
                     raise ProgrammingError(
                         "Field member 'required' must be set to 'True' when "
-                        "index type is set to 'SPATIAL'")
-                if args["type"].upper() == "INDEX" and \
-                   constraint["type"] == "GEOJSON":
+                        "index type is set to 'SPATIAL'"
+                    )
+                if (
+                    args["type"].upper() == "INDEX"
+                    and constraint["type"] == "GEOJSON"
+                ):
                     raise ProgrammingError(
                         "Index 'type' must be set to 'SPATIAL' when field "
-                        "type is set to 'GEOJSON'")
+                        "type is set to 'GEOJSON'"
+                    )
                 if "collation" in field_desc:
                     if not constraint["type"].upper().startswith("TEXT"):
                         raise ProgrammingError(
                             "The 'collation' member can only be used when "
                             "field type is set to '{}'"
-                            "".format(constraint["type"].upper()))
+                            "".format(constraint["type"].upper())
+                        )
                     constraint["collation"] = field_desc.pop("collation")
                 # "options" and "srid" fields in IndexField can be
                 # present only if "type" is set to "GEOJSON"
@@ -1413,23 +1505,29 @@ class CreateCollectionIndexStatement(Statement):
                     if constraint["type"].upper() != "GEOJSON":
                         raise ProgrammingError(
                             "The 'options' member can only be used when "
-                            "index type is set to 'GEOJSON'")
+                            "index type is set to 'GEOJSON'"
+                        )
                     constraint["options"] = field_desc.pop("options")
                 if "srid" in field_desc:
                     if constraint["type"].upper() != "GEOJSON":
                         raise ProgrammingError(
                             "The 'srid' member can only be used when index "
-                            "type is set to 'GEOJSON'")
+                            "type is set to 'GEOJSON'"
+                        )
                     constraint["srid"] = field_desc.pop("srid")
                 args["constraint"].append(constraint)
         except KeyError as err:
-            raise ProgrammingError("Required inner member {} not found in "
-                                   "constraint: {}".format(err, field_desc))
+            raise ProgrammingError(
+                "Required inner member {} not found in "
+                "constraint: {}".format(err, field_desc)
+            )
 
         for field_desc in self._fields_desc:
             if field_desc:
-                raise ProgrammingError("Unidentified inner fields:{}"
-                                       "".format(field_desc))
+                raise ProgrammingError(
+                    "Unidentified inner fields:{}" "".format(field_desc)
+                )
 
         return self._connection.execute_nonquery(
-            "mysqlx", "create_collection_index", True, args)
+            "mysqlx", "create_collection_index", True, args
+        )

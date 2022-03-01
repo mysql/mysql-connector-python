@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,10 +26,57 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-from django.db.backends.mysql.compiler import (
-    SQLAggregateCompiler,
-    SQLCompiler,
-    SQLDeleteCompiler,
-    SQLInsertCompiler,
-    SQLUpdateCompiler,
-)
+[build-system]
+requires = ['setuptools', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[tool.isort]
+profile = 'black'
+combine_as_imports = true
+known_first_party = ['mysql.connector', 'mysqlx']
+line_length = 79
+lines_between_types = 1
+skip_glob = [
+    'build/*',
+    'dist/*',
+    'docs/*',
+    'lib/mysql/connector/locales/eng',
+    'lib/mysqlx/locales/eng',
+    'lib/mysqlx/protobuf',
+    'venv/*'
+]
+
+[tool.black]
+line-length = 79
+target-version = ['py37']
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | build
+  | dist
+  | docs
+  | lib/mysql/connector/locales/eng
+  | lib/mysqlx/locales/eng
+  | lib/mysqlx/protobuf
+  | venv
+)/
+'''
+
+[tool.coverage.run]
+branch = true
+omit = [
+    '*/dist-packages/*',
+    '*/site-packages/*',
+    'cpydist/*',
+    'examples/*',
+    'setupinfo.py',
+    'tests/*',
+    'unittests.py',
+]
+
+[tool.coverage.html]
+directory = 'build/coverage_html'
+
+[tool.coverage.xml]
+output = 'build/coverage.xml'

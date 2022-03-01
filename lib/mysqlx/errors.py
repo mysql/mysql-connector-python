@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -35,6 +35,7 @@ from .locales import get_client_error
 
 class Error(Exception):
     """Exception that is base class for all other error exceptions."""
+
     def __init__(self, msg=None, errno=None, values=None, sqlstate=None):
         super(Error, self).__init__()
         self.msg = msg
@@ -53,10 +54,7 @@ class Error(Exception):
             self._full_msg = self.msg = "Unknown error"
 
         if self.msg and self.errno != -1:
-            fields = {
-                "errno": self.errno,
-                "msg": self.msg
-            }
+            fields = {"errno": self.errno, "msg": self.msg}
             if self.sqlstate:
                 fmt = "{errno} ({state}): {msg}"
                 fields["state"] = self.sqlstate
@@ -72,51 +70,62 @@ class Error(Exception):
 
 class InterfaceError(Error):
     """Exception for errors related to the interface."""
+
     pass
 
 
 class DatabaseError(Error):
     """Exception for errors related to the database."""
+
     pass
 
 
 class InternalError(DatabaseError):
     """Exception for errors internal database errors."""
+
     pass
 
 
 class OperationalError(DatabaseError):
     """Exception for errors related to the database's operation."""
+
     pass
 
 
 class ProgrammingError(DatabaseError):
     """Exception for errors programming errors."""
+
     pass
 
 
 class IntegrityError(DatabaseError):
     """Exception for errors regarding relational integrity."""
+
     pass
 
 
 class DataError(DatabaseError):
     """Exception for errors reporting problems with processed data."""
+
     pass
 
 
 class NotSupportedError(DatabaseError):
     """Exception for errors when an unsupported database feature was used."""
+
     pass
 
 
 class PoolError(Error):
     """Exception for errors relating to connection pooling."""
+
     pass
+
 
 # pylint: disable=W0622
 class TimeoutError(Error):
     """Exception for errors relating to connection timeout."""
+
     pass
 
 
@@ -169,8 +178,9 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
     Returns an Exception.
     """
     try:
-        return _ERROR_EXCEPTIONS[errno](msg=msg, errno=errno,
-                                        sqlstate=sqlstate)
+        return _ERROR_EXCEPTIONS[errno](
+            msg=msg, errno=errno, sqlstate=sqlstate
+        )
     except KeyError:
         # Error was not mapped to particular exception
         pass
@@ -179,8 +189,9 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
         return DatabaseError(msg=msg, errno=errno)
 
     try:
-        return _SQLSTATE_CLASS_EXCEPTION[sqlstate[0:2]](msg=msg, errno=errno,
-                                                        sqlstate=sqlstate)
+        return _SQLSTATE_CLASS_EXCEPTION[sqlstate[0:2]](
+            msg=msg, errno=errno, sqlstate=sqlstate
+        )
     except KeyError:
         # Return default InterfaceError
         return DatabaseError(msg=msg, errno=errno, sqlstate=sqlstate)
@@ -200,8 +211,9 @@ def get_exception(packet):
         if packet[4] != 255:
             raise ValueError("Packet is not an error packet")
     except IndexError as err:
-        return InterfaceError("Failed getting Error information ({0})"
-                              "".format(err))
+        return InterfaceError(
+            "Failed getting Error information ({0})" "".format(err)
+        )
 
     sqlstate = None
     try:
@@ -218,8 +230,9 @@ def get_exception(packet):
             sqlstate = sqlstate.decode("utf8")
             errmsg = packet.decode("utf8")
     except Exception as err:  # pylint: disable=W0703
-        return InterfaceError("Failed getting Error information ({0})"
-                              "".format(err))
+        return InterfaceError(
+            "Failed getting Error information ({0})" "".format(err)
+        )
     else:
         return get_mysql_exception(errno, errmsg, sqlstate)
 
@@ -251,7 +264,7 @@ _SQLSTATE_CLASS_EXCEPTION = {
     "3F": ProgrammingError,  # invalid schema name
     "40": InternalError,  # transaction rollback
     "42": ProgrammingError,  # syntax error or access rule violation
-    "44": InternalError,   # with check option violation
+    "44": InternalError,  # with check option violation
     "HZ": OperationalError,  # remote database access
     "XA": IntegrityError,
     "0K": OperationalError,

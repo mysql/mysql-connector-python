@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -69,7 +69,7 @@ def create_json_with_id():
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
 class CollectionAddTests(tests.MySQLxTests):
-    """Tests for collection.add(). """
+    """Tests for collection.add()."""
 
     def _drop_collection_if_exists(self, name):
         collection = self.schema.get_collection(name)

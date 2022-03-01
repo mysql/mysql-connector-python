@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,6 +32,7 @@ MySQL Connector/Python - MySQL driver written in Python
 
 try:
     import _mysql_connector  # pylint: disable=F0401
+
     from .connection_cext import CMySQLConnection
 except ImportError:
     HAVE_CEXT = False
@@ -39,8 +40,8 @@ else:
     HAVE_CEXT = True
 
 try:
-    import dns.resolver
     import dns.exception
+    import dns.resolver
 except ImportError:
     HAVE_DNSPYTHON = False
 else:
@@ -51,20 +52,46 @@ import warnings
 
 from . import version
 from .connection import MySQLConnection
-from .constants import DEFAULT_CONFIGURATION
-from .errors import (  # pylint: disable=W0622
-    Error, Warning, InterfaceError, DatabaseError,
-    NotSupportedError, DataError, IntegrityError, ProgrammingError,
-    OperationalError, InternalError, custom_error_exception, PoolError)
-from .constants import FieldFlag, FieldType, CharacterSet, \
-    RefreshOption, ClientFlag
+from .constants import (
+    DEFAULT_CONFIGURATION,
+    CharacterSet,
+    ClientFlag,
+    FieldFlag,
+    FieldType,
+    RefreshOption,
+)
 from .dbapi import (
-    Date, Time, Timestamp, Binary, DateFromTicks,
-    TimestampFromTicks, TimeFromTicks,
-    STRING, BINARY, NUMBER, DATETIME, ROWID,
-    apilevel, threadsafety, paramstyle)
+    BINARY,
+    DATETIME,
+    NUMBER,
+    ROWID,
+    STRING,
+    Binary,
+    Date,
+    DateFromTicks,
+    Time,
+    TimeFromTicks,
+    Timestamp,
+    TimestampFromTicks,
+    apilevel,
+    paramstyle,
+    threadsafety,
+)
+from .errors import (  # pylint: disable=W0622
+    DatabaseError,
+    DataError,
+    Error,
+    IntegrityError,
+    InterfaceError,
+    InternalError,
+    NotSupportedError,
+    OperationalError,
+    PoolError,
+    ProgrammingError,
+    Warning,
+    custom_error_exception,
+)
 from .optionfiles import read_option_files
-
 
 _CONNECTION_POOLS = {}
 
@@ -75,16 +102,18 @@ def _get_pooled_connection(**kwargs):
     """Return a pooled MySQL connection"""
     # If no pool name specified, generate one
     from .pooling import (
-        MySQLConnectionPool, generate_pool_name,
-        CONNECTION_POOL_LOCK)
+        CONNECTION_POOL_LOCK,
+        MySQLConnectionPool,
+        generate_pool_name,
+    )
 
     try:
-        pool_name = kwargs['pool_name']
+        pool_name = kwargs["pool_name"]
     except KeyError:
         pool_name = generate_pool_name(**kwargs)
 
-    if 'use_pure' in kwargs:
-        if not kwargs['use_pure'] and not HAVE_CEXT:
+    if "use_pure" in kwargs:
+        if not kwargs["use_pure"] and not HAVE_CEXT:
             raise ImportError(ERROR_NO_CEXT)
 
     # Setup the pool, ensuring only 1 thread can update at a time
@@ -94,17 +123,16 @@ def _get_pooled_connection(**kwargs):
         elif isinstance(_CONNECTION_POOLS[pool_name], MySQLConnectionPool):
             # pool_size must be the same
             check_size = _CONNECTION_POOLS[pool_name].pool_size
-            if ('pool_size' in kwargs
-                    and kwargs['pool_size'] != check_size):
-                raise PoolError("Size can not be changed "
-                                "for active pools.")
+            if "pool_size" in kwargs and kwargs["pool_size"] != check_size:
+                raise PoolError("Size can not be changed " "for active pools.")
 
     # Return pooled connection
     try:
         return _CONNECTION_POOLS[pool_name].get_connection()
     except AttributeError:
         raise InterfaceError(
-            "Failed getting connection from pool '{0}'".format(pool_name))
+            "Failed getting connection from pool '{0}'".format(pool_name)
+        )
 
 
 def _get_failover_connection(**kwargs):
@@ -120,14 +148,24 @@ def _get_failover_connection(**kwargs):
     """
     config = kwargs.copy()
     try:
-        failover = config['failover']
+        failover = config["failover"]
     except KeyError:
-        raise ValueError('failover argument not provided')
-    del config['failover']
+        raise ValueError("failover argument not provided")
+    del config["failover"]
 
     support_cnx_args = set(
-        ['user', 'password', 'host', 'port', 'unix_socket',
-         'database', 'pool_name', 'pool_size', 'priority'])
+        [
+            "user",
+            "password",
+            "host",
+            "port",
+            "unix_socket",
+            "database",
+            "pool_name",
+            "pool_size",
+            "priority",
+        ]
+    )
 
     # First check if we can add all use the configuration
     priority_count = 0
@@ -136,8 +174,9 @@ def _get_failover_connection(**kwargs):
         if diff:
             raise ValueError(
                 "Unsupported connection argument {0} in failover: {1}".format(
-                    's' if len(diff) > 1 else '',
-                    ', '.join(diff)))
+                    "s" if len(diff) > 1 else "", ", ".join(diff)
+                )
+            )
         if hasattr(server, "priority"):
             priority_count += 1
 
@@ -145,18 +184,22 @@ def _get_failover_connection(**kwargs):
         if server["priority"] < 0 or server["priority"] > 100:
             raise InterfaceError(
                 "Priority value should be in the range of 0 to 100, "
-                "got : {}".format(server["priority"]))
+                "got : {}".format(server["priority"])
+            )
         if not isinstance(server["priority"], int):
             raise InterfaceError(
                 "Priority value should be an integer in the range of 0 to "
-                "100, got : {}".format(server["priority"]))
+                "100, got : {}".format(server["priority"])
+            )
 
     if 0 < priority_count < len(failover):
-            raise ProgrammingError("You must either assign no priority to any "
-                                   "of the routers or give a priority for "
-                                   "every router")
+        raise ProgrammingError(
+            "You must either assign no priority to any "
+            "of the routers or give a priority for "
+            "every router"
+        )
 
-    failover.sort(key=lambda x: x['priority'], reverse=True)
+    failover.sort(key=lambda x: x["priority"], reverse=True)
 
     server_directory = {}
     server_priority_list = []
@@ -175,7 +218,7 @@ def _get_failover_connection(**kwargs):
             server = failover_list.pop(index)
             new_config = config.copy()
             new_config.update(server)
-            new_config.pop('priority', None)
+            new_config.pop("priority", None)
             try:
                 return connect(**new_config)
             except Error:
@@ -198,63 +241,77 @@ def connect(*args, **kwargs):
     Returns MySQLConnection or PooledMySQLConnection.
     """
     # DNS SRV
-    dns_srv = kwargs.pop('dns_srv') if 'dns_srv' in kwargs else False
+    dns_srv = kwargs.pop("dns_srv") if "dns_srv" in kwargs else False
 
     if not isinstance(dns_srv, bool):
         raise InterfaceError("The value of 'dns-srv' must be a boolean")
 
     if dns_srv:
         if not HAVE_DNSPYTHON:
-            raise InterfaceError('MySQL host configuration requested DNS '
-                                 'SRV. This requires the Python dnspython '
-                                 'module. Please refer to documentation')
-        if 'unix_socket' in kwargs:
-            raise InterfaceError('Using Unix domain sockets with DNS SRV '
-                                 'lookup is not allowed')
-        if 'port' in kwargs:
-            raise InterfaceError('Specifying a port number with DNS SRV '
-                                 'lookup is not allowed')
-        if 'failover' in kwargs:
-            raise InterfaceError('Specifying multiple hostnames with DNS '
-                                 'SRV look up is not allowed')
-        if 'host' not in kwargs:
-            kwargs['host'] = DEFAULT_CONFIGURATION['host']
+            raise InterfaceError(
+                "MySQL host configuration requested DNS "
+                "SRV. This requires the Python dnspython "
+                "module. Please refer to documentation"
+            )
+        if "unix_socket" in kwargs:
+            raise InterfaceError(
+                "Using Unix domain sockets with DNS SRV "
+                "lookup is not allowed"
+            )
+        if "port" in kwargs:
+            raise InterfaceError(
+                "Specifying a port number with DNS SRV "
+                "lookup is not allowed"
+            )
+        if "failover" in kwargs:
+            raise InterfaceError(
+                "Specifying multiple hostnames with DNS "
+                "SRV look up is not allowed"
+            )
+        if "host" not in kwargs:
+            kwargs["host"] = DEFAULT_CONFIGURATION["host"]
 
         try:
-            srv_records = dns.resolver.query(kwargs['host'], 'SRV')
+            srv_records = dns.resolver.query(kwargs["host"], "SRV")
         except dns.exception.DNSException:
-            raise InterfaceError("Unable to locate any hosts for '{0}'"
-                                 "".format(kwargs['host']))
+            raise InterfaceError(
+                "Unable to locate any hosts for '{0}'"
+                "".format(kwargs["host"])
+            )
 
         failover = []
         for srv in srv_records:
-            failover.append({
-                'host': srv.target.to_text(omit_final_dot=True),
-                'port': srv.port,
-                'priority': srv.priority,
-                'weight': srv.weight
-            })
+            failover.append(
+                {
+                    "host": srv.target.to_text(omit_final_dot=True),
+                    "port": srv.port,
+                    "priority": srv.priority,
+                    "weight": srv.weight,
+                }
+            )
 
-        failover.sort(key=lambda x: (x['priority'], -x['weight']))
-        kwargs['failover'] = [{'host': srv['host'],
-                               'port': srv['port']} for srv in failover]
+        failover.sort(key=lambda x: (x["priority"], -x["weight"]))
+        kwargs["failover"] = [
+            {"host": srv["host"], "port": srv["port"]} for srv in failover
+        ]
 
     # Option files
-    if 'read_default_file' in kwargs:
-        kwargs['option_files'] = kwargs['read_default_file']
-        kwargs.pop('read_default_file')
+    if "read_default_file" in kwargs:
+        kwargs["option_files"] = kwargs["read_default_file"]
+        kwargs.pop("read_default_file")
 
-    if 'option_files' in kwargs:
+    if "option_files" in kwargs:
         new_config = read_option_files(**kwargs)
         return connect(**new_config)
 
     # Failover
-    if 'failover' in kwargs:
+    if "failover" in kwargs:
         return _get_failover_connection(**kwargs)
 
     # Pooled connections
     try:
         from .constants import CNX_POOL_ARGS
+
         if any([key in kwargs for key in CNX_POOL_ARGS]):
             return _get_pooled_connection(**kwargs)
     except NameError:
@@ -262,40 +319,62 @@ def connect(*args, **kwargs):
         pass
 
     # Use C Extension by default
-    use_pure = kwargs.get('use_pure', False)
-    if 'use_pure' in kwargs:
-        del kwargs['use_pure']  # Remove 'use_pure' from kwargs
+    use_pure = kwargs.get("use_pure", False)
+    if "use_pure" in kwargs:
+        del kwargs["use_pure"]  # Remove 'use_pure' from kwargs
         if not use_pure and not HAVE_CEXT:
             raise ImportError(ERROR_NO_CEXT)
 
     if HAVE_CEXT and not use_pure:
         return CMySQLConnection(*args, **kwargs)
     return MySQLConnection(*args, **kwargs)
+
+
 Connect = connect  # pylint: disable=C0103
 
 __version_info__ = version.VERSION
 __version__ = version.VERSION_TEXT
 
 __all__ = [
-    'MySQLConnection', 'Connect', 'custom_error_exception',
-
+    "MySQLConnection",
+    "Connect",
+    "custom_error_exception",
     # Some useful constants
-    'FieldType', 'FieldFlag', 'ClientFlag', 'CharacterSet', 'RefreshOption',
-    'HAVE_CEXT',
-
+    "FieldType",
+    "FieldFlag",
+    "ClientFlag",
+    "CharacterSet",
+    "RefreshOption",
+    "HAVE_CEXT",
     # Error handling
-    'Error', 'Warning',
-    'InterfaceError', 'DatabaseError',
-    'NotSupportedError', 'DataError', 'IntegrityError', 'ProgrammingError',
-    'OperationalError', 'InternalError',
-
+    "Error",
+    "Warning",
+    "InterfaceError",
+    "DatabaseError",
+    "NotSupportedError",
+    "DataError",
+    "IntegrityError",
+    "ProgrammingError",
+    "OperationalError",
+    "InternalError",
     # DBAPI PEP 249 required exports
-    'connect', 'apilevel', 'threadsafety', 'paramstyle',
-    'Date', 'Time', 'Timestamp', 'Binary',
-    'DateFromTicks', 'DateFromTicks', 'TimestampFromTicks', 'TimeFromTicks',
-    'STRING', 'BINARY', 'NUMBER',
-    'DATETIME', 'ROWID',
-
+    "connect",
+    "apilevel",
+    "threadsafety",
+    "paramstyle",
+    "Date",
+    "Time",
+    "Timestamp",
+    "Binary",
+    "DateFromTicks",
+    "DateFromTicks",
+    "TimestampFromTicks",
+    "TimeFromTicks",
+    "STRING",
+    "BINARY",
+    "NUMBER",
+    "DATETIME",
+    "ROWID",
     # C Extension
-    'CMySQLConnection',
-    ]
+    "CMySQLConnection",
+]

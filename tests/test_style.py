@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,10 +32,11 @@ Requires:
     pylint v1.2.0 or higher
 """
 
-import os
-import tests
 import logging
+import os
 import unittest
+
+import tests
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
@@ -48,9 +49,12 @@ except ImportError as err:
     _PYLINT_AVAILABLE = False
 
 _CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
-(_BASE_PATH, _,) = os.path.split(_CURRENT_PATH)
-PYLINTRC = os.path.join(_CURRENT_PATH, '..', 'support', 'style', 'pylint.rc')
-IGNORE_LIST = ['dbapi.py', 'client_error.py', 'errorcode.py', 'charsets.py']
+(
+    _BASE_PATH,
+    _,
+) = os.path.split(_CURRENT_PATH)
+PYLINTRC = os.path.join(_CURRENT_PATH, "..", "support", "style", "pylint.rc")
+IGNORE_LIST = ["dbapi.py", "client_error.py", "errorcode.py", "charsets.py"]
 
 
 @unittest.skipIf(not os.path.exists(PYLINTRC), "pylint.rc not available")
@@ -60,8 +64,8 @@ class LintTests(tests.MySQLConnectorTests):
 
     def setUp(self):
         self.pylint_rc_path = PYLINTRC
-        self.dir_path = os.path.join('lib', 'mysql', 'connector')
-        self.output_file_path = os.path.join(os.getcwd(), 'pylint_output.txt')
+        self.dir_path = os.path.join("lib", "mysql", "connector")
+        self.output_file_path = os.path.join(os.getcwd(), "pylint_output.txt")
         self.pylint_output_file = open(self.output_file_path, "w+")
         self.failed_files = []
 
@@ -73,34 +77,37 @@ class LintTests(tests.MySQLConnectorTests):
 
     @unittest.skipIf(not _PYLINT_AVAILABLE, "pylint not available")
     def test_lint(self):
-        """Process modules for pylint tests
-        """
+        """Process modules for pylint tests"""
         txtreporter = TextReporter(self.pylint_output_file)
         for root, _, files in os.walk(self.dir_path):
-            if (['connector', 'django'] ==
-                [ os.path.basename(fld) for fld in os.path.split(root)]):
+            if ["connector", "django"] == [
+                os.path.basename(fld) for fld in os.path.split(root)
+            ]:
                 continue
             for name in files:
-                if name.endswith('.py') and name not in IGNORE_LIST:
+                if name.endswith(".py") and name not in IGNORE_LIST:
                     current_path = os.path.join(root, name)
                     lint_args = [
                         current_path,
-                        "--rcfile={0}".format(self.pylint_rc_path)
-                        ]
-                    lint_run = lint.Run(lint_args, reporter=txtreporter,
-                                        exit=False)
-
-                    if lint_run.linter.stats['by_msg']:
+                        "--rcfile={0}".format(self.pylint_rc_path),
+                    ]
+                    lint_run = lint.Run(
+                        lint_args, reporter=txtreporter, exit=False
+                    )
+                    if lint_run.linter.stats.by_msg:
                         rel_file_path = os.path.join(
-                            os.path.relpath(root, _BASE_PATH), name)
+                            os.path.relpath(root, _BASE_PATH), name
+                        )
                         self.failed_files.append(rel_file_path)
 
         if self.failed_files:
-            file_names = ''
+            file_names = ""
             for file in self.failed_files:
-                file_names += file + '\n'
-            self.fail('Lint tests failed on following files\n{0}\n'
-                      'For more information check {1}.'.format(
-                        file_names,
-                        os.path.relpath(self.output_file_path, _BASE_PATH)))
-
+                file_names += file + "\n"
+            self.fail(
+                "Lint tests failed on following files\n{0}\n"
+                "For more information check {1}.".format(
+                    file_names,
+                    os.path.relpath(self.output_file_path, _BASE_PATH),
+                )
+            )
