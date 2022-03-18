@@ -170,16 +170,13 @@ Requires:      %{scl}-runtime
 Requires:      python38
 %endif
 
-# There is no new enough python3-protobuf on some older Linux distros
-%if ! ( 0%{?rhel} == 7 || 0%{?suse_version} == 1315 )
-Requires:      python3-protobuf >= %{requires_py_protobuf_version}
-%endif
-
 # Some operations requires DNSPYTHON but this is not a strict
 # requirement for the RPM install as currently few RPM platforms has
 # the required version as RPMs. Users need to install using PIP.
+# Most of the linux distros except fedora got older version of python3-protobuf.
 %if 0%{?fedora}
 Requires:      python3-dns >= %{wants_py_dnspython_version}
+Requires:      python3-protobuf >= %{requires_py_protobuf_version}
 %endif
 
 %description -n mysql-connector-python3%{?product_suffix}
