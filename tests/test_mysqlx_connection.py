@@ -57,6 +57,7 @@ from mysqlx.connection import (
     TLS_V1_3_SUPPORTED,
     SocketStream,
 )
+from mysqlx.constants import Compression
 from mysqlx.errors import (
     InterfaceError,
     NotSupportedError,
@@ -146,7 +147,7 @@ _URI_TEST_RESULTS = (  # (uri, result)
             "port": 33060,
             "password": "",
             "user": "user",
-            "compression": "required",
+            "compression": Compression.REQUIRED,
         },
     ),
     (
@@ -803,39 +804,49 @@ class MySQLxSessionTests(tests.MySQLxTests):
         session.close()
 
         # Socket parsing tests
-        conn = mysqlx._get_connection_settings("root:@(/path/to/sock)")
+        conn = mysqlx.connection._get_connection_settings(
+            "root:@(/path/to/sock)"
+        )
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
-        conn = mysqlx._get_connection_settings("root:@(/path/to/sock)/schema")
+        conn = mysqlx.connection._get_connection_settings(
+            "root:@(/path/to/sock)/schema"
+        )
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-        conn = mysqlx._get_connection_settings("root:@/path%2Fto%2Fsock")
+        conn = mysqlx.connection._get_connection_settings(
+            "root:@/path%2Fto%2Fsock"
+        )
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
-        conn = mysqlx._get_connection_settings(
+        conn = mysqlx.connection._get_connection_settings(
             "root:@/path%2Fto%2Fsock/schema"
         )
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-        conn = mysqlx._get_connection_settings("root:@.%2Fpath%2Fto%2Fsock")
+        conn = mysqlx.connection._get_connection_settings(
+            "root:@.%2Fpath%2Fto%2Fsock"
+        )
         self.assertEqual("./path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
-        conn = mysqlx._get_connection_settings(
+        conn = mysqlx.connection._get_connection_settings(
             "root:@.%2Fpath%2Fto%2Fsock" "/schema"
         )
         self.assertEqual("./path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-        conn = mysqlx._get_connection_settings("root:@..%2Fpath%2Fto%2Fsock")
+        conn = mysqlx.connection._get_connection_settings(
+            "root:@..%2Fpath%2Fto%2Fsock"
+        )
         self.assertEqual("../path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
-        conn = mysqlx._get_connection_settings(
+        conn = mysqlx.connection._get_connection_settings(
             "root:@..%2Fpath%2Fto%2Fsock" "/schema"
         )
         self.assertEqual("../path/to/sock", conn["socket"])
@@ -857,7 +868,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Test URI parser function
         for uri, res in _URI_TEST_RESULTS:
             try:
-                settings = mysqlx._get_connection_settings(uri)
+                settings = mysqlx.connection._get_connection_settings(uri)
                 self.assertEqual(res, settings)
             except mysqlx.Error:
                 self.assertEqual(res, None)
@@ -865,7 +876,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Test URI parser function
         for uri, res in _ROUTER_LIST_RESULTS:
             try:
-                settings = mysqlx._get_connection_settings(uri)
+                settings = mysqlx.connection._get_connection_settings(uri)
                 self.assertEqual(res, settings)
             except mysqlx.Error:
                 self.assertEqual(res, None)
@@ -1604,7 +1615,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
-            ("tls-version: 'INVALID' is" in context.exception.msg),
+            ("tls_version: 'INVALID' is" in context.exception.msg),
             "Unexpected exception message found: {}"
             "".format(context.exception.msg),
         )
@@ -2523,15 +2534,17 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         # The compression algorithm negotiation should fail when there is no
         # compression algorithm available in the server and compress is
         # required
-        config["compression"] = "required"
-        self._set_compression_algorithms("")
-        self.assertRaises(InterfaceError, mysqlx.get_session, config)
+        for compression in ("required", Compression.REQUIRED):
+            config["compression"] = compression
+            self._set_compression_algorithms("")
+            self.assertRaises(InterfaceError, mysqlx.get_session, config)
 
         # Using compress='disabled' should work even when there is no
         # compression algorithm available in the server
-        config["compression"] = "disabled"
-        session = mysqlx.get_session(config)
-        session.close()
+        for compression in ("disabled", Compression.DISABLED):
+            config["compression"] = compression
+            session = mysqlx.get_session(config)
+            session.close()
 
         # Should fail when using an invalid compress option
         config["compression"] = "invalid"

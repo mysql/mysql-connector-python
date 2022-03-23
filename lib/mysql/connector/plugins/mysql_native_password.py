@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Native Password Authentication Plugin."""
+
 import logging
 import struct
 
@@ -70,9 +72,9 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             hash3 = sha1(auth_data + hash2).digest()
             xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
             hash4 = struct.pack("20B", *xored)
-        except Exception as exc:
+        except (struct.error, TypeError) as err:
             raise errors.InterfaceError(
-                "Failed scrambling password; {0}".format(exc)
-            )
+                f"Failed scrambling password; {err}"
+            ) from err
 
         return hash4

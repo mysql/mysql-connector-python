@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Clear Password Authentication Plugin."""
+
 from . import BaseAuthPlugin
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLClearPasswordAuthPlugin"
@@ -36,14 +38,3 @@ class MySQLClearPasswordAuthPlugin(BaseAuthPlugin):
 
     requires_ssl = True
     plugin_name = "mysql_clear_password"
-
-    def prepare_password(self):
-        """Returns password as as clear text"""
-        if not self._password:
-            return b"\x00"
-        password = self._password
-
-        if isinstance(password, str):
-            password = password.encode("utf8")
-
-        return password + b"\x00"

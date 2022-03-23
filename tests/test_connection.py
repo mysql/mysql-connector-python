@@ -63,7 +63,6 @@ except ImportError:
     HAVE_CMYSQL = False
 
 from mysql.connector import (
-    HAVE_DNSPYTHON,
     MySQLConnection,
     abstracts,
     connect,
@@ -81,6 +80,7 @@ from mysql.connector.errors import (
 )
 from mysql.connector.network import TLS_V1_3_SUPPORTED
 from mysql.connector.optionfiles import read_option_files
+from mysql.connector.pooling import HAVE_DNSPYTHON
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import LICENSE, VERSION
 
@@ -223,9 +223,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cnx = FakeMySQLConnection(database=exp)
         self.assertEqual(exp, cnx._database)
 
-    def test__get_self(self):
+    def test_get_self(self):
         """Return self"""
-        self.assertEqual(self.cnx, self.cnx._get_self())
+        self.assertEqual(self.cnx, self.cnx.get_self())
 
     def test__send_cmd(self):
         """Send a command to MySQL"""
@@ -289,7 +289,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._have_next_result = False
         packet = OK_PACKET[:-4] + b"\x08" + OK_PACKET[-3:]
         self.cnx._handle_ok(packet)
-        self.assertTrue(self.cnx._have_next_result)
+        self.assertTrue(self.cnx.have_next_result)
 
     def test__handle_eof(self):
         """Handle an EOF-packet sent by MySQL"""
@@ -305,7 +305,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._have_next_result = False
         packet = EOF_PACKET[:-2] + b"\x08" + EOF_PACKET[-1:]
         self.cnx._handle_eof(packet)
-        self.assertTrue(self.cnx._have_next_result)
+        self.assertTrue(self.cnx.have_next_result)
 
     def test__handle_result(self):
         """Handle the result after sending a command to MySQL"""
@@ -462,7 +462,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.__helper_get_rows_buffer(toggle_next_result=True)
         exp = {"status_flag": 8, "warning_count": 0}
         self.assertEqual(exp, self.cnx.get_rows(raw=True)[-1])
-        self.assertTrue(self.cnx._have_next_result)
+        self.assertTrue(self.cnx.have_next_result)
 
     def test_get_row(self):
         """Get a row from the MySQL resultset"""
@@ -4126,7 +4126,7 @@ class WL14237(tests.MySQLConnectorTests):
             with self.assertRaises(ProgrammingError) as context:
                 cur.add_attribute(name=attr_name, value=attr_val)
             self.assertIn(
-                "`name` must be a string type.",
+                "`name` must be a string type",
                 context.exception.msg,
                 "Unexpected message found: {}".format(context.exception),
             )
@@ -4156,7 +4156,7 @@ class WL14237(tests.MySQLConnectorTests):
             with self.assertRaises(ProgrammingError) as context:
                 cur.add_attribute(**{"name": attr_name, "value": attr_val})
             self.assertIn(
-                "cannot be converted to a MySQL type.",
+                "cannot be converted to a MySQL type",
                 context.exception.msg,
                 "Unexpected message found: {}".format(context.exception),
             )

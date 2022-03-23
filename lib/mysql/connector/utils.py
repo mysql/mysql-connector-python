@@ -26,8 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Utilities
-"""
+"""Utilities."""
 
 import os
 import platform
@@ -64,19 +63,16 @@ NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
 
 def intread(buf):
     """Unpacks the given buffer to an integer"""
-    try:
-        if isinstance(buf, int):
-            return buf
-        length = len(buf)
-        if length == 1:
-            return buf[0]
-        elif length <= 4:
-            tmp = buf + b"\x00" * (4 - length)
-            return struct.unpack("<I", tmp)[0]
-        tmp = buf + b"\x00" * (8 - length)
-        return struct.unpack("<Q", tmp)[0]
-    except:
-        raise
+    if isinstance(buf, int):
+        return buf
+    length = len(buf)
+    if length == 1:
+        return buf[0]
+    if length <= 4:
+        tmp = buf + b"\x00" * (4 - length)
+        return struct.unpack("<I", tmp)[0]
+    tmp = buf + b"\x00" * (8 - length)
+    return struct.unpack("<Q", tmp)[0]
 
 
 def int1store(i):
@@ -87,8 +83,7 @@ def int1store(i):
     """
     if i < 0 or i > 255:
         raise ValueError("int1store requires 0 <= i <= 255")
-    else:
-        return bytearray(struct.pack("<B", i))
+    return bytearray(struct.pack("<B", i))
 
 
 def int2store(i):
@@ -99,8 +94,7 @@ def int2store(i):
     """
     if i < 0 or i > 65535:
         raise ValueError("int2store requires 0 <= i <= 65535")
-    else:
-        return bytearray(struct.pack("<H", i))
+    return bytearray(struct.pack("<H", i))
 
 
 def int3store(i):
@@ -111,8 +105,7 @@ def int3store(i):
     """
     if i < 0 or i > 16777215:
         raise ValueError("int3store requires 0 <= i <= 16777215")
-    else:
-        return bytearray(struct.pack("<I", i)[0:3])
+    return bytearray(struct.pack("<I", i)[0:3])
 
 
 def int4store(i):
@@ -123,8 +116,7 @@ def int4store(i):
     """
     if i < 0 or i > 4294967295:
         raise ValueError("int4store requires 0 <= i <= 4294967295")
-    else:
-        return bytearray(struct.pack("<I", i))
+    return bytearray(struct.pack("<I", i))
 
 
 def int8store(i):
@@ -135,8 +127,7 @@ def int8store(i):
     """
     if i < 0 or i > 18446744073709551616:
         raise ValueError("int8store requires 0 <= i <= 2^64")
-    else:
-        return bytearray(struct.pack("<Q", i))
+    return bytearray(struct.pack("<Q", i))
 
 
 def intstore(i):
@@ -175,9 +166,9 @@ def lc_int(i):
 
     if i < 251:
         return bytearray(struct.pack("<B", i))
-    elif i <= 65535:
+    if i <= 65535:
         return b"\xfc" + bytearray(struct.pack("<H", i))
-    elif i <= 16777215:
+    if i <= 16777215:
         return b"\xfd" + bytearray(struct.pack("<I", i)[0:3])
 
     return b"\xfe" + bytearray(struct.pack("<Q", i))
@@ -235,11 +226,11 @@ def read_lc_string(buf):
     if fst <= 250:  # \xFA
         length = fst
         return (buf[1 + length :], buf[1 : length + 1])
-    elif fst == 252:
+    if fst == 252:
         lsize = 2
     elif fst == 253:
         lsize = 3
-    if fst == 254:
+    elif fst == 254:
         lsize = 8
 
     length = intread(buf[1 : lsize + 1])
@@ -300,10 +291,10 @@ def read_string(buf, end=None, size=None):
     if end is not None:
         try:
             idx = buf.index(end)
-        except ValueError:
-            raise ValueError("end byte not present in buffer")
+        except ValueError as err:
+            raise ValueError("end byte not present in buffer") from err
         return (buf[idx + 1 :], buf[0:idx])
-    elif size is not None:
+    if size is not None:
         return read_bytes(buf, size)
 
     raise ValueError("read_string() needs either end or size (weird)")
@@ -314,12 +305,7 @@ def read_int(buf, size):
 
     Returns a tuple (truncated buffer, int)
     """
-
-    try:
-        res = intread(buf[0:size])
-    except:
-        raise
-
+    res = intread(buf[0:size])
     return (buf[size:], res)
 
 
@@ -335,16 +321,15 @@ def read_lc_int(buf):
     lcbyte = buf[0]
     if lcbyte == 251:
         return (buf[1:], None)
-    elif lcbyte < 251:
+    if lcbyte < 251:
         return (buf[1:], int(lcbyte))
-    elif lcbyte == 252:
+    if lcbyte == 252:
         return (buf[3:], struct.unpack("<xH", buf[0:3])[0])
-    elif lcbyte == 253:
+    if lcbyte == 253:
         return (buf[4:], struct.unpack("<I", buf[1:4] + b"\x00")[0])
-    elif lcbyte == 254:
+    if lcbyte == 254:
         return (buf[9:], struct.unpack("<xQ", buf[0:9])[0])
-    else:
-        raise ValueError("Failed reading length encoded integer")
+    raise ValueError("Failed reading length encoded integer")
 
 
 #
@@ -353,8 +338,8 @@ def read_lc_int(buf):
 def _digest_buffer(buf):
     """Debug function for showing buffers"""
     if not isinstance(buf, str):
-        return "".join(["\\x%02x" % c for c in buf])
-    return "".join(["\\x%02x" % ord(c) for c in buf])
+        return "".join([f"\\x{c:02x}" for c in buf])
+    return "".join([f"\\x{ord(c):02x}" for c in buf])
 
 
 def print_buffer(abuffer, prefix=None, limit=30):
@@ -379,7 +364,7 @@ def _parse_os_release():
     os_release_file = os.path.join("/etc", "os-release")
     if not os.path.exists(os_release_file):
         return distro
-    with open(os_release_file) as file_obj:
+    with open(os_release_file, encoding="utf-8") as file_obj:
         for line in file_obj:
             key_value = line.split("=")
             if len(key_value) != 2:
@@ -399,7 +384,7 @@ def _parse_lsb_release():
     distro = {}
     lsb_release_file = os.path.join("/etc", "lsb-release")
     if os.path.exists(lsb_release_file):
-        with open(lsb_release_file) as file_obj:
+        with open(lsb_release_file, encoding="utf-8") as file_obj:
             for line in file_obj:
                 key_value = line.split("=")
                 if len(key_value) != 2:
@@ -417,7 +402,7 @@ def _parse_lsb_release_command():
         A dictionary containing release information.
     """
     distro = {}
-    with open(os.devnull, "w") as devnull:
+    with open(os.devnull, "w", encoding="utf-8") as devnull:
         try:
             stdout = subprocess.check_output(
                 ("lsb_release", "-a"), stderr=devnull
@@ -561,8 +546,8 @@ def validate_normalized_unicode_string(normalized_str):
         return normalized_str, str(err)
 
     for char in normalized_str:
-        for rule in rules:
-            if rules[rule](char) and char != " ":
+        for rule, func in rules.items():
+            if func(char) and char != " ":
                 return char, rule
 
     return None
@@ -605,27 +590,6 @@ def normalize_unicode_string(a_string):
     return nstr
 
 
-def make_abc(base_class):
-    """Decorator used to create a abstract base class.
-
-    We use this decorator to create abstract base classes instead of
-    using the abc-module. The decorator makes it possible to do the
-    same in both Python v2 and v3 code.
-    """
-
-    def wrapper(class_):
-        """Wrapper"""
-        attrs = class_.__dict__.copy()
-        for attr in "__dict__", "__weakref__":
-            attrs.pop(attr, None)  # ignore missing attributes
-
-        bases = class_.__bases__
-        bases = (class_,) + bases
-        return base_class(class_.__name__, bases, attrs)
-
-    return wrapper
-
-
 def init_bytearray(payload=b"", encoding="utf-8"):
     """Initialize a bytearray from the payload."""
     if isinstance(payload, bytearray):
@@ -635,8 +599,8 @@ def init_bytearray(payload=b"", encoding="utf-8"):
     if not isinstance(payload, bytes):
         try:
             return bytearray(payload.encode(encoding=encoding))
-        except AttributeError:
-            raise ValueError("payload must be a str or bytes")
+        except AttributeError as err:
+            raise ValueError("payload must be a str or bytes") from err
 
     return bytearray(payload)
 
@@ -652,11 +616,11 @@ def get_platform():
             plat["arch"] = "i386"
         else:
             plat["arch"] = platform.architecture()
-        plat["version"] = "Windows-{}".format(platform.win32_ver()[1])
+        plat["version"] = f"Windows-{platform.win32_ver()[1]}"
     else:
         plat["arch"] = platform.machine()
         if platform.system() == "Darwin":
-            plat["version"] = "{}-{}".format("macOS", platform.mac_ver()[0])
+            plat["version"] = f"macOS-{platform.mac_ver()[0]}"
         else:
             plat["version"] = "-".join(linux_distribution()[0:2])
 

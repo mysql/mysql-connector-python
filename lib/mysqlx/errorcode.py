@@ -28,11 +28,11 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""This module contains the MySQL Server and Client error codes."""
+
 # This file was auto-generated.
 _GENERATED_ON = "2021-08-11"
 _MYSQL_VERSION = (8, 0, 27)
-
-"""This module contains the MySQL Server and Client error codes"""
 
 # Start MySQL Errors
 OBSOLETE_ER_HASHCHK = 1000

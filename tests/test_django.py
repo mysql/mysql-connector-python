@@ -428,27 +428,27 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
 class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
     """Test the Django base.DjangoMySQLConverter class"""
 
-    def test__TIME_to_python(self):
+    def test__time_to_python(self):
         value = b"10:11:12"
         django_converter = DjangoMySQLConverter()
         self.assertEqual(
             datetime.time(10, 11, 12),
-            django_converter._TIME_to_python(value, dsc=None),
+            django_converter._time_to_python(value, dsc=None),
         )
 
-    def test__DATETIME_to_python(self):
+    def test__datetime_to_python(self):
         value = b"1990-11-12 00:00:00"
         django_converter = DjangoMySQLConverter()
         self.assertEqual(
             datetime.datetime(1990, 11, 12, 0, 0, 0),
-            django_converter._DATETIME_to_python(value, dsc=None),
+            django_converter._datetime_to_python(value, dsc=None),
         )
 
         settings.USE_TZ = True
         value = b"0000-00-00 00:00:00"
         django_converter = DjangoMySQLConverter()
         self.assertEqual(
-            None, django_converter._DATETIME_to_python(value, dsc=None)
+            None, django_converter._datetime_to_python(value, dsc=None)
         )
         settings.USE_TZ = False
 
@@ -456,11 +456,11 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
 class CustomDjangoMySQLConverter(DjangoMySQLConverter):
     """A custom Django MySQL converter."""
 
-    def _CUSTOMTYPE_to_python(self, value):
+    def _customtype_to_python(self, value):
         try:
             return int(value)
         except ValueError:
-            raise ValueError("Invalid value for CUSTOMTYPE conversion")
+            raise ValueError("Invalid value for customtype conversion")
 
 
 class CustomDjangoMySQLConverterTests(tests.MySQLConnectorTests):
@@ -474,20 +474,20 @@ class CustomDjangoMySQLConverterTests(tests.MySQLConnectorTests):
         backend = load_backend(db["ENGINE"])
         return backend.DatabaseWrapper(db, alias)
 
-    def test__TIME_to_python(self):
+    def test__time_to_python(self):
         value = b"10:11:12"
         django_converter = CustomDjangoMySQLConverter()
         self.assertEqual(
             datetime.time(10, 11, 12),
-            django_converter._TIME_to_python(value, dsc=None),
+            django_converter._time_to_python(value, dsc=None),
         )
 
-    def test__DATETIME_to_python(self):
+    def test__datetime_to_python(self):
         value = b"1990-11-12 00:00:00"
         django_converter = CustomDjangoMySQLConverter()
         self.assertEqual(
             datetime.datetime(1990, 11, 12, 0, 0, 0),
-            django_converter._DATETIME_to_python(value, dsc=None),
+            django_converter._datetime_to_python(value, dsc=None),
         )
 
         settings.USE_TZ = True
@@ -495,24 +495,24 @@ class CustomDjangoMySQLConverterTests(tests.MySQLConnectorTests):
         django_converter = DjangoMySQLConverter()
         self.assertEqual(
             None,
-            django_converter._DATETIME_to_python(value, dsc=None),
+            django_converter._datetime_to_python(value, dsc=None),
         )
         settings.USE_TZ = False
 
-    def test__CUSTOMTYPE_to_python(self):
+    def test__customtype_to_python(self):
         value = b"2021"
         django_converter = CustomDjangoMySQLConverter()
         self.assertEqual(
             2021,
-            django_converter._CUSTOMTYPE_to_python(value),
+            django_converter._customtype_to_python(value),
         )
 
-    def test_invalid__CUSTOMTYPE_to_python(self):
+    def test_invalid__customtype_to_python(self):
         value = b"abc"
         django_converter = CustomDjangoMySQLConverter()
         self.assertRaises(
             ValueError,
-            django_converter._CUSTOMTYPE_to_python,
+            django_converter._customtype_to_python,
             value,
         )
 

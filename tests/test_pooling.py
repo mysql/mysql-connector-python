@@ -55,7 +55,7 @@ MYSQL_CNX_CLASS = (
 
 class PoolingTests(tests.MySQLConnectorTests):
     def tearDown(self):
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
 
     def test_generate_pool_name(self):
         self.assertRaises(errors.PoolError, pooling.generate_pool_name)
@@ -81,7 +81,7 @@ class PoolingTests(tests.MySQLConnectorTests):
 
 class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
     def tearDown(self):
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
 
     def test___init__(self):
         dbconfig = tests.get_mysql_config()
@@ -162,7 +162,7 @@ class PooledMySQLConnectionTests(tests.MySQLConnectorTests):
 
 class MySQLConnectionPoolTests(tests.MySQLConnectorTests):
     def tearDown(self):
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
 
     def test___init__(self):
         dbconfig = tests.get_mysql_config()
@@ -386,29 +386,29 @@ class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
     """Testing MySQL Connector module pooling functionality"""
 
     def tearDown(self):
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
 
     def test__connection_pools(self):
-        self.assertEqual(mysql.connector._CONNECTION_POOLS, {})
+        self.assertEqual(mysql.connector.pooling._CONNECTION_POOLS, {})
 
     def test__get_pooled_connection(self):
         dbconfig = tests.get_mysql_config()
-        mysql.connector._CONNECTION_POOLS.update({"spam": "ham"})
+        mysql.connector.pooling._CONNECTION_POOLS.update({"spam": "ham"})
         self.assertRaises(
             errors.InterfaceError, mysql.connector.connect, pool_name="spam"
         )
 
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
 
         mysql.connector.connect(pool_name="ham", **dbconfig)
-        self.assertTrue("ham" in mysql.connector._CONNECTION_POOLS)
-        cnxpool = mysql.connector._CONNECTION_POOLS["ham"]
+        self.assertTrue("ham" in mysql.connector.pooling._CONNECTION_POOLS)
+        cnxpool = mysql.connector.pooling._CONNECTION_POOLS["ham"]
         self.assertTrue(isinstance(cnxpool, pooling.MySQLConnectionPool))
         self.assertEqual("ham", cnxpool.pool_name)
 
         mysql.connector.connect(pool_size=5, **dbconfig)
         pool_name = pooling.generate_pool_name(**dbconfig)
-        self.assertTrue(pool_name in mysql.connector._CONNECTION_POOLS)
+        self.assertTrue(pool_name in mysql.connector.pooling._CONNECTION_POOLS)
 
     def test_connect_pure(self):
         dbconfig = tests.get_mysql_config()
@@ -423,7 +423,7 @@ class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
         cnx.close()
         self.assertEqual(
             exp,
-            mysql.connector._get_pooled_connection(
+            mysql.connector.pooling._get_pooled_connection(
                 pool_name="ham"
             ).connection_id,
         )
@@ -442,7 +442,7 @@ class ModuleConnectorPoolingTests(tests.MySQLConnectorTests):
         cnx.close()
         self.assertEqual(
             exp,
-            mysql.connector._get_pooled_connection(
+            mysql.connector.pooling._get_pooled_connection(
                 pool_name="ham"
             ).connection_id,
         )

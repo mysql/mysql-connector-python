@@ -26,15 +26,14 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implements the MySQL Client/Server protocol
-"""
+"""Implements the MySQL Client/Server protocol."""
 
 import datetime
 import struct
 
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 
-from . import errors, utils
+from . import utils
 from .authentication import get_auth_plugin
 from .constants import (
     PARAMETER_COUNT_AVAILABLE,
@@ -43,7 +42,12 @@ from .constants import (
     FieldType,
     ServerCmd,
 )
-from .errors import DatabaseError, get_exception
+from .errors import (
+    DatabaseError,
+    InterfaceError,
+    ProgrammingError,
+    get_exception,
+)
 
 PROTOCOL_VERSION = 10
 
@@ -54,14 +58,15 @@ class MySQLProtocol:
     Create and parses MySQL packets.
     """
 
-    def _connect_with_db(self, client_flags, database):
+    @staticmethod
+    def _connect_with_db(client_flags, database):
         """Prepare database string for handshake response"""
         if client_flags & ClientFlag.CONNECT_WITH_DB and database:
             return database.encode("utf8") + b"\x00"
         return b"\x00"
 
+    @staticmethod
     def _auth_response(
-        self,
         client_flags,
         username,
         password,
@@ -83,10 +88,8 @@ class MySQLProtocol:
                 ssl_enabled=ssl_enabled,
             )
             plugin_auth_response = auth.auth_response()
-        except (TypeError, errors.InterfaceError) as exc:
-            raise errors.InterfaceError(
-                "Failed authentication: {0}".format(str(exc))
-            )
+        except (TypeError, InterfaceError) as err:
+            raise InterfaceError(f"Failed authentication: {err}") from err
 
         if client_flags & ClientFlag.SECURE_CONNECTION:
             resplen = len(plugin_auth_response)
@@ -113,22 +116,24 @@ class MySQLProtocol:
         try:
             auth_data = handshake["auth_data"]
             auth_plugin = auth_plugin or handshake["auth_plugin"]
-        except (TypeError, KeyError) as exc:
-            raise errors.ProgrammingError(
-                "Handshake misses authentication info ({0})".format(exc)
-            )
+        except (TypeError, KeyError) as err:
+            raise ProgrammingError(
+                f"Handshake misses authentication info ({err})"
+            ) from None
 
         if not username:
             username = b""
         try:
-            username_bytes = username.encode("utf8")  # pylint: disable=E1103
+            username_bytes = username.encode("utf8")
         except AttributeError:
             # Username is already bytes
             username_bytes = username
+
+        filler = "x" * 22
+        username_len = len(username_bytes)
+
         packet = struct.pack(
-            "<IIH{filler}{usrlen}sx".format(
-                filler="x" * 22, usrlen=len(username_bytes)
-            ),
+            f"<IIH{filler}{username_len}sx",
             client_flags,
             max_allowed_packet,
             charset,
@@ -155,7 +160,8 @@ class MySQLProtocol:
 
         return packet
 
-    def make_conn_attrs(self, conn_attrs):
+    @staticmethod
+    def make_conn_attrs(conn_attrs):
         """Encode the connection attributes"""
         for attr_name in conn_attrs:
             if conn_attrs[attr_name] is None:
@@ -174,8 +180,9 @@ class MySQLProtocol:
             conn_attrs_packet += conn_attrs[attr_name].encode("utf8")
         return conn_attrs_packet
 
+    @staticmethod
     def make_auth_ssl(
-        self, charset=45, client_flags=0, max_allowed_packet=1073741824
+        charset=45, client_flags=0, max_allowed_packet=1073741824
     ):
         """Make a SSL authentication packet"""
         return (
@@ -185,14 +192,16 @@ class MySQLProtocol:
             + b"\x00" * 22
         )
 
-    def make_command(self, command, argument=None):
+    @staticmethod
+    def make_command(command, argument=None):
         """Make a MySQL packet containing a command"""
         data = utils.int1store(command)
         if argument is not None:
             data += argument
         return data
 
-    def make_stmt_fetch(self, statement_id, rows=1):
+    @staticmethod
+    def make_stmt_fetch(statement_id, rows=1):
         """Make a MySQL packet with Fetch Statement command"""
         return utils.int4store(statement_id) + utils.int4store(rows)
 
@@ -213,20 +222,22 @@ class MySQLProtocol:
         try:
             auth_data = handshake["auth_data"]
             auth_plugin = auth_plugin or handshake["auth_plugin"]
-        except (TypeError, KeyError) as exc:
-            raise errors.ProgrammingError(
-                "Handshake misses authentication info ({0})".format(exc)
-            )
+        except (TypeError, KeyError) as err:
+            raise ProgrammingError(
+                f"Handshake misses authentication info ({err})"
+            ) from None
 
         if not username:
             username = b""
         try:
-            username_bytes = username.encode("utf8")  # pylint: disable=E1103
+            username_bytes = username.encode("utf8")
         except AttributeError:
             # Username is already bytes
             username_bytes = username
+
+        username_len = len(username_bytes)
         packet = struct.pack(
-            "<B{usrlen}sx".format(usrlen=len(username_bytes)),
+            f"<B{username_len}sx",
             ServerCmd.CHANGE_USER,
             username_bytes,
         )
@@ -253,16 +264,17 @@ class MySQLProtocol:
 
         return packet
 
-    def parse_handshake(self, packet):
+    @staticmethod
+    def parse_handshake(packet):
         """Parse a MySQL Handshake-packet"""
         res = {}
         res["protocol"] = struct.unpack("<xxxxB", packet[0:5])[0]
         if res["protocol"] != PROTOCOL_VERSION:
             raise DatabaseError(
-                "Protocol mismatch; server version = {}, "
-                "client version = {}".format(res["protocol"], PROTOCOL_VERSION)
+                f"Protocol mismatch; server version = {res['protocol']}, "
+                f"client version = {PROTOCOL_VERSION}"
             )
-        (packet, res["server_version_original"]) = utils.read_string(
+        packet, res["server_version_original"] = utils.read_string(
             packet[5:], end=b"\x00"
         )
 
@@ -308,56 +320,58 @@ class MySQLProtocol:
         res["capabilities"] = capabilities
         return res
 
-    def parse_auth_next_factor(self, packet):
+    @staticmethod
+    def parse_auth_next_factor(packet):
         """Parse a MySQL AuthNextFactor packet."""
         packet, status = utils.read_int(packet, 1)
         if not status == 2:
-            raise errors.InterfaceError(
+            raise InterfaceError(
                 "Failed parsing AuthNextFactor packet (invalid)"
             )
         packet, auth_plugin = utils.read_string(packet, end=b"\x00")
         return packet, auth_plugin.decode("utf-8")
 
-    def parse_ok(self, packet):
+    @staticmethod
+    def parse_ok(packet):
         """Parse a MySQL OK-packet"""
         if not packet[4] == 0:
-            raise errors.InterfaceError("Failed parsing OK packet (invalid).")
+            raise InterfaceError("Failed parsing OK packet (invalid).")
 
         ok_packet = {}
         try:
             ok_packet["field_count"] = struct.unpack("<xxxxB", packet[0:5])[0]
-            (packet, ok_packet["affected_rows"]) = utils.read_lc_int(
-                packet[5:]
-            )
-            (packet, ok_packet["insert_id"]) = utils.read_lc_int(packet)
+            packet, ok_packet["affected_rows"] = utils.read_lc_int(packet[5:])
+            packet, ok_packet["insert_id"] = utils.read_lc_int(packet)
             (
                 ok_packet["status_flag"],
                 ok_packet["warning_count"],
             ) = struct.unpack("<HH", packet[0:4])
             packet = packet[4:]
             if packet:
-                (packet, ok_packet["info_msg"]) = utils.read_lc_string(packet)
+                packet, ok_packet["info_msg"] = utils.read_lc_string(packet)
                 ok_packet["info_msg"] = ok_packet["info_msg"].decode("utf-8")
-        except ValueError:
-            raise errors.InterfaceError("Failed parsing OK packet.")
+        except ValueError as err:
+            raise InterfaceError("Failed parsing OK packet.") from err
         return ok_packet
 
-    def parse_column_count(self, packet):
+    @staticmethod
+    def parse_column_count(packet):
         """Parse a MySQL packet with the number of columns in result set"""
         try:
             count = utils.read_lc_int(packet[4:])[1]
             return count
-        except (struct.error, ValueError):
-            raise errors.InterfaceError("Failed parsing column count")
+        except (struct.error, ValueError) as err:
+            raise InterfaceError("Failed parsing column count") from err
 
-    def parse_column(self, packet, encoding="utf-8"):
+    @staticmethod
+    def parse_column(packet, encoding="utf-8"):
         """Parse a MySQL column-packet"""
-        (packet, _) = utils.read_lc_string(packet[4:])  # catalog
-        (packet, _) = utils.read_lc_string(packet)  # db
-        (packet, _) = utils.read_lc_string(packet)  # table
-        (packet, _) = utils.read_lc_string(packet)  # org_table
-        (packet, name) = utils.read_lc_string(packet)  # name
-        (packet, _) = utils.read_lc_string(packet)  # org_name
+        packet, _ = utils.read_lc_string(packet[4:])  # catalog
+        packet, _ = utils.read_lc_string(packet)  # db
+        packet, _ = utils.read_lc_string(packet)  # table
+        packet, _ = utils.read_lc_string(packet)  # org_table
+        packet, name = utils.read_lc_string(packet)  # name
+        packet, _ = utils.read_lc_string(packet)  # org_name
 
         try:
             (
@@ -368,7 +382,7 @@ class MySQLProtocol:
                 _,
             ) = struct.unpack("<xHIBHBxx", packet)
         except struct.error:
-            raise errors.InterfaceError("Failed parsing column information")
+            raise InterfaceError("Failed parsing column information") from None
 
         return (
             name.decode(encoding),
@@ -392,17 +406,18 @@ class MySQLProtocol:
         res = {}
         try:
             unpacked = struct.unpack("<xxxBBHH", packet)
-        except struct.error:
-            raise errors.InterfaceError(err_msg)
+        except struct.error as err:
+            raise InterfaceError(err_msg) from err
 
         if not (unpacked[1] == 254 and len(packet) <= 9):
-            raise errors.InterfaceError(err_msg)
+            raise InterfaceError(err_msg)
 
         res["warning_count"] = unpacked[2]
         res["status_flag"] = unpacked[3]
         return res
 
-    def parse_statistics(self, packet, with_header=True):
+    @staticmethod
+    def parse_statistics(packet, with_header=True):
         """Parse the statistics packet"""
         errmsg = "Failed getting COM_STATISTICS information"
         res = {}
@@ -413,21 +428,19 @@ class MySQLProtocol:
             pairs = packet.split(b"\x20\x20")
         for pair in pairs:
             try:
-                (lbl, val) = [v.strip() for v in pair.split(b":", 2)]
-            except:
-                raise errors.InterfaceError(errmsg)
+                lbl, val = [v.strip() for v in pair.split(b":", 2)]
+            except ValueError as err:
+                raise InterfaceError(errmsg) from err
 
             # It's either an integer or a decimal
             lbl = lbl.decode("utf-8")
             try:
                 res[lbl] = int(val)
-            except:
+            except (KeyError, ValueError):
                 try:
                     res[lbl] = Decimal(val.decode("utf-8"))
-                except:
-                    raise errors.InterfaceError(
-                        "{0} ({1}:{2}).".format(errmsg, lbl, val)
-                    )
+                except DecimalException as err:
+                    raise InterfaceError(f"{errmsg} ({lbl}:{val})") from err
         return res
 
     def read_text_result(self, sock, version, count=1):
@@ -438,6 +451,8 @@ class MySQLProtocol:
         Returns a tuple with 2 elements: a list with all rows and
         the EOF packet.
         """
+        # Keep unused 'version' for API backward compatibility
+        _ = version
         rows = []
         eof = None
         rowdata = None
@@ -467,7 +482,8 @@ class MySQLProtocol:
             i += 1
         return rows, eof
 
-    def _parse_binary_integer(self, packet, field):
+    @staticmethod
+    def _parse_binary_integer(packet, field):
         """Parse an integer from a binary packet"""
         if field[1] == FieldType.TINY:
             format_ = "<b"
@@ -487,7 +503,8 @@ class MySQLProtocol:
 
         return (packet[length:], struct.unpack(format_, packet[0:length])[0])
 
-    def _parse_binary_float(self, packet, field):
+    @staticmethod
+    def _parse_binary_float(packet, field):
         """Parse a float/double from a binary packet"""
         if field[1] == FieldType.DOUBLE:
             length = 8
@@ -498,12 +515,14 @@ class MySQLProtocol:
 
         return (packet[length:], struct.unpack(format_, packet[0:length])[0])
 
-    def _parse_binary_new_decimal(self, packet, charset="utf8"):
+    @staticmethod
+    def _parse_binary_new_decimal(packet, charset="utf8"):
         """Parse a New Decimal from a binary packet"""
         (packet, value) = utils.read_lc_string(packet)
         return (packet, Decimal(value.decode(charset)))
 
-    def _parse_binary_timestamp(self, packet, field):
+    @staticmethod
+    def _parse_binary_timestamp(packet):
         """Parse a timestamp from a binary packet"""
         length = packet[0]
         value = None
@@ -529,7 +548,8 @@ class MySQLProtocol:
 
         return (packet[length + 1 :], value)
 
-    def _parse_binary_time(self, packet, field):
+    @staticmethod
+    def _parse_binary_time(packet):
         """Parse a time value from a binary packet"""
         length = packet[0]
         data = packet[1 : length + 1]
@@ -560,32 +580,30 @@ class MySQLProtocol:
             if null_bitmap[int((pos + 2) / 8)] & (1 << (pos + 2) % 8):
                 values.append(None)
                 continue
-            elif field[1] in (
+            if field[1] in (
                 FieldType.TINY,
                 FieldType.SHORT,
                 FieldType.INT24,
                 FieldType.LONG,
                 FieldType.LONGLONG,
             ):
-                (packet, value) = self._parse_binary_integer(packet, field)
+                packet, value = self._parse_binary_integer(packet, field)
                 values.append(value)
             elif field[1] in (FieldType.DOUBLE, FieldType.FLOAT):
-                (packet, value) = self._parse_binary_float(packet, field)
+                packet, value = self._parse_binary_float(packet, field)
                 values.append(value)
             elif field[1] in (FieldType.DECIMAL, FieldType.NEWDECIMAL):
-                (packet, value) = self._parse_binary_new_decimal(
-                    packet, charset
-                )
+                packet, value = self._parse_binary_new_decimal(packet, charset)
                 values.append(value)
             elif field[1] in (
                 FieldType.DATETIME,
                 FieldType.DATE,
                 FieldType.TIMESTAMP,
             ):
-                (packet, value) = self._parse_binary_timestamp(packet, field)
+                (packet, value) = self._parse_binary_timestamp(packet)
                 values.append(value)
             elif field[1] == FieldType.TIME:
-                (packet, value) = self._parse_binary_time(packet, field)
+                (packet, value) = self._parse_binary_time(packet)
                 values.append(value)
             else:
                 (packet, value) = utils.read_lc_string(packet)
@@ -623,24 +641,26 @@ class MySQLProtocol:
             i += 1
         return (rows, eof)
 
-    def parse_binary_prepare_ok(self, packet):
+    @staticmethod
+    def parse_binary_prepare_ok(packet):
         """Parse a MySQL Binary Protocol OK packet"""
         if not packet[4] == 0:
-            raise errors.InterfaceError("Failed parsing Binary OK packet")
+            raise InterfaceError("Failed parsing Binary OK packet")
 
         ok_pkt = {}
         try:
-            (packet, ok_pkt["statement_id"]) = utils.read_int(packet[5:], 4)
-            (packet, ok_pkt["num_columns"]) = utils.read_int(packet, 2)
-            (packet, ok_pkt["num_params"]) = utils.read_int(packet, 2)
+            packet, ok_pkt["statement_id"] = utils.read_int(packet[5:], 4)
+            packet, ok_pkt["num_columns"] = utils.read_int(packet, 2)
+            packet, ok_pkt["num_params"] = utils.read_int(packet, 2)
             packet = packet[1:]  # Filler 1 * \x00
-            (packet, ok_pkt["warning_count"]) = utils.read_int(packet, 2)
-        except ValueError:
-            raise errors.InterfaceError("Failed parsing Binary OK packet")
+            packet, ok_pkt["warning_count"] = utils.read_int(packet, 2)
+        except ValueError as err:
+            raise InterfaceError("Failed parsing Binary OK packet") from err
 
         return ok_pkt
 
-    def _prepare_binary_integer(self, value):
+    @staticmethod
+    def prepare_binary_integer(value):
         """Prepare an integer for the MySQL binary protocol"""
         field_type = None
         flags = 0
@@ -673,7 +693,8 @@ class MySQLProtocol:
                 format_ = "<Q"
         return (struct.pack(format_, value), field_type, flags)
 
-    def _prepare_binary_timestamp(self, value):
+    @staticmethod
+    def prepare_binary_timestamp(value):
         """Prepare a timestamp object for the MySQL binary protocol
 
         This method prepares a timestamp of type datetime.datetime or
@@ -713,7 +734,8 @@ class MySQLProtocol:
         packed = utils.int1store(len(packed)) + packed
         return (packed, field_type)
 
-    def _prepare_binary_time(self, value):
+    @staticmethod
+    def prepare_binary_time(value):
         """Prepare a time object for the MySQL binary protocol
 
         This method prepares a time object of type datetime.timedelta or
@@ -763,7 +785,8 @@ class MySQLProtocol:
 
         return (packed, field_type)
 
-    def _prepare_stmt_send_long_data(self, statement, param, data):
+    @staticmethod
+    def prepare_stmt_send_long_data(statement, param, data):
         """Prepare long data for prepared statements
 
         Returns a string.
@@ -802,7 +825,7 @@ class MySQLProtocol:
             null_bitmap = [0] * ((len(data) + 7) // 8)
         if parameters or data:
             if data_len != len(parameters):
-                raise errors.InterfaceError(
+                raise InterfaceError(
                     "Failed executing prepared statement: data values does not"
                     " match number of parameters"
                 )
@@ -816,7 +839,7 @@ class MySQLProtocol:
                         + utils.int1store(_flags)
                     )
                     continue
-                elif pos in long_data_used:
+                if pos in long_data_used:
                     if long_data_used[pos][0]:
                         # We suppose binary data
                         field_type = FieldType.BLOB
@@ -828,7 +851,7 @@ class MySQLProtocol:
                         packed,
                         field_type,
                         _flags,
-                    ) = self._prepare_binary_integer(value)
+                    ) = self.prepare_binary_integer(value)
                     values.append(packed)
                 elif isinstance(value, str):
                     value = value.encode(charset)
@@ -847,23 +870,19 @@ class MySQLProtocol:
                     values.append(struct.pack("<d", value))
                     field_type = FieldType.DOUBLE
                 elif isinstance(value, (datetime.datetime, datetime.date)):
-                    (packed, field_type) = self._prepare_binary_timestamp(
-                        value
-                    )
+                    (packed, field_type) = self.prepare_binary_timestamp(value)
                     values.append(packed)
                 elif isinstance(value, (datetime.timedelta, datetime.time)):
-                    (packed, field_type) = self._prepare_binary_time(value)
+                    (packed, field_type) = self.prepare_binary_time(value)
                     values.append(packed)
                 elif converter_str_fallback:
                     value = str(value).encode(charset)
                     values.append(utils.lc_int(len(value)) + value)
                     field_type = FieldType.STRING
                 else:
-                    raise errors.ProgrammingError(
+                    raise ProgrammingError(
                         "MySQL binary protocol can not handle "
-                        "'{classname}' objects".format(
-                            classname=value.__class__.__name__
-                        )
+                        f"'{value.__class__.__name__}' objects"
                     )
                 types.append(
                     utils.int1store(field_type) + utils.int1store(_flags)
@@ -910,22 +929,22 @@ class MySQLProtocol:
 
         return packet
 
-    def parse_auth_switch_request(self, packet):
+    @staticmethod
+    def parse_auth_switch_request(packet):
         """Parse a MySQL AuthSwitchRequest-packet"""
         if not packet[4] == 254:
-            raise errors.InterfaceError(
-                "Failed parsing AuthSwitchRequest packet"
-            )
+            raise InterfaceError("Failed parsing AuthSwitchRequest packet")
 
-        (packet, plugin_name) = utils.read_string(packet[5:], end=b"\x00")
+        packet, plugin_name = utils.read_string(packet[5:], end=b"\x00")
         if packet and packet[-1] == 0:
             packet = packet[:-1]
 
         return plugin_name.decode("utf8"), packet
 
-    def parse_auth_more_data(self, packet):
+    @staticmethod
+    def parse_auth_more_data(packet):
         """Parse a MySQL AuthMoreData-packet"""
         if not packet[4] == 1:
-            raise errors.InterfaceError("Failed parsing AuthMoreData packet")
+            raise InterfaceError("Failed parsing AuthMoreData packet")
 
         return packet[5:]

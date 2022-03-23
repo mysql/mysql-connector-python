@@ -88,8 +88,10 @@ def quote_identifier(identifier, sql_mode=""):
     if len(identifier) == 0:
         return "``"
     if "ANSI_QUOTES" in sql_mode:
-        return '"{0}"'.format(identifier.replace('"', '""'))
-    return "`{0}`".format(identifier.replace("`", "``"))
+        quoted = identifier.replace('"', '""')
+        return f'"{quoted}"'
+    quoted = identifier.replace("`", "``")
+    return f"`{quoted}`"
 
 
 def quote_multipart_identifier(identifiers, sql_mode=""):
@@ -119,7 +121,7 @@ def parse_table_name(default_schema, table_name, sql_mode=""):
         str: The parsed table name.
     """
     quote = '"' if "ANSI_QUOTES" in sql_mode else "`"
-    delimiter = ".{0}".format(quote) if quote in table_name else "."
+    delimiter = f".{quote}" if quote in table_name else "."
     temp = table_name.split(delimiter, 1)
     return (
         default_schema if len(temp) == 1 else temp[0].strip(quote),
@@ -244,9 +246,7 @@ class FilterableStatement(Statement):
     """
 
     def __init__(self, target, doc_based=True, condition=None):
-        super(FilterableStatement, self).__init__(
-            target=target, doc_based=doc_based
-        )
+        super().__init__(target=target, doc_based=doc_based)
         self._binding_map = {}
         self._bindings = {}
         self._having = None
@@ -289,8 +289,8 @@ class FilterableStatement(Statement):
                 res = json.loads(obj)
                 if not isinstance(res, dict):
                     raise ValueError
-            except ValueError:
-                raise ProgrammingError("Invalid JSON string to bind")
+            except ValueError as err:
+                raise ProgrammingError("Invalid JSON string to bind") from err
             for key in res.keys():
                 self.bind(key, res[key])
         else:
@@ -328,8 +328,8 @@ class FilterableStatement(Statement):
         try:
             expr = ExprParser(condition, not self._doc_based)
             self._where_expr = expr.expr()
-        except ValueError:
-            raise ProgrammingError("Invalid condition")
+        except ValueError as err:
+            raise ProgrammingError("Invalid condition") from err
         self._binding_map = expr.placeholder_name_to_position
         self._changed = True
         return self
@@ -575,7 +575,7 @@ class SqlStatement(Statement):
     """
 
     def __init__(self, connection, sql):
-        super(SqlStatement, self).__init__(target=None, doc_based=False)
+        super().__init__(target=None, doc_based=False)
         self._connection = connection
         self._sql = sql
         self._binding_map = None
@@ -636,7 +636,7 @@ class WriteStatement(Statement):
     """Provide common write operation attributes."""
 
     def __init__(self, target, doc_based):
-        super(WriteStatement, self).__init__(target, doc_based)
+        super().__init__(target, doc_based)
         self._values = []
 
     def get_values(self):
@@ -664,7 +664,7 @@ class AddStatement(WriteStatement):
     """
 
     def __init__(self, collection):
-        super(AddStatement, self).__init__(collection, True)
+        super().__init__(collection, True)
         self._upsert = False
         self.ids = []
 
@@ -766,9 +766,7 @@ class ModifyStatement(FilterableStatement):
     """
 
     def __init__(self, collection, condition):
-        super(ModifyStatement, self).__init__(
-            target=collection, condition=condition
-        )
+        super().__init__(target=collection, condition=condition)
         self._update_ops = {}
 
     def sort(self, *clauses):
@@ -953,7 +951,7 @@ class ReadStatement(FilterableStatement):
     """
 
     def __init__(self, target, doc_based=True, condition=None):
-        super(ReadStatement, self).__init__(target, doc_based, condition)
+        super().__init__(target, doc_based, condition)
         self._lock_exclusive = False
         self._lock_shared = False
         self._lock_contention = LockContention.DEFAULT
@@ -974,12 +972,11 @@ class ReadStatement(FilterableStatement):
         """
         try:
             # Check if is a valid lock contention value
-            _ = LockContention.index(lock_contention)
-        except ValueError:
+            _ = LockContention(lock_contention.value)
+        except ValueError as err:
             raise ProgrammingError(
-                "Invalid lock contention mode. Use 'NOWAIT' "
-                "or 'SKIP_LOCKED'"
-            )
+                "Invalid lock contention mode. Use 'NOWAIT' or 'SKIP_LOCKED'"
+            ) from err
         self._lock_contention = lock_contention
 
     def is_lock_exclusive(self):
@@ -1069,7 +1066,7 @@ class FindStatement(ReadStatement):
     """
 
     def __init__(self, collection, condition=None):
-        super(FindStatement, self).__init__(collection, True, condition)
+        super().__init__(collection, True, condition)
 
     def fields(self, *fields):
         """Sets a document field filter.
@@ -1104,7 +1101,7 @@ class SelectStatement(ReadStatement):
     """
 
     def __init__(self, table, *fields):
-        super(SelectStatement, self).__init__(table, False)
+        super().__init__(table, False)
         self._set_projection(*fields)
 
     def where(self, condition):
@@ -1135,35 +1132,21 @@ class SelectStatement(ReadStatement):
         Returns:
             str: The generated SQL.
         """
-        where = " WHERE {0}".format(self._where_str) if self.has_where else ""
+        where = f" WHERE {self._where_str}" if self.has_where else ""
         group_by = (
-            " GROUP BY {0}".format(self._grouping_str)
-            if self.has_group_by
-            else ""
+            f" GROUP BY {self._grouping_str}" if self.has_group_by else ""
         )
-        having = " HAVING {0}".format(self._having) if self.has_having else ""
-        order_by = (
-            " ORDER BY {0}".format(self._sort_str) if self.has_sort else ""
-        )
+        having = f" HAVING {self._having}" if self.has_having else ""
+        order_by = f" ORDER BY {self._sort_str}" if self.has_sort else ""
         limit = (
-            " LIMIT {0} OFFSET {1}".format(
-                self._limit_row_count, self._limit_offset
-            )
+            f" LIMIT {self._limit_row_count} OFFSET {self._limit_offset}"
             if self.has_limit
             else ""
         )
         stmt = (
-            "SELECT {select} FROM {schema}.{table}{where}{group}{having}"
-            "{order}{limit}".format(
-                select=self._projection_str or "*",
-                schema=self.schema.name,
-                table=self.target.name,
-                limit=limit,
-                where=where,
-                group=group_by,
-                having=having,
-                order=order_by,
-            )
+            f"SELECT {self._projection_str or '*'} "
+            f"FROM {self.schema.name}.{self.target.name}"
+            f"{where}{group_by}{having}{order_by}{limit}"
         )
         return stmt
 
@@ -1177,7 +1160,7 @@ class InsertStatement(WriteStatement):
     """
 
     def __init__(self, table, *fields):
-        super(InsertStatement, self).__init__(table, False)
+        super().__init__(table, False)
         self._fields = flexible_params(*fields)
 
     def values(self, *values):
@@ -1212,7 +1195,7 @@ class UpdateStatement(FilterableStatement):
     """
 
     def __init__(self, table):
-        super(UpdateStatement, self).__init__(target=table, doc_based=False)
+        super().__init__(target=table, doc_based=False)
         self._update_ops = {}
 
     def where(self, condition):
@@ -1290,9 +1273,7 @@ class RemoveStatement(FilterableStatement):
     """
 
     def __init__(self, collection, condition):
-        super(RemoveStatement, self).__init__(
-            target=collection, condition=condition
-        )
+        super().__init__(target=collection, condition=condition)
 
     def sort(self, *clauses):
         """Sets the sorting criteria.
@@ -1330,7 +1311,7 @@ class DeleteStatement(FilterableStatement):
     """
 
     def __init__(self, table):
-        super(DeleteStatement, self).__init__(target=table, doc_based=False)
+        super().__init__(target=table, doc_based=False)
 
     def where(self, condition):
         """Sets the search condition to filter.
@@ -1392,7 +1373,7 @@ class CreateCollectionIndexStatement(Statement):
     """
 
     def __init__(self, collection, index_name, index_desc):
-        super(CreateCollectionIndexStatement, self).__init__(target=collection)
+        super().__init__(target=collection)
         self._index_desc = copy.deepcopy(index_desc)
         self._index_name = index_name
         self._fields_desc = self._index_desc.pop("fields", [])
@@ -1427,22 +1408,21 @@ class CreateCollectionIndexStatement(Statement):
                         ERR_INVALID_INDEX_NAME.format(self._index_name)
                     )
 
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as err:
             raise ProgrammingError(
                 ERR_INVALID_INDEX_NAME.format(self._index_name)
-            )
+            ) from err
 
         # Validate members that constraint the index
         if not self._fields_desc:
             raise ProgrammingError(
-                "Required member 'fields' not found in "
-                "the given index description: {}"
-                "".format(self._index_desc)
+                "Required member 'fields' not found in the given index "
+                f"description: {self._index_desc}"
             )
 
         if not isinstance(self._fields_desc, list):
             raise ProgrammingError(
-                "Required member 'fields' must contain a " "list."
+                "Required member 'fields' must contain a list"
             )
 
         args = {}
@@ -1460,9 +1440,7 @@ class CreateCollectionIndexStatement(Statement):
         args["constraint"] = []
 
         if self._index_desc:
-            raise ProgrammingError(
-                "Unidentified fields: {}" "".format(self._index_desc)
-            )
+            raise ProgrammingError(f"Unidentified fields: {self._index_desc}")
 
         try:
             for field_desc in self._fields_desc:
@@ -1495,8 +1473,8 @@ class CreateCollectionIndexStatement(Statement):
                     if not constraint["type"].upper().startswith("TEXT"):
                         raise ProgrammingError(
                             "The 'collation' member can only be used when "
-                            "field type is set to '{}'"
-                            "".format(constraint["type"].upper())
+                            "field type is set to "
+                            f"'{constraint['type'].upper()}'"
                         )
                     constraint["collation"] = field_desc.pop("collation")
                 # "options" and "srid" fields in IndexField can be
@@ -1518,14 +1496,14 @@ class CreateCollectionIndexStatement(Statement):
                 args["constraint"].append(constraint)
         except KeyError as err:
             raise ProgrammingError(
-                "Required inner member {} not found in "
-                "constraint: {}".format(err, field_desc)
-            )
+                f"Required inner member {err} not found in constraint: "
+                f"{field_desc}"
+            ) from err
 
         for field_desc in self._fields_desc:
             if field_desc:
                 raise ProgrammingError(
-                    "Unidentified inner fields:{}" "".format(field_desc)
+                    f"Unidentified inner fields: {field_desc}"
                 )
 
         return self._connection.execute_nonquery(

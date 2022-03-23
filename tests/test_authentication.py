@@ -252,8 +252,6 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             context.exception.msg,
             "not the expected error {}".format(context.exception.msg),
         )
-        with self.assertRaises(NotImplementedError) as context:
-            auth_plugin.prepare_password()
 
         # Test SCRAM-SHA-1 mechanism is accepted
         auth_data = b"SCRAM-SHA-1"
@@ -384,8 +382,6 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             context.exception.msg,
             "not the expected error {}".format(context.exception.msg),
         )
-        with self.assertRaises(NotImplementedError) as context:
-            auth_plugin.prepare_password()
 
         # Test SCRAM-SHA-256 mechanism is accepted
         auth_data = b"SCRAM-SHA-256"

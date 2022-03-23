@@ -26,8 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implementing communication with MySQL servers.
-"""
+"""Implementing communication with MySQL servers."""
 
 import datetime
 import getpass
@@ -35,13 +34,12 @@ import logging
 import os
 import socket
 import struct
-import time
 import warnings
 
 from decimal import Decimal
 from io import IOBase
 
-from . import errors, version
+from . import version
 from .abstracts import MySQLConnectionAbstract
 from .authentication import get_auth_plugin
 from .constants import (
@@ -66,6 +64,16 @@ from .cursor import (
     MySQLCursorPrepared,
     MySQLCursorRaw,
 )
+from .errors import (
+    DatabaseError,
+    Error,
+    InterfaceError,
+    InternalError,
+    NotSupportedError,
+    OperationalError,
+    ProgrammingError,
+    get_exception,
+)
 from .network import MySQLTCPSocket, MySQLUnixSocket
 from .protocol import MySQLProtocol
 from .utils import get_platform, int1store, int4store, lc_int
@@ -78,11 +86,11 @@ _LOGGER = logging.getLogger(__name__)
 class MySQLConnection(MySQLConnectionAbstract):
     """Connection to a MySQL Server"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         self._protocol = None
         self._socket = None
         self._handshake = None
-        super(MySQLConnection, self).__init__(*args, **kwargs)
+        super().__init__()
 
         self._converter_class = MySQLConverter
 
@@ -126,7 +134,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         if kwargs:
             try:
                 self.connect(**kwargs)
-            except:
+            except Exception:
                 # Tidy-up underlying socket on failure
                 self.close()
                 self._socket = None
@@ -158,16 +166,10 @@ class MySQLConnection(MySQLConnectionAbstract):
         """Get the handshake from the MySQL server"""
         packet = self._socket.recv()
         if packet[4] == 255:
-            raise errors.get_exception(packet)
+            raise get_exception(packet)
 
         self._handshake = None
-        try:
-            handshake = self._protocol.parse_handshake(packet)
-        except Exception as err:
-            # pylint: disable=E1101
-            raise errors.get_mysql_exception(
-                msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
-            )
+        handshake = self._protocol.parse_handshake(packet)
 
         self._server_version = self._check_server_version(
             handshake["server_version_original"]
@@ -179,9 +181,9 @@ class MySQLConnection(MySQLConnectionAbstract):
                     "Clear password authentication is not supported "
                     "over insecure channels"
                 )
-                raise errors.InterfaceError(err_msg)
+                raise InterfaceError(err_msg)
             if self._ssl.get("verify_cert"):
-                raise errors.InterfaceError(
+                raise InterfaceError(
                     "SSL is required but the server " "doesn't support it",
                     errno=2026,
                 )
@@ -295,12 +297,12 @@ class MySQLConnection(MySQLConnectionAbstract):
         _LOGGER.debug("new_auth_plugin: %s", new_auth_plugin)
         packet = self._socket.recv()
         if packet[4] == 254 and len(packet) == 5:
-            raise errors.NotSupportedError(
+            raise NotSupportedError(
                 "Authentication with old (insecure) passwords "
                 "is not supported. For more information, lookup "
                 "Password Hashing in the latest MySQL manual"
             )
-        elif packet[4] == 254:
+        if packet[4] == 254:
             # AuthSwitchRequest
             (
                 new_auth_plugin,
@@ -308,7 +310,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             ) = self._protocol.parse_auth_switch_request(packet)
             auth = get_auth_plugin(new_auth_plugin)(
                 auth_data,
-                username=self._user,
+                username=username or self._user,
                 password=password,
                 ssl_enabled=self._ssl_active,
             )
@@ -327,10 +329,10 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if packet[4] == 0:
             return self._handle_ok(packet)
-        elif packet[4] == 2:
+        if packet[4] == 2:
             return self._handle_mfa(packet)
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
+        if packet[4] == 255:
+            raise get_exception(packet)
         return None
 
     def _handle_mfa(self, packet):
@@ -341,7 +343,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         elif self._mfa_nfactor == 3:
             password = self._password3
         else:
-            raise errors.InterfaceError(
+            raise InterfaceError(
                 "Failed Multi Factor Authentication (invalid N factor)"
             )
 
@@ -369,10 +371,10 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if packet[4] == 0:
             return self._handle_ok(packet)
-        elif packet[4] == 2:
+        if packet[4] == 2:
             return self._handle_mfa(packet)
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
+        if packet[4] == 255:
+            raise get_exception(packet)
         return None
 
     def _auth_continue(self, auth, auth_plugin, auth_data):
@@ -435,11 +437,9 @@ class MySQLConnection(MySQLConnectionAbstract):
                 packet = self._socket.recv()
                 tries += 1
             if not complete:
-                raise errors.InterfaceError(
-                    "Unable to fulfill server request after %s attempts. "
-                    "Last server response: %s",
-                    tries,
-                    packet,
+                raise InterfaceError(
+                    f"Unable to fulfill server request after {tries} "
+                    f"attempts. Last server response: {packet}"
                 )
             _LOGGER.debug(
                 " last GSSAPI response from server: %s length: %d",
@@ -489,9 +489,9 @@ class MySQLConnection(MySQLConnectionAbstract):
                 tries += 1
 
             if not complete:
-                raise errors.InterfaceError(
-                    "Unable to fulfill server request after {} attempts. "
-                    "Last server response: {}".format(tries, packet)
+                raise InterfaceError(
+                    f"Unable to fulfill server request after {tries} "
+                    f"attempts. Last server response: {packet}"
                 )
 
             _LOGGER.debug(
@@ -506,7 +506,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         return packet
 
-    def _get_connection(self, prtcls=None):
+    def _get_connection(self):
         """Get connection based on configuration
 
         This method will return the appropriated connection object using
@@ -561,7 +561,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self._socket.recv = self._socket.recv_compressed
                 self._socket.send = self._socket.send_compressed
             self._socket.set_connection_timeout(None)
-        except:
+        except Exception:
             # close socket
             self.close()
             raise
@@ -588,7 +588,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         try:
             self._socket.shutdown()
-        except (AttributeError, errors.Error):
+        except (AttributeError, Error):
             pass  # Getting an exception would mean we are disconnected.
 
     def close(self):
@@ -598,7 +598,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         try:
             self.cmd_quit()
-        except (AttributeError, errors.Error):
+        except (AttributeError, Error):
             pass  # Getting an exception would mean we are disconnected.
         self._socket.close_connection()
         self._handshake = None
@@ -637,8 +637,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                 packet_number,
                 compressed_packet_number,
             )
-        except AttributeError:
-            raise errors.OperationalError("MySQL Connection not available.")
+        except AttributeError as err:
+            raise OperationalError("MySQL Connection not available") from err
 
         if not expect_response:
             return None
@@ -664,16 +664,16 @@ class MySQLConnection(MySQLConnectionAbstract):
             while buf:
                 self._socket.send(buf)
                 buf = data_file.read(NET_BUFFER_LENGTH - 16)
-        except AttributeError:
-            raise errors.OperationalError("MySQL Connection not available.")
+        except AttributeError as err:
+            raise OperationalError("MySQL Connection not available") from err
 
         if send_empty_packet:
             try:
                 self._socket.send(b"")
-            except AttributeError:
-                raise errors.OperationalError(
-                    "MySQL Connection not available."
-                )
+            except AttributeError as err:
+                raise OperationalError(
+                    "MySQL Connection not available"
+                ) from err
 
         return self._socket.recv()
 
@@ -699,7 +699,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         This method handles a MySQL OK packet. When the packet is found to
         be an Error packet, an error will be raised. If the packet is neither
-        an OK or an Error packet, errors.InterfaceError will be raised.
+        an OK or an Error packet, InterfaceError will be raised.
 
         Returns a dict()
         """
@@ -707,16 +707,16 @@ class MySQLConnection(MySQLConnectionAbstract):
             ok_pkt = self._protocol.parse_ok(packet)
             self._handle_server_status(ok_pkt["status_flag"])
             return ok_pkt
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
-        raise errors.InterfaceError("Expected OK packet")
+        if packet[4] == 255:
+            raise get_exception(packet)
+        raise InterfaceError("Expected OK packet")
 
     def _handle_eof(self, packet):
         """Handle a MySQL EOF packet
 
         This method handles a MySQL EOF packet. When the packet is found to
         be an Error packet, an error will be raised. If the packet is neither
-        and OK or an Error packet, errors.InterfaceError will be raised.
+        and OK or an Error packet, InterfaceError will be raised.
 
         Returns a dict()
         """
@@ -724,22 +724,20 @@ class MySQLConnection(MySQLConnectionAbstract):
             eof = self._protocol.parse_eof(packet)
             self._handle_server_status(eof["status_flag"])
             return eof
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
-        raise errors.InterfaceError("Expected EOF packet")
+        if packet[4] == 255:
+            raise get_exception(packet)
+        raise InterfaceError("Expected EOF packet")
 
     def _handle_load_data_infile(self, filename):
         """Handle a LOAD DATA INFILE LOCAL request"""
         file_name = os.path.abspath(filename)
         if os.path.islink(file_name):
-            raise errors.OperationalError(
-                "Use of symbolic link is not allowed"
-            )
+            raise OperationalError("Use of symbolic link is not allowed")
         if (
             not self._allow_local_infile
             and not self._allow_local_infile_in_path
         ):
-            raise errors.DatabaseError(
+            raise DatabaseError(
                 "LOAD DATA LOCAL INFILE file request rejected due to "
                 "restrictions on access."
             )
@@ -754,21 +752,21 @@ class MySQLConnection(MySQLConnectionAbstract):
                     "{} while loading file `{}` and path `{}` given"
                     " in allow_local_infile_in_path"
                 )
-                raise errors.InterfaceError(
+                raise InterfaceError(
                     err_msg.format(str(err), file_name, infile_path)
-                )
+                ) from err
 
             if c_path != infile_path:
                 err_msg = (
                     "The file `{}` is not found in the given "
                     "allow_local_infile_in_path {}"
                 )
-                raise errors.DatabaseError(
-                    err_msg.format(file_name, infile_path)
-                )
+                raise DatabaseError(err_msg.format(file_name, infile_path))
 
         try:
-            data_file = open(file_name, "rb")
+            data_file = open(  # pylint: disable=consider-using-with
+                file_name, "rb"
+            )
             return self._handle_ok(
                 self._send_data(data_file, send_empty_packet=True)
             )
@@ -776,13 +774,13 @@ class MySQLConnection(MySQLConnectionAbstract):
             # Send a empty packet to cancel the operation
             try:
                 self._socket.send(b"")
-            except AttributeError:
-                raise errors.OperationalError(
-                    "MySQL Connection not available."
-                )
-            raise errors.InterfaceError(
-                "File '{0}' could not be read".format(file_name)
-            )
+            except AttributeError as err:
+                raise OperationalError(
+                    "MySQL Connection not available"
+                ) from err
+            raise InterfaceError(
+                f"File '{file_name}' could not be read"
+            ) from None
         finally:
             try:
                 data_file.close()
@@ -794,7 +792,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         This method handles a MySQL result, for example, after sending the
         query command. OK and EOF packets will be handled and returned. If
-        the packet is an Error packet, an errors.Error-exception will be
+        the packet is an Error packet, an Error-exception will be
         raised.
 
         The dictionary returned of:
@@ -804,21 +802,21 @@ class MySQLConnection(MySQLConnectionAbstract):
         Returns a dict()
         """
         if not packet or len(packet) < 4:
-            raise errors.InterfaceError("Empty response")
-        elif packet[4] == 0:
+            raise InterfaceError("Empty response")
+        if packet[4] == 0:
             return self._handle_ok(packet)
-        elif packet[4] == 251:
+        if packet[4] == 251:
             filename = packet[5:].decode()
             return self._handle_load_data_infile(filename)
-        elif packet[4] == 254:
+        if packet[4] == 254:
             return self._handle_eof(packet)
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
+        if packet[4] == 255:
+            raise get_exception(packet)
 
         # We have a text result set
         column_count = self._protocol.parse_column_count(packet)
         if not column_count or not isinstance(column_count, int):
-            raise errors.InterfaceError("Illegal result set.")
+            raise InterfaceError("Illegal result set")
 
         self._columns_desc = [
             None,
@@ -864,7 +862,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             raw = self._raw
 
         if not self.unread_result:
-            raise errors.InternalError("No result set available.")
+            raise InternalError("No result set available")
 
         try:
             if binary:
@@ -878,7 +876,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 rows = self._protocol.read_text_result(
                     self._socket, self._server_version, count=count
                 )
-        except errors.Error as err:
+        except Error as err:
             self.unread_result = False
             raise err
 
@@ -932,7 +930,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         When the query doesn't return a text result, the OK or EOF packet
         information as dictionary will be returned. In case the result was
-        an error, exception errors.Error will be raised.
+        an error, exception Error will be raised.
 
         Returns a tuple()
         """
@@ -960,12 +958,12 @@ class MySQLConnection(MySQLConnectionAbstract):
                     null_bitmap[(pos // 8)] |= 1 << (pos % 8)
                     types.append(int1store(FieldType.NULL) + int1store(flags))
                     continue
-                elif isinstance(value, int):
+                if isinstance(value, int):
                     (
                         packed,
                         field_type,
                         flags,
-                    ) = self._protocol._prepare_binary_integer(value)
+                    ) = self._protocol.prepare_binary_integer(value)
                     values.append(packed)
                 elif isinstance(value, str):
                     value = value.encode(charset)
@@ -987,19 +985,17 @@ class MySQLConnection(MySQLConnectionAbstract):
                     (
                         packed,
                         field_type,
-                    ) = self._protocol._prepare_binary_timestamp(value)
+                    ) = self._protocol.prepare_binary_timestamp(value)
                     values.append(packed)
                 elif isinstance(value, (datetime.timedelta, datetime.time)):
-                    (packed, field_type) = self._protocol._prepare_binary_time(
+                    (packed, field_type) = self._protocol.prepare_binary_time(
                         value
                     )
                     values.append(packed)
                 else:
-                    raise errors.ProgrammingError(
+                    raise ProgrammingError(
                         "MySQL binary protocol can not handle "
-                        "'{classname}' objects".format(
-                            classname=value.__class__.__name__
-                        )
+                        f"'{value.__class__.__name__}' objects"
                     )
                 types.append(int1store(field_type) + int1store(flags))
                 name = attr_tuple[0].encode(charset)
@@ -1028,7 +1024,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             result = self._handle_result(
                 self._send_cmd(ServerCmd.QUERY, query)
             )
-        except errors.ProgrammingError as err:
+        except ProgrammingError as err:
             if (
                 err.errno == 3948
                 and "Loading local data is disabled" in err.msg
@@ -1037,10 +1033,10 @@ class MySQLConnection(MySQLConnectionAbstract):
                     "LOAD DATA LOCAL INFILE file request rejected due "
                     "to restrictions on access."
                 )
-                raise errors.DatabaseError(err_msg)
+                raise DatabaseError(err_msg) from err
             raise
         if self._have_next_result:
-            raise errors.InterfaceError(
+            raise InterfaceError(
                 "Use cmd_query_iter for statements with multiple queries."
             )
 
@@ -1132,7 +1128,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         if shutdown_type:
             if not ShutdownType.get_info(shutdown_type):
-                raise errors.InterfaceError("Invalid shutdown type")
+                raise InterfaceError("Invalid shutdown type")
             atype = shutdown_type
         else:
             atype = ShutdownType.SHUTDOWN_DEFAULT
@@ -1221,7 +1217,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self.handle_unread_result()
 
         if self._compress:
-            raise errors.NotSupportedError(
+            raise NotSupportedError(
                 "Change user is not supported with " "compression."
             )
         packet = self._protocol.make_change_user(
@@ -1242,14 +1238,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         ok_packet = self._auth_switch_request(username, password)
 
-        try:
-            if (
-                not (self._client_flags & ClientFlag.CONNECT_WITH_DB)
-                and database
-            ):
-                self.cmd_init_db(database)
-        except:
-            raise
+        if not (self._client_flags & ClientFlag.CONNECT_WITH_DB) and database:
+            self.cmd_init_db(database)
 
         self._charset_id = charset
         self._post_connection()
@@ -1262,9 +1252,9 @@ class MySQLConnection(MySQLConnectionAbstract):
         return self.info_query("SELECT DATABASE()")[0]
 
     @database.setter
-    def database(self, value):  # pylint: disable=W0221
+    def database(self, value):
         """Set the current database"""
-        self.cmd_query("USE %s" % value)
+        self.cmd_query(f"USE {value}")
 
     def is_connected(self):
         """Reports whether the connection to MySQL Server is available
@@ -1277,14 +1267,15 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         try:
             self.cmd_ping()
-        except:
+        except Error:
             return False  # This method does not raise
         return True
 
     def set_allow_local_infile_in_path(self, path):
-        """set local_infile_in_path
+        """Set the path that user can upload files.
 
-        Set allow_local_infile_in_path.
+        Args:
+            path (str): Path that user can upload files.
         """
         self._allow_local_infile_in_path = path
 
@@ -1305,7 +1296,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         unread results and InterfaceError on errors.
         """
         if not self.is_connected():
-            raise errors.OperationalError("MySQL Connection not available.")
+            raise OperationalError("MySQL Connection not available.")
 
         if not self.cmd_reset_connection():
             try:
@@ -1319,47 +1310,16 @@ class MySQLConnection(MySQLConnectionAbstract):
                     self._password3,
                     self._oci_config_file,
                 )
-            except errors.ProgrammingError:
+            except ProgrammingError:
                 self.reconnect()
 
         cur = self.cursor()
         if user_variables:
             for key, value in user_variables.items():
-                cur.execute("SET @`{0}` = %s".format(key), (value,))
+                cur.execute(f"SET @`{key}` = %s", (value,))
         if session_variables:
             for key, value in session_variables.items():
-                cur.execute("SET SESSION `{0}` = %s".format(key), (value,))
-
-    def reconnect(self, attempts=1, delay=0):
-        """Attempt to reconnect to the MySQL server
-
-        The argument attempts should be the number of times a reconnect
-        is tried. The delay argument is the number of seconds to wait between
-        each retry.
-
-        You may want to set the number of attempts higher and use delay when
-        you expect the MySQL server to be down for maintenance or when you
-        expect the network to be temporary unavailable.
-
-        Raises InterfaceError on errors.
-        """
-        counter = 0
-        while counter != attempts:
-            counter = counter + 1
-            try:
-                self.disconnect()
-                self.connect()
-                if self.is_connected():
-                    break
-            except Exception as err:  # pylint: disable=W0703
-                if counter == attempts:
-                    msg = (
-                        "Can not reconnect to MySQL after {0} "
-                        "attempt(s): {1}".format(attempts, str(err))
-                    )
-                    raise errors.InterfaceError(msg)
-            if delay > 0:
-                time.sleep(delay)
+                cur.execute(f"SET SESSION `{key}` = %s", (value,))
 
     def ping(self, reconnect=False, attempts=1, delay=0):
         """Check availability of the MySQL server
@@ -1377,13 +1337,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         try:
             self.cmd_ping()
-        except:
+        except Error as err:
             if reconnect:
                 self.reconnect(attempts=attempts, delay=delay)
             else:
-                raise errors.InterfaceError(
-                    "Connection to MySQL is" " not available."
-                )
+                raise InterfaceError(
+                    "Connection to MySQL is not available"
+                ) from err
 
     @property
     def connection_id(self):
@@ -1423,10 +1383,10 @@ class MySQLConnection(MySQLConnectionAbstract):
         self.handle_unread_result()
 
         if not self.is_connected():
-            raise errors.OperationalError("MySQL Connection not available.")
+            raise OperationalError("MySQL Connection not available")
         if cursor_class is not None:
             if not issubclass(cursor_class, CursorBase):
-                raise errors.ProgrammingError(
+                raise ProgrammingError(
                     "Cursor class needs be to subclass of cursor.CursorBase"
                 )
             return (cursor_class)(self)
@@ -1466,7 +1426,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 + ", ".join(
                     [args[i] for i in range(5) if cursor_type & (1 << i) != 0]
                 )
-            )
+            ) from None
 
     def commit(self):
         """Commit current transaction"""
@@ -1483,7 +1443,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         """Execute a query
 
         This method simply calls cmd_query() after checking for unread
-        result. If there are still unread result, an errors.InterfaceError
+        result. If there are still unread result, an InterfaceError
         is raised. Otherwise whatever cmd_query() returns is returned.
 
         Returns a dict()
@@ -1502,24 +1462,23 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         This method handles a MySQL Binary Protocol OK packet. When the
         packet is found to be an Error packet, an error will be raised. If
-        the packet is neither an OK or an Error packet, errors.InterfaceError
+        the packet is neither an OK or an Error packet, InterfaceError
         will be raised.
 
         Returns a dict()
         """
         if packet[4] == 0:
             return self._protocol.parse_binary_prepare_ok(packet)
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
-        raise errors.InterfaceError("Expected Binary OK packet")
+        if packet[4] == 255:
+            raise get_exception(packet)
+        raise InterfaceError("Expected Binary OK packet")
 
     def _handle_binary_result(self, packet):
         """Handle a MySQL Result
 
         This method handles a MySQL result, for example, after sending the
         query command. OK and EOF packets will be handled and returned. If
-        the packet is an Error packet, an errors.Error-exception will be
-        raised.
+        the packet is an Error packet, an Error exception will be raised.
 
         The tuple returned by this method consist of:
         - the number of columns in the result,
@@ -1529,18 +1488,18 @@ class MySQLConnection(MySQLConnectionAbstract):
         Returns tuple() or dict()
         """
         if not packet or len(packet) < 4:
-            raise errors.InterfaceError("Empty response")
-        elif packet[4] == 0:
+            raise InterfaceError("Empty response")
+        if packet[4] == 0:
             return self._handle_ok(packet)
-        elif packet[4] == 254:
+        if packet[4] == 254:
             return self._handle_eof(packet)
-        elif packet[4] == 255:
-            raise errors.get_exception(packet)
+        if packet[4] == 255:
+            raise get_exception(packet)
 
         # We have a binary result set
         column_count = self._protocol.parse_column_count(packet)
         if not column_count or not isinstance(column_count, int):
-            raise errors.InterfaceError("Illegal result set.")
+            raise InterfaceError("Illegal result set.")
 
         columns = [None] * column_count
         for i in range(0, column_count):
@@ -1673,13 +1632,12 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         chunk_size = 8192
         total_sent = 0
-        # pylint: disable=W0212
-        prepare_packet = self._protocol._prepare_stmt_send_long_data
-        # pylint: enable=W0212
         try:
             buf = data.read(chunk_size)
             while buf:
-                packet = prepare_packet(statement_id, param_id, buf)
+                packet = self._protocol.prepare_stmt_send_long_data(
+                    statement_id, param_id, buf
+                )
                 self._send_cmd(
                     ServerCmd.STMT_SEND_LONG_DATA,
                     packet=packet,
@@ -1687,8 +1645,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                 )
                 total_sent += len(buf)
                 buf = data.read(chunk_size)
-        except AttributeError:
-            raise errors.OperationalError("MySQL Connection not available.")
+        except AttributeError as err:
+            raise OperationalError("MySQL Connection not available") from err
 
         return total_sent
 
@@ -1715,7 +1673,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._handle_ok(self._send_cmd(ServerCmd.RESET_CONNECTION))
             self._post_connection()
             return True
-        except (errors.NotSupportedError, errors.OperationalError):
+        except (NotSupportedError, OperationalError):
             return False
 
     def handle_unread_result(self):
@@ -1723,4 +1681,4 @@ class MySQLConnection(MySQLConnectionAbstract):
         if self.can_consume_results:
             self.consume_results()
         elif self.unread_result:
-            raise errors.InternalError("Unread result found")
+            raise InternalError("Unread result found")

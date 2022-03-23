@@ -37,9 +37,9 @@ class ExprJSONEncoder(json.JSONEncoder):
     """A :class:`json.JSONEncoder` subclass, which enables encoding of
     :class:`mysqlx.ExprParser` objects."""
 
-    def default(self, o):  # pylint: disable=E0202
+    def default(self, o):
         if hasattr(o, "expr"):
-            return "{0}".format(o)
+            return f"{o}"
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, o)
 
@@ -60,7 +60,7 @@ class DbDoc:
         elif isinstance(value, str):
             self.__dict__ = json.loads(value)
         else:
-            raise ValueError("Unable to handle type: {0}".format(type(value)))
+            raise ValueError(f"Unable to handle type: {type(value)}")
 
     def __str__(self):
         return self.as_str()

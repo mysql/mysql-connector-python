@@ -26,11 +26,10 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Python exceptions
-"""
+"""Python exceptions."""
 
-from . import utils
 from .locales import get_client_error
+from .utils import read_bytes, read_int
 
 # _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is ued by the
 # function custom_error_exception. _ERROR_EXCEPTIONS (at bottom of module)
@@ -74,7 +73,7 @@ def custom_error_exception(error=None, exception=None):
 
     Returns a dictionary.
     """
-    global _CUSTOM_ERROR_EXCEPTIONS  # pylint: disable=W0603
+    global _CUSTOM_ERROR_EXCEPTIONS  # pylint: disable=global-statement
 
     if isinstance(error, dict) and not error:
         _CUSTOM_ERROR_EXCEPTIONS = {}
@@ -93,12 +92,14 @@ def custom_error_exception(error=None, exception=None):
 
     for errno, _exception in error.items():
         if not isinstance(errno, int):
-            raise ValueError("error number should be an integer")
+            raise ValueError("Error number should be an integer")
         try:
             if not issubclass(_exception, Exception):
                 raise TypeError
-        except TypeError:
-            raise ValueError("exception should be subclass of Exception")
+        except TypeError as err:
+            raise ValueError(
+                "Exception should be subclass of Exception"
+            ) from err
         _CUSTOM_ERROR_EXCEPTIONS[errno] = _exception
 
     return _CUSTOM_ERROR_EXCEPTIONS
@@ -157,12 +158,12 @@ def get_exception(packet):
         if packet[4] != 255:
             raise ValueError("Packet is not an error packet")
     except IndexError as err:
-        return InterfaceError("Failed getting Error information (%r)" % err)
+        return InterfaceError(f"Failed getting Error information ({err})")
 
     sqlstate = None
     try:
         packet = packet[5:]
-        (packet, errno) = utils.read_int(packet, 2)
+        packet, errno = read_int(packet, 2)
         if packet[0] != 35:
             # Error without SQLState
             if isinstance(packet, (bytes, bytearray)):
@@ -170,11 +171,11 @@ def get_exception(packet):
             else:
                 errmsg = packet
         else:
-            (packet, sqlstate) = utils.read_bytes(packet[1:], 5)
+            packet, sqlstate = read_bytes(packet[1:], 5)
             sqlstate = sqlstate.decode("utf8")
             errmsg = packet.decode("utf8")
-    except Exception as err:  # pylint: disable=W0703
-        return InterfaceError("Failed getting Error information (%r)" % err)
+    except (IndexError, UnicodeError) as err:
+        return InterfaceError(f"Failed getting Error information ({err})")
     else:
         return get_mysql_exception(errno, errmsg, sqlstate)
 
@@ -183,7 +184,7 @@ class Error(Exception):
     """Exception that is base class for all other error exceptions"""
 
     def __init__(self, msg=None, errno=None, values=None, sqlstate=None):
-        super(Error, self).__init__()
+        super().__init__()
         self.msg = msg
         self._full_msg = self.msg
         self.errno = errno or -1
@@ -195,7 +196,7 @@ class Error(Exception):
                 try:
                     self.msg = self.msg % values
                 except TypeError as err:
-                    self.msg = "{0} (Warning: {1})".format(self.msg, str(err))
+                    self.msg = f"{self.msg} (Warning: {err})"
         elif not self.msg:
             self._full_msg = self.msg = "Unknown error"
 
@@ -214,64 +215,44 @@ class Error(Exception):
         return self._full_msg
 
 
-class Warning(Exception):  # pylint: disable=W0622
+class Warning(Exception):  # pylint: disable=redefined-builtin
     """Exception for important warnings"""
-
-    pass
 
 
 class InterfaceError(Error):
     """Exception for errors related to the interface"""
 
-    pass
-
 
 class DatabaseError(Error):
     """Exception for errors related to the database"""
-
-    pass
 
 
 class InternalError(DatabaseError):
     """Exception for errors internal database errors"""
 
-    pass
-
 
 class OperationalError(DatabaseError):
     """Exception for errors related to the database's operation"""
-
-    pass
 
 
 class ProgrammingError(DatabaseError):
     """Exception for errors programming errors"""
 
-    pass
-
 
 class IntegrityError(DatabaseError):
     """Exception for errors regarding relational integrity"""
-
-    pass
 
 
 class DataError(DatabaseError):
     """Exception for errors reporting problems with processed data"""
 
-    pass
-
 
 class NotSupportedError(DatabaseError):
     """Exception for errors when an unsupported database feature was used"""
 
-    pass
-
 
 class PoolError(Error):
     """Exception for errors relating to connection pooling"""
-
-    pass
 
 
 _SQLSTATE_CLASS_EXCEPTION = {

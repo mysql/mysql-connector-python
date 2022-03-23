@@ -33,7 +33,7 @@ import logging
 
 from functools import lru_cache
 
-from . import errors
+from .errors import NotSupportedError, ProgrammingError
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -49,27 +49,27 @@ def get_auth_plugin(plugin_name):
     This function returns the class for the authentication plugin plugin_name.
     The returned class is a subclass of BaseAuthPlugin.
 
-    Raises errors.NotSupportedError when plugin_name is not supported.
+    Raises NotSupportedError when plugin_name is not supported.
 
     Returns subclass of BaseAuthPlugin.
     """
     package = DEFAULT_PLUGINS_PKG
     if plugin_name:
         try:
-            _LOGGER.info(f"package: {package}")
-            _LOGGER.info(f"plugin_name: {plugin_name}")
+            _LOGGER.info("package: %s", package)
+            _LOGGER.info("plugin_name: %s", plugin_name)
             plugin_module = importlib.import_module(f".{plugin_name}", package)
             _LOGGER.info(
-                "AUTHENTICATION_PLUGIN_CLASS: "
-                f"{plugin_module.AUTHENTICATION_PLUGIN_CLASS}"
+                "AUTHENTICATION_PLUGIN_CLASS: %s",
+                plugin_module.AUTHENTICATION_PLUGIN_CLASS,
             )
             return getattr(
                 plugin_module, plugin_module.AUTHENTICATION_PLUGIN_CLASS
             )
         except ModuleNotFoundError as err:
-            _LOGGER.warn(f"Requested Module was not found: {err}")
+            _LOGGER.warning("Requested Module was not found: %s", err)
         except ValueError as err:
-            raise errors.ProgrammingError(f"Invalid module name: {err}")
-    raise errors.NotSupportedError(
+            raise ProgrammingError(f"Invalid module name: {err}") from err
+    raise NotSupportedError(
         f"Authentication plugin '{plugin_name}' is not supported"
     )

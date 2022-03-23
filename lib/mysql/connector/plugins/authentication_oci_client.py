@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""OCI Authentication Plugin."""
+
 import logging
 import os
 
@@ -38,7 +40,9 @@ try:
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
 except ImportError:
-    raise errors.ProgrammingError("Package 'cryptography' is not installed")
+    raise errors.ProgrammingError(
+        "Package 'cryptography' is not installed"
+    ) from None
 
 try:
     from oci import config, exceptions
@@ -46,7 +50,7 @@ except ImportError:
     raise errors.ProgrammingError(
         "Package 'oci' (Oracle Cloud Infrastructure Python SDK) "
         "is not installed"
-    )
+    ) from None
 
 from . import BaseAuthPlugin
 
@@ -54,17 +58,18 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 _LOGGER = logging.getLogger(__name__)
 
-AUTHENTICATION_PLUGIN_CLASS = "MySQL_OCI_AuthPlugin"
+AUTHENTICATION_PLUGIN_CLASS = "MySQLOCIAuthPlugin"
 
 
-class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
+class MySQLOCIAuthPlugin(BaseAuthPlugin):
     """Implement the MySQL OCI IAM authentication plugin."""
 
     plugin_name = "authentication_oci_client"
     requires_ssl = False
     context = None
 
-    def _prepare_auth_response(self, signature, oci_config):
+    @staticmethod
+    def _prepare_auth_response(signature, oci_config):
         """Prepare client's authentication response
 
         Prepares client's authentication response in JSON format
@@ -82,7 +87,8 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
         }
         return repr(auth_response).replace(" ", "").replace("'", '"')
 
-    def _get_private_key(self, key_path):
+    @staticmethod
+    def _get_private_key(key_path):
         """Get the private_key form the given location"""
         try:
             with open(os.path.expanduser(key_path), "rb") as key_file:
@@ -92,13 +98,14 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
                 )
         except (TypeError, OSError, ValueError, UnsupportedAlgorithm) as err:
             raise errors.ProgrammingError(
-                f'An error occurred while reading the API_KEY from "{key_path}":'
-                f" {err}"
+                "An error occurred while reading the API_KEY from "
+                f'"{key_path}": {err}'
             )
 
         return private_key
 
-    def _get_valid_oci_config(self, oci_path=None, profile_name="DEFAULT"):
+    @staticmethod
+    def _get_valid_oci_config(oci_path=None, profile_name="DEFAULT"):
         """Get a valid OCI config from the given configuration file path"""
         if not oci_path:
             oci_path = config.DEFAULT_LOCATION
@@ -112,21 +119,20 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
         try:
             # key_file is validated by oci.config if present
             oci_config = config.from_file(oci_path, profile_name)
-            for req_key in req_keys:
+            for req_key, req_value in req_keys.items():
                 try:
                     # Verify parameter in req_key is present and valid
-                    if oci_config[req_key] and not req_keys[req_key](
+                    if oci_config[req_key] and not req_value(
                         oci_config[req_key]
                     ):
                         error_list.append(f'Parameter "{req_key}" is invalid')
-                except KeyError as err:
+                except KeyError:
                     error_list.append(f"Does not contain parameter {req_key}")
         except (
             exceptions.ConfigFileNotFound,
             exceptions.InvalidConfig,
             exceptions.InvalidKeyFilePath,
             exceptions.InvalidPrivateKey,
-            exceptions.MissingPrivateKeyPassphrase,
             exceptions.ProfileNotFound,
         ) as err:
             error_list.append(str(err))
@@ -140,8 +146,9 @@ class MySQL_OCI_AuthPlugin(BaseAuthPlugin):
 
         return oci_config
 
-    def auth_response(self, oci_path=None):
+    def auth_response(self, auth_data=None):
         """Prepare authentication string for the server."""
+        oci_path = auth_data
         _LOGGER.debug(
             "server nonce: %s, len %d", self._auth_data, len(self._auth_data)
         )

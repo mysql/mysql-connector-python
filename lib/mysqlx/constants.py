@@ -28,40 +28,41 @@
 
 """Constants."""
 
-from collections import namedtuple
+from enum import Enum
 
 
-# pylint: disable=C0103
-def create_enum(name, fields, values=None):
-    """Emulates an enum by creating a namedtuple.
+class Auth(Enum):
+    """Enum to identify the authentication mechanisms."""
 
-    Args:
-        name (string): The type name.
-        fields (tuple): The fields names.
-        values (tuple): The values of the fields.
-
-    Returns:
-        namedtuple: A namedtuple object.
-    """
-    Enum = namedtuple(name, fields)
-    if values is None:
-        return Enum(*fields)
-    return Enum(*values)
+    PLAIN = "plain"
+    MYSQL41 = "mysql41"
+    SHA256_MEMORY = "sha256_memory"
 
 
-SSLMode = create_enum(
-    "SSLMode",
-    ("REQUIRED", "DISABLED", "VERIFY_CA", "VERIFY_IDENTITY"),
-    ("required", "disabled", "verify_ca", "verify_identity"),
-)
-Auth = create_enum(
-    "Auth",
-    ("PLAIN", "MYSQL41", "SHA256_MEMORY"),
-    ("plain", "mysql41", "sha256_memory"),
-)
-LockContention = create_enum(
-    "LockContention", ("DEFAULT", "NOWAIT", "SKIP_LOCKED"), (0, 1, 2)
-)
+class Compression(Enum):
+    """Enum to identify the compression options."""
+
+    PREFERRED = "preferred"
+    REQUIRED = "required"
+    DISABLED = "disabled"
+
+
+class LockContention(Enum):
+    """Enum to identify the row locking modes."""
+
+    DEFAULT = 0
+    NOWAIT = 1
+    SKIP_LOCKED = 2
+
+
+class SSLMode(Enum):
+    """Enum to identify the SSL modes."""
+
+    REQUIRED = "required"
+    DISABLED = "disabled"
+    VERIFY_CA = "verify_ca"
+    VERIFY_IDENTITY = "verify_identity"
+
 
 # Compression algorithms and aliases
 COMPRESSION_ALGORITHMS = {
@@ -74,6 +75,8 @@ COMPRESSION_ALGORITHMS = {
 }
 
 TLS_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]
+SUPPORTED_TLS_VERSIONS = ["TLSv1.2", "TLSv1.3"]
+DEPRECATED_TLS_VERSIONS = ["TLSv1", "TLSv1.1"]
 
 # TLS v1.0 cipher suites IANI to OpenSSL name translation
 TLSV1_CIPHER_SUITES = {

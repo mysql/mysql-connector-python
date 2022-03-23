@@ -95,7 +95,7 @@ def escape(*args):
         """Escapes special characters."""
         if value is None:
             return value
-        elif isinstance(value, NUMERIC_TYPES):
+        if isinstance(value, NUMERIC_TYPES):
             return value
         if isinstance(value, (bytes, bytearray)):
             value = value.replace(b"\\", b"\\\\")
@@ -130,8 +130,10 @@ def quote_identifier(identifier, sql_mode=""):
         str: Returns string with the identifier quoted with backticks.
     """
     if sql_mode == "ANSI_QUOTES":
-        return '"{0}"'.format(identifier.replace('"', '""'))
-    return "`{0}`".format(identifier.replace("`", "``"))
+        quoted = identifier.replace('"', '""')
+        return f'"{quoted}"'
+    quoted = identifier.replace("`", "``")
+    return f"`{quoted}`"
 
 
 def deprecated(version=None, reason=None):
@@ -163,11 +165,11 @@ def deprecated(version=None, reason=None):
                 *args: Variable length argument list.
                 **kwargs: Arbitrary keyword arguments.
             """
-            message = ["'{}' is deprecated".format(func.__name__)]
+            message = [f"'{func.__name__}' is deprecated"]
             if version:
-                message.append(" since version {}".format(version))
+                message.append(f" since version {version}")
             if reason:
-                message.append(". {}".format(reason))
+                message.append(f". {reason}")
             frame = inspect.currentframe().f_back
             warnings.warn_explicit(
                 "".join(message),
@@ -204,8 +206,7 @@ def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
             translated_names.append(cipher_suites[name])
         else:
             raise InterfaceError(
-                "The '{}' in cipher suites is not a valid "
-                "cipher suite".format(name)
+                f"The '{name}' in cipher suites is not a valid cipher suite"
             )
     return translated_names
 

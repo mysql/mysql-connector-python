@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""SQL Compiler classes."""
+
 from django.db.backends.mysql.compiler import (
     SQLAggregateCompiler,
     SQLCompiler,
@@ -33,3 +35,11 @@ from django.db.backends.mysql.compiler import (
     SQLInsertCompiler,
     SQLUpdateCompiler,
 )
+
+__all__ = [
+    "SQLAggregateCompiler",
+    "SQLCompiler",
+    "SQLDeleteCompiler",
+    "SQLInsertCompiler",
+    "SQLUpdateCompiler",
+]

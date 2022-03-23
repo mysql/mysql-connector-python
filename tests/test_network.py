@@ -101,12 +101,12 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
 
     def test_next_packet_number(self):
         """Test packet number property"""
-        self.assertEqual(0, self.cnx.next_packet_number)
+        self.assertEqual(0, self.cnx.next_packet_number())
         self.assertEqual(0, self.cnx._packet_number)
-        self.assertEqual(1, self.cnx.next_packet_number)
+        self.assertEqual(1, self.cnx.next_packet_number())
         self.assertEqual(1, self.cnx._packet_number)
         self.cnx._packet_number = 255
-        self.assertEqual(0, self.cnx.next_packet_number)
+        self.assertEqual(0, self.cnx.next_packet_number())
 
     def test_open_connection(self):
         """Opening a connection"""

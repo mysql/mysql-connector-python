@@ -32,6 +32,7 @@ DB API v2.0 (PEP-249).
 """
 
 # Python Db API v2
+# pylint: disable=invalid-name
 apilevel = "2.0"
 threadsafety = 1
 paramstyle = "pyformat"
@@ -47,16 +48,10 @@ class _DBAPITypeObject:
         self.values = values
 
     def __eq__(self, other):
-        if other in self.values:
-            return True
-        else:
-            return False
+        return other in self.values
 
     def __ne__(self, other):
-        if other in self.values:
-            return False
-        else:
-            return True
+        return other not in self.values
 
 
 Date = datetime.date
@@ -65,14 +60,17 @@ Timestamp = datetime.datetime
 
 
 def DateFromTicks(ticks):
+    """Construct an object holding a date value from the given ticks value."""
     return Date(*time.localtime(ticks)[:3])
 
 
 def TimeFromTicks(ticks):
+    """Construct an object holding a time value from the given ticks value."""
     return Time(*time.localtime(ticks)[3:6])
 
 
 def TimestampFromTicks(ticks):
+    """Construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*time.localtime(ticks)[:6])
 
 

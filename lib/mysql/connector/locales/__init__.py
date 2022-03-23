@@ -26,8 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Translations
-"""
+"""Translations."""
 
 __all__ = ["get_client_error"]
 
@@ -52,15 +51,15 @@ def get_client_error(error, language="eng"):
     """
     try:
         tmp = __import__(
-            "mysql.connector.locales.{0}".format(language),
+            f"mysql.connector.locales.{language}",
             globals(),
             locals(),
             ["client_error"],
         )
     except ImportError:
         raise ImportError(
-            "No localization support for language '{0}'".format(language)
-        )
+            f"No localization support for language '{language}'"
+        ) from None
     client_error = tmp.client_error
 
     if isinstance(error, int):

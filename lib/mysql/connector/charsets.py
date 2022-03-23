@@ -28,11 +28,11 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""This module contains the MySQL Server Character Sets."""
+
 # This file was auto-generated.
 _GENERATED_ON = "2022-01-10"
 _MYSQL_VERSION = (8, 0, 28)
-
-"""This module contains the MySQL Server Character Sets"""
 
 MYSQL_CHARACTER_SETS = [
     # (character set name, collation, default)

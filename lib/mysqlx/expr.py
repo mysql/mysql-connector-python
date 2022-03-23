@@ -33,8 +33,10 @@ from .helpers import BYTE_TYPES, get_item_or_attr
 from .protobuf import Message, mysqlxpb_enum
 
 
-# pylint: disable=C0103,C0111
+# pylint: disable=missing-function-docstring
 class TokenType:
+    """Token types class."""
+
     NOT = 1
     AND = 2
     OR = 3
@@ -125,8 +127,6 @@ class TokenType:
     YEAR_MONTH = 88
     OVERLAPS = 89
 
-
-# pylint: enable=C0103
 
 _INTERVAL_UNITS = set(
     [
@@ -276,6 +276,8 @@ _NEGATION = {
 
 
 class Token:
+    """Token representation class."""
+
     def __init__(self, token_type, value, length=1):
         self.token_type = token_type
         self.value = value
@@ -285,13 +287,13 @@ class Token:
         return self.__str__()
 
     def __str__(self):
-        if (
-            self.token_type == TokenType.IDENT
-            or self.token_type == TokenType.LNUM
-            or self.token_type == TokenType.LSTRING
+        if self.token_type in (
+            TokenType.IDENT,
+            TokenType.LNUM,
+            TokenType.LSTRING,
         ):
-            return "{0}({1})".format(self.token_type, self.value)
-        return "{0}".format(self.token_type)
+            return f"{self.token_type}({self.value})"
+        return f"{self.token_type}"
 
 
 # static protobuf helper functions
@@ -301,9 +303,9 @@ def build_expr(value):
     msg = Message("Mysqlx.Expr.Expr")
     if isinstance(value, (Message)):
         return value
-    elif isinstance(value, (ExprParser)):
+    if isinstance(value, (ExprParser)):
         return value.expr(reparse=True)
-    elif isinstance(value, (dict, DbDoc)):
+    if isinstance(value, (dict, DbDoc)):
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OBJECT")
         msg["object"] = build_object(value).get_message()
     elif isinstance(value, (list, tuple)):
@@ -318,17 +320,17 @@ def build_expr(value):
 def build_scalar(value):
     if isinstance(value, str):
         return build_string_scalar(value)
-    elif isinstance(value, BYTE_TYPES):
+    if isinstance(value, BYTE_TYPES):
         return build_bytes_scalar(value)
-    elif isinstance(value, bool):
+    if isinstance(value, bool):
         return build_bool_scalar(value)
-    elif isinstance(value, int):
+    if isinstance(value, int):
         return build_int_scalar(value)
-    elif isinstance(value, float):
+    if isinstance(value, float):
         return build_double_scalar(value)
-    elif value is None:
+    if value is None:
         return build_null_scalar()
-    raise ValueError("Unsupported data type: {0}.".format(type(value)))
+    raise ValueError(f"Unsupported data type: {type(value)}")
 
 
 def build_object(obj):
@@ -422,6 +424,8 @@ def escape_literal(string):
 
 
 class ExprParser:
+    """Expression parser class."""
+
     def __init__(self, string, allow_relational=True):
         self.string = string
         self.tokens = []
@@ -434,7 +438,7 @@ class ExprParser:
         self.lex()
 
     def __str__(self):
-        return "<mysqlx.ExprParser '{}'>".format(self.string)
+        return f"<mysqlx.ExprParser '{self.string}'>"
 
     def clean_expression(self):
         """Removes the keywords that does not form part of the expression.
@@ -512,7 +516,7 @@ class ExprParser:
             ):
                 # break if we have a quote char that's not double
                 break
-            elif char == quote_char or char == "\\":
+            if char in (quote_char, "\\"):
                 # this quote char has to be doubled
                 if key + 1 >= len(self.string):
                     break
@@ -522,9 +526,7 @@ class ExprParser:
                 val += char
             key += 1
         if key >= len(self.string) or self.string[key] != quote_char:
-            raise ValueError(
-                "Unterminated quoted string starting at {0}" "".format(start)
-            )
+            raise ValueError(f"Unterminated quoted string starting at {start}")
         if quote_char == "`":
             return Token(TokenType.IDENT, val, len(val) + 2)
         return Token(TokenType.LSTRING, val, len(val) + 2)
@@ -538,7 +540,7 @@ class ExprParser:
             if char.isspace():
                 i += 1
                 continue
-            elif char.isdigit():
+            if char.isdigit():
                 token = self.lex_number(i)
             elif char.isalpha() or char == "_":
                 token = self.lex_alpha(i, inside_arrow)
@@ -626,33 +628,30 @@ class ExprParser:
                     token = self.lex_number(i)
                 else:
                     token = Token(TokenType.DOT, char)
-            elif (char == "'" or char == '"') and arrow_last:
+            elif char in ("'", '"') and arrow_last:
                 token = Token(TokenType.QUOTE, char)
                 if not inside_arrow:
                     inside_arrow = True
                 else:
                     arrow_last = False
                     inside_arrow = False
-            elif char == '"' or char == "'" or char == "`":
+            elif char in ('"', "'", "`"):
                 token = self.lex_quoted_token(i)
             else:
-                raise ValueError("Unknown character at {0}".format(i))
+                raise ValueError(f"Unknown character at {i}")
             self.tokens.append(token)
             i += token.length
 
     def assert_cur_token(self, token_type):
         if self.pos >= len(self.tokens):
             raise ValueError(
-                "Expected token type {0} at pos {1} but no "
-                "tokens left".format(token_type, self.pos)
+                f"Expected token type {token_type} at pos {self.pos} but no "
+                "tokens left"
             )
         if self.tokens[self.pos].token_type != token_type:
             raise ValueError(
-                "Expected token type {0} at pos {1} but found "
-                "type {2}, on tokens {3}"
-                "".format(
-                    token_type, self.pos, self.tokens[self.pos], self.tokens
-                )
+                f"Expected token type {token_type} at pos {self.pos} but found "
+                f"type {self.tokens[self.pos]}, on tokens {self.tokens}"
             )
 
     def cur_token_type_is(self, token_type):
@@ -739,8 +738,7 @@ class ExprParser:
         if token.token_type == TokenType.IDENT:
             if token.value.startswith("`") and token.value.endswith("`"):
                 raise ValueError(
-                    "{0} is not a valid JSON/ECMAScript "
-                    "identifier".format(token.value)
+                    f"{token.value} is not a valid JSON/ECMAScript identifier"
                 )
             self.consume_token(TokenType.IDENT)
             member_name = token.value
@@ -749,8 +747,8 @@ class ExprParser:
             member_name = token.value
         else:
             raise ValueError(
-                "Expected token type IDENT or LSTRING in JSON "
-                "path at token pos {0}".format(self.pos)
+                "Expected token type IDENT or LSTRING in JSON path at token "
+                f"pos {self.pos}"
             )
         doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
         doc_path_item["type"] = mysqlxpb_enum(
@@ -769,11 +767,11 @@ class ExprParser:
                 "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX_ASTERISK"
             )
             return doc_path_item
-        elif self.cur_token_type_is(TokenType.LNUM):
+        if self.cur_token_type_is(TokenType.LNUM):
             value = int(self.consume_token(TokenType.LNUM))
             if value < 0:
                 raise IndexError(
-                    "Array index cannot be negative at {0}" "".format(self.pos)
+                    f"Array index cannot be negative at {self.pos}"
                 )
             self.consume_token(TokenType.RSQBRACKET)
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
@@ -782,12 +780,10 @@ class ExprParser:
             )
             doc_path_item["index"] = value
             return doc_path_item
-        else:
-            raise ValueError(
-                "Exception token type MUL or LNUM in JSON "
-                "path array index at token pos {0}"
-                "".format(self.pos)
-            )
+        raise ValueError(
+            "Exception token type MUL or LNUM in JSON path array index at "
+            f"token pos {self.pos}"
+        )
 
     def document_field(self):
         col_id = Message("Mysqlx.Expr.ColumnIdentifier")
@@ -839,9 +835,7 @@ class ExprParser:
         ) == mysqlxpb_enum(
             "Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK"
         ):
-            raise ValueError(
-                "JSON path may not end in '**' at {0}" "".format(self.pos)
-            )
+            raise ValueError(f"JSON path may not end in '**' at {self.pos}")
         return doc_path
 
     def column_identifier(self):
@@ -851,9 +845,7 @@ class ExprParser:
             self.consume_token(TokenType.DOT)
             parts.append(self.consume_token(TokenType.IDENT))
         if len(parts) > 3:
-            raise ValueError(
-                "Too many parts to identifier at {0}" "".format(self.pos)
-            )
+            raise ValueError(f"Too many parts to identifier at {self.pos}")
         parts.reverse()
         col_id = Message("Mysqlx.Expr.ColumnIdentifier")
         # clever way to apply them to the struct
@@ -905,7 +897,7 @@ class ExprParser:
     def expect_token(self, token_type):
         token = self.next_token()
         if token.token_type != token_type:
-            raise ValueError("Expected token type {0}".format(token_type))
+            raise ValueError(f"Expected token type {token_type}")
 
     def peek_token(self):
         return self.tokens[self.pos]
@@ -968,7 +960,7 @@ class ExprParser:
             place_holder_name = str(self.positional_placeholder_count)
         else:
             raise ValueError(
-                "Invalid placeholder name at token pos {0}" "".format(self.pos)
+                f"Invalid placeholder name at token pos {self.pos}"
             )
 
         msg_expr = Message("Mysqlx.Expr.Expr")
@@ -1020,26 +1012,15 @@ class ExprParser:
             TokenType.TIME,
         ):
             dimension = self.cast_data_type_dimension()
-            return (
-                "{0}{1}".format(token.value, dimension)
-                if dimension
-                else token.value
-            )
-        elif token.token_type is TokenType.DECIMAL:
+            return f"{token.value}{dimension}" if dimension else token.value
+        if token.token_type is TokenType.DECIMAL:
             dimension = self.cast_data_type_dimension(True)
-            return (
-                "{0}{1}".format(token.value, dimension)
-                if dimension
-                else token.value
-            )
-        elif token.token_type in (
-            TokenType.SIGNED,
-            TokenType.UNSIGNED,
-        ):
+            return f"{token.value}{dimension}" if dimension else token.value
+        if token.token_type in (TokenType.SIGNED, TokenType.UNSIGNED):
             if self.cur_token_type_is(TokenType.INTEGER):
                 self.consume_token(TokenType.INTEGER)
             return token.value
-        elif token.token_type in (
+        if token.token_type in (
             TokenType.INTEGER,
             TokenType.JSON,
             TokenType.DATE,
@@ -1047,8 +1028,8 @@ class ExprParser:
             return token.value
 
         raise ValueError(
-            "Unknown token type {0} at position {1} ({2})"
-            "".format(token.token_type, self.pos, token.value)
+            f"Unknown token type {token.token_type} at position {self.pos} "
+            f"({token.value})"
         )
 
     def cast_data_type_dimension(self, decimal=False):
@@ -1065,12 +1046,13 @@ class ExprParser:
         self.consume_token(TokenType.RPAREN)
 
         return (
-            "({0})".format(dimension[0])
+            f"({dimension[0]})"
             if len(dimension) == 1
-            else "({0},{1})".format(*dimension)
+            else f"({dimension[0]},{dimension[1]})"
         )
 
-    def star_operator(self):
+    @staticmethod
+    def star_operator():
         msg = Message("Mysqlx.Expr.Expr")
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
         msg["operator"] = Message("Mysqlx.Expr.Operator", name="*")
@@ -1082,47 +1064,43 @@ class ExprParser:
 
         if token.token_type in [TokenType.EROTEME, TokenType.COLON]:
             return self.parse_place_holder(token)
-        elif token.token_type == TokenType.LCURLY:
+        if token.token_type == TokenType.LCURLY:
             return self.parse_json_doc()
-        elif token.token_type == TokenType.LSQBRACKET:
+        if token.token_type == TokenType.LSQBRACKET:
             return self.parse_json_array()
-        elif token.token_type == TokenType.CAST:
+        if token.token_type == TokenType.CAST:
             return self.cast()
-        elif token.token_type == TokenType.LPAREN:
+        if token.token_type == TokenType.LPAREN:
             expr = self._expr()
             self.expect_token(TokenType.RPAREN)
             return expr
-        elif token.token_type in [TokenType.PLUS, TokenType.MINUS]:
+        if token.token_type in [TokenType.PLUS, TokenType.MINUS]:
             peek = self.peek_token()
             if peek.token_type == TokenType.LNUM:
                 self.tokens[self.pos].value = token.value + peek.value
                 return self.atomic_expr()
             return build_unary_op(token.value, self.atomic_expr())
-        elif token.token_type in [
-            TokenType.NOT,
-            TokenType.NEG,
-            TokenType.BANG,
-        ]:
+        if token.token_type in (TokenType.NOT, TokenType.NEG, TokenType.BANG):
             return build_unary_op(token.value, self.atomic_expr())
-        elif token.token_type == TokenType.LSTRING:
+        if token.token_type == TokenType.LSTRING:
             return build_literal_expr(build_string_scalar(token.value))
-        elif token.token_type == TokenType.NULL:
+        if token.token_type == TokenType.NULL:
             return build_literal_expr(build_null_scalar())
-        elif token.token_type == TokenType.LNUM:
+        if token.token_type == TokenType.LNUM:
             if "." in token.value:
                 return build_literal_expr(
                     build_double_scalar(float(token.value))
                 )
             return build_literal_expr(build_int_scalar(int(token.value)))
-        elif token.token_type in [TokenType.TRUE, TokenType.FALSE]:
+        if token.token_type in [TokenType.TRUE, TokenType.FALSE]:
             return build_literal_expr(
                 build_bool_scalar(token.token_type == TokenType.TRUE)
             )
-        elif token.token_type == TokenType.DOLLAR:
+        if token.token_type == TokenType.DOLLAR:
             return self.document_field()
-        elif token.token_type == TokenType.MUL:
+        if token.token_type == TokenType.MUL:
             return self.star_operator()
-        elif token.token_type == TokenType.IDENT:
+        if token.token_type == TokenType.IDENT:
             self.pos = self.pos - 1  # stay on the identifier
             if self.next_token_type_is(TokenType.LPAREN) or (
                 self.next_token_type_is(TokenType.DOT)
@@ -1138,9 +1116,8 @@ class ExprParser:
             )
 
         raise ValueError(
-            "Unknown token type = {0}  when expecting atomic "
-            "expression at {1}"
-            "".format(token.token_type, self.pos)
+            f"Unknown token type = {token.token_type}  when expecting atomic "
+            f"expression at {self.pos}"
         )
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
@@ -1183,8 +1160,7 @@ class ExprParser:
 
             if not self.cur_token_type_in(*_INTERVAL_UNITS):
                 raise ValueError(
-                    "Expected interval type at position {0}"
-                    "".format(self.pos)
+                    f"Expected interval type at position {self.pos}"
                 )
 
             token = str.encode(self.consume_any_token().upper())
@@ -1279,8 +1255,7 @@ class ExprParser:
             else:
                 if is_not:
                     raise ValueError(
-                        "Unknown token after NOT as pos {0}"
-                        "".format(self.pos)
+                        f"Unknown token after NOT as pos {self.pos}"
                     )
                 op_name = None  # not an operator we're interested in
             if op_name:
@@ -1326,8 +1301,8 @@ class ExprParser:
             used_tokens += 2
         if used_tokens < len(self.tokens):
             raise ValueError(
-                "Unused token types {} found in expression at "
-                "position: {}".format(self.tokens[self.pos :], self.pos)
+                f"Unused token types {self.tokens[self.pos :]} found in "
+                f"expression at position: {self.pos}"
             )
         return expression
 
@@ -1350,7 +1325,7 @@ class ExprParser:
                 or field.count("[") != field.count("]")
                 or field.count("{") != field.count("}")
             ):
-                field = "{1},{0}".format(temp.pop(), field)
+                field = f"{temp.pop()},{field}"
             fields.append(field.strip())
         return fields
 

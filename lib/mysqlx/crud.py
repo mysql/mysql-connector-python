@@ -179,7 +179,7 @@ class Schema(DatabaseObject):
 
     def __init__(self, session, name):
         self._session = session
-        super(Schema, self).__init__(self, name)
+        super().__init__(self, name)
 
     def exists_in_database(self):
         """Verifies if this object exists in the database.
@@ -342,7 +342,7 @@ class Schema(DatabaseObject):
             for option in validation:
                 if option not in valid_options:
                     raise ProgrammingError(
-                        "Invalid option in 'validation': {}" "".format(option)
+                        f"Invalid option in 'validation': {option}"
                     )
 
             options = []
@@ -378,14 +378,14 @@ class Schema(DatabaseObject):
                     "Your MySQL server does not support the requested "
                     "operation. Please update to MySQL 8.0.19 or a later "
                     "version"
-                )
+                ) from err
             if err.errno == ER_TABLE_EXISTS_ERROR:
                 if not reuse_existing:
                     raise ProgrammingError(
-                        "Collection '{}' already exists".format(name)
-                    )
+                        f"Collection '{name}' already exists"
+                    ) from err
             else:
-                raise ProgrammingError(err.msg, err.errno)
+                raise ProgrammingError(err.msg, err.errno) from err
 
         return collection
 
@@ -417,7 +417,7 @@ class Schema(DatabaseObject):
         for option in validation:
             if option not in valid_options:
                 raise ProgrammingError(
-                    "Invalid option in 'validation': {}" "".format(option)
+                    f"Invalid option in 'validation': {option}"
                 )
         options = []
 
@@ -454,8 +454,8 @@ class Schema(DatabaseObject):
                     "Your MySQL server does not support the requested "
                     "operation. Please update to MySQL 8.0.19 or a later "
                     "version"
-                )
-            raise ProgrammingError(err.msg, err.errno)
+                ) from err
+            raise ProgrammingError(err.msg, err.errno) from err
 
 
 class Collection(DatabaseObject):
@@ -547,9 +547,9 @@ class Collection(DatabaseObject):
         except OperationalError as err:
             if err.errno == ER_NO_SUCH_TABLE:
                 raise OperationalError(
-                    "Collection '{}' does not exist in schema '{}'"
-                    "".format(self._name, self._schema.name)
-                )
+                    f"Collection '{self._name}' does not exist in schema "
+                    f"'{self._schema.name}'"
+                ) from err
             raise
         return res
 
@@ -739,9 +739,9 @@ class Table(DatabaseObject):
         except OperationalError as err:
             if err.errno == ER_NO_SUCH_TABLE:
                 raise OperationalError(
-                    "Table '{}' does not exist in schema '{}'"
-                    "".format(self._name, self._schema.name)
-                )
+                    f"Table '{self._name}' does not exist in schema "
+                    f"'{self._schema.name}'"
+                ) from err
             raise
         return res
 

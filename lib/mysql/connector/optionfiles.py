@@ -26,8 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implements parser to parse MySQL option files.
-"""
+"""Implements parser to parse MySQL option files."""
 
 import codecs
 import io
@@ -82,9 +81,7 @@ def read_option_files(**config):
                             option not in CNX_POOL_ARGS
                             and option != "failover"
                         ):
-                            # pylint: disable=W0104
-                            DEFAULT_CONFIGURATION[option]
-                            # pylint: enable=W0104
+                            _ = DEFAULT_CONFIGURATION[option]
 
                         if (
                             option not in config_options
@@ -94,8 +91,8 @@ def read_option_files(**config):
                     except KeyError:
                         if group == "connector_python":
                             raise AttributeError(
-                                "Unsupported argument " "'{0}'".format(option)
-                            )
+                                f"Unsupported argument '{option}'"
+                            ) from None
             except KeyError:
                 continue
 
@@ -106,19 +103,19 @@ def read_option_files(**config):
                     if option in not_evaluate:
                         config[option] = value[0]
                     else:
-                        config[option] = eval(
+                        config[option] = eval(  # pylint: disable=eval-used
                             value[0]
-                        )  # pylint: disable=W0123
+                        )
                 except (NameError, SyntaxError):
                     config[option] = value[0]
 
     return config
 
 
-class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
+class MySQLOptionsParser(SafeConfigParser):
     """This class implements methods to parse MySQL option files"""
 
-    def __init__(self, files=None, keep_dashes=True):  # pylint: disable=W0231
+    def __init__(self, files=None, keep_dashes=True):
         """Initialize
 
         If defaults is True, default option files are read first
@@ -128,7 +125,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         """
 
         # Regular expression to allow options with no value(For Python v2.6)
-        self.OPTCRE = re.compile(  # pylint: disable=C0103
+        self.optcre = re.compile(
             r"(?P<option>[^:=\s][^:=]*)"
             r"\s*(?:"
             r"(?P<vi>[:=])\s*"
@@ -180,10 +177,10 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
             try:
                 if file_ in initial_files[index + 1 :]:
                     raise ValueError(
-                        "Same option file '{0}' occurring more "
-                        "than once in the list".format(file_)
+                        f"Same option file '{file_}' occurring more "
+                        "than once in the list"
                     )
-                with open(file_, "r") as op_file:
+                with open(file_, "r", encoding="utf-8") as op_file:
                     for line in op_file.readlines():
                         if line.startswith("!includedir"):
                             _, dir_path = line.split(None, 1)
@@ -210,21 +207,19 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
                     index += 1
                     files.append(file_)
-            except (IOError, OSError) as exc:
+            except IOError as err:
                 raise ValueError(
-                    "Failed reading file '{0}': {1}".format(file_, str(exc))
-                )
+                    f"Failed reading file '{file_}': {err}"
+                ) from err
 
         read_files = self.read(files)
         not_read_files = set(files) - set(read_files)
         if not_read_files:
             raise ValueError(
-                "File(s) {0} could not be read.".format(
-                    ", ".join(not_read_files)
-                )
+                f"File(s) {', '.join(not_read_files)} could not be read."
             )
 
-    def read(self, filenames):  # pylint: disable=W0221
+    def read(self, filenames, encoding=None):
         """Read and parse a filename or a list of filenames.
 
         Overridden from ConfigParser and modified so as to allow options
@@ -245,7 +240,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
                         if line.startswith("!include"):
                             continue
 
-                        match_obj = self.OPTCRE.match(line)
+                        match_obj = self.optcre.match(line)
                         if not self.SECTCRE.match(line) and match_obj:
                             optname, delimiter, optval = match_obj.group(
                                 "option", "vi", "value"
@@ -309,7 +304,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
 
         return options
 
-    def get_groups_as_dict_with_priority(self, *args):  # pylint: disable=C0103
+    def get_groups_as_dict_with_priority(self, *args):
         """Returns options as dictionary of dictionaries.
 
         Returns options from all the groups specified as arguments. For each
@@ -326,7 +321,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         if not args:
             args = self._options_dict.keys()
 
-        options = dict()
+        options = {}
         for group in args:
             try:
                 options[group] = dict(
@@ -355,7 +350,7 @@ class MySQLOptionsParser(SafeConfigParser):  # pylint: disable=R0901
         if not args:
             args = self._options_dict.keys()
 
-        options = dict()
+        options = {}
         for group in args:
             try:
                 options[group] = dict(

@@ -50,7 +50,8 @@ skip_glob = [
 line-length = 79
 target-version = ['py37']
 exclude = '''
-/(
+(
+  /(
     \.eggs
   | \.git
   | build
@@ -58,9 +59,21 @@ exclude = '''
   | docs
   | lib/mysql/connector/locales/eng
   | lib/mysqlx/locales/eng
-  | lib/mysqlx/protobuf
   | venv
-)/
+  )/
+  | lib/mysqlx/protobuf/mysqlx_connection_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_crud_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_cursor_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_expect_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_expr_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_notice_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_prepare_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_resultset_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_session_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_sql_pb2.py
+)
 '''
 
 [tool.coverage.run]
@@ -80,3 +93,30 @@ directory = 'build/coverage_html'
 
 [tool.coverage.xml]
 output = 'build/coverage.xml'
+
+[tool.pylint.master]
+load-plugins = ['pylint.extensions.overlapping_exceptions']
+ignore-paths = ['lib/mysqlx/protobuf/mysqlx_*']
+init-hook = 'import sys; sys.path.append("lib")'
+
+[tool.pylint.messages_control]
+disable = [
+    'duplicate-code',
+    'import-outside-toplevel',
+    'too-few-public-methods',
+    'too-many-ancestors',
+    'too-many-arguments',
+    'too-many-branches',
+    'too-many-instance-attributes',
+    'too-many-lines',
+    'too-many-locals',
+    'too-many-nested-blocks',
+    'too-many-public-methods',
+    'too-many-return-statements',
+    'too-many-statements',
+    'wrong-import-order',
+    'wrong-import-position',
+]
+
+[tool.pylint.format]
+good-names = ["i", "f", "db", "dt", "ca", "hi", "pw"]

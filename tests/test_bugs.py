@@ -2099,7 +2099,7 @@ class BugOra17414258(tests.MySQLConnectorTests):
 
     def tearDown(self):
         # Remove pools created by test
-        del mysql.connector._CONNECTION_POOLS[self.config["pool_name"]]
+        del mysql.connector.pooling._CONNECTION_POOLS[self.config["pool_name"]]
 
     def test_poolsize(self):
         cnx = mysql.connector.connect(**self.config)
@@ -3469,7 +3469,7 @@ class BugOra19168737(tests.MySQLConnectorTests):
             option_files=opt_file, option_groups=["pooling"], **config
         )
         self.assertEqual("my_pool", conn.pool_name)
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
         conn.close()
 
         new_config = read_option_files(
@@ -3740,14 +3740,14 @@ class BugOra19549363(tests.MySQLConnectorTests):
         self.config = tests.get_mysql_config()
         self.config["compress"] = True
 
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
         self.config["pool_name"] = "mypool"
         self.config["pool_size"] = 3
         self.config["pool_reset_session"] = True
 
     def tearDown(self):
         # Remove pools created by test
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
 
     def test_compress_reset_connection(self):
         self.config["use_pure"] = True
@@ -3758,7 +3758,7 @@ class BugOra19549363(tests.MySQLConnectorTests):
         except:
             self.fail("Reset session with compression test failed.")
         finally:
-            mysql.connector._CONNECTION_POOLS = {}
+            mysql.connector.pooling._CONNECTION_POOLS = {}
 
     @unittest.skipIf(CMySQLConnection is None, ERR_NO_CEXT)
     def test_compress_reset_connection_cext(self):
@@ -3770,7 +3770,7 @@ class BugOra19549363(tests.MySQLConnectorTests):
         except:
             self.fail("Reset session with compression test failed.")
         finally:
-            mysql.connector._CONNECTION_POOLS = {}
+            mysql.connector.pooling._CONNECTION_POOLS = {}
 
 
 class BugOra19803702(tests.MySQLConnectorTests):
@@ -5875,7 +5875,7 @@ class BugOra27277937(tests.MySQLConnectorTests):
         try:
             self.cnx.connect(**config)
         except errors.ProgrammingError as err:
-            self.assertEqual(err.msg, "Collation 'foobar' unknown.")
+            self.assertEqual(err.msg, "Collation 'foobar' unknown")
         else:
             self.fail("A ProgrammingError was expected")
 
@@ -6166,7 +6166,7 @@ class BugOra25349794(tests.MySQLConnectorTests):
             read_default_file=opt_file, option_groups=["pooling"], **config
         )
         self.assertEqual("my_pool", conn.pool_name)
-        mysql.connector._CONNECTION_POOLS = {}
+        mysql.connector.pooling._CONNECTION_POOLS = {}
         conn.close()
 
 
@@ -6325,13 +6325,15 @@ class Bug27489937(tests.MySQLConnectorTests):
         else:
             self.config["use_pure"] = False
         try:
-            del mysql.connector._CONNECTION_POOLS[self.config["pool_name"]]
+            del mysql.connector.pooling._CONNECTION_POOLS[
+                self.config["pool_name"]
+            ]
         except:
             pass
 
     def _tearDown(self):
         # Remove pools created by test
-        del mysql.connector._CONNECTION_POOLS[self.config["pool_name"]]
+        del mysql.connector.pooling._CONNECTION_POOLS[self.config["pool_name"]]
 
     @foreach_cnx()
     def test_cext_pool_support(self):

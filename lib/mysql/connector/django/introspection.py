@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Database Introspection."""
+
 from collections import namedtuple
 
 import sqlparse
@@ -60,6 +62,7 @@ else:
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):
+    """Encapsulate backend-specific introspection utilities."""
 
     data_types_reverse = {
         FieldType.BLOB: "TextField",
@@ -88,16 +91,16 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         if "auto_increment" in description.extra:
             if field_type == "IntegerField":
                 return "AutoField"
-            elif field_type == "BigIntegerField":
+            if field_type == "BigIntegerField":
                 return "BigAutoField"
-            elif field_type == "SmallIntegerField":
+            if field_type == "SmallIntegerField":
                 return "SmallAutoField"
         if description.is_unsigned:
             if field_type == "BigIntegerField":
                 return "PositiveBigIntegerField"
-            elif field_type == "IntegerField":
+            if field_type == "IntegerField":
                 return "PositiveIntegerField"
-            elif field_type == "SmallIntegerField":
+            if field_type == "SmallIntegerField":
                 return "PositiveSmallIntegerField"
         # JSON data type is an alias for LONGTEXT in MariaDB, use check
         # constraints clauses to introspect JSONField.
@@ -173,8 +176,8 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         field_info = {line[0]: InfoLine(*line) for line in cursor.fetchall()}
 
         cursor.execute(
-            "SELECT * FROM %s LIMIT 1"
-            % self.connection.ops.quote_name(table_name)
+            f"SELECT * FROM {self.connection.ops.quote_name(table_name)} "
+            "LIMIT 1"
         )
 
         def to_int(i):
@@ -215,9 +218,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         return fields
 
     def get_indexes(self, cursor, table_name):
+        """Return indexes from table."""
         cursor.execute(
-            "SHOW INDEX FROM {0}"
-            "".format(self.connection.ops.quote_name(table_name))
+            f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}"
         )
         # Do a two-pass search for indexes: on first pass check which indexes
         # are multicolumn, on second pass check which single-column indexes
@@ -299,9 +302,26 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             [table_name],
         )
         result = cursor.fetchone()
+        # pylint: disable=protected-access
         if not result:
             return self.connection.features._mysql_storage_engine
+        # pylint: enable=protected-access
         return result[0]
+
+    def _parse_constraint_columns(self, check_clause, columns):
+        check_columns = OrderedSet()
+        statement = sqlparse.parse(check_clause)[0]
+        tokens = (
+            token for token in statement.flatten() if not token.is_whitespace
+        )
+        for token in tokens:
+            if (
+                token.ttype == sqlparse.tokens.Name
+                and self.connection.ops.quote_name(token.value) == token.value
+                and token.value[1:-1] in columns
+            ):
+                check_columns.add(token.value[1:-1])
+        return check_columns
 
     def get_constraints(self, cursor, table_name):
         """
@@ -380,7 +400,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 if set(constraint_columns) == {constraint}:
                     unnamed_constraints_index += 1
                     constraint = (
-                        "__unnamed_constraint_%s__" % unnamed_constraints_index
+                        f"__unnamed_constraint_{unnamed_constraints_index}__"
                     )
                 constraints[constraint] = {
                     "columns": constraint_columns,
@@ -392,9 +412,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 }
         # Now add in the indexes
         cursor.execute(
-            "SHOW INDEX FROM %s" % self.connection.ops.quote_name(table_name)
+            f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}"
         )
-        for table, non_unique, index, colseq, column, order, type_ in [
+        for _, _, index, _, column, order, type_ in [
             x[:6] + (x[10],) for x in cursor.fetchall()
         ]:
             if index not in constraints:

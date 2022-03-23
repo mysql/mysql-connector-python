@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Caching SHA2 Password Authentication Plugin."""
+
 import struct
 
 from hashlib import sha256
@@ -49,7 +51,7 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
     fast_auth_success = 3
 
     def _scramble(self):
-        """Returns a scramble of the password using a Nonce sent by the
+        """Return a scramble of the password using a Nonce sent by the
         server.
 
         The scramble is of the form:
@@ -78,25 +80,20 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
 
         return hash3
 
-    def prepare_password(self):
-        if len(self._auth_data) > 1:
-            return self._scramble()
-        elif self._auth_data[0] == self.perform_full_authentication:
-            return self._full_authentication()
-        return None
-
     def _full_authentication(self):
         """Returns password as as clear text"""
         if not self._ssl_enabled:
-            raise errors.InterfaceError(
-                "{name} requires SSL".format(name=self.plugin_name)
-            )
+            raise errors.InterfaceError(f"{self.plugin_name} requires SSL")
+        return super().prepare_password()
 
-        if not self._password:
-            return b"\x00"
-        password = self._password
+    def prepare_password(self):
+        """Prepare and return password.
 
-        if isinstance(password, str):
-            password = password.encode("utf8")
-
-        return password + b"\x00"
+        Returns:
+            bytes: Prepared password.
+        """
+        if len(self._auth_data) > 1:
+            return self._scramble()
+        if self._auth_data[0] == self.perform_full_authentication:
+            return self._full_authentication()
+        return None

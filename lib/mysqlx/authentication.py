@@ -46,7 +46,7 @@ def xor_string(hash1, hash2, hash_size):
         str: A string with the xor applied.
     """
     xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
-    return struct.pack("{0}B".format(hash_size), *xored)
+    return struct.pack(f"{hash_size}B", *xored)
 
 
 class BaseAuthPlugin:
@@ -110,10 +110,8 @@ class MySQL41AuthPlugin(BaseAuthPlugin):
             hash1 = hashlib.sha1(password).digest()
             hash2 = hashlib.sha1(hash1).digest()
             xored = xor_string(hash1, hashlib.sha1(data + hash2).digest(), 20)
-            return "{0}\0{1}\0*{2}\0".format(
-                "", self._username, hexlify(xored)
-            )
-        return "{0}\0{1}\0".format("", self._username)
+            return f"\0{self._username}\0*{hexlify(xored)}\0"
+        return f"\0{self._username}\0"
 
 
 class PlainAuthPlugin(BaseAuthPlugin):
@@ -141,7 +139,7 @@ class PlainAuthPlugin(BaseAuthPlugin):
         Returns:
             str: The authentication data.
         """
-        return "\0{0}\0{1}".format(self._username, self._password)
+        return f"\0{self._username}\0{self._password}"
 
 
 class Sha256MemoryAuthPlugin(BaseAuthPlugin):
@@ -183,4 +181,4 @@ class Sha256MemoryAuthPlugin(BaseAuthPlugin):
         hash1 = hashlib.sha256(password).digest()
         hash2 = hashlib.sha256(hashlib.sha256(hash1).digest() + data).digest()
         xored = xor_string(hash2, hash1, 32)
-        return "\0{0}\0{1}".format(self._username, hexlify(xored))
+        return f"\0{self._username}\0{hexlify(xored)}"

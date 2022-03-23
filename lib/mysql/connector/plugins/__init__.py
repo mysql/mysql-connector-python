@@ -26,7 +26,11 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Base Authentication Plugin class."""
+
 import logging
+
+from abc import ABC
 
 from .. import errors
 
@@ -35,7 +39,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 _LOGGER = logging.getLogger(__name__)
 
 
-class BaseAuthPlugin:
+class BaseAuthPlugin(ABC):
     """Base class for authentication plugins
 
 
@@ -59,7 +63,6 @@ class BaseAuthPlugin:
         password=None,
         database=None,
         ssl_enabled=False,
-        instance=None,
     ):
         """Initialization"""
         self._auth_data = auth_data
@@ -69,25 +72,29 @@ class BaseAuthPlugin:
         self._ssl_enabled = ssl_enabled
 
     def prepare_password(self):
-        """Prepares and returns password to be send to MySQL
+        """Prepare and return password as as clear text.
 
-        This method needs to be implemented by classes inheriting from
-        this class. It is used by the auth_response() method.
-
-        Raises NotImplementedError.
+        Returns:
+            bytes: Prepared password.
         """
-        raise NotImplementedError
+        if not self._password:
+            return b"\x00"
+        password = self._password
 
-    def auth_response(self):
-        """Returns the prepared password to send to MySQL
+        if isinstance(password, str):
+            password = password.encode("utf8")
 
-        Raises InterfaceError on errors. For example, when SSL is required
-        by not enabled.
+        return password + b"\x00"
 
-        Returns str
+    def auth_response(self, auth_data=None):  # pylint: disable=unused-argument
+        """Return the prepared password to send to MySQL.
+
+        Raises:
+            InterfaceError: When SSL is required by not enabled.
+
+        Returns:
+            str: The prepared password.
         """
         if self.requires_ssl and not self._ssl_enabled:
-            raise errors.InterfaceError(
-                "{name} requires SSL".format(name=self.plugin_name)
-            )
+            raise errors.InterfaceError(f"{self.plugin_name} requires SSL")
         return self.prepare_password()

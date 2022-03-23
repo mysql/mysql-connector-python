@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Kerberos Authentication Plugin."""
+
 import getpass
 import logging
 import os
@@ -42,16 +44,14 @@ except ImportError:
             "Module gssapi is required for GSSAPI authentication "
             "mechanism but was not found. Unable to authenticate "
             "with the server"
-        )
+        ) from None
 
 try:
     import sspi
     import sspicon
-    import win32api
 except ImportError:
     sspi = None
     sspicon = None
-    win32api = None
 
 from . import BaseAuthPlugin
 
@@ -62,6 +62,7 @@ _LOGGER = logging.getLogger(__name__)
 AUTHENTICATION_PLUGIN_CLASS = "MySQLKerberosAuthPlugin"
 
 
+# pylint: disable=c-extension-no-member,no-member
 class MySQLKerberosAuthPlugin(BaseAuthPlugin):
     """Implement the MySQL Kerberos authentication plugin."""
 
@@ -102,7 +103,8 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         creds = acquire_cred_result[0]
         return creds
 
-    def _parse_auth_data(self, packet):
+    @staticmethod
+    def _parse_auth_data(packet):
         """Parse authentication data.
 
         Get the SPN and REALM from the authentication data packet.
@@ -127,17 +129,6 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
 
         return spn.decode(), realm.decode()
 
-    def prepare_password(self):
-        """Return password as as clear text."""
-        if not self._password:
-            return b"\x00"
-        password = self._password
-
-        if isinstance(password, str):
-            password = password.encode("utf8")
-
-        return password + b"\x00"
-
     def auth_response(self, auth_data=None):
         """Prepare the fist message to the server."""
         spn = None
@@ -147,7 +138,9 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             try:
                 spn, realm = self._parse_auth_data(auth_data)
             except struct.error as err:
-                raise InterruptedError(f"Invalid authentication data: {err}")
+                raise InterruptedError(
+                    f"Invalid authentication data: {err}"
+                ) from err
 
         if spn is None:
             return self.prepare_password()
@@ -283,7 +276,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         except gssapi.raw.exceptions.BadMICError as err:
             _LOGGER.debug("Unable to unwrap server message: %s", err)
             raise errors.InterfaceError(
-                "Unable to unwrap server message: {}".format(err)
+                f"Unable to unwrap server message: {err}"
             )
 
         _LOGGER.debug("Unwrapped server message: %s", unwraped)
@@ -310,8 +303,10 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
     plugin_name = "authentication_kerberos_client"
     requires_ssl = False
     context = None
+    clientauth = None
 
-    def _parse_auth_data(self, packet):
+    @staticmethod
+    def _parse_auth_data(packet):
         """Parse authentication data.
 
         Get the SPN and REALM from the authentication data packet.
@@ -346,7 +341,9 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
             try:
                 spn, realm = self._parse_auth_data(auth_data)
             except struct.error as err:
-                raise InterruptedError(f"Invalid authentication data: {err}")
+                raise InterruptedError(
+                    f"Invalid authentication data: {err}"
+                ) from err
 
         _LOGGER.debug("Service Principal: %s", spn)
         _LOGGER.debug("Realm: %s", realm)
@@ -390,7 +387,7 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         except Exception as err:
             raise errors.InterfaceError(
                 f"Unable to initiate security context: {err}"
-            )
+            ) from err
 
         _LOGGER.debug("Initial client token: %s", initial_client_token)
         return initial_client_token
@@ -421,6 +418,9 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug("Context completed?: %s", self.clientauth.authenticated)
 
         return resp, self.clientauth.authenticated
+
+
+# pylint: enable=c-extension-no-member,no-member
 
 
 if os.name == "nt":

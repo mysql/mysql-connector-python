@@ -413,9 +413,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ),
         ]
         for exp, data in cases:
-            res = self._protocol._parse_binary_timestamp(
-                data + b"\x00\x00", None
-            )
+            res = self._protocol._parse_binary_timestamp(data + b"\x00\x00")
             self.assertEqual(
                 (b"\x00\x00", exp),
                 res,
@@ -445,7 +443,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ),
         ]
         for exp, data in cases:
-            res = self._protocol._parse_binary_time(data + b"\x00\x00", None)
+            res = self._protocol._parse_binary_time(data + b"\x00\x00")
             self.assertEqual(
                 (bytearray(b"\x00\x00"), exp),
                 res,
@@ -497,7 +495,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
     def test_read_binary_result(self):
         """Read MySQL binary protocol result"""
 
-    def test__prepare_binary_integer(self):
+    def test_prepare_binary_integer(self):
         """Prepare an integer for the MySQL binary protocol"""
         # Case = Data; expected value
         cases = [
@@ -517,12 +515,12 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ),
         ]
         for data, exp in cases:
-            res = self._protocol._prepare_binary_integer(data)
+            res = self._protocol.prepare_binary_integer(data)
             self.assertEqual(
                 exp, res, "Failed preparing value '{0}'".format(data)
             )
 
-    def test__prepare_binary_timestamp(self):
+    def test_prepare_binary_timestamp(self):
         """Prepare a timestamp object for the MySQL binary protocol"""
         cases = [
             (
@@ -550,16 +548,16 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         for data, exp in cases:
             self.assertEqual(
                 exp,
-                self._protocol._prepare_binary_timestamp(data),
+                self._protocol.prepare_binary_timestamp(data),
                 "Failed preparing value '{0}'".format(data),
             )
 
         # Raise an error
         self.assertRaises(
-            ValueError, self._protocol._prepare_binary_timestamp, "spam"
+            ValueError, self._protocol.prepare_binary_timestamp, "spam"
         )
 
-    def test__prepare_binary_time(self):
+    def test_prepare_binary_time(self):
         """Prepare a time object for the MySQL binary protocol"""
         cases = [
             (
@@ -604,13 +602,13 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         for data, exp in cases:
             self.assertEqual(
                 exp,
-                self._protocol._prepare_binary_time(data),
+                self._protocol.prepare_binary_time(data),
                 "Failed preparing value '{0}'".format(data),
             )
 
         # Raise an error
         self.assertRaises(
-            ValueError, self._protocol._prepare_binary_time, "spam"
+            ValueError, self._protocol.prepare_binary_time, "spam"
         )
 
     def test_make_stmt_execute(self):

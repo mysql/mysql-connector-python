@@ -26,8 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implementation of the X protocol for MySQL servers.
-"""
+"""Implementation of the X protocol for MySQL servers."""
 
 import logging
 import struct
@@ -186,7 +185,7 @@ class MessageReader:
 
         frame_payload = self._stream.read(frame_size - 1)
         if frame_type not in SERVER_MESSAGES:
-            raise ValueError("Unknown message type: {}".format(frame_type))
+            raise ValueError(f"Unknown message type: {frame_type}")
 
         # Do not parse empty notices, Message requires a type in payload
         if frame_type == 11 and frame_payload == b"":
@@ -331,7 +330,8 @@ class Protocol:
         """str: The compresion algorithm."""
         return self._compression_algorithm
 
-    def _apply_filter(self, msg, stmt):
+    @staticmethod
+    def _apply_filter(msg, stmt):
         """Apply filter.
 
         Args:
@@ -360,11 +360,11 @@ class Protocol:
             value = Message("Mysqlx.Datatypes.Scalar.String", value=arg)
             scalar = Message("Mysqlx.Datatypes.Scalar", type=8, v_string=value)
             return Message("Mysqlx.Datatypes.Any", type=1, scalar=scalar)
-        elif isinstance(arg, bool):
+        if isinstance(arg, bool):
             return Message(
                 "Mysqlx.Datatypes.Any", type=1, scalar=build_bool_scalar(arg)
             )
-        elif isinstance(arg, int):
+        if isinstance(arg, int):
             if arg < 0:
                 return Message(
                     "Mysqlx.Datatypes.Any",
@@ -376,7 +376,7 @@ class Protocol:
                 type=1,
                 scalar=build_unsigned_int_scalar(arg),
             )
-        elif isinstance(arg, tuple) and len(arg) == 2:
+        if isinstance(arg, tuple) and len(arg) == 2:
             arg_key, arg_value = arg
             obj_fld = Message(
                 "Mysqlx.Datatypes.Object.ObjectField",
@@ -387,7 +387,7 @@ class Protocol:
                 "Mysqlx.Datatypes.Object", fld=[obj_fld.get_message()]
             )
             return Message("Mysqlx.Datatypes.Any", type=2, obj=obj)
-        elif isinstance(arg, dict) or (
+        if isinstance(arg, dict) or (
             isinstance(arg, (list, tuple)) and isinstance(arg[0], dict)
         ):
             array_values = []
@@ -408,7 +408,7 @@ class Protocol:
             msg = Message("Mysqlx.Datatypes.Array")
             msg["value"] = array_values
             return Message("Mysqlx.Datatypes.Any", type=3, array=msg)
-        elif isinstance(arg, list):
+        if isinstance(arg, list):
             obj_flds = []
             for key, value in arg:
                 obj_fld = Message(
@@ -459,8 +459,7 @@ class Protocol:
         for name, value in bindings.items():
             if name not in binding_map:
                 raise ProgrammingError(
-                    "Unable to find placeholder for "
-                    "parameter: {0}".format(name)
+                    f"Unable to find placeholder for parameter: {name}"
                 )
             pos = binding_map[name]
             args[pos] = build_value(value)
@@ -540,13 +539,13 @@ class Protocol:
             except RuntimeError as err:
                 warnings = repr(result.get_warnings())
                 if warnings:
-                    raise RuntimeError("{} reason: {}".format(err, warnings))
+                    raise RuntimeError(f"{err} reason: {warnings}") from err
             if msg.type == "Mysqlx.Error":
                 raise OperationalError(msg["msg"], msg["code"])
-            elif msg.type == "Mysqlx.Notice.Frame":
+            if msg.type == "Mysqlx.Notice.Frame":
                 try:
                     self._process_frame(msg, result)
-                except:
+                except (AttributeError, KeyError):
                     continue
             elif msg.type == "Mysqlx.Sql.StmtExecuteOk":
                 return None
@@ -605,7 +604,7 @@ class Protocol:
             mysqlx.protobuf.Message: MySQL X Protobuf Message.
         """
         if not kwargs:
-            return
+            return None
         capabilities = Message("Mysqlx.Connection.Capabilities")
         for key, value in kwargs.items():
             capability = Message("Mysqlx.Connection.Capability")
@@ -737,7 +736,7 @@ class Protocol:
             elif msg.type == "Mysqlx.Crud.Delete":
                 _, msg = self.build_delete(stmt)
             else:
-                raise ValueError("Invalid message type: {}".format(msg_type))
+                raise ValueError(f"Invalid message type: {msg_type}")
             # Build 'limit_expr' message
             position = len(stmt.get_bindings())
             placeholder = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.PLACEHOLDER")
@@ -766,8 +765,8 @@ class Protocol:
 
         try:
             self.read_ok()
-        except InterfaceError:
-            raise NotSupportedError
+        except InterfaceError as err:
+            raise NotSupportedError from err
 
     def send_prepare_execute(self, msg_type, msg, stmt):
         """
@@ -839,9 +838,7 @@ class Protocol:
                 msg_limit["offset"] = stmt.get_limit_offset()
             msg["limit"] = msg_limit
         is_scalar = (
-            False
-            if msg_type == "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"
-            else True
+            not msg_type == "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"
         )
         args = self._get_binding_args(stmt, is_scalar=is_scalar)
         if args:
@@ -901,8 +898,8 @@ class Protocol:
                 "Mysqlx.Crud.Find.RowLock.SHARED_LOCK"
             )
 
-        if stmt.lock_contention > 0:
-            msg["locking_options"] = stmt.lock_contention
+        if stmt.lock_contention.value > 0:
+            msg["locking_options"] = stmt.lock_contention.value
 
         return "Mysqlx.ClientMessages.Type.CRUD_FIND", msg
 
@@ -1013,7 +1010,8 @@ class Protocol:
             msg["args"] = [msg_any.get_message()]
         return "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE", msg
 
-    def build_insert(self, stmt):
+    @staticmethod
+    def build_insert(stmt):
         """Build insert statement.
 
         Args:
@@ -1135,7 +1133,7 @@ class Protocol:
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
             raise InterfaceError(
-                "Mysqlx.Error: {}".format(msg["msg"]), errno=msg["code"]
+                f"Mysqlx.Error: {msg['msg']}", errno=msg["code"]
             )
         if msg.type != "Mysqlx.Ok":
             raise InterfaceError("Unexpected message encountered")

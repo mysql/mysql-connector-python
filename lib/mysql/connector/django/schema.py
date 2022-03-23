@@ -26,13 +26,20 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Database schema editor."""
+
 from django.db.backends.mysql.schema import (
     DatabaseSchemaEditor as MySQLDatabaseSchemaEditor,
 )
 
 
 class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
+    """This class is responsible for emitting schema-changing statements to the
+    databases.
+    """
+
     def quote_value(self, value):
+        """Quote value."""
         self.connection.ensure_connection()
         if isinstance(value, str):
             value = value.replace("%", "%%")
@@ -40,3 +47,10 @@ class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
         if isinstance(value, str) and isinstance(quoted, bytes):
             quoted = quoted.decode()
         return quoted
+
+    def prepare_default(self, value):
+        """Implement the required abstract method.
+
+        MySQL has requires_literal_defaults=False, therefore return the value.
+        """
+        return value

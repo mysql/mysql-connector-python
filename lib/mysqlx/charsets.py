@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,11 +28,11 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-# This file was auto-generated.
-_GENERATED_ON = "2019-04-29"
-_MYSQL_VERSION = (8, 0, 17)
+"""This module contains the MySQL Server Character Sets."""
 
-"""This module contains the MySQL Server Character Sets"""
+# This file was auto-generated.
+_GENERATED_ON = "2022-01-10"
+_MYSQL_VERSION = (8, 0, 28)
 
 MYSQL_CHARACTER_SETS = [
     # (character set name, collation, default)
@@ -346,4 +346,5 @@ MYSQL_CHARACTER_SETS = [
     ("utf8mb4", "utf8mb4_ru_0900_as_cs", False),  # 307
     ("utf8mb4", "utf8mb4_zh_0900_as_cs", False),  # 308
     ("utf8mb4", "utf8mb4_0900_bin", False),  # 309
+    ("utf8mb3", "utf8_general_ci", True),  # 310 deprecated as of 8.0.28
 ]

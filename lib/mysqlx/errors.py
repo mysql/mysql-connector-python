@@ -37,7 +37,7 @@ class Error(Exception):
     """Exception that is base class for all other error exceptions."""
 
     def __init__(self, msg=None, errno=None, values=None, sqlstate=None):
-        super(Error, self).__init__()
+        super().__init__()
         self.msg = msg
         self._full_msg = self.msg
         self.errno = errno or -1
@@ -49,7 +49,7 @@ class Error(Exception):
                 try:
                     self.msg = self.msg % values
                 except TypeError as err:
-                    self.msg = "{0} (Warning: {1})".format(self.msg, str(err))
+                    self.msg = f"{self.msg} (Warning: {err})"
         elif not self.msg:
             self._full_msg = self.msg = "Unknown error"
 
@@ -71,79 +71,55 @@ class Error(Exception):
 class InterfaceError(Error):
     """Exception for errors related to the interface."""
 
-    pass
-
 
 class DatabaseError(Error):
     """Exception for errors related to the database."""
-
-    pass
 
 
 class InternalError(DatabaseError):
     """Exception for errors internal database errors."""
 
-    pass
-
 
 class OperationalError(DatabaseError):
     """Exception for errors related to the database's operation."""
-
-    pass
 
 
 class ProgrammingError(DatabaseError):
     """Exception for errors programming errors."""
 
-    pass
-
 
 class IntegrityError(DatabaseError):
     """Exception for errors regarding relational integrity."""
-
-    pass
 
 
 class DataError(DatabaseError):
     """Exception for errors reporting problems with processed data."""
 
-    pass
-
 
 class NotSupportedError(DatabaseError):
     """Exception for errors when an unsupported database feature was used."""
-
-    pass
 
 
 class PoolError(Error):
     """Exception for errors relating to connection pooling."""
 
-    pass
 
-
-# pylint: disable=W0622
-class TimeoutError(Error):
+class TimeoutError(Error):  # pylint: disable=redefined-builtin
     """Exception for errors relating to connection timeout."""
-
-    pass
 
 
 def intread(buf):
     """Unpacks the given buffer to an integer."""
-    try:
-        if isinstance(buf, int):
-            return buf
-        length = len(buf)
-        if length == 1:
-            return buf[0]
-        elif length <= 4:
-            tmp = buf + b"\x00" * (4 - length)
-            return struct_unpack("<I", tmp)[0]
-        tmp = buf + b"\x00" * (8 - length)
-        return struct_unpack("<Q", tmp)[0]
-    except:
-        raise
+    if isinstance(buf, int):
+        return buf
+    length = len(buf)
+    if length == 1:
+        return buf[0]
+    if length <= 4:
+        tmp = buf + b"\x00" * (4 - length)
+        return struct_unpack("<I", tmp)[0]
+    tmp = buf + b"\x00" * (8 - length)
+    return struct_unpack("<Q", tmp)[0]
 
 
 def read_int(buf, size):
@@ -151,12 +127,7 @@ def read_int(buf, size):
 
     Returns a tuple (truncated buffer, int).
     """
-
-    try:
-        res = intread(buf[0:size])
-    except:
-        raise
-
+    res = intread(buf[0:size])
     return (buf[size:], res)
 
 
@@ -211,9 +182,7 @@ def get_exception(packet):
         if packet[4] != 255:
             raise ValueError("Packet is not an error packet")
     except IndexError as err:
-        return InterfaceError(
-            "Failed getting Error information ({0})" "".format(err)
-        )
+        return InterfaceError(f"Failed getting Error information ({err})")
 
     sqlstate = None
     try:
@@ -221,18 +190,17 @@ def get_exception(packet):
         packet, errno = read_int(packet, 2)
         if packet[0] != 35:
             # Error without SQLState
-            if isinstance(packet, (bytes, bytearray)):
-                errmsg = packet.decode("utf8")
-            else:
-                errmsg = packet
+            errmsg = (
+                packet.decode("utf8")
+                if isinstance(packet, (bytes, bytearray))
+                else packet
+            )
         else:
             packet, sqlstate = read_bytes(packet[1:], 5)
             sqlstate = sqlstate.decode("utf8")
             errmsg = packet.decode("utf8")
-    except Exception as err:  # pylint: disable=W0703
-        return InterfaceError(
-            "Failed getting Error information ({0})" "".format(err)
-        )
+    except (IndexError, ValueError) as err:
+        return InterfaceError(f"Failed getting Error information ({err})")
     else:
         return get_mysql_exception(errno, errmsg, sqlstate)
 

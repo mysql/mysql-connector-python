@@ -80,7 +80,7 @@ class MySQLConverterBase:
         """Convert Python data type to MySQL"""
         type_name = value.__class__.__name__.lower()
         try:
-            return getattr(self, "_{0}_to_mysql".format(type_name))(value)
+            return getattr(self, f"_{type_name}_to_mysql")(value)
         except AttributeError:
             return value
 
@@ -96,7 +96,7 @@ class MySQLConverterBase:
             for name, info in FieldType.desc.items():
                 try:
                     self._cache_field_types[info[0]] = getattr(
-                        self, "_{0}_to_python".format(name)
+                        self, f"_{name.lower()}_to_python"
                     )
                 except AttributeError:
                     # We ignore field types which has no method
@@ -107,11 +107,13 @@ class MySQLConverterBase:
         except KeyError:
             return value
 
-    def escape(self, value):
+    @staticmethod
+    def escape(value):
         """Escape buffer for sending to MySQL"""
         return value
 
-    def quote(self, buf):
+    @staticmethod
+    def quote(buf):
         """Quote buffer for sending to MySQL"""
         return str(buf)
 
@@ -134,7 +136,8 @@ class MySQLConverter(MySQLConverterBase):
         MySQLConverterBase.__init__(self, charset, use_unicode, str_fallback)
         self._cache_field_types = {}
 
-    def escape(self, value):
+    @staticmethod
+    def escape(value):
         """
         Escapes special characters as they are expected to by when MySQL
         receives them.
@@ -144,7 +147,7 @@ class MySQLConverter(MySQLConverterBase):
         """
         if value is None:
             return value
-        elif isinstance(value, NUMERIC_TYPES):
+        if isinstance(value, NUMERIC_TYPES):
             return value
         if isinstance(value, (bytes, bytearray)):
             value = value.replace(b"\\", b"\\\\")
@@ -162,7 +165,8 @@ class MySQLConverter(MySQLConverterBase):
             value = value.replace("\032", "\134\032")  # for Win32
         return value
 
-    def quote(self, buf):
+    @staticmethod
+    def quote(buf):
         """
         Quote the parameters for commands. General rules:
           o numbers are returns as bytes using ascii codec
@@ -173,7 +177,7 @@ class MySQLConverter(MySQLConverterBase):
         """
         if isinstance(buf, NUMERIC_TYPES):
             return str(buf).encode("ascii")
-        elif isinstance(buf, type(None)):
+        if isinstance(buf, type(None)):
             return bytearray(b"NULL")
         return bytearray(b"'" + buf + b"'")
 
@@ -181,14 +185,13 @@ class MySQLConverter(MySQLConverterBase):
         """Convert Python data type to MySQL"""
         type_name = value.__class__.__name__.lower()
         try:
-            return getattr(self, "_{0}_to_mysql".format(type_name))(value)
+            return getattr(self, f"_{type_name}_to_mysql")(value)
         except AttributeError:
             if self.str_fallback:
                 return str(value).encode()
             raise TypeError(
-                "Python '{0}' cannot be converted to a "
-                "MySQL type".format(type_name)
-            )
+                f"Python '{type_name}' cannot be converted to a MySQL type"
+            ) from None
 
     def to_python(self, vtype, value):
         """Convert MySQL data type to Python"""
@@ -203,7 +206,7 @@ class MySQLConverter(MySQLConverterBase):
             for name, info in FieldType.desc.items():
                 try:
                     self._cache_field_types[info[0]] = getattr(
-                        self, "_{0}_to_python".format(name)
+                        self, f"_{name.lower()}_to_python"
                     )
                 except AttributeError:
                     # We ignore field types which has no method
@@ -218,21 +221,22 @@ class MySQLConverter(MySQLConverterBase):
             except UnicodeDecodeError:
                 return value
         except ValueError as err:
-            raise ValueError("%s (field %s)" % (err, vtype[0]))
+            raise ValueError(f"{err} (field {vtype[0]})") from err
         except TypeError as err:
-            raise TypeError("%s (field %s)" % (err, vtype[0]))
-        except:
-            raise
+            raise TypeError(f"{err} (field {vtype[0]})") from err
 
-    def _int_to_mysql(self, value):
+    @staticmethod
+    def _int_to_mysql(value):
         """Convert value to int"""
         return int(value)
 
-    def _long_to_mysql(self, value):
+    @staticmethod
+    def _long_to_mysql(value):
         """Convert value to int"""
         return int(value)
 
-    def _float_to_mysql(self, value):
+    @staticmethod
+    def _float_to_mysql(value):
         """Convert value to float"""
         if math.isnan(value):
             return None
@@ -255,21 +259,25 @@ class MySQLConverter(MySQLConverterBase):
                 return HexLiteral(value, charset)
         return encoded
 
-    def _bytes_to_mysql(self, value):
+    @staticmethod
+    def _bytes_to_mysql(value):
         """Convert value to bytes"""
         return value
 
-    def _bytearray_to_mysql(self, value):
+    @staticmethod
+    def _bytearray_to_mysql(value):
         """Convert value to bytes"""
         return bytes(value)
 
-    def _bool_to_mysql(self, value):
+    @staticmethod
+    def _bool_to_mysql(value):
         """Convert value to boolean"""
         if value:
             return 1
         return 0
 
-    def _nonetype_to_mysql(self, value):
+    @staticmethod
+    def _nonetype_to_mysql(value):  # pylint: disable=unused-argument
         """
         This would return what None would be in MySQL, but instead we
         leave it None and return it right away. The actual conversion
@@ -279,7 +287,8 @@ class MySQLConverter(MySQLConverterBase):
         """
         return None
 
-    def _datetime_to_mysql(self, value):
+    @staticmethod
+    def _datetime_to_mysql(value):
         """
         Converts a datetime instance to a string suitable for MySQL.
         The returned string has format: %Y-%m-%d %H:%M:%S[.%f]
@@ -310,7 +319,8 @@ class MySQLConverter(MySQLConverterBase):
             value.second,
         ).encode("ascii")
 
-    def _date_to_mysql(self, value):
+    @staticmethod
+    def _date_to_mysql(value):
         """
         Converts a date instance to a string suitable for MySQL.
         The returned string has format: %Y-%m-%d
@@ -319,11 +329,12 @@ class MySQLConverter(MySQLConverterBase):
 
         Returns a bytes.
         """
-        return "{0:04d}-{1:02d}-{2:02d}".format(
-            value.year, value.month, value.day
-        ).encode("ascii")
+        return f"{value.year:04d}-{value.month:02d}-{value.day:02d}".encode(
+            "ascii"
+        )
 
-    def _time_to_mysql(self, value):
+    @staticmethod
+    def _time_to_mysql(value):
         """
         Converts a time instance to a string suitable for MySQL.
         The returned string has format: %H:%M:%S[.%f]
@@ -336,7 +347,8 @@ class MySQLConverter(MySQLConverterBase):
             return value.strftime("%H:%M:%S.%f").encode("ascii")
         return value.strftime("%H:%M:%S").encode("ascii")
 
-    def _struct_time_to_mysql(self, value):
+    @staticmethod
+    def _struct_time_to_mysql(value):
         """
         Converts a time.struct_time sequence to a string suitable
         for MySQL.
@@ -346,7 +358,8 @@ class MySQLConverter(MySQLConverterBase):
         """
         return time.strftime("%Y-%m-%d %H:%M:%S", value).encode("ascii")
 
-    def _timedelta_to_mysql(self, value):
+    @staticmethod
+    def _timedelta_to_mysql(value):
         """
         Converts a timedelta instance to a string suitable for MySQL.
         The returned string has format: %H:%M:%S
@@ -378,7 +391,8 @@ class MySQLConverter(MySQLConverterBase):
 
         return result.encode("ascii")
 
-    def _decimal_to_mysql(self, value):
+    @staticmethod
+    def _decimal_to_mysql(value):
         """
         Converts a decimal.Decimal instance to a string suitable for
         MySQL.
@@ -407,7 +421,7 @@ class MySQLConverter(MySQLConverterBase):
             for name, info in FieldType.desc.items():
                 try:
                     self._cache_field_types[info[0]] = getattr(
-                        self, "_{0}_to_python".format(name)
+                        self, f"_{name.lower()}_to_python"
                     )
                 except AttributeError:
                     # We ignore field types which has no method
@@ -430,56 +444,62 @@ class MySQLConverter(MySQLConverterBase):
                 except UnicodeDecodeError:
                     result[i] = row[i]
             except (ValueError, TypeError) as err:
-                err.message = "{0} (field {1})".format(str(err), field[0])
+                err.message = f"{err} (field {field[0]})"
                 raise
 
             i += 1
 
         return tuple(result)
 
-    def _FLOAT_to_python(self, value, desc=None):  # pylint: disable=C0103
+    # pylint: disable=unused-argument
+    @staticmethod
+    def _float_to_python(value, desc=None):
         """
         Returns value as float type.
         """
         return float(value)
 
-    _DOUBLE_to_python = _FLOAT_to_python
+    _double_to_python = _float_to_python
 
-    def _INT_to_python(self, value, desc=None):  # pylint: disable=C0103
+    @staticmethod
+    def _int_to_python(value, desc=None):
         """
         Returns value as int type.
         """
         return int(value)
 
-    _TINY_to_python = _INT_to_python
-    _SHORT_to_python = _INT_to_python
-    _INT24_to_python = _INT_to_python
-    _LONG_to_python = _INT_to_python
-    _LONGLONG_to_python = _INT_to_python
+    _tiny_to_python = _int_to_python
+    _short_to_python = _int_to_python
+    _int24_to_python = _int_to_python
+    _long_to_python = _int_to_python
+    _longlong_to_python = _int_to_python
 
-    def _DECIMAL_to_python(self, value, desc=None):  # pylint: disable=C0103
+    def _decimal_to_python(self, value, desc=None):
         """
         Returns value as a decimal.Decimal.
         """
         val = value.decode(self.charset)
         return Decimal(val)
 
-    _NEWDECIMAL_to_python = _DECIMAL_to_python
+    _newdecimal_to_python = _decimal_to_python
 
-    def _str(self, value, desc=None):
+    @staticmethod
+    def _str(value, desc=None):
         """
         Returns value as str type.
         """
         return str(value)
 
-    def _BIT_to_python(self, value, dsc=None):  # pylint: disable=C0103
+    @staticmethod
+    def _bit_to_python(value, dsc=None):
         """Returns BIT columntype as integer"""
         int_val = value
         if len(int_val) < 8:
             int_val = b"\x00" * (8 - len(int_val)) + int_val
         return struct.unpack(">Q", int_val)[0]
 
-    def _DATE_to_python(self, value, dsc=None):  # pylint: disable=C0103
+    @staticmethod
+    def _date_to_python(value, dsc=None):
         """Converts TIME column MySQL to a python datetime.datetime type.
 
         Raises ValueError if the value can not be converted.
@@ -492,8 +512,7 @@ class MySQLConverter(MySQLConverterBase):
             parts = value.split(b"-")
             if len(parts) != 3:
                 raise ValueError(
-                    "invalid datetime format: {} len: {}"
-                    "".format(parts, len(parts))
+                    f"invalid datetime format: {parts} len: {len(parts)}"
                 )
             try:
                 return datetime.date(
@@ -503,14 +522,13 @@ class MySQLConverter(MySQLConverterBase):
                 return None
         except (IndexError, ValueError):
             raise ValueError(
-                "Could not convert {0} to python datetime.timedelta".format(
-                    value
-                )
-            )
+                f"Could not convert {value} to python datetime.timedelta"
+            ) from None
 
-    _NEWDATE_to_python = _DATE_to_python
+    _NEWDATE_to_python = _date_to_python
 
-    def _TIME_to_python(self, value, dsc=None):  # pylint: disable=C0103
+    @staticmethod
+    def _time_to_python(value, dsc=None):
         """Converts TIME column value to python datetime.time value type.
 
         Converts the TIME column MySQL type passed as bytes to a python
@@ -536,10 +554,11 @@ class MySQLConverter(MySQLConverterBase):
         except (IndexError, TypeError, ValueError):
             raise ValueError(
                 CONVERT_ERROR.format(value=value, pytype="datetime.timedelta")
-            )
+            ) from None
 
-    def _DATETIME_to_python(self, value, dsc=None):  # pylint: disable=C0103
-        """ "Converts DATETIME column value to python datetime.time value type.
+    @staticmethod
+    def _datetime_to_python(value, dsc=None):
+        """Converts DATETIME column value to python datetime.time value type.
 
         Converts the DATETIME column MySQL type passed as bytes to a python
         datetime.datetime type.
@@ -566,37 +585,38 @@ class MySQLConverter(MySQLConverterBase):
             )
             if len(dtval) < 6:
                 raise ValueError(
-                    "invalid datetime format: {} len: {}"
-                    "".format(dtval, len(dtval))
+                    f"invalid datetime format: {dtval} len: {len(dtval)}"
                 )
-            else:
-                # Note that by default MySQL accepts invalid timestamps
-                # (this is also backward compatibility).
-                # Traditionaly C/py returns None for this well formed but
-                # invalid datetime for python like '0000-00-00 HH:MM:SS'.
-                try:
-                    datetime_val = datetime.datetime(*dtval)
-                except ValueError:
-                    return None
+            # Note that by default MySQL accepts invalid timestamps
+            # (this is also backward compatibility).
+            # Traditionaly C/py returns None for this well formed but
+            # invalid datetime for python like '0000-00-00 HH:MM:SS'.
+            try:
+                datetime_val = datetime.datetime(*dtval)
+            except ValueError:
+                return None
         except (IndexError, TypeError):
             raise ValueError(
                 CONVERT_ERROR.format(value=value, pytype="datetime.timedelta")
-            )
+            ) from None
 
         return datetime_val
 
-    _TIMESTAMP_to_python = _DATETIME_to_python
+    _timestamp_to_python = _datetime_to_python
 
-    def _YEAR_to_python(self, value, desc=None):  # pylint: disable=C0103
+    @staticmethod
+    def _year_to_python(value, desc=None):
         """Returns YEAR column type as integer"""
         try:
             year = int(value)
-        except ValueError:
-            raise ValueError("Failed converting YEAR to int (%s)" % value)
+        except ValueError as err:
+            raise ValueError(
+                f"Failed converting YEAR to int ({value})"
+            ) from err
 
         return year
 
-    def _SET_to_python(self, value, dsc=None):  # pylint: disable=C0103
+    def _set_to_python(self, value, dsc=None):
         """Returns SET column type as set
 
         Actually, MySQL protocol sees a SET as a string type field. So this
@@ -610,11 +630,13 @@ class MySQLConverter(MySQLConverterBase):
             return set()
         try:
             set_type = set(val.split(","))
-        except ValueError:
-            raise ValueError("Could not convert set %s to a sequence." % value)
+        except ValueError as err:
+            raise ValueError(
+                f"Could not convert set {value} to a sequence"
+            ) from err
         return set_type
 
-    def _STRING_to_python(self, value, dsc=None):  # pylint: disable=C0103
+    def _string_to_python(self, value, dsc=None):
         """
         Note that a SET is a string too, but using the FieldFlag we can see
         whether we have to split it.
@@ -627,7 +649,7 @@ class MySQLConverter(MySQLConverterBase):
             if dsc[1] == FieldType.JSON and self.use_unicode:
                 return value.decode(self.charset)
             if dsc[7] & FieldFlag.SET:
-                return self._SET_to_python(value, dsc)
+                return self._set_to_python(value, dsc)
             if dsc[8] == 63:  # 'binary' charset
                 return value
         if isinstance(value, (bytes, bytearray)) and self.use_unicode:
@@ -638,16 +660,17 @@ class MySQLConverter(MySQLConverterBase):
 
         return value
 
-    _VAR_STRING_to_python = _STRING_to_python
-    _JSON_to_python = _STRING_to_python
+    _var_string_to_python = _string_to_python
+    _json_to_python = _string_to_python
 
-    def _BLOB_to_python(self, value, dsc=None):  # pylint: disable=C0103
+    def _blob_to_python(self, value, dsc=None):
         """Convert BLOB data type to Python."""
         if dsc is not None:
             if dsc[7] & FieldFlag.BLOB and dsc[7] & FieldFlag.BINARY:
                 return bytes(value)
-        return self._STRING_to_python(value, dsc)
+        return self._string_to_python(value, dsc)
 
-    _LONG_BLOB_to_python = _BLOB_to_python
-    _MEDIUM_BLOB_to_python = _BLOB_to_python
-    _TINY_BLOB_to_python = _BLOB_to_python
+    _long_blob_to_python = _blob_to_python
+    _medium_blob_to_python = _blob_to_python
+    _tiny_blob_to_python = _blob_to_python
+    # pylint: enable=unused-argument

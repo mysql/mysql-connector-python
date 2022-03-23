@@ -39,7 +39,7 @@ from .dbdoc import DbDoc
 from .helpers import decode_from_bytes, deprecated
 
 
-# pylint: disable=C0111
+# pylint: disable=missing-class-docstring,missing-function-docstring
 def from_protobuf(column, payload):
     if len(payload) == 0:
         return None
@@ -50,8 +50,8 @@ def from_protobuf(column, payload):
     try:
         return ColumnProtoType.converter_map[column.get_proto_type()](payload)
     except KeyError as err:
-        sys.stderr.write("{0}".format(err))
-        sys.stderr.write("{0}".format(payload.encode("hex")))
+        sys.stderr.write(f"{err}")
+        sys.stderr.write(f"{payload.encode('hex')}")
         return None
 
 
@@ -168,7 +168,7 @@ def decimal_from_protobuf(payload):
             assert low_bcd == 0x00
             break
         else:
-            raise ValueError("Invalid BCD: {0}".format(high_bcd))
+            raise ValueError(f"Invalid BCD: {high_bcd}")
 
     return decimal.Decimal((sign, digits, -scale))
 
@@ -384,8 +384,8 @@ class Flags:
                 try:
                     flag_names.append(self._flag_names[flag])
                 except KeyError:
-                    sys.stderr.write("{0}".format(self._flag_names))
-                    sys.stderr.write("{0}".format(self.__class__.__dict__))
+                    sys.stderr.write(f"{self._flag_names}")
+                    sys.stderr.write(f"{self.__class__.__dict__}")
 
         return ",".join(flag_names)
 
@@ -432,7 +432,7 @@ class BytesContentType(ColumnFlags):
     XML = 0x0003
 
 
-# pylint: enable=C0111
+# pylint: enable=missing-class-docstring,missing-function-docstring
 
 
 class Column:
@@ -494,8 +494,7 @@ class Column:
         if self._collation > 0:
             if self._collation >= len(MYSQL_CHARACTER_SETS):
                 raise ValueError(
-                    "No mapping found for collation {0}"
-                    "".format(self._collation)
+                    f"No mapping found for collation {self._collation}"
                 )
             info = MYSQL_CHARACTER_SETS[self._collation]
             self._character_set_name = info[0]
@@ -610,9 +609,7 @@ class Column:
         elif self._proto_type == ColumnProtoType.BIT:
             self._col_type = ColumnType.BIT
         else:
-            raise ValueError(
-                "Unknown column type {0}".format(self._proto_type)
-            )
+            raise ValueError(f"Unknown column type {self._proto_type}")
 
     @property
     def schema_name(self):
@@ -811,13 +808,13 @@ class Row:
     """Represents a row element returned from a SELECT query.
 
     Args:
-        rs (mysqlx.SqlResult or mysqlx.RowResult): The result set.
+        resultset (mysqlx.SqlResult or mysqlx.RowResult): The result set.
         fields (`list`): The list of fields.
     """
 
-    def __init__(self, rs, fields):
+    def __init__(self, resultset, fields):
         self._fields = fields
-        self._resultset = rs
+        self._resultset = resultset
 
     def __repr__(self):
         return repr(self._fields)
@@ -833,7 +830,7 @@ class Row:
             else index
         )
         if int_index == -1 and isinstance(index, str):
-            raise ValueError("Column name '{0}' not found".format(index))
+            raise ValueError(f"Column name '{index}' not found")
         if int_index >= len(self._fields) or int_index < 0:
             raise IndexError("Index out of range")
         return self._fields[int_index]
@@ -851,7 +848,7 @@ class Row:
         if int_index >= len(self._fields):
             raise IndexError("Argument out of range")
         if int_index == -1:
-            raise ValueError("Column name '{0}' not found".format(str_index))
+            raise ValueError(f"Column name '{str_index}' not found")
         return str(self._fields[int_index])
 
 
@@ -937,7 +934,7 @@ class Result(BaseResult):
     """
 
     def __init__(self, connection=None, ids=None):
-        super(Result, self).__init__(connection)
+        super().__init__(connection)
         self._ids = ids
 
         if connection is not None:
@@ -983,7 +980,7 @@ class BufferingResult(BaseResult):
     """
 
     def __init__(self, connection):
-        super(BufferingResult, self).__init__(connection)
+        super().__init__(connection)
         self._columns = []
         self._has_data = False
         self._has_more_results = False
@@ -1003,7 +1000,7 @@ class BufferingResult(BaseResult):
     def _init_result(self):
         """Initialize the result."""
         self._columns = self._connection.get_column_metadata(self)
-        self._has_more_data = True if len(self._columns) > 0 else False
+        self._has_more_data = len(self._columns) > 0
         self._items = []
         self._page_size = 20
         self._position = -1
@@ -1108,9 +1105,6 @@ class RowResult(BufferingResult):
         connection (mysqlx.connection.Connection): The Connection object.
     """
 
-    def __init__(self, connection):
-        super(RowResult, self).__init__(connection)
-
     @property
     def columns(self):
         """`list`: The list of columns."""
@@ -1133,9 +1127,6 @@ class SqlResult(RowResult):
     Args:
         connection (mysqlx.connection.Connection): The Connection object.
     """
-
-    def __init__(self, connection):
-        super(SqlResult, self).__init__(connection)
 
     def get_autoincrement_value(self):
         """Returns the identifier for the last record inserted.
@@ -1176,9 +1167,6 @@ class DocResult(BufferingResult):
         connection (mysqlx.connection.Connection): The Connection object.
     """
 
-    def __init__(self, connection):
-        super(DocResult, self).__init__(connection)
-
     def _read_item(self, dumping):
         """Read item.
 
@@ -1188,7 +1176,7 @@ class DocResult(BufferingResult):
         Returns:
             :class:`mysqlx.DbDoc`: A `DbDoc` object.
         """
-        row = super(DocResult, self)._read_item(dumping)
+        row = super()._read_item(dumping)
         if row is None:
             return None
         return DbDoc(decode_from_bytes(row[0]))

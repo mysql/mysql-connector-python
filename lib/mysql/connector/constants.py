@@ -26,15 +26,14 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Various MySQL constants and character sets
-"""
+"""Various MySQL constants and character sets."""
 
-import ssl
 import warnings
+
+from abc import ABC, ABCMeta
 
 from .charsets import MYSQL_CHARACTER_SETS
 from .errors import ProgrammingError
-from .utils import make_abc
 
 MAX_PACKET_LENGTH = 16777215
 NET_BUFFER_LENGTH = 8192
@@ -111,30 +110,24 @@ def flag_is_set(flag, flags):
 
 def _obsolete_option(name, new_name, value):
     warnings.warn(
-        'The option "{}" has been deprecated, use "{}" instead.'
-        "".format(name, new_name),
+        f'The option "{name}" has been deprecated, use "{new_name}" instead.',
         category=DeprecationWarning,
     )
     return value
 
 
-class _Constants:
-    """
-    Base class for constants
-    """
+class _Constants(ABC):
+    """Base class for constants."""
 
     prefix = ""
     desc = {}
-
-    def __new__(cls):
-        raise TypeError("Can not instanciate from %s" % cls.__name__)
 
     @classmethod
     def get_desc(cls, name):
         """Get description of given constant"""
         try:
             return cls.desc[name][1]
-        except:
+        except (IndexError, KeyError):
             return None
 
     @classmethod
@@ -150,9 +143,9 @@ class _Constants:
         """get full information about given constant"""
         res = ()
         try:
-            res = ["%s : %s" % (k, v[1]) for k, v in cls.desc.items()]
-        except Exception as err:  # pylint: disable=W0703
-            res = "No information found in constant class.%s" % err
+            res = [f"{k} : {v[1]}" for k, v in cls.desc.items()]
+        except (AttributeError, IndexError) as err:
+            res = f"No information found in constant class. {err}"
 
         return res
 
@@ -545,7 +538,7 @@ class ServerFlag(_Flags):
         "SERVER_STATUS_AUTOCOMMIT": (1 << 1, "Server in auto_commit mode"),
         "SERVER_MORE_RESULTS_EXISTS": (
             1 << 3,
-            "Multi query - " "next query exists",
+            "Multi query - next query exists",
         ),
         "SERVER_QUERY_NO_GOOD_INDEX_USED": (1 << 4, ""),
         "SERVER_QUERY_NO_INDEX_USED": (1 << 5, ""),
@@ -556,7 +549,7 @@ class ServerFlag(_Flags):
         ),
         "SERVER_STATUS_LAST_ROW_SENT": (
             1 << 7,
-            "Set when a read-only cursor is " "exhausted",
+            "Set when a read-only cursor is exhausted",
         ),
         "SERVER_STATUS_DB_DROPPED": (1 << 8, "A database was dropped"),
         "SERVER_STATUS_NO_BACKSLASH_ESCAPES": (1 << 9, ""),
@@ -570,7 +563,7 @@ class ServerFlag(_Flags):
         "SERVER_QUERY_WAS_SLOW": (2048, ""),
         "SERVER_PS_OUT_PARAMS": (
             4096,
-            "To mark ResultSet containing output " "parameter values.",
+            "To mark ResultSet containing output parameter values.",
         ),
         "SERVER_STATUS_IN_TRANS_READONLY": (
             8192,
@@ -587,9 +580,15 @@ class ServerFlag(_Flags):
     }
 
 
-class RefreshOption_meta(type):
+class RefreshOptionMeta(ABCMeta):
+    """RefreshOption Metaclass."""
+
     @property
-    def SLAVE(self):
+    def SLAVE(self):  # pylint: disable=bad-mcs-method-argument,invalid-name
+        """Return the deprecated alias of RefreshOption.REPLICA.
+
+        Raises a warning about this attribute deprecation.
+        """
         return _obsolete_option(
             "RefreshOption.SLAVE",
             "RefreshOption.REPLICA",
@@ -597,9 +596,8 @@ class RefreshOption_meta(type):
         )
 
 
-@make_abc(RefreshOption_meta)
-class RefreshOption(_Constants):
-    """MySQL Refresh command options
+class RefreshOption(_Constants, metaclass=RefreshOptionMeta):
+    """MySQL Refresh command options.
 
     Options used when sending the COM_REFRESH server command.
     """
@@ -703,8 +701,8 @@ class CharacterSet(_Constants):
             return cls.desc[setid][0:2]
         except IndexError:
             raise ProgrammingError(
-                "Character set '{0}' unsupported".format(setid)
-            )
+                f"Character set '{setid}' unsupported"
+            ) from None
 
     @classmethod
     def get_desc(cls, name):
@@ -715,10 +713,8 @@ class CharacterSet(_Constants):
 
         Returns a tuple.
         """
-        try:
-            return "%s/%s" % cls.get_info(name)
-        except:
-            raise
+        charset, collation = cls.get_info(name)
+        return f"{charset}/{collation}"
 
     @classmethod
     def get_default_collation(cls, charset):
@@ -732,10 +728,8 @@ class CharacterSet(_Constants):
             try:
                 info = cls.desc[charset]
                 return info[1], info[0], charset
-            except:
-                ProgrammingError(
-                    "Character set ID '%s' unsupported." % (charset)
-                )
+            except (IndexError, KeyError):
+                ProgrammingError(f"Character set ID '{charset}' unsupported")
 
         for cid, info in enumerate(cls.desc):
             if info is None:
@@ -743,7 +737,7 @@ class CharacterSet(_Constants):
             if info[0] == charset and info[2] is True:
                 return info[1], info[0], cid
 
-        raise ProgrammingError("Character set '%s' unsupported." % (charset))
+        raise ProgrammingError(f"Character set '{charset}' unsupported")
 
     @classmethod
     def get_charset_info(cls, charset=None, collation=None):
@@ -767,32 +761,25 @@ class CharacterSet(_Constants):
                 info = cls.desc[charset]
                 return (charset, info[0], info[1])
             except IndexError:
-                ProgrammingError(
-                    "Character set ID {0} unknown.".format(charset)
-                )
+                ProgrammingError(f"Character set ID {charset} unknown")
 
         if charset is not None and collation is None:
             info = cls.get_default_collation(charset)
             return (info[2], info[1], info[0])
-        elif charset is None and collation is not None:
+        if charset is None and collation is not None:
             for cid, info in enumerate(cls.desc):
                 if info is None:
                     continue
                 if collation == info[1]:
                     return (cid, info[0], info[1])
-            raise ProgrammingError(
-                "Collation '{0}' unknown.".format(collation)
-            )
-        else:
-            for cid, info in enumerate(cls.desc):
-                if info is None:
-                    continue
-                if info[0] == charset and info[1] == collation:
-                    return (cid, info[0], info[1])
-            _ = cls.get_default_collation(charset)
-            raise ProgrammingError(
-                "Collation '{0}' unknown.".format(collation)
-            )
+            raise ProgrammingError(f"Collation '{collation}' unknown")
+        for cid, info in enumerate(cls.desc):
+            if info is None:
+                continue
+            if info[0] == charset and info[1] == collation:
+                return (cid, info[0], info[1])
+        _ = cls.get_default_collation(charset)
+        raise ProgrammingError(f"Collation '{collation}' unknown")
 
     @classmethod
     def get_supported(cls):

@@ -421,53 +421,53 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         res = self.cnv.row_to_python(data, description)
         self.assertEqual(res, self._to_python_exp)
 
-    def test__FLOAT_to_python(self):
+    def test__float_to_python(self):
         """Convert a MySQL FLOAT/DOUBLE to a Python float type"""
         data = b"3.14"
         exp = float(data)
-        res = self.cnv._FLOAT_to_python(data)
+        res = self.cnv._float_to_python(data)
 
         self.assertEqual(exp, res)
 
-        self.assertEqual(self.cnv._FLOAT_to_python, self.cnv._DOUBLE_to_python)
+        self.assertEqual(self.cnv._float_to_python, self.cnv._double_to_python)
 
-    def test__INT_to_python(self):
+    def test__int_to_python(self):
         """Convert a MySQL TINY/SHORT/INT24/INT to a Python int type"""
         data = b"128"
         exp = int(data)
-        res = self.cnv._INT_to_python(data)
+        res = self.cnv._int_to_python(data)
 
         self.assertEqual(exp, res)
 
-        self.assertEqual(self.cnv._INT_to_python, self.cnv._TINY_to_python)
-        self.assertEqual(self.cnv._INT_to_python, self.cnv._SHORT_to_python)
-        self.assertEqual(self.cnv._INT_to_python, self.cnv._INT24_to_python)
+        self.assertEqual(self.cnv._int_to_python, self.cnv._tiny_to_python)
+        self.assertEqual(self.cnv._int_to_python, self.cnv._short_to_python)
+        self.assertEqual(self.cnv._int_to_python, self.cnv._int24_to_python)
 
-    def test__LONG_to_python(self):
+    def test__long_to_python(self):
         """Convert a MySQL LONG/LONGLONG to a Python long type"""
         data = b"1281288"
         exp = int(data)
-        res = self.cnv._LONG_to_python(data)
+        res = self.cnv._long_to_python(data)
 
         self.assertEqual(exp, res)
 
         self.assertEqual(
-            self.cnv._LONG_to_python, self.cnv._LONGLONG_to_python
+            self.cnv._long_to_python, self.cnv._longlong_to_python
         )
 
-    def test__DECIMAL_to_python(self):
+    def test__decimal_to_python(self):
         """Convert a MySQL DECIMAL to a Python decimal.Decimal type"""
         data = b"3.14"
         exp = Decimal("3.14")
-        res = self.cnv._DECIMAL_to_python(data)
+        res = self.cnv._decimal_to_python(data)
 
         self.assertEqual(exp, res)
 
         self.assertEqual(
-            self.cnv._DECIMAL_to_python, self.cnv._NEWDECIMAL_to_python
+            self.cnv._decimal_to_python, self.cnv._newdecimal_to_python
         )
 
-    def test__BIT_to_python(self):
+    def test__bit_to_python(self):
         """Convert a MySQL BIT to Python int"""
         data = [
             b"\x80",
@@ -491,21 +491,21 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         ]
 
         for i, buf in enumerate(data):
-            self.assertEqual(self.cnv._BIT_to_python(buf), exp[i])
+            self.assertEqual(self.cnv._bit_to_python(buf), exp[i])
 
-    def test__DATE_to_python(self):
+    def test__date_to_python(self):
         """Convert a MySQL DATE to a Python datetime.date type"""
         data = b"2008-05-07"
         exp = datetime.date(2008, 5, 7)
-        res = self.cnv._DATE_to_python(data)
+        res = self.cnv._date_to_python(data)
 
         self.assertEqual(exp, res)
 
-        self.assertEqual(None, self.cnv._DATE_to_python(b"0000-00-00"))
+        self.assertEqual(None, self.cnv._date_to_python(b"0000-00-00"))
 
-        self.assertEqual(None, self.cnv._DATE_to_python(b"1000-00-00"))
+        self.assertEqual(None, self.cnv._date_to_python(b"1000-00-00"))
 
-    def test__TIME_to_python(self):
+    def test__time_to_python(self):
         """Convert a MySQL TIME to a Python datetime.time type"""
         cases = [
             (
@@ -526,13 +526,13 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             data, exp = case
             self.assertEqual(
                 exp,
-                self.cnv._TIME_to_python(data),
+                self.cnv._time_to_python(data),
                 "Case {0} failed: {1}; got {2}".format(
-                    i + 1, repr(data), repr(self.cnv._TIME_to_python(data))
+                    i + 1, repr(data), repr(self.cnv._time_to_python(data))
                 ),
             )
 
-    def test__DATETIME_to_python(self):
+    def test__datetime_to_python(self):
         """Convert a MySQL DATETIME to a Python datetime.datetime type"""
         cases = [
             (
@@ -547,21 +547,21 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             (b"1000-00-00 00:00:00", None),
         ]
         for data, exp in cases:
-            self.assertEqual(exp, self.cnv._DATETIME_to_python(data))
+            self.assertEqual(exp, self.cnv._datetime_to_python(data))
 
-    def test__YEAR_to_python(self):
+    def test__year_to_python(self):
         """Convert a MySQL YEAR to Python int"""
         data = "2008"
         exp = 2008
 
-        self.assertEqual(exp, self.cnv._YEAR_to_python(data))
+        self.assertEqual(exp, self.cnv._year_to_python(data))
         data = "foobar"
-        self.assertRaises(ValueError, self.cnv._YEAR_to_python, data)
+        self.assertRaises(ValueError, self.cnv._year_to_python, data)
 
-    def test__SET_to_python(self):
+    def test__set_to_python(self):
         """Convert a MySQL SET type to a Python sequence
 
-        This actually calls hte _STRING_to_python() method since a SET is
+        This actually calls hte _string_to_python() method since a SET is
         returned as string by MySQL. However, the description of the field
         has in it's field flags that the string is a SET.
         """
@@ -578,37 +578,37 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             constants.FieldFlag.SET,
             45,
         )
-        res = self.cnv._STRING_to_python(data, desc)
+        res = self.cnv._string_to_python(data, desc)
 
         self.assertEqual(exp, res)
 
-    def test__STRING_to_python_utf8(self):
+    def test__string_to_python_utf8(self):
         """Convert a UTF-8 MySQL STRING/VAR_STRING to a Python Unicode type"""
         self.cnv.set_charset("utf8")  # default
         data = b"\xc3\xa4 utf8 string"
         exp = data.decode("utf-8")
-        res = self.cnv._STRING_to_python(data)
+        res = self.cnv._string_to_python(data)
 
         self.assertEqual(exp, res)
 
-    def test__STRING_to_python_latin1(self):
+    def test__string_to_python_latin1(self):
         """Convert a ISO-8859-1 MySQL STRING/VAR_STRING to a Python str"""
         self.cnv.set_charset("latin1")
         self.cnv.set_unicode(False)
         data = b"\xe4 latin string"
         exp = data
-        res = self.cnv._STRING_to_python(data)
+        res = self.cnv._string_to_python(data)
         self.assertEqual(exp, res)
 
         exp = data.decode("latin1")
         self.cnv.set_unicode(True)
-        res = self.cnv._STRING_to_python(data)
+        res = self.cnv._string_to_python(data)
         self.assertEqual(exp, res)
 
         self.cnv.set_charset("utf8")
         self.cnv.set_unicode(True)
 
-    def test__STRING_to_python_binary(self):
+    def test__string_to_python_binary(self):
         """Convert a STRING BINARY to Python bytes type"""
         data = b"\x33\xfd\x34\xed"
         desc = (
@@ -622,11 +622,11 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             constants.FieldFlag.BINARY,
             63,
         )
-        res = self.cnv._STRING_to_python(data, desc)
+        res = self.cnv._string_to_python(data, desc)
 
         self.assertEqual(data, res)
 
-    def test__BLOB_to_python_binary(self):
+    def test__blob_to_python_binary(self):
         """Convert a BLOB BINARY to Python bytes type"""
         data = b"\x33\xfd\x34\xed"
         desc = (
@@ -640,7 +640,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             constants.FieldFlag.BINARY,
             63,
         )
-        res = self.cnv._BLOB_to_python(data, desc)
+        res = self.cnv._blob_to_python(data, desc)
 
         self.assertEqual(data, res)
 

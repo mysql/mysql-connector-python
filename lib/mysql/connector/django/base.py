@@ -39,14 +39,13 @@ Requires and comes with MySQL Connector/Python v8.0.22 and later:
     http://dev.mysql.com/downloads/connector/python/
 """
 
-import sys
 import warnings
 
 from datetime import datetime
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import IntegrityError, utils
+from django.db import IntegrityError
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import dateparse, timezone
 from django.utils.functional import cached_property
@@ -57,11 +56,11 @@ try:
     from mysql.connector.conversion import MySQLConverter
 except ImportError as err:
     raise ImproperlyConfigured(
-        "Error loading mysql.connector module: {0}".format(err)
-    )
+        f"Error loading mysql.connector module: {err}"
+    ) from err
 
 try:
-    from _mysql_connector import datetime_to_mysql, time_to_mysql
+    from _mysql_connector import datetime_to_mysql
 except ImportError:
     HAVE_CEXT = False
 else:
@@ -83,12 +82,12 @@ ProgrammingError = mysql.connector.ProgrammingError
 
 
 def adapt_datetime_with_timezone_support(value):
-    # Equivalent to DateTimeField.get_db_prep_value. Used only by raw SQL.
+    """Equivalent to DateTimeField.get_db_prep_value. Used only by raw SQL."""
     if settings.USE_TZ:
         if timezone.is_naive(value):
             warnings.warn(
-                "MySQL received a naive datetime (%s)"
-                " while time zone support is active." % value,
+                f"MySQL received a naive datetime ({value})"
+                " while time zone support is active.",
                 RuntimeWarning,
             )
             default_timezone = timezone.get_default_timezone()
@@ -96,8 +95,7 @@ def adapt_datetime_with_timezone_support(value):
         value = value.astimezone(timezone.utc).replace(tzinfo=None)
     if HAVE_CEXT:
         return datetime_to_mysql(value)
-    else:
-        return value.strftime("%Y-%m-%d %H:%M:%S.%f")
+    return value.strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 class CursorWrapper:
@@ -118,7 +116,8 @@ class CursorWrapper:
     def __init__(self, cursor):
         self.cursor = cursor
 
-    def _adapt_execute_args_dict(self, args):
+    @staticmethod
+    def _adapt_execute_args_dict(args):
         if not args:
             return args
         new_args = dict(args)
@@ -128,7 +127,8 @@ class CursorWrapper:
 
         return new_args
 
-    def _adapt_execute_args(self, args):
+    @staticmethod
+    def _adapt_execute_args(args):
         if not args:
             return args
         new_args = list(args)
@@ -150,9 +150,9 @@ class CursorWrapper:
             new_args = self._adapt_execute_args(args)
         try:
             return self.cursor.execute(query, new_args)
-        except mysql.connector.OperationalError as e:
-            if e.args[0] in self.codes_for_integrityerror:
-                raise IntegrityError(*tuple(e.args))
+        except mysql.connector.OperationalError as exc:
+            if exc.args[0] in self.codes_for_integrityerror:
+                raise IntegrityError(*tuple(exc.args)) from None
             raise
 
     def executemany(self, query, args):
@@ -163,21 +163,23 @@ class CursorWrapper:
         """
         try:
             return self.cursor.executemany(query, args)
-        except mysql.connector.OperationalError as e:
-            if e.args[0] in self.codes_for_integrityerror:
-                raise IntegrityError(*tuple(e.args))
+        except mysql.connector.OperationalError as exc:
+            if exc.args[0] in self.codes_for_integrityerror:
+                raise IntegrityError(*tuple(exc.args)) from None
             raise
 
     def __getattr__(self, attr):
-        """Return attribute of wrapped cursor"""
+        """Return an attribute of wrapped cursor"""
         return getattr(self.cursor, attr)
 
     def __iter__(self):
-        """Returns iterator over wrapped cursor"""
+        """Return an iterator over wrapped cursor"""
         return iter(self.cursor)
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):
+    """Represent a database connection."""
+
     vendor = "mysql"
     # This dictionary maps Field objects to their associated MySQL column
     # types, as strings. Column-type strings can contain format strings; they'll
@@ -286,7 +288,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     validation_class = DatabaseValidation
 
     def __init__(self, *args, **kwargs):
-        super(DatabaseWrapper, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         options = self.settings_dict.get("OPTIONS")
         if options:
@@ -349,7 +351,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return kwargs
 
     def get_new_connection(self, conn_params):
-        if not "converter_class" in conn_params:
+        if "converter_class" not in conn_params:
             conn_params["converter_class"] = DjangoMySQLConverter
         cnx = mysql.connector.connect(**conn_params)
 
@@ -439,37 +441,28 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     referenced_column_name,
                 ) in key_columns:
                     cursor.execute(
-                        """
-                        SELECT REFERRING.`%s`, REFERRING.`%s` FROM `%s` as REFERRING
-                        LEFT JOIN `%s` as REFERRED
-                        ON (REFERRING.`%s` = REFERRED.`%s`)
-                        WHERE REFERRING.`%s` IS NOT NULL AND REFERRED.`%s` IS NULL
-                        """
-                        % (
-                            primary_key_column_name,
-                            column_name,
-                            table_name,
-                            referenced_table_name,
-                            column_name,
-                            referenced_column_name,
-                            column_name,
-                            referenced_column_name,
+                        f"""
+                        SELECT REFERRING.`{primary_key_column_name}`,
+                        REFERRING.`{column_name}`
+                        FROM `{table_name}` as REFERRING
+                        LEFT JOIN `{referenced_table_name}` as REFERRED
+                        ON (
+                            REFERRING.`{column_name}` =
+                            REFERRED.`{referenced_column_name}`
                         )
+                        WHERE REFERRING.`{column_name}` IS NOT NULL
+                        AND REFERRED.`{referenced_column_name}` IS NULL
+                        """
                     )
                     for bad_row in cursor.fetchall():
                         raise IntegrityError(
-                            "The row in table '%s' with primary key '%s' has an invalid "
-                            "foreign key: %s.%s contains a value '%s' that does not "
-                            "have a corresponding value in %s.%s."
-                            % (
-                                table_name,
-                                bad_row[0],
-                                table_name,
-                                column_name,
-                                bad_row[1],
-                                referenced_table_name,
-                                referenced_column_name,
-                            )
+                            f"The row in table '{table_name}' with primary "
+                            f"key '{bad_row[0]}' has an invalid foreign key: "
+                            f"{table_name}.{column_name} contains a value "
+                            f"'{bad_row[1]}' that does not have a "
+                            f"corresponding value in "
+                            f"{referenced_table_name}."
+                            f"{referenced_column_name}."
                         )
 
     def is_usable(self):
@@ -481,11 +474,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return True
 
     @cached_property
-    def display_name(self):
+    @staticmethod
+    def display_name():
+        """Display name."""
         return "MySQL"
 
     @cached_property
     def data_type_check_constraints(self):
+        """Mapping of Field objects to their SQL for CHECK constraints."""
         if self.features.supports_column_check_constraints:
             check_constraints = {
                 "PositiveBigIntegerField": "`%(column)s` >= 0",
@@ -497,6 +493,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     @cached_property
     def mysql_server_data(self):
+        """Return MySQL server data."""
         with self.temporary_connection() as cursor:
             # Select some server variables and test if the time zone
             # definitions are installed. CONVERT_TZ returns NULL if 'UTC'
@@ -523,12 +520,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     @cached_property
     def mysql_server_info(self):
+        """Return MySQL version."""
         with self.temporary_connection() as cursor:
             cursor.execute("SELECT VERSION()")
             return cursor.fetchone()[0]
 
     @cached_property
     def mysql_version(self):
+        """Return MySQL version."""
         config = self.get_connection_params()
         with mysql.connector.connect(**config) as conn:
             server_version = conn.get_server_version()
@@ -536,6 +535,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     @cached_property
     def sql_mode(self):
+        """Return SQL mode."""
         with self.cursor() as cursor:
             cursor.execute("SELECT @@sql_mode")
             sql_mode = cursor.fetchone()
@@ -543,20 +543,25 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     @property
     def use_pure(self):
+        """Return True if pure Python version is being used."""
         return self._use_pure
 
 
 class DjangoMySQLConverter(MySQLConverter):
     """Custom converter for Django."""
 
-    def _TIME_to_python(self, value, dsc=None):
+    # pylint: disable=unused-argument
+
+    @staticmethod
+    def _time_to_python(value, dsc=None):
         """Return MySQL TIME data type as datetime.time()
 
         Returns datetime.time()
         """
         return dateparse.parse_time(value.decode("utf-8"))
 
-    def __DATETIME_to_python(self, value, dsc=None):
+    @staticmethod
+    def _datetime_to_python(value, dsc=None):
         """Connector/Python always returns naive datetime.datetime
 
         Connector/Python always returns naive timestamps since MySQL has
@@ -567,12 +572,15 @@ class DjangoMySQLConverter(MySQLConverter):
         """
         if not value:
             return None
-        dt = MySQLConverter._DATETIME_to_python(self, value)
+
+        dt = super()._datetime_to_python(value)
         if dt is None:
             return None
         if settings.USE_TZ and timezone.is_naive(dt):
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
+
+    # pylint: enable=unused-argument
 
     def _safestring_to_mysql(self, value):
         return self._str_to_mysql(value)

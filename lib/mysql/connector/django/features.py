@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Database Features."""
+
 from django.db.backends.mysql.features import (
     DatabaseFeatures as MySQLDatabaseFeatures,
 )
@@ -33,14 +35,16 @@ from django.utils.functional import cached_property
 
 
 class DatabaseFeatures(MySQLDatabaseFeatures):
+    """Database Features Specification class."""
+
     empty_fetchmany_value = []
 
     @cached_property
     def can_introspect_check_constraints(self):
+        """Check if backend support introspection CHECK of constraints."""
         return self.connection.mysql_version >= (8, 0, 16)
 
     @cached_property
     def supports_microsecond_precision(self):
-        if self.connection.mysql_version >= (5, 6, 3):
-            return True
-        return False
+        """Check if backend support microsecond precision."""
+        return self.connection.mysql_version >= (5, 6, 3)
