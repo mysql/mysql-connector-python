@@ -15,6 +15,7 @@ v8.0.30
 - WL#15137: Fix linting issues
 - WL#15035: Enforce PEP 7 and PEP 8 coding style
 - WL#14822: Refactor the authentication plugin mechanism
+- WL#14815: Support OpenSSL 3.0
 
 v8.0.29
 =======

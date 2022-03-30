@@ -33,14 +33,14 @@
         <File Id="LibMySQLDLL310" Name="libmysql.dll"
          Source="$(var.LibMySQLDLL)" DiskId="1"/>
         <?if "$(var.Platform)"="x64" ?>
-          <File Id="LIBcrypto310" Name="libcrypto-1_1-x64.dll"
+          <File Id="LIBcrypto310" Name="$(var.LIBcrypto)"
            Source="$(var.LIBcryptoDLL)" DiskId="1"/>
-          <File Id="LIBSSL310" Name="libssl-1_1-x64.dll"
+          <File Id="LIBSSL310" Name="$(var.LIBSSL)"
            Source="$(var.LIBSSLDLL)" DiskId="1"/>
         <?else?>
-          <File Id="LIBcrypto310" Name="libcrypto-1_1.dll"
+          <File Id="LIBcrypto310" Name="$(var.LIBcrypto)"
            Source="$(var.LIBcryptoDLL)" DiskId="1"/>
-          <File Id="LIBSSL310" Name="libssl-1_1.dll"
+          <File Id="LIBSSL310" Name="$(var.LIBSSL)"
            Source="$(var.LIBSSLDLL)" DiskId="1"/>
         <?endif?>
       </Component>
@@ -138,15 +138,15 @@
       <?if $(var.HaveCExt310) = 1 ?>
       <Component Id="Vendor310" Guid="02156b38-6c13-44eb-bc59-53a5547cbad0" Win64="$(var.Win64)">
         <?if "$(var.Platform)"="x64" ?>
-          <File Id="libcrypto_1_1310" Name="libcrypto-1_1-x64.dll"
-           Source="$(var.BDist310)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
-          <File Id="libssl_1_1310" Name="libssl-1_1-x64.dll"
-           Source="$(var.BDist310)\mysql\vendor\libssl-1_1-x64.dll" DiskId="1"/>
+          <File Id="libcrypto_1_1310" Name="$(var.LIBcrypto)"
+           Source="$(var.BDist310)\mysql\vendor\$(var.LIBcrypto)" DiskId="1"/>
+          <File Id="libssl_1_1310" Name="$(var.LIBSSL)"
+           Source="$(var.BDist310)\mysql\vendor\$(var.LIBSSL)" DiskId="1"/>
         <?else?>
-          <File Id="libcrypto_1_1310" Name="libcrypto-1_1.dll"
-           Source="$(var.BDist310)\mysql\vendor\libcrypto-1_1.dll" DiskId="1"/>
-          <File Id="libssl_1_1310" Name="libssl-1_1.dll"
-           Source="$(var.BDist310)\mysql\vendor\libssl-1_1.dll" DiskId="1"/>
+          <File Id="libcrypto_1_1310" Name="$(var.LIBcrypto)"
+           Source="$(var.BDist310)\mysql\vendor\$(var.LIBcrypto)" DiskId="1"/>
+          <File Id="libssl_1_1310" Name="$(var.LIBSSL)"
+           Source="$(var.BDist310)\mysql\vendor\$(var.LIBSSL)" DiskId="1"/>
         <?endif?>
         <?if $(var.HaveLdapLibs310) = 1 ?>
         <File Id="libsasl310" Name="libsasl.dll"

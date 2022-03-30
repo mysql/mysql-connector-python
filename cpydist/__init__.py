@@ -47,7 +47,14 @@ from subprocess import PIPE, Popen, check_call
 
 from setuptools.command.build_ext import build_ext
 
-from .utils import ARCH, ARCH_64BIT, mysql_c_api_info, write_info_bin, write_info_src
+from .utils import (
+    ARCH,
+    ARCH_64BIT,
+    get_openssl_libs,
+    mysql_c_api_info,
+    write_info_bin,
+    write_info_src,
+)
 
 # Load version information
 VERSION = [999, 0, 0, "a", 0]
@@ -166,30 +173,47 @@ class BaseCommand(Command):
             self.log.setLevel(logging.DEBUG)
             log.set_threshold(1)  # Set Distutils logging level to DEBUG
 
+        if not self.with_mysql_capi:
+            self.with_mysql_capi = os.environ.get("MYSQL_CAPI")
+        if not self.with_openssl_include_dir:
+            self.with_openssl_include_dir = os.environ.get("OPENSSL_INCLUDE_DIR")
+        if not self.with_openssl_lib_dir:
+            self.with_openssl_lib_dir = os.environ.get("OPENSSL_LIB_DIR")
+        if not self.with_protobuf_include_dir:
+            self.with_protobuf_include_dir = os.environ.get("PROTOBUF_INCLUDE_DIR")
+        if not self.with_protobuf_lib_dir:
+            self.with_protobuf_lib_dir = os.environ.get("PROTOBUF_LIB_DIR")
+        if not self.with_protoc:
+            self.with_protoc = os.environ.get("PROTOC")
+        if not self.extra_compile_args:
+            self.extra_compile_args = os.environ.get("EXTRA_COMPILE_ARGS")
+        if not self.extra_link_args:
+            self.extra_link_args = os.environ.get("EXTRA_LINK_ARGS")
+        if not self.skip_vendor:
+            self.skip_vendor = os.environ.get("SKIP_VENDOR")
+
         cmd_build_ext = self.distribution.get_command_obj("build_ext")
-        cmd_build_ext.with_mysql_capi = self.with_mysql_capi or os.environ.get(
-            "MYSQL_CAPI"
-        )
-        cmd_build_ext.with_openssl_include_dir = (
-            self.with_openssl_include_dir or os.environ.get("OPENSSL_INCLUDE_DIR")
-        )
-        cmd_build_ext.with_openssl_lib_dir = (
-            self.with_openssl_lib_dir or os.environ.get("OPENSSL_LIB_DIR")
-        )
-        cmd_build_ext.with_protobuf_include_dir = (
-            self.with_protobuf_include_dir or os.environ.get("PROTOBUF_INCLUDE_DIR")
-        )
-        cmd_build_ext.with_protobuf_lib_dir = (
-            self.with_protobuf_lib_dir or os.environ.get("PROTOBUF_LIB_DIR")
-        )
-        cmd_build_ext.with_protoc = self.with_protoc or os.environ.get("PROTOC")
-        cmd_build_ext.extra_compile_args = self.extra_compile_args or os.environ.get(
-            "EXTRA_COMPILE_ARGS"
-        )
-        cmd_build_ext.extra_link_args = self.extra_link_args or os.environ.get(
-            "EXTRA_LINK_ARGS"
-        )
-        cmd_build_ext.skip_vendor = self.skip_vendor or os.environ.get("SKIP_VENDOR")
+        cmd_build_ext.with_mysql_capi = self.with_mysql_capi
+        cmd_build_ext.with_openssl_include_dir = self.with_openssl_include_dir
+        cmd_build_ext.with_openssl_lib_dir = self.with_openssl_lib_dir
+        cmd_build_ext.with_protobuf_include_dir = self.with_protobuf_include_dir
+        cmd_build_ext.with_protobuf_lib_dir = self.with_protobuf_lib_dir
+        cmd_build_ext.with_protoc = self.with_protoc
+        cmd_build_ext.extra_compile_args = self.extra_compile_args
+        cmd_build_ext.extra_link_args = self.extra_link_args
+        cmd_build_ext.skip_vendor = self.skip_vendor
+
+        install = self.distribution.get_command_obj("install")
+        install.with_mysql_capi = self.with_mysql_capi
+        install.with_openssl_include_dir = self.with_openssl_include_dir
+        install.with_openssl_lib_dir = self.with_openssl_lib_dir
+        install.with_protobuf_include_dir = self.with_protobuf_include_dir
+        install.with_protobuf_lib_dir = self.with_protobuf_lib_dir
+        install.with_protoc = self.with_protoc
+        install.extra_compile_args = self.extra_compile_args
+        install.extra_link_args = self.extra_link_args
+        install.skip_vendor = self.skip_vendor
+
         if not cmd_build_ext.skip_vendor:
             self._copy_vendor_libraries()
 
@@ -202,35 +226,30 @@ class BaseCommand(Command):
             if os.path.exists(vendor_folder):
                 remove_tree(vendor_folder)
             elif os.name == "nt":
-                if ARCH == "64-bit":
-                    libraries = [
-                        "libmysql.dll",
-                        "libssl-1_1-x64.dll",
-                        "libcrypto-1_1-x64.dll",
-                    ]
-                else:
-                    libraries = [
-                        "libmysql.dll",
-                        "libssl-1_1.dll",
-                        "libcrypto-1_1.dll",
-                    ]
+                libssl, libcrypto = self._get_openssl_libs(ext="dll")
+                libraries = ["libmysql.dll", libssl, libcrypto]
                 for filename in libraries:
                     dll_file = os.path.join(os.getcwd(), filename)
                     if os.path.exists(dll_file):
                         os.unlink(dll_file)
 
-    def _get_openssl_libs(self):
-        libssl = glob(os.path.join(self.with_openssl_lib_dir, "libssl.*.*.*"))
-        libcrypto = glob(os.path.join(self.with_openssl_lib_dir, "libcrypto.*.*.*"))
+    def _get_openssl_libs(self, lib_dir=None, ext=None):
+        if lib_dir is None:
+            lib_dir = self.with_openssl_lib_dir
+        libssl, libcrypto = get_openssl_libs(lib_dir, ext)
         if not libssl or not libcrypto:
-            self.log.error(
-                "Unable to find OpenSSL libraries in '%s'",
-                self.with_openssl_lib_dir,
-            )
+            self.log.error("Unable to find OpenSSL libraries in '%s'", lib_dir)
             sys.exit(1)
-        return (os.path.basename(libssl[0]), os.path.basename(libcrypto[0]))
+        self.log.debug(
+            "Found OpenSSL libraries '%s', '%s' in '%s'",
+            libssl,
+            libcrypto,
+            lib_dir,
+        )
+        return (libssl, libcrypto)
 
     def _copy_vendor_libraries(self):
+        openssl_libs = []
         vendor_libs = []
 
         if os.name == "posix":
@@ -284,14 +303,6 @@ class BaseCommand(Command):
                         plugin_libs.append(lib_name)
                 if plugin_libs:
                     vendor_libs.append((libs_path, plugin_libs))
-
-                if ARCH_64BIT:
-                    openssl_libs = [
-                        "libssl-1_1-x64.dll",
-                        "libcrypto-1_1-x64.dll",
-                    ]
-                else:
-                    openssl_libs = ["libssl-1_1.dll", "libcrypto-1_1.dll"]
                 if self.with_openssl_lib_dir:
                     openssl_libs_path = os.path.abspath(self.with_openssl_lib_dir)
                     if os.path.basename(openssl_libs_path) == "lib":
@@ -303,6 +314,8 @@ class BaseCommand(Command):
                     self.log.info("# openssl_libs_path: %s", openssl_libs_path)
                 else:
                     openssl_libs_path = os.path.join(self.with_mysql_capi, "bin")
+                libssl, libcrypto = self._get_openssl_libs(openssl_libs_path, "dll")
+                openssl_libs = [libssl, libcrypto]
                 vendor_libs.append((openssl_libs_path, openssl_libs))
 
         if not vendor_libs:

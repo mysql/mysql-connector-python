@@ -47,6 +47,7 @@ from .utils import (
     ARCH_64BIT,
     add_arch_dep_elems,
     get_magic_tag,
+    get_openssl_libs,
     write_info_bin,
     write_info_src,
 )
@@ -187,24 +188,25 @@ class DistMSI(BaseCommand):
         copy_tree(os.path.join(connc_loc, "include"), self._connc_include)
 
         self.log.info("# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir)
-        if ARCH_64BIT:
-            openssl_files = ["libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll"]
-        else:
-            openssl_files = ["libssl-1_1.dll", "libcrypto-1_1.dll"]
 
-        for filename in openssl_files:
-            if self.with_openssl_lib_dir:
-                openssl_lib_dir = os.path.abspath(self.with_openssl_lib_dir)
-                if os.path.basename(openssl_lib_dir) == "lib":
-                    openssl_lib_dir = os.path.split(openssl_lib_dir)[0]
-                if os.path.exists(openssl_lib_dir) and os.path.exists(
-                    os.path.join(openssl_lib_dir, "bin")
-                ):
-                    openssl_lib_dir = os.path.join(openssl_lib_dir, "bin")
-                self.log.info("# openssl_lib_dir: %s", openssl_lib_dir)
-                src = os.path.join(openssl_lib_dir, filename)
-            else:
-                src = os.path.join(connc_loc, "bin", filename)
+        if self.with_openssl_lib_dir:
+            openssl_lib_dir = os.path.abspath(self.with_openssl_lib_dir)
+            if os.path.basename(openssl_lib_dir) == "lib":
+                openssl_dir, _ = os.path.split(openssl_lib_dir)
+                if os.path.exists(os.path.join(openssl_dir, "bin")):
+                    openssl_lib_dir = os.path.join(openssl_dir, "bin")
+        else:
+            openssl_lib_dir = os.path.join(connc_loc, "bin")
+
+        self.log.info("# openssl_lib_dir: %s", openssl_lib_dir)
+
+        libssl, libcrypto = get_openssl_libs(openssl_lib_dir, ext="dll")
+        if not libssl or not libcrypto:
+            self.log.error("Unable to find OpenSSL libraries in '%s'", openssl_lib_dir)
+            sys.exit(1)
+
+        for filename in (libssl, libcrypto):
+            src = os.path.join(openssl_lib_dir, filename)
             self.log.info("Using %s: located in %s", filename, src)
             dst = self._connc_lib
             self.log.info("copying {0} -> {1}".format(src, dst))
@@ -368,23 +370,16 @@ class DistMSI(BaseCommand):
             pyd_ext = ".pyd"
 
         if self._connc_lib:
-            if ARCH_64BIT:
-                libcrypto_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libcrypto-1_1-x64.dll"
-                )
-                libssl_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libssl-1_1-x64.dll"
-                )
-            else:
-                libcrypto_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libcrypto-1_1.dll"
-                )
-                libssl_dll_path = os.path.join(
-                    os.path.abspath(self._connc_lib), "libssl-1_1.dll"
-                )
+            libssl, libcrypto = get_openssl_libs(self._connc_lib, ext="dll")
+            libssl_dll_path = os.path.join(os.path.abspath(self._connc_lib), libssl)
+            libcrypto_dll_path = os.path.join(
+                os.path.abspath(self._connc_lib), libcrypto
+            )
         else:
-            libcrypto_dll_path = ""
             libssl_dll_path = ""
+            libssl = ""
+            libcrypto_dll_path = ""
+            libcrypto = ""
 
         # WiX preprocessor variables
         params = {
@@ -416,9 +411,12 @@ class DistMSI(BaseCommand):
             else "",
             "LIBcryptoDLL": libcrypto_dll_path,
             "LIBSSLDLL": libssl_dll_path,
+            "LIBcrypto": libcrypto,
+            "LIBSSL": libssl,
             "Win64": win64,
             "BitmapDir": os.path.join(os.getcwd(), "cpydist", "data", "msi"),
         }
+        self.log.debug("Using WiX preprocessor variables: %s", repr(params))
         for py_ver in self._supported_versions:
             ver = py_ver.split(".")
             params["BDist{}{}".format(*ver)] = ""

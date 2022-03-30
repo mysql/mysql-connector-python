@@ -46,6 +46,7 @@ from distutils.file_util import copy_file
 from distutils.spawn import find_executable
 from distutils.sysconfig import get_python_version
 from distutils.version import LooseVersion
+from glob import glob
 from subprocess import PIPE, Popen
 from xml.dom.minidom import parse, parseString
 
@@ -636,3 +637,24 @@ def add_arch_dep_elems(xml_path, result_path, for32=False, add_vs_redist=True):
         fp.write(dom_msi.toprettyxml())
         fp.flush()
         fp.close()
+
+
+def get_openssl_libs(openssl_lib_dir, ext=None):
+    """Get libssl and libcrypto filenames from a OpenSSL library path.
+
+    Arg:
+        openssl_lib_dir (str): OpenSSL library path.
+
+    Returns:
+        tuple: Tuple with libssl and libcrypto filenames.
+    """
+    ext = f".{ext}" if ext else ""
+    pathname = os.path.join(openssl_lib_dir, f"libcrypto*{ext}")
+    libcrypto = sorted(glob(pathname), key=lambda item: item.count("."), reverse=True)
+
+    pathname = os.path.join(openssl_lib_dir, f"libssl*{ext}")
+    libssl = sorted(glob(pathname), key=lambda item: item.count("."), reverse=True)
+
+    if not libssl or not libcrypto:
+        return (None, None)
+    return (os.path.basename(libssl[0]), os.path.basename(libcrypto[0]))

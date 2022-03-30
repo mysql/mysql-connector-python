@@ -29,6 +29,8 @@
 %global requires_py_protobuf_version 3.0.0
 %global wants_py_dnspython_version 1.16.0
 
+%undefine _package_note_file
+
 %if 0%{?suse_version} == 1315
 %global dist            .sles12
 %{!?__python3: %global __python3 /usr/bin/python3}
