@@ -365,9 +365,9 @@ class SocketStream(object):
         tls_version = self._socket.version()
         if tls_version in ("TLSv1", "TLSv1.1"):
             warn_msg = (
-                f"This connection is using {tls_version} which is now "
+                "This connection is using {} which is now "
                 "deprecated and will be removed in a future release of "
-                "MySQL Connector/Python"
+                "MySQL Connector/Python".format(tls_version)
             )
             warnings.warn(warn_msg, DeprecationWarning)
 
