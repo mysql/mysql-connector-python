@@ -1425,7 +1425,6 @@ class MySQLCursorDict(MySQLCursor):
         Returns:
             list: A list of tuples with all rows of a query result set.
         """
-        """Returns all rows of a query result set"""
         self._check_executed()
         if not self._have_unread_result():
             return []

@@ -473,7 +473,7 @@ class MySQLConnectionPool:
         self._pool_size = pool_size
 
     def _set_pool_name(self, pool_name):
-        """Set the name of the pool.
+        r"""Set the name of the pool.
 
         This method checks the validity and sets the name of the pool.
 
