@@ -495,9 +495,7 @@ class ExprParser:
             ):
                 token = Token(TokenType.IDENT, val, len(val))
             else:
-                token = Token(
-                    _RESERVED_WORDS[val.lower()], val.lower(), len(val)
-                )
+                token = Token(_RESERVED_WORDS[val.lower()], val.lower(), len(val))
         except KeyError:
             token = Token(TokenType.IDENT, val, len(val))
         return token
@@ -658,10 +656,7 @@ class ExprParser:
         return self.pos_token_type_is(self.pos, token_type)
 
     def cur_token_type_in(self, *types):
-        return (
-            self.pos < len(self.tokens)
-            and self.tokens[self.pos].token_type in types
-        )
+        return self.pos < len(self.tokens) and self.tokens[self.pos].token_type in types
 
     def next_token_type_is(self, token_type):
         return self.pos_token_type_is(self.pos + 1, token_type)
@@ -673,10 +668,7 @@ class ExprParser:
         )
 
     def pos_token_type_is(self, pos, token_type):
-        return (
-            pos < len(self.tokens)
-            and self.tokens[pos].token_type == token_type
-        )
+        return pos < len(self.tokens) and self.tokens[pos].token_type == token_type
 
     def consume_token(self, token_type):
         self.assert_cur_token(token_type)
@@ -770,9 +762,7 @@ class ExprParser:
         if self.cur_token_type_is(TokenType.LNUM):
             value = int(self.consume_token(TokenType.LNUM))
             if value < 0:
-                raise IndexError(
-                    f"Array index cannot be negative at {self.pos}"
-                )
+                raise IndexError(f"Array index cannot be negative at {self.pos}")
             self.consume_token(TokenType.RSQBRACKET)
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
@@ -830,9 +820,7 @@ class ExprParser:
             else:
                 break
         items = len(doc_path)
-        if items > 0 and get_item_or_attr(
-            doc_path[items - 1], "type"
-        ) == mysqlxpb_enum(
+        if items > 0 and get_item_or_attr(doc_path[items - 1], "type") == mysqlxpb_enum(
             "Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK"
         ):
             raise ValueError(f"JSON path may not end in '**' at {self.pos}")
@@ -959,16 +947,12 @@ class ExprParser:
         elif token.token_type == TokenType.EROTEME:
             place_holder_name = str(self.positional_placeholder_count)
         else:
-            raise ValueError(
-                f"Invalid placeholder name at token pos {self.pos}"
-            )
+            raise ValueError(f"Invalid placeholder name at token pos {self.pos}")
 
         msg_expr = Message("Mysqlx.Expr.Expr")
         msg_expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.PLACEHOLDER")
         if place_holder_name in self.placeholder_name_to_position:
-            msg_expr["position"] = self.placeholder_name_to_position[
-                place_holder_name
-            ]
+            msg_expr["position"] = self.placeholder_name_to_position[place_holder_name]
         else:
             msg_expr["position"] = self.positional_placeholder_count
             self.placeholder_name_to_position[
@@ -985,9 +969,7 @@ class ExprParser:
         self.consume_token(TokenType.AS)
 
         type_scalar = build_bytes_scalar(str.encode(self.cast_data_type()))
-        operator["param"].extend(
-            [build_literal_expr(type_scalar).get_message()]
-        )
+        operator["param"].extend([build_literal_expr(type_scalar).get_message()])
         self.consume_token(TokenType.RPAREN)
         msg = Message("Mysqlx.Expr.Expr", operator=operator.get_message())
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
@@ -1088,9 +1070,7 @@ class ExprParser:
             return build_literal_expr(build_null_scalar())
         if token.token_type == TokenType.LNUM:
             if "." in token.value:
-                return build_literal_expr(
-                    build_double_scalar(float(token.value))
-                )
+                return build_literal_expr(build_double_scalar(float(token.value)))
             return build_literal_expr(build_int_scalar(int(token.value)))
         if token.token_type in [TokenType.TRUE, TokenType.FALSE]:
             return build_literal_expr(
@@ -1124,10 +1104,7 @@ class ExprParser:
         """Given a `set' of types and an Expr-returning inner parser function,
         parse a left associate binary operator expression"""
         lhs = inner_parser()
-        while (
-            self.pos < len(self.tokens)
-            and self.tokens[self.pos].token_type in types
-        ):
+        while self.pos < len(self.tokens) and self.tokens[self.pos].token_type in types:
             msg = Message("Mysqlx.Expr.Expr")
             msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
             operator = Message("Mysqlx.Expr.Operator")
@@ -1150,18 +1127,14 @@ class ExprParser:
             operator = Message("Mysqlx.Expr.Operator")
             operator["param"].extend([lhs.get_message()])
             operator["name"] = (
-                "date_add"
-                if token.token_type is TokenType.PLUS
-                else "date_sub"
+                "date_add" if token.token_type is TokenType.PLUS else "date_sub"
             )
 
             self.consume_token(TokenType.INTERVAL)
             operator["param"].extend([self.bit_expr().get_message()])
 
             if not self.cur_token_type_in(*_INTERVAL_UNITS):
-                raise ValueError(
-                    f"Expected interval type at position {self.pos}"
-                )
+                raise ValueError(f"Expected interval type at position {self.pos}")
 
             token = str.encode(self.consume_any_token().upper())
             operator["param"].extend(
@@ -1254,18 +1227,14 @@ class ExprParser:
                 params.append(self.comp_expr().get_message())
             else:
                 if is_not:
-                    raise ValueError(
-                        f"Unknown token after NOT as pos {self.pos}"
-                    )
+                    raise ValueError(f"Unknown token after NOT as pos {self.pos}")
                 op_name = None  # not an operator we're interested in
             if op_name:
                 operator = Message("Mysqlx.Expr.Operator")
                 operator["name"] = _NEGATION[op_name] if is_not else op_name
                 operator["param"] = params
                 msg_expr = Message("Mysqlx.Expr.Expr")
-                msg_expr["type"] = mysqlxpb_enum(
-                    "Mysqlx.Expr.Expr.Type.OPERATOR"
-                )
+                msg_expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
                 msg_expr["operator"] = operator.get_message()
                 lhs = msg_expr
         return lhs
@@ -1276,9 +1245,7 @@ class ExprParser:
         )
 
     def xor_expr(self):
-        return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.XOR]), self.and_expr
-        )
+        return self.parse_left_assoc_binary_op_expr(set([TokenType.XOR]), self.and_expr)
 
     def or_expr(self):
         return self.parse_left_assoc_binary_op_expr(
@@ -1307,9 +1274,7 @@ class ExprParser:
         return expression
 
     def parse_table_insert_field(self):
-        return Message(
-            "Mysqlx.Crud.Column", name=self.consume_token(TokenType.IDENT)
-        )
+        return Message("Mysqlx.Crud.Column", name=self.consume_token(TokenType.IDENT))
 
     def parse_table_update_field(self):
         return self.column_identifier().identifier
@@ -1356,14 +1321,10 @@ class ExprParser:
             first = False
             order = Message("Mysqlx.Crud.Order", expr=self._expr())
             if self.cur_token_type_is(TokenType.ORDERBY_ASC):
-                order["direction"] = mysqlxpb_enum(
-                    "Mysqlx.Crud.Order.Direction.ASC"
-                )
+                order["direction"] = mysqlxpb_enum("Mysqlx.Crud.Order.Direction.ASC")
                 self.consume_token(TokenType.ORDERBY_ASC)
             elif self.cur_token_type_is(TokenType.ORDERBY_DESC):
-                order["direction"] = mysqlxpb_enum(
-                    "Mysqlx.Crud.Order.Direction.DESC"
-                )
+                order["direction"] = mysqlxpb_enum("Mysqlx.Crud.Order.Direction.DESC")
                 self.consume_token(TokenType.ORDERBY_DESC)
             order_specs.append(order.get_message())
         return order_specs

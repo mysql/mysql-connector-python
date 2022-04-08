@@ -64,6 +64,4 @@ class Bug21879914(tests.MySQLConnectorTests):
 
         cnx = mysql.connector.connect(**config)
         cnx.cmd_query("SHOW STATUS LIKE 'Ssl_cipher'")
-        self.assertNotEqual(
-            cnx.get_row()[1], ""
-        )  # Ssl_cipher must have a value
+        self.assertNotEqual(cnx.get_row()[1], "")  # Ssl_cipher must have a value

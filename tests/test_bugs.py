@@ -81,10 +81,7 @@ from tests import cnx_config, foreach_cnx
 from . import check_tls_versions_support
 
 try:
-    from mysql.connector.connection_cext import (
-        CMySQLConnection,
-        MySQLInterfaceError,
-    )
+    from mysql.connector.connection_cext import CMySQLConnection, MySQLInterfaceError
 except ImportError:
     # Test without C Extension
     CMySQLConnection = None
@@ -189,9 +186,7 @@ class Bug380528(tests.MySQLConnectorTests):
             user = "'myconnpy'@'%s'" % (config["host"])
 
         try:
-            cur.execute(
-                "GRANT SELECT ON %s.* TO %s" % (self.config["database"], user)
-            )
+            cur.execute("GRANT SELECT ON %s.* TO %s" % (self.config["database"], user))
             cur.execute("SET PASSWORD FOR %s = OLD_PASSWORD('fubar')" % (user))
         except:
             self.fail("Failed executing grant.")
@@ -202,16 +197,13 @@ class Bug380528(tests.MySQLConnectorTests):
         test_config["user"] = "myconnpy"
         test_config["password"] = "fubar"
 
-        self.assertRaises(
-            errors.NotSupportedError, self.cnx.__class__, **test_config
-        )
+        self.assertRaises(errors.NotSupportedError, self.cnx.__class__, **test_config)
 
         self.cnx = self.cnx.__class__(**self.config)
         cur = self.cnx.cursor()
         try:
             cur.execute(
-                "REVOKE SELECT ON %s.* FROM %s"
-                % (self.config["database"], user)
+                "REVOKE SELECT ON %s.* FROM %s" % (self.config["database"], user)
             )
             cur.execute("DROP USER %s" % (user))
         except mysql.connector.Error as exc:
@@ -394,9 +386,7 @@ class Bug507466(tests.MySQLConnectorTests):
 
         insert = """insert into myconnpy_bits (c1,c2,c3,c4,c5,c6,c7,c8)
             values (%s,%s,%s,%s,%s,%s,%s,%s)"""
-        select = (
-            "SELECT c1,c2,c3,c4,c5,c6,c7,c8 FROM myconnpy_bits ORDER BY id"
-        )
+        select = "SELECT c1,c2,c3,c4,c5,c6,c7,c8 FROM myconnpy_bits ORDER BY id"
 
         data = []
         data.append((0, 0, 0, 0, 0, 0, 0, 0))
@@ -486,9 +476,7 @@ class Bug571201(tests.MySQLConnectorTests):
         cur = self.cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
         cur.execute(
-            (
-                "CREATE TABLE {0} ( " "id INT AUTO_INCREMENT KEY, " "c1 INT)"
-            ).format(self.tbl)
+            ("CREATE TABLE {0} (id INT AUTO_INCREMENT KEY, c1 INT)").format(self.tbl)
         )
 
         stmts = [
@@ -567,8 +555,7 @@ class Bug675425(tests.MySQLConnectorTests):
 
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
         cur.execute(
-            "CREATE TABLE {0} (c1 VARCHAR(30),"
-            " c2 VARCHAR(30))".format(self.tbl)
+            "CREATE TABLE {0} (c1 VARCHAR(30), c2 VARCHAR(30))".format(self.tbl)
         )
 
         data = [
@@ -638,9 +625,7 @@ class Bug809033(tests.MySQLConnectorTests):
         except:
             pass
 
-    @unittest.skipIf(
-        platform.machine() == "arm64", "Test not available for ARM64"
-    )
+    @unittest.skipIf(platform.machine() == "arm64", "Test not available for ARM64")
     @foreach_cnx()
     def test_lost_connection(self):
         self._setup()
@@ -656,10 +641,8 @@ class Bug809033(tests.MySQLConnectorTests):
             """Execute a SELECT statement which takes a while to complete"""
             cur = cnx.cursor()
             # Ugly query ahead!
-            stmt = (
-                "SELECT x1.*, x2.* from {table} as x1, {table} as x2".format(
-                    table=self.table_name
-                )
+            stmt = "SELECT x1.*, x2.* from {table} as x1, {table} as x2".format(
+                table=self.table_name
             )
             cur.execute(stmt)
             # Save the error so we can check in the calling thread
@@ -706,9 +689,7 @@ class Bug865859(tests.MySQLConnectorTests):
             cur = self.cnx.cursor()
             cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_name))
         except errors.InterfaceError as err:
-            self.fail(
-                "Connection was not closed, we got timeout: {0}".format(err)
-            )
+            self.fail("Connection was not closed, we got timeout: {0}".format(err))
         else:
             cur.close()
             self.cnx.close()
@@ -752,9 +733,7 @@ class BugOra13395083(tests.MySQLConnectorTests):
         self.cnx.time_zone = "+02:00"
         cur.execute("SELECT c1 FROM {0}".format(self.table_name))
         row = cur.fetchone()
-        self.assertEqual(
-            now_utc.astimezone(testzone), row[0].replace(tzinfo=testzone)
-        )
+        self.assertEqual(now_utc.astimezone(testzone), row[0].replace(tzinfo=testzone))
 
         self.cnx.close()
 
@@ -771,10 +750,7 @@ class BugOra13392739(tests.MySQLConnectorTests):
         try:
             self.cnx.ping()
         except Exception as e:
-            self.fail(
-                "Error raised although connection should be "
-                "available (%s)." % e
-            )
+            self.fail("Error raised although connection should be available (%s)." % e)
 
         self.cnx.close()
         self.assertRaises(errors.InterfaceError, self.cnx.ping)
@@ -798,10 +774,7 @@ class BugOra13392739(tests.MySQLConnectorTests):
         try:
             self.cnx.reconnect()
         except:
-            self.fail(
-                "Errors raised although connection should have been "
-                "reconnected."
-            )
+            self.fail("Errors raised although connection should have been reconnected.")
 
         self.cnx.disconnect()
         # Temper with the host to which we reconnect to simulate the
@@ -1148,7 +1121,7 @@ class BugOra15916486(tests.MySQLConnectorTests):
             "CREATE PROCEDURE sp1(IN pIn INT, OUT pOut INT)"
             " BEGIN SELECT 1; SET pOut := pIn; SELECT 2; END"
         )
-        sp2 = "CREATE PROCEDURE sp2 ()" " BEGIN SELECT 1; SELECT 2; END"
+        sp2 = "CREATE PROCEDURE sp2 () BEGIN SELECT 1; SELECT 2; END"
 
         cur.execute(sp1)
         cur.execute(sp2)
@@ -1199,9 +1172,7 @@ class BugOra15916486(tests.MySQLConnectorTests):
     os.name == "nt",
     "Cannot test error handling when doing handshake on Windows",
 )
-@unittest.skipIf(
-    tests.MYSQL_VERSION > (8, 0, 4), "Revoked users can no more grant"
-)
+@unittest.skipIf(tests.MYSQL_VERSION > (8, 0, 4), "Revoked users can no more grant")
 class BugOra15836979(tests.MySQLConnectorTests):
     """BUG#15836979: UNCLEAR ERROR MESSAGE CONNECTING USING UNALLOWED IP ADDRESS"""
 
@@ -1220,12 +1191,9 @@ class BugOra15836979(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         cnx.cmd_query(
-            "GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' "
-            "WITH GRANT OPTION"
+            "GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION"
         )
-        cnx.cmd_query(
-            "GRANT ALL PRIVILEGES ON *.* TO 'root'@'::1' " "WITH GRANT OPTION"
-        )
+        cnx.cmd_query("GRANT ALL PRIVILEGES ON *.* TO 'root'@'::1' WITH GRANT OPTION")
         cnx.close()
 
     @foreach_cnx()
@@ -1321,9 +1289,7 @@ class BugOra16217667(tests.MySQLConnectorTests):
 
     def tearDown(self):
         self.admin_cnx.cmd_query(
-            "DROP USER 'ssluser'@'{0}'".format(
-                tests.get_mysql_config()["host"]
-            )
+            "DROP USER 'ssluser'@'{0}'".format(tests.get_mysql_config()["host"])
         )
 
     @foreach_cnx()
@@ -1411,15 +1377,9 @@ class BugOra16316049(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_ssl(self):
-        ssl_ca = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_CA_cert.pem")
-        )
-        ssl_cert = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_client_cert.pem")
-        )
-        ssl_key = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_client_key.pem")
-        )
+        ssl_ca = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"))
+        ssl_cert = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_client_cert.pem"))
+        ssl_key = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_client_key.pem"))
 
         config = self.config.copy()
         config.update(
@@ -1488,9 +1448,7 @@ class BugOra16662920(tests.MySQLConnectorTests):
         )
 
         data = [("a",), ("c",), ("e",), ("d",), ("g",), ("f",)]
-        cur.executemany(
-            "INSERT INTO {0} (c1) VALUES (%s)".format(self.tbl), data
-        )
+        cur.executemany("INSERT INTO {0} (c1) VALUES (%s)".format(self.tbl), data)
         cur.close()
         cnx.commit()
 
@@ -1540,9 +1498,7 @@ class BugOra17041412(tests.MySQLConnectorTests):
         cur = cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS %s" % self.table_name)
         cur.execute("CREATE TABLE %s (c1 INT)" % self.table_name)
-        cur.executemany(
-            "INSERT INTO %s (c1) VALUES (%%s)" % self.table_name, self.data
-        )
+        cur.executemany("INSERT INTO %s (c1) VALUES (%%s)" % self.table_name, self.data)
         cnx.commit()
 
     def tearDown(self):
@@ -1726,16 +1682,10 @@ class BugOra17041240(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
-        cur.execute(
-            "DROP TABLE IF EXISTS {table}".format(table=self.table_name)
-        )
-        cur.execute(
-            "CREATE TABLE {table} (c1 INT)".format(table=self.table_name)
-        )
+        cur.execute("DROP TABLE IF EXISTS {table}".format(table=self.table_name))
+        cur.execute("CREATE TABLE {table} (c1 INT)".format(table=self.table_name))
         cur.executemany(
-            "INSERT INTO {table} (c1) VALUES (%s)".format(
-                table=self.table_name
-            ),
+            "INSERT INTO {table} (c1) VALUES (%s)".format(table=self.table_name),
             self.data,
         )
         cnx.commit()
@@ -1745,18 +1695,14 @@ class BugOra17041240(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
-        cur.execute(
-            "DROP TABLE IF EXISTS {table}".format(table=self.table_name)
-        )
+        cur.execute("DROP TABLE IF EXISTS {table}".format(table=self.table_name))
         cnx.close()
 
     @foreach_cnx()
     def test_cursor_close(self):
         self._setup()
         cur = self.cnx.cursor()
-        cur.execute(
-            "SELECT * FROM {table} ORDER BY c1".format(table=self.table_name)
-        )
+        cur.execute("SELECT * FROM {table} ORDER BY c1".format(table=self.table_name))
         self.assertEqual(self.data[0], cur.fetchone())
         self.assertEqual(self.data[1], cur.fetchone())
         self.assertRaises(mysql.connector.InternalError, cur.close)
@@ -1766,9 +1712,7 @@ class BugOra17041240(tests.MySQLConnectorTests):
     def test_cursor_new(self):
         self._setup()
         cur = self.cnx.cursor()
-        cur.execute(
-            "SELECT * FROM {table} ORDER BY c1".format(table=self.table_name)
-        )
+        cur.execute("SELECT * FROM {table} ORDER BY c1".format(table=self.table_name))
         self.assertEqual(self.data[0], cur.fetchone())
         self.assertEqual(self.data[1], cur.fetchone())
         self.assertRaises(mysql.connector.InternalError, self.cnx.cursor)
@@ -1783,9 +1727,7 @@ class BugOra17065366(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
         self.table_name = "BugOra17065366"
-        cur.execute(
-            "DROP TABLE IF EXISTS {table}".format(table=self.table_name)
-        )
+        cur.execute("DROP TABLE IF EXISTS {table}".format(table=self.table_name))
         cur.execute(
             "CREATE TABLE {table} ( "
             "id INT UNSIGNED NOT NULL AUTO_INCREMENT KEY, "
@@ -1796,9 +1738,7 @@ class BugOra17065366(tests.MySQLConnectorTests):
     def tearDown(self):
         cnx = connection.MySQLConnection(**tests.get_mysql_config())
         cur = cnx.cursor()
-        cur.execute(
-            "DROP TABLE IF EXISTS {table}".format(table=self.table_name)
-        )
+        cur.execute("DROP TABLE IF EXISTS {table}".format(table=self.table_name))
         cnx.close()
 
     @foreach_cnx()
@@ -1890,9 +1830,7 @@ class BugOra16369511(tests.MySQLConnectorTests):
     def _setup(self):
         cnx = connection.MySQLConnection(**tests.get_mysql_config())
         cnx.cmd_query("DROP TABLE IF EXISTS local_data")
-        cnx.cmd_query(
-            "CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))"
-        )
+        cnx.cmd_query("CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
         cnx.close()
 
     def tearDown(self):
@@ -2044,9 +1982,7 @@ class BugOra17422299(tests.MySQLConnectorTests):
             self.ensure_up()
             cnx = cnx_class(**self.config)
             try:
-                cnx.cmd_shutdown(
-                    constants.ShutdownType.SHUTDOWN_WAIT_ALL_BUFFERS
-                )
+                cnx.cmd_shutdown(constants.ShutdownType.SHUTDOWN_WAIT_ALL_BUFFERS)
             except mysql.connector.DatabaseError as err:
                 self.fail("COM_SHUTDOWN failed: {0}".format(err))
 
@@ -2145,9 +2081,7 @@ class Bug17578937(tests.MySQLConnectorTests):
         if tests.MYSQL_VERSION < (5, 7):
             config["client_flags"] = [-constants.ClientFlag.CONNECT_ARGS]
         config["connection_timeout"] = 2
-        cnxpool = pooling.MySQLConnectionPool(
-            pool_name="test", pool_size=1, **config
-        )
+        cnxpool = pooling.MySQLConnectionPool(pool_name="test", pool_size=1, **config)
 
         pcnx = cnxpool.get_connection()
         self.assertTrue(isinstance(pcnx, pooling.PooledMySQLConnection))
@@ -2297,15 +2231,11 @@ class BugOra17573172(tests.MySQLConnectorTests):
 
     def test_read_only(self):
         if self.cnx.get_server_version() < (5, 6, 5):
-            self.assertRaises(
-                ValueError, self.cnx.start_transaction, readonly=True
-            )
+            self.assertRaises(ValueError, self.cnx.start_transaction, readonly=True)
         else:
             self.cnx.start_transaction(readonly=True)
             self.assertTrue(self.cnx.in_transaction)
-            self.assertRaises(
-                errors.ProgrammingError, self.cnx.start_transaction
-            )
+            self.assertRaises(errors.ProgrammingError, self.cnx.start_transaction)
 
             query = "INSERT INTO BugOra17573172 VALUES(4, 40)"
             self.assertRaises(errors.ProgrammingError, self.cur.execute, query)
@@ -2425,8 +2355,7 @@ class BugOra17965619(tests.MySQLConnectorTests):
         self.cnx.cmd_query(procedure)
 
         procedure = (
-            "CREATE PROCEDURE `proce_with_binary` "
-            "(data VARBINARY(512)) BEGIN END;"
+            "CREATE PROCEDURE `proce_with_binary` (data VARBINARY(512)) BEGIN END;"
         )
         self.cnx.cmd_query(procedure)
 
@@ -2494,12 +2423,8 @@ class BugOra17054848(tests.MySQLConnectorTests):
             )
             return
 
-        ssl_ca = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_CA_cert.pem")
-        )
-        ssl_key = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_client_key.pem")
-        )
+        ssl_ca = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"))
+        ssl_key = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_client_key.pem"))
 
         config = tests.get_mysql_config()
         config["user"] = "ssluser"
@@ -2561,9 +2486,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
     def _create_user(self, cnx, user, password, host, database, plugin):
 
         self._drop_user(cnx, user, host)
-        create_user = (
-            "CREATE USER '{user}'@'{host}' " "IDENTIFIED WITH {plugin}"
-        )
+        create_user = "CREATE USER '{user}'@'{host}' IDENTIFIED WITH {plugin}"
         cnx.cmd_query(create_user.format(user=user, host=host, plugin=plugin))
 
         if tests.MYSQL_VERSION[0:3] < (8, 0, 5):
@@ -2574,13 +2497,12 @@ class BugOra16217765(tests.MySQLConnectorTests):
 
         if tests.MYSQL_VERSION < (5, 7, 5):
             passwd = (
-                "SET PASSWORD FOR '{user}'@'{host}' = "
-                "PASSWORD('{password}')"
+                "SET PASSWORD FOR '{user}'@'{host}' = PASSWORD('{password}')"
             ).format(user=user, host=host, password=password)
         else:
-            passwd = (
-                "ALTER USER '{user}'@'{host}' IDENTIFIED BY " "'{password}'"
-            ).format(user=user, host=host, password=password)
+            passwd = ("ALTER USER '{user}'@'{host}' IDENTIFIED BY '{password}'").format(
+                user=user, host=host, password=password
+            )
         cnx.cmd_query(passwd)
 
         grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
@@ -2678,8 +2600,7 @@ class BugOra16217765(tests.MySQLConnectorTests):
                 cnx.cmd_change_user(config["user"], config["password"])
             except:
                 self.fail(
-                    "Changing user using sha256_password auth failed "
-                    "with CExtension"
+                    "Changing user using sha256_password auth failed with CExtension"
                 )
 
     @unittest.skipIf(
@@ -2698,13 +2619,9 @@ class BugOra16217765(tests.MySQLConnectorTests):
         config["user"] = user["username"]
         config["password"] = user["password"]
         config["auth_plugin"] = user["auth_plugin"]
-        self.assertRaises(
-            errors.InterfaceError, connection.MySQLConnection, **config
-        )
+        self.assertRaises(errors.InterfaceError, connection.MySQLConnection, **config)
         if CMySQLConnection:
-            self.assertRaises(
-                errors.InterfaceError, CMySQLConnection, **config
-            )
+            self.assertRaises(errors.InterfaceError, CMySQLConnection, **config)
 
     @unittest.skipIf(
         tests.MYSQL_VERSION < (5, 5, 7),
@@ -2845,8 +2762,7 @@ class BugOra18389196(tests.MySQLConnectorTests):
             cur.execute(stmt, {"id": 1, "name": "ABC"})
         except errors.ProgrammingError as err:
             self.fail(
-                "Inserting parameter multiple times in a statement "
-                "failed: %s" % err
+                "Inserting parameter multiple times in a statement failed: %s" % err
             )
 
         cur.close()
@@ -2854,9 +2770,7 @@ class BugOra18389196(tests.MySQLConnectorTests):
 
 @unittest.skipIf(
     tests.MYSQL_VERSION >= (5, 7, 5),
-    "MySQL {0} does not support old password auth".format(
-        tests.MYSQL_VERSION_TXT
-    ),
+    "MySQL {0} does not support old password auth".format(tests.MYSQL_VERSION_TXT),
 )
 class BugOra18415927(tests.MySQLConnectorTests):
     """BUG#18415927: AUTH_RESPONSE VARIABLE INCREMENTED WITHOUT BEING DEFINED"""
@@ -2881,13 +2795,9 @@ class BugOra18415927(tests.MySQLConnectorTests):
             pass
 
         create_user = "CREATE USER '{user}'@'{host}' "
-        cnx.cmd_query(
-            create_user.format(user=self.user["username"], host=host)
-        )
+        cnx.cmd_query(create_user.format(user=self.user["username"], host=host))
 
-        passwd = (
-            "SET PASSWORD FOR '{user}'@'{host}' = " "PASSWORD('{password}')"
-        ).format(
+        passwd = ("SET PASSWORD FOR '{user}'@'{host}' = PASSWORD('{password}')").format(
             user=self.user["username"],
             host=host,
             password=self.user["password"],
@@ -2897,9 +2807,7 @@ class BugOra18415927(tests.MySQLConnectorTests):
 
         grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
         cnx.cmd_query(
-            grant.format(
-                database=database, user=self.user["username"], host=host
-            )
+            grant.format(database=database, user=self.user["username"], host=host)
         )
 
     def tearDown(self):
@@ -2907,9 +2815,7 @@ class BugOra18415927(tests.MySQLConnectorTests):
         host = config["host"]
         cnx = connection.MySQLConnection(**config)
         cnx.cmd_query(
-            "DROP USER '{user}'@'{host}'".format(
-                host=host, user=self.user["username"]
-            )
+            "DROP USER '{user}'@'{host}'".format(host=host, user=self.user["username"])
         )
 
     def test_auth_response(self):
@@ -3015,9 +2921,7 @@ class BugOra18694096(tests.MySQLConnectorTests):
 
         # Following uses _timedelta_to_mysql to insert data
         data = [(case[0],) for case in self.cases]
-        cur.executemany(
-            "INSERT INTO {0} (c1) VALUES (%s)".format(self.tbl), data
-        )
+        cur.executemany("INSERT INTO {0} (c1) VALUES (%s)".format(self.tbl), data)
         self.cnx.commit()
 
         # We use _TIME_to_python to convert back to Python
@@ -3048,9 +2952,7 @@ class BugOra18220593(tests.MySQLConnectorTests):
 
     def test_unicode_operation(self):
         data = [("database",), ("データベース",), ("데이터베이스",)]
-        self.cur.executemany(
-            "INSERT INTO {0} VALUES (%s)".format(self.table), data
-        )
+        self.cur.executemany("INSERT INTO {0} VALUES (%s)".format(self.table), data)
         self.cnx.commit()
         self.cur.execute("SELECT c1 FROM {0}".format(self.table))
 
@@ -3088,9 +2990,7 @@ class BugOra14843456(tests.MySQLConnectorTests):
         for user, password in self._credentials:
             try:
                 self.cursor.execute(
-                    "DROP USER '{user}'@'{host}'".format(
-                        user=user, host=self.host
-                    )
+                    "DROP USER '{user}'@'{host}'".format(user=user, host=self.host)
                 )
             except errors.DatabaseError:
                 pass
@@ -3145,9 +3045,7 @@ class Bug499410(tests.MySQLConnectorTests):
         try:
             cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
             cur.execute(
-                "CREATE TABLE {0} (c1 VARCHAR(60)) charset={1}".format(
-                    tbl, charset
-                )
+                "CREATE TABLE {0} (c1 VARCHAR(60)) charset={1}".format(tbl, charset)
             )
         except:
             self.fail("Failed creating test table.")
@@ -3322,11 +3220,7 @@ class BugOra19169990(tests.MySQLConnectorTests):
                 cur.execute("SELECT %s", ("mysql" * 10000,))
             except TypeError:
                 traceback.print_exc()
-                self.fail(
-                    "Failed setting up compressed cnx using {0}".format(
-                        charset
-                    )
-                )
+                self.fail("Failed setting up compressed cnx using {0}".format(charset))
             except errors.Error:
                 self.fail("Failed sending/retrieving compressed data")
 
@@ -3342,9 +3236,7 @@ class BugOra19184025(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
 
         cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
-        create = "CREATE TABLE {0} (c1 INT, c2 INT NOT NULL DEFAULT 2)".format(
-            self.tbl
-        )
+        create = "CREATE TABLE {0} (c1 INT, c2 INT NOT NULL DEFAULT 2)".format(self.tbl)
         cnx.cmd_query(create)
 
     def tearDown(self):
@@ -3389,9 +3281,7 @@ class BugOra19169143(tests.MySQLConnectorTests):
             os.path.join(option_file_dir, "include_files", "2.cnf"),
             os.path.join(option_file_dir, "include_files", "1.cnf"),
         ]
-        self.assertRaises(
-            ValueError, mysql.connector.connect, option_files=files
-        )
+        self.assertRaises(ValueError, mysql.connector.connect, option_files=files)
 
 
 class BugOra19282158(tests.MySQLConnectorTests):
@@ -3504,10 +3394,7 @@ class BugOra21530100(tests.MySQLConnectorTests):
 
             cnf = "[group32]\n"
             cnf += "\n".join(
-                [
-                    "{0} = {1}".format(key, value)
-                    for key, value in config.items()
-                ]
+                ["{0} = {1}".format(key, value) for key, value in config.items()]
             )
 
             cnf += "\n[group31]\n"
@@ -3527,10 +3414,7 @@ class BugOra21530100(tests.MySQLConnectorTests):
                 option_groups=["group31", "group32", "group41"],
             )
         except Exception as exc:
-            self.fail(
-                "Connection failed with option_files argument: {0}"
-                "".format(exc)
-            )
+            self.fail("Connection failed with option_files argument: {0}".format(exc))
         finally:
             os.remove(temp_cnf_file)
             os.remove(temp_include_file)
@@ -3651,25 +3535,19 @@ class BugOra19522948(tests.MySQLConnectorTests):
         cur = self.cnx.cursor(prepared=True)
 
         data = "test_data" * 10
-        cur.execute(
-            "INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,)
-        )
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual((data,), self.cur.fetchone())
         self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
 
         data = "test_data" * 1000
-        cur.execute(
-            "INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,)
-        )
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual((data,), self.cur.fetchone())
         self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
 
         data = "test_data" * 10000
-        cur.execute(
-            "INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,)
-        )
+        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         self.assertEqual((data,), self.cur.fetchone())
 
@@ -3729,9 +3607,7 @@ class BugOra19500097(tests.MySQLConnectorTests):
 
 @unittest.skipIf(
     tests.MYSQL_VERSION < (5, 7, 3),
-    "MySQL {0} does not support COM_RESET_CONNECTION".format(
-        tests.MYSQL_VERSION_TXT
-    ),
+    "MySQL {0} does not support COM_RESET_CONNECTION".format(tests.MYSQL_VERSION_TXT),
 )
 class BugOra19549363(tests.MySQLConnectorTests):
     """BUG#19549363: Compression does not work with Change User"""
@@ -4200,9 +4076,7 @@ class BugOra20653441(tests.MySQLConnectorTests):
         except:
             pass
 
-    @unittest.skipIf(
-        platform.machine() == "arm64", "Test not available for ARM64"
-    )
+    @unittest.skipIf(platform.machine() == "arm64", "Test not available for ARM64")
     @foreach_cnx()
     def test_kill_query(self):
         def kill(connection_id):
@@ -4216,10 +4090,8 @@ class BugOra20653441(tests.MySQLConnectorTests):
             """Execute a SELECT statement which takes a while to complete"""
             cur = cnx.cursor()
             # Ugly query ahead!
-            stmt = (
-                "SELECT x1.*, x2.* from {table} as x1, {table} as x2".format(
-                    table=self.table_name
-                )
+            stmt = "SELECT x1.*, x2.* from {table} as x1, {table} as x2".format(
+                table=self.table_name
             )
             cur.execute(stmt)
             # Save the error so we can check in the calling thread
@@ -4418,9 +4290,7 @@ class BugOra21492428(tests.MySQLConnectorTests):
         for user, password in self._credentials:
             try:
                 self.cursor.execute(
-                    "DROP USER '{user}'@'{host}'".format(
-                        user=user, host=self.host
-                    )
+                    "DROP USER '{user}'@'{host}'".format(user=user, host=self.host)
                 )
             except errors.DatabaseError:
                 pass
@@ -4443,9 +4313,7 @@ class BugOra21492428(tests.MySQLConnectorTests):
             try:
                 cnx = connection.MySQLConnection(**config)
             except errors.ProgrammingError:
-                self.fail(
-                    "Failed using password with spaces for user %s" % user
-                )
+                self.fail("Failed using password with spaces for user %s" % user)
             else:
                 cnx.close()
 
@@ -4461,9 +4329,7 @@ class BugOra21476495(tests.MySQLConnectorTests):
 
     def test_bad_set_charset_number(self):
         old_val = self.cnx._charset_id
-        self.assertRaises(
-            mysql.connector.Error, self.cnx.set_charset_collation, 19999
-        )
+        self.assertRaises(mysql.connector.Error, self.cnx.set_charset_collation, 19999)
 
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
@@ -4500,8 +4366,7 @@ class BugOra21477493(tests.MySQLConnectorTests):
         data = [("A", 1), ("B", 2)]
         cursor = self.cnx.cursor()
         cursor.executemany(
-            "INSERT INTO fun1 SELECT CONCAT('VALUES', %s), "
-            "b + %s FROM fun1",
+            "INSERT INTO fun1 SELECT CONCAT('VALUES', %s), b + %s FROM fun1",
             data,
         )
         cursor.close()
@@ -4514,8 +4379,7 @@ class BugOra21477493(tests.MySQLConnectorTests):
         data = [("A", 1), ("B", 2)]
         cursor = self.cnx.cursor()
         cursor.executemany(
-            "INSERT INTO fun1 SELECT CONCAT('VALUES(ab, cd)',"
-            "%s), b + %s FROM fun1",
+            "INSERT INTO fun1 SELECT CONCAT('VALUES(ab, cd)',%s), b + %s FROM fun1",
             data,
         )
         cursor.close()
@@ -4553,9 +4417,7 @@ class BugOra21492815(tests.MySQLConnectorTests):
         self.proc2 = "Bug20834643_1"
         cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc1))
 
-        create = "CREATE PROCEDURE {0}() BEGIN SELECT 1234; " "END".format(
-            self.proc1
-        )
+        create = "CREATE PROCEDURE {0}() BEGIN SELECT 1234; END".format(self.proc1)
         cur.execute(create)
         cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc2))
 
@@ -4581,9 +4443,7 @@ class BugOra21492815(tests.MySQLConnectorTests):
     def test_set(self):
         cur = self.cnx.cursor()
         cur.callproc(self.proc1)
-        self.assertEqual(
-            (bytearray(b"1234"),), next(cur.stored_results()).fetchone()
-        )
+        self.assertEqual((bytearray(b"1234"),), next(cur.stored_results()).fetchone())
 
         cur.callproc(self.proc2)
         exp = [[(bytearray(b"9876"),)], [(bytearray(b"abcd"),)]]
@@ -4623,9 +4483,7 @@ class BugOra21656282(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         self.cnx = CMySQLConnection(**config)
         self.host = (
-            "127.0.0.1"
-            if config["unix_socket"] and os.name != "nt"
-            else config["host"]
+            "127.0.0.1" if config["unix_socket"] and os.name != "nt" else config["host"]
         )
         self.user = "unicode_user"
         self.password = "步"
@@ -4637,21 +4495,15 @@ class BugOra21656282(tests.MySQLConnectorTests):
         self._drop_user(self.host, self.user)
 
         # Create the user with unicode password
-        create_user = (
-            "CREATE USER '{user}'@'{host}' IDENTIFIED BY " "'{password}'"
-        )
+        create_user = "CREATE USER '{user}'@'{host}' IDENTIFIED BY '{password}'"
         self.cnx.cmd_query(
-            create_user.format(
-                user=self.user, host=self.host, password=self.password
-            )
+            create_user.format(user=self.user, host=self.host, password=self.password)
         )
 
         # Grant all to new user on database
         grant = "GRANT ALL ON {database}.* TO '{user}'@'{host}'"
         self.cnx.cmd_query(
-            grant.format(
-                database=config["database"], user=self.user, host=self.host
-            )
+            grant.format(database=config["database"], user=self.user, host=self.host)
         )
 
     def tearDown(self):
@@ -4721,9 +4573,7 @@ class BugOra21530841(tests.MySQLConnectorTests):
     tests.MYSQL_EXTERNAL_SERVER,
     "Test not available for external MySQL servers",
 )
-@unittest.skipIf(
-    sys.version_info < (2, 7, 9), "Python 2.7.9+ is required for SSL"
-)
+@unittest.skipIf(sys.version_info < (2, 7, 9), "Python 2.7.9+ is required for SSL")
 class BugOra25397650(tests.MySQLConnectorTests):
     """BUG#25397650: CERTIFICATE VALIDITY NOT VERIFIED"""
 
@@ -4731,20 +4581,14 @@ class BugOra25397650(tests.MySQLConnectorTests):
         self.config = tests.get_mysql_config().copy()
         self.config.pop("unix_socket")
         self.config["host"] = "localhost"
-        self.ca = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_CA_cert.pem")
-        )
-        self.ca_1 = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_CA_cert_1.pem")
-        )
+        self.ca = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"))
+        self.ca_1 = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_CA_cert_1.pem"))
 
     def _verify_cert(self, config):
         # Test with a bad CA
         config["ssl_ca"] = self.ca_1
         config["ssl_verify_cert"] = True
-        self.assertRaises(
-            errors.InterfaceError, mysql.connector.connect, **config
-        )
+        self.assertRaises(errors.InterfaceError, mysql.connector.connect, **config)
         config["ssl_verify_cert"] = False
         mysql.connector.connect(**config)
 
@@ -4871,26 +4715,25 @@ class Bug28133321(tests.MySQLConnectorTests):
             for col, val in row.items():
                 self.assertTrue(
                     isinstance(col, str),
-                    "The columns name {} is not a string type" "".format(col),
+                    "The columns name {} is not a string type".format(col),
                 )
                 self.assertFalse(
                     isinstance(col, (bytearray)),
-                    "The columns name {} is a bytearray type" "".format(col),
+                    "The columns name {} is a bytearray type".format(col),
                 )
                 self.assertFalse(
                     isinstance(val, (bytearray)),
-                    "The value {} of column {} is a bytearray type"
-                    "".format(val, col),
+                    "The value {} of column {} is a bytearray type".format(val, col),
                 )
 
         for col_name in col_names:
             self.assertTrue(
                 isinstance(col_name, str),
-                "The columns name {} is not a string type" "".format(col_name),
+                "The columns name {} is not a string type".format(col_name),
             )
             self.assertFalse(
                 isinstance(col_name, (bytearray)),
-                "The columns name {} is a bytearray type" "".format(col_name),
+                "The columns name {} is a bytearray type".format(col_name),
             )
 
 
@@ -5004,9 +4847,7 @@ class BugOra25589496(tests.MySQLConnectorTests):
             "VALUES (%(section)s, %(pickled)s)".format(self.tbl)
         )
 
-        new_row = cursor.execute(
-            add_row_q, {"section": "foo", "pickled": pickled}
-        )
+        new_row = cursor.execute(add_row_q, {"section": "foo", "pickled": pickled})
         self.cnx.commit()
         self.assertEqual(1, cursor.lastrowid)
         cursor.close()
@@ -5108,7 +4949,7 @@ class BugOra22564149(tests.MySQLConnectorTests):
         self.cnx = connection.MySQLConnection(**config)
         self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
         self.cnx.cmd_query(
-            "CREATE TABLE {0} (id INT, name VARCHAR(50))" "".format(self.tbl)
+            "CREATE TABLE {0} (id INT, name VARCHAR(50))".format(self.tbl)
         )
 
     def tearDown(self):
@@ -5116,14 +4957,9 @@ class BugOra22564149(tests.MySQLConnectorTests):
         self.cnx.close()
 
     def test_cmd_query_iter(self):
-        stmt = (
-            "SELECT 1; INSERT INTO {0} VALUES (1, 'João'),(2, 'André'); "
-            "SELECT 3"
-        )
+        stmt = "SELECT 1; INSERT INTO {0} VALUES (1, 'João'),(2, 'André'); SELECT 3"
         results = []
-        for result in self.cnx.cmd_query_iter(
-            stmt.format(self.tbl).encode("utf-8")
-        ):
+        for result in self.cnx.cmd_query_iter(stmt.format(self.tbl).encode("utf-8")):
             results.append(result)
             if "columns" in result:
                 results.append(self.cnx.get_rows())
@@ -5141,7 +4977,7 @@ class BugOra24659561(tests.MySQLConnectorTests):
         self.cur = self.cnx.cursor()
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
         self.cur.execute(
-            "CREATE TABLE {0} (id INT, name VARCHAR(100))" "".format(self.tbl)
+            "CREATE TABLE {0} (id INT, name VARCHAR(100))".format(self.tbl)
         )
 
     def tearDown(self):
@@ -5215,7 +5051,7 @@ class BugOra27277964(tests.MySQLConnectorTests):
         self.cur = self.cnx.cursor()
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
         self.cur.execute(
-            "CREATE TABLE {0} (id INT, name VARCHAR(100))" "".format(self.tbl)
+            "CREATE TABLE {0} (id INT, name VARCHAR(100))".format(self.tbl)
         )
 
     def tearDown(self):
@@ -5249,9 +5085,7 @@ class Bug26484601(tests.MySQLConnectorTests):
                 " the connection used: {}."
             )
             # Get the version as tuple
-            server_tls = tuple(
-                [int(d) for d in (res[0][1].split("v")[1].split("."))]
-            )
+            server_tls = tuple([int(d) for d in (res[0][1].split("v")[1].split("."))])
             self.assertGreaterEqual(
                 server_tls,
                 expected_ssl_version,
@@ -5568,7 +5402,7 @@ class BugOra28239074(tests.MySQLConnectorTests):
             (chr(127), 5),
         ]
         cur.executemany(
-            "INSERT INTO {0} (a, b) VALUES " "(%s, %s)".format(self.table),
+            "INSERT INTO {0} (a, b) VALUES (%s, %s)".format(self.table),
             data,
         )
 
@@ -5595,8 +5429,7 @@ class BugOra28239074(tests.MySQLConnectorTests):
             self.assertEqual(
                 exp[i],
                 row,
-                "row {} is not equal to expected row"
-                " {}".format(row, exp[i]),
+                "row {} is not equal to expected row {}".format(row, exp[i]),
             )
             row = cur.fetchone()
             i += 1
@@ -5614,8 +5447,7 @@ class BugOra28239074(tests.MySQLConnectorTests):
             self.assertEqual(
                 exp[i],
                 row,
-                "row {} is not equal to expected row"
-                " {}".format(row, exp[i]),
+                "row {} is not equal to expected row {}".format(row, exp[i]),
             )
             i += 1
 
@@ -5925,15 +5757,9 @@ class BugOra27434751(tests.MySQLConnectorTests):
     """BUG#27434751: MYSQL.CONNECTOR HAS NO TLS/SSL OPTION TO VERIFY SERVER NAME"""
 
     def setUp(self):
-        ssl_ca = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_CA_cert.pem")
-        )
-        ssl_cert = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_client_cert.pem")
-        )
-        ssl_key = os.path.abspath(
-            os.path.join(tests.SSL_DIR, "tests_client_key.pem")
-        )
+        ssl_ca = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"))
+        ssl_cert = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_client_cert.pem"))
+        ssl_key = os.path.abspath(os.path.join(tests.SSL_DIR, "tests_client_key.pem"))
         self.config = tests.get_mysql_config()
         self.config.pop("unix_socket")
         self.config["ssl_ca"] = ssl_ca
@@ -5954,9 +5780,7 @@ class BugOra27434751(tests.MySQLConnectorTests):
 
         # Should fail to connect with ssl_verify_identity=True
         config["ssl_verify_identity"] = True
-        self.assertRaises(
-            errors.InterfaceError, mysql.connector.connect, **config
-        )
+        self.assertRaises(errors.InterfaceError, mysql.connector.connect, **config)
 
         # Should connect with the correct host name and ssl_verify_identity=True
         config["host"] = "localhost"
@@ -6036,16 +5860,13 @@ class Bug27897881(tests.MySQLConnectorTests):
 
         stm = "SELECT * FROM {} WHERE col1 like '{}'"
 
-        for num, expected_value in zip(
-            range(len(test_values)), expected_values
-        ):
+        for num, expected_value in zip(range(len(test_values)), expected_values):
             cur.execute(stm.format(self.tbl, num))
             row = cur.fetchall()[0]
             self.assertEqual(
                 row[1],
                 expected_value,
-                "value {} is not "
-                "the expected {}".format(row[1], expected_value),
+                "value {} is not the expected {}".format(row[1], expected_value),
             )
 
         cur.close()
@@ -6090,10 +5911,7 @@ class Bug20811567(tests.MySQLConnectorTests):
             config["use_pure"] = use_pure
             cnf = "[connector_python]\n"
             cnf += "\n".join(
-                [
-                    "{0} = {1}".format(key, value)
-                    for key, value in config.items()
-                ]
+                ["{0} = {1}".format(key, value) for key, value in config.items()]
             )
             cnf_file.write(cnf)
 
@@ -6325,9 +6143,7 @@ class Bug27489937(tests.MySQLConnectorTests):
         else:
             self.config["use_pure"] = False
         try:
-            del mysql.connector.pooling._CONNECTION_POOLS[
-                self.config["pool_name"]
-            ]
+            del mysql.connector.pooling._CONNECTION_POOLS[self.config["pool_name"]]
         except:
             pass
 
@@ -6364,9 +6180,7 @@ class Bug27489937(tests.MySQLConnectorTests):
 
             exp = (b"2",)
             self.assertNotEqual(exp, cnx.get_rows()[0][0])
-        self.assertRaises(
-            errors.PoolError, mysql.connector.connect, **self.config
-        )
+        self.assertRaises(errors.PoolError, mysql.connector.connect, **self.config)
 
         for cnx in cnx_list:
             cnx.close()
@@ -6393,9 +6207,7 @@ class BugOra29195610(tests.MySQLConnectorTests):
             cnx.cmd_query("DROP TABLE IF EXISTS bug29195610")
             cnx.cmd_query("DROP PROCEDURE IF EXISTS sp_bug29195610")
             cnx.cmd_query("CREATE TABLE bug29195610 (id INT, name VARCHAR(5))")
-            cnx.cmd_query(
-                "INSERT INTO bug29195610 (id, name) VALUES (2020, 'Foo')"
-            )
+            cnx.cmd_query("INSERT INTO bug29195610 (id, name) VALUES (2020, 'Foo')")
             cnx.cmd_query(
                 "CREATE PROCEDURE sp_bug29195610 (in_id INT) "
                 "SELECT id, name FROM bug29195610 WHERE id = in_id;"
@@ -6463,12 +6275,10 @@ class BugOra24938411(tests.MySQLConnectorTests):
                 "(mydate datetime(3) DEFAULT NULL) ENGINE=InnoDB"
             )
             cur.execute(
-                "INSERT INTO bug24938411 (mydate) "
-                'VALUES ("2020-01-01 01:01:01.543")'
+                "INSERT INTO bug24938411 (mydate) " 'VALUES ("2020-01-01 01:01:01.543")'
             )
             cur.execute(
-                "SELECT mydate, CAST(mydate AS CHAR) AS mydate_char "
-                "FROM bug24938411"
+                "SELECT mydate, CAST(mydate AS CHAR) AS mydate_char FROM bug24938411"
             )
             row = cur.fetchone()
             self.assertEqual(row[0], datetime(2020, 1, 1, 1, 1, 1, 543000))
@@ -6499,9 +6309,7 @@ class BugOra32165864(tests.MySQLConnectorTests):
 
         with self.cnx.cursor(prepared=True) as cur:
             for _ in range(10):
-                self.assertRaises(
-                    errors.Error, cur.execute, stmt, (10, "Gabriela")
-                )
+                self.assertRaises(errors.Error, cur.execute, stmt, (10, "Gabriela"))
 
         with self.cnx.cursor() as cur:
             cur.execute("DROP TABLE IF EXISTS bug32165864")
@@ -6556,9 +6364,7 @@ class BugOra30416704(tests.MySQLConnectorTests):
         with mysql.connector.connection.MySQLConnection(**config) as cnx:
             cnx.cmd_query(f"DROP TABLE IF EXISTS {cls.table_name}")
 
-    def _test_result(
-        self, cnx, exp_values, cursor=None, use_binary_charset=False
-    ):
+    def _test_result(self, cnx, exp_values, cursor=None, use_binary_charset=False):
         with cnx.cursor() as cur:
             cur = self.cnx.cursor(cursor)
             cur.execute(
@@ -6589,9 +6395,7 @@ class BugOra30416704(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_binary_charset(self):
         self.cnx.set_charset_collation("binary")
-        self._test_result(
-            self.cnx, self.exp_binary_values, use_binary_charset=True
-        )
+        self._test_result(self.cnx, self.exp_binary_values, use_binary_charset=True)
 
     @foreach_cnx()
     def test_binary_charset_cursor_prepared(self):
@@ -6606,9 +6410,7 @@ class BugOra30416704(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_without_use_unicode(self):
         self.cnx.set_unicode(False)
-        self._test_result(
-            self.cnx, self.exp_binary_values, use_binary_charset=True
-        )
+        self._test_result(self.cnx, self.exp_binary_values, use_binary_charset=True)
 
     @foreach_cnx()
     def test_without_use_unicode_cursor_prepared(self):
@@ -6656,9 +6458,7 @@ class Bug32496788(tests.MySQLConnectorTests):
         with self.cnx.cursor(prepared=True) as cur:
             # Test incorrect types must raise error
             for param in ["12", 12, 1.3, lambda: "1" + "2"]:
-                self.assertRaises(
-                    errors.ProgrammingError, cur.execute, stmt, (param,)
-                )
+                self.assertRaises(errors.ProgrammingError, cur.execute, stmt, (param,))
                 with self.assertRaises(errors.ProgrammingError) as contex:
                     cur.execute(stmt, param)
                 self.assertIn(
@@ -6677,9 +6477,7 @@ class Bug32496788(tests.MySQLConnectorTests):
             self.assertEqual(cur.fetchall(), [("1", "2")])
 
         with self.cnx.cursor(prepared=True) as cur:
-            insert_stmt = (
-                f"INSERT INTO {self.table_name} VALUES (?, ?, ?, ?, ?)"
-            )
+            insert_stmt = f"INSERT INTO {self.table_name} VALUES (?, ?, ?, ?, ?)"
             cur.execute(insert_stmt)
             with self.assertRaises(errors.ProgrammingError) as contex:
                 cur.execute(insert_stmt, "JD")
@@ -6695,9 +6493,7 @@ class Bug32496788(tests.MySQLConnectorTests):
             cur.execute(insert_stmt, self.test_values[1])
 
             select_stmt = f"SELECT * FROM {self.table_name} WHERE column_last_name=? and column_first_name=?"
-            self.assertRaises(
-                errors.ProgrammingError, cur.execute, select_stmt, ("JD")
-            )
+            self.assertRaises(errors.ProgrammingError, cur.execute, select_stmt, ("JD"))
             with self.assertRaises(errors.ProgrammingError) as contex:
                 cur.execute(select_stmt, "JD")
                 self.assertIn(
@@ -6782,9 +6578,7 @@ class Bug32162928(tests.MySQLConnectorTests):
             self.new_users = self.users
 
         for new_user in self.new_users:
-            cnx.cmd_query(
-                "DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user)
-            )
+            cnx.cmd_query("DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user))
 
             stmt = (
                 "CREATE USER IF NOT EXISTS '{user}'@'{host}' IDENTIFIED "
@@ -6840,9 +6634,7 @@ class Bug32162928(tests.MySQLConnectorTests):
             cnx_test = self.cnx.__class__(**conn_args_user1)
             cnx_test.cmd_query("SELECT USER()")
             first_user = cnx_test.get_rows()[0][0][0]
-            self.assertEqual(
-                "{user}@{host}".format(**self.users[user1]), first_user
-            )
+            self.assertEqual("{user}@{host}".format(**self.users[user1]), first_user)
 
             cnx_test.cmd_change_user(
                 self.users[user2]["user"],
@@ -6853,18 +6645,14 @@ class Bug32162928(tests.MySQLConnectorTests):
             rows = cnx_test.get_rows()
             current_user = rows[0][0][0]
             self.assertNotEqual(first_user, current_user)
-            self.assertEqual(
-                "{user}@{host}".format(**self.users[user2]), current_user
-            )
+            self.assertEqual("{user}@{host}".format(**self.users[user2]), current_user)
             cnx_test.close()
 
     def tearDown(self):
         cnx = MySQLConnection(**self.connect_kwargs)
         # cleanup users
         for new_user in self.users:
-            cnx.cmd_query(
-                "DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user)
-            )
+            cnx.cmd_query("DROP USER IF EXISTS '{user}'@'{host}'".format(**new_user))
 
 
 class BugOra32497631(tests.MySQLConnectorTests):
@@ -6875,9 +6663,7 @@ class BugOra32497631(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_prepared_statement_parameters(self):
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
-        self.cnx.cmd_query(
-            f"CREATE TABLE {self.table_name} (name VARCHAR(255))"
-        )
+        self.cnx.cmd_query(f"CREATE TABLE {self.table_name} (name VARCHAR(255))")
         with self.cnx.cursor(prepared=True) as cur:
             query = f"INSERT INTO {self.table_name} (name) VALUES (?)"
             # If the query has placeholders and no parameters is given,
@@ -6933,9 +6719,7 @@ class BugOra30203754(tests.MySQLConnectorTests):
                     self.assertEqual(tc, rows[0][0])
 
                 for tc in test_cases:
-                    query = (
-                        f"INSERT INTO {self.table_name} (bigints) VALUES (%s)"
-                    )
+                    query = f"INSERT INTO {self.table_name} (bigints) VALUES (%s)"
                     cur.execute(query, (tc,))
                     self.cnx.commit()
 
@@ -6967,15 +6751,11 @@ class BugOra31528783(tests.MySQLConnectorTests):
             values = [1, 10, 100, 1000]
             # Insert data
             for value in values:
-                cur.execute(
-                    f"INSERT INTO {self.table_name} (value) VALUES ({value})"
-                )
+                cur.execute(f"INSERT INTO {self.table_name} (value) VALUES ({value})")
 
             # Test values
             for value in values:
-                cur.execute(
-                    f"SELECT value FROM {self.table_name} WHERE value={value}"
-                )
+                cur.execute(f"SELECT value FROM {self.table_name} WHERE value={value}")
                 res = cur.fetchone()
                 self.assertEqual(res[0], value)
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
@@ -7000,8 +6780,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
                 """
             )
             cnx.cmd_query(
-                f"INSERT INTO {self.table_name} "
-                "VALUES ('1','1'),('2','2'),('3','3')"
+                f"INSERT INTO {self.table_name} VALUES ('1','1'),('2','2'),('3','3')"
             )
             cnx.commit()
 
@@ -7018,9 +6797,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
-            refresh = (
-                constants.RefreshOption.LOG | constants.RefreshOption.THREADS
-            )
+            refresh = constants.RefreshOption.LOG | constants.RefreshOption.THREADS
             self.cnx.cmd_refresh(refresh)
             self.assertFalse(self.cnx.unread_result)
 

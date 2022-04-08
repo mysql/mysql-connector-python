@@ -82,13 +82,11 @@ TLS_VERSION_ERROR = (
 )
 
 TLS_VERSION_DEPRECATED_ERROR = (
-    "The given tls_version: '{}' are no longer "
-    "allowed (should be one of {})."
+    "The given tls_version: '{}' are no longer allowed (should be one of {})."
 )
 
 TLS_VER_NO_SUPPORTED = (
-    "No supported TLS protocol version found in the "
-    "'tls-versions' list '{}'. "
+    "No supported TLS protocol version found in the 'tls-versions' list '{}'. "
 )
 
 KRB_SERVICE_PINCIPAL_ERROR = (
@@ -365,9 +363,7 @@ class MySQLConnectionAbstract(ABC):
                 )
             )
         elif invalid_tls_versions:
-            raise AttributeError(
-                TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS)
-            )
+            raise AttributeError(TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
 
     @property
     def user(self):
@@ -477,9 +473,7 @@ class MySQLConnectionAbstract(ABC):
                 and not os.path.isdir(infile_in_path)
                 or os.path.islink(infile_in_path)
             ):
-                raise AttributeError(
-                    "allow_local_infile_in_path must be a " "directory"
-                )
+                raise AttributeError("allow_local_infile_in_path must be a directory")
         if self._allow_local_infile or self._allow_local_infile_in_path:
             self.set_client_flags([ClientFlag.LOCAL_FILES])
         else:
@@ -512,9 +506,7 @@ class MySQLConnectionAbstract(ABC):
                 del config["collation"]
             except KeyError:
                 collation = None
-            self._charset_id = CharacterSet.get_charset_info(
-                charset, collation
-            )[0]
+            self._charset_id = CharacterSet.get_charset_info(charset, collation)[0]
 
         # Set converter class
         try:
@@ -569,9 +561,7 @@ class MySQLConnectionAbstract(ABC):
         except KeyError:
             pass  # Missing port argument is OK
         except ValueError as err:
-            raise InterfaceError(
-                "TCP/IP port number should be an integer"
-            ) from err
+            raise InterfaceError("TCP/IP port number should be an integer") from err
 
         if "ssl_disabled" in config:
             self._ssl_disabled = config.pop("ssl_disabled")
@@ -605,9 +595,7 @@ class MySQLConnectionAbstract(ABC):
 
         if set_ssl_flag:
             if "verify_cert" not in self._ssl:
-                self._ssl["verify_cert"] = DEFAULT_CONFIGURATION[
-                    "ssl_verify_cert"
-                ]
+                self._ssl["verify_cert"] = DEFAULT_CONFIGURATION["ssl_verify_cert"]
             if "verify_identity" not in self._ssl:
                 self._ssl["verify_identity"] = DEFAULT_CONFIGURATION[
                     "ssl_verify_identity"
@@ -617,8 +605,7 @@ class MySQLConnectionAbstract(ABC):
                 self._ssl["ca"] = ""
             if bool("key" in self._ssl) != bool("cert" in self._ssl):
                 raise AttributeError(
-                    "ssl_key and ssl_cert need to be both "
-                    "specified, or neither."
+                    "ssl_key and ssl_cert need to be both specified, or neither"
                 )
             # Make sure key/cert are set to None
             if not set(("key", "cert")) <= set(self._ssl):
@@ -626,12 +613,9 @@ class MySQLConnectionAbstract(ABC):
                 self._ssl["cert"] = None
             elif (self._ssl["key"] is None) != (self._ssl["cert"] is None):
                 raise AttributeError(
-                    "ssl_key and ssl_cert need to be both " "set, or neither."
+                    "ssl_key and ssl_cert need to be both set, or neither"
                 )
-            if (
-                "tls_versions" in self._ssl
-                and self._ssl["tls_versions"] is not None
-            ):
+            if "tls_versions" in self._ssl and self._ssl["tls_versions"] is not None:
                 self._validate_tls_versions()
 
             if (
@@ -657,8 +641,7 @@ class MySQLConnectionAbstract(ABC):
                 # Validate attribute name limit 32 characters
                 if len(attr_name) > 32:
                     raise InterfaceError(
-                        f"Attribute name '{attr_name}' exceeds 32 characters "
-                        "limit size"
+                        f"Attribute name '{attr_name}' exceeds 32 characters limit size"
                     )
                 # Validate names in connection attributes cannot start with "_"
                 if attr_name.startswith("_"):
@@ -698,9 +681,7 @@ class MySQLConnectionAbstract(ABC):
                 )
             if "/" not in self._krb_service_principal:
                 raise InterfaceError(
-                    KRB_SERVICE_PINCIPAL_ERROR.format(
-                        error="is incorrectly formatted"
-                    )
+                    KRB_SERVICE_PINCIPAL_ERROR.format(error="is incorrectly formatted")
                 )
 
         if self._fido_callback:
@@ -719,9 +700,7 @@ class MySQLConnectionAbstract(ABC):
                     raise ProgrammingError(f"{err}") from err
             # Check if it's a callable
             if not callable(self._fido_callback):
-                raise ProgrammingError(
-                    "Expected a callable for 'fido_callback'"
-                )
+                raise ProgrammingError("Expected a callable for 'fido_callback'")
             # Check the callable signature if has only 1 positional argument
             params = len(signature(self._fido_callback).parameters)
             if params != 1:
@@ -755,9 +734,7 @@ class MySQLConnectionAbstract(ABC):
 
         version = tuple(int(v) for v in match.groups()[0:3])
         if version < (4, 1):
-            raise InterfaceError(
-                f"MySQL Version '{server_version}' is not supported"
-            )
+            raise InterfaceError(f"MySQL Version '{server_version}' is not supported")
 
         return version
 
@@ -814,9 +791,7 @@ class MySQLConnectionAbstract(ABC):
                 else:
                     self._client_flags |= flag
         else:
-            raise ProgrammingError(
-                "set_client_flags expect integer (>0) or set"
-            )
+            raise ProgrammingError("set_client_flags expect integer (>0) or set")
         return self._client_flags
 
     def isset_client_flag(self, flag):
@@ -1036,9 +1011,7 @@ class MySQLConnectionAbstract(ABC):
                     collation_name,
                 ) = CharacterSet.get_charset_info(charset, collation)
             else:
-                raise ValueError(
-                    "charset should be either integer, string or None"
-                )
+                raise ValueError("charset should be either integer, string or None")
         elif collation:
             (
                 self._charset_id,
@@ -1046,9 +1019,7 @@ class MySQLConnectionAbstract(ABC):
                 collation_name,
             ) = CharacterSet.get_charset_info(collation=collation)
 
-        self._execute_query(
-            f"SET NAMES '{charset_name}' COLLATE '{collation_name}'"
-        )
+        self._execute_query(f"SET NAMES '{charset_name}' COLLATE '{collation_name}'")
 
         try:
             # Required for C Extension
@@ -1213,9 +1184,7 @@ class MySQLConnectionAbstract(ABC):
             ]
 
             if level not in levels:
-                raise ValueError(
-                    f'Unknown isolation level "{isolation_level}"'
-                )
+                raise ValueError(f'Unknown isolation level "{isolation_level}"')
 
             self._execute_query(f"SET TRANSACTION ISOLATION LEVEL {level}")
 
@@ -1293,8 +1262,7 @@ class MySQLConnectionAbstract(ABC):
             self.converter.str_fallback = self._converter_str_fallback
         else:
             raise TypeError(
-                "Converter class should be a subclass "
-                "of conversion.MySQLConverterBase."
+                "Converter class should be a subclass of conversion.MySQLConverterBase."
             )
 
     @abstractmethod

@@ -83,8 +83,7 @@ try:
     import _mysqlxpb
 
     SERVER_MESSAGES = {
-        int(_mysqlxpb.enum_value(key)): val
-        for key, val in _SERVER_MESSAGES_TUPLES
+        int(_mysqlxpb.enum_value(key)): val for key, val in _SERVER_MESSAGES_TUPLES
     }
     HAVE_MYSQLXPB_CEXT = True
 except ImportError:
@@ -100,9 +99,7 @@ try:
         descriptor_pool,
         message_factory,
     )
-    from google.protobuf.internal.containers import (
-        RepeatedCompositeFieldContainer,
-    )
+    from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
     try:
         from google.protobuf.pyext._message import RepeatedCompositeContainer
@@ -159,13 +156,8 @@ try:
         _MESSAGES[f"Mysqlx.Datatypes.Any.Type.{key}"] = val
 
     # Mysqlx.Expect
-    for (
-        key,
-        val,
-    ) in mysqlx_expect_pb2.Open.Condition.ConditionOperation.items():
-        _MESSAGES[
-            f"Mysqlx.Expect.Open.Condition.ConditionOperation.{key}"
-        ] = val
+    for key, val in mysqlx_expect_pb2.Open.Condition.ConditionOperation.items():
+        _MESSAGES[f"Mysqlx.Expect.Open.Condition.ConditionOperation.{key}"] = val
     for key, val in mysqlx_expect_pb2.Open.Condition.Key.items():
         _MESSAGES[f"Mysqlx.Expect.Open.Condition.Key.{key}"] = val
     for key, val in mysqlx_expect_pb2.Open.CtxOperation.items():
@@ -258,9 +250,7 @@ try:
         )
     )
 
-    SERVER_MESSAGES = {
-        _MESSAGES[key]: val for key, val in _SERVER_MESSAGES_TUPLES
-    }
+    SERVER_MESSAGES = {_MESSAGES[key]: val for key, val in _SERVER_MESSAGES_TUPLES}
     HAVE_PROTOBUF = True
     HAVE_PROTOBUF_ERROR = None
 
@@ -360,9 +350,7 @@ except (ImportError, SyntaxError, TypeError) as err:
         err if PROTOBUF_VERSION is not None else "Protobuf >=3.0.0 is required"
     )
     if not HAVE_MYSQLXPB_CEXT:
-        raise ImportError(
-            f"Protobuf is not available: {HAVE_PROTOBUF_ERROR}"
-        ) from err
+        raise ImportError(f"Protobuf is not available: {HAVE_PROTOBUF_ERROR}") from err
 
 CRUD_PREPARE_MAPPING = {
     "Mysqlx.ClientMessages.Type.CRUD_FIND": (
@@ -406,9 +394,7 @@ class Protobuf:
             use_pure (bool): `True` to use pure Python implementation.
         """
         if use_pure and not HAVE_PROTOBUF:
-            raise ImportError(
-                f"Protobuf is not available: {HAVE_PROTOBUF_ERROR}"
-            )
+            raise ImportError(f"Protobuf is not available: {HAVE_PROTOBUF_ERROR}")
         if not use_pure and not HAVE_MYSQLXPB_CEXT:
             raise ImportError("MySQL X Protobuf C extension is not available")
         Protobuf.mysqlxpb = _mysqlxpb_pure if use_pure else _mysqlxpb
@@ -425,9 +411,7 @@ class Message:
 
     def __init__(self, msg_type_name=None, **kwargs):
         self.__dict__["_msg"] = (
-            Protobuf.mysqlxpb.new_message(msg_type_name)
-            if msg_type_name
-            else None
+            Protobuf.mysqlxpb.new_message(msg_type_name) if msg_type_name else None
         )
         for name, value in kwargs.items():
             self.__setattr__(name, value)
@@ -452,9 +436,7 @@ class Message:
     def __getattr__(self, name):
         try:
             return (
-                self._msg[name]
-                if not Protobuf.use_pure
-                else getattr(self._msg, name)
+                self._msg[name] if not Protobuf.use_pure else getattr(self._msg, name)
             )
         except KeyError:
             raise AttributeError from None
@@ -586,9 +568,7 @@ class Message:
                                      containing parsed data.
         """
         msg = cls()
-        msg.set_message(
-            Protobuf.mysqlxpb.parse_message(msg_type_name, payload)
-        )
+        msg.set_message(Protobuf.mysqlxpb.parse_message(msg_type_name, payload))
         return msg
 
     @classmethod
@@ -605,9 +585,7 @@ class Message:
                                      containing parsed data.
         """
         msg = cls()
-        msg.set_message(
-            Protobuf.mysqlxpb.parse_server_message(msg_type, payload)
-        )
+        msg.set_message(Protobuf.mysqlxpb.parse_server_message(msg_type, payload))
         return msg
 
 

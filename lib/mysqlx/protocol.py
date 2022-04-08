@@ -200,9 +200,7 @@ class MessageReader:
             while bytes_processed < uncompressed_size:
                 payload_size, msg_type = struct.unpack("<LB", stream.read(5))
                 payload = stream.read(payload_size - 1)
-                self._msg_queue.append(
-                    Message.from_server_message(msg_type, payload)
-                )
+                self._msg_queue.append(Message.from_server_message(msg_type, payload))
                 bytes_processed += payload_size + 4
             return self._msg_queue.pop(0) if self._msg_queue else None
 
@@ -282,16 +280,14 @@ class MessageWriter:
 
             output = b"".join(
                 [
-                    encode_to_bytes(
-                        msg_first_fields.serialize_partial_to_string()
-                    )[:-2],
+                    encode_to_bytes(msg_first_fields.serialize_partial_to_string())[
+                        :-2
+                    ],
                     encode_to_bytes(msg_payload.serialize_partial_to_string()),
                 ]
             )
 
-            msg_comp_id = mysqlxpb_enum(
-                "Mysqlx.ClientMessages.Type.COMPRESSION"
-            )
+            msg_comp_id = mysqlxpb_enum("Mysqlx.ClientMessages.Type.COMPRESSION")
             header = struct.pack("<LB", len(output) + 1, msg_comp_id)
             self._stream.sendall(b"".join([header, output]))
         else:
@@ -383,9 +379,7 @@ class Protocol:
                 key=arg_key,
                 value=self._create_any(arg_value),
             )
-            obj = Message(
-                "Mysqlx.Datatypes.Object", fld=[obj_fld.get_message()]
-            )
+            obj = Message("Mysqlx.Datatypes.Object", fld=[obj_fld.get_message()])
             return Message("Mysqlx.Datatypes.Any", type=2, obj=obj)
         if isinstance(arg, dict) or (
             isinstance(arg, (list, tuple)) and isinstance(arg[0], dict)
@@ -453,8 +447,7 @@ class Protocol:
         args = count * [None]
         if count != len(bindings):
             raise ProgrammingError(
-                "The number of bind parameters and "
-                "placeholders do not match"
+                "The number of bind parameters and placeholders do not match"
             )
         for name, value in bindings.items():
             if name not in binding_map:
@@ -473,28 +466,22 @@ class Protocol:
             result (Result): A `Result` based type object.
         """
         if msg["type"] == 1:
-            warn_msg = Message.from_message(
-                "Mysqlx.Notice.Warning", msg["payload"]
-            )
+            warn_msg = Message.from_message("Mysqlx.Notice.Warning", msg["payload"])
             self._warnings.append(warn_msg.msg)
             _LOGGER.warning(
-                "Protocol.process_frame Received Warning Notice "
-                "code %s: %s",
+                "Protocol.process_frame Received Warning Notice code %s: %s",
                 warn_msg.code,
                 warn_msg.msg,
             )
             result.append_warning(warn_msg.level, warn_msg.code, warn_msg.msg)
         elif msg["type"] == 2:
-            Message.from_message(
-                "Mysqlx.Notice.SessionVariableChanged", msg["payload"]
-            )
+            Message.from_message("Mysqlx.Notice.SessionVariableChanged", msg["payload"])
         elif msg["type"] == 3:
             sess_state_msg = Message.from_message(
                 "Mysqlx.Notice.SessionStateChanged", msg["payload"]
             )
             if sess_state_msg["param"] == mysqlxpb_enum(
-                "Mysqlx.Notice.SessionStateChanged.Parameter."
-                "GENERATED_DOCUMENT_IDS"
+                "Mysqlx.Notice.SessionStateChanged.Parameter.GENERATED_DOCUMENT_IDS"
             ):
                 result.set_generated_ids(
                     [
@@ -513,15 +500,13 @@ class Protocol:
                     else sess_state_msg["value"]
                 )
                 if sess_state_msg["param"] == mysqlxpb_enum(
-                    "Mysqlx.Notice.SessionStateChanged.Parameter."
-                    "ROWS_AFFECTED"
+                    "Mysqlx.Notice.SessionStateChanged.Parameter.ROWS_AFFECTED"
                 ):
                     result.set_rows_affected(
                         get_item_or_attr(sess_state_value, "v_unsigned_int")
                     )
                 elif sess_state_msg["param"] == mysqlxpb_enum(
-                    "Mysqlx.Notice.SessionStateChanged.Parameter."
-                    "GENERATED_INSERT_ID"
+                    "Mysqlx.Notice.SessionStateChanged.Parameter.GENERATED_INSERT_ID"
                 ):
                     result.set_generated_insert_id(
                         get_item_or_attr(sess_state_value, "v_unsigned_int")
@@ -657,9 +642,7 @@ class Protocol:
         if initial_response is not None:
             msg["initial_response"] = initial_response
         self._writer.write_message(
-            mysqlxpb_enum(
-                "Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_START"
-            ),
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_START"),
             msg,
         )
 
@@ -678,8 +661,7 @@ class Protocol:
             msg = self._reader.read_message()
         if msg.type != "Mysqlx.Session.AuthenticateContinue":
             raise InterfaceError(
-                "Unexpected message encountered during "
-                "authentication handshake"
+                "Unexpected message encountered during authentication handshake"
             )
         return msg["auth_data"]
 
@@ -689,13 +671,9 @@ class Protocol:
         Args:
             auth_data (str): Authentication data.
         """
-        msg = Message(
-            "Mysqlx.Session.AuthenticateContinue", auth_data=auth_data
-        )
+        msg = Message("Mysqlx.Session.AuthenticateContinue", auth_data=auth_data)
         self._writer.write_message(
-            mysqlxpb_enum(
-                "Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_CONTINUE"
-            ),
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_CONTINUE"),
             msg,
         )
 
@@ -837,9 +815,7 @@ class Protocol:
             if msg.type == "Mysqlx.Crud.Find":
                 msg_limit["offset"] = stmt.get_limit_offset()
             msg["limit"] = msg_limit
-        is_scalar = (
-            not msg_type == "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"
-        )
+        is_scalar = msg_type != "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"
         args = self._get_binding_args(stmt, is_scalar=is_scalar)
         if args:
             msg["args"].extend(args)
@@ -882,21 +858,15 @@ class Protocol:
             name=stmt.target.name,
             schema=stmt.schema.name,
         )
-        msg = Message(
-            "Mysqlx.Crud.Find", data_model=data_model, collection=collection
-        )
+        msg = Message("Mysqlx.Crud.Find", data_model=data_model, collection=collection)
         if stmt.has_projection:
             msg["projection"] = stmt.get_projection_expr()
         self._apply_filter(msg, stmt)
 
         if stmt.is_lock_exclusive():
-            msg["locking"] = mysqlxpb_enum(
-                "Mysqlx.Crud.Find.RowLock.EXCLUSIVE_LOCK"
-            )
+            msg["locking"] = mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.EXCLUSIVE_LOCK")
         elif stmt.is_lock_shared():
-            msg["locking"] = mysqlxpb_enum(
-                "Mysqlx.Crud.Find.RowLock.SHARED_LOCK"
-            )
+            msg["locking"] = mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.SHARED_LOCK")
 
         if stmt.lock_contention.value > 0:
             msg["locking_options"] = stmt.lock_contention.value
@@ -1132,9 +1102,7 @@ class Protocol:
         """
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
-            raise InterfaceError(
-                f"Mysqlx.Error: {msg['msg']}", errno=msg["code"]
-            )
+            raise InterfaceError(f"Mysqlx.Error: {msg['msg']}", errno=msg["code"])
         if msg.type != "Mysqlx.Ok":
             raise InterfaceError("Unexpected message encountered")
 
@@ -1154,9 +1122,7 @@ class Protocol:
 
     def send_expect_open(self):
         """Send expectation."""
-        cond_key = mysqlxpb_enum(
-            "Mysqlx.Expect.Open.Condition.Key.EXPECT_FIELD_EXIST"
-        )
+        cond_key = mysqlxpb_enum("Mysqlx.Expect.Open.Condition.Key.EXPECT_FIELD_EXIST")
         msg_oc = Message("Mysqlx.Expect.Open.Condition")
         msg_oc["condition_key"] = cond_key
         msg_oc["condition_value"] = "6.1"

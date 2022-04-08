@@ -47,13 +47,7 @@ from subprocess import PIPE, Popen, check_call
 
 from setuptools.command.build_ext import build_ext
 
-from .utils import (
-    ARCH,
-    ARCH_64BIT,
-    mysql_c_api_info,
-    write_info_bin,
-    write_info_src,
-)
+from .utils import ARCH, ARCH_64BIT, mysql_c_api_info, write_info_bin, write_info_src
 
 # Load version information
 VERSION = [999, 0, 0, "a", 0]
@@ -177,31 +171,25 @@ class BaseCommand(Command):
             "MYSQL_CAPI"
         )
         cmd_build_ext.with_openssl_include_dir = (
-            self.with_openssl_include_dir
-            or os.environ.get("OPENSSL_INCLUDE_DIR")
+            self.with_openssl_include_dir or os.environ.get("OPENSSL_INCLUDE_DIR")
         )
         cmd_build_ext.with_openssl_lib_dir = (
             self.with_openssl_lib_dir or os.environ.get("OPENSSL_LIB_DIR")
         )
         cmd_build_ext.with_protobuf_include_dir = (
-            self.with_protobuf_include_dir
-            or os.environ.get("PROTOBUF_INCLUDE_DIR")
+            self.with_protobuf_include_dir or os.environ.get("PROTOBUF_INCLUDE_DIR")
         )
         cmd_build_ext.with_protobuf_lib_dir = (
             self.with_protobuf_lib_dir or os.environ.get("PROTOBUF_LIB_DIR")
         )
-        cmd_build_ext.with_protoc = self.with_protoc or os.environ.get(
-            "PROTOC"
-        )
-        cmd_build_ext.extra_compile_args = (
-            self.extra_compile_args or os.environ.get("EXTRA_COMPILE_ARGS")
+        cmd_build_ext.with_protoc = self.with_protoc or os.environ.get("PROTOC")
+        cmd_build_ext.extra_compile_args = self.extra_compile_args or os.environ.get(
+            "EXTRA_COMPILE_ARGS"
         )
         cmd_build_ext.extra_link_args = self.extra_link_args or os.environ.get(
             "EXTRA_LINK_ARGS"
         )
-        cmd_build_ext.skip_vendor = self.skip_vendor or os.environ.get(
-            "SKIP_VENDOR"
-        )
+        cmd_build_ext.skip_vendor = self.skip_vendor or os.environ.get("SKIP_VENDOR")
         if not cmd_build_ext.skip_vendor:
             self._copy_vendor_libraries()
 
@@ -233,9 +221,7 @@ class BaseCommand(Command):
 
     def _get_openssl_libs(self):
         libssl = glob(os.path.join(self.with_openssl_lib_dir, "libssl.*.*.*"))
-        libcrypto = glob(
-            os.path.join(self.with_openssl_lib_dir, "libcrypto.*.*.*")
-        )
+        libcrypto = glob(os.path.join(self.with_openssl_lib_dir, "libcrypto.*.*.*"))
         if not libssl or not libcrypto:
             self.log.error(
                 "Unable to find OpenSSL libraries in '%s'",
@@ -251,9 +237,7 @@ class BaseCommand(Command):
             # Bundle OpenSSL libs
             if self.with_openssl_lib_dir:
                 libssl, libcrypto = self._get_openssl_libs()
-                vendor_libs.append(
-                    (self.with_openssl_lib_dir, [libssl, libcrypto])
-                )
+                vendor_libs.append((self.with_openssl_lib_dir, [libssl, libcrypto]))
 
         # Plugins
         bundle_plugin_libs = False
@@ -309,22 +293,16 @@ class BaseCommand(Command):
                 else:
                     openssl_libs = ["libssl-1_1.dll", "libcrypto-1_1.dll"]
                 if self.with_openssl_lib_dir:
-                    openssl_libs_path = os.path.abspath(
-                        self.with_openssl_lib_dir
-                    )
+                    openssl_libs_path = os.path.abspath(self.with_openssl_lib_dir)
                     if os.path.basename(openssl_libs_path) == "lib":
                         openssl_libs_path = os.path.split(openssl_libs_path)[0]
                     if os.path.exists(openssl_libs_path) and os.path.exists(
                         os.path.join(openssl_libs_path, "bin")
                     ):
-                        openssl_libs_path = os.path.join(
-                            openssl_libs_path, "bin"
-                        )
+                        openssl_libs_path = os.path.join(openssl_libs_path, "bin")
                     self.log.info("# openssl_libs_path: %s", openssl_libs_path)
                 else:
-                    openssl_libs_path = os.path.join(
-                        self.with_mysql_capi, "bin"
-                    )
+                    openssl_libs_path = os.path.join(self.with_mysql_capi, "bin")
                 vendor_libs.append((openssl_libs_path, openssl_libs))
 
         if not vendor_libs:
@@ -358,8 +336,7 @@ class BaseCommand(Command):
         if os.name == "nt":
             self.distribution.package_data = {"mysql": ["vendor/plugin/*"]}
             site_packages_files = [
-                os.path.join(openssl_libs_path, lib_n)
-                for lib_n in openssl_libs
+                os.path.join(openssl_libs_path, lib_n) for lib_n in openssl_libs
             ]
             site_packages_files.append(
                 os.path.join(self.with_mysql_capi, "lib", "libmysql.dll")
@@ -367,18 +344,12 @@ class BaseCommand(Command):
             self.distribution.data_files = [
                 ("lib\\site-packages\\", site_packages_files)
             ]
-            self.log.debug(
-                "# site_packages_files: %s", self.distribution.data_files
-            )
+            self.log.debug("# site_packages_files: %s", self.distribution.data_files)
         elif bundle_plugin_libs:
             # Bundle SASL libs
-            sasl_libs_path = os.path.join(
-                self.with_mysql_capi, "lib", "private"
-            )
+            sasl_libs_path = os.path.join(self.with_mysql_capi, "lib", "private")
             if not os.path.exists(sasl_libs_path):
-                self.log.info(
-                    "sasl2 llibraries not found at %s", sasl_libs_path
-                )
+                self.log.info("sasl2 llibraries not found at %s", sasl_libs_path)
             sasl_libs = []
             sasl_plugin_libs_w = [
                 "libsasl2.*.*",
@@ -408,9 +379,7 @@ class BaseCommand(Command):
                     if not os.path.exists(src):
                         self.log.warn("Library not found: %s", src)
                         continue
-                    dst = os.path.join(
-                        os.getcwd(), self.vendor_folder, "private"
-                    )
+                    dst = os.path.join(os.getcwd(), self.vendor_folder, "private")
                     self.log.info("copying %s -> %s", src, dst)
                     shutil.copy(src, dst)
 
@@ -420,9 +389,7 @@ class BaseCommand(Command):
                 self.with_mysql_capi, "lib", "private", "sasl2"
             )
             if not os.path.exists(sasl2_libs_path):
-                self.log.info(
-                    "sasl2 llibraries not found at %s", sasl2_libs_path
-                )
+                self.log.info("sasl2 llibraries not found at %s", sasl2_libs_path)
             sasl2_libs_w = [
                 "libanonymous.*",
                 "libcrammd5.*.*",
@@ -449,9 +416,7 @@ class BaseCommand(Command):
 
             sasl2_scram_libs = []
             for sasl2_lib in sasl2_libs_w:
-                lib_path_entries = glob(
-                    os.path.join(sasl2_libs_path, sasl2_lib)
-                )
+                lib_path_entries = glob(os.path.join(sasl2_libs_path, sasl2_lib))
                 for lib_path_entry in lib_path_entries:
                     sasl2_scram_libs.append(os.path.basename(lib_path_entry))
 
@@ -522,9 +487,7 @@ class BuildExt(build_ext, BaseCommand):
         # Add libmysqlclient libraries to be copied
         if "link_dirs" in self._mysql_info:
             libs += glob(
-                os.path.join(
-                    self._mysql_info["link_dirs"][0], "libmysqlclient*"
-                )
+                os.path.join(self._mysql_info["link_dirs"][0], "libmysqlclient*")
             )
 
         for lib in libs:
@@ -549,9 +512,7 @@ class BuildExt(build_ext, BaseCommand):
             )
 
         if not self.with_protobuf_lib_dir:
-            self.with_protobuf_lib_dir = os.environ.get(
-                "MYSQLXPB_PROTOBUF_LIB_DIR"
-            )
+            self.with_protobuf_lib_dir = os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
 
         if not self.with_protoc:
             self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
@@ -569,9 +530,7 @@ class BuildExt(build_ext, BaseCommand):
             sys.exit(1)
 
         if self.with_protobuf_lib_dir:
-            self.log.info(
-                "Protobuf library directory: %s", self.with_protobuf_lib_dir
-            )
+            self.log.info("Protobuf library directory: %s", self.with_protobuf_lib_dir)
             if not os.path.isdir(self.with_protobuf_lib_dir):
                 self.log.error("Protobuf library dir should be a directory")
                 sys.exit(1)
@@ -596,9 +555,7 @@ class BuildExt(build_ext, BaseCommand):
         libs = glob(os.path.join(self.with_protobuf_lib_dir, "libprotobuf*"))
         for lib in libs:
             if os.path.isfile(lib):
-                self.log.info(
-                    "copying %s -> %s", lib, self._build_protobuf_lib_dir
-                )
+                self.log.info("copying %s -> %s", lib, self._build_protobuf_lib_dir)
                 shutil.copy2(lib, self._build_protobuf_lib_dir)
 
         # Remove all but static libraries to force static linking
@@ -609,9 +566,7 @@ class BuildExt(build_ext, BaseCommand):
             )
             for lib in os.listdir(self._build_protobuf_lib_dir):
                 lib_path = os.path.join(self._build_protobuf_lib_dir, lib)
-                if os.path.isfile(lib_path) and not lib.endswith(
-                    (".a", ".dylib")
-                ):
+                if os.path.isfile(lib_path) and not lib.endswith((".a", ".dylib")):
                     os.unlink(os.path.join(self._build_protobuf_lib_dir, lib))
 
     def _run_protoc(self):
@@ -635,12 +590,8 @@ class BuildExt(build_ext, BaseCommand):
 
         self.log.info("Python architecture: %s", ARCH)
 
-        self._build_mysql_lib_dir = os.path.join(
-            self.build_temp, "capi", "lib"
-        )
-        self._build_protobuf_lib_dir = os.path.join(
-            self.build_temp, "protobuf", "lib"
-        )
+        self._build_mysql_lib_dir = os.path.join(self.build_temp, "capi", "lib")
+        self._build_protobuf_lib_dir = os.path.join(self.build_temp, "protobuf", "lib")
         if self.with_mysql_capi:
             self._mysql_info = mysql_c_api_info(self.with_mysql_capi)
             self._finalize_mysql_capi()
@@ -665,9 +616,7 @@ class BuildExt(build_ext, BaseCommand):
             # Add Protobuf include and library dirs
             if ext.name == "_mysqlxpb":
                 if not self.with_mysqlxpb_cext:
-                    self.log.warning(
-                        "The '_mysqlxpb' C extension will not be built"
-                    )
+                    self.log.warning("The '_mysqlxpb' C extension will not be built")
                     disabled.append(ext)
                     continue
                 if platform.system() == "Darwin":
@@ -680,9 +629,7 @@ class BuildExt(build_ext, BaseCommand):
                         fp.write("\n")
                 ext.include_dirs.append(self.with_protobuf_include_dir)
                 ext.library_dirs.append(self._build_protobuf_lib_dir)
-                ext.libraries.append(
-                    "libprotobuf" if os.name == "nt" else "protobuf"
-                )
+                ext.libraries.append("libprotobuf" if os.name == "nt" else "protobuf")
                 # Add -std=c++11 needed for Protobuf 3.6.1
                 ext.extra_compile_args.append("-std=c++11")
                 self._run_protoc()
@@ -695,17 +642,13 @@ class BuildExt(build_ext, BaseCommand):
                     continue
                 # Add extra compile args
                 if self.extra_compile_args:
-                    ext.extra_compile_args.extend(
-                        self.extra_compile_args.split()
-                    )
+                    ext.extra_compile_args.extend(self.extra_compile_args.split())
                 # Add extra link args
                 if self.extra_link_args:
                     ext.extra_link_args.extend(self.extra_link_args.split())
                 # Add -rpath if the platform is Linux
                 if platform.system() == "Linux" and not self.skip_vendor:
-                    ext.extra_link_args.extend(
-                        ["-Wl,-rpath,$ORIGIN/mysql/vendor"]
-                    )
+                    ext.extra_link_args.extend(["-Wl,-rpath,$ORIGIN/mysql/vendor"])
                 # Add include dirs
                 if self.with_openssl_include_dir:
                     ext.include_dirs.append(self.with_openssl_include_dir)
@@ -726,11 +669,11 @@ class BuildExt(build_ext, BaseCommand):
 
         if os.name != "nt":
             cmd_gcc_ver = ["gcc", "-v"]
-            self.log.info("Executing: {0}" "".format(" ".join(cmd_gcc_ver)))
+            self.log.info("Executing: {0}".format(" ".join(cmd_gcc_ver)))
             proc = Popen(cmd_gcc_ver, stdout=PIPE, universal_newlines=True)
             self.log.info(proc.communicate())
             cmd_gpp_ver = ["g++", "-v"]
-            self.log.info("Executing: {0}" "".format(" ".join(cmd_gcc_ver)))
+            self.log.info("Executing: {0}".format(" ".join(cmd_gcc_ver)))
             proc = Popen(cmd_gpp_ver, stdout=PIPE, universal_newlines=True)
             self.log.info(proc.communicate())
 
@@ -752,12 +695,8 @@ class BuildExt(build_ext, BaseCommand):
                         "@loader_path/mysql/vendor/{0}".format(libssl),
                         build_ext.get_ext_fullpath(self, "_mysql_connector"),
                     ]
-                    self.log.info(
-                        "Executing: {0}" "".format(" ".join(cmd_libssl))
-                    )
-                    proc = Popen(
-                        cmd_libssl, stdout=PIPE, universal_newlines=True
-                    )
+                    self.log.info("Executing: {0}".format(" ".join(cmd_libssl)))
+                    proc = Popen(cmd_libssl, stdout=PIPE, universal_newlines=True)
                     stdout, _ = proc.communicate()
                     cmd_libcrypto = [
                         "install_name_tool",
@@ -766,12 +705,8 @@ class BuildExt(build_ext, BaseCommand):
                         "@loader_path/mysql/vendor/{0}".format(libcrypto),
                         build_ext.get_ext_fullpath(self, "_mysql_connector"),
                     ]
-                    self.log.info(
-                        "Executing: {0}" "".format(" ".join(cmd_libcrypto))
-                    )
-                    proc = Popen(
-                        cmd_libcrypto, stdout=PIPE, universal_newlines=True
-                    )
+                    self.log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
+                    proc = Popen(cmd_libcrypto, stdout=PIPE, universal_newlines=True)
                     stdout, _ = proc.communicate()
 
         # Generate docs/INFO_BIN
@@ -806,9 +741,7 @@ class InstallLib(install_lib):
     def finalize_options(self):
         """Finalize the options."""
         install_lib.finalize_options(self)
-        self.set_undefined_options(
-            "install", ("byte_code_only", "byte_code_only")
-        )
+        self.set_undefined_options("install", ("byte_code_only", "byte_code_only"))
         self.set_undefined_options("build", ("build_base", "build_dir"))
 
     def run(self):

@@ -73,8 +73,7 @@ def main(config):
 
     for row in cur.fetchall():
         output.append(
-            "%d | %s | %d\nInfo: %s..\n"
-            % (row[0], row[1], row[3], row[2][:20])
+            "%d | %s | %d\nInfo: %s..\n" % (row[0], row[1], row[3], row[2][:20])
         )
 
     # Cleaning up, dropping the table again

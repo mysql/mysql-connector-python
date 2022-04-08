@@ -139,9 +139,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
         for table_name, sql in TABLES.items():
             cur.execute("SET foreign_key_checks = 0")
             cur.execute(
-                "DROP TABLE IF EXISTS {table_name}".format(
-                    table_name=table_name
-                )
+                "DROP TABLE IF EXISTS {table_name}".format(table_name=table_name)
             )
             cur.execute(sql.format(table_name=table_name))
         cur.execute("SET foreign_key_checks = 1")
@@ -152,9 +150,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
         cur.execute("SET foreign_key_checks = 0")
         for table_name, sql in TABLES.items():
             cur.execute(
-                "DROP TABLE IF EXISTS {table_name}".format(
-                    table_name=table_name
-                )
+                "DROP TABLE IF EXISTS {table_name}".format(table_name=table_name)
             )
         cur.execute("SET foreign_key_checks = 1")
 
@@ -162,13 +158,11 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
         cur = self.cnx.cursor()
         for exp in TABLES.keys():
             res = any(
-                table.name == exp
-                for table in self.introspect.get_table_list(cur)
+                table.name == exp for table in self.introspect.get_table_list(cur)
             )
             self.assertTrue(
                 res,
-                "Table {table_name} not in table list"
-                "".format(table_name=exp),
+                "Table {table_name} not in table list".format(table_name=exp),
             )
 
     def test_get_table_description(self):
@@ -271,9 +265,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
     def test_get_key_columns(self):
         cur = self.cnx.cursor()
         exp = [("id_t1", "django_t1", "id")]
-        self.assertEqual(
-            exp, self.introspect.get_key_columns(cur, "django_t2")
-        )
+        self.assertEqual(exp, self.introspect.get_key_columns(cur, "django_t2"))
 
     def test_get_indexes(self):
         cur = self.cnx.cursor()
@@ -323,9 +315,7 @@ class DjangoIntrospection(tests.MySQLConnectorTests):
             exp["PRIMARY"]["orders"] = ["ASC"]
             exp["django_t2_ibfk_1"]["orders"] = []
             exp["id_t1"]["orders"] = ["ASC"]
-        self.assertEqual(
-            exp, self.introspect.get_constraints(cur, "django_t2")
-        )
+        self.assertEqual(exp, self.introspect.get_constraints(cur, "django_t2"))
 
 
 @unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")
@@ -416,13 +406,9 @@ class DjangoDatabaseOperations(tests.MySQLConnectorTests):
         fields = ["col1", "col2", "col3"]
         placeholder_rows = [["%s"] * len(fields) for _ in range(num_values)]
         exp = "VALUES {0}".format(
-            ", ".join(
-                ["({0})".format(", ".join(["%s"] * len(fields)))] * num_values
-            )
+            ", ".join(["({0})".format(", ".join(["%s"] * len(fields)))] * num_values)
         )
-        self.assertEqual(
-            exp, self.dbo.bulk_insert_sql(fields, placeholder_rows)
-        )
+        self.assertEqual(exp, self.dbo.bulk_insert_sql(fields, placeholder_rows))
 
 
 class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
@@ -447,9 +433,7 @@ class DjangoMySQLConverterTests(tests.MySQLConnectorTests):
         settings.USE_TZ = True
         value = b"0000-00-00 00:00:00"
         django_converter = DjangoMySQLConverter()
-        self.assertEqual(
-            None, django_converter._datetime_to_python(value, dsc=None)
-        )
+        self.assertEqual(None, django_converter._datetime_to_python(value, dsc=None))
         settings.USE_TZ = False
 
 
@@ -542,9 +526,7 @@ class BugOra20106629(tests.MySQLConnectorTests):
         self.cur = self.cnx.cursor()
         self.tbl = "BugOra20106629"
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
-        self.cur.execute(
-            "CREATE TABLE {0}(col1 TEXT, col2 BLOB)".format(self.tbl), ()
-        )
+        self.cur.execute("CREATE TABLE {0}(col1 TEXT, col2 BLOB)".format(self.tbl), ())
 
     def tearDown(self):
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
@@ -557,6 +539,4 @@ class BugOra20106629(tests.MySQLConnectorTests):
             (safe_text, safe_bytes),
         )
         self.cur.execute("SELECT * FROM {0}".format(self.tbl), ())
-        self.assertEqual(
-            self.cur.fetchall(), [(safe_text, safe_bytes.encode())]
-        )
+        self.assertEqual(self.cur.fetchall(), [(safe_text, safe_bytes.encode())])

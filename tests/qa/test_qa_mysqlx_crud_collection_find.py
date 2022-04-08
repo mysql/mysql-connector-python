@@ -106,13 +106,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 2, "a": 2, "b": 1, "c": 200},
             {"_id": 3, "a": 3, "b": 2, "c": 300},
         ).execute()
-        result = (
-            collection.find("$.a > 1")
-            .fields("$.a")
-            .limit(2)
-            .offset(1)
-            .execute()
-        )
+        result = collection.find("$.a > 1").fields("$.a").limit(2).offset(1).execute()
         row = result.fetch_all()
         self.schema.drop_collection("mycoll10")
 
@@ -143,9 +137,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 2, "name": "Sam"},
             {"_id": 3, "name": "amr"},
         ).execute()
-        result = (
-            collection.find("$.name  == :name").bind("name", "Sana").execute()
-        )
+        result = collection.find("$.name  == :name").bind("name", "Sana").execute()
         row = result.fetch_all()[0]
         self.assertEqual(row["_id"], 1)
         self.schema.drop_collection("mycoll11")
@@ -183,10 +175,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 3, "a": 3, "b": 2, "c": 100},
         ).execute()
         result = (
-            collection.find()
-            .fields("$a,$.b,$.c")
-            .group_by("$.b", "$.c")
-            .execute()
+            collection.find().fields("$a,$.b,$.c").group_by("$.b", "$.c").execute()
         ).fetch_all()
         self.assertEqual(len(result), 2)
         self.schema.drop_collection("mycol20")
@@ -202,10 +191,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 3, "a": 2, "b": 10, "c": 300},
         ).execute()
         result = (
-            collection.find()
-            .fields("$.a, $.b")
-            .sort("a ASC", "b DESC")
-            .execute()
+            collection.find().fields("$.a, $.b").sort("a ASC", "b DESC").execute()
         ).fetch_all()
         self.assertEqual(result[0]["$.b"], 11)
         self.schema.drop_collection("mycoll21")
@@ -224,9 +210,7 @@ class CollectionAddTests(tests.MySQLxTests):
         self.assertEqual(len(result.fetch_all()), 2)
         self.schema.drop_collection("newcoll1")
 
-    @unittest.skipUnless(
-        tests.ARCH_64BIT, "Test available only for 64 bit platforms"
-    )
+    @unittest.skipUnless(tests.ARCH_64BIT, "Test available only for 64 bit platforms")
     @unittest.skipIf(os.name == "nt", "Test not available for Windows")
     @tests.foreach_session()
     def test_collection_find11(self):
@@ -313,9 +297,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test IN operator with int as operand - With LHS in RHS."""
         self._drop_collection_if_exists("mycoll2")
         collection = self.schema.create_collection("mycoll2")
-        collection.add(
-            {"name": "a", "age": 21}, {"name": "b", "age": 21}
-        ).execute()
+        collection.add({"name": "a", "age": 21}, {"name": "b", "age": 21}).execute()
         result = collection.find("21 IN $.age").execute()
         self.assertEqual(len(result.fetch_all()), 2)
         self.schema.drop_collection("mycoll2")
@@ -349,9 +331,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test NOT IN operator with int as operand - With LHS not in RHS."""
         self._drop_collection_if_exists("mycoll5")
         collection = self.schema.create_collection("mycoll5")
-        collection.add(
-            {"name": "a", "age": 21}, {"name": "b", "age": 22}
-        ).execute()
+        collection.add({"name": "a", "age": 21}, {"name": "b", "age": 22}).execute()
         result = collection.find("21 NOT IN $.age").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.schema.drop_collection("mycoll5")
@@ -360,9 +340,7 @@ class CollectionAddTests(tests.MySQLxTests):
     def test_contains_operator6(self):
         self._drop_collection_if_exists("mycoll6")
         collection = self.schema.create_collection("mycoll6")
-        collection.add(
-            {"name": "a", "age": 21}, {"name": "b", "age": 21}
-        ).execute()
+        collection.add({"name": "a", "age": 21}, {"name": "b", "age": 21}).execute()
         result = collection.find("'b' NOT IN $.name").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.schema.drop_collection("mycoll6")
@@ -372,9 +350,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test IN operator with different datatypes as operands."""
         self._drop_collection_if_exists("mycoll7")
         collection = self.schema.create_collection("mycoll7")
-        collection.add(
-            {"name": "a", "age": 21}, {"name": "b", "age": 22}
-        ).execute()
+        collection.add({"name": "a", "age": 21}, {"name": "b", "age": 22}).execute()
         result = collection.find("21 IN $.name").execute()
         result1 = collection.find("'b' IN $.age").limit(1).execute()
         self.assertEqual(len(result.fetch_all()), 0)
@@ -395,12 +371,7 @@ class CollectionAddTests(tests.MySQLxTests):
         result = collection.find("$.age IN [21,23,24,28]").execute()
         result1 = collection.find("$.name IN ['a','b','c','d','e']").execute()
         result2 = collection.find("$.age IN (21,23)").execute()
-        result3 = (
-            collection.find()
-            .fields("21 IN (22,23) as test")
-            .limit(1)
-            .execute()
-        )
+        result3 = collection.find().fields("21 IN (22,23) as test").limit(1).execute()
         result4 = collection.find('["p","q"] IN $.prof').execute()
         self.assertEqual(len(result.fetch_all()), 2)
         self.assertEqual(len(result1.fetch_all()), 3)
@@ -432,14 +403,9 @@ class CollectionAddTests(tests.MySQLxTests):
                 },
             }
         ).execute()
-        result = collection.find(
-            "'reading' IN $.additionalinfo.hobbies"
-        ).execute()
+        result = collection.find("'reading' IN $.additionalinfo.hobbies").execute()
         result1 = (
-            collection.find()
-            .fields("'music' IN $.age as test")
-            .limit(1)
-            .execute()
+            collection.find().fields("'music' IN $.age as test").limit(1).execute()
         )
         result2 = (
             collection.find()
@@ -1083,9 +1049,7 @@ class CollectionAddTests(tests.MySQLxTests):
             collection = schema1.get_collection("mycoll7")
 
             session1.start_transaction()
-            collection.find(
-                "$.name = 'James'"
-            ).lock_exclusive().lock_shared().execute()
+            collection.find("$.name = 'James'").lock_exclusive().lock_shared().execute()
             locking.set()
             time.sleep(2)
             locking.clear()
@@ -1174,8 +1138,7 @@ class CollectionAddTests(tests.MySQLxTests):
 
             if not waiting.is_set():
                 errors.append(
-                    "{0}-{1} lock test failure."
-                    "".format(lock_type_1, lock_type_2)
+                    "{0}-{1} lock test failure.".format(lock_type_1, lock_type_2)
                 )
                 session.commit()
                 return
@@ -1187,17 +1150,14 @@ class CollectionAddTests(tests.MySQLxTests):
 
             if not locking.wait(2):
                 errors.append(
-                    "{0}-{0} lock test failure."
-                    "".format(lock_type_1, lock_type_2)
+                    "{0}-{0} lock test failure.".format(lock_type_1, lock_type_2)
                 )
                 session.commit()
                 return
 
             session.start_transaction()
             if lock_type_2 == "S":
-                result = collection.find("name = 'Fred'").lock_shared(
-                    lock_contention
-                )
+                result = collection.find("name = 'Fred'").lock_shared(lock_contention)
             else:
                 result = collection.find("name = 'Fred'").lock_exclusive(
                     lock_contention
@@ -1242,9 +1202,7 @@ class CollectionAddTests(tests.MySQLxTests):
         self.schema.drop_collection("mycoll")
 
     @unittest.skip("TODO: Fix me")
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable."
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable.")
     def test_lock_shared_with_nowait(self):
         self._lock_contention_test("S", "S", mysqlx.LockContention.NOWAIT)
         self._lock_contention_test("S", "X", mysqlx.LockContention.NOWAIT)
@@ -1985,12 +1943,8 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test the MCPY-354 issue ( parameter_binding) with parameter list."""
         self._drop_collection_if_exists("mycoll1")
         collection = self.schema.create_collection("mycoll1")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
-        result = (
-            collection.find("name == :name").bind('{"name":"b"}').execute()
-        )
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
+        result = collection.find("name == :name").bind('{"name":"b"}').execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["_id"], 2)
         self.schema.drop_collection("mycoll1")
@@ -2005,11 +1959,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 1, "bday": "2000-10-10"},
             {"_id": 2, "bday": "2000-10-11"},
         ).execute()
-        result = (
-            collection.find("bday == :bday")
-            .bind("bday", "2000-10-11")
-            .execute()
-        )
+        result = collection.find("bday == :bday").bind("bday", "2000-10-11").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["_id"], 2)
         self.schema.drop_collection("mycoll2")
@@ -2019,15 +1969,9 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test client-side buffering."""
         self._drop_collection_if_exists("mycoll3")
         collection = self.schema.create_collection("mycoll3")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
-        result1 = (
-            collection.find("name == :name").bind('{"name":"b"}').execute()
-        )
-        result2 = (
-            collection.find("name == :name").bind('{"name":"a"}').execute()
-        )
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
+        result1 = collection.find("name == :name").bind('{"name":"b"}').execute()
+        result2 = collection.find("name == :name").bind('{"name":"a"}').execute()
         row2 = result2.fetch_all()
         self.assertEqual(row2[0]["_id"], 1)
         row1 = result1.fetch_all()

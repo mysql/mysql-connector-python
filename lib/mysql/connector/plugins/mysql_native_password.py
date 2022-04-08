@@ -73,8 +73,6 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
             hash4 = struct.pack("20B", *xored)
         except (struct.error, TypeError) as err:
-            raise errors.InterfaceError(
-                f"Failed scrambling password; {err}"
-            ) from err
+            raise errors.InterfaceError(f"Failed scrambling password; {err}") from err
 
         return hash4

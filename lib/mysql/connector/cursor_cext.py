@@ -40,11 +40,7 @@ from _mysql_connector import MySQLInterfaceError
 # pylint: enable=import-error,no-name-in-module
 # isort: split
 
-from .abstracts import (
-    NAMED_TUPLE_CACHE,
-    MySQLConnectionAbstract,
-    MySQLCursorAbstract,
-)
+from .abstracts import NAMED_TUPLE_CACHE, MySQLConnectionAbstract, MySQLCursorAbstract
 from .cursor import (
     RE_PY_PARAM,
     RE_SQL_COMMENT,
@@ -319,8 +315,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         matches = re.search(RE_SQL_INSERT_VALUES, tmp)
         if not matches:
             raise InterfaceError(
-                "Failed rewriting statement for multi-row INSERT. "
-                "Check SQL syntax."
+                "Failed rewriting statement for multi-row INSERT. Check SQL syntax"
             )
         fmt = matches.group(1).encode(self._cnx.python_charset)
         values = []
@@ -350,9 +345,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         except (UnicodeDecodeError, UnicodeEncodeError) as err:
             raise ProgrammingError(str(err)) from err
         except Exception as err:
-            raise InterfaceError(
-                f"Failed executing the operation; {err}"
-            ) from None
+            raise InterfaceError(f"Failed executing the operation; {err}") from None
 
     def executemany(self, operation, seq_params):
         """Execute the given operation multiple times"""
@@ -364,9 +357,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         self._cnx.handle_unread_result()
 
         if not isinstance(seq_params, (list, tuple)):
-            raise ProgrammingError(
-                "Parameters for query must be list or tuple."
-            )
+            raise ProgrammingError("Parameters for query must be list or tuple.")
 
         # Optimize INSERTs by batching them
         if re.match(RE_SQL_INSERT_STMT, operation):
@@ -395,9 +386,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                     pass
 
         except (ValueError, TypeError) as err:
-            raise ProgrammingError(
-                f"Failed executing the operation; {err}"
-            ) from err
+            raise ProgrammingError(f"Failed executing the operation; {err}") from err
 
         self._rowcount = rowcnt
         return None
@@ -461,9 +450,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             results = []
             while self._cnx.result_set_available:
                 result = self._cnx.fetch_eof_columns()
-                if isinstance(
-                    self, (CMySQLCursorDict, CMySQLCursorBufferedDict)
-                ):
+                if isinstance(self, (CMySQLCursorDict, CMySQLCursorBufferedDict)):
                     cursor_class = CMySQLCursorBufferedDict
                 elif isinstance(
                     self,
@@ -502,9 +489,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         except Error:
             raise
         except Exception as err:
-            raise InterfaceError(
-                f"Failed calling stored routine; {err}"
-            ) from None
+            raise InterfaceError(f"Failed calling stored routine; {err}") from None
 
     def nextset(self):
         """Skip to the next available result set"""
@@ -939,9 +924,7 @@ class CMySQLCursorPrepared(CMySQLCursor):
         self._nextrow = (None, None)
         self._handle_warnings()
         if self._cnx.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(
-                self._warnings[0][1], self._warnings[0][2]
-            )
+            raise get_mysql_exception(self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self, raw=False):
         """Returns the next row in the result set
@@ -1066,8 +1049,7 @@ class CMySQLCursorPrepared(CMySQLCursor):
             if self._stmt.param_count != len(params):
                 raise ProgrammingError(
                     errno=1210,
-                    msg="Incorrect number of arguments executing prepared "
-                    "statement",
+                    msg="Incorrect number of arguments executing prepared statement",
                 )
 
         if params is None:
@@ -1093,9 +1075,7 @@ class CMySQLCursorPrepared(CMySQLCursor):
                     self.fetchall()
                 rowcnt += self._rowcount
         except (ValueError, TypeError) as err:
-            raise InterfaceError(
-                f"Failed executing the operation; {err}"
-            ) from err
+            raise InterfaceError(f"Failed executing the operation; {err}") from err
         self._rowcount = rowcnt
 
     def fetchone(self):

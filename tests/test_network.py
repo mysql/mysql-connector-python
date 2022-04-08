@@ -80,9 +80,7 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
     def _get_socket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         LOGGER.debug(
-            "Get socket for {host}:{port}".format(
-                host=self._host, port=self._port
-            )
+            "Get socket for {host}:{port}".format(host=self._host, port=self._port)
         )
         sock.connect((self._host, self._port))
         return sock
@@ -129,9 +127,7 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
     def test_send_plain(self):
         """Send plain data through the socket"""
         data = b"asddfasdfasdf"
-        self.assertRaises(
-            errors.OperationalError, self.cnx.send_plain, data, 0
-        )
+        self.assertRaises(errors.OperationalError, self.cnx.send_plain, data, 0)
 
         self.cnx.sock = tests.DummySocket()
         data = [
@@ -151,18 +147,14 @@ class BaseMySQLSocketTests(tests.MySQLConnectorTests):
             try:
                 self.cnx.send_plain(*value)
             except errors.Error as err:
-                self.fail(
-                    "Failed sending pktnr {}: {}".format(value[1], str(err))
-                )
+                self.fail("Failed sending pktnr {}: {}".format(value[1], str(err)))
             self.assertEqual(exp, self.cnx.sock._client_sends)
             self.cnx.sock.reset()
 
     def test_send_compressed(self):
         """Send compressed data through the socket"""
         data = b"asddfasdfasdf"
-        self.assertRaises(
-            errors.OperationalError, self.cnx.send_compressed, data, 0
-        )
+        self.assertRaises(errors.OperationalError, self.cnx.send_compressed, data, 0)
 
         self.cnx.sock = tests.DummySocket()
         self.assertRaises(Exception, self.cnx.send_compressed, None, None)
@@ -335,7 +327,7 @@ class MySQLUnixSocketTests(tests.MySQLConnectorTests):
     )
     @unittest.skipIf(
         not tests.SSL_AVAILABLE,
-        "Could not test switch to SSL. Make sure Python supports " "SSL.",
+        "Could not test switch to SSL. Make sure Python supports SSL.",
     )
     def test_switch_to_ssl(self):
         """Switch the socket to use SSL"""
@@ -345,18 +337,14 @@ class MySQLUnixSocketTests(tests.MySQLConnectorTests):
             "key": os.path.join(tests.SSL_DIR, "tests_client_key.pem"),
             "cipher_suites": "AES256-SHA",
         }
-        self.assertRaises(
-            errors.InterfaceError, self.cnx.switch_to_ssl, **args
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)
 
         # Handshake failure
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(4)
         sock.connect(self._unix_socket)
         self.cnx.sock = sock
-        self.assertRaises(
-            errors.InterfaceError, self.cnx.switch_to_ssl, **args
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)
 
 
 class MySQLTCPSocketTests(tests.MySQLConnectorTests):
@@ -429,9 +417,7 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
 
     def _test_open_connection(self, addr, family, should_raise, force):
         try:
-            sock = network.MySQLTCPSocket(
-                host=addr, port=self._port, force_ipv6=force
-            )
+            sock = network.MySQLTCPSocket(host=addr, port=self._port, force_ipv6=force)
             sock.set_connection_timeout(1)
             sock.open_connection()
         except (errors.InterfaceError, socket.error):
@@ -444,15 +430,13 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
                 self.assertEqual(
                     family,
                     sock._family,
-                    "Family for {0} did not match".format(
-                        addr, family, sock._family
-                    ),
+                    "Family for {0} did not match".format(addr, family, sock._family),
                 )
             sock.close_connection()
 
     @unittest.skipIf(
         not tests.SSL_AVAILABLE,
-        "Could not test switch to SSL. Make sure Python supports " "SSL.",
+        "Could not test switch to SSL. Make sure Python supports SSL.",
     )
     def test_switch_to_ssl(self):
         """Switch the socket to use SSL"""
@@ -461,9 +445,7 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
             "cert": os.path.join(tests.SSL_DIR, "tests_client_cert.pem"),
             "key": os.path.join(tests.SSL_DIR, "tests_client_key.pem"),
         }
-        self.assertRaises(
-            errors.InterfaceError, self.cnx.switch_to_ssl, **args
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)
 
         # Handshake failure
         (family, socktype, proto, _, sockaddr) = socket.getaddrinfo(
@@ -473,6 +455,4 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
         sock.settimeout(4)
         sock.connect(sockaddr)
         self.cnx.sock = sock
-        self.assertRaises(
-            errors.InterfaceError, self.cnx.switch_to_ssl, **args
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)

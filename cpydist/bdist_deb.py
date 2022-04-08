@@ -98,9 +98,7 @@ class DistDeb(BaseCommand):
         self.debian_support_dir = DEBIAN_ROOT
         self.edition = EDITION
         self.codename = linux_distribution()[2].lower()
-        self.version_extra = (
-            "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
-        )
+        self.version_extra = "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
 
     def finalize_options(self):
         """Finalize the options."""
@@ -162,9 +160,7 @@ class DistDeb(BaseCommand):
     def _populate_debian(self):
         """Copy and make files ready in the debian/ folder."""
         for afile in self.debian_files:
-            copy_file(
-                os.path.join(self.debian_support_dir, afile), self.debian_base
-            )
+            copy_file(os.path.join(self.debian_support_dir, afile), self.debian_base)
 
         copy_file(
             os.path.join(self.debian_support_dir, "source", "format"),
@@ -175,9 +171,7 @@ class DistDeb(BaseCommand):
         changelog_file = os.path.join(self.debian_base, "changelog")
         with open(changelog_file, "r") as fp:
             changelog = fp.readlines()
-        self.log.info(
-            "changing changelog '%s' version and log", changelog_file
-        )
+        self.log.info("changing changelog '%s' version and log", changelog_file)
 
         log_lines = self._get_changes()
         if not log_lines:
@@ -192,9 +186,7 @@ class DistDeb(BaseCommand):
             match = regex.match(line)
             if match:
                 version = match.groups()[0]
-                line = line.replace(
-                    version, "{0}.{1}.{2}-1".format(*VERSION[0:3])
-                )
+                line = line.replace(version, "{0}.{1}.{2}-1".format(*VERSION[0:3]))
             if first_line:
                 if self.codename == "":
                     proc = subprocess.Popen(
@@ -204,9 +196,7 @@ class DistDeb(BaseCommand):
                     )
                     codename = proc.stdout.read().split()[-1]
                     self.codename = (
-                        codename.decode()
-                        if sys.version_info[0] == 3
-                        else codename
+                        codename.decode() if sys.version_info[0] == 3 else codename
                     )
                 if self.label:
                     line = line.replace(
@@ -227,9 +217,7 @@ class DistDeb(BaseCommand):
                 for change in log_lines:
                     new_changelog.append(change)
             elif line.startswith(" --") and "@" in line:
-                utcnow = datetime.utcnow().strftime(
-                    "%a, %d %b %Y %H:%M:%S +0000"
-                )
+                utcnow = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
                 line = re.sub(r"( -- .* <.*@.*>  ).*", r"\1" + utcnow, line)
                 new_changelog.append(line + "\n")
             else:
@@ -254,17 +242,13 @@ class DistDeb(BaseCommand):
             add_label_regex = re.compile(
                 r"^((?:Source|Package): mysql-connector-python)"
             )
-            remove_label_regex = re.compile(
-                "^(Conflicts: .*?)-{}".format(self.label)
-            )
+            remove_label_regex = re.compile("^(Conflicts: .*?)-{}".format(self.label))
             for line in control:
                 line = line.rstrip()
 
                 match = add_label_regex.match(line)
                 if match:
-                    line = add_label_regex.sub(
-                        r"\1-{}".format(self.label), line
-                    )
+                    line = add_label_regex.sub(r"\1-{}".format(self.label), line)
 
                 match = remove_label_regex.match(line)
                 if match:
@@ -312,9 +296,7 @@ class DistDeb(BaseCommand):
             move_file(tarball, self.orig_tarball)
 
             unarchive_targz(self.orig_tarball)
-            self.debian_base = os.path.join(
-                tarball.replace(".tar.gz", ""), "debian"
-            )
+            self.debian_base = os.path.join(tarball.replace(".tar.gz", ""), "debian")
         elif base:
             self.debian_base = os.path.join(base, "debian")
 
@@ -327,9 +309,7 @@ class DistDeb(BaseCommand):
         self.log.info("creating Debian package using '%s'", DPKG_MAKER)
 
         orig_pwd = os.getcwd()
-        os.chdir(
-            os.path.join(self.build_base, self.distribution.get_fullname())
-        )
+        os.chdir(os.path.join(self.build_base, self.distribution.get_fullname()))
         cmd = [DPKG_MAKER, "-uc"]
 
         if not self.sign:
@@ -340,9 +320,7 @@ class DistDeb(BaseCommand):
         env["MYSQL_CAPI"] = self.with_mysql_capi or ""
         env["OPENSSL_INCLUDE_DIR"] = self.with_openssl_include_dir or ""
         env["OPENSSL_LIB_DIR"] = self.with_openssl_lib_dir or ""
-        env["MYSQLXPB_PROTOBUF_INCLUDE_DIR"] = (
-            self.with_protobuf_include_dir or ""
-        )
+        env["MYSQLXPB_PROTOBUF_INCLUDE_DIR"] = self.with_protobuf_include_dir or ""
         env["MYSQLXPB_PROTOBUF_LIB_DIR"] = self.with_protobuf_lib_dir or ""
         env["MYSQLXPB_PROTOC"] = self.with_protoc or ""
         env["WITH_CEXT"] = "1" if self.with_cext else ""

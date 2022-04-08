@@ -149,9 +149,7 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
     Returns an Exception.
     """
     try:
-        return _ERROR_EXCEPTIONS[errno](
-            msg=msg, errno=errno, sqlstate=sqlstate
-        )
+        return _ERROR_EXCEPTIONS[errno](msg=msg, errno=errno, sqlstate=sqlstate)
     except KeyError:
         # Error was not mapped to particular exception
         pass

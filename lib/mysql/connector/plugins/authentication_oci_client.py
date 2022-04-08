@@ -40,16 +40,13 @@ try:
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
 except ImportError:
-    raise errors.ProgrammingError(
-        "Package 'cryptography' is not installed"
-    ) from None
+    raise errors.ProgrammingError("Package 'cryptography' is not installed") from None
 
 try:
     from oci import config, exceptions
 except ImportError:
     raise errors.ProgrammingError(
-        "Package 'oci' (Oracle Cloud Infrastructure Python SDK) "
-        "is not installed"
+        "Package 'oci' (Oracle Cloud Infrastructure Python SDK) is not installed"
     ) from None
 
 from . import BaseAuthPlugin
@@ -122,9 +119,7 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
             for req_key, req_value in req_keys.items():
                 try:
                     # Verify parameter in req_key is present and valid
-                    if oci_config[req_key] and not req_value(
-                        oci_config[req_key]
-                    ):
+                    if oci_config[req_key] and not req_value(oci_config[req_key]):
                         error_list.append(f'Parameter "{req_key}" is invalid')
                 except KeyError:
                     error_list.append(f"Does not contain parameter {req_key}")
@@ -149,9 +144,7 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
     def auth_response(self, auth_data=None):
         """Prepare authentication string for the server."""
         oci_path = auth_data
-        _LOGGER.debug(
-            "server nonce: %s, len %d", self._auth_data, len(self._auth_data)
-        )
+        _LOGGER.debug("server nonce: %s, len %d", self._auth_data, len(self._auth_data))
         _LOGGER.debug("OCI configuration file location: %s", oci_path)
 
         oci_config = self._get_valid_oci_config(oci_path)

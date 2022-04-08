@@ -544,8 +544,7 @@ class ServerFlag(_Flags):
         "SERVER_QUERY_NO_INDEX_USED": (1 << 5, ""),
         "SERVER_STATUS_CURSOR_EXISTS": (
             1 << 6,
-            "Set when server opened a read-only "
-            "non-scrollable cursor for a query.",
+            "Set when server opened a read-only non-scrollable cursor for a query.",
         ),
         "SERVER_STATUS_LAST_ROW_SENT": (
             1 << 7,
@@ -567,9 +566,7 @@ class ServerFlag(_Flags):
         ),
         "SERVER_STATUS_IN_TRANS_READONLY": (
             8192,
-            "Set if multi-statement "
-            "transaction is a read-only "
-            "transaction.",
+            "Set if multi-statement transaction is a read-only transaction.",
         ),
         "SERVER_SESSION_STATE_CHANGED": (
             1 << 14,
@@ -662,8 +659,7 @@ class ShutdownType(_Constants):
         ),
         "SHUTDOWN_WAIT_CRITICAL_BUFFERS": (
             SHUTDOWN_WAIT_CRITICAL_BUFFERS,
-            "don't flush InnoDB buffers, "
-            "flush other storage engines' buffers",
+            "don't flush InnoDB buffers, flush other storage engines' buffers",
         ),
         "KILL_QUERY": (KILL_QUERY, "(no description)"),
         "KILL_CONNECTION": (KILL_CONNECTION, "(no description)"),
@@ -700,9 +696,7 @@ class CharacterSet(_Constants):
         try:
             return cls.desc[setid][0:2]
         except IndexError:
-            raise ProgrammingError(
-                f"Character set '{setid}' unsupported"
-            ) from None
+            raise ProgrammingError(f"Character set '{setid}' unsupported") from None
 
     @classmethod
     def get_desc(cls, name):
@@ -857,9 +851,7 @@ class SQLMode(_Constants):
         """
         res = []
         for key in vars(cls).keys():
-            if not key.startswith("_") and not hasattr(
-                getattr(cls, key), "__call__"
-            ):
+            if not key.startswith("_") and not hasattr(getattr(cls, key), "__call__"):
                 res.append(key)
         return tuple(sorted(res))
 

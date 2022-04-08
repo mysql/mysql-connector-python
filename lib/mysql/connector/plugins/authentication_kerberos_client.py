@@ -84,9 +84,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
 
     def _acquire_cred_with_password(self, upn):
         """Acquire credentials through provided password."""
-        _LOGGER.debug(
-            "Attempt to acquire credentials through provided password"
-        )
+        _LOGGER.debug("Attempt to acquire credentials through provided password")
 
         username = gssapi.raw.names.import_name(
             upn.encode("utf-8"), name_type=gssapi.NameType.user
@@ -138,9 +136,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             try:
                 spn, realm = self._parse_auth_data(auth_data)
             except struct.error as err:
-                raise InterruptedError(
-                    f"Invalid authentication data: {err}"
-                ) from err
+                raise InterruptedError(f"Invalid authentication data: {err}") from err
 
         if spn is None:
             return self.prepare_password()
@@ -176,11 +172,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
                 )
                 if self._password is not None:
                     creds = self._acquire_cred_with_password(upn)
-            if (
-                creds_realm
-                and creds_realm != realm
-                and self._password is not None
-            ):
+            if creds_realm and creds_realm != realm and self._password is not None:
                 creds = self._acquire_cred_with_password(upn)
         except gssapi.raw.exceptions.ExpiredCredentialsError as err:
             if upn and self._password is not None:
@@ -209,9 +201,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         try:
             initial_client_token = self.context.step()
         except gssapi.raw.misc.GSSError as err:
-            raise errors.InterfaceError(
-                f"Unable to initiate security context: {err}"
-            )
+            raise errors.InterfaceError(f"Unable to initiate security context: {err}")
 
         _LOGGER.debug("Initial client token: %s", initial_client_token)
         return initial_client_token
@@ -275,9 +265,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             _LOGGER.debug("Unwraped: %s", unwraped)
         except gssapi.raw.exceptions.BadMICError as err:
             _LOGGER.debug("Unable to unwrap server message: %s", err)
-            raise errors.InterfaceError(
-                f"Unable to unwrap server message: {err}"
-            )
+            raise errors.InterfaceError(f"Unable to unwrap server message: {err}")
 
         _LOGGER.debug("Unwrapped server message: %s", unwraped)
         # The message contents for the clients closing message:
@@ -341,9 +329,7 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
             try:
                 spn, realm = self._parse_auth_data(auth_data)
             except struct.error as err:
-                raise InterruptedError(
-                    f"Invalid authentication data: {err}"
-                ) from err
+                raise InterruptedError(f"Invalid authentication data: {err}") from err
 
         _LOGGER.debug("Service Principal: %s", spn)
         _LOGGER.debug("Realm: %s", realm)
@@ -379,9 +365,7 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
             err, out_buf = self.clientauth.authorize(data)
             _LOGGER.debug("Context step err: %s", err)
             _LOGGER.debug("Context step out_buf: %s", out_buf)
-            _LOGGER.debug(
-                "Context completed?: %s", self.clientauth.authenticated
-            )
+            _LOGGER.debug("Context completed?: %s", self.clientauth.authenticated)
             initial_client_token = out_buf[0].Buffer
             _LOGGER.debug("pkg_info: %s", self.clientauth.pkg_info)
         except Exception as err:

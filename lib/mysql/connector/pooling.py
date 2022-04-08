@@ -65,9 +65,7 @@ CNX_POOL_MAXNAMESIZE = 64
 CNX_POOL_NAMEREGEX = re.compile(r"[^a-zA-Z0-9._:\-*$#]")
 ERROR_NO_CEXT = "MySQL Connector/Python C Extension not available"
 MYSQL_CNX_CLASS = (
-    MySQLConnection
-    if CMySQLConnection is None
-    else (MySQLConnection, CMySQLConnection)
+    MySQLConnection if CMySQLConnection is None else (MySQLConnection, CMySQLConnection)
 )
 
 _CONNECTION_POOLS = {}
@@ -77,9 +75,7 @@ def _get_pooled_connection(**kwargs):
     """Return a pooled MySQL connection."""
     # If no pool name specified, generate one
     pool_name = (
-        kwargs["pool_name"]
-        if "pool_name" in kwargs
-        else generate_pool_name(**kwargs)
+        kwargs["pool_name"] if "pool_name" in kwargs else generate_pool_name(**kwargs)
     )
 
     if kwargs.get("use_pure") is False and CMySQLConnection is None:
@@ -224,18 +220,15 @@ def connect(*args, **kwargs):
             )
         if "unix_socket" in kwargs:
             raise InterfaceError(
-                "Using Unix domain sockets with DNS SRV "
-                "lookup is not allowed"
+                "Using Unix domain sockets with DNS SRV lookup is not allowed"
             )
         if "port" in kwargs:
             raise InterfaceError(
-                "Specifying a port number with DNS SRV "
-                "lookup is not allowed"
+                "Specifying a port number with DNS SRV lookup is not allowed"
             )
         if "failover" in kwargs:
             raise InterfaceError(
-                "Specifying multiple hostnames with DNS "
-                "SRV look up is not allowed"
+                "Specifying multiple hostnames with DNS SRV look up is not allowed"
             )
         if "host" not in kwargs:
             kwargs["host"] = DEFAULT_CONFIGURATION["host"]
@@ -393,9 +386,7 @@ class PooledMySQLConnection:
 class MySQLConnectionPool:
     """Class defining a pool of MySQL connections"""
 
-    def __init__(
-        self, pool_size=5, pool_name=None, pool_reset_session=True, **kwargs
-    ):
+    def __init__(self, pool_size=5, pool_name=None, pool_reset_session=True, **kwargs):
         """Initialize
 
         Initialize a MySQL connection pool with a maximum number of
@@ -453,9 +444,7 @@ class MySQLConnectionPool:
                 self._cnx_config = kwargs
                 self._config_version = uuid4()
             except AttributeError as err:
-                raise PoolError(
-                    f"Connection configuration not valid: {err}"
-                ) from err
+                raise PoolError(f"Connection configuration not valid: {err}") from err
 
     def _set_pool_size(self, pool_size):
         """Set the size of the pool
@@ -481,9 +470,7 @@ class MySQLConnectionPool:
         ([^a-zA-Z0-9._\-*$#]) or is longer than pooling.CNX_POOL_MAXNAMESIZE.
         """
         if CNX_POOL_NAMEREGEX.search(pool_name):
-            raise AttributeError(
-                f"Pool name '{pool_name}' contains illegal characters"
-            )
+            raise AttributeError(f"Pool name '{pool_name}' contains illegal characters")
         if len(pool_name) > CNX_POOL_MAXNAMESIZE:
             raise AttributeError(f"Pool name '{pool_name}' is too long")
         self._pool_name = pool_name
@@ -498,9 +485,7 @@ class MySQLConnectionPool:
         Raises PoolError on errors.
         """
         if not isinstance(cnx, MYSQL_CNX_CLASS):
-            raise PoolError(
-                "Connection instance not subclass of MySQLConnection"
-            )
+            raise PoolError("Connection instance not subclass of MySQLConnection")
 
         try:
             self._cnx_queue.put(cnx, block=False)
@@ -569,9 +554,7 @@ class MySQLConnectionPool:
             try:
                 cnx = self._cnx_queue.get(block=False)
             except queue.Empty as err:
-                raise PoolError(
-                    "Failed getting connection; pool exhausted"
-                ) from err
+                raise PoolError("Failed getting connection; pool exhausted") from err
 
             if (
                 not cnx.is_connected()

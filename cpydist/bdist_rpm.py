@@ -38,9 +38,7 @@ from distutils.file_util import copy_file
 from . import EDITION, VERSION, VERSION_EXTRA, BaseCommand
 from .utils import linux_distribution
 
-RPM_SPEC = os.path.join(
-    "cpydist", "data", "rpm", "mysql-connector-python.spec"
-)
+RPM_SPEC = os.path.join("cpydist", "data", "rpm", "mysql-connector-python.spec")
 LINUX_DIST = linux_distribution()
 VERSION_TEXT_SHORT = "{0}.{1}.{2}".format(*VERSION[0:3])
 
@@ -83,14 +81,10 @@ class DistRPM(BaseCommand):
         """Finalize the options."""
         BaseCommand.finalize_options(self)
         self.set_undefined_options("build", ("build_base", "build_base"))
-        self.set_undefined_options(
-            self._cmd_dist_tarball, ("dist_dir", "dist_dir")
-        )
+        self.set_undefined_options(self._cmd_dist_tarball, ("dist_dir", "dist_dir"))
 
         if not self.rpm_base:
-            self.rpm_base = os.path.abspath(
-                os.path.join(self.build_base, "rpmbuild")
-            )
+            self.rpm_base = os.path.abspath(os.path.join(self.build_base, "rpmbuild"))
 
         if not self.python3_pkgversion:
             self.python3_pkgversion = os.environ.get("PYTHON3_PKGVERSION")
@@ -172,27 +166,25 @@ class DistRPM(BaseCommand):
             cmd.extend(
                 [
                     "--define",
-                    "openssl_include_dir {}"
-                    "".format(self.with_openssl_include_dir),
+                    "openssl_include_dir {}".format(self.with_openssl_include_dir),
                 ]
             )
             cmd.extend(
                 [
                     "--define",
-                    "openssl_lib_dir {}" "".format(self.with_openssl_lib_dir),
+                    "openssl_lib_dir {}".format(self.with_openssl_lib_dir),
                 ]
             )
         cmd.extend(
             [
                 "--define",
-                "protobuf_include_dir {}"
-                "".format(self.with_protobuf_include_dir),
+                "protobuf_include_dir {}".format(self.with_protobuf_include_dir),
             ]
         )
         cmd.extend(
             [
                 "--define",
-                "protobuf_lib_dir {}" "".format(self.with_protobuf_lib_dir),
+                "protobuf_lib_dir {}".format(self.with_protobuf_lib_dir),
             ]
         )
         cmd.extend(["--define", "protoc {}".format(self.with_protoc)])
@@ -201,8 +193,7 @@ class DistRPM(BaseCommand):
             cmd.extend(
                 [
                     "--define",
-                    "extra_compile_args '{0}'"
-                    "".format(self.extra_compile_args),
+                    "extra_compile_args '{0}'".format(self.extra_compile_args),
                 ]
             )
         if self.extra_link_args:

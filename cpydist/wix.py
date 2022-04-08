@@ -53,9 +53,7 @@ def find_candle_bindir(wix_install_path):
     if os.path.isfile(candle) and os.access(candle, os.X_OK):
         return (candle, wix_install_path)
 
-    raise DistutilsError(
-        "Could not find candle.exe under %s" % wix_install_path
-    )
+    raise DistutilsError("Could not find candle.exe under %s" % wix_install_path)
 
 
 def check_wix_install(
@@ -92,13 +90,12 @@ def check_wix_install(
     m = re.search(r"version\s+(?P<major>\d+)\.(?P<minor>\d+)", verline)
     if not m:
         raise DistutilsError(
-            "Can't parse version output from candle.exe: {}" "".format(verline)
+            "Can't parse version output from candle.exe: {}".format(verline)
         )
     wix_version = [int(m.group("major")), int(m.group("minor"))]
     wix_min_version = [int(i) for i in wix_required_version.split(".")[:2]]
     if wix_version[0] < wix_min_version[0] or (
-        wix_version[0] == wix_min_version[0]
-        and wix_version[1] < wix_min_version[1]
+        wix_version[0] == wix_min_version[0] and wix_version[1] < wix_min_version[1]
     ):
         raise DistutilsError(
             "Minimal WiX v{}, we found v{}"
@@ -226,9 +223,7 @@ class WiX:
         print("cwd: {}".format(cwd))
         os.chdir(base_path)
         print("base_path: {}".format(base_path))
-        wxlfile = os.path.join(
-            data_path, "cpydist\\data\\msi\\WixUI_en-us.wxl"
-        )
+        wxlfile = os.path.join(data_path, "cpydist\\data\\msi\\WixUI_en-us.wxl")
         print("wxlfile loc file: {}".format(wxlfile))
 
         cmdargs = [

@@ -81,9 +81,7 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_insert1(self):
         """Test the table.insert_ with different_datatype."""
-        self.session.sql(
-            "create table t4(_id int, name varchar(32))"
-        ).execute()
+        self.session.sql("create table t4(_id int, name varchar(32))").execute()
         table = self.schema.get_table("t4")
         table.insert("_id", "name").values(1, "amr").execute()
         result = table.select().where("_id ==1").execute()
@@ -108,9 +106,7 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_insert3(self):
         """Test the table.insert."""
-        self.session.sql(
-            "create table t6(_id int, name varchar(32))"
-        ).execute()
+        self.session.sql("create table t6(_id int, name varchar(32))").execute()
         table = self.schema.get_table("t6")
         try:
             table.insert().values().execute()
@@ -159,9 +155,7 @@ class TableInsertTests(tests.MySQLxTests):
         self.session.sql(
             "create table t10(a int key auto_increment , name varchar(32))"
         ).execute()
-        result = self.session.sql(
-            "insert into t10 values(Null,'Fred')"
-        ).execute()
+        result = self.session.sql("insert into t10 values(Null,'Fred')").execute()
         table = self.schema.get_table("t10")
         table.insert().values(None, "Boo").execute()
         self.session.sql("drop table t10").execute()

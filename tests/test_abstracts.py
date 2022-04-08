@@ -111,8 +111,7 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
             self.cnx.sql_mode = exp
         except errors.Error as err:
             self.fail(
-                "Failed setting SQL Mode with multiple "
-                "modes: {0}".format(str(err))
+                "Failed setting SQL Mode with multiple modes: {0}".format(str(err))
             )
         self.assertEqual(exp, self.cnx._sql_mode)
 
@@ -176,9 +175,7 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.cnx.cmd_init_db("myconnpy")
         self.assertEqual("myconnpy", self.cnx.database)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (5, 7, 2), "reset command not available"
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 2), "reset command not available")
     @foreach_cnx()
     @unittest.skipIf(
         tests.MYSQL_VERSION < (8, 0),

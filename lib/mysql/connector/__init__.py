@@ -38,13 +38,7 @@ else:
 
 from . import version
 from .connection import MySQLConnection
-from .constants import (
-    CharacterSet,
-    ClientFlag,
-    FieldFlag,
-    FieldType,
-    RefreshOption,
-)
+from .constants import CharacterSet, ClientFlag, FieldFlag, FieldType, RefreshOption
 from .dbapi import (
     BINARY,
     DATETIME,

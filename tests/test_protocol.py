@@ -110,14 +110,10 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             "client_flags": flags,
         }
 
-        self.assertRaises(
-            errors.ProgrammingError, self._protocol.make_auth, **kwargs
-        )
+        self.assertRaises(errors.ProgrammingError, self._protocol.make_auth, **kwargs)
 
         kwargs["handshake"] = {"auth_data": SEED}
-        self.assertRaises(
-            errors.ProgrammingError, self._protocol.make_auth, **kwargs
-        )
+        self.assertRaises(errors.ProgrammingError, self._protocol.make_auth, **kwargs)
 
         kwargs["handshake"] = {
             "auth_data": SEED,
@@ -332,9 +328,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ),
         ]
         for packet, exp in cases:
-            self.assertEqual(
-                exp, self._protocol.parse_binary_prepare_ok(packet)
-            )
+            self.assertEqual(exp, self._protocol.parse_binary_prepare_ok(packet))
 
     def test__parse_binary_integer(self):
         """Parse an integer from a binary packet"""
@@ -383,9 +377,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         field_info[0] = "c1"
         for exp, data, field_type in cases:
             field_info[1] = field_type
-            res = self._protocol._parse_binary_float(
-                data + b"\x00\x00", field_info
-            )
+            res = self._protocol._parse_binary_float(data + b"\x00\x00", field_info)
             self.assertEqual(
                 bytearray(b"\x00\x00"),
                 res[0],
@@ -437,9 +429,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ),
             (
                 datetime.timedelta(10, 58530, 230000),
-                bytearray(
-                    b"\x0c\x00\x0a\x00\x00\x00" b"\x10\x0f\x1e\x70\x82\x03\x00"
-                ),
+                bytearray(b"\x0c\x00\x0a\x00\x00\x00" b"\x10\x0f\x1e\x70\x82\x03\x00"),
             ),
         ]
         for exp, data in cases:
@@ -516,9 +506,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         ]
         for data, exp in cases:
             res = self._protocol.prepare_binary_integer(data)
-            self.assertEqual(
-                exp, res, "Failed preparing value '{0}'".format(data)
-            )
+            self.assertEqual(exp, res, "Failed preparing value '{0}'".format(data))
 
     def test_prepare_binary_timestamp(self):
         """Prepare a timestamp object for the MySQL binary protocol"""
@@ -538,9 +526,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             (
                 datetime.datetime(1977, 6, 14, 21, 33, 14, 345),
                 (
-                    bytearray(
-                        b"\x0b\xb9\x07\x06\x0e\x15" b"\x21\x0e\x59\x01\x00\x00"
-                    ),
+                    bytearray(b"\x0b\xb9\x07\x06\x0e\x15" b"\x21\x0e\x59\x01\x00\x00"),
                     12,
                 ),
             ),
@@ -553,9 +539,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             )
 
         # Raise an error
-        self.assertRaises(
-            ValueError, self._protocol.prepare_binary_timestamp, "spam"
-        )
+        self.assertRaises(ValueError, self._protocol.prepare_binary_timestamp, "spam")
 
     def test_prepare_binary_time(self):
         """Prepare a time object for the MySQL binary protocol"""
@@ -569,13 +553,10 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
                 (bytearray(b"\x08\x01\x06\x00\x00\x00\x15\x2d\x10"), 11),
             ),
             (
-                datetime.timedelta(
-                    hours=123, minutes=45, seconds=16, microseconds=345
-                ),
+                datetime.timedelta(hours=123, minutes=45, seconds=16, microseconds=345),
                 (
                     bytearray(
-                        b"\x0c\x00\x05\x00\x00\x00\x03"
-                        b"\x2d\x10\x59\x01\x00\x00"
+                        b"\x0c\x00\x05\x00\x00\x00\x03" b"\x2d\x10\x59\x01\x00\x00"
                     ),
                     11,
                 ),
@@ -592,8 +573,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
                 datetime.time(14, 53, 36, 345),
                 (
                     bytearray(
-                        b"\x0c\x00\x00\x00\x00\x00\x0e"
-                        b"\x35\x24\x59\x01\x00\x00"
+                        b"\x0c\x00\x00\x00\x00\x00\x0e" b"\x35\x24\x59\x01\x00\x00"
                     ),
                     11,
                 ),
@@ -607,9 +587,7 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             )
 
         # Raise an error
-        self.assertRaises(
-            ValueError, self._protocol.prepare_binary_time, "spam"
-        )
+        self.assertRaises(ValueError, self._protocol.prepare_binary_time, "spam")
 
     def test_make_stmt_execute(self):
         """Make a MySQL packet with the STMT_EXECUTE command"""
@@ -640,29 +618,25 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             (
                 "ham",
                 bytearray(
-                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x0f\x00"
-                    b"\x03ham"
+                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x0f\x00" b"\x03ham"
                 ),
             ),
             (
                 decimal.Decimal("3.14"),
                 bytearray(
-                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00"
-                    b"\x043.14"
+                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00" b"\x043.14"
                 ),
             ),
             (
                 255,
                 bytearray(
-                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x01\x80"
-                    b"\xff"
+                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x01\x80" b"\xff"
                 ),
             ),
             (
                 -128,
                 bytearray(
-                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x01\x00"
-                    b"\x80"
+                    b"\x01\x00\x00\x00\x00\x01\x00\x00\x00\x00\x01\x01\x00" b"\x80"
                 ),
             ),
             (

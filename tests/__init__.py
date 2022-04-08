@@ -565,9 +565,7 @@ class MySQLConnectorTests(unittest.TestCase):
         )
         self.assertTrue(
             inspect.ismethod(getattr(obj, method)),
-            "{0} object defines {1}, but is not a method".format(
-                cls_name, method
-            ),
+            "{0} object defines {1}, but is not a method".format(cls_name, method),
         )
 
     def check_args(self, function, supported_arguments):
@@ -639,16 +637,13 @@ class MySQLConnectorTests(unittest.TestCase):
                 getattr(tocheck, attr)
             except AttributeError:
                 self.fail(
-                    "Attribute '{0}' not part of namedtuple {1}".format(
-                        attr, tocheck
-                    )
+                    "Attribute '{0}' not part of namedtuple {1}".format(attr, tocheck)
                 )
 
     def get_clean_mysql_config(self):
         config = get_mysql_config()
         return {
-            opt: config[opt]
-            for opt in ["host", "port", "user", "password", "database"]
+            opt: config[opt] for opt in ["host", "port", "user", "password", "database"]
         }
 
 
@@ -846,9 +841,7 @@ def test_skip_if(condition, reason):
 
 def setup_logger(logger, debug=False, logfile=None):
     """Setting up the logger"""
-    formatter = logging.Formatter(
-        "%(asctime)s [%(name)s:%(levelname)s] %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s [%(name)s:%(levelname)s] %(message)s")
     handler = None
     if logfile:
         handler = logging.FileHandler(logfile)
@@ -1073,10 +1066,7 @@ def is_plugin_available(plugin_name, config_vars=None, in_server=None):
             cnx.cmd_query("SHOW PLUGINS")
             res = cnx.get_rows()
             for row in res[0]:
-                if (
-                    row[0].lower() == plugin_name.lower()
-                    and row[1] == "ACTIVE"
-                ):
+                if row[0].lower() == plugin_name.lower() and row[1] == "ACTIVE":
                     return True
         return False
 

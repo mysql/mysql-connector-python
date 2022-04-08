@@ -47,12 +47,7 @@ import tests
 from mysql.connector.utils import linux_distribution
 from mysql.connector.version import LICENSE, VERSION
 from mysqlx.connection import update_timeout_penalties_by_error
-from mysqlx.errors import (
-    InterfaceError,
-    OperationalError,
-    PoolError,
-    ProgrammingError,
-)
+from mysqlx.errors import InterfaceError, OperationalError, PoolError, ProgrammingError
 
 from . import check_tls_versions_support, shutdown_mysql_server
 from .test_mysqlx_connection import build_uri
@@ -104,35 +99,25 @@ class MySQLxClientTests(tests.MySQLxTests):
         self.users = [("client_user", "passclient"), ("max_size", "max_pass")]
 
         for user, password in self.users:
+            self.session.sql(DROP_USER.format(user=user, host=self.host)).execute()
             self.session.sql(
-                DROP_USER.format(user=user, host=self.host)
-            ).execute()
-            self.session.sql(
-                CREATE_USER.format(
-                    user=user, host=self.host, password=password
-                )
+                CREATE_USER.format(user=user, host=self.host, password=password)
             ).execute()
             # Grant all to new user on database
             self.session.sql(
-                GRANT_USER.format(
-                    database=self.schema_name, user=user, host=self.host
-                )
+                GRANT_USER.format(database=self.schema_name, user=user, host=self.host)
             ).execute()
 
     def tearDown(self):
         for user, _ in self.users:
-            self.session.sql(
-                DROP_USER.format(user=user, host=self.host)
-            ).execute()
+            self.session.sql(DROP_USER.format(user=user, host=self.host)).execute()
 
     def test_get_client(self):
         """Test valid and invalid parameters of get_client()."""
         # Test invalid settings
         invalid_params = [(), (""), ({}), ("1", "2", "3"), ({}, {}, {})]
         for params in invalid_params:
-            with self.assertRaises(
-                TypeError, msg="with params {}".format(params)
-            ):
+            with self.assertRaises(TypeError, msg="with params {}".format(params)):
                 mysqlx.get_client(*params)
 
         invalid_params = [
@@ -140,9 +125,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             ({}, {}),
         ]
         for params in invalid_params:
-            with self.assertRaises(
-                InterfaceError, msg="with params {}".format(params)
-            ):
+            with self.assertRaises(InterfaceError, msg="with params {}".format(params)):
                 mysqlx.get_client(*params)
 
         settings = self.connect_kwargs.copy()
@@ -161,9 +144,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         ]
         for value in invalid_values:
             cnx_options = {"pooling": value}
-            with self.assertRaises(
-                InterfaceError, msg="with value {}".format(value)
-            ):
+            with self.assertRaises(InterfaceError, msg="with value {}".format(value)):
                 mysqlx.get_client(settings, cnx_options)
 
         # Raise error for unrecognized settings for pooling option
@@ -191,9 +172,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         for value in invalid_values:
             pooling_dict = {"max_size": value}
             cnx_options = {"pooling": pooling_dict}
-            with self.assertRaises(
-                AttributeError, msg="with value {}".format(value)
-            ):
+            with self.assertRaises(AttributeError, msg="with value {}".format(value)):
                 mysqlx.get_client(settings, cnx_options)
 
         # Test valid values for max_size option
@@ -221,9 +200,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         for value in invalid_values:
             pooling_dict = {"max_idle_time": value}
             cnx_options = {"pooling": pooling_dict}
-            with self.assertRaises(
-                AttributeError, msg="with value {}".format(value)
-            ):
+            with self.assertRaises(AttributeError, msg="with value {}".format(value)):
                 mysqlx.get_client(settings, cnx_options)
 
         # Test valid values for max_idle_time option
@@ -253,9 +230,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         for value in invalid_values:
             pooling_dict = {"queue_timeout": value}
             cnx_options = {"pooling": pooling_dict}
-            with self.assertRaises(
-                AttributeError, msg="with value {}".format(value)
-            ):
+            with self.assertRaises(AttributeError, msg="with value {}".format(value)):
                 mysqlx.get_client(settings, cnx_options)
 
         # Test valid values for queue_timeout option
@@ -274,9 +249,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         for value in invalid_values:
             pooling_dict = {"enabled": value}
             cnx_options = {"pooling": pooling_dict}
-            with self.assertRaises(
-                AttributeError, msg="with value {}".format(value)
-            ):
+            with self.assertRaises(AttributeError, msg="with value {}".format(value)):
                 mysqlx.get_client(settings, cnx_options)
 
         # Test valid values for enabled option
@@ -334,9 +307,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         sessions[5].close()
         sessions[9].close()
         connections = get_current_connections(old_session)
-        self.assertTrue(
-            len(connections[self.users[0][0]]) >= (total_connections - 2)
-        )
+        self.assertTrue(len(connections[self.users[0][0]]) >= (total_connections - 2))
 
         if tests.MYSQL_VERSION < (8, 0, 16):
             # Send reset message requires the user to re-authentificate
@@ -355,9 +326,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         # check len(pool) == total_connections
         client.close()
         # Verify the connections on the pool are closed
-        open_connections = wait_for_connections(
-            old_session, self.users[0][0], 0
-        )
+        open_connections = wait_for_connections(old_session, self.users[0][0], 0)
         self.assertEqual(open_connections, 0)
 
     @unittest.skipIf(
@@ -412,9 +381,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # verify all sessions are closed
         for session in sessions:
-            with self.assertRaises(
-                (mysqlx.errors.OperationalError, InterfaceError)
-            ):
+            with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
                 session.sql("SELECT 1").execute()
             session.get_schema(settings["schema"])
 
@@ -431,9 +398,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         # Verify that clossing the session again does not raise eceptions
         session.close()
         # Verify that trying to use a closed session raises error
-        with self.assertRaises(
-            (mysqlx.errors.OperationalError, InterfaceError)
-        ):
+        with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
             session.sql("SELECT 1").execute()
         client.close()
         # Verify that clossing the client again does not raise eceptions
@@ -448,18 +413,12 @@ class MySQLxClientTests(tests.MySQLxTests):
         client = mysqlx.get_client(settings, cnx_options)
 
         session1 = client.get_session()
-        conn_id1 = (
-            session1.sql("select connection_id()").execute().fetch_all()[0][0]
-        )
+        conn_id1 = session1.sql("select connection_id()").execute().fetch_all()[0][0]
         session1.close()
         # Verify that new session is has the same id from previous one
         session2 = client.get_session()
-        conn_id2 = (
-            session2.sql("select connection_id()").execute().fetch_all()[0][0]
-        )
-        self.assertEqual(
-            conn_id1, conn_id2, "The connection id was not the same"
-        )
+        conn_id2 = session2.sql("select connection_id()").execute().fetch_all()[0][0]
+        self.assertEqual(conn_id1, conn_id2, "The connection id was not the same")
         session2.close()
         client.close()
 
@@ -481,21 +440,15 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Getting session 0
         session0 = client.get_session()
-        conn_id0 = (
-            session0.sql("select connection_id()").execute().fetch_all()[0][0]
-        )
+        conn_id0 = session0.sql("select connection_id()").execute().fetch_all()[0][0]
         # Closing session 0
         session0.close()
 
         # Getting session 1
         session1 = client.get_session()
-        conn_id1 = (
-            session1.sql("select connection_id()").execute().fetch_all()[0][0]
-        )
+        conn_id1 = session1.sql("select connection_id()").execute().fetch_all()[0][0]
         # Closing session 1
-        self.assertEqual(
-            conn_id1, conn_id0, "The connection id was not greater"
-        )
+        self.assertEqual(conn_id1, conn_id0, "The connection id was not greater")
 
         session1.close()
         # Verify that new session does not has the same id from previous one
@@ -503,9 +456,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         sleep(4)
         # Getting session 2
         session2 = client.get_session()
-        conn_id2 = (
-            session2.sql("select connection_id()").execute().fetch_all()[0][0]
-        )
+        conn_id2 = session2.sql("select connection_id()").execute().fetch_all()[0][0]
         self.assertNotEqual(
             conn_id0, conn_id2, "The connection id was the same from the old"
         )
@@ -518,12 +469,8 @@ class MySQLxClientTests(tests.MySQLxTests):
         # Getting the max allowed connections
         # Getting session 3
         session3 = client.get_session()
-        conn_id3 = (
-            session3.sql("select connection_id()").execute().fetch_all()[0][0]
-        )
-        self.assertGreater(
-            conn_id3, conn_id2, "The connection id was not greater"
-        )
+        conn_id3 = session3.sql("select connection_id()").execute().fetch_all()[0][0]
+        self.assertGreater(conn_id3, conn_id2, "The connection id was not greater")
 
         # Getting session 4
         session4 = client.get_session()
@@ -579,8 +526,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             _ = mysqlx.get_client(settings, cnx_options)
         self.assertTrue(
             ("No valid cipher" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # URI string connection settings tests
@@ -605,8 +551,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             _ = mysqlx.get_client(uri_settings, cnx_options)
         self.assertTrue(
             ("No valid cipher" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Verify InterfaceError exception is raised With invalid TLS version
@@ -618,8 +563,7 @@ class MySQLxClientTests(tests.MySQLxTests):
             _ = mysqlx.get_client(uri_settings, cnx_options)
         self.assertTrue(
             ("not recognized" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Verify unkown cipher suite case
@@ -639,9 +583,7 @@ class MySQLxClientTests(tests.MySQLxTests):
         session.close()
         client.close()
 
-        supported_tls = check_tls_versions_support(
-            ["TLSv1.2", "TLSv1.1", "TLSv1"]
-        )
+        supported_tls = check_tls_versions_support(["TLSv1.2", "TLSv1.1", "TLSv1"])
         if not supported_tls:
             self.fail("No TLS version to test: {}".format(supported_tls))
         if len(supported_tls) > 1:
@@ -786,14 +728,10 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
             self.fail("{0}".format(err))
 
         for host in self.hosts:
-            self.session.sql(
-                DROP_USER.format(user=self.user, host=host)
-            ).execute()
+            self.session.sql(DROP_USER.format(user=self.user, host=host)).execute()
         for host in self.hosts:
             self.session.sql(
-                CREATE_USER.format(
-                    user=self.user, host=host, password=self.password
-                )
+                CREATE_USER.format(user=self.user, host=host, password=self.password)
             ).execute()
             # Grant all to new user on database
             self.session.sql(
@@ -869,9 +807,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
 
         # Closing pools in client1 must not close connections in client2
         client1.close()
-        with self.assertRaises(
-            (mysqlx.errors.OperationalError, InterfaceError)
-        ):
+        with self.assertRaises((mysqlx.errors.OperationalError, InterfaceError)):
             session1.sql("SELECT 1").execute()
         session2.sql("SELECT 2").execute()
         session2.get_schema(settings["schema"])
@@ -935,8 +871,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
             _ = client.get_session()
         self.assertTrue(
             ("pool max size has been reached" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
         client.close()
 
@@ -966,12 +901,8 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
         with self.assertRaises(mysqlx.errors.PoolError) as context:
             _ = client.get_session()
         self.assertTrue(
-            (
-                "Unable to connect to any of the target hosts"
-                in context.exception.msg
-            ),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            ("Unable to connect to any of the target hosts" in context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         try:
@@ -1024,9 +955,7 @@ class MySQLxClientPoolingTests(tests.MySQLxTests):
             "Expected less repetions found: {}"
             "".format(
                 [
-                    "ip_order: {} reps: {}".format(
-                        ip_order, ip_orders[ip_order]
-                    )
+                    "ip_order: {} reps: {}".format(ip_order, ip_orders[ip_order])
                     for ip_order in ip_orders
                 ]
             ),
@@ -1049,15 +978,11 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
             self.fail("{0}".format(err))
 
         for host in self.hosts:
-            self.session.sql(
-                DROP_USER.format(user=self.user, host=host)
-            ).execute()
+            self.session.sql(DROP_USER.format(user=self.user, host=host)).execute()
 
         for host in self.hosts:
             self.session.sql(
-                CREATE_USER.format(
-                    user=self.user, host=host, password=self.password
-                )
+                CREATE_USER.format(user=self.user, host=host, password=self.password)
             ).execute()
             # Grant all to new user on database
             self.session.sql(
@@ -1071,9 +996,7 @@ class MySQLxConnectionPoolingTests(tests.MySQLxTests):
 
     def tearDown(self):
         for host in self.hosts:
-            self.session.sql(
-                DROP_USER.format(user=self.user, host=host)
-            ).execute()
+            self.session.sql(DROP_USER.format(user=self.user, host=host)).execute()
 
     @unittest.skipIf(
         tests.MYSQL_EXTERNAL_SERVER,
@@ -1164,9 +1087,7 @@ class MySQLxClientConnectionAttributesTests(tests.MySQLConnectorTests):
         else:
             self.client_license = "Commercial"
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 16), "XPlugin not compatible"
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "XPlugin not compatible")
     def test_connection_attributes(self):
         # Validate an error is raised if URL user defined connection attributes
         # through a connection URL name is duplicate
@@ -1223,9 +1144,7 @@ class MySQLxClientConnectionAttributesTests(tests.MySQLConnectorTests):
                 my_client = mysqlx.get_client(connect_kwargs, "{}")
                 _ = my_client.get_session()
 
-            self.assertTrue(
-                "exceeds 32 characters limit size" in context.exception.msg
-            )
+            self.assertTrue("exceeds 32 characters limit size" in context.exception.msg)
 
         # Test error is raised for attribute value size exceeds 1024 characters
         connection_attributes = [
@@ -1325,17 +1244,13 @@ class MySQLxPoolingSessionTests(tests.MySQLxTests):
         client = mysqlx.get_client(settings, pooling_dict)
         session = client.get_session()
         schema = session.get_default_schema()
-        self.assertIsNone(
-            schema, "None value was expected but got '{}'".format(schema)
-        )
+        self.assertIsNone(schema, "None value was expected but got '{}'".format(schema))
         session.close()
 
         # Test SQL statements not fully qualified, which must not raise error:
         #     mysqlx.errors.OperationalError: No database selected
         self.session.sql("CREATE DATABASE my_test_schema").execute()
-        self.session.sql(
-            "CREATE TABLE my_test_schema.pets(name VARCHAR(20))"
-        ).execute()
+        self.session.sql("CREATE TABLE my_test_schema.pets(name VARCHAR(20))").execute()
         settings = self.connect_kwargs.copy()
         settings["schema"] = "my_test_schema"
 
@@ -1358,9 +1273,7 @@ class MySQLxPoolingSessionTests(tests.MySQLxTests):
         client = mysqlx.get_client(settings, pooling_dict)
         session = client.get_session()
         schema = session.get_default_schema()
-        self.assertIsNone(
-            schema, "None value was expected but got '{}'".format(schema)
-        )
+        self.assertIsNone(schema, "None value was expected but got '{}'".format(schema))
         session.close()
         client.close()
 

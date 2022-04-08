@@ -51,9 +51,7 @@ class UtilsTests(tests.MySQLConnectorTests):
                 )
             )
         elif exp != result:
-            self.fail(
-                "Wrong result. Expected {0}, we got {1}".format((data, result))
-            )
+            self.fail("Wrong result. Expected {0}, we got {1}".format((data, result)))
 
     def test_intread(self):
         """Use intread to read from valid strings."""
@@ -61,11 +59,7 @@ class UtilsTests(tests.MySQLConnectorTests):
             for i in range(4):
                 utils.intread(bytearray(b"a") * (i + 1))
         except ValueError as err:
-            self.fail(
-                "intread failed calling 'int{0}read: {1}".format(
-                    int(i) + 1, err
-                )
-            )
+            self.fail("intread failed calling 'int{0}read: {1}".format(int(i) + 1, err))
 
     def test_int1store(self):
         """Use int1store to pack an integer (2^8) as a string."""
@@ -142,9 +136,7 @@ class UtilsTests(tests.MySQLConnectorTests):
         try:
             for i, j in enumerate((128, 251, 2**24 - 1, 2**64 - 1)):
                 lenenc = utils.lc_int(j)
-                exp = prefix[i] + getattr(
-                    utils, "int{0}store".format(intstore[i])
-                )(j)
+                exp = prefix[i] + getattr(utils, "int{0}store".format(intstore[i]))(j)
                 self.assertEqual(exp, lenenc)
         except ValueError as err:
             self.fail("length_encoded_int failed for size {0}".format(j, err))
@@ -176,9 +168,7 @@ class UtilsTests(tests.MySQLConnectorTests):
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
             self.fail(
-                "Wrong result. Expected '{0}', got '{1}'".format(
-                    expsize, len(result)
-                )
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
             )
 
     def test_read_lc_string_2(self):
@@ -190,9 +180,7 @@ class UtilsTests(tests.MySQLConnectorTests):
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
             self.fail(
-                "Wrong result. Expected '{0}', got '{1}'".format(
-                    expsize, len(result)
-                )
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
             )
 
     def test_read_lc_string_3(self):
@@ -204,9 +192,7 @@ class UtilsTests(tests.MySQLConnectorTests):
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
             self.fail(
-                "Wrong result. Expected '{0}', got '{1}'".format(
-                    expsize, len(result)
-                )
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
             )
 
     def test_read_lc_string_8(self):
@@ -218,9 +204,7 @@ class UtilsTests(tests.MySQLConnectorTests):
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
             self.fail(
-                "Wrong result. Expected '{0}', got '{1}'".format(
-                    expsize, len(result)
-                )
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
             )
 
     def test_read_lc_string_5(self):

@@ -161,9 +161,7 @@ class WL6148Tests(tests.MySQLConnectorTests):
         """
         cursor = self.cnx.cursor(prepared=True)
         cursor.execute("DROP TABLE IF EXISTS customer")
-        cursor.execute(
-            "CREATE TABLE customer2 (i INT,name varchar(10),age int)"
-        )
+        cursor.execute("CREATE TABLE customer2 (i INT,name varchar(10),age int)")
         cursor.execute(
             "INSERT INTO customer2 (i,name,age) VALUES"
             "(10,'Joshi',30),(20,'Kiran',30),(30,'Raja',30)"
@@ -182,9 +180,7 @@ class WL6148Tests(tests.MySQLConnectorTests):
         out = cursor.fetchone()[0]
         self.assertEqual(exp, out)
         # Update the table data
-        altStmt = (
-            "UPDATE customer2 set name='same name' where i = ? and age = ?"
-        )
+        altStmt = "UPDATE customer2 set name='same name' where i = ? and age = ?"
         cursor.execute(
             altStmt,
             (

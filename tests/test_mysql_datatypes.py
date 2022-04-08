@@ -80,9 +80,7 @@ class TestsDataTypes(tests.MySQLConnectorTests):
         cur = cnx.cursor()
         table_names = self.tables.values()
         cur.execute(
-            "DROP TABLE IF EXISTS {tables}".format(
-                tables=",".join(table_names)
-            )
+            "DROP TABLE IF EXISTS {tables}".format(tables=",".join(table_names))
         )
         cur.close()
 
@@ -310,24 +308,16 @@ class TestsCursor(TestsDataTypes):
 
         data = [
             (
-                Decimal(
-                    "-9999999999999999999999999.999999999999999999999999999999"
-                ),
-                Decimal(
-                    "+9999999999999999999999999.999999999999999999999999999999"
-                ),
+                Decimal("-9999999999999999999999999.999999999999999999999999999999"),
+                Decimal("+9999999999999999999999999.999999999999999999999999999999"),
             ),
             (
                 Decimal("-1234567.1234"),
                 Decimal("+123456789012345.123456789012345678901"),
             ),
             (
-                Decimal(
-                    "-1234567890123456789012345.123456789012345678901234567890"
-                ),
-                Decimal(
-                    "+1234567890123456789012345.123456789012345678901234567890"
-                ),
+                Decimal("-1234567890123456789012345.123456789012345678901234567890"),
+                Decimal("+1234567890123456789012345.123456789012345678901234567890"),
             ),
         ]
         cur.executemany(insert, data)

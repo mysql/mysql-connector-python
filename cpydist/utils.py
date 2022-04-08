@@ -157,9 +157,7 @@ def _mysql_c_api_info_win(mysql_capi):
     mysql_version_h = os.path.join(mysql_capi, "include", "mysql_version.h")
 
     if not os.path.exists(mysql_version_h):
-        LOGGER.error(
-            "Invalid MySQL C API installation " "(mysql_version.h not found)"
-        )
+        LOGGER.error("Invalid MySQL C API installation (mysql_version.h not found)")
         sys.exit(1)
 
     # Get MySQL version
@@ -182,9 +180,7 @@ def _mysql_c_api_info_win(mysql_capi):
     info["include_dirs"] = [os.path.join(mysql_capi, "include")]
 
     # Get libmysql.dll arch
-    connc_64bit = _win_dll_is64bit(
-        os.path.join(mysql_capi, "lib", "libmysql.dll")
-    )
+    connc_64bit = _win_dll_is64bit(os.path.join(mysql_capi, "lib", "libmysql.dll"))
     LOGGER.debug("connc_64bit: {0}".format(connc_64bit))
     info["arch"] = "x86_64" if connc_64bit else "i386"
     LOGGER.debug("# _mysql_c_api_info_win info: %s", info)
@@ -210,7 +206,7 @@ def mysql_c_api_info(mysql_config):
     stdout, stderr = process.communicate()
     if not stdout:
         raise ValueError(
-            "Error executing command: {} ({})" "".format(mysql_config, stderr)
+            "Error executing command: {} ({})".format(mysql_config, stderr)
         )
 
     # Parse the output. Try to be future safe in case new options
@@ -218,9 +214,7 @@ def mysql_c_api_info(mysql_config):
     info = {}
 
     for line in stdout.splitlines():
-        re_obj = re.search(
-            r"^\s+(?:--)?(\w+)\s+\[\s*(.*?)\s*\]", line.decode("utf-8")
-        )
+        re_obj = re.search(r"^\s+(?:--)?(\w+)\s+\[\s*(.*?)\s*\]", line.decode("utf-8"))
         if re_obj:
             mc_key = re_obj.group(1)
             mc_val = re_obj.group(2)
@@ -270,10 +264,7 @@ def mysql_c_api_info(mysql_config):
     info["arch"] = "x86_64" if sys.maxsize > 2**32 else "i386"
     # Return a tuple for version instead of a string
     info["version"] = tuple(
-        [
-            int(num) if num.isdigit() else num
-            for num in info["version"].split(".")
-        ]
+        [int(num) if num.isdigit() else num for num in info["version"].split(".")]
     )
     return info
 
@@ -304,10 +295,7 @@ def get_git_info():
         stdout, _ = proc.communicate()
         git_info = dict(
             parse_qsl(
-                stdout.replace("'", "")
-                .replace("+", "%2B")
-                .split(",")[-1:][0]
-                .strip()
+                stdout.replace("'", "").replace("+", "%2B").split(",")[-1:][0].strip()
             )
         )
         try:
@@ -396,9 +384,7 @@ def _parse_lsb_release_command():
     distro = {}
     with open(os.devnull, "w") as devnull:
         try:
-            stdout = subprocess.check_output(
-                ("lsb_release", "-a"), stderr=devnull
-            )
+            stdout = subprocess.check_output(("lsb_release", "-a"), stderr=devnull)
         except OSError:
             return None
         lines = stdout.decode(sys.getfilesystemencoding()).splitlines()
@@ -537,7 +523,7 @@ def add_docs(doc_path, doc_files=None):
             if not os.path.exists(doc_file):
                 # we do not have it, create a fake one
                 LOGGER.warning(
-                    "documentation '%s' does not exist; creating" " empty",
+                    "documentation '%s' does not exist; creating empty",
                     doc_file,
                 )
                 open(doc_file, "w").close()
@@ -597,7 +583,7 @@ def _append_child_from_unparsed_xml(father_node, unparsed_xml):
             return
 
     raise DistutilsInternalError(
-        "Could not Append append elements to " "the Windows msi descriptor."
+        "Could not Append append elements to the Windows msi descriptor."
     )
 
 
@@ -645,9 +631,7 @@ def add_arch_dep_elems(xml_path, result_path, for32=False, add_vs_redist=True):
         LOGGER.info("Adding 64bit elements")
         _add_64bit_elements(dom_msi, add_vs_redist)
 
-    LOGGER.info(
-        "Saving xml to:%s working directory:%s", result_path, os.getcwd()
-    )
+    LOGGER.info("Saving xml to:%s working directory:%s", result_path, os.getcwd())
     with open(result_path, "w+") as fp:
         fp.write(dom_msi.toprettyxml())
         fp.flush()

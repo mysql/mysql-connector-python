@@ -39,8 +39,7 @@ class WL7292Tests(tests.MySQLConnectorTests):
             with cnx.cursor() as cur:
                 cur.execute("drop table if exists wl7292")
                 cur.execute(
-                    "create table wl7292(id int, name varchar(5), "
-                    "dept varchar(3))"
+                    "create table wl7292(id int, name varchar(5), dept varchar(3))"
                 )
                 cur.execute("insert into wl7292 values(1, 'abc', 'cs')")
                 cur.execute("insert into wl7292 values(2, 'def', 'is')")

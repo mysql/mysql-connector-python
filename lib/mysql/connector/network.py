@@ -77,9 +77,7 @@ def _prepare_packets(buf, pktnr):
     pllen = len(buf)
     maxpktlen = MAX_PACKET_LENGTH
     while pllen > maxpktlen:
-        pkts.append(
-            b"\xff\xff\xff" + struct.pack("<B", pktnr) + buf[:maxpktlen]
-        )
+        pkts.append(b"\xff\xff\xff" + struct.pack("<B", pktnr) + buf[:maxpktlen])
         buf = buf[maxpktlen:]
         pllen = len(buf)
         pktnr = pktnr + 1
@@ -147,9 +145,7 @@ class BaseMySQLSocket:
     def __del__(self):
         self.shutdown()
 
-    def send_plain(
-        self, buf, packet_number=None, compressed_packet_number=None
-    ):
+    def send_plain(self, buf, packet_number=None, compressed_packet_number=None):
         """Send packets to the MySQL server"""
         # Keep 'compressed_packet_number' for API backward compatibility
         _ = compressed_packet_number
@@ -170,9 +166,7 @@ class BaseMySQLSocket:
 
     send = send_plain
 
-    def send_compressed(
-        self, buf, packet_number=None, compressed_packet_number=None
-    ):
+    def send_compressed(self, buf, packet_number=None, compressed_packet_number=None):
         """Send compressed packets to the MySQL server"""
         if packet_number is None:
             self.next_packet_number()
@@ -222,9 +216,7 @@ class BaseMySQLSocket:
                 zpkts.append(header + zbuf)
             del tmpbuf
         else:
-            pkt = (
-                struct.pack("<I", pllen)[0:3] + struct.pack("<B", pktnr) + buf
-            )
+            pkt = struct.pack("<I", pllen)[0:3] + struct.pack("<B", pktnr) + buf
             pllen = len(pkt)
             if pllen > 50:
                 zbuf = zlib.compress(pkt)
@@ -327,9 +319,7 @@ class BaseMySQLSocket:
     def _split_zipped_payload(self, packet_bunch):
         """Split compressed payload"""
         while packet_bunch:
-            payload_length = struct.unpack("<I", packet_bunch[0:3] + b"\x00")[
-                0
-            ]
+            payload_length = struct.unpack("<I", packet_bunch[0:3] + b"\x00")[0]
             self._packet_queue.append(packet_bunch[0 : payload_length + 4])
             packet_bunch = packet_bunch[payload_length + 4 :]
 
@@ -354,9 +344,7 @@ class BaseMySQLSocket:
                     raise InterfaceError(errno=2013)
 
                 # Get length of compressed packet
-                zip_payload_length = struct.unpack(
-                    "<I", header[0:3] + b"\x00"
-                )[0]
+                zip_payload_length = struct.unpack("<I", header[0:3] + b"\x00")[0]
                 self._compressed_packet_number = header[3]
 
                 # Get payload length before compression
@@ -364,9 +352,7 @@ class BaseMySQLSocket:
 
                 zip_payload = init_bytearray(abyte)
                 while len(zip_payload) < zip_payload_length:
-                    chunk = self.sock.recv(
-                        zip_payload_length - len(zip_payload)
-                    )
+                    chunk = self.sock.recv(zip_payload_length - len(zip_payload))
                     if not chunk:
                         raise InterfaceError(errno=2013)
                     zip_payload = zip_payload + chunk
@@ -474,17 +460,13 @@ class BaseMySQLSocket:
                     context.load_verify_locations(ca)
                 except (IOError, ssl.SSLError) as err:
                     self.sock.close()
-                    raise InterfaceError(
-                        f"Invalid CA Certificate: {err}"
-                    ) from err
+                    raise InterfaceError(f"Invalid CA Certificate: {err}") from err
             if cert:
                 try:
                     context.load_cert_chain(cert, key)
                 except (IOError, ssl.SSLError) as err:
                     self.sock.close()
-                    raise InterfaceError(
-                        f"Invalid Certificate/Key: {err}"
-                    ) from err
+                    raise InterfaceError(f"Invalid Certificate/Key: {err}") from err
             if cipher_suites:
                 context.set_ciphers(cipher_suites)
 
@@ -523,9 +505,7 @@ class BaseMySQLSocket:
                         f"Unable to verify server identity: {', '.join(errs)}"
                     )
         except NameError as err:
-            raise NotSupportedError(
-                "Python installation has no SSL support"
-            ) from err
+            raise NotSupportedError("Python installation has no SSL support") from err
         except (ssl.SSLError, IOError) as err:
             raise InterfaceError(
                 errno=2055, values=(self.get_address(), _strioerror(err))
@@ -599,9 +579,7 @@ class MySQLTCPSocket(BaseMySQLSocket):
                     addrinfo = info
                     break
             if self.force_ipv6 and addrinfo[0] is None:
-                raise InterfaceError(
-                    f"No IPv6 address found for {self.server_host}"
-                )
+                raise InterfaceError(f"No IPv6 address found for {self.server_host}")
             if addrinfo[0] is None:
                 addrinfo = addrinfos[0]
         except IOError as err:

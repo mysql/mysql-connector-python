@@ -77,9 +77,7 @@ class TableDeleteTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t4").execute()
         self.session.sql("create table t4(a int , b int)").execute()
         table = self.schema.get_table("t4")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(
-            2, 11
-        ).execute()
+        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
         table.delete().sort("a ASC", "b DESC").limit(3).where("true").execute()
         self.assertEqual(table.count(), 1)
         result = table.select().execute()
@@ -93,12 +91,8 @@ class TableDeleteTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t5").execute()
         self.session.sql("create table t5(a int , b int)").execute()
         table = self.schema.get_table("t5")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(
-            2, 11
-        ).execute()
-        table.delete().sort("a ASC", "b DESC").limit(3).where(
-            "false"
-        ).execute()
+        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.delete().sort("a ASC", "b DESC").limit(3).where("false").execute()
         self.assertEqual(table.count(), 4)
         result = table.select().execute()
         row = result.fetch_all()
@@ -111,12 +105,8 @@ class TableDeleteTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t6").execute()
         self.session.sql("create table t6(a int , b int)").execute()
         table = self.schema.get_table("t6")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(
-            2, 11
-        ).execute()
-        table.delete().sort("a ASC", "b DESC").limit(3).where(
-            "1 == 0"
-        ).execute()
+        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.delete().sort("a ASC", "b DESC").limit(3).where("1 == 0").execute()
         self.assertEqual(table.count(), 4)
         result = table.select().execute()
         row = result.fetch_all()
@@ -129,12 +119,8 @@ class TableDeleteTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t7").execute()
         self.session.sql("create table t7(a int , b int)").execute()
         table = self.schema.get_table("t7")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(
-            2, 11
-        ).execute()
-        table.delete().sort("a ASC", "b DESC").limit(3).where(
-            "1 == 1"
-        ).execute()
+        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.delete().sort("a ASC", "b DESC").limit(3).where("1 == 1").execute()
         self.assertEqual(table.count(), 1)
         result = table.select().execute()
         row = result.fetch_all()
@@ -147,9 +133,7 @@ class TableDeleteTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t8").execute()
         self.session.sql("create table t8(a int , b int)").execute()
         table = self.schema.get_table("t8")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(
-            2, 11
-        ).execute()
+        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
         try:
             table.delete().sort("a ASC", "b DESC").limit(3).where("").execute()
         except mysqlx.ProgrammingError:
@@ -218,9 +202,7 @@ class TableDeleteTests(tests.MySQLxTests):
             )
             .execute()
         )
-        result1 = (
-            table.delete().where('["happy","joy"] IN n->$.name').execute()
-        )
+        result1 = table.delete().where('["happy","joy"] IN n->$.name').execute()
         result2 = (
             table.delete()
             .where('["car","bike"] NOT IN addinfo->$.additionalinfo.vehicle')
@@ -257,9 +239,7 @@ class TableDeleteTests(tests.MySQLxTests):
         ).execute()
         result = (
             table.delete()
-            .where(
-                '{"company":"abc","vehicle":"car"} IN addinfo->$.additionalinfo'
-            )
+            .where('{"company":"abc","vehicle":"car"} IN addinfo->$.additionalinfo')
             .execute()
         )
         result1 = (
@@ -274,9 +254,7 @@ class TableDeleteTests(tests.MySQLxTests):
         )
         result3 = (
             table.delete()
-            .where(
-                '{"company":"abc","vehicle":"car"} NOT IN addinfo->$.additionalinfo'
-            )
+            .where('{"company":"abc","vehicle":"car"} NOT IN addinfo->$.additionalinfo')
             .execute()
         )
         self.assertEqual(result.get_affected_items_count(), 2)
@@ -314,9 +292,7 @@ class TableDeleteTests(tests.MySQLxTests):
             4, '{"name":"d"}', '{"age":23}'
         ).execute()
         result = table.delete().where("n->'$.name' NOT OVERLAPS 'a'").execute()
-        result1 = (
-            table.delete().where("a->'$.age' NOT OVERLAPS [22,24]").execute()
-        )
+        result1 = table.delete().where("a->'$.age' NOT OVERLAPS [22,24]").execute()
         self.assertEqual(result.get_affected_items_count(), 3)
         self.assertEqual(result1.get_affected_items_count(), 0)
         self.session.sql("drop table if exists t2").execute()
@@ -360,11 +336,7 @@ class TableDeleteTests(tests.MySQLxTests):
             '{"age":24}',
             '{"additionalinfo":{"company":"abc","vehicle":"car","hobbies":["playing","painting","boxing"]}}',
         ).execute()
-        result1 = (
-            table.delete()
-            .where('["happy","joy"] OVERLAPS n->$.name')
-            .execute()
-        )
+        result1 = table.delete().where('["happy","joy"] OVERLAPS n->$.name').execute()
         # Adding data
         table.insert().values(
             '{"_id":1}',
@@ -379,9 +351,7 @@ class TableDeleteTests(tests.MySQLxTests):
         ).execute()
         result2 = (
             table.delete()
-            .where(
-                '["car","bike"] NOT OVERLAPS addinfo->$.additionalinfo.vehicle'
-            )
+            .where('["car","bike"] NOT OVERLAPS addinfo->$.additionalinfo.vehicle')
             .execute()
         )
         self.assertEqual(result.get_affected_items_count(), 2)

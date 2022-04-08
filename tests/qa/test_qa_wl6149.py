@@ -94,9 +94,7 @@ class WL6149Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_datetime")
             cur.execute("CREATE TABLE t_datetime (t1 datetime(3))")
-            cur.execute(
-                "insert into t_datetime values ('2038-01-19 03:14:07.11')"
-            )
+            cur.execute("insert into t_datetime values ('2038-01-19 03:14:07.11')")
             self.cnx.commit()
             cur.execute("SELECT * from t_datetime")
             exp = b"2038-01-19 03:14:07.110"
@@ -116,9 +114,7 @@ class WL6149Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_alt_datetime")
             cur.execute("CREATE TABLE t_alt_datetime (t1 datetime(3))")
-            cur.execute(
-                "insert into t_alt_datetime values ('2038-01-19 03:14:07.11')"
-            )
+            cur.execute("insert into t_alt_datetime values ('2038-01-19 03:14:07.11')")
             self.cnx.commit()
             cur.execute("SELECT * from t_alt_datetime")
             exp = b"2038-01-19 03:14:07.110"
@@ -139,9 +135,7 @@ class WL6149Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_alt_timestamp")
             cur.execute("CREATE TABLE t_alt_timestamp (t1 timestamp(4))")
-            cur.execute(
-                "insert into t_alt_timestamp values ('2011-01-19 03:14:07.11')"
-            )
+            cur.execute("insert into t_alt_timestamp values ('2011-01-19 03:14:07.11')")
             self.cnx.commit()
             cur.execute("SELECT * from t_alt_timestamp")
             exp = b"2011-01-19 03:14:07.1100"

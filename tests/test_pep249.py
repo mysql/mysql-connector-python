@@ -91,8 +91,7 @@ class PEP249ModuleTests(PEP249Base):
         cnx = myconn.connect(use_pure=True, **tests.get_mysql_config())
         self.assertTrue(
             isinstance(cnx, myconn.connection.MySQLConnection),
-            "connect() not returning by default pure "
-            "MySQLConnection object",
+            "connect() not returning by default pure MySQLConnection object",
         )
 
         if tests.MYSQL_CAPI:
@@ -105,9 +104,7 @@ class PEP249ModuleTests(PEP249Base):
 
     def test_apilevel(self):
         """Interface sets the API level"""
-        self.assertTrue(
-            hasattr(myconn, "apilevel"), "API level is not defined"
-        )
+        self.assertTrue(hasattr(myconn, "apilevel"), "API level is not defined")
         self.assertEqual("2.0", myconn.apilevel, "API Level should be '2.0'")
 
     def test_threadsafety(self):
@@ -118,8 +115,7 @@ class PEP249ModuleTests(PEP249Base):
     def test_paramstyle(self):
         """Interface sets the parameter style"""
         self.assertTrue(
-            myconn.paramstyle
-            in ("qmark", "numeric", "named", "format", "pyformat"),
+            myconn.paramstyle in ("qmark", "numeric", "named", "format", "pyformat"),
             "paramstyle was assigned an unsupported value",
         )
         self.assertEqual(
@@ -172,45 +168,35 @@ class PEP249ErrorsTests(PEP249Base):
     def test_OperationalError(self):
         """Interface exports the OperationalError-exception"""
         self.assertTrue(
-            issubclass(
-                myconn.errors.OperationalError, myconn.errors.DatabaseError
-            ),
+            issubclass(myconn.errors.OperationalError, myconn.errors.DatabaseError),
             "OperationalError is not subclass of errors.DatabaseError",
         )
 
     def test_IntegrityError(self):
         """Interface exports the IntegrityError-exception"""
         self.assertTrue(
-            issubclass(
-                myconn.errors.IntegrityError, myconn.errors.DatabaseError
-            ),
+            issubclass(myconn.errors.IntegrityError, myconn.errors.DatabaseError),
             "IntegrityError is not subclass of errors.DatabaseError",
         )
 
     def test_InternalError(self):
         """Interface exports the InternalError-exception"""
         self.assertTrue(
-            issubclass(
-                myconn.errors.InternalError, myconn.errors.DatabaseError
-            ),
+            issubclass(myconn.errors.InternalError, myconn.errors.DatabaseError),
             "InternalError is not subclass of errors.DatabaseError",
         )
 
     def test_ProgrammingError(self):
         """Interface exports the ProgrammingError-exception"""
         self.assertTrue(
-            issubclass(
-                myconn.errors.ProgrammingError, myconn.errors.DatabaseError
-            ),
+            issubclass(myconn.errors.ProgrammingError, myconn.errors.DatabaseError),
             "ProgrammingError is not subclass of errors.DatabaseError",
         )
 
     def test_NotSupportedError(self):
         """Interface exports the NotSupportedError-exception"""
         self.assertTrue(
-            issubclass(
-                myconn.errors.NotSupportedError, myconn.errors.DatabaseError
-            ),
+            issubclass(myconn.errors.NotSupportedError, myconn.errors.DatabaseError),
             "NotSupportedError is not subclass of errors.DatabaseError",
         )
 
@@ -360,7 +346,7 @@ class PEP249CursorTests(PEP249Base):
                 )
                 self.assertTrue(
                     inspect.ismethod(cur.fetchone),
-                    "Cursor object defines fetchone, " "but is not a method",
+                    "Cursor object defines fetchone, but is not a method",
                 )
                 # An exception is raised if the previous call to execute*()
                 # did not produce any result set or no call was issued yet
@@ -382,7 +368,7 @@ class PEP249CursorTests(PEP249Base):
                 )
                 self.assertTrue(
                     inspect.ismethod(cur.fetchmany),
-                    "Cursor object defines fetchmany, " "but is not a method",
+                    "Cursor object defines fetchmany, but is not a method",
                 )
                 # An exception is raised if the previous call to execute*()
                 # did not produce any result set or no call was issued yet
@@ -404,7 +390,7 @@ class PEP249CursorTests(PEP249Base):
                 )
                 self.assertTrue(
                     inspect.ismethod(cur.fetchall),
-                    "Cursor object defines fetchall, " "but is not a method",
+                    "Cursor object defines fetchall, but is not a method",
                 )
                 # An exception is raised if the previous call to execute*()
                 # did not produce any result set or no call was issued yet
@@ -495,9 +481,9 @@ class PEP249CursorTests(PEP249Base):
             "ENGINE={engine}"
         ).format(table=tbl, engine=engine)
         stmt_drop = "DROP TABLE IF EXISTS {table}".format(table=tbl)
-        stmt_insert = (
-            "INSERT INTO {table} (col1,col2) " "VALUES (%s,%s)"
-        ).format(table=tbl)
+        stmt_insert = ("INSERT INTO {table} (col1,col2) VALUES (%s,%s)").format(
+            table=tbl
+        )
         stmt_select = "SELECT col1,col2 FROM {table}".format(table=tbl)
 
         # Setup

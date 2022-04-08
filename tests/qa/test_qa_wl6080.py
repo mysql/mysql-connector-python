@@ -124,9 +124,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
         config["pool_size"] = 5
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
-            self.assertRaises(
-                AttributeError, mysql.connector.connect, **config
-            )
+            self.assertRaises(AttributeError, mysql.connector.connect, **config)
 
     def test_numbers_name(self):
         """Test with pool name having only numbers."""
@@ -147,9 +145,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
         config["pool_size"] = 5
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
-            self.assertRaises(
-                AttributeError, mysql.connector.connect, **config
-            )
+            self.assertRaises(AttributeError, mysql.connector.connect, **config)
 
     def test_multipool_samename(self):
         """Test with multiple pool name having same name.
@@ -181,9 +177,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
             config["pool_name"] = "newname{}".format(idx)
             config["pool_size"] = 5
             try:
-                cnx_list.append(
-                    mysql.connector.connect(pool_name=config["pool_name"])
-                )
+                cnx_list.append(mysql.connector.connect(pool_name=config["pool_name"]))
             except DatabaseError as err:
                 self.assertEqual(err.errno, 1040)
             except PoolError:

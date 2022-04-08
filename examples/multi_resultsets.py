@@ -75,9 +75,7 @@ def main(config):
                     "Names in table: " + " ".join([name[0] for name in result])
                 )
             else:
-                output.append(
-                    "Number of rows: {0}".format(result.fetchone()[0])
-                )
+                output.append("Number of rows: {0}".format(result.fetchone()[0]))
         else:
             output.append(
                 "Inserted {0} row{1}".format(

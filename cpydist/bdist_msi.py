@@ -142,9 +142,7 @@ class DistMSI(BaseCommand):
         if self.python_version not in self._supported_versions:
             raise DistutilsOptionError(
                 "The --python-version {} should be a supported version, one "
-                "of {}".format(
-                    self.python_version, ",".join(self._supported_versions)
-                )
+                "of {}".format(self.python_version, ",".join(self._supported_versions))
             )
 
         if self.python_version[0] != get_python_version()[0]:
@@ -164,12 +162,8 @@ class DistMSI(BaseCommand):
 
         if self._with_cext:
             cmd_build = self.get_finalized_command("build")
-            self._connc_lib = os.path.join(
-                cmd_build.build_temp, "connc", "lib"
-            )
-            self._connc_include = os.path.join(
-                cmd_build.build_temp, "connc", "include"
-            )
+            self._connc_lib = os.path.join(cmd_build.build_temp, "connc", "lib")
+            self._connc_include = os.path.join(cmd_build.build_temp, "connc", "include")
             self._finalize_connector_c(self.with_mysql_capi)
 
         self._wxs = self._finalize_msi_descriptor()
@@ -192,9 +186,7 @@ class DistMSI(BaseCommand):
         copy_tree(os.path.join(connc_loc, "lib"), self._connc_lib)
         copy_tree(os.path.join(connc_loc, "include"), self._connc_include)
 
-        self.log.info(
-            "# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir
-        )
+        self.log.info("# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir)
         if ARCH_64BIT:
             openssl_files = ["libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll"]
         else:
@@ -249,9 +241,7 @@ class DistMSI(BaseCommand):
             label="-{}".format(self.label) if self.label else "",
             conver=mycver,
             edition=self.edition,
-            version_extra="-{0}".format(VERSION_EXTRA)
-            if VERSION_EXTRA
-            else "",
+            version_extra="-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else "",
             arch="windows-x86-64bit" if ARCH_64BIT else "windows-x86-32bit",
         )
 
@@ -266,9 +256,7 @@ class DistMSI(BaseCommand):
                 "Lib",
                 "site-packages",
             )
-            zip_fn = "{}.zip".format(
-                DIST_PATH_FORMAT.format(*py_ver.split("."))
-            )
+            zip_fn = "{}.zip".format(DIST_PATH_FORMAT.format(*py_ver.split(".")))
 
             self.log.info("Locating zip: %s at %s", zip_fn, os.path.curdir)
             bdist_path = None
@@ -276,21 +264,15 @@ class DistMSI(BaseCommand):
                 with zipfile.ZipFile(zip_fn) as zip_f:
                     zip_f.extractall()
             else:
-                self.log.warning(
-                    "Unable to find zip: %s at %s", zip_fn, os.path.curdir
-                )
+                self.log.warning("Unable to find zip: %s at %s", zip_fn, os.path.curdir)
             if bdist_path is None:
                 bdist_path = bdist_paths[py_ver]
-                self.log.info(
-                    "Checking for extracted distribution at %s", bdist_path
-                )
+                self.log.info("Checking for extracted distribution at %s", bdist_path)
             if os.path.exists(bdist_path):
                 valid_bdist_paths[py_ver] = bdist_path
                 self.log.info("Distribution path found at %s", bdist_path)
             else:
-                self.log.warning(
-                    "Unable to find distribution path for %s", py_ver
-                )
+                self.log.warning("Unable to find distribution path for %s", py_ver)
 
         return valid_bdist_paths
 
@@ -354,9 +336,7 @@ class DistMSI(BaseCommand):
                 content = content.replace(b"\n", b"\r\n")
                 open(txt_fixed, "wb").write(content)
             else:
-                self.log.info(
-                    "not converting newlines in %s, this is odd", txt_fixed
-                )
+                self.log.info("not converting newlines in %s, this is odd", txt_fixed)
                 open(txt_fixed, "wb").write(content)
 
         digit_needle = r"Connector/Python \d{1,2}.\d{1,2}"
@@ -371,18 +351,14 @@ class DistMSI(BaseCommand):
                         digit_needle, xy_sub.format(*VERSION[0:2]), line
                     )
                     line = content[idx]
-                    content[idx] = re.sub(
-                        xy_needle, xy_sub.format(*VERSION[0:2]), line
-                    )
+                    content[idx] = re.sub(xy_needle, xy_sub.format(*VERSION[0:2]), line)
                 fp.seek(0)
                 fp.write("".join(content))
 
         plat_type = "x64" if ARCH_64BIT else "x86"
         win64 = "yes" if ARCH_64BIT else "no"
         pyd_arch = "win_amd64" if ARCH_64BIT else "win32"
-        directory_id = (
-            "ProgramFiles64Folder" if ARCH_64BIT else "ProgramFilesFolder"
-        )
+        directory_id = "ProgramFiles64Folder" if ARCH_64BIT else "ProgramFilesFolder"
 
         # For 3.5 the driver names are pretty complex, see
         # https://www.python.org/dev/peps/pep-0425/
@@ -452,12 +428,10 @@ class DistMSI(BaseCommand):
             else:
                 pyd_ext = ".pyd"
 
-            params[
-                "CExtLibName{}{}".format(*ver)
-            ] = "_mysql_connector{}".format(pyd_ext)
-            params["CExtXPBName{}{}".format(*ver)] = "_mysqlxpb{}".format(
+            params["CExtLibName{}{}".format(*ver)] = "_mysql_connector{}".format(
                 pyd_ext
             )
+            params["CExtXPBName{}{}".format(*ver)] = "_mysqlxpb{}".format(pyd_ext)
             params["HaveCExt{}{}".format(*ver)] = 0
             params["HaveLdapLibs{}{}".format(*ver)] = 0
             params["HaveKerberosLibs{}{}".format(*ver)] = 0
@@ -465,9 +439,7 @@ class DistMSI(BaseCommand):
             params["HavePlugin{}{}".format(*ver)] = 0
 
             if py_ver in self.pyver_bdist_paths:
-                params["BDist{}{}".format(*ver)] = self.pyver_bdist_paths[
-                    py_ver
-                ]
+                params["BDist{}{}".format(*ver)] = self.pyver_bdist_paths[py_ver]
                 if os.path.exists(
                     os.path.join(
                         self.pyver_bdist_paths[py_ver],
@@ -538,9 +510,7 @@ class DistMSI(BaseCommand):
                     file_path = os.path.join(base, filename)
                     new_name = filename.split(".")[0] + ".pyc"
                     new_name_path = os.path.join(base, "..", new_name)
-                    self.log.info(
-                        "  renaming file: %s to: %s", filename, new_name_path
-                    )
+                    self.log.info("  renaming file: %s to: %s", filename, new_name_path)
                     os.rename(file_path, new_name_path)
 
         for base, _, _ in os.walk(start_dir):
@@ -549,9 +519,7 @@ class DistMSI(BaseCommand):
 
     def _prepare(self):
         self.log.info("Preparing installation in %s", self.build_base)
-        cmd_install = self.reinitialize_command(
-            "install", reinit_subcommands=1
-        )
+        cmd_install = self.reinitialize_command("install", reinit_subcommands=1)
         cmd_install.prefix = self.prefix
         cmd_install.with_mysql_capi = self.with_mysql_capi
         cmd_install.with_protobuf_include_dir = self.with_protobuf_include_dir
@@ -587,9 +555,7 @@ class DistMSI(BaseCommand):
     def run(self):
         """Run the command."""
         if os.name != "nt":
-            self.log.info(
-                "This command is only useful on Windows. " "Forcing dry run."
-            )
+            self.log.info("This command is only useful on Windows. Forcing dry run.")
             self.dry_run = True
 
         self.log.info("generating INFO_SRC and INFO_BIN files")

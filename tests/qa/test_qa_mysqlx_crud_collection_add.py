@@ -126,9 +126,7 @@ class CollectionAddTests(tests.MySQLxTests):
             collection.get_name(),
             "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm7",
         )
-        self.schema.drop_collection(
-            "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm7"
-        )
+        self.schema.drop_collection("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm7")
 
     @tests.foreach_session()
     def test_collection_test4(self):
@@ -344,9 +342,7 @@ class CollectionAddTests(tests.MySQLxTests):
         self.assertEqual(res["_id"], 0)
         self.schema.drop_collection("mycoll29")
 
-    @unittest.skipUnless(
-        tests.ARCH_64BIT, "Test available only for 64 bit platforms"
-    )
+    @unittest.skipUnless(tests.ARCH_64BIT, "Test available only for 64 bit platforms")
     @unittest.skipIf(os.name == "nt", "Test not available for Windows")
     @tests.foreach_session()
     def test_collection_add_id_test9(self):
@@ -393,8 +389,7 @@ class CollectionAddTests(tests.MySQLxTests):
         self.assertTrue(is_unique_id(result.get_generated_ids()))
         for idx in range(0, 112):
             self.assertTrue(
-                result.get_generated_ids()[idx]
-                < result.get_generated_ids()[idx + 1]
+                result.get_generated_ids()[idx] < result.get_generated_ids()[idx + 1]
             )
             self.assertRegex(result.get_generated_ids()[idx], r"[a-f0-9]{28}")
             idx = idx + 1
@@ -456,18 +451,9 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test inserting invalid values to _id."""
         self._drop_collection_if_exists("mycoll37")
         collection = self.schema.create_collection("mycoll37")
-        res = collection.add(
-            {"_id": "", "name": "myname1", "age": 28}
-        ).execute()
-        res1 = collection.add(
-            {"_id": None, "name": "myname2", "age": 30}
-        ).execute()
-        result = (
-            collection.find()
-            .fields("_id", "name", "age")
-            .sort("age")
-            .execute()
-        )
+        res = collection.add({"_id": "", "name": "myname1", "age": 28}).execute()
+        res1 = collection.add({"_id": None, "name": "myname2", "age": 30}).execute()
+        result = collection.find().fields("_id", "name", "age").sort("age").execute()
         self.assertEqual(len(res.get_generated_ids()), 0)
         self.assertEqual(collection.count(), 2)
         row = result.fetch_all()
@@ -479,9 +465,7 @@ class CollectionAddTests(tests.MySQLxTests):
     def test_dbdoc_test1(self):
         self._drop_collection_if_exists("mycoll1")
         collection = self.schema.create_collection("mycoll1")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         self.assertEqual(collection.count(), 2)
         self.schema.drop_collection("mycoll1")
 

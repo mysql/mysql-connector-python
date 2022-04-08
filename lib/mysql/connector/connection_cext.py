@@ -34,13 +34,7 @@ import socket
 
 from . import version
 from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
-from .constants import (
-    CharacterSet,
-    ClientFlag,
-    FieldFlag,
-    ServerFlag,
-    ShutdownType,
-)
+from .constants import CharacterSet, ClientFlag, FieldFlag, ServerFlag, ShutdownType
 from .errors import (
     InterfaceError,
     InternalError,
@@ -82,9 +76,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def __init__(self, **kwargs):
         """Initialization"""
         if not HAVE_CMYSQL:
-            raise RuntimeError(
-                "MySQL Connector/Python C Extension not available"
-            )
+            raise RuntimeError("MySQL Connector/Python C Extension not available")
         self._cmysql = None
         self._columns = []
         self._plugin_dir = os.path.join(
@@ -120,9 +112,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             {
                 "_connector_name": "mysql-connector-python",
                 "_connector_license": client_license,
-                "_connector_version": ".".join(
-                    [str(x) for x in version.VERSION[0:3]]
-                ),
+                "_connector_version": ".".join([str(x) for x in version.VERSION[0:3]]),
                 "_source_host": socket.gethostname(),
             }
         )
@@ -263,8 +253,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     "tls_versions": tls_versions,
                     "tls_cipher_suites": tls_ciphersuites,
                     "ssl_verify_cert": self._ssl.get("verify_cert") or False,
-                    "ssl_verify_identity": self._ssl.get("verify_identity")
-                    or False,
+                    "ssl_verify_identity": self._ssl.get("verify_identity") or False,
                     "ssl_disabled": self._ssl_disabled,
                 }
             )
@@ -366,9 +355,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self, count=None, binary=False, columns=None, raw=None, prep_stmt=None
     ):
         """Get all or a subset of rows returned by the MySQL server"""
-        unread_result = (
-            prep_stmt.have_result_set if prep_stmt else self.unread_result
-        )
+        unread_result = prep_stmt.have_result_set if prep_stmt else self.unread_result
         if not (self._cmysql and unread_result):
             raise InternalError("No result set available")
 
@@ -381,9 +368,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         counter = 0
         try:
-            fetch_row = (
-                prep_stmt.fetch_row if prep_stmt else self._cmysql.fetch_row
-            )
+            fetch_row = prep_stmt.fetch_row if prep_stmt else self._cmysql.fetch_row
             if self.converter:
                 # When using a converter class, the C extension should not
                 # convert the values. This can be accomplished by setting
@@ -395,9 +380,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     row = list(row)
                     for i, _ in enumerate(row):
                         if not raw:
-                            row[i] = self.converter.to_python(
-                                self._columns[i], row[i]
-                            )
+                            row[i] = self.converter.to_python(self._columns[i], row[i])
                     row = tuple(row)
                 rows.append(row)
                 counter += 1
@@ -477,18 +460,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def fetch_eof_columns(self, prep_stmt=None):
         """Fetch EOF and column information"""
         have_result_set = (
-            prep_stmt.have_result_set
-            if prep_stmt
-            else self._cmysql.have_result_set
+            prep_stmt.have_result_set if prep_stmt else self._cmysql.have_result_set
         )
         if not have_result_set:
             raise InterfaceError("No result set")
 
-        fields = (
-            prep_stmt.fetch_fields()
-            if prep_stmt
-            else self._cmysql.fetch_fields()
-        )
+        fields = prep_stmt.fetch_fields() if prep_stmt else self._cmysql.fetch_fields()
         self._columns = []
         for col in fields:
             self._columns.append(
@@ -587,9 +564,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
         except AttributeError as err:
             addr = (
-                self._unix_socket
-                if self._unix_socket
-                else f"{self._host}:{self._port}"
+                self._unix_socket if self._unix_socket else f"{self._host}:{self._port}"
             )
             raise OperationalError(
                 errno=2055, values=(addr, "Connection not available.")
@@ -647,8 +622,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if cursor_class is not None:
             if not issubclass(cursor_class, MySQLCursorAbstract):
                 raise ProgrammingError(
-                    "Cursor class needs be to subclass"
-                    " of cursor_cext.CMySQLCursor"
+                    "Cursor class needs be to subclass of cursor_cext.CMySQLCursor"
                 )
             return (cursor_class)(self)
 
@@ -684,9 +658,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             args = ("buffered", "raw", "dictionary", "named_tuple", "prepared")
             raise ValueError(
                 "Cursor not available with given criteria: "
-                + ", ".join(
-                    [args[i] for i in range(5) if cursor_type & (1 << i) != 0]
-                )
+                + ", ".join([args[i] for i in range(5) if cursor_type & (1 << i) != 0])
             ) from None
 
     @property
@@ -882,9 +854,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def handle_unread_result(self, prepared=False):
         """Check whether there is an unread result"""
-        unread_result = (
-            self._unread_result if prepared is True else self.unread_result
-        )
+        unread_result = self._unread_result if prepared is True else self.unread_result
         if self.can_consume_results:
             self.consume_results()
         elif unread_result:

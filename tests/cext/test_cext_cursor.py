@@ -68,13 +68,9 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         return CMySQLCursor(connection=cnx)
 
     def test___init__(self):
-        self.assertRaises(
-            errors.InterfaceError, CMySQLCursor, connection="ham"
-        )
+        self.assertRaises(errors.InterfaceError, CMySQLCursor, connection="ham")
         cur = self._get_cursor(self.cnx)
-        self.assertTrue(
-            hex(id(self.cnx)).upper()[2:-1] in repr(cur._cnx).upper()
-        )
+        self.assertTrue(hex(id(self.cnx)).upper()[2:-1] in repr(cur._cnx).upper())
 
     def test_lastrowid(self):
         cur = self._get_cursor(self.cnx)
@@ -185,9 +181,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         self.assertEqual(None, cur.executemany("empty params", []))
         self.assertEqual(None, cur.executemany("params is None", None))
 
-        self.assertRaises(
-            errors.ProgrammingError, cur.executemany, "foo", ["foo"]
-        )
+        self.assertRaises(errors.ProgrammingError, cur.executemany, "foo", ["foo"])
         self.assertRaises(
             errors.ProgrammingError,
             cur.executemany,
@@ -330,9 +324,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
             for sp_name in sp_names:
                 cur.execute(stmt_drop.format(procname=sp_name))
         except errors.Error as err:
-            self.fail(
-                "Failed cleaning up test stored routine; {0}".format(err)
-            )
+            self.fail("Failed cleaning up test stored routine; {0}".format(err))
         cur.close()
 
     def test_callproc(self):
@@ -373,9 +365,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         self.assertEqual(exp, result)
 
         exp = ("ham", "spam", "hamspam")
-        result = cur.callproc(
-            "myconnpy_sp_4", (exp[0], (exp[1], "CHAR"), (0, "CHAR"))
-        )
+        result = cur.callproc("myconnpy_sp_4", (exp[0], (exp[1], "CHAR"), (0, "CHAR")))
         self.assertTrue(isinstance(cur._stored_results, list))
         self.assertEqual(exp, result)
 
@@ -402,13 +392,9 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
 
         tbl = "myconnpy_fetch"
         self.setup_table(self.cnx, tbl)
-        stmt_insert = (
-            "INSERT INTO {table} (col1,col2) "
-            "VALUES (%s,%s)".format(table=tbl)
-        )
-        stmt_select = (
-            "SELECT col1,col2 FROM {table} "
-            "ORDER BY col1 DESC".format(table=tbl)
+        stmt_insert = "INSERT INTO {table} (col1,col2) VALUES (%s,%s)".format(table=tbl)
+        stmt_select = "SELECT col1,col2 FROM {table} ORDER BY col1 DESC".format(
+            table=tbl
         )
 
         cur = self.cnx.cursor()
@@ -473,13 +459,9 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
 
         tbl = "myconnpy_fetch"
         self.setup_table(self.cnx, tbl)
-        stmt_insert = (
-            "INSERT INTO {table} (col1,col2) "
-            "VALUES (%s,%s)".format(table=tbl)
-        )
-        stmt_select = (
-            "SELECT col1,col2 FROM {table} "
-            "ORDER BY col1 ASC".format(table=tbl)
+        stmt_insert = "INSERT INTO {table} (col1,col2) VALUES (%s,%s)".format(table=tbl)
+        stmt_select = "SELECT col1,col2 FROM {table} ORDER BY col1 ASC".format(
+            table=tbl
         )
 
         cur = self.cnx.cursor()
@@ -519,9 +501,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         stmt = "SELECT VERSION(),USER(),CURRENT_TIME(),NOW(),SHA1('myconnpy')"
         cur.execute(stmt)
         cur.fetchone()
-        self.assertEqual(
-            "CMySQLCursor: {0}..".format(stmt[:40]), cur.__str__()
-        )
+        self.assertEqual("CMySQLCursor: {0}..".format(stmt[:40]), cur.__str__())
         cur.close()
 
     def test_column_names(self):
@@ -600,9 +580,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
             if cur.with_rows:
                 results.append((cur.statement, cur.fetchall()))
             else:
-                results.append(
-                    (cur.statement, cur._affected_rows, cur.lastrowid)
-                )
+                results.append((cur.statement, cur._affected_rows, cur.lastrowid))
 
         self.assertEqual(exp, results)
 
@@ -612,8 +590,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         cur = self._get_cursor(self.cnx)
         cur.execute("DROP PROCEDURE IF EXISTS multi_results")
         procedure = (
-            "CREATE PROCEDURE multi_results () "
-            "BEGIN SELECT 1; SELECT 'ham'; END"
+            "CREATE PROCEDURE multi_results () BEGIN SELECT 1; SELECT 'ham'; END"
         )
         cur.execute(procedure)
         stmt = b"CALL multi_results()"
@@ -638,14 +615,10 @@ class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
         return CMySQLCursorBuffered(connection=cnx)
 
     def test___init__(self):
-        self.assertRaises(
-            errors.InterfaceError, CMySQLCursorBuffered, connection="ham"
-        )
+        self.assertRaises(errors.InterfaceError, CMySQLCursorBuffered, connection="ham")
 
         cur = self._get_cursor(self.cnx)
-        self.assertTrue(
-            hex(id(self.cnx)).upper()[2:-1] in repr(cur._cnx).upper()
-        )
+        self.assertTrue(hex(id(self.cnx)).upper()[2:-1] in repr(cur._cnx).upper())
 
     def test_execute(self):
         self.cnx.get_warnings = True
@@ -661,9 +634,7 @@ class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
     def test_raise_on_warning(self):
         self.cnx.raise_on_warnings = True
         cur = self._get_cursor(self.cnx)
-        self.assertRaises(
-            errors.DatabaseError, cur.execute, "SELECT 'a' + 'b'"
-        )
+        self.assertRaises(errors.DatabaseError, cur.execute, "SELECT 'a' + 'b'")
 
     def test_with_rows(self):
         cur = self._get_cursor(self.cnx)

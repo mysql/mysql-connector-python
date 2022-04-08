@@ -59,9 +59,7 @@ class Bug21879859(tests.MySQLConnectorTests):
         cur.execute("CREATE TABLE {0} (c1 VARCHAR(1024))".format(self.table))
         cur.execute(
             "CREATE PROCEDURE {1}() BEGIN SELECT 1234; "
-            "SELECT t from {0}; SELECT '' from {0}; END".format(
-                self.table, self.proc
-            )
+            "SELECT t from {0}; SELECT '' from {0}; END".format(self.table, self.proc)
         )
 
     def tearDown(self):
@@ -75,9 +73,7 @@ class Bug21879859(tests.MySQLConnectorTests):
     def test_consume_after_callproc(self):
         cur = self.cnx.cursor()
 
-        cur.execute(
-            "INSERT INTO {0} VALUES ('a'),('b'),('c')".format(self.table)
-        )
+        cur.execute("INSERT INTO {0} VALUES ('a'),('b'),('c')".format(self.table))
 
         # expected to fail
         self.assertRaises(Error, cur.callproc, self.proc)

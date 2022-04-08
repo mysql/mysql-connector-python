@@ -61,8 +61,7 @@ class DistMacOS(bdist, BaseCommand):
         (
             "create-dmg",
             "c",
-            "create a dmg image from the resulting package file "
-            "(default 'False')",
+            "create a dmg image from the resulting package file (default 'False')",
         ),
         ("sign", "s", "signs the package file (default 'False')"),
         (
@@ -75,8 +74,7 @@ class DistMacOS(bdist, BaseCommand):
         (
             "platform=",
             "p",
-            "name of the platform in resulting file "
-            "(default '{}')".format(platf_n),
+            "name of the platform in resulting file (default '{}')".format(platf_n),
         ),
         (
             "platform-version=",
@@ -94,9 +92,7 @@ class DistMacOS(bdist, BaseCommand):
 
         self.name = self.distribution.get_name()
         self.version = self.distribution.get_version()
-        self.version_extra = (
-            "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
-        )
+        self.version_extra = "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
         self.create_dmg = False
         self.dist_dir = None
         self.started_dir = os.getcwd()
@@ -249,9 +245,7 @@ class DistMacOS(bdist, BaseCommand):
                 fp.seek(0)
                 fp.write("".join(content))
 
-    def _create_pkg(
-        self, macos_dist_name, dmg=False, sign=False, root="", identity=""
-    ):
+    def _create_pkg(self, macos_dist_name, dmg=False, sign=False, root="", identity=""):
         """Create the macOS pkg and a dmg image if it is required."""
         macos_pkg_name = "{0}.pkg".format(macos_dist_name)
         macos_pkg_contents = os.path.join(macos_pkg_name, "Contents")
@@ -261,9 +255,7 @@ class DistMacOS(bdist, BaseCommand):
 
         # Create a bom(8) file to tell the installer which files need to be
         # installed
-        self.log.info(
-            "Creating Archive.bom file, that describe files to " "install"
-        )
+        self.log.info("Creating Archive.bom file, that describe files to install")
         self.log.info("dstroot {0}".format(self.dstroot))
         archive_bom_path = os.path.join(macos_pkg_contents, "Archive.bom")
         self.spawn(["mkbom", self.dstroot, archive_bom_path])
@@ -335,9 +327,7 @@ class DistMacOS(bdist, BaseCommand):
                         ),
                     )
                     file_path = os.path.join(base, filename)
-                    file_dest = os.path.join(
-                        self.started_dir, self.dist_dir, new_name
-                    )
+                    file_dest = os.path.join(self.started_dir, self.dist_dir, new_name)
                     copy_file(file_path, file_dest)
                     break
             for dir_name in dirs:
@@ -351,9 +341,7 @@ class DistMacOS(bdist, BaseCommand):
                             self.platform_version,
                         ),
                     )
-                    dir_dest = os.path.join(
-                        self.started_dir, self.dist_dir, new_name
-                    )
+                    dir_dest = os.path.join(self.started_dir, self.dist_dir, new_name)
                     copy_tree(dir_name, dir_dest)
                     break
             break
@@ -363,9 +351,7 @@ class DistMacOS(bdist, BaseCommand):
         self.mkpath(self.dist_dir)
         self.debug = self.verbose
 
-        cmd_install = self.reinitialize_command(
-            "install", reinit_subcommands=1
-        )
+        cmd_install = self.reinitialize_command("install", reinit_subcommands=1)
         cmd_install.with_mysql_capi = self.with_mysql_capi
         cmd_install.with_openssl_include_dir = self.with_openssl_include_dir
         cmd_install.with_openssl_lib_dir = self.with_openssl_lib_dir
@@ -384,9 +370,7 @@ class DistMacOS(bdist, BaseCommand):
 
         macos_dist_name = "{0}-{1}".format(self.name, self.version)
         if self.label:
-            macos_dist_name = "{0}-{1}-{2}".format(
-                self.name, self.label, self.version
-            )
+            macos_dist_name = "{0}-{1}-{2}".format(self.name, self.label, self.version)
 
         self._prepare_pgk_base(macos_dist_name, MACOS_ROOT, root=self.dist_dir)
         self._create_pkg(

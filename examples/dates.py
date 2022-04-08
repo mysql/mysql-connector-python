@@ -79,14 +79,12 @@ def main(config):
     cursor.execute(stmt_create)
 
     # not using executemany to handle errors better
-    stmt_insert = "INSERT INTO {0} (c1,c2,c3) VALUES " "(%s,%s,%s)".format(tbl)
+    stmt_insert = "INSERT INTO {0} (c1,c2,c3) VALUES (%s,%s,%s)".format(tbl)
     for data in DATA:
         try:
             cursor.execute(stmt_insert, data)
         except (mysql.connector.errors.Error, TypeError) as exc:
-            output.append(
-                "Failed inserting {0}\nError: {1}\n".format(data, exc)
-            )
+            output.append("Failed inserting {0}\nError: {1}\n".format(data, exc))
             cursor.execute(stmt_drop)
             raise
 

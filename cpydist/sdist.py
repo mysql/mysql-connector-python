@@ -70,14 +70,12 @@ class DistSource(sdist):
         (
             "keep-temp",
             "k",
-            "keep the distribution tree around after creating "
-            "archive file(s)",
+            "keep the distribution tree around after creating archive file(s)",
         ),
         (
             "dist-dir=",
             "d",
-            "directory to put the source distribution archive(s) in "
-            "[default: dist]",
+            "directory to put the source distribution archive(s) in [default: dist]",
         ),
         (
             "owner=",
@@ -130,9 +128,7 @@ class DistSource(sdist):
             self.log.info("copying files to %s...", base_dir)
         for filename in files:
             if not os.path.isfile(filename):
-                self.log.warning(
-                    "'%s' not a regular file -- skipping", filename
-                )
+                self.log.warning("'%s' not a regular file -- skipping", filename)
             else:
                 dest = os.path.join(base_dir, filename)
                 self.copy_file(filename, dest)
@@ -162,7 +158,7 @@ class SourceGPL(sdist):
     generate RPM or other packages.
     """
 
-    description = "create a source distribution for Python v{}.x" "".format(
+    description = "create a source distribution for Python v{}.x".format(
         get_python_version()[0]
     )
     user_options = [
@@ -216,9 +212,7 @@ class SourceGPL(sdist):
 
         with open("README.txt", "r") as file_handler:
             license = file_handler.read()
-            self.distribution.metadata.long_description += "\n{}".format(
-                license
-            )
+            self.distribution.metadata.long_description += "\n{}".format(license)
 
         if self.debug:
             self.log.setLevel(logging.DEBUG)
@@ -237,18 +231,14 @@ class SourceGPL(sdist):
             python_version=get_python_version()[0],
         )
         self.dist_target = os.path.join(self.dist_dir, self.dist_name)
-        self.log.info(
-            "distribution will be available as '%s'", self.dist_target
-        )
+        self.log.info("distribution will be available as '%s'", self.dist_target)
 
         # build command: just to get the build_base
         cmdbuild = self.get_finalized_command("build")
         self.build_base = cmdbuild.build_base
 
         # install command
-        install = self.reinitialize_command(
-            "install_lib", reinit_subcommands=1
-        )
+        install = self.reinitialize_command("install_lib", reinit_subcommands=1)
         install.compile = False
         install.warn_dir = 0
         install.install_dir = self.bdist_dir

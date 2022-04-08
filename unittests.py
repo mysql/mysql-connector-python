@@ -310,7 +310,7 @@ _UNITTESTS_CMD_ARGS = {
         "dest": "mysql_sharedir",
         "metavar": "NAME",
         "default": None,
-        "help": ("share folder of the MySQL server (default <basedir>/share)"),
+        "help": "share folder of the MySQL server (default <basedir>/share)",
     },
     ("", "--mysql-topdir"): {
         "dest": "mysql_topdir",
@@ -325,7 +325,7 @@ _UNITTESTS_CMD_ARGS = {
         "dest": "secure_file_priv",
         "metavar": "DIRECTORY",
         "default": None,
-        "help": ("MySQL server option, can be empty to disable"),
+        "help": "MySQL server option, can be empty to disable",
     },
     ("", "--bind-address"): {
         "dest": "bind_address",
@@ -379,26 +379,24 @@ _UNITTESTS_CMD_ARGS = {
         "dest": "ipv6",
         "action": "store_true",
         "default": False,
-        "help": (
-            "Use IPv6 to run tests. This sets --bind-address=:: --host=::1."
-        ),
+        "help": "Use IPv6 to run tests. This sets --bind-address=:: --host=::1.",
     },
     ("", "--with-django"): {
         "dest": "django_path",
         "metavar": "NAME",
         "default": None,
-        "help": ("Location of Django (none installed source)"),
+        "help": "Location of Django (none installed source)",
     },
     ("", "--help-tests"): {
         "dest": "show_tests",
         "action": "store_true",
-        "help": ("Show extra information about test groups"),
+        "help": "Show extra information about test groups",
     },
     ("", "--skip-install"): {
         "dest": "skip_install",
         "action": "store_true",
         "default": False,
-        "help": ("Skip installation of Connector/Python, reuse previous."),
+        "help": "Skip installation of Connector/Python, reuse previous.",
     },
     ("", "--use-external-server"): {
         "dest": "use_external_server",
@@ -410,10 +408,7 @@ _UNITTESTS_CMD_ARGS = {
         "dest": "mysql_capi",
         "metavar": "NAME",
         "default": None,
-        "help": (
-            "Location of MySQL C API installation "
-            "or full path to mysql_config"
-        ),
+        "help": "Location of MySQL C API installation or full path to mysql_config",
     },
     ("", "--with-openssl-include-dir"): {
         "dest": "openssl_include_dir",
@@ -425,37 +420,37 @@ _UNITTESTS_CMD_ARGS = {
         "dest": "openssl_lib_dir",
         "metavar": "NAME",
         "default": os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR"),
-        "help": ("Location of OpenSSL library directory"),
+        "help": "Location of OpenSSL library directory",
     },
     ("", "--with-protobuf-include-dir"): {
         "dest": "protobuf_include_dir",
         "metavar": "NAME",
         "default": os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR"),
-        "help": ("Location of Protobuf include directory"),
+        "help": "Location of Protobuf include directory",
     },
     ("", "--with-protobuf-lib-dir"): {
         "dest": "protobuf_lib_dir",
         "metavar": "NAME",
         "default": os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR"),
-        "help": ("Location of Protobuf library directory"),
+        "help": "Location of Protobuf library directory",
     },
     ("", "--with-protoc"): {
         "dest": "protoc",
         "metavar": "NAME",
         "default": os.environ.get("MYSQLXPB_PROTOC"),
-        "help": ("Location of Protobuf protoc binary"),
+        "help": "Location of Protobuf protoc binary",
     },
     ("", "--extra-compile-args"): {
         "dest": "extra_compile_args",
         "metavar": "NAME",
         "default": None,
-        "help": ("Extra compile args for the C extension"),
+        "help": "Extra compile args for the C extension",
     },
     ("", "--extra-link-args"): {
         "dest": "extra_link_args",
         "metavar": "NAME",
         "default": None,
-        "help": ("Extra link args for the C extension"),
+        "help": "Extra link args for the C extension",
     },
 }
 
@@ -508,9 +503,7 @@ def _show_help(msg=None, parser=None, exit_code=0):
 
 def get_stats_tablename():
     return "myconnpy_{version}".format(
-        version="_".join(
-            [str(i) for i in mysql.connector.__version_info__[0:3]]
-        )
+        version="_".join([str(i) for i in mysql.connector.__version_info__[0:3]])
     )
 
 
@@ -565,9 +558,7 @@ class StatsTestResult(TextTestResult):
                 "INSERT INTO {table} (test_case, {field}) "
                 "VALUES (%s, %s) ON DUPLICATE KEY UPDATE {field} = %s"
             ).format(table=get_stats_tablename(), field=get_stats_field())
-            cur.execute(
-                stmt, (str(test), self.elapsed_time, self.elapsed_time)
-            )
+            cur.execute(stmt, (str(test), self.elapsed_time, self.elapsed_time))
             cur.close()
 
     def _save_not_ok(self, test):
@@ -757,9 +748,7 @@ def setup_stats_db(cnx):
         )
     else:
         LOGGER.info(
-            "Created table '{0}' for saving statistics".format(
-                get_stats_tablename()
-            )
+            "Created table '{0}' for saving statistics".format(get_stats_tablename())
         )
     cur.close()
 
@@ -789,9 +778,7 @@ def init_mysql_server(port, options):
             }
         ]
     else:
-        extra_args += [
-            {"version": (5, 5, 53), "options": {"secure_file_priv": ""}}
-        ]
+        extra_args += [{"version": (5, 5, 53), "options": {"secure_file_priv": ""}}]
 
     try:
         mysql_server = mysqld.MySQLServer(
@@ -833,9 +820,7 @@ def init_mysql_server(port, options):
             mysql_server.stop()
             if not mysql_server.wait_down():
                 LOGGER.error(
-                    "Failed shutting down the MySQL server '{name}'".format(
-                        name=name
-                    )
+                    "Failed shutting down the MySQL server '{name}'".format(name=name)
                 )
                 sys.exit(1)
         mysql_server.remove()
@@ -850,9 +835,7 @@ def init_mysql_server(port, options):
         else:
             LOGGER.warning(
                 "Can not connect to previously bootstrapped "
-                "MySQL Server '{name}'; forcing bootstrapping".format(
-                    name=name
-                )
+                "MySQL Server '{name}'; forcing bootstrapping".format(name=name)
             )
             mysql_server.remove()
 
@@ -955,9 +938,7 @@ def main():
 
             tests.DJANGO_VERSION = django.VERSION[0:3]
         except ImportError:
-            msg = "Could not find django package at {0}".format(
-                options.django_path
-            )
+            msg = "Could not find django package at {0}".format(options.django_path)
             LOGGER.error(msg)
             sys.exit(1)
 
@@ -1007,18 +988,14 @@ def main():
                     # Create database for testing
                     LOGGER.info("Creating 'myconnpy' database")
                     cur.execute("DROP DATABASE IF EXISTS myconnpy")
-                    cur.execute(
-                        "CREATE DATABASE myconnpy CHARACTER SET utf8mb4"
-                    )
+                    cur.execute("CREATE DATABASE myconnpy CHARACTER SET utf8mb4")
 
                     # Version
                     cur.execute("SELECT VERSION()")
                     res = cur.fetchone()
                     match = version_re.match(res[0])
                     if not match:
-                        raise ValueError(
-                            "Invalid version number '{}'".format(res[0])
-                        )
+                        raise ValueError("Invalid version number '{}'".format(res[0]))
                     ver = tuple(map(int, match.groups()))
 
                     # License
@@ -1044,9 +1021,7 @@ def main():
             tests.MYSQL_LICENSE = mysql_server.license
             tests.MYSQL_VERSION_TXT = ".".join(map(str, mysql_server.version))
         except Exception as err:
-            LOGGER.error(
-                "Failed connecting to the external MySQL server: %s", err
-            )
+            LOGGER.error("Failed connecting to the external MySQL server: %s", err)
             sys.exit(1)
     else:
         # Bootstrap MySQL server
@@ -1159,17 +1134,13 @@ def main():
                 setup_stats_db(cnxstats)
             else:
                 cnxstats = None
-            result = StatsTestRunner(
-                verbosity=options.verbosity, dbcnx=cnxstats
-            ).run(testsuite)
+            result = StatsTestRunner(verbosity=options.verbosity, dbcnx=cnxstats).run(
+                testsuite
+            )
         elif sys.version_info[0:2] == (2, 6):
-            result = Python26TestRunner(verbosity=options.verbosity).run(
-                testsuite
-            )
+            result = Python26TestRunner(verbosity=options.verbosity).run(testsuite)
         else:
-            result = BasicTestRunner(verbosity=options.verbosity).run(
-                testsuite
-            )
+            result = BasicTestRunner(verbosity=options.verbosity).run(testsuite)
         was_successful = result.wasSuccessful()
     except KeyboardInterrupt:
         LOGGER.info("Unittesting was interrupted")

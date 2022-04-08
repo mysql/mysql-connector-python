@@ -79,9 +79,7 @@ class MySQLConverterBaseTests(tests.MySQLConnectorTests):
         self.assertEqual(True, cnv.use_unicode)
 
     def test_init2(self):
-        cnv = conversion.MySQLConverterBase(
-            charset="latin1", use_unicode=False
-        )
+        cnv = conversion.MySQLConverterBase(charset="latin1", use_unicode=False)
 
         self.assertEqual("latin1", cnv.charset)
         self.assertEqual(False, cnv.use_unicode)
@@ -408,9 +406,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
     def test_to_python(self):
         """Convert MySQL data to Python types using helper method"""
 
-        res = tuple(
-            [self.cnv.to_python(v[1], v[0]) for v in self._to_python_data]
-        )
+        res = tuple([self.cnv.to_python(v[1], v[0]) for v in self._to_python_data])
         self.assertEqual(res, tuple(self._to_python_exp))
 
     def test_row_to_python(self):
@@ -451,9 +447,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
 
         self.assertEqual(exp, res)
 
-        self.assertEqual(
-            self.cnv._long_to_python, self.cnv._longlong_to_python
-        )
+        self.assertEqual(self.cnv._long_to_python, self.cnv._longlong_to_python)
 
     def test__decimal_to_python(self):
         """Convert a MySQL DECIMAL to a Python decimal.Decimal type"""
@@ -463,9 +457,7 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
 
         self.assertEqual(exp, res)
 
-        self.assertEqual(
-            self.cnv._decimal_to_python, self.cnv._newdecimal_to_python
-        )
+        self.assertEqual(self.cnv._decimal_to_python, self.cnv._newdecimal_to_python)
 
     def test__bit_to_python(self):
         """Convert a MySQL BIT to Python int"""

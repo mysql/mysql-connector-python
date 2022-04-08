@@ -33,10 +33,7 @@ import io
 import os
 import re
 
-from configparser import (
-    ConfigParser as SafeConfigParser,
-    MissingSectionHeaderError,
-)
+from configparser import ConfigParser as SafeConfigParser, MissingSectionHeaderError
 
 from .constants import CNX_POOL_ARGS, DEFAULT_CONFIGURATION
 
@@ -66,9 +63,7 @@ def read_option_files(**config):
         )
         del config["option_files"]
 
-        config_from_file = option_parser.get_groups_as_dict_with_priority(
-            *groups
-        )
+        config_from_file = option_parser.get_groups_as_dict_with_priority(*groups)
         config_options = {}
         for group in groups:
             try:
@@ -77,10 +72,7 @@ def read_option_files(**config):
                         if option == "socket":
                             option = "unix_socket"
 
-                        if (
-                            option not in CNX_POOL_ARGS
-                            and option != "failover"
-                        ):
+                        if option not in CNX_POOL_ARGS and option != "failover":
                             _ = DEFAULT_CONFIGURATION[option]
 
                         if (
@@ -103,9 +95,7 @@ def read_option_files(**config):
                     if option in not_evaluate:
                         config[option] = value[0]
                     else:
-                        config[option] = eval(  # pylint: disable=eval-used
-                            value[0]
-                        )
+                        config[option] = eval(value[0])  # pylint: disable=eval-used
                 except (NameError, SyntaxError):
                     config[option] = value[0]
 
@@ -188,9 +178,7 @@ class MySQLOptionsParser(SafeConfigParser):
                             for entry in os.listdir(dir_path):
                                 entry = os.path.join(dir_path, entry)
                                 if entry in files:
-                                    raise ValueError(
-                                        err_msg.format(entry, file_)
-                                    )
+                                    raise ValueError(err_msg.format(entry, file_))
                                 if os.path.isfile(entry) and entry.endswith(
                                     self.default_extension
                                 ):
@@ -200,24 +188,18 @@ class MySQLOptionsParser(SafeConfigParser):
                             _, filename = line.split(None, 1)
                             filename = filename.strip()
                             if filename in files:
-                                raise ValueError(
-                                    err_msg.format(filename, file_)
-                                )
+                                raise ValueError(err_msg.format(filename, file_))
                             files.append(filename)
 
                     index += 1
                     files.append(file_)
             except IOError as err:
-                raise ValueError(
-                    f"Failed reading file '{file_}': {err}"
-                ) from err
+                raise ValueError(f"Failed reading file '{file_}': {err}") from err
 
         read_files = self.read(files)
         not_read_files = set(files) - set(read_files)
         if not_read_files:
-            raise ValueError(
-                f"File(s) {', '.join(not_read_files)} could not be read."
-            )
+            raise ValueError(f"File(s) {', '.join(not_read_files)} could not be read.")
 
     def read(self, filenames, encoding=None):
         """Read and parse a filename or a list of filenames.

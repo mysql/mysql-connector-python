@@ -271,9 +271,7 @@ def read_lc_string_list(buf):
                 except KeyError:
                     return None
                 length = intread(buf[(pos + 1) : lsize + (pos + 1)])
-                byteslst.append(
-                    buf[pos + 1 + lsize : length + lsize + (pos + 1)]
-                )
+                byteslst.append(buf[pos + 1 + lsize : length + lsize + (pos + 1)])
                 pos += 1 + lsize + length
 
     return tuple(byteslst)
@@ -404,9 +402,7 @@ def _parse_lsb_release_command():
     distro = {}
     with open(os.devnull, "w", encoding="utf-8") as devnull:
         try:
-            stdout = subprocess.check_output(
-                ("lsb_release", "-a"), stderr=devnull
-            )
+            stdout = subprocess.check_output(("lsb_release", "-a"), stderr=devnull)
         except OSError:
             return None
         lines = stdout.decode(sys.getfilesystemencoding()).splitlines()
@@ -493,14 +489,10 @@ def _get_unicode_direction_rule(unicode_str):
                 "must be RandALCat too."
             )
         # characters from in_table_d2 are prohibited.
-        return {
-            "Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d2
-        }
+        return {"Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d2}
 
     # characters from in_table_d1 are prohibited.
-    return {
-        "Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d1
-    }
+    return {"Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d1}
 
 
 def validate_normalized_unicode_string(normalized_str):

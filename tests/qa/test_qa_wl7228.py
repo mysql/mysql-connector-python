@@ -68,9 +68,7 @@ class WL7228Tests(tests.MySQLConnectorTests):
     def test_option_file(self):
         """Checking the basic functionality."""
         config = self.get_clean_mysql_config()
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_option.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_option.cnf")
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
             with mysql.connector.connect(**config) as cnx:
@@ -94,9 +92,7 @@ class WL7228Tests(tests.MySQLConnectorTests):
         config["database"] = "ex_data"
         config["buffered"] = False
         config["force_ipv6"] = True
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_option.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_option.cnf")
         config["option_groups"] = "my_explicit"
         for cls in self.all_cnx_classes:
             with cls(**config) as cnx:
@@ -110,18 +106,14 @@ class WL7228Tests(tests.MySQLConnectorTests):
     def test_invalid_option_file(self):
         """Checking with the option file which doesnt exist."""
         config = self.get_clean_mysql_config()
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_invalid.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_invalid.cnf")
         for cls in self.all_cnx_classes:
             self.assertRaises(ValueError, cls, **config)
 
     def test_duplicate_option_groups(self):
         """Checking the behaviour with duplicate groups."""
         config = self.get_clean_mysql_config()
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_duplicate.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_duplicate.cnf")
         for cls in self.all_cnx_classes:
             with cls(**config) as cnx:
                 with cnx.cursor() as _:
@@ -130,9 +122,7 @@ class WL7228Tests(tests.MySQLConnectorTests):
     def test_preced_of_groups(self):
         """Checking the precedence of the option groups."""
         config = self.get_clean_mysql_config()
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_option.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_option.cnf")
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
             with mysql.connector.connect(**config) as cnx:
@@ -143,9 +133,7 @@ class WL7228Tests(tests.MySQLConnectorTests):
         """Checking the behaviour with custom option group."""
         config = self.get_clean_mysql_config()
         config["database"] = "mygroup_data"
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_option.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_option.cnf")
         config["option_groups"] = "my_group"
         for cls in self.all_cnx_classes:
             with cls(**config) as cnx:
@@ -165,9 +153,7 @@ class WL7228Tests(tests.MySQLConnectorTests):
     def test_incorrect_perm_file(self):
         """Checking with option file having invalid permission."""
         config = self.get_clean_mysql_config()
-        config["option_files"] = os.path.join(
-            OPTION_FILES_PATH, "my_option.cnf"
-        )
+        config["option_files"] = os.path.join(OPTION_FILES_PATH, "my_option.cnf")
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
             with mysql.connector.connect(**config) as cnx:

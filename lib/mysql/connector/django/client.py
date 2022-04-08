@@ -45,9 +45,7 @@ class DatabaseClient(BaseDatabaseClient):
 
         db = settings_dict["OPTIONS"].get("database", settings_dict["NAME"])
         user = settings_dict["OPTIONS"].get("user", settings_dict["USER"])
-        passwd = settings_dict["OPTIONS"].get(
-            "password", settings_dict["PASSWORD"]
-        )
+        passwd = settings_dict["OPTIONS"].get("password", settings_dict["PASSWORD"])
         host = settings_dict["OPTIONS"].get("host", settings_dict["HOST"])
         port = settings_dict["OPTIONS"].get("port", settings_dict["PORT"])
         ssl_ca = settings_dict["OPTIONS"].get("ssl_ca")

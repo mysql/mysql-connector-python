@@ -80,9 +80,7 @@ class DistBinary(bdist):
         def _get_fullname():
             label = "-{}".format(self.label) if self.label else ""
             python_version = (
-                "-py{}".format(get_python_version())
-                if self.byte_code_only
-                else ""
+                "-py{}".format(get_python_version()) if self.byte_code_only else ""
             )
             return "{name}{label}-{version}{edition}{pyver}".format(
                 name=self.distribution.get_name(),
@@ -132,18 +130,14 @@ class DistBinary(bdist):
 
         dist_name = self.distribution.get_fullname()
         self.dist_target = os.path.join(self.dist_dir, dist_name)
-        self.log.info(
-            "Distribution will be available as '%s'", self.dist_target
-        )
+        self.log.info("Distribution will be available as '%s'", self.dist_target)
 
         # build command: just to get the build_base
         cmdbuild = self.get_finalized_command("build")
         self.build_base = cmdbuild.build_base
 
         # install command
-        install = self.reinitialize_command(
-            "install_lib", reinit_subcommands=1
-        )
+        install = self.reinitialize_command("install_lib", reinit_subcommands=1)
         install.compile = False
         install.warn_dir = 0
         install.install_dir = self.bdist_dir
@@ -188,9 +182,7 @@ class DistBinary(bdist):
             if dst is None:
                 dest_name, _ = copy_file(src, self.dist_target)
             else:
-                dest_name, _ = copy_file(
-                    src, os.path.join(self.dist_target, dst)
-                )
+                dest_name, _ = copy_file(src, os.path.join(self.dist_target, dst))
 
         add_docs(os.path.join(self.dist_target, "docs"))
 

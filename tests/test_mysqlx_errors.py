@@ -71,9 +71,7 @@ class ErrorsTests(tests.MySQLxTests):
                 res = errors.get_mysql_exception(errno, msg, sqlstate)
                 self.assertTrue(
                     isinstance(res, exp),
-                    "SQLState {0} should be {1}".format(
-                        sqlstate, exp.__name__
-                    ),
+                    "SQLState {0} should be {1}".format(sqlstate, exp.__name__),
                 )
                 self.assertEqual(sqlstate, res.sqlstate)
                 self.assertEqual(
@@ -107,9 +105,7 @@ class ErrorsTests(tests.MySQLxTests):
             b"\x77\x6f\x72\x64\x3a\x20\x59\x45\x53\x29"
         )
         self.assertTrue(
-            isinstance(
-                errors.get_exception(err_packet), errors.ProgrammingError
-            )
+            isinstance(errors.get_exception(err_packet), errors.ProgrammingError)
         )
 
         self.assertRaises(ValueError, errors.get_exception, ok_packet)
@@ -166,9 +162,7 @@ class ErrorTest(tests.MySQLxTests):
         msg = "Spam"
         self.assertEqual("Spam", str(errors.Error(msg)))
         self.assertEqual("1: Spam", str(errors.Error(msg, 1)))
-        self.assertEqual(
-            "1 (XYZ): Spam", str(errors.Error(msg, 1, sqlstate="XYZ"))
-        )
+        self.assertEqual("1 (XYZ): Spam", str(errors.Error(msg, 1, sqlstate="XYZ")))
 
 
 class InterfaceErrorTests(tests.MySQLxTests):
@@ -188,23 +182,17 @@ class InternalErrorTests(tests.MySQLxTests):
 
 class OperationalErrorTests(tests.MySQLxTests):
     def test___init__(self):
-        self.assertTrue(
-            issubclass(errors.OperationalError, errors.DatabaseError)
-        )
+        self.assertTrue(issubclass(errors.OperationalError, errors.DatabaseError))
 
 
 class ProgrammingErrorTests(tests.MySQLxTests):
     def test___init__(self):
-        self.assertTrue(
-            issubclass(errors.ProgrammingError, errors.DatabaseError)
-        )
+        self.assertTrue(issubclass(errors.ProgrammingError, errors.DatabaseError))
 
 
 class IntegrityErrorTests(tests.MySQLxTests):
     def test___init__(self):
-        self.assertTrue(
-            issubclass(errors.IntegrityError, errors.DatabaseError)
-        )
+        self.assertTrue(issubclass(errors.IntegrityError, errors.DatabaseError))
 
 
 class DataErrorTests(tests.MySQLxTests):
@@ -214,9 +202,7 @@ class DataErrorTests(tests.MySQLxTests):
 
 class NotSupportedErrorTests(tests.MySQLxTests):
     def test___init__(self):
-        self.assertTrue(
-            issubclass(errors.NotSupportedError, errors.DatabaseError)
-        )
+        self.assertTrue(issubclass(errors.NotSupportedError, errors.DatabaseError))
 
 
 class PoolErrorTests(tests.MySQLxTests):

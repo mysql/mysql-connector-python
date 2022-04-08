@@ -55,9 +55,7 @@ try:
 
     from mysql.connector.conversion import MySQLConverter
 except ImportError as err:
-    raise ImproperlyConfigured(
-        f"Error loading mysql.connector module: {err}"
-    ) from err
+    raise ImproperlyConfigured(f"Error loading mysql.connector module: {err}") from err
 
 try:
     from _mysql_connector import datetime_to_mysql
@@ -258,9 +256,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     #
     # Note: we use str.format() here for readability as '%' is used as a wildcard for
     # the LIKE operator.
-    pattern_esc = (
-        r"REPLACE(REPLACE(REPLACE({}, '\\', '\\\\'), '%%', '\%%'), '_', '\_')"
-    )
+    pattern_esc = r"REPLACE(REPLACE(REPLACE({}, '\\', '\\\\'), '%%', '\%%'), '_', '\_')"
     pattern_ops = {
         "contains": "LIKE BINARY CONCAT('%%', {}, '%%')",
         "icontains": "LIKE CONCAT('%%', {}, '%%')",
@@ -425,16 +421,12 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             if table_names is None:
                 table_names = self.introspection.table_names(cursor)
             for table_name in table_names:
-                primary_key_column_name = (
-                    self.introspection.get_primary_key_column(
-                        cursor, table_name
-                    )
+                primary_key_column_name = self.introspection.get_primary_key_column(
+                    cursor, table_name
                 )
                 if not primary_key_column_name:
                     continue
-                key_columns = self.introspection.get_key_columns(
-                    cursor, table_name
-                )
+                key_columns = self.introspection.get_key_columns(cursor, table_name)
                 for (
                     column_name,
                     referenced_table_name,

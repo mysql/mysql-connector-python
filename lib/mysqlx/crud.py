@@ -61,8 +61,7 @@ _COUNT_TABLES_QUERY = (
     "WHERE table_schema = '{0}' AND table_name = '{1}'"
 )
 _COUNT_SCHEMAS_QUERY = (
-    "SELECT COUNT(*) FROM information_schema.schemata "
-    "WHERE schema_name = '{0}'"
+    "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = '{0}'"
 )
 _COUNT_QUERY = "SELECT COUNT(*) FROM {0}.{1}"
 _DROP_TABLE_QUERY = "DROP TABLE IF EXISTS {0}.{1}"
@@ -196,9 +195,7 @@ class Schema(DatabaseObject):
         Returns:
             `list`: List of Collection objects.
         """
-        rows = self._connection.get_row_result(
-            "list_objects", {"schema": self._name}
-        )
+        rows = self._connection.get_row_result("list_objects", {"schema": self._name})
         rows.fetch_all()
         collections = []
         for row in rows:
@@ -226,9 +223,7 @@ class Schema(DatabaseObject):
         Returns:
             `list`: List of Table objects.
         """
-        rows = self._connection.get_row_result(
-            "list_objects", {"schema": self._name}
-        )
+        rows = self._connection.get_row_result("list_objects", {"schema": self._name})
         rows.fetch_all()
         tables = []
         object_types = (
@@ -294,9 +289,7 @@ class Schema(DatabaseObject):
             False,
         )
 
-    def create_collection(
-        self, name, reuse_existing=False, validation=None, **kwargs
-    ):
+    def create_collection(self, name, reuse_existing=False, validation=None, **kwargs):
         """Creates in the current schema a new collection with the specified
         name and retrieves an object representing the new collection created.
 
@@ -341,9 +334,7 @@ class Schema(DatabaseObject):
             valid_options = ("level", "schema")
             for option in validation:
                 if option not in valid_options:
-                    raise ProgrammingError(
-                        f"Invalid option in 'validation': {option}"
-                    )
+                    raise ProgrammingError(f"Invalid option in 'validation': {option}")
 
             options = []
 
@@ -360,9 +351,7 @@ class Schema(DatabaseObject):
                 options.append(
                     (
                         "schema",
-                        json.dumps(schema)
-                        if isinstance(schema, dict)
-                        else schema,
+                        json.dumps(schema) if isinstance(schema, dict) else schema,
                     )
                 )
 
@@ -416,9 +405,7 @@ class Schema(DatabaseObject):
         valid_options = ("level", "schema")
         for option in validation:
             if option not in valid_options:
-                raise ProgrammingError(
-                    f"Invalid option in 'validation': {option}"
-                )
+                raise ProgrammingError(f"Invalid option in 'validation': {option}")
         options = []
 
         if "level" in validation:
@@ -472,9 +459,7 @@ class Collection(DatabaseObject):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_TABLES_QUERY.format(
-            escape(self._schema.name), escape(self._name)
-        )
+        sql = _COUNT_TABLES_QUERY.format(escape(self._schema.name), escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
     def find(self, condition=None):
@@ -607,9 +592,7 @@ class Collection(DatabaseObject):
                 "Replacement document has an _id that is different than the "
                 "matched document"
             )
-        return (
-            self.modify("_id = :id").set("$", doc).bind("id", doc_id).execute()
-        )
+        return self.modify("_id = :id").set("$", doc).bind("id", doc_id).execute()
 
     def add_or_replace_one(self, doc_id, doc):
         """Upserts the Document matching the document ID with a new document
@@ -671,9 +654,7 @@ class Table(DatabaseObject):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_TABLES_QUERY.format(
-            escape(self._schema.name), escape(self._name)
-        )
+        sql = _COUNT_TABLES_QUERY.format(escape(self._schema.name), escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
     def select(self, *fields):
@@ -751,9 +732,7 @@ class Table(DatabaseObject):
         Returns:
             bool: `True` if the underlying object is a view.
         """
-        sql = _COUNT_VIEWS_QUERY.format(
-            escape(self._schema.name), escape(self._name)
-        )
+        sql = _COUNT_VIEWS_QUERY.format(escape(self._schema.name), escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
 
@@ -773,7 +752,5 @@ class View(Table):
         Returns:
             bool: `True` if object exists in database.
         """
-        sql = _COUNT_VIEWS_QUERY.format(
-            escape(self._schema.name), escape(self._name)
-        )
+        sql = _COUNT_VIEWS_QUERY.format(escape(self._schema.name), escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1

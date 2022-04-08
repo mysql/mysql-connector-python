@@ -66,9 +66,7 @@ class LocalesModulesTests(tests.MySQLConnectorTests):
         try:
             locales.get_client_error(2000, language="spam")
         except ImportError as err:
-            self.assertEqual(
-                "No localization support for language 'spam'", str(err)
-            )
+            self.assertEqual("No localization support for language 'spam'", str(err))
         else:
             self.fail("ImportError not raised")
 

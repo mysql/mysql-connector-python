@@ -161,8 +161,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         try:
             cred = gssapi.Credentials()
             _LOGGER.debug(
-                "# Stored credentials found, if password was given it"
-                " will be ignored."
+                "# Stored credentials found, if password was given it will be ignored."
             )
             try:
                 # validate credentials has not expired.
@@ -177,9 +176,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
                     f"Unable to retrieve stored credentials error: {err}"
                 )
             try:
-                _LOGGER.debug(
-                    "# Attempt to retrieve credentials with given password"
-                )
+                _LOGGER.debug("# Attempt to retrieve credentials with given password")
                 acquire_cred_result = gssapi.raw.acquire_cred_with_password(
                     user_name,
                     self._password.encode("utf8"),
@@ -188,8 +185,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
                 cred = acquire_cred_result[0]
             except gssapi.raw.misc.GSSError as err2:
                 raise errors.ProgrammingError(
-                    "Unable to retrieve credentials with the given password: "
-                    f"{err2}"
+                    f"Unable to retrieve credentials with the given password: {err2}"
                 )
 
         flags_l = (
@@ -214,9 +210,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         try:
             initial_client_token = self.ctx.step()
         except gssapi.raw.misc.GSSError as err:
-            raise errors.InterfaceError(
-                f"Unable to initiate security context: {err}"
-            )
+            raise errors.InterfaceError(f"Unable to initiate security context: {err}")
 
         _LOGGER.debug("# initial client token: %s", initial_client_token)
         return initial_client_token
@@ -276,9 +270,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             unwraped = self.ctx.unwrap(message)
             _LOGGER.debug("# unwraped: %s", unwraped)
         except gssapi.raw.exceptions.BadMICError as err:
-            raise errors.InterfaceError(
-                f"Unable to unwrap server message: {err}"
-            )
+            raise errors.InterfaceError(f"Unable to unwrap server message: {err}")
 
         _LOGGER.debug("# unwrapped server message: %s", unwraped)
         # The message contents for the clients closing message:
@@ -343,13 +335,8 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             raise errors.InterfaceError("Missing authentication data (seed)")
 
         passw = self._normalize(self._password)
-        salted_password = self._hi(
-            passw, b64decode(self.server_salt), self.iterations
-        )
-
-        _LOGGER.debug(
-            "salted_password: %s", b64encode(salted_password).decode()
-        )
+        salted_password = self._hi(passw, b64decode(self.server_salt), self.iterations)
+        _LOGGER.debug("salted_password: %s", b64encode(salted_password).decode())
 
         client_key = self._hmac(salted_password, b"Client Key")
         _LOGGER.debug("client_key: %s", b64encode(client_key).decode())
@@ -383,9 +370,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug("auth_msg: %s", auth_msg)
 
         client_signature = self._hmac(stored_key, auth_msg.encode())
-        _LOGGER.debug(
-            "client_signature: %s", b64encode(client_signature).decode()
-        )
+        _LOGGER.debug("client_signature: %s", b64encode(client_signature).decode())
 
         client_proof = self._xor(client_key, client_signature)
         _LOGGER.debug("client_proof: %s", b64encode(client_proof).decode())
@@ -412,12 +397,8 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         First message from the server is in the form:
             <server_salt>,i=<iterations>
         """
-        if not servers_first or not isinstance(
-            servers_first, (bytearray, bytes)
-        ):
-            raise errors.InterfaceError(
-                f"Unexpected server message: {servers_first}"
-            )
+        if not servers_first or not isinstance(servers_first, (bytearray, bytes)):
+            raise errors.InterfaceError(f"Unexpected server message: {servers_first}")
         try:
             servers_first = servers_first.decode()
             self.servers_first = servers_first
@@ -487,9 +468,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             or len(servers_second) <= 2
             or not servers_second.startswith(b"v=")
         ):
-            raise errors.InterfaceError(
-                "The server's proof is not well formated."
-            )
+            raise errors.InterfaceError("The server's proof is not well formated")
         server_var = servers_second[2:].decode()
         _LOGGER.debug("server auth variable: %s", server_var)
         return self.server_auth_var == server_var
@@ -503,7 +482,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
         """
         if not self._validate_second_reponse(servers_second_response):
             raise errors.InterfaceError(
-                "Authentication failed: Unable to " "proof server identity."
+                "Authentication failed: Unable to proof server identity"
             )
         return True
 

@@ -329,9 +329,7 @@ class MySQLConverter(MySQLConverterBase):
 
         Returns a bytes.
         """
-        return f"{value.year:04d}-{value.month:02d}-{value.day:02d}".encode(
-            "ascii"
-        )
+        return f"{value.year:04d}-{value.month:02d}-{value.day:02d}".encode("ascii")
 
     @staticmethod
     def _time_to_mysql(value):
@@ -511,13 +509,9 @@ class MySQLConverter(MySQLConverterBase):
         try:
             parts = value.split(b"-")
             if len(parts) != 3:
-                raise ValueError(
-                    f"invalid datetime format: {parts} len: {len(parts)}"
-                )
+                raise ValueError(f"invalid datetime format: {parts} len: {len(parts)}")
             try:
-                return datetime.date(
-                    int(parts[0]), int(parts[1]), int(parts[2])
-                )
+                return datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
             except ValueError:
                 return None
         except (IndexError, ValueError):
@@ -584,9 +578,7 @@ class MySQLConverter(MySQLConverterBase):
                 ]
             )
             if len(dtval) < 6:
-                raise ValueError(
-                    f"invalid datetime format: {dtval} len: {len(dtval)}"
-                )
+                raise ValueError(f"invalid datetime format: {dtval} len: {len(dtval)}")
             # Note that by default MySQL accepts invalid timestamps
             # (this is also backward compatibility).
             # Traditionaly C/py returns None for this well formed but
@@ -610,9 +602,7 @@ class MySQLConverter(MySQLConverterBase):
         try:
             year = int(value)
         except ValueError as err:
-            raise ValueError(
-                f"Failed converting YEAR to int ({value})"
-            ) from err
+            raise ValueError(f"Failed converting YEAR to int ({value})") from err
 
         return year
 
@@ -631,9 +621,7 @@ class MySQLConverter(MySQLConverterBase):
         try:
             set_type = set(val.split(","))
         except ValueError as err:
-            raise ValueError(
-                f"Could not convert set {value} to a sequence"
-            ) from err
+            raise ValueError(f"Could not convert set {value} to a sequence") from err
         return set_type
 
     def _string_to_python(self, value, dsc=None):

@@ -493,15 +493,12 @@ class Column:
 
         if self._collation > 0:
             if self._collation >= len(MYSQL_CHARACTER_SETS):
-                raise ValueError(
-                    f"No mapping found for collation {self._collation}"
-                )
+                raise ValueError(f"No mapping found for collation {self._collation}")
             info = MYSQL_CHARACTER_SETS[self._collation]
             self._character_set_name = info[0]
             self._collation_name = info[1]
             self._is_binary = (
-                "binary" in self._collation_name
-                or "_bin" in self._collation_name
+                "binary" in self._collation_name or "_bin" in self._collation_name
             )
         self._map_type()
         self._is_bytes = self._col_type in (
@@ -583,19 +580,13 @@ class Column:
             self._map_uint_type()
         elif self._proto_type == ColumnProtoType.FLOAT:
             self._col_type = ColumnType.FLOAT
-            self._is_number_signed = (
-                self._flags & FloatColumnFlags.UNSIGNED
-            ) == 0
+            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
         elif self._proto_type == ColumnProtoType.DECIMAL:
             self._col_type = ColumnType.DECIMAL
-            self._is_number_signed = (
-                self._flags & FloatColumnFlags.UNSIGNED
-            ) == 0
+            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
         elif self._proto_type == ColumnProtoType.DOUBLE:
             self._col_type = ColumnType.DOUBLE
-            self._is_number_signed = (
-                self._flags & FloatColumnFlags.UNSIGNED
-            ) == 0
+            self._is_number_signed = (self._flags & FloatColumnFlags.UNSIGNED) == 0
         elif self._proto_type == ColumnProtoType.BYTES:
             self._map_bytes()
         elif self._proto_type == ColumnProtoType.TIME:
@@ -824,11 +815,7 @@ class Row:
 
         .. versionchanged:: 8.0.12
         """
-        int_index = (
-            self._resultset.index_of(index)
-            if isinstance(index, str)
-            else index
-        )
+        int_index = self._resultset.index_of(index) if isinstance(index, str) else index
         if int_index == -1 and isinstance(index, str):
             raise ValueError(f"Column name '{index}' not found")
         if int_index >= len(self._fields) or int_index < 0:
@@ -1004,9 +991,7 @@ class BufferingResult(BaseResult):
         self._items = []
         self._page_size = 20
         self._position = -1
-        self._connection.set_active_result(
-            self if self._has_more_data else None
-        )
+        self._connection.set_active_result(self if self._has_more_data else None)
 
     def _read_item(self, dumping):
         """Read item.

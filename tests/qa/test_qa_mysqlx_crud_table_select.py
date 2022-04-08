@@ -109,13 +109,11 @@ class TableSelectTests(tests.MySQLxTests):
     def test_table_select6(self):
         """Test the table.select."""
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql(
-            "create table t6(a int , name varchar(32),age int)"
-        ).execute()
+        self.session.sql("create table t6(a int , name varchar(32),age int)").execute()
         table = self.schema.get_table("t6")
-        table.insert().values(1, "a", 20).values(2, "a", 21).values(
-            3, "b", 34
-        ).values(4, "b", 35).execute()
+        table.insert().values(1, "a", 20).values(2, "a", 21).values(3, "b", 34).values(
+            4, "b", 35
+        ).execute()
         result = table.select().where("a > 1 and a < 4").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
@@ -128,19 +126,13 @@ class TableSelectTests(tests.MySQLxTests):
         """Test the table.select with group by."""
         self.session.sql("drop table if exists t7").execute()
         self.session.sql("set sql_mode=''").execute()
-        self.session.sql(
-            "create table t7(a int , name varchar(32),age int)"
-        ).execute()
+        self.session.sql("create table t7(a int , name varchar(32),age int)").execute()
         table = self.schema.get_table("t7")
-        table.insert().values(1, "a", 20).values(2, "a", 21).values(
-            3, "b", 34
-        ).values(4, "b", 35).execute()
+        table.insert().values(1, "a", 20).values(2, "a", 21).values(3, "b", 34).values(
+            4, "b", 35
+        ).execute()
         result = (
-            table.select()
-            .group_by("name")
-            .sort("age ASC")
-            .having("age > 30")
-            .execute()
+            table.select().group_by("name").sort("age ASC").having("age > 30").execute()
         )
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
@@ -153,9 +145,7 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t8").execute()
         self.session.sql("create table t8(a int , b int, c int)").execute()
         table = self.schema.get_table("t8")
-        table.insert().values(1, 3, 1).values(2, 1, 2).values(
-            3, 2, 3
-        ).execute()
+        table.insert().values(1, 3, 1).values(2, 1, 2).values(3, 2, 3).execute()
         result = table.select("a", "b").where("c== 1").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["a"], 1)
@@ -169,9 +159,7 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("set sql_mode=''").execute()
         self.session.sql("create table t9(a int , b int)").execute()
         table = self.schema.get_table("t9")
-        table.insert().values(1, 10).values(1, 10).values(2, 20).values(
-            2, 30
-        ).execute()
+        table.insert().values(1, 10).values(1, 10).values(2, 20).values(2, 30).execute()
         result = table.select("a", "b").group_by("a", "b").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["b"], 10)
@@ -183,9 +171,7 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t10").execute()
         self.session.sql("create table t10(a int , b int)").execute()
         table = self.schema.get_table("t10")
-        table.insert().values(1, 10).values(1, 11).values(2, 10).values(
-            2, 11
-        ).execute()
+        table.insert().values(1, 10).values(1, 11).values(2, 10).values(2, 11).execute()
         result = table.select("a", "b").sort("a ASC", "b DESC").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["b"], 11)
@@ -196,9 +182,7 @@ class TableSelectTests(tests.MySQLxTests):
     def test_table_select11(self):
         """Test for bug25519251."""
         self.session.sql("drop table if exists t11").execute()
-        self.session.sql(
-            "create table t11 (age INT, name VARCHAR(50))"
-        ).execute()
+        self.session.sql("create table t11 (age INT, name VARCHAR(50))").execute()
         self.session.sql("INSERT INTO t11 VALUES (21, 'Fred')").execute()
         self.session.sql("INSERT INTO t11 VALUES (28, 'Barney')").execute()
         self.session.sql("INSERT INTO t11 VALUES (42, 'Wilma')").execute()
@@ -217,9 +201,7 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t12").execute()
         self.session.sql("create table t12(a int , b int)").execute()
         table = self.schema.get_table("t12")
-        table.insert().values(1, 10).values(1, 11).values(2, 10).values(
-            2, 11
-        ).execute()
+        table.insert().values(1, 10).values(1, 11).values(2, 10).values(2, 11).execute()
         result = (
             table.select("a", "b").limit(1, 1).execute()
         )  # limit(x,y) is deprecated since 8.0.12
@@ -234,9 +216,7 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t13").execute()
         self.session.sql("create table t13(a int , b int)").execute()
         table = self.schema.get_table("t13")
-        table.insert().values(1, 10).values(1, 11).values(2, 10).values(
-            2, 11
-        ).execute()
+        table.insert().values(1, 10).values(1, 11).values(2, 10).values(2, 11).execute()
         try:
             table.select("a", "b").limit(-1).execute()
         except ValueError:
@@ -250,9 +230,7 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t14").execute()
         self.session.sql("create table t14(a int , b int)").execute()
         table = self.schema.get_table("t14")
-        table.insert().values(1, 10).values(1, 11).values(2, 10).values(
-            2, 11
-        ).execute()
+        table.insert().values(1, 10).values(1, 11).values(2, 10).values(2, 11).execute()
         try:
             result = table.select("a", "b").limit(2).offset(-1).execute()
         except ValueError:
@@ -264,13 +242,11 @@ class TableSelectTests(tests.MySQLxTests):
     def test_table_select15(self):
         """Test get_columns()."""
         self.session.sql("drop table if exists t15").execute()
-        self.session.sql(
-            "create table t15(a int , name varchar(32),age int)"
-        ).execute()
+        self.session.sql("create table t15(a int , name varchar(32),age int)").execute()
         table = self.schema.get_table("t15")
-        table.insert().values(1, "a", 20).values(2, "a", 21).values(
-            3, "b", 34
-        ).values(4, "b", 35).execute()
+        table.insert().values(1, "a", 20).values(2, "a", 21).values(3, "b", 34).values(
+            4, "b", 35
+        ).execute()
         result = table.select().where("a > 1 and a < 4").execute()
         cols = result.get_columns()
         self.session.sql("drop table if exists t15").execute()
@@ -281,13 +257,11 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t16").execute()
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
-        self.session.sql(
-            "create table t16(a int , name varchar(32),age int)"
-        ).execute()
+        self.session.sql("create table t16(a int , name varchar(32),age int)").execute()
         table = self.schema.get_table("t16")
-        table.insert().values(1, "a", 20).values(2, "a", 21).values(
-            3, "b", 34
-        ).values(4, "b", 35).execute()
+        table.insert().values(1, "a", 20).values(2, "a", 21).values(3, "b", 34).values(
+            4, "b", 35
+        ).execute()
         result = table.select().where("a > 1 and a < 4").execute()
         cols = result.get_columns()
         col0 = cols[0]
@@ -381,11 +355,9 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t3").execute()
         self.session.sql("create table t3(n JSON, a json, c JSON)").execute()
         table = self.schema.get_table("t3")
-        table.insert().values(
-            '{"name":"joy"}', '{"age":18}', '{"comp":"abc"}'
-        ).values('{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}').values(
-            '{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}'
-        ).execute()
+        table.insert().values('{"name":"joy"}', '{"age":18}', '{"comp":"abc"}').values(
+            '{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}'
+        ).values('{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}').execute()
         result = table.select().where("21 IN a->'$.age'").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.session.sql("drop table if exists t3").execute()
@@ -409,11 +381,9 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t5").execute()
         self.session.sql("create table t5(n JSON, a JSON, c JSON)").execute()
         table = self.schema.get_table("t5")
-        table.insert().values(
-            '{"name":"joy"}', '{"age":18}', '{"comp":"abc"}'
-        ).values('{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}').values(
-            '{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}'
-        ).execute()
+        table.insert().values('{"name":"joy"}', '{"age":18}', '{"comp":"abc"}').values(
+            '{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}'
+        ).values('{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}').execute()
         result = table.select().where("21 NOT IN a->'$.age'").execute()
         self.assertEqual(len(result.fetch_all()), 2)
         self.session.sql("drop table if exists t5").execute()
@@ -439,11 +409,9 @@ class TableSelectTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t7").execute()
         self.session.sql("create table t7(n JSON, a json, c JSON)").execute()
         table = self.schema.get_table("t7")
-        table.insert().values(
-            '{"name":"joy"}', '{"age":18}', '{"comp":"abc"}'
-        ).values('{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}').values(
-            '{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}'
-        ).execute()
+        table.insert().values('{"name":"joy"}', '{"age":18}', '{"comp":"abc"}').values(
+            '{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}'
+        ).values('{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}').execute()
         result = table.select().where("21 IN n->'$.name'").execute()
         result1 = table.select().where("'b' IN a->$.age").limit(1).execute()
         self.assertEqual(len(result.fetch_all()), 0)
@@ -455,9 +423,7 @@ class TableSelectTests(tests.MySQLxTests):
         """Test IN operator with single element on LHS and array/list on RHS
         and vice versa."""
         self.session.sql("drop table if exists t8").execute()
-        self.session.sql(
-            "create table t8(id int, n JSON, a JSON, p JSON)"
-        ).execute()
+        self.session.sql("create table t8(id int, n JSON, a JSON, p JSON)").execute()
         table = self.schema.get_table("t8")
         table.insert().values(
             1, '{"name":"a"}', '{"age":21}', '{"prof":["x","y"]}'
@@ -465,11 +431,7 @@ class TableSelectTests(tests.MySQLxTests):
             3, '{"name":"c"}', '{"age":26}', '{"prof":["l","m"]}'
         ).execute()
         result = table.select().where("a->$.age IN [21,23,24,28]").execute()
-        result1 = (
-            table.select()
-            .where("n->'$.name' IN ['a','b','c','d','e']")
-            .execute()
-        )
+        result1 = table.select().where("n->'$.name' IN ['a','b','c','d','e']").execute()
         result2 = table.select().where("a->$.age IN (21,23)").execute()
         result3 = table.select().where("21 IN (22,23)").limit(1).execute()
         result4 = table.select().where("['p','q'] IN p->'$.prof'").execute()
@@ -497,13 +459,9 @@ class TableSelectTests(tests.MySQLxTests):
         ).values(
             2, "b", '{"age":21}', '{"additionalinfo":["boxing","music"]}'
         ).execute()
-        result = (
-            table.select().where("'reading' IN ai->$.additionalinfo").execute()
-        )
+        result = table.select().where("'reading' IN ai->$.additionalinfo").execute()
         result1 = table.select().where("'music' IN a->$.age").execute()
-        result2 = (
-            table.select().where("'music' IN ai->$.additionalinfo").execute()
-        )
+        result2 = table.select().where("'music' IN ai->$.additionalinfo").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.assertEqual(len(result1.fetch_all()), 0)
         self.assertEqual(len(result2.fetch_all()), 2)
@@ -514,9 +472,7 @@ class TableSelectTests(tests.MySQLxTests):
         """Test IN operator with array/list operand on LHS and array/list on
         RHS."""
         self.session.sql("drop table if exists t10").execute()
-        self.session.sql(
-            "create table t10(i JSON, n JSON, a JSON, ai JSON)"
-        ).execute()
+        self.session.sql("create table t10(i JSON, n JSON, a JSON, ai JSON)").execute()
         table = self.schema.get_table("t10")
         table.insert().values(
             '{"id":1}',
@@ -535,10 +491,7 @@ class TableSelectTests(tests.MySQLxTests):
             .execute()
         )
         result1 = (
-            table.select()
-            .where('["happy","joy"] IN n->$.name')
-            .limit(1)
-            .execute()
+            table.select().where('["happy","joy"] IN n->$.name').limit(1).execute()
         )
         result2 = (
             table.select()
@@ -555,9 +508,7 @@ class TableSelectTests(tests.MySQLxTests):
     def test_contains_operator_select11(self):
         """Test IN operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t11").execute()
-        self.session.sql(
-            "create table t11(i JSON, n JSON, a JSON, ai JSON)"
-        ).execute()
+        self.session.sql("create table t11(i JSON, n JSON, a JSON, ai JSON)").execute()
         table = self.schema.get_table("t11")
         table.insert().values(
             '{"id":1}',
@@ -599,20 +550,11 @@ class TableSelectTests(tests.MySQLxTests):
         table.insert().values(1, "a", 21).values(2, "b", 22).values(
             3, "c", 32
         ).execute()
-        result = (
-            table.select().where("(1>5) IN (true, false)").limit(1).execute()
-        )
-        result1 = (
-            table.select()
-            .where("('a'>'b') in (true, false)")
-            .limit(1)
-            .execute()
-        )
+        result = table.select().where("(1>5) IN (true, false)").limit(1).execute()
+        result1 = table.select().where("('a'>'b') in (true, false)").limit(1).execute()
         result2 = (
             table.select()
-            .where(
-                "true IN [(1>5), !(false), (true || false), (false && true)]"
-            )
+            .where("true IN [(1>5), !(false), (true || false), (false && true)]")
             .limit(1)
             .execute()
         )
@@ -661,9 +603,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql(
-            "create table t1(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t1(name varchar(20), age int)").execute()
         table = self.schema.get_table("t1")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -734,9 +674,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql(
-            "create table t2(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t2(name varchar(20), age int)").execute()
         table = self.schema.get_table("t2")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -807,9 +745,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t3").execute()
-        self.session.sql(
-            "create table t3(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t3(name varchar(20), age int)").execute()
         table = self.schema.get_table("t3")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -880,9 +816,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t4").execute()
-        self.session.sql(
-            "create table t4(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t4(name varchar(20), age int)").execute()
         table = self.schema.get_table("t4")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -953,9 +887,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t5").execute()
-        self.session.sql(
-            "create table t5(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t5(name varchar(20), age int)").execute()
         table = self.schema.get_table("t5")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1031,9 +963,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql(
-            "create table t6(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t6(name varchar(20), age int)").execute()
         table = self.schema.get_table("t6")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1107,9 +1037,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t7").execute()
-        self.session.sql(
-            "create table t7(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t7(name varchar(20), age int)").execute()
         table = self.schema.get_table("t7")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1465,9 +1393,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql(
-            "create table t1(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t1(name varchar(20), age int)").execute()
         table = self.schema.get_table("t1")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1540,9 +1466,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql(
-            "create table t2(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t2(name varchar(20), age int)").execute()
         table = self.schema.get_table("t2")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1615,9 +1539,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t3").execute()
-        self.session.sql(
-            "create table t3(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t3(name varchar(20), age int)").execute()
         table = self.schema.get_table("t3")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1690,9 +1612,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t4").execute()
-        self.session.sql(
-            "create table t4(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t4(name varchar(20), age int)").execute()
         table = self.schema.get_table("t4")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1765,9 +1685,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t5").execute()
-        self.session.sql(
-            "create table t5(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t5(name varchar(20), age int)").execute()
         table = self.schema.get_table("t5")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1852,9 +1770,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql(
-            "create table t6(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t6(name varchar(20), age int)").execute()
         table = self.schema.get_table("t6")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1890,9 +1806,7 @@ class TableSelectTests(tests.MySQLxTests):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
         self.session.sql("drop table if exists t7").execute()
-        self.session.sql(
-            "create table t7(name varchar(20), age int)"
-        ).execute()
+        self.session.sql("create table t7(name varchar(20), age int)").execute()
         table = self.schema.get_table("t7")
         table.insert().values("Joe", 21).values("James", 23).execute()
 
@@ -1973,9 +1887,7 @@ class TableSelectTests(tests.MySQLxTests):
         table.insert().values(1, 1, '{"comp":"abc"}').values(
             2, 1, '{"comp":"pqr"}'
         ).values(3, 2, '{"comp":"xyz"}').execute()
-        result = (
-            table.select("a").where("'pqr' OVERLAPS c->'$.comp'").execute()
-        )
+        result = table.select("a").where("'pqr' OVERLAPS c->'$.comp'").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["a"], 2)
@@ -2001,11 +1913,9 @@ class TableSelectTests(tests.MySQLxTests):
         """OVERLAPS operator with boolean as operand - With LHS in RHS."""
         self.session.sql("create table t3(n JSON, a json, c JSON)").execute()
         table = self.schema.get_table("t3")
-        table.insert().values(
-            '{"name":"joy"}', '{"age":18}', '{"comp":"abc"}'
-        ).values('{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}').values(
-            '{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}'
-        ).execute()
+        table.insert().values('{"name":"joy"}', '{"age":18}', '{"comp":"abc"}').values(
+            '{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}'
+        ).values('{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}').execute()
         result = table.select().where("21 OVERLAPS a->'$.age'").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.session.sql("drop table if exists t3").execute()
@@ -2018,9 +1928,7 @@ class TableSelectTests(tests.MySQLxTests):
         table.insert().values('{"name":"joy"}', 18, '{"comp":"abc"}').values(
             '{"name":"happy"}', 21, '{"comp":"pqr"}'
         ).values('{"name":"sad"}', 32, '{"comp":"xyz"}').execute()
-        result = (
-            table.select().where("'happy' NOT OVERLAPS n->'$.name'").execute()
-        )
+        result = table.select().where("'happy' NOT OVERLAPS n->'$.name'").execute()
         self.assertEqual(len(result.fetch_all()), 2)
         self.session.sql("drop table if exists t4").execute()
 
@@ -2029,14 +1937,10 @@ class TableSelectTests(tests.MySQLxTests):
         """NOT OVERLAPS operator with int as operand - With LHS not in RHS."""
         self.session.sql("create table t5(n JSON, a JSON, c JSON)").execute()
         table = self.schema.get_table("t5")
-        table.insert().values(
-            '{"name":"joy"}', '{"age":18}', '{"comp":"abc"}'
-        ).values('{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}').values(
-            '{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}'
-        ).execute()
-        result = (
-            table.select().where("[21,32] NOT OVERLAPS a->'$.age'").execute()
-        )
+        table.insert().values('{"name":"joy"}', '{"age":18}', '{"comp":"abc"}').values(
+            '{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}'
+        ).values('{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}').execute()
+        result = table.select().where("[21,32] NOT OVERLAPS a->'$.age'").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.session.sql("drop table if exists t5").execute()
 
@@ -2051,11 +1955,7 @@ class TableSelectTests(tests.MySQLxTests):
         table.insert().values("a", 21, '{"comp":"pqr"}').values(
             "b", 31, '{"comp":"xyz"}'
         ).values("e", 22, '{"comp":"xyz"}').execute()
-        result = (
-            table.select()
-            .where("c->'$.comp' OVERLAPS ['pqr','abc']")
-            .execute()
-        )
+        result = table.select().where("c->'$.comp' OVERLAPS ['pqr','abc']").execute()
         self.assertEqual(len(result.fetch_all()), 1)
         self.session.sql("drop table if exists t6").execute()
 
@@ -2064,15 +1964,11 @@ class TableSelectTests(tests.MySQLxTests):
         """OVERLAPS operator with different datatypes as operands."""
         self.session.sql("create table t7(n JSON, a json, c JSON)").execute()
         table = self.schema.get_table("t7")
-        table.insert().values(
-            '{"name":"joy"}', '{"age":18}', '{"comp":"abc"}'
-        ).values('{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}').values(
-            '{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}'
-        ).execute()
+        table.insert().values('{"name":"joy"}', '{"age":18}', '{"comp":"abc"}').values(
+            '{"name":"happy"}', '{"age":21}', '{"comp":"pqr"}'
+        ).values('{"name":"sad"}', '{"age":32}', '{"comp":"xyz"}').execute()
         result = table.select().where("21 OVERLAPS n->'$.name'").execute()
-        result1 = (
-            table.select().where("'b' OVERLAPS a->$.age").limit(1).execute()
-        )
+        result1 = table.select().where("'b' OVERLAPS a->$.age").limit(1).execute()
         self.assertEqual(len(result.fetch_all()), 0)
         self.assertEqual(len(result1.fetch_all()), 0)
         self.session.sql("drop table if exists t7").execute()
@@ -2081,30 +1977,20 @@ class TableSelectTests(tests.MySQLxTests):
     def test_overlaps_table_select8(self):
         """OVERLAPS operator with single element on LHS and array/list on RHS
         and vice versa."""
-        self.session.sql(
-            "create table t8(id int, n JSON, a JSON, p JSON)"
-        ).execute()
+        self.session.sql("create table t8(id int, n JSON, a JSON, p JSON)").execute()
         table = self.schema.get_table("t8")
         table.insert().values(
             1, '{"name":"a"}', '{"age":21}', '{"prof":["x","y"]}'
         ).values(2, '{"name":"b"}', '{"age":24}', '{"prof":["p","q"]}').values(
             3, '{"name":"c"}', '{"age":26}', '{"prof":["l","m"]}'
         ).execute()
-        result = (
-            table.select().where("a->$.age OVERLAPS [21,23,24,28]").execute()
-        )
+        result = table.select().where("a->$.age OVERLAPS [21,23,24,28]").execute()
         result1 = (
-            table.select()
-            .where("n->'$.name' OVERLAPS ['a','b','c','d','e']")
-            .execute()
+            table.select().where("n->'$.name' OVERLAPS ['a','b','c','d','e']").execute()
         )
         result2 = table.select().where("a->$.age OVERLAPS [(10+11)]").execute()
-        result3 = (
-            table.select().where("21 OVERLAPS [22,23]").limit(1).execute()
-        )
-        result4 = (
-            table.select().where("['p','q'] OVERLAPS p->'$.prof'").execute()
-        )
+        result3 = table.select().where("21 OVERLAPS [22,23]").limit(1).execute()
+        result4 = table.select().where("['p','q'] OVERLAPS p->'$.prof'").execute()
         self.assertEqual(len(result.fetch_all()), 2)
         self.assertEqual(len(result1.fetch_all()), 3)
         self.assertEqual(len(result2.fetch_all()), 1)
@@ -2130,15 +2016,11 @@ class TableSelectTests(tests.MySQLxTests):
             2, "b", '{"age":21}', '{"additionalinfo":["boxing","music"]}'
         ).execute()
         result = (
-            table.select()
-            .where("'reading' OVERLAPS ai->$.additionalinfo")
-            .execute()
+            table.select().where("'reading' OVERLAPS ai->$.additionalinfo").execute()
         )
         result1 = table.select().where("'music' OVERLAPS a->$.age").execute()
         result2 = (
-            table.select()
-            .where("'music' OVERLAPS ai->$.additionalinfo")
-            .execute()
+            table.select().where("'music' OVERLAPS ai->$.additionalinfo").execute()
         )
         self.assertEqual(len(result.fetch_all()), 1)
         self.assertEqual(len(result1.fetch_all()), 0)
@@ -2150,9 +2032,7 @@ class TableSelectTests(tests.MySQLxTests):
         """OVERLAPS operator with array/list operand on LHS and array/list
         on RHS."""
         self.session.sql("drop table if exists t10").execute()
-        self.session.sql(
-            "create table t10(i JSON, n JSON, a JSON, ai JSON)"
-        ).execute()
+        self.session.sql("create table t10(i JSON, n JSON, a JSON, ai JSON)").execute()
         table = self.schema.get_table("t10")
         table.insert().values(
             '{"id":1}',
@@ -2167,9 +2047,7 @@ class TableSelectTests(tests.MySQLxTests):
         ).execute()
         result = (
             table.select()
-            .where(
-                "['playing','painting','boxing'] OVERLAPS ai->'$.additionalinfo'"
-            )
+            .where("['playing','painting','boxing'] OVERLAPS ai->'$.additionalinfo'")
             .execute()
         )
         result1 = (
@@ -2193,9 +2071,7 @@ class TableSelectTests(tests.MySQLxTests):
     def test_overlaps_table_select11(self):
         """OVERLAPS operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t11").execute()
-        self.session.sql(
-            "create table t11(i JSON, n JSON, a JSON, ai JSON)"
-        ).execute()
+        self.session.sql("create table t11(i JSON, n JSON, a JSON, ai JSON)").execute()
         table = self.schema.get_table("t11")
         table.insert().values(
             '{"id":1}',
@@ -2238,10 +2114,7 @@ class TableSelectTests(tests.MySQLxTests):
             3, "c", 32
         ).execute()
         result = (
-            table.select()
-            .where("[(1>5)] OVERLAPS [true, false]")
-            .limit(1)
-            .execute()
+            table.select().where("[(1>5)] OVERLAPS [true, false]").limit(1).execute()
         )
         result1 = (
             table.select()
@@ -2251,9 +2124,7 @@ class TableSelectTests(tests.MySQLxTests):
         )
         result2 = (
             table.select()
-            .where(
-                "true OVERLAPS [(1>5), !(false), (true || false), (false && true)]"
-            )
+            .where("true OVERLAPS [(1>5), !(false), (true || false), (false && true)]")
             .limit(1)
             .execute()
         )
@@ -2296,9 +2167,7 @@ class TableSelectTests(tests.MySQLxTests):
             2, '{"name":"b"}', 22
         ).values(3, '{"name":"c"}', 32).execute()
         result = table.select().where("'' OVERLAPS n->'$.name'").execute()
-        result1 = (
-            table.select().where("n->'$.name' OVERLAPS ['', ' ']").execute()
-        )
+        result1 = table.select().where("n->'$.name' OVERLAPS ['', ' ']").execute()
         self.assertEqual(len(result.fetch_all()), 0)
         self.assertEqual(len(result1.fetch_all()), 0)
         self.session.sql("drop table if exists t14").execute()

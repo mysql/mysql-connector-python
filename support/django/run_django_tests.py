@@ -129,9 +129,7 @@ def get_args():
         epilog=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--tests", metavar="test", nargs="+", help="tests to run"
-    )
+    parser.add_argument("--tests", metavar="test", nargs="+", help="tests to run")
     parser.add_argument(
         "--debug", action="store_true", help="show debugging information"
     )
@@ -148,9 +146,7 @@ def get_args():
             versions=", ".join(DJANGO.keys())
         ),
     )
-    parser.add_argument(
-        "--django-path", required=False, help="Path to Django source"
-    )
+    parser.add_argument("--django-path", required=False, help="Path to Django source")
     parser.add_argument(
         "--settings",
         required=False,
@@ -213,9 +209,7 @@ def download(url, local_file=None):
 
     urlparts = urlparse(url)
     logger.info(
-        "Downloading '{file}' from {loc}".format(
-            file=local_file, loc=urlparts.netloc
-        )
+        "Downloading '{file}' from {loc}".format(file=local_file, loc=urlparts.netloc)
     )
 
     with open(local_file, "wb") as localfp:
@@ -349,9 +343,7 @@ def get_django_version(path):
 
 def main():
     """Start application"""
-    formatter = logging.Formatter(
-        "%(asctime)s [%(name)s:%(levelname)s] %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s [%(name)s:%(levelname)s] %(message)s")
     loghandle = logging.StreamHandler()
     loghandle.setFormatter(formatter)
     logger.addHandler(loghandle)
@@ -366,8 +358,7 @@ def main():
     if os.name != "nt":
         if "http_proxy" not in os.environ or "https_proxy" not in os.environ:
             logger.warning(
-                "Note: http_proxy and/or https_proxy "
-                "environment variables not set"
+                "Note: http_proxy and/or https_proxy environment variables not set"
             )
 
     logger.info("Python v{maj}: {exe}".format(maj=PYMAJ, exe=sys.executable))
@@ -383,9 +374,7 @@ def main():
 
     if args.django_path:
         if not os.path.isdir(args.django_path):
-            logger.error(
-                "Path to Django is not valid, was %s", args.django_path
-            )
+            logger.error("Path to Django is not valid, was %s", args.django_path)
             sys.exit(1)
         django_path = os.path.abspath(args.django_path)
     else:

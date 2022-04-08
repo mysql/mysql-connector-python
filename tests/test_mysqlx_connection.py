@@ -64,12 +64,7 @@ from mysqlx.errors import (
     OperationalError,
     ProgrammingError,
 )
-from mysqlx.protobuf import (
-    HAVE_MYSQLXPB_CEXT,
-    HAVE_PROTOBUF,
-    Protobuf,
-    mysqlxpb_enum,
-)
+from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT, HAVE_PROTOBUF, Protobuf, mysqlxpb_enum
 from mysqlx.protocol import (
     HAVE_LZ4,
     HAVE_ZSTD,
@@ -369,9 +364,7 @@ def build_uri(**kwargs):
 
     if "host" in kwargs:
         host = (
-            "[{0}]".format(kwargs["host"])
-            if ":" in kwargs["host"]
-            else kwargs["host"]
+            "[{0}]".format(kwargs["host"]) if ":" in kwargs["host"] else kwargs["host"]
         )
         uri = "{0}@{1}".format(uri, host)
     elif "routers" in kwargs:
@@ -390,9 +383,7 @@ def build_uri(**kwargs):
             port = ":{0}".format(router["port"]) if "port" in router else ""
 
             routers.append(
-                fmt.format(
-                    host=host, port=port, priority=router.get("priority", None)
-                )
+                fmt.format(host=host, port=port, priority=router.get("priority", None))
             )
 
         uri = "{0}@[{1}]".format(uri, ",".join(routers))
@@ -423,8 +414,7 @@ def build_uri(**kwargs):
             conn_attrs.startswith("[") and conn_attrs.endswith("]")
         ):
             query.append(
-                "connection-attributes={}"
-                "".format(kwargs["connection-attributes"])
+                "connection-attributes={}".format(kwargs["connection-attributes"])
             )
         else:
             attr_list = []
@@ -440,7 +430,7 @@ def build_uri(**kwargs):
         if isinstance(tls_versions, str) and not (
             tls_versions.startswith("[") and tls_versions.endswith("]")
         ):
-            query.append("tls-versions=[{}]" "".format(kwargs["tls-versions"]))
+            query.append("tls-versions=[{}]".format(kwargs["tls-versions"]))
         else:
             query.append("tls-versions=[{}]".format(",".join(tls_versions)))
 
@@ -449,9 +439,7 @@ def build_uri(**kwargs):
         if isinstance(tls_ciphers, str) and not (
             tls_ciphers.startswith("[") and tls_ciphers.endswith("]")
         ):
-            query.append(
-                "tls-ciphersuites=[{}]" "".format(",".format(tls_ciphers))
-            )
+            query.append("tls-ciphersuites=[{}]".format(",".format(tls_ciphers)))
         else:
             query.append("tls-ciphersuites=[{}]".format(",".join(tls_ciphers)))
 
@@ -495,13 +483,9 @@ class ServerProtocol(Protocol):
         Args:
             auth_data (str): Authentication data.
         """
-        msg = Message(
-            "Mysqlx.Session.AuthenticateContinue", auth_data=auth_data
-        )
+        msg = Message("Mysqlx.Session.AuthenticateContinue", auth_data=auth_data)
         self._writer.write_message(
-            mysqlxpb_enum(
-                "Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_CONTINUE"
-            ),
+            mysqlxpb_enum("Mysqlx.ServerMessages.Type.SESS_AUTHENTICATE_CONTINUE"),
             msg,
         )
 
@@ -637,9 +621,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Break loop during connect (none left)
-        uri = "mysqlx://{0}:{1}@[bad_host, another_bad_host]".format(
-            user, password
-        )
+        uri = "mysqlx://{0}:{1}@[bad_host, another_bad_host]".format(user, password)
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
         try:
             session = mysqlx.get_session(uri)
@@ -647,25 +629,21 @@ class MySQLxSessionTests(tests.MySQLxTests):
             self.assertEqual(4001, err.errno)
 
         # Invalid option with URI
-        uri = "mysqlx://{0}:{1}@{2}:{3}?invalid=option" "".format(
+        uri = "mysqlx://{0}:{1}@{2}:{3}?invalid=option".format(
             user, password, host, port
         )
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
-        uri = "mysqlx://{0}:{1}@{2}:{3}?user=root" "".format(
-            user, password, host, port
-        )
+        uri = "mysqlx://{0}:{1}@{2}:{3}?user=root".format(user, password, host, port)
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
-        uri = "mysqlx://{0}:{1}@{2}:{3}?password=secret" "".format(
+        uri = "mysqlx://{0}:{1}@{2}:{3}?password=secret".format(
             user, password, host, port
         )
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Invalid scheme
-        uri = "mysqlx+invalid://{0}:{1}@{2}:{3}" "".format(
-            user, password, host, port
-        )
+        uri = "mysqlx+invalid://{0}:{1}@{2}:{3}".format(user, password, host, port)
         self.assertRaises(InterfaceError, mysqlx.get_session, uri)
 
         # Invalid option with dict
@@ -682,9 +660,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(InterfaceError, mysqlx.get_session, **config)
 
         # SocketSteam.is_socket()
-        session = mysqlx.get_session(
-            user=user, password=password, host=host, port=port
-        )
+        session = mysqlx.get_session(user=user, password=password, host=host, port=port)
         self.assertFalse(session._connection.stream.is_socket())
 
     def test_auth(self):
@@ -704,8 +680,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             "mysql_native_password BY 'test'"
         ).execute()
         sess.sql(
-            "CREATE USER 'sha256'@'%' IDENTIFIED WITH "
-            "sha256_password BY 'sha256'"
+            "CREATE USER 'sha256'@'%' IDENTIFIED WITH sha256_password BY 'sha256'"
         ).execute()
 
         config = {
@@ -778,9 +753,9 @@ class MySQLxSessionTests(tests.MySQLxTests):
     )
     @unittest.skipIf(
         tests.MYSQL_VERSION < (5, 7, 15),
-        "--mysqlx-socket option" " tests not available for this MySQL version",
+        "--mysqlx-socket option tests not available for this MySQL version",
     )
-    @unittest.skipIf(os.name == "nt", "sockets not available" " on windows")
+    @unittest.skipIf(os.name == "nt", "sockets not available on windows")
     def test_mysqlx_socket(self):
         # Connect with unix socket
         uri = "mysqlx://{user}:{password}@({socket})".format(
@@ -804,9 +779,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         session.close()
 
         # Socket parsing tests
-        conn = mysqlx.connection._get_connection_settings(
-            "root:@(/path/to/sock)"
-        )
+        conn = mysqlx.connection._get_connection_settings("root:@(/path/to/sock)")
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
@@ -816,9 +789,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-        conn = mysqlx.connection._get_connection_settings(
-            "root:@/path%2Fto%2Fsock"
-        )
+        conn = mysqlx.connection._get_connection_settings("root:@/path%2Fto%2Fsock")
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
@@ -828,26 +799,22 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual("/path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-        conn = mysqlx.connection._get_connection_settings(
-            "root:@.%2Fpath%2Fto%2Fsock"
-        )
+        conn = mysqlx.connection._get_connection_settings("root:@.%2Fpath%2Fto%2Fsock")
         self.assertEqual("./path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
         conn = mysqlx.connection._get_connection_settings(
-            "root:@.%2Fpath%2Fto%2Fsock" "/schema"
+            "root:@.%2Fpath%2Fto%2Fsock/schema"
         )
         self.assertEqual("./path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
 
-        conn = mysqlx.connection._get_connection_settings(
-            "root:@..%2Fpath%2Fto%2Fsock"
-        )
+        conn = mysqlx.connection._get_connection_settings("root:@..%2Fpath%2Fto%2Fsock")
         self.assertEqual("../path/to/sock", conn["socket"])
         self.assertEqual("", conn["schema"])
 
         conn = mysqlx.connection._get_connection_settings(
-            "root:@..%2Fpath%2Fto%2Fsock" "/schema"
+            "root:@..%2Fpath%2Fto%2Fsock/schema"
         )
         self.assertEqual("../path/to/sock", conn["socket"])
         self.assertEqual("schema", conn["schema"])
@@ -990,9 +957,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                 "selected server",
             )
         except mysqlx.InterfaceError as err:
-            self.assertEqual(
-                err.msg, "Unable to connect to any of the target hosts"
-            )
+            self.assertEqual(err.msg, "Unable to connect to any of the target hosts")
 
         # Trying to establish a connection with a wrong password should not
         # wait for timeout
@@ -1052,17 +1017,13 @@ class MySQLxSessionTests(tests.MySQLxTests):
         settings.pop("schema")
         session = mysqlx.get_session(settings)
         schema = session.get_default_schema()
-        self.assertIsNone(
-            schema, "None value was expected but got '{}'".format(schema)
-        )
+        self.assertIsNone(schema, "None value was expected but got '{}'".format(schema))
         session.close()
 
         # Test SQL statements not fully qualified, which must not raise error:
         #     mysqlx.errors.OperationalError: No database selected
         self.session.sql("CREATE DATABASE my_test_schema").execute()
-        self.session.sql(
-            "CREATE TABLE my_test_schema.pets(name VARCHAR(20))"
-        ).execute()
+        self.session.sql("CREATE TABLE my_test_schema.pets(name VARCHAR(20))").execute()
         settings = self.connect_kwargs.copy()
         settings["schema"] = "my_test_schema"
         session = mysqlx.get_session(settings)
@@ -1082,9 +1043,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         build_uri(**settings)
         session = mysqlx.get_session(settings)
         schema = session.get_default_schema()
-        self.assertIsNone(
-            schema, "None value was expected but got '{}'".format(schema)
-        )
+        self.assertIsNone(schema, "None value was expected but got '{}'".format(schema))
         session.close()
 
         # Test not existing default schema at get_session raise error
@@ -1111,7 +1070,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Grant privilege to one unrelated schema
         self.session.sql(
-            "GRANT ALL PRIVILEGES ON nonexistent.* TO " "'def_schema'@'%'"
+            "GRANT ALL PRIVILEGES ON nonexistent.* TO 'def_schema'@'%'"
         ).execute()
         with self.assertRaises(InterfaceError) as context:
             _ = mysqlx.get_session(settings)
@@ -1212,9 +1171,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         # Invalid rollback savepoint without a started transaction
         sp1 = self.session.set_savepoint("sp1")
-        self.assertRaises(
-            mysqlx.errors.OperationalError, self.session.rollback_to, sp1
-        )
+        self.assertRaises(mysqlx.errors.OperationalError, self.session.rollback_to, sp1)
 
         collection = schema.create_collection(collection_name)
 
@@ -1245,9 +1202,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual(1, collection.count())
 
         # The 'sp3' savepoint should not exist at this point
-        self.assertRaises(
-            mysqlx.errors.OperationalError, self.session.rollback_to, sp3
-        )
+        self.assertRaises(mysqlx.errors.OperationalError, self.session.rollback_to, sp3)
 
         collection.add({"_id": "4", "name": "Barney", "age": 42}).execute()
         self.assertEqual(2, collection.count())
@@ -1263,9 +1218,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertEqual(3, collection.count())
 
         # The 'sp4' savepoint should not exist at this point
-        self.assertRaises(
-            mysqlx.errors.OperationalError, self.session.rollback_to, sp4
-        )
+        self.assertRaises(mysqlx.errors.OperationalError, self.session.rollback_to, sp4)
 
         self.session.commit()
         schema.drop_collection(collection_name)
@@ -1283,7 +1236,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
     )
     @unittest.skipIf(
         sys.version_info < (2, 7, 9),
-        "The support for SSL is " "not available for Python versions < 2.7.9.",
+        "The support for SSL is not available for Python versions < 2.7.9.",
     )
     def test_ssl_connection(self):
         config = {}
@@ -1345,11 +1298,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Should connect with ssl_mode=False
         config["ssl-mode"] = "verify_ca"
         session = mysqlx.get_session(config)
-        res = (
-            session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_active'")
-            .execute()
-            .fetch_all()
-        )
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
         self.assertEqual("ON", res[0][1])
 
         # Should fail to connect with verify_identity
@@ -1361,18 +1310,10 @@ class MySQLxSessionTests(tests.MySQLxTests):
         config["ssl-mode"] = "verify_identity"
         session = mysqlx.get_session(config)
 
-        res = (
-            session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_active'")
-            .execute()
-            .fetch_all()
-        )
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_active'").execute().fetch_all()
         self.assertEqual("ON", res[0][1])
 
-        res = (
-            session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'")
-            .execute()
-            .fetch_all()
-        )
+        res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
         self.assertTrue("TLS" in res[0][1])
 
         session.close()
@@ -1425,15 +1366,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
             # The test should pass only if the following condition is hold:
             # -  Contain one the following values  ["TLSv1.2", "TLSv1.3"]
-            if [
-                arg
-                for arg in ["TLSv1.2", "TLSv1.3"]
-                if arg in tls_versions_arg
-            ]:
-                if (
-                    not TLS_V1_3_SUPPORTED
-                    and "TLSv1.2" not in tls_versions_arg
-                ):
+            if [arg for arg in ["TLSv1.2", "TLSv1.3"] if arg in tls_versions_arg]:
+                if not TLS_V1_3_SUPPORTED and "TLSv1.2" not in tls_versions_arg:
                     with self.assertRaises(NotSupportedError) as context:
                         _ = mysqlx.get_session(settings)
                     self.assertIn(
@@ -1451,26 +1385,18 @@ class MySQLxSessionTests(tests.MySQLxTests):
                         .fetch_all()
                     )
                     for row in status:
-                        if (
-                            row.get_string("Variable_name")
-                            == "Mysqlx_ssl_version"
-                        ):
+                        if row.get_string("Variable_name") == "Mysqlx_ssl_version":
                             self.assertTrue(
-                                row.get_string("Value")
-                                in ["TLSv1.2", "TLSv1.3"],
+                                row.get_string("Value") in ["TLSv1.2", "TLSv1.3"],
                                 "Unexpected TLS version found: {} for: {}"
-                                "".format(
-                                    row.get_string("Value"), tls_versions_arg
-                                ),
+                                "".format(row.get_string("Value"), tls_versions_arg),
                             )
 
             # The test should fail with error indicating that TLSv1 and TLSv1.1
             # are no longer allowed if the following conditions hold:
             # - Does not contain one the following values  ["TLSv1.2", "TLSv1.3"]
             # - Contain one the following values  ["TLSv1", "TLSv1.1"]
-            elif [
-                arg for arg in ["TLSv1", "TLSv1.1"] if arg in tls_versions_arg
-            ]:
+            elif [arg for arg in ["TLSv1", "TLSv1.1"] if arg in tls_versions_arg]:
                 with self.assertRaises(NotSupportedError) as context:
                     _ = mysqlx.get_session(settings)
                 self.assertTrue(
@@ -1526,8 +1452,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(settings)
         self.assertTrue(
             ("No valid cipher suite" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Given tls-version not in ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
@@ -1549,8 +1474,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(settings)
         self.assertTrue(
             ("At least one TLS" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Verify unkown cipher suite case?
@@ -1583,8 +1507,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("No valid cipher suite" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Empty tls_ciphersuites list without tls-versions
@@ -1594,8 +1517,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("value 'INVALID' in cipher" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         settings["tls-ciphersuites"] = "INVALID"
@@ -1604,8 +1526,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("No valid cipher suite" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Invalid value on tls_version list on URI
@@ -1616,8 +1537,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("tls_version: 'INVALID' is" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Empty tls_ciphersuites list
@@ -1628,8 +1548,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("No valid cipher suite" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Given tls-version not in ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
@@ -1647,8 +1566,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("At least one TLS" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Repeated values in tls-versions on URI
@@ -1666,8 +1584,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
             _ = mysqlx.get_session(uri_settings)
         self.assertTrue(
             ("not recognized" in context.exception.msg),
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Verify unkown cipher suite case?
@@ -1685,9 +1602,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Connection must be successfully by including another TLS version
         _ = mysqlx.get_session(uri_settings)
 
-        supported_tls = check_tls_versions_support(
-            ["TLSv1.2", "TLSv1.1", "TLSv1"]
-        )
+        supported_tls = check_tls_versions_support(["TLSv1.2", "TLSv1.1", "TLSv1"])
         if not supported_tls:
             self.fail("No TLS version to test: {}".format(supported_tls))
         if len(supported_tls) > 1:
@@ -1787,9 +1702,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         uri_settings = build_uri(**settings)
         session = mysqlx.get_session(uri_settings)
         status = (
-            session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_cipher%'")
-            .execute()
-            .fetch_all()
+            session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_cipher%'").execute().fetch_all()
         )
         for row in status:
             if row.get_string("Variable_name") == "Mysqlx_ssl_cipher":
@@ -1865,9 +1778,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         self.assertRaises(ProgrammingError, setattr, session, "use_pure", -1)
         session.close()
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 16), "XPlugin not compatible"
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "XPlugin not compatible")
     def test_connection_attributes(self):
         # Validate an error is raised if URL user defined connection attributes
         # given in a list are invalid
@@ -1945,10 +1856,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         with self.assertRaises(InterfaceError) as context:
             mysqlx.get_session(uri)
-            LOGGER.error(
-                "InterfaceError not raised while testing "
-                "uri: {}".format(uri)
-            )
+            LOGGER.error("InterfaceError not raised while testing uri: {}".format(uri))
 
         self.assertTrue(
             "Duplicate key 'repeated' used in "
@@ -1990,9 +1898,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
                     "connection_attributes: {}".format(conn_attr)
                 )
 
-            self.assertTrue(
-                "exceeds 32 characters limit size" in context.exception.msg
-            )
+            self.assertTrue("exceeds 32 characters limit size" in context.exception.msg)
 
         # Test error is raised for attribute value size exceeds 1024 characters
         connection_attributes = [
@@ -2187,9 +2093,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
         tests.MYSQL_VERSION < (8, 0, 19),
         "MySQL 8.0.19+ is required for DNS SRV",
     )
-    @unittest.skipIf(
-        not HAVE_DNSPYTHON, "dnspython module is required for DNS SRV"
-    )
+    @unittest.skipIf(not HAVE_DNSPYTHON, "dnspython module is required for DNS SRV")
     def test_dns_srv(self):
         # The value of 'dns-srv' must be a boolean
         uri = "root:@localhost/myschema?dns-srv=invalid"
@@ -2477,16 +2381,12 @@ class MySQLxCompressionTests(tests.MySQLxTests):
 
     def _get_random_data(self, size):
         return "".join(
-            [
-                random.choice(string.ascii_letters + string.digits)
-                for _ in range(size)
-            ]
+            [random.choice(string.ascii_letters + string.digits) for _ in range(size)]
         )
 
     def _set_compression_algorithms(self, algorithms):
         self.session.sql(
-            "SET GLOBAL mysqlx_compression_algorithms='{}'"
-            "".format(algorithms)
+            "SET GLOBAL mysqlx_compression_algorithms='{}'".format(algorithms)
         ).execute()
 
     def test_compression_negotiation(self):
@@ -2510,9 +2410,7 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         session.close()
 
         # The zstd_stream should have the highest priority
-        self._set_compression_algorithms(
-            "zstd_stream,lz4_message,deflate_stream"
-        )
+        self._set_compression_algorithms("zstd_stream,lz4_message,deflate_stream")
         session = mysqlx.get_session(config)
         algorithm = session.get_connection().protocol.compression_algorithm
 
@@ -2584,12 +2482,8 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         coll = schema.create_collection(coll_name)
         coll.add({"data": self._get_random_data(2000)}).execute()
         sizes = self._get_mysqlx_bytes(session)
-        self.assertGreater(
-            sizes["Mysqlx_bytes_received_compressed_payload"], 0
-        )
-        self.assertGreater(
-            sizes["Mysqlx_bytes_received_uncompressed_frame"], 0
-        )
+        self.assertGreater(sizes["Mysqlx_bytes_received_compressed_payload"], 0)
+        self.assertGreater(sizes["Mysqlx_bytes_received_uncompressed_frame"], 0)
         self.assertGreater(sizes["Mysqlx_bytes_sent_compressed_payload"], 0)
         self.assertGreater(sizes["Mysqlx_bytes_sent_uncompressed_frame"], 0)
         schema.drop_collection(coll_name)
@@ -2604,9 +2498,7 @@ class MySQLxCompressionTests(tests.MySQLxTests):
         default_algorithms = res.fetch_all()[0][1]
 
         # Set the server compression algorithms
-        self._set_compression_algorithms(
-            "deflate_stream,lz4_message,zstd_stream"
-        )
+        self._set_compression_algorithms("deflate_stream,lz4_message,zstd_stream")
 
         # Test algorithms with a given order with aliases
         config["compression-algorithms"] = "deflate,lz4"

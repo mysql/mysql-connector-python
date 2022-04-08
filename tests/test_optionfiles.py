@@ -64,14 +64,10 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
         underscores(_) if keep_dashes variable is set.
         """
         self.assertEqual("ham", self.option_file_parser.optionxform("HAM"))
-        self.assertEqual(
-            "ham-spam", self.option_file_parser.optionxform("HAM-SPAM")
-        )
+        self.assertEqual("ham-spam", self.option_file_parser.optionxform("HAM-SPAM"))
 
         self.option_file_parser.keep_dashes = False
-        self.assertEqual(
-            "ham_spam", self.option_file_parser.optionxform("HAM-SPAM")
-        )
+        self.assertEqual("ham_spam", self.option_file_parser.optionxform("HAM-SPAM"))
 
     def test__parse_options(self):
         files = [
@@ -86,17 +82,11 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
         )
         self.option_file_parser._parse_options(files)
         exp = {"option1": "15", "option2": "20"}
-        self.assertEqual(
-            exp, self.option_file_parser.get_groups("group2", "group1")
-        )
+        self.assertEqual(exp, self.option_file_parser.get_groups("group2", "group1"))
 
         exp = {"option3": "200"}
-        self.assertEqual(
-            exp, self.option_file_parser.get_groups("group3", "group4")
-        )
-        self.assertEqual(
-            exp, self.option_file_parser.get_groups("group4", "group3")
-        )
+        self.assertEqual(exp, self.option_file_parser.get_groups("group3", "group4"))
+        self.assertEqual(exp, self.option_file_parser.get_groups("group4", "group3"))
 
     def test_read(
         self,
@@ -134,9 +124,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
         }
         self.assertEqual(
             exp,
-            self.option_file_parser.get_groups(
-                "client", "mysqld_safe", "mysqld"
-            ),
+            self.option_file_parser.get_groups("client", "mysqld_safe", "mysqld"),
         )
 
     def test_get_groups_as_dict(self):
@@ -201,9 +189,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
 
     def test_read_option_files(self):
 
-        self.assertRaises(
-            ValueError, read_option_files, option_files="dummy_file.cnf"
-        )
+        self.assertRaises(ValueError, read_option_files, option_files="dummy_file.cnf")
 
         option_file_dir = os.path.join("tests", "data", "option_files")
         exp = {
@@ -215,9 +201,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
             "ssl_key": "dummyKey",
             "ssl_cipher": "AES256-SHA:CAMELLIA256-SHA",
         }
-        result = read_option_files(
-            option_files=os.path.join(option_file_dir, "my.cnf")
-        )
+        result = read_option_files(option_files=os.path.join(option_file_dir, "my.cnf"))
         self.assertEqual(exp, result)
         exp = {
             "password": "12345",
@@ -256,9 +240,7 @@ class MySQLOptionsParserTests(tests.MySQLConnectorTests):
             top_dir, "..", self.option_file_dir, "my_include_override.cnf"
         )
 
-        result = read_option_files(
-            option_files=my_overwrite, option_groups="mysqld"
-        )
+        result = read_option_files(option_files=my_overwrite, option_groups="mysqld")
 
         # option in the overwrite file
         port_exp = 1002

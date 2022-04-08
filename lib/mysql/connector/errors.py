@@ -83,9 +83,7 @@ def custom_error_exception(error=None, exception=None):
         return _CUSTOM_ERROR_EXCEPTIONS
 
     if not isinstance(error, (int, dict)):
-        raise ValueError(
-            "The error argument should be either an integer or dictionary"
-        )
+        raise ValueError("The error argument should be either an integer or dictionary")
 
     if isinstance(error, int):
         error = {error: exception}
@@ -97,9 +95,7 @@ def custom_error_exception(error=None, exception=None):
             if not issubclass(_exception, Exception):
                 raise TypeError
         except TypeError as err:
-            raise ValueError(
-                "Exception should be subclass of Exception"
-            ) from err
+            raise ValueError("Exception should be subclass of Exception") from err
         _CUSTOM_ERROR_EXCEPTIONS[errno] = _exception
 
     return _CUSTOM_ERROR_EXCEPTIONS
@@ -117,17 +113,13 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
     Returns an Exception
     """
     try:
-        return _CUSTOM_ERROR_EXCEPTIONS[errno](
-            msg=msg, errno=errno, sqlstate=sqlstate
-        )
+        return _CUSTOM_ERROR_EXCEPTIONS[errno](msg=msg, errno=errno, sqlstate=sqlstate)
     except KeyError:
         # Error was not mapped to particular exception
         pass
 
     try:
-        return _ERROR_EXCEPTIONS[errno](
-            msg=msg, errno=errno, sqlstate=sqlstate
-        )
+        return _ERROR_EXCEPTIONS[errno](msg=msg, errno=errno, sqlstate=sqlstate)
     except KeyError:
         # Error was not mapped to particular exception
         pass

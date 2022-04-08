@@ -63,13 +63,9 @@ def get_auth_plugin(plugin_name):
                 "AUTHENTICATION_PLUGIN_CLASS: %s",
                 plugin_module.AUTHENTICATION_PLUGIN_CLASS,
             )
-            return getattr(
-                plugin_module, plugin_module.AUTHENTICATION_PLUGIN_CLASS
-            )
+            return getattr(plugin_module, plugin_module.AUTHENTICATION_PLUGIN_CLASS)
         except ModuleNotFoundError as err:
             _LOGGER.warning("Requested Module was not found: %s", err)
         except ValueError as err:
             raise ProgrammingError(f"Invalid module name: {err}") from err
-    raise NotSupportedError(
-        f"Authentication plugin '{plugin_name}' is not supported"
-    )
+    raise NotSupportedError(f"Authentication plugin '{plugin_name}' is not supported")

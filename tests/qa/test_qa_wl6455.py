@@ -72,8 +72,7 @@ class WL6936Tests(tests.MySQLConnectorTests):
             # creating the table
             cur.execute("create table gm3 (g geometry )engine=innodb")
             cur.execute(
-                "set @g = "
-                "'POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7,5 5))'"
+                "set @g = 'POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7,5 5))'"
             )
             cur.execute("INSERT INTO gm3 VALUES (ST_GeomFromText(@g))")
             exp = "POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7,5 5))"

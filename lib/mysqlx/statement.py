@@ -493,14 +493,10 @@ class FilterableStatement(Statement):
            The usage of ``offset`` was deprecated.
         """
         if not isinstance(row_count, int) or row_count < 0:
-            raise ValueError(
-                "The 'row_count' value must be a positive integer"
-            )
+            raise ValueError("The 'row_count' value must be a positive integer")
         if not self.has_limit:
             self._changed = bool(self._exec_counter == 0)
-            self._deallocate_prepare_execute = bool(
-                not self._exec_counter == 0
-            )
+            self._deallocate_prepare_execute = bool(not self._exec_counter == 0)
 
         self._limit_row_count = row_count
         self.has_limit = True
@@ -725,18 +721,14 @@ class UpdateSpec:
     """
 
     def __init__(self, update_type, source, value=None):
-        if update_type == mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.SET"
-        ):
+        if update_type == mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.SET"):
             self._table_set(source, value)
         else:
             self.update_type = update_type
             self.source = source
             if len(source) > 0 and source[0] == "$":
                 self.source = source[1:]
-            self.source = (
-                ExprParser(self.source, False).document_field().identifier
-            )
+            self.source = ExprParser(self.source, False).document_field().identifier
             self.value = value
 
     def _table_set(self, source, value):
@@ -746,9 +738,7 @@ class UpdateSpec:
             source (str): The source.
             value (str): The value.
         """
-        self.update_type = mysqlxpb_enum(
-            "Mysqlx.Crud.UpdateOperation.UpdateType.SET"
-        )
+        self.update_type = mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.SET")
         self.source = ExprParser(source, True).parse_table_update_field()
         self.value = value
 
@@ -821,9 +811,7 @@ class ModifyStatement(FilterableStatement):
         .. deprecated:: 8.0.12
         """
         self._update_ops[doc_path] = UpdateSpec(
-            mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"
-            ),
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REPLACE"),
             doc_path,
             value,
         )
@@ -842,9 +830,7 @@ class ModifyStatement(FilterableStatement):
         """
         for item in flexible_params(*doc_paths):
             self._update_ops[item] = UpdateSpec(
-                mysqlxpb_enum(
-                    "Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REMOVE"
-                ),
+                mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.ITEM_REMOVE"),
                 item,
             )
         self._changed = True
@@ -863,9 +849,7 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         self._update_ops[field] = UpdateSpec(
-            mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"
-            ),
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_INSERT"),
             field,
             value,
         )
@@ -886,9 +870,7 @@ class ModifyStatement(FilterableStatement):
             mysqlx.ModifyStatement: ModifyStatement object.
         """
         self._update_ops[doc_path] = UpdateSpec(
-            mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"
-            ),
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.ARRAY_APPEND"),
             doc_path,
             value,
         )
@@ -911,13 +893,10 @@ class ModifyStatement(FilterableStatement):
             doc = ""
         if not isinstance(doc, (ExprParser, dict, DbDoc, str)):
             raise ProgrammingError(
-                "Invalid data for update operation on document collection "
-                "table"
+                "Invalid data for update operation on document collection table"
             )
         self._update_ops["patch"] = UpdateSpec(
-            mysqlxpb_enum(
-                "Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"
-            ),
+            mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
             "",
             doc.expr() if isinstance(doc, ExprParser) else doc,
         )
@@ -1133,9 +1112,7 @@ class SelectStatement(ReadStatement):
             str: The generated SQL.
         """
         where = f" WHERE {self._where_str}" if self.has_where else ""
-        group_by = (
-            f" GROUP BY {self._grouping_str}" if self.has_group_by else ""
-        )
+        group_by = f" GROUP BY {self._grouping_str}" if self.has_group_by else ""
         having = f" HAVING {self._having}" if self.has_having else ""
         order_by = f" ORDER BY {self._sort_str}" if self.has_sort else ""
         limit = (
@@ -1386,24 +1363,18 @@ class CreateCollectionIndexStatement(Statement):
         """
         # Validate index name is a valid identifier
         if self._index_name is None:
-            raise ProgrammingError(
-                ERR_INVALID_INDEX_NAME.format(self._index_name)
-            )
+            raise ProgrammingError(ERR_INVALID_INDEX_NAME.format(self._index_name))
         try:
             parsed_ident = ExprParser(self._index_name).expr().get_message()
 
             # The message is type dict when the Protobuf cext is used
             if isinstance(parsed_ident, dict):
-                if parsed_ident["type"] != mysqlxpb_enum(
-                    "Mysqlx.Expr.Expr.Type.IDENT"
-                ):
+                if parsed_ident["type"] != mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT"):
                     raise ProgrammingError(
                         ERR_INVALID_INDEX_NAME.format(self._index_name)
                     )
             else:
-                if parsed_ident.type != mysqlxpb_enum(
-                    "Mysqlx.Expr.Expr.Type.IDENT"
-                ):
+                if parsed_ident.type != mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT"):
                     raise ProgrammingError(
                         ERR_INVALID_INDEX_NAME.format(self._index_name)
                     )
@@ -1421,9 +1392,7 @@ class CreateCollectionIndexStatement(Statement):
             )
 
         if not isinstance(self._fields_desc, list):
-            raise ProgrammingError(
-                "Required member 'fields' must contain a list"
-            )
+            raise ProgrammingError("Required member 'fields' must contain a list")
 
         args = {}
         args["name"] = self._index_name
@@ -1453,18 +1422,12 @@ class CreateCollectionIndexStatement(Statement):
                     raise TypeError("Field member 'required' must be Boolean")
                 if not isinstance(constraint["array"], bool):
                     raise TypeError("Field member 'array' must be Boolean")
-                if (
-                    args["type"].upper() == "SPATIAL"
-                    and not constraint["required"]
-                ):
+                if args["type"].upper() == "SPATIAL" and not constraint["required"]:
                     raise ProgrammingError(
                         "Field member 'required' must be set to 'True' when "
                         "index type is set to 'SPATIAL'"
                     )
-                if (
-                    args["type"].upper() == "INDEX"
-                    and constraint["type"] == "GEOJSON"
-                ):
+                if args["type"].upper() == "INDEX" and constraint["type"] == "GEOJSON":
                     raise ProgrammingError(
                         "Index 'type' must be set to 'SPATIAL' when field "
                         "type is set to 'GEOJSON'"
@@ -1496,15 +1459,12 @@ class CreateCollectionIndexStatement(Statement):
                 args["constraint"].append(constraint)
         except KeyError as err:
             raise ProgrammingError(
-                f"Required inner member {err} not found in constraint: "
-                f"{field_desc}"
+                f"Required inner member {err} not found in constraint: {field_desc}"
             ) from err
 
         for field_desc in self._fields_desc:
             if field_desc:
-                raise ProgrammingError(
-                    f"Unidentified inner fields: {field_desc}"
-                )
+                raise ProgrammingError(f"Unidentified inner fields: {field_desc}")
 
         return self._connection.execute_nonquery(
             "mysqlx", "create_collection_index", True, args

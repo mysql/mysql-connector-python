@@ -72,8 +72,7 @@ class DistSolaris(bdist, BaseCommand):
         (
             "platform=",
             "p",
-            "name of the platform in resulting file "
-            "(default '{0}')".format(platf_n),
+            "name of the platform in resulting file (default '{0}')".format(platf_n),
         ),
         (
             "platform-version=",
@@ -100,9 +99,7 @@ class DistSolaris(bdist, BaseCommand):
         BaseCommand.initialize_options(self)
         self.name = self.distribution.get_name()
         self.version = self.distribution.get_version()
-        self.version_extra = (
-            "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
-        )
+        self.version_extra = "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
         self.keep_temp = None
         self.create_dmg = False
         self.dist_dir = None
@@ -211,9 +208,7 @@ class DistSolaris(bdist, BaseCommand):
         for src, dst in copy_file_src_dst:
             copy_file(src, dst)
 
-    def _create_pkg(
-        self, template_name, dmg=False, sign=False, root="", identity=""
-    ):
+    def _create_pkg(self, template_name, dmg=False, sign=False, root="", identity=""):
         """Create the Solaris package using the OS dependent commands."""
         self.log.info("-> _create_pkg()")
         self.log.info("template_name: {}".format(template_name))
@@ -243,15 +238,11 @@ class DistSolaris(bdist, BaseCommand):
 
         with open(proto_tmp, "w") as f_out:
             cmd = ["pkgproto", "."]
-            pkgp_p = subprocess.Popen(
-                cmd, shell=False, stdout=f_out, stderr=f_out
-            )
+            pkgp_p = subprocess.Popen(cmd, shell=False, stdout=f_out, stderr=f_out)
             res = pkgp_p.wait()
             if res != 0:
                 self.log.error("pkgproto command failed with: {}".format(res))
-                raise DistutilsExecError(
-                    "pkgproto command failed with: {}" "".format(res)
-                )
+                raise DistutilsExecError("pkgproto command failed with: {}".format(res))
             f_out.flush()
 
         # log Prototype contents
@@ -294,9 +285,7 @@ class DistSolaris(bdist, BaseCommand):
         self.log.info("Creating package with pkgmk")
 
         self.log.info("Root directory for pkgmk: {}".format(os.getcwd()))
-        self.spawn(
-            ["pkgmk", "-o", "-r", ".", "-d", "../", "-f", prototype_path]
-        )
+        self.spawn(["pkgmk", "-o", "-r", ".", "-d", "../", "-f", prototype_path])
         os.chdir("../")
         if self.debug:
             self.log.info("current directory: {}".format(os.getcwd()))
@@ -307,9 +296,7 @@ class DistSolaris(bdist, BaseCommand):
         make_tarball(self.sun_pkg_name, self.name, compress="gzip")
 
         if self.trans:
-            self.log.info(
-                "Transforming package into data stream with " "pkgtrans"
-            )
+            self.log.info("Transforming package into data stream with pkgtrans")
             self.log.info("Current directory: {}".format(os.getcwd()))
             self.spawn(
                 [
@@ -335,9 +322,7 @@ class DistSolaris(bdist, BaseCommand):
                         ),
                     )
                     file_path = os.path.join(base, filename)
-                    file_dest = os.path.join(
-                        self.started_dir, self.dist_dir, new_name
-                    )
+                    file_dest = os.path.join(self.started_dir, self.dist_dir, new_name)
                     copy_file(file_path, file_dest)
             break
 
@@ -356,9 +341,7 @@ class DistSolaris(bdist, BaseCommand):
 
         data_dir = SOLARIS_PKGS["pure"]
         sun_root = os.path.join(build_base, "sun_pure")
-        cmd_install = self.reinitialize_command(
-            "install", reinit_subcommands=1
-        )
+        cmd_install = self.reinitialize_command("install", reinit_subcommands=1)
         cmd_install.byte_code_only = self.byte_code_only
         cmd_install.compile = self.byte_code_only
         cmd_install.distribution.metadata.name = metadata_name

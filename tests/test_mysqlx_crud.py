@@ -49,9 +49,7 @@ ARCH_64BIT = sys.maxsize > 2**32 and sys.platform != "win32"
 
 _CREATE_TEST_TABLE_QUERY = "CREATE TABLE `{0}`.`{1}` (id INT)"
 _INSERT_TEST_TABLE_QUERY = "INSERT INTO `{0}`.`{1}` VALUES ({2})"
-_CREATE_TEST_VIEW_QUERY = (
-    "CREATE VIEW `{0}`.`{1}` AS SELECT * " "FROM `{2}`.`{3}`"
-)
+_CREATE_TEST_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS SELECT * FROM `{2}`.`{3}`"
 _CREATE_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS {2}"
 _DROP_TABLE_QUERY = "DROP TABLE IF EXISTS `{0}`.`{1}`"
 _DROP_VIEW_QUERY = "DROP VIEW IF EXISTS `{0}`.`{1}`"
@@ -103,9 +101,7 @@ class MySQLxDbDocTests(tests.MySQLxTests):
         self.assertEqual(1, self.collection.count())
 
         # Don't allow _id assignment
-        self.assertRaises(
-            mysqlx.ProgrammingError, doc_1.__setitem__, "_id", "1"
-        )
+        self.assertRaises(mysqlx.ProgrammingError, doc_1.__setitem__, "_id", "1")
 
         doc_2 = {"_id": "2", "name": "Wilma", "age": 33}
         self.collection.add(doc_2).execute()
@@ -180,12 +176,8 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         )
 
         # should get exception if using an invalid name
-        self.assertRaises(
-            mysqlx.ProgrammingError, self.schema.create_collection, ""
-        )
-        self.assertRaises(
-            mysqlx.ProgrammingError, self.schema.create_collection, None
-        )
+        self.assertRaises(mysqlx.ProgrammingError, self.schema.create_collection, "")
+        self.assertRaises(mysqlx.ProgrammingError, self.schema.create_collection, None)
 
         self.schema.drop_collection(collection_name)
 
@@ -208,9 +200,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
             _CREATE_TEST_TABLE_QUERY.format(self.schema_name, table_name)
         ).execute()
 
-        defined_as = "SELECT id FROM {0}.{1}".format(
-            self.schema_name, table_name
-        )
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name, table_name)
         view = create_view(self.schema, view_name, defined_as)
         self.assertTrue(view.exists_in_database())
 
@@ -280,9 +270,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         # dropping an non-existing collection should succeed silently
         self.schema.drop_collection(collection_name)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 19), "Schema validation unavailable."
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 19), "Schema validation unavailable.")
     def test_schema_validation(self):
         collection_name = "collection_test"
         json_schema = {
@@ -346,9 +334,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         # The latitude and longitude should be numbers
         self.assertRaises(
             mysqlx.OperationalError,
-            coll.add(
-                {"latitude": "41.14961", "longitude": "-8.61099"}
-            ).execute,
+            coll.add({"latitude": "41.14961", "longitude": "-8.61099"}).execute,
         )
         coll.add({"latitude": 41.14961, "longitude": -8.61099}).execute()
         self.assertEqual(1, coll.count())
@@ -363,9 +349,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
 
         self.assertRaises(
             mysqlx.OperationalError,
-            coll.add(
-                {"latitude": "41.14961", "longitude": "-8.61099"}
-            ).execute,
+            coll.add({"latitude": "41.14961", "longitude": "-8.61099"}).execute,
         )
         coll.add({"latitude": 41.14961, "longitude": -8.61099}).execute()
         self.assertEqual(1, coll.count())
@@ -403,9 +387,7 @@ class MySQLxSchemaTests(tests.MySQLxTests):
         self.assertEqual(2, coll.count())
 
         # Test using only 'level' option in Schema.modify_collectioa()
-        self.schema.modify_collection(
-            collection_name, validation={"level": "off"}
-        )
+        self.schema.modify_collection(collection_name, validation={"level": "off"})
 
         # Test using only 'schema' option in Schema.modify_collection()
         self.schema.modify_collection(
@@ -541,9 +523,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             sess1.start_transaction()
             waiting.set()
             lock_a.release()
-            result = (
-                collection.find("name = 'Fred'").lock_exclusive().execute()
-            )
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
             waiting.clear()
             sess1.commit()
 
@@ -596,9 +576,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             collection = schema.get_collection(collection_name)
 
             sess1.start_transaction()
-            result = (
-                collection.find("name = 'Fred'").lock_exclusive().execute()
-            )
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
             locking.set()
             time.sleep(2)
             locking.clear()
@@ -611,9 +589,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             pause.set()
 
             sess1.start_transaction()
-            result = (
-                collection.find("name = 'Fred'").lock_exclusive().execute()
-            )
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
             locking.set()
             time.sleep(2)
             locking.clear()
@@ -633,9 +609,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             sess1.start_transaction()
 
             waiting.set()
-            result = (
-                collection.find("name = 'Fred'").lock_exclusive().execute()
-            )
+            result = collection.find("name = 'Fred'").lock_exclusive().execute()
             waiting.clear()
 
             sess1.commit()
@@ -707,9 +681,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         result = collection.add(persons).execute()
 
-        self.assertEqual(
-            2, result.get_affected_items_count(), "documents not inserted"
-        )
+        self.assertEqual(2, result.get_affected_items_count(), "documents not inserted")
 
         # Empty list is expected here since the server did not generate the ids
         self.assertEqual(
@@ -746,8 +718,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
             if not waiting.is_set():
                 errors.append(
-                    "{0}-{0} lock test failure."
-                    "".format(lock_type_1, lock_type_2)
+                    "{0}-{0} lock test failure.".format(lock_type_1, lock_type_2)
                 )
                 session.commit()
                 return
@@ -761,17 +732,14 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
             if not locking.wait(2):
                 errors.append(
-                    "{0}-{0} lock test failure."
-                    "".format(lock_type_1, lock_type_2)
+                    "{0}-{0} lock test failure.".format(lock_type_1, lock_type_2)
                 )
                 session.commit()
                 return
 
             session.start_transaction()
             if lock_type_2 == "S":
-                result = collection.find("name = 'Fred'").lock_shared(
-                    lock_contention
-                )
+                result = collection.find("name = 'Fred'").lock_shared(lock_contention)
             else:
                 result = collection.find("name = 'Fred'").lock_exclusive(
                     lock_contention
@@ -814,30 +782,22 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable."
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable.")
     def test_lock_shared_with_nowait(self):
         self._test_lock_contention("S", "S", mysqlx.LockContention.NOWAIT)
         self._test_lock_contention("S", "X", mysqlx.LockContention.NOWAIT)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable."
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable.")
     def test_lock_exclusive_with_nowait(self):
         self._test_lock_contention("X", "X", mysqlx.LockContention.NOWAIT)
         self._test_lock_contention("X", "S", mysqlx.LockContention.NOWAIT)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable."
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable.")
     def test_lock_shared_with_skip_locked(self):
         self._test_lock_contention("S", "S", mysqlx.LockContention.SKIP_LOCKED)
         self._test_lock_contention("S", "X", mysqlx.LockContention.SKIP_LOCKED)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable."
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 5), "Lock contention unavailable.")
     def test_lock_exclusive_with_skip_locker(self):
         self._test_lock_contention("X", "X", mysqlx.LockContention.SKIP_LOCKED)
         self._test_lock_contention("X", "S", mysqlx.LockContention.SKIP_LOCKED)
@@ -845,9 +805,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
     def test_add(self):
         collection_name = "collection_test"
         collection = self.schema.create_collection(collection_name)
-        result = collection.add(
-            {"_id": 1, "name": "Fred", "age": 21}
-        ).execute()
+        result = collection.add({"_id": 1, "name": "Fred", "age": 21}).execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(1, collection.count())
 
@@ -948,9 +906,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         self.schema.drop_collection(collection_name)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 2), "CONT_IN operator unavailable"
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 2), "CONT_IN operator unavailable")
     def test_cont_in_operator(self):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
@@ -999,9 +955,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             # To comply with the SQL standard, IN returns NULL not only if the
             # expression on the left hand side is NULL, but also if no match
             # is found in the list and one of the expressions in the list is NULL.
-            not_found_without_null = (
-                False if tests.MYSQL_VERSION < (8, 0, 22) else None
-            )
+            not_found_without_null = False if tests.MYSQL_VERSION < (8, 0, 22) else None
             not_found_with_null = None
             # Value false match result changed
             value_false_match_everything = False
@@ -1115,13 +1069,11 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                 self.assertEqual(
                     result["res"],
                     test[1],
-                    "For test case {} " "result was {}".format(test, result),
+                    "For test case {} result was {}".format(test, result),
                 )
         self.schema.drop_collection(collection_name)
 
-    @unittest.skipIf(
-        tests.MYSQL_VERSION < (8, 0, 17), "OVERLAPS operator unavailable"
-    )
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 17), "OVERLAPS operator unavailable")
     def test_overlaps_operator(self):
         collection_name = "{0}.test".format(self.schema_name)
         collection = self.schema.create_collection(collection_name)
@@ -1280,14 +1232,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
                 self.assertEqual(
                     None,
                     test[1],
-                    "For test case {} "
-                    "exeption was not expected.".format(test),
+                    "For test case {} exeption was not expected.".format(test),
                 )
             else:
                 self.assertEqual(
                     result["res"],
                     test[1],
-                    "For test case {} " "result was {}".format(test, result),
+                    "For test case {} result was {}".format(test, result),
                 )
         self.schema.drop_collection(collection_name)
 
@@ -1357,38 +1308,28 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         # sign_plus
         result = (
-            collection.find("$.age == 21")
-            .fields("+($.age * -1) as test")
-            .execute()
+            collection.find("$.age == 21").fields("+($.age * -1) as test").execute()
         )
         self.assertEqual(-21, result.fetch_all()[0]["test"])
 
         # sign_minus
-        result = (
-            collection.find("$.age == 21").fields("-$.age as test").execute()
-        )
+        result = collection.find("$.age == 21").fields("-$.age as test").execute()
         self.assertEqual(-21, result.fetch_all()[0]["test"])
 
         # !
         result = (
-            collection.find("$.age == 21")
-            .fields("! ($.age == 21) as test")
-            .execute()
+            collection.find("$.age == 21").fields("! ($.age == 21) as test").execute()
         )
         self.assertFalse(result.fetch_all()[0]["test"])
 
         # not
         result = (
-            collection.find("$.age == 21")
-            .fields("not ($.age == 21) as test")
-            .execute()
+            collection.find("$.age == 21").fields("not ($.age == 21) as test").execute()
         )
         self.assertFalse(result.fetch_all()[0]["test"])
 
         # ~
-        result = (
-            collection.find("$.age == 21").fields("5 & ~1 as test").execute()
-        )
+        result = collection.find("$.age == 21").fields("5 & ~1 as test").execute()
         self.assertEqual(4, result.fetch_all()[0]["test"])
 
         self.schema.drop_collection(collection_name)
@@ -1418,68 +1359,56 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         result = (
             collection.find()
-            .fields(
-                "$.adatetime + interval 1 second = "
-                "'2000-01-01 12:00:02' "
-                "as test"
-            )
+            .fields("$.adatetime + interval 1 second = '2000-01-01 12:00:02' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields(
-                "$.adatetime + interval 2 minute = "
-                "'2000-01-01 12:02:01' "
-                "as test"
-            )
+            .fields("$.adatetime + interval 2 minute = '2000-01-01 12:02:01' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields(
-                "$.adatetime + interval 4 hour = "
-                "'2000-01-01 16:00:01' "
-                "as test"
-            )
+            .fields("$.adatetime + interval 4 hour = '2000-01-01 16:00:01' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields("$.adate + interval 10 day = " "'2000-01-11' as test")
+            .fields("$.adate + interval 10 day = '2000-01-11' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields("$.adate + interval 2 week = " "'2000-01-15' as test")
+            .fields("$.adate + interval 2 week = '2000-01-15' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields("$.adate - interval 2 month = " "'1999-11-01' as test")
+            .fields("$.adate - interval 2 month = '1999-11-01' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields("$.adate + interval 2 quarter = " "'2000-07-01' as test")
+            .fields("$.adate + interval 2 quarter = '2000-07-01' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
 
         result = (
             collection.find()
-            .fields("$.adate - interval 1 year = " "'1999-01-01' as test")
+            .fields("$.adate - interval 1 year = '1999-01-01' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
@@ -1600,11 +1529,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         result = (
             collection.find()
-            .fields(
-                "$.adate + interval '2-3' "
-                "year_month = "
-                "'2002-04-01' as test"
-            )
+            .fields("$.adate + interval '2-3' year_month = '2002-04-01' as test")
             .execute()
         )
         self.assertTrue(result.fetch_all()[0]["test"])
@@ -1623,33 +1548,23 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         ).execute()
 
         # &
-        result = (
-            collection.find("$.age = 21").fields("$.age & 1 as test").execute()
-        )
+        result = collection.find("$.age = 21").fields("$.age & 1 as test").execute()
         self.assertEqual(1, result.fetch_all()[0]["test"])
 
         # |
-        result = (
-            collection.find("$.age == 21").fields("0 | 1 as test").execute()
-        )
+        result = collection.find("$.age == 21").fields("0 | 1 as test").execute()
         self.assertEqual(1, result.fetch_all()[0]["test"])
 
         # ^
-        result = (
-            collection.find("$.age = 21").fields("$.age ^ 1 as test").execute()
-        )
+        result = collection.find("$.age = 21").fields("$.age ^ 1 as test").execute()
         self.assertEqual(20, result.fetch_all()[0]["test"])
 
         # <<
-        result = (
-            collection.find("$.age == 21").fields("1 << 2 as test").execute()
-        )
+        result = collection.find("$.age == 21").fields("1 << 2 as test").execute()
         self.assertEqual(4, result.fetch_all()[0]["test"])
 
         # >>
-        result = (
-            collection.find("$.age == 21").fields("4 >> 2 as test").execute()
-        )
+        result = collection.find("$.age == 21").fields("4 >> 2 as test").execute()
         self.assertEqual(1, result.fetch_all()[0]["test"])
 
         self.schema.drop_collection(collection_name)
@@ -1719,51 +1634,27 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(2, len(result.fetch_all()))
 
         # +
-        result = (
-            collection.find("$.age == 21")
-            .fields("$.age + 10 as test")
-            .execute()
-        )
+        result = collection.find("$.age == 21").fields("$.age + 10 as test").execute()
         self.assertEqual(31, result.fetch_all()[0]["test"])
 
         # -
-        result = (
-            collection.find("$.age == 21")
-            .fields("$.age - 10 as test")
-            .execute()
-        )
+        result = collection.find("$.age == 21").fields("$.age - 10 as test").execute()
         self.assertEqual(11, result.fetch_all()[0]["test"])
 
         # *
-        result = (
-            collection.find("$.age == 21")
-            .fields("$.age * 10 as test")
-            .execute()
-        )
+        result = collection.find("$.age == 21").fields("$.age * 10 as test").execute()
         self.assertEqual(210, result.fetch_all()[0]["test"])
 
         # /
-        result = (
-            collection.find("$.age == 21")
-            .fields("$.age / 7 as test")
-            .execute()
-        )
+        result = collection.find("$.age == 21").fields("$.age / 7 as test").execute()
         self.assertEqual(3, result.fetch_all()[0]["test"])
 
         # div
-        result = (
-            collection.find("$.age == 21")
-            .fields("$.age div 7 as test")
-            .execute()
-        )
+        result = collection.find("$.age == 21").fields("$.age div 7 as test").execute()
         self.assertEqual(3, result.fetch_all()[0]["test"])
 
         # %
-        result = (
-            collection.find("$.age == 21")
-            .fields("$.age % 7 as test")
-            .execute()
-        )
+        result = collection.find("$.age == 21").fields("$.age % 7 as test").execute()
         self.assertEqual(0, result.fetch_all()[0]["test"])
 
         self.schema.drop_collection(collection_name)
@@ -1837,9 +1728,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         add_samples = self._collect_samples(sample_size, collection.add, param)
 
         param = "'$.name == \"{}\"'.format(num)"
-        find_samples = self._collect_samples(
-            sample_size, collection.find, param
-        )
+        find_samples = self._collect_samples(sample_size, collection.find, param)
 
         # The tolerance here is the number of new objects that can be created
         # on each sequential method invocation without exceed memory usage.
@@ -1901,39 +1790,25 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(1, len(docs))
         self.assertEqual("Betty", docs[0]["name"])
 
-        result = (
-            collection.find("$.age > 28").sort("age DESC, name ASC").execute()
-        )
+        result = collection.find("$.age > 28").sort("age DESC, name ASC").execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
         self.assertEqual(67, docs[0]["age"])
 
-        result = (
-            collection.find().fields("age").sort("age DESC").limit(2).execute()
-        )
+        result = collection.find().fields("age").sort("age DESC").limit(2).execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
         self.assertEqual(42, docs[1]["age"])
         self.assertEqual(1, len(docs[1].keys()))
 
         # test flexible params
-        result = (
-            collection.find("$.age > 28")
-            .sort(["age DESC", "name ASC"])
-            .execute()
-        )
+        result = collection.find("$.age > 28").sort(["age DESC", "name ASC"]).execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
         self.assertEqual(67, docs[0]["age"])
 
         # test flexible params
-        result = (
-            collection.find()
-            .fields(["age"])
-            .sort("age DESC")
-            .limit(2)
-            .execute()
-        )
+        result = collection.find().fields(["age"]).sort("age DESC").limit(2).execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
         self.assertEqual(42, docs[1]["age"])
@@ -1956,16 +1831,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertTrue("$.age + 100" in docs[0].keys())
 
         # tests comma seperated fields
-        result = (
-            collection.find("$.age = 21").fields("$.age, $.name").execute()
-        )
+        result = collection.find("$.age = 21").fields("$.age, $.name").execute()
         docs = result.fetch_all()
         self.assertEqual("Fred", docs[0]["$.name"])
 
         # test limit and offset
-        result = (
-            collection.find().fields("$.name").limit(2).offset(2).execute()
-        )
+        result = collection.find().fields("$.name").limit(2).offset(2).execute()
         docs = result.fetch_all()
         self.assertEqual(2, len(docs))
         self.assertEqual("Wilma", docs[0]["$.name"])
@@ -1998,9 +1869,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         doc = collection.find("name = 'Fred'").execute().fetch_all()[0]
         self.assertEqual(True, doc.young)
 
-        result = (
-            collection.modify("age == 28").change("young", False).execute()
-        )
+        result = collection.modify("age == 28").change("young", False).execute()
         self.assertEqual(1, result.get_affected_items_count())
         docs = collection.find("young = True").execute().fetch_all()
         self.assertEqual(2, len(docs))
@@ -2104,11 +1973,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual(0, result.get_affected_items_count())
 
         # Test addition of new attribute
-        result = (
-            collection.modify("age <= 21")
-            .patch('{"status": "young"}')
-            .execute()
-        )
+        result = collection.modify("age <= 21").patch('{"status": "young"}').execute()
         self.assertEqual(3, result.get_affected_items_count())
         doc = collection.find("name = 'Bran'").execute().fetch_all()[0]
         self.assertEqual("young", doc.status)
@@ -2117,11 +1982,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         doc = collection.find("name = 'Arya'").execute().fetch_all()[0]
         self.assertEqual("young", doc.status)
 
-        result = (
-            collection.modify("age > 21")
-            .patch('{"status": "older"}')
-            .execute()
-        )
+        result = collection.modify("age > 21").patch('{"status": "older"}').execute()
         self.assertEqual(5, result.get_affected_items_count())
         doc = collection.find("name = 'Jon'").execute().fetch_all()[0]
         self.assertEqual("older", doc.status)
@@ -2147,8 +2008,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = (
             collection.modify('name == "Jon"')
             .patch(
-                '{"parents": ["Lyanna Stark and Rhaegar Targaryen"], '
-                '"bastard":null}'
+                '{"parents": ["Lyanna Stark and Rhaegar Targaryen"], ' '"bastard":null}'
             )
             .execute()
         )
@@ -2160,8 +2020,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = (
             collection.modify('name == "Jon"')
             .patch(
-                '{"parents": ["Lyanna Stark", "Rhaegar Targaryen"], '
-                '"bastard":null}'
+                '{"parents": ["Lyanna Stark", "Rhaegar Targaryen"], ' '"bastard":null}'
             )
             .execute()
         )
@@ -2223,9 +2082,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # Test add new attribute using expression
         result = (
             collection.modify('name == "Daenerys"')
-            .patch(
-                mysqlx.expr('JSON_OBJECT("dragons", JSON_OBJECT("count", 3))')
-            )
+            .patch(mysqlx.expr('JSON_OBJECT("dragons", JSON_OBJECT("count", 3))'))
             .execute()
         )
         self.assertEqual(1, result.get_affected_items_count())
@@ -2394,13 +2251,9 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual("George", result["name"])
 
         doc = {"_id": "5", "name": "Fred", "age": 21}
-        self.assertRaises(
-            mysqlx.ProgrammingError, collection.replace_one, "1", doc
-        )
+        self.assertRaises(mysqlx.ProgrammingError, collection.replace_one, "1", doc)
         doc = mysqlx.DbDoc({"_id": "5", "name": "Fred", "age": 21})
-        self.assertRaises(
-            mysqlx.ProgrammingError, collection.replace_one, "1", doc
-        )
+        self.assertRaises(mysqlx.ProgrammingError, collection.replace_one, "1", doc)
 
         self.schema.drop_collection(collection_name)
 
@@ -2512,9 +2365,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.create_index(
             index_name,
             {
-                "fields": [
-                    {"field": "$.age", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.age", "type": "INT", "required": True}],
                 "unique": True,
             },
         )
@@ -2524,17 +2375,13 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection.create_index(
             index_name,
             {
-                "fields": [
-                    {"field": "$.age", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.age", "type": "INT", "required": True}],
                 "unique": False,
             },
         ).execute()
 
         result = self.session.sql(
-            _SHOW_INDEXES_QUERY.format(
-                self.schema_name, collection_name, index_name
-            )
+            _SHOW_INDEXES_QUERY.format(self.schema_name, collection_name, index_name)
         ).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
@@ -2561,9 +2408,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         ).execute()
 
         result = self.session.sql(
-            _SHOW_INDEXES_QUERY.format(
-                self.schema_name, collection_name, index_name
-            )
+            _SHOW_INDEXES_QUERY.format(self.schema_name, collection_name, index_name)
         ).execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
@@ -2588,9 +2433,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         ).execute()
 
         result = self.session.sql(
-            _SHOW_INDEXES_QUERY.format(
-                self.schema_name, collection_name, index_name
-            )
+            _SHOW_INDEXES_QUERY.format(self.schema_name, collection_name, index_name)
         ).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
@@ -2598,16 +2441,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # Create an index on document fields which contain arrays
         index_name = "emails_idx"
         index_desc = {
-            "fields": [
-                {"field": "$.emails", "type": "CHAR(128)", "array": True}
-            ]
+            "fields": [{"field": "$.emails", "type": "CHAR(128)", "array": True}]
         }
         collection.create_index(index_name, index_desc).execute()
 
         result = self.session.sql(
-            _SHOW_INDEXES_QUERY.format(
-                self.schema_name, collection_name, index_name
-            )
+            _SHOW_INDEXES_QUERY.format(self.schema_name, collection_name, index_name)
         ).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
@@ -2744,9 +2583,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
 
         # member description contains aditional fields
         index_desc = {
-            "fields": [
-                {"field": "$.myField", "type": "int", "additional": "field"}
-            ],
+            "fields": [{"field": "$.myField", "type": "int", "additional": "field"}],
             "type": "INDEX",
         }
         create_index = collection.create_index(index_name, index_desc)
@@ -2833,17 +2670,14 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         # "array" fields must be Boolean
         index_name = "emails_idx"
         index_desc = {
-            "fields": [
-                {"field": "$.emails", "type": "CHAR(128)", "array": "True"}
-            ]
+            "fields": [{"field": "$.emails", "type": "CHAR(128)", "array": "True"}]
         }
         create_index = collection.create_index(index_name, index_desc)
         self.assertRaises(TypeError, create_index.execute)
 
         # check error message for wrong collation
         err_msg = (
-            "The 'collation' member can only be used when field type "
-            "is set to '{}'"
+            "The 'collation' member can only be used when field type is set to '{}'"
         )
         index_name = "age_idx"
         index_desc = {
@@ -2890,9 +2724,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         collection.create_index(
             index_name,
             {
-                "fields": [
-                    {"field": "$.age", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.age", "type": "INT", "required": True}],
                 "unique": False,
             },
         ).execute()
@@ -2964,18 +2796,12 @@ class MySQLxCollectionTests(tests.MySQLxTests):
             {"_id": "2", "name": "João", "age": 28},
             {"_id": "3", "name": "Célia", "age": 42},
         ).execute()
-        result = (
-            collection.find("name == :name").bind("name", "José").execute()
-        )
+        result = collection.find("name == :name").bind("name", "José").execute()
         docs = result.fetch_all()
         self.assertEqual(1, len(docs))
         self.assertEqual("José", docs[0]["name"])
 
-        result = (
-            collection.find("$.name = :name")
-            .bind('{"name": "João"}')
-            .execute()
-        )
+        result = collection.find("$.name = :name").bind('{"name": "João"}').execute()
         docs = result.fetch_all()
         self.assertEqual(1, len(docs))
         self.assertEqual("João", docs[0]["name"])
@@ -2996,9 +2822,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual([1, 2, 3, 4], docs[0]["cards"])
 
         # Test binding
-        modify = collection.modify("$._id == :id").array_insert(
-            "$.cards[0]", 0
-        )
+        modify = collection.modify("$._id == :id").array_insert("$.cards[0]", 0)
         modify.bind("id", 1).execute()
         doc = collection.get_one(1)
         self.assertEqual([0], doc["cards"])
@@ -3027,9 +2851,7 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         self.assertEqual([1, [2, 3], 4], docs[0]["cards"])
 
         # Test binding
-        modify = collection.modify("$._id == :id").array_append(
-            "$.cards[0]", 5
-        )
+        modify = collection.modify("$._id == :id").array_append("$.cards[0]", 5)
         modify.bind("id", 1).execute()
         doc = collection.get_one(1)
         self.assertEqual([[1, 5]], doc["cards"])
@@ -3314,19 +3136,19 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, table_name)
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50))" "".format(table_name)
+            "CREATE TABLE {0}(age INT, name VARCHAR(50))".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')" "".format(table_name)
+            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')" "".format(table_name)
+            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma')" "".format(table_name)
+            "INSERT INTO {0} VALUES (42, 'Wilma')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty')" "".format(table_name)
+            "INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)
         ).execute()
 
         table = self.schema.get_table("test")
@@ -3379,16 +3201,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.DATE)
 
         result = table.select(
-            "cast('1994-12-11:12:00:00' as datetime) as " "test"
+            "cast('1994-12-11:12:00:00' as datetime) as test"
         ).execute()
-        self.assertEqual(
-            result.columns[0].get_type(), mysqlx.ColumnType.DATETIME
-        )
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.DATETIME)
 
         result = table.select("cast(age as decimal(10, 7)) as test").execute()
-        self.assertEqual(
-            result.columns[0].get_type(), mysqlx.ColumnType.DECIMAL
-        )
+        self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.DECIMAL)
 
         result = table.select("cast('{\"a\": 24}' as json) as test").execute()
         self.assertEqual(result.columns[0].get_type(), mysqlx.ColumnType.JSON)
@@ -3427,22 +3245,20 @@ class MySQLxTableTests(tests.MySQLxTests):
             "gender CHAR(1))".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', 'M')" "".format(table_name)
+            "INSERT INTO {0} VALUES (21, 'Fred', 'M')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', 'M')" "".format(table_name)
+            "INSERT INTO {0} VALUES (28, 'Barney', 'M')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', 'F')" "".format(table_name)
+            "INSERT INTO {0} VALUES (42, 'Wilma', 'F')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', 'F')" "".format(table_name)
+            "INSERT INTO {0} VALUES (67, 'Betty', 'F')".format(table_name)
         ).execute()
 
         table = self.schema.get_table("test")
-        result = (
-            table.select().group_by("gender").order_by("age ASC").execute()
-        )
+        result = table.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
         self.assertEqual(2, len(rows))
         self.assertEqual(21, rows[0]["age"])
@@ -3544,16 +3360,12 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         # Update with a mysqlx expression
         statement = table.update()
-        statement.set(
-            "info", mysqlx.expr("JSON_SET(info, '$.sons', $.sons * 2)")
-        )
+        statement.set("info", mysqlx.expr("JSON_SET(info, '$.sons', $.sons * 2)"))
         result = statement.where("name = 'Barney' or name = 'Betty'").execute()
         assert 2 == result.get_affected_items_count()
 
         statement = table.update()
-        statement.set(
-            "info", mysqlx.expr("JSON_REPLACE(info, '$.married', False)")
-        )
+        statement.set("info", mysqlx.expr("JSON_REPLACE(info, '$.married', False)"))
         result = statement.where("name = 'Fred' or name = 'Wilma'").execute()
         assert 2 == result.get_affected_items_count()
 
@@ -3610,12 +3422,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test")
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50))" "".format(table_name)
+            "CREATE TABLE {0}(age INT, name VARCHAR(50))".format(table_name)
         ).execute()
 
         # Test if result has no data
         result = self.session.sql(
-            "SELECT age, name FROM {0}" "".format(table_name)
+            "SELECT age, name FROM {0}".format(table_name)
         ).execute()
         self.assertFalse(result.has_data())
         rows = result.fetch_all()
@@ -3623,15 +3435,15 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         # Insert data
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')" "".format(table_name)
+            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')" "".format(table_name)
+            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
         ).execute()
 
         # Test if result has data
         result = self.session.sql(
-            "SELECT age, name FROM {0}" "".format(table_name)
+            "SELECT age, name FROM {0}".format(table_name)
         ).execute()
         self.assertTrue(result.has_data())
         rows = result.fetch_all()
@@ -3660,9 +3472,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         # Test result using column label
         table = self.schema.get_table("test")
         result = (
-            table.select("age AS the_age, name AS the_name")
-            .where("age = 21")
-            .execute()
+            table.select("age AS the_age, name AS the_name").where("age = 21").execute()
         )
         row = result.fetch_one()
         self.assertEqual(21, row["the_age"])
@@ -3672,7 +3482,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
     def test_multiple_resultsets(self):
         self.session.sql(
-            "DROP PROCEDURE IF EXISTS {0}.spProc" "".format(self.schema_name)
+            "DROP PROCEDURE IF EXISTS {0}.spProc".format(self.schema_name)
         ).execute()
         self.session.sql(
             "CREATE PROCEDURE {0}.spProc() BEGIN SELECT 1; "
@@ -3680,9 +3490,7 @@ class MySQLxTableTests(tests.MySQLxTests):
             "".format(self.schema_name)
         ).execute()
 
-        result = self.session.sql(
-            " CALL {0}.spProc" "".format(self.schema_name)
-        ).execute()
+        result = self.session.sql(" CALL {0}.spProc".format(self.schema_name)).execute()
         rows = result.fetch_all()
         self.assertEqual(1, len(rows))
         self.assertEqual(1, rows[0][0])
@@ -3697,7 +3505,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertEqual(False, result.next_result())
 
         self.session.sql(
-            "DROP PROCEDURE IF EXISTS {0}.spProc" "".format(self.schema_name)
+            "DROP PROCEDURE IF EXISTS {0}.spProc".format(self.schema_name)
         ).execute()
 
     def test_auto_inc_value(self):
@@ -3709,7 +3517,7 @@ class MySQLxTableTests(tests.MySQLxTests):
             "".format(table_name)
         ).execute()
         result = self.session.sql(
-            "INSERT INTO {0} VALUES (NULL, 'Fred')" "".format(table_name)
+            "INSERT INTO {0} VALUES (NULL, 'Fred')".format(table_name)
         ).execute()
         self.assertEqual(1, result.get_autoincrement_value())
         table = self.schema.get_table("test")
@@ -3975,9 +3783,9 @@ class MySQLxTableTests(tests.MySQLxTests):
             "".format(self.schema_name, table_name)
         ).execute()
         table = schema.get_table(table_name)
-        table.insert("name", "age").values("Fred", 21).values(
-            "Barney", 28
-        ).values("Wilma", 42).values("Betty", 67).values("Bob", 75).execute()
+        table.insert("name", "age").values("Fred", 21).values("Barney", 28).values(
+            "Wilma", 42
+        ).values("Betty", 67).values("Bob", 75).execute()
 
         # SelectStatement
 
@@ -4150,9 +3958,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.session.sql(
             _CREATE_TEST_TABLE_QUERY.format(self.schema_name, self.table_name)
         ).execute()
-        defined_as = "SELECT id FROM {0}.{1}".format(
-            self.schema_name, self.table_name
-        )
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name, self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertTrue(view.exists_in_database())
 
@@ -4160,20 +3966,19 @@ class MySQLxViewTests(tests.MySQLxTests):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50))"
-            "".format(table_name)
+            "CREATE TABLE {0} (age INT, name VARCHAR(50))".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')" "".format(table_name)
+            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')" "".format(table_name)
+            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma')" "".format(table_name)
+            "INSERT INTO {0} VALUES (42, 'Wilma')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty')" "".format(table_name)
+            "INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)
         ).execute()
 
         defined_as = "SELECT age, name FROM {0}".format(table_name)
@@ -4205,16 +4010,16 @@ class MySQLxViewTests(tests.MySQLxTests):
             "gender CHAR(1))".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', 'M')" "".format(table_name)
+            "INSERT INTO {0} VALUES (21, 'Fred', 'M')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', 'M')" "".format(table_name)
+            "INSERT INTO {0} VALUES (28, 'Barney', 'M')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', 'F')" "".format(table_name)
+            "INSERT INTO {0} VALUES (42, 'Wilma', 'F')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', 'F')" "".format(table_name)
+            "INSERT INTO {0} VALUES (67, 'Betty', 'F')".format(table_name)
         ).execute()
 
         defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
@@ -4308,14 +4113,10 @@ class MySQLxViewTests(tests.MySQLxTests):
             _CREATE_TEST_TABLE_QUERY.format(self.schema_name, self.table_name)
         ).execute()
         self.session.sql(
-            _INSERT_TEST_TABLE_QUERY.format(
-                self.schema_name, self.table_name, "1"
-            )
+            _INSERT_TEST_TABLE_QUERY.format(self.schema_name, self.table_name, "1")
         ).execute()
 
-        defined_as = "SELECT id FROM {0}.{1}".format(
-            self.schema_name, self.table_name
-        )
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name, self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
         view.delete().where("id = 1").execute()
@@ -4326,14 +4127,10 @@ class MySQLxViewTests(tests.MySQLxTests):
             _CREATE_TEST_TABLE_QUERY.format(self.schema_name, self.table_name)
         ).execute()
         self.session.sql(
-            _INSERT_TEST_TABLE_QUERY.format(
-                self.schema_name, self.table_name, "1"
-            )
+            _INSERT_TEST_TABLE_QUERY.format(self.schema_name, self.table_name, "1")
         ).execute()
 
-        defined_as = "SELECT id FROM {0}.{1}".format(
-            self.schema_name, self.table_name
-        )
+        defined_as = "SELECT id FROM {0}.{1}".format(self.schema_name, self.table_name)
         view = create_view(self.schema, self.view_name, defined_as)
         self.assertEqual(view.count(), 1)
         drop_view(self.schema, self.view_name)
@@ -4343,14 +4140,13 @@ class MySQLxViewTests(tests.MySQLxTests):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50))"
-            "".format(table_name)
+            "CREATE TABLE {0} (age INT, name VARCHAR(50))".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')" "".format(table_name)
+            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')" "".format(table_name)
+            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
         ).execute()
 
         defined_as = "SELECT age, name FROM {0}".format(table_name)
@@ -4369,7 +4165,7 @@ class MySQLxViewTests(tests.MySQLxTests):
             "name VARCHAR(50))".format(table_name)
         ).execute()
         result = self.session.sql(
-            "INSERT INTO {0} VALUES (NULL, 'Fred')" "".format(table_name)
+            "INSERT INTO {0} VALUES (NULL, 'Fred')".format(table_name)
         ).execute()
         self.assertEqual(1, result.get_autoincrement_value())
 

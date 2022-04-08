@@ -54,9 +54,7 @@ class WL6351Tests(tests.MySQLConnectorTests):
     def test_db(self):
         """Try to open a database connection and use non existing database."""
         with self.cnx.cursor() as cur:
-            with self.assertRaises(
-                mysql.connector.errors.ProgrammingError
-            ) as context:
+            with self.assertRaises(mysql.connector.errors.ProgrammingError) as context:
                 cur.execute("use unknowndb")
             self.assertEqual(context.exception.errno, 1049)
 
@@ -64,8 +62,6 @@ class WL6351Tests(tests.MySQLConnectorTests):
     def test_table(self):
         """Execute the SQL query using execute() method."""
         with self.cnx.cursor() as cur:
-            with self.assertRaises(
-                mysql.connector.errors.ProgrammingError
-            ) as context:
+            with self.assertRaises(mysql.connector.errors.ProgrammingError) as context:
                 cur.execute("SELECT * FROM unknowntable")
             self.assertEqual(context.exception.errno, 1146)

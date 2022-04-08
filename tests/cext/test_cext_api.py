@@ -262,9 +262,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy.connect(**self.connect_kwargs)
 
         unicode_string = "Kangxi⽃\0⽇"
-        self.assertRaises(
-            UnicodeEncodeError, cmy.escape_string, unicode_string
-        )
+        self.assertRaises(UnicodeEncodeError, cmy.escape_string, unicode_string)
 
         cmy.set_character_set("UTF8")
 
@@ -380,8 +378,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy.query("CREATE TABLE {0} (c1 INT, c2 INT)".format(table))
 
         cmy.query(
-            "INSERT INTO {0} (c1, c2) VALUES "
-            "(1, 10), (2, 20), (3, 30)".format(table)
+            "INSERT INTO {0} (c1, c2) VALUES (1, 10), (2, 20), (3, 30)".format(table)
         )
         self.assertEqual(3, cmy.affected_rows())
 
@@ -407,9 +404,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertEqual(3, cmy.field_count())
         cmy.free_result()
 
-        cmy.query(
-            "INSERT INTO {0} (c1, c2, c3) VALUES " "(1, 10, 100)".format(table)
-        )
+        cmy.query("INSERT INTO {0} (c1, c2, c3) VALUES (1, 10, 100)".format(table))
         cmy.commit()
 
         cmy.query("SELECT * FROM {0}".format(table))
@@ -442,9 +437,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         # Turn AUTOCOMMIT on
         cmy1.autocommit(True)
-        cmy1.query(
-            "INSERT INTO {0} (c1) VALUES " "(1), (2), (3)".format(table)
-        )
+        cmy1.query("INSERT INTO {0} (c1) VALUES (1), (2), (3)".format(table))
 
         cmy2.query("SELECT * FROM {0}".format(table))
         self.assertEqual(3, cmy2.num_rows())
@@ -452,9 +445,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         # Turn AUTOCOMMIT off
         cmy1.autocommit(False)
-        cmy1.query(
-            "INSERT INTO {0} (c1) VALUES " "(4), (5), (6)".format(table)
-        )
+        cmy1.query("INSERT INTO {0} (c1) VALUES (4), (5), (6)".format(table))
 
         cmy2.query("SELECT * FROM {0} WHERE c1 > 3".format(table))
         self.assertEqual([], fetch_rows(cmy2))
@@ -479,9 +470,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
 
         cmy1.query("START TRANSACTION")
-        cmy1.query(
-            "INSERT INTO {0} (c1) VALUES " "(1), (2), (3)".format(table)
-        )
+        cmy1.query("INSERT INTO {0} (c1) VALUES (1), (2), (3)".format(table))
 
         cmy2.query("SELECT * FROM {0}".format(table))
         self.assertEqual([], fetch_rows(cmy2))
@@ -570,8 +559,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                 cnx.cmd_query(stmt)
             else:
                 stmt = (
-                    "CREATE USER '{user}'@'{host}' IDENTIFIED "
-                    "WITH {auth_plugin}"
+                    "CREATE USER '{user}'@'{host}' IDENTIFIED WITH {auth_plugin}"
                 ).format(**new_user)
                 cnx.cmd_query(stmt)
                 if new_user["auth_plugin"] == "mysql_native_password":
@@ -665,9 +653,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
     def test_set_character_set(self):
         cmy1 = MySQL(buffered=True)
-        self.assertRaises(
-            MySQLInterfaceError, cmy1.set_character_set, "latin2"
-        )
+        self.assertRaises(MySQLInterfaceError, cmy1.set_character_set, "latin2")
 
         cmy1.connect(**self.connect_kwargs)
         orig = cmy1.character_set_name()
@@ -677,17 +663,13 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         self.assertNotEqual(orig, charset)
         self.assertIn("utf8", charset)
 
-        self.assertRaises(
-            MySQLInterfaceError, cmy1.set_character_set, "ham_spam"
-        )
+        self.assertRaises(MySQLInterfaceError, cmy1.set_character_set, "ham_spam")
 
         variables = ("character_set_connection",)
         exp = "utf8"
         self.assertIn(
             exp,
-            get_variables(cmy1, variables=variables)[
-                "character_set_connection"
-            ],
+            get_variables(cmy1, variables=variables)["character_set_connection"],
         )
 
         exp = {"character_set_connection": "big5"}
@@ -746,9 +728,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
                 "c1 VARCHAR(400)) CHARACTER SET {1}".format(table, charset)
             )
 
-        insert = "INSERT INTO {0} (id, c1) VALUES ({{id}}, {{hex}})".format(
-            table
-        )
+        insert = "INSERT INTO {0} (id, c1) VALUES ({{id}}, {{hex}})".format(table)
         select = "SELECT c1 FROM {0} WHERE id = {{id}}".format(table)
 
         for encoding, data in cases.items():
@@ -885,18 +865,14 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
 
         cmy1.query("START TRANSACTION")
-        cmy1.query(
-            "INSERT INTO {0} (c1) VALUES " "(1), (2), (3)".format(table)
-        )
+        cmy1.query("INSERT INTO {0} (c1) VALUES (1), (2), (3)".format(table))
         cmy1.commit()
 
         cmy2.query("SELECT * FROM {0}".format(table))
         self.assertEqual([(1,), (2,), (3,)], fetch_rows(cmy2))
 
         cmy1.query("START TRANSACTION")
-        cmy1.query(
-            "INSERT INTO {0} (c1) VALUES " "(4), (5), (6)".format(table)
-        )
+        cmy1.query("INSERT INTO {0} (c1) VALUES (4), (5), (6)".format(table))
         cmy1.rollback()
 
         cmy2.query("SELECT * FROM {0}".format(table))

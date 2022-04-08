@@ -96,9 +96,7 @@ def main(config):
     if rows == []:
         output.append("No data, all is fine.")
     else:
-        output.append(
-            "Something is wrong, we have data although we rolled back!"
-        )
+        output.append("Something is wrong, we have data although we rolled back!")
         output.append(rows)
         cursor.close()
         db.close()

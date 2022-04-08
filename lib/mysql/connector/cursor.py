@@ -68,12 +68,8 @@ RE_PY_MAPPING_PARAM = re.compile(
     """,
     re.X,
 )
-RE_SQL_SPLIT_STMTS = re.compile(
-    b""";(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)"""
-)
-RE_SQL_FIND_PARAM = re.compile(
-    b"""%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)"""
-)
+RE_SQL_SPLIT_STMTS = re.compile(b""";(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)""")
+RE_SQL_FIND_PARAM = re.compile(b"""%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)""")
 
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
@@ -439,15 +435,11 @@ class MySQLCursor(CursorBase):
             self._last_insert_id = res["insert_id"]
             self._warning_count = res["warning_count"]
         except (KeyError, TypeError) as err:
-            raise ProgrammingError(
-                f"Failed handling non-resultset; {err}"
-            ) from None
+            raise ProgrammingError(f"Failed handling non-resultset; {err}") from None
 
         self._handle_warnings()
         if self._connection.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(
-                self._warnings[0][1], self._warnings[0][2]
-            )
+            raise get_mysql_exception(self._warnings[0][1], self._warnings[0][2])
 
     def _handle_resultset(self):
         """Handles result set
@@ -545,9 +537,7 @@ class MySQLCursor(CursorBase):
 
         if params:
             if isinstance(params, dict):
-                stmt = _bytestr_format_dict(
-                    stmt, self._process_params_dict(params)
-                )
+                stmt = _bytestr_format_dict(stmt, self._process_params_dict(params))
             elif isinstance(params, (list, tuple)):
                 psub = _ParamSubstitutor(self._process_params(params))
                 stmt = RE_PY_PARAM.sub(psub, stmt)
@@ -599,8 +589,7 @@ class MySQLCursor(CursorBase):
         matches = re.search(RE_SQL_INSERT_VALUES, tmp)
         if not matches:
             raise InterfaceError(
-                "Failed rewriting statement for multi-row INSERT. "
-                "Check SQL syntax."
+                "Failed rewriting statement for multi-row INSERT. Check SQL syntax"
             )
         fmt = matches.group(1).encode(self._connection.python_charset)
         values = []
@@ -610,9 +599,7 @@ class MySQLCursor(CursorBase):
             for params in seq_params:
                 tmp = fmt
                 if isinstance(params, dict):
-                    tmp = _bytestr_format_dict(
-                        tmp, self._process_params_dict(params)
-                    )
+                    tmp = _bytestr_format_dict(tmp, self._process_params_dict(params))
                 else:
                     psub = _ParamSubstitutor(self._process_params(params))
                     tmp = RE_PY_PARAM.sub(psub, tmp)
@@ -633,9 +620,7 @@ class MySQLCursor(CursorBase):
         except Error:
             raise
         except Exception as err:
-            raise InterfaceError(
-                f"Failed executing the operation; {err}"
-            ) from None
+            raise InterfaceError(f"Failed executing the operation; {err}") from None
 
     def executemany(self, operation, seq_params):
         """Execute the given operation multiple times
@@ -666,9 +651,7 @@ class MySQLCursor(CursorBase):
         try:
             _ = iter(seq_params)
         except TypeError as err:
-            raise ProgrammingError(
-                "Parameters for query must be an Iterable"
-            ) from err
+            raise ProgrammingError("Parameters for query must be an Iterable") from err
 
         # Optimize INSERTs by batching them
         if re.match(RE_SQL_INSERT_STMT, operation):
@@ -688,9 +671,7 @@ class MySQLCursor(CursorBase):
                     self.fetchall()
                 rowcnt += self._rowcount
         except (ValueError, TypeError) as err:
-            raise InterfaceError(
-                f"Failed executing the operation; {err}"
-            ) from None
+            raise InterfaceError(f"Failed executing the operation; {err}") from None
         self._rowcount = rowcnt
         return None
 
@@ -772,9 +753,7 @@ class MySQLCursor(CursorBase):
             can_consume_results = self._connection.can_consume_results
             for result in self._connection.cmd_query_iter(call):
                 self._connection.can_consume_results = False
-                if isinstance(
-                    self, (MySQLCursorDict, MySQLCursorBufferedDict)
-                ):
+                if isinstance(self, (MySQLCursorDict, MySQLCursorBufferedDict)):
                     cursor_class = MySQLCursorBufferedDict
                 elif isinstance(
                     self,
@@ -815,9 +794,7 @@ class MySQLCursor(CursorBase):
         except Error:
             raise
         except Exception as err:
-            raise InterfaceError(
-                f"Failed calling stored routine; {err}"
-            ) from None
+            raise InterfaceError(f"Failed calling stored routine; {err}") from None
 
     def getlastrowid(self):
         """Returns the value generated for an AUTO_INCREMENT column
@@ -862,9 +839,7 @@ class MySQLCursor(CursorBase):
         self._warning_count = eof["warning_count"]
         self._handle_warnings()
         if self._connection.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(
-                self._warnings[0][1], self._warnings[0][2]
-            )
+            raise get_mysql_exception(self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self, raw=False):
         """Returns the next row in the result set
@@ -1184,9 +1159,7 @@ class MySQLCursorPrepared(MySQLCursor):
         self._cursor_exists = False
 
     def _handle_noresultset(self, res):
-        self._handle_server_status(
-            res.get("status_flag", res.get("server_status", 0))
-        )
+        self._handle_server_status(res.get("status_flag", res.get("server_status", 0)))
         super()._handle_noresultset(res)
 
     def _handle_server_status(self, flags):
@@ -1197,9 +1170,7 @@ class MySQLCursorPrepared(MySQLCursor):
         self._last_row_sent = flags & ServerFlag.STATUS_LAST_ROW_SENT != 0
 
     def _handle_eof(self, eof):
-        self._handle_server_status(
-            eof.get("status_flag", eof.get("server_status", 0))
-        )
+        self._handle_server_status(eof.get("status_flag", eof.get("server_status", 0)))
         super()._handle_eof(eof)
 
     def callproc(self, procname, args=()):
@@ -1289,8 +1260,7 @@ class MySQLCursorPrepared(MySQLCursor):
             if len(self._prepared["parameters"]) != len(params):
                 raise ProgrammingError(
                     errno=1210,
-                    msg="Incorrect number of arguments "
-                    "executing prepared statement",
+                    msg="Incorrect number of arguments executing prepared statement",
                 )
 
         if params is None:
@@ -1321,9 +1291,7 @@ class MySQLCursorPrepared(MySQLCursor):
                     self.fetchall()
                 rowcnt += self._rowcount
         except (ValueError, TypeError) as err:
-            raise InterfaceError(
-                f"Failed executing the operation; {err}"
-            ) from None
+            raise InterfaceError(f"Failed executing the operation; {err}") from None
         self._rowcount = rowcnt
 
     def fetchone(self):
@@ -1393,9 +1361,7 @@ class MySQLCursorDict(MySQLCursor):
         }
     """
 
-    def _row_to_python(
-        self, rowdata, desc=None
-    ):  # pylint: disable=unused-argument
+    def _row_to_python(self, rowdata, desc=None):  # pylint: disable=unused-argument
         """Convert a MySQL text result row to Python types
 
         Returns a dictionary.
@@ -1452,9 +1418,7 @@ class MySQLCursorNamedTuple(MySQLCursor):
     row.col1, row.col2
     """
 
-    def _row_to_python(
-        self, rowdata, desc=None
-    ):  # pylint: disable=unused-argument
+    def _row_to_python(self, rowdata, desc=None):  # pylint: disable=unused-argument
         """Convert a MySQL text result row to Python types
 
         Returns a named tuple.
@@ -1540,9 +1504,7 @@ class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
         return res
 
 
-class MySQLCursorBufferedNamedTuple(
-    MySQLCursorNamedTuple, MySQLCursorBuffered
-):
+class MySQLCursorBufferedNamedTuple(MySQLCursorNamedTuple, MySQLCursorBuffered):
     """
     Buffered Cursor fetching rows as named tuple.
     """

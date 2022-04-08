@@ -42,12 +42,7 @@ from .constants import (
     FieldType,
     ServerCmd,
 )
-from .errors import (
-    DatabaseError,
-    InterfaceError,
-    ProgrammingError,
-    get_exception,
-)
+from .errors import DatabaseError, InterfaceError, ProgrammingError, get_exception
 
 PROTOCOL_VERSION = 10
 
@@ -181,9 +176,7 @@ class MySQLProtocol:
         return conn_attrs_packet
 
     @staticmethod
-    def make_auth_ssl(
-        charset=45, client_flags=0, max_allowed_packet=1073741824
-    ):
+    def make_auth_ssl(charset=45, client_flags=0, max_allowed_packet=1073741824):
         """Make a SSL authentication packet"""
         return (
             utils.int4store(client_flags)
@@ -287,9 +280,7 @@ class MySQLProtocol:
             capabilities2,
             auth_data_length,
         ) = struct.unpack("<I8sx2sBH2sBxxxxxxxxxx", packet[0:31])
-        res["server_version_original"] = res[
-            "server_version_original"
-        ].decode()
+        res["server_version_original"] = res["server_version_original"].decode()
 
         packet = packet[31:]
 
@@ -303,15 +294,13 @@ class MySQLProtocol:
                 auth_data2 = auth_data2[:-1]
 
         if capabilities & ClientFlag.PLUGIN_AUTH:
-            if b"\x00" not in packet and res[
-                "server_version_original"
-            ].startswith("5.5.8"):
+            if b"\x00" not in packet and res["server_version_original"].startswith(
+                "5.5.8"
+            ):
                 # MySQL server 5.5.8 has a bug where end byte is not send
                 (packet, res["auth_plugin"]) = (b"", packet)
             else:
-                (packet, res["auth_plugin"]) = utils.read_string(
-                    packet, end=b"\x00"
-                )
+                (packet, res["auth_plugin"]) = utils.read_string(packet, end=b"\x00")
             res["auth_plugin"] = res["auth_plugin"].decode("utf-8")
         else:
             res["auth_plugin"] = "mysql_native_password"
@@ -325,9 +314,7 @@ class MySQLProtocol:
         """Parse a MySQL AuthNextFactor packet."""
         packet, status = utils.read_int(packet, 1)
         if not status == 2:
-            raise InterfaceError(
-                "Failed parsing AuthNextFactor packet (invalid)"
-            )
+            raise InterfaceError("Failed parsing AuthNextFactor packet (invalid)")
         packet, auth_plugin = utils.read_string(packet, end=b"\x00")
         return packet, auth_plugin.decode("utf-8")
 
@@ -631,9 +618,7 @@ class MySQLProtocol:
                 values = None
             elif packet[4] == 0:
                 eof = None
-                values = self._parse_binary_values(
-                    columns, packet[5:], charset
-                )
+                values = self._parse_binary_values(columns, packet[5:], charset)
             if eof is None and values is not None:
                 rows.append(values)
             elif eof is None and values is None:
@@ -711,9 +696,7 @@ class MySQLProtocol:
         elif isinstance(value, datetime.date):
             field_type = FieldType.DATE
         else:
-            raise ValueError(
-                "Argument must a datetime.datetime or datetime.date"
-            )
+            raise ValueError("Argument must a datetime.datetime or datetime.date")
 
         packed = (
             utils.int2store(value.year)
@@ -748,9 +731,7 @@ class MySQLProtocol:
         Returns a tuple.
         """
         if not isinstance(value, (datetime.timedelta, datetime.time)):
-            raise ValueError(
-                "Argument must a datetime.timedelta or datetime.time"
-            )
+            raise ValueError("Argument must a datetime.timedelta or datetime.time")
 
         field_type = FieldType.TIME
         negative = 0
@@ -835,8 +816,7 @@ class MySQLProtocol:
                 if value is None:
                     null_bitmap[(pos // 8)] |= 1 << (pos % 8)
                     types.append(
-                        utils.int1store(FieldType.NULL)
-                        + utils.int1store(_flags)
+                        utils.int1store(FieldType.NULL) + utils.int1store(_flags)
                     )
                     continue
                 if pos in long_data_used:
@@ -884,9 +864,7 @@ class MySQLProtocol:
                         "MySQL binary protocol can not handle "
                         f"'{value.__class__.__name__}' objects"
                     )
-                types.append(
-                    utils.int1store(field_type) + utils.int1store(_flags)
-                )
+                types.append(utils.int1store(field_type) + utils.int1store(_flags))
                 if query_attrs and pos + 1 > data_len:
                     name = query_attrs[pos - data_len][0].encode(charset)
                     query_attr_names.append(utils.lc_int(len(name)) + name)

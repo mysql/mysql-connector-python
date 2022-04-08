@@ -72,9 +72,7 @@ class DatabaseOperations(MySQLDatabaseOperations):
             if settings.USE_TZ:
                 value = value.astimezone(timezone.utc).replace(tzinfo=None)
             else:
-                raise ValueError(
-                    "MySQL backend does not support timezone-aware times."
-                )
+                raise ValueError("MySQL backend does not support timezone-aware times")
         if not self.connection.features.supports_microsecond_precision:
             value = value.replace(microsecond=0)
         if not self.connection.use_pure:
@@ -93,9 +91,7 @@ class DatabaseOperations(MySQLDatabaseOperations):
 
         # MySQL doesn't support tz-aware times
         if timezone.is_aware(value):
-            raise ValueError(
-                "MySQL backend does not support timezone-aware " "times."
-            )
+            raise ValueError("MySQL backend does not support timezone-aware times")
 
         if not self.connection.use_pure:
             return time_to_mysql(value)

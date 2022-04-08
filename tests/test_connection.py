@@ -73,11 +73,7 @@ from mysql.connector import (
     network,
 )
 from mysql.connector.conversion import MySQLConverter, MySQLConverterBase
-from mysql.connector.errors import (
-    InterfaceError,
-    NotSupportedError,
-    ProgrammingError,
-)
+from mysql.connector.errors import InterfaceError, NotSupportedError, ProgrammingError
 from mysql.connector.network import TLS_V1_3_SUPPORTED
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.pooling import HAVE_DNSPYTHON
@@ -234,9 +230,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         pktnr = 2
 
         self.cnx._socket.sock = None
-        self.assertRaises(
-            errors.OperationalError, self.cnx._send_cmd, cmd, arg, pktnr
-        )
+        self.assertRaises(errors.OperationalError, self.cnx._send_cmd, cmd, arg, pktnr)
 
         self.cnx._socket.sock = tests.DummySocket()
         exp = OK_PACKET
@@ -278,12 +272,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     def test__handle_ok(self):
         """Handle an OK-packet sent by MySQL"""
         self.assertEqual(OK_PACKET_RESULT, self.cnx._handle_ok(OK_PACKET))
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx._handle_ok, ERR_PACKET
-        )
-        self.assertRaises(
-            errors.InterfaceError, self.cnx._handle_ok, EOF_PACKET
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx._handle_ok, ERR_PACKET)
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_ok, EOF_PACKET)
 
         # Test for multiple results
         self.cnx._have_next_result = False
@@ -294,12 +284,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     def test__handle_eof(self):
         """Handle an EOF-packet sent by MySQL"""
         self.assertEqual(EOF_PACKET_RESULT, self.cnx._handle_eof(EOF_PACKET))
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx._handle_eof, ERR_PACKET
-        )
-        self.assertRaises(
-            errors.InterfaceError, self.cnx._handle_eof, OK_PACKET
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx._handle_eof, ERR_PACKET)
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_eof, OK_PACKET)
 
         # Test for multiple results
         self.cnx._have_next_result = False
@@ -309,9 +295,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test__handle_result(self):
         """Handle the result after sending a command to MySQL"""
-        self.assertRaises(
-            errors.InterfaceError, self.cnx._handle_result, "\x00"
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_result, "\x00")
         self.assertRaises(errors.InterfaceError, self.cnx._handle_result, None)
         self.cnx._allow_local_infile = 1
         self.cnx._socket.sock = tests.DummySocket()
@@ -325,9 +309,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         res = self.cnx._handle_result(COLUMNS_SINGLE_COUNT)
         self.assertEqual(exp, res)
 
-        self.assertEqual(
-            EOF_PACKET_RESULT, self.cnx._handle_result(EOF_PACKET)
-        )
+        self.assertEqual(EOF_PACKET_RESULT, self.cnx._handle_result(EOF_PACKET))
         self.cnx._unread_result = False
 
         # Handle LOAD DATA INFILE
@@ -372,9 +354,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # Column count is invalid ( more than 4096)
         self.cnx._socket.sock.reset()
         packet = bytearray(b"\x01\x00\x00\x01\xfc\xff\xff\xff")
-        self.assertRaises(
-            errors.InterfaceError, self.cnx._handle_result, packet
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_result, packet)
 
         # First byte in first packet is wrong
         self.cnx._socket.sock.add_packets(
@@ -400,18 +380,13 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         packets = [
             bytearray(b"\x07\x00\x00\x04\x06\x4d\x79\x49\x53\x41\x4d"),
             bytearray(b"\x07\x00\x00\x05\x06\x49\x6e\x6e\x6f\x44\x42"),
-            bytearray(
-                b"\x0a\x00\x00\x06\x09\x42\x4c" b"\x41\x43\x4b\x48\x4f\x4c\x45"
-            ),
+            bytearray(b"\x0a\x00\x00\x06\x09\x42\x4c" b"\x41\x43\x4b\x48\x4f\x4c\x45"),
             bytearray(b"\x04\x00\x00\x07\x03\x43\x53\x56"),
             bytearray(b"\x07\x00\x00\x08\x06\x4d\x45\x4d\x4f\x52\x59"),
-            bytearray(
-                b"\x0a\x00\x00\x09\x09\x46\x45" b"\x44\x45\x52\x41\x54\x45\x44"
-            ),
+            bytearray(b"\x0a\x00\x00\x09\x09\x46\x45" b"\x44\x45\x52\x41\x54\x45\x44"),
             bytearray(b"\x08\x00\x00\x0a\x07\x41\x52\x43\x48\x49\x56\x45"),
             bytearray(
-                b"\x0b\x00\x00\x0b\x0a\x4d\x52"
-                b"\x47\x5f\x4d\x59\x49\x53\x41\x4d"
+                b"\x0b\x00\x00\x0b\x0a\x4d\x52" b"\x47\x5f\x4d\x59\x49\x53\x41\x4d"
             ),
             bytearray(b"\x05\x00\x00\x0c\xfe\x00\x00\x20\x00"),
         ]
@@ -538,9 +513,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         packets[-1] = packets[-1][:-2] + b"\x08" + packets[-1][-1:]
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets(packets)
-        self.assertRaises(
-            errors.InterfaceError, self.cnx.cmd_query, "SELECT 1"
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx.cmd_query, "SELECT 1")
 
     def test_cmd_query_iter(self):
         """Send queries to MySQL"""
@@ -702,9 +675,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         )
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(pkt)
-        self.assertRaises(
-            errors.DatabaseError, self.cnx.cmd_process_kill, 1605
-        )
+        self.assertRaises(errors.DatabaseError, self.cnx.cmd_process_kill, 1605)
 
     def test_cmd_debug(self):
         """Send the Debug-command to MySQL"""
@@ -876,9 +847,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packet(bytearray(b"\x01\x00\x00\x02\xfe"))
-        self.assertRaises(
-            errors.NotSupportedError, self.cnx._do_auth, **kwargs
-        )
+        self.assertRaises(errors.NotSupportedError, self.cnx._do_auth, **kwargs)
 
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets(
@@ -949,9 +918,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.add_packets(
             [
                 bytearray(b"\x02\x00\x00\x03\x01\x04"),  # full_auth request
-                bytearray(
-                    b"\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00"
-                ),  # OK
+                bytearray(b"\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00"),  # OK
             ]
         )
         self.cnx._do_auth(**kwargs)
@@ -991,9 +958,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx._socket.sock.add_packets(
             [
                 bytearray(b"\x02\x00\x00\x03\x01\x03"),  # fast_auth success
-                bytearray(
-                    b"\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00"
-                ),  # OK
+                bytearray(b"\x07\x00\x00\x05\x00\x00\x00\x02\x00\x00\x00"),  # OK
             ]
         )
         self.cnx._do_auth(**kwargs)
@@ -1064,9 +1029,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             ]
         )
         self.cnx._do_auth(**kwargs)
-        self.assertEqual(
-            exp, [p[4:] for p in self.cnx._socket.sock._client_sends]
-        )
+        self.assertEqual(exp, [p[4:] for p in self.cnx._socket.sock._client_sends])
 
     def test_config(self):
         """Configure the MySQL connection
@@ -1079,9 +1042,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         default_config = abstracts.DEFAULT_CONFIGURATION.copy()
 
         # Should fail because 'dsn' is given
-        self.assertRaises(
-            errors.NotSupportedError, cnx.config, **default_config
-        )
+        self.assertRaises(errors.NotSupportedError, cnx.config, **default_config)
 
         # Remove unsupported arguments
         del default_config["dsn"]
@@ -1099,8 +1060,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             cnx.config(**default_config)
         except AttributeError as err:
             self.fail(
-                "Config does not accept a supported"
-                " argument: {}".format(str(err))
+                "Config does not accept a supported argument: {}".format(str(err))
             )
 
         # Add an argument which we don't allow
@@ -1177,9 +1137,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # Test compress argument
         cnx.config(compress=True)
         exp = constants.ClientFlag.COMPRESS
-        self.assertEqual(
-            exp, cnx._client_flags & constants.ClientFlag.COMPRESS
-        )
+        self.assertEqual(exp, cnx._client_flags & constants.ClientFlag.COMPRESS)
 
         # Test character set
         # utf8mb4 is default, which is mapped to 45
@@ -1253,9 +1211,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         # Option Files tests
         option_file_dir = os.path.join("tests", "data", "option_files")
-        cfg = read_option_files(
-            option_files=os.path.join(option_file_dir, "my.cnf")
-        )
+        cfg = read_option_files(option_files=os.path.join(option_file_dir, "my.cnf"))
         cnx.config(**cfg)
         self.assertEqual(cnx._port, 1000)
         self.assertEqual(cnx._unix_socket, "/var/run/mysqld/mysqld.sock")
@@ -1304,12 +1260,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         self.cnx._client_flags |= constants.ClientFlag.COMPRESS
         self.cnx._open_connection()
-        self.assertEqual(
-            self.cnx._socket.recv_compressed, self.cnx._socket.recv
-        )
-        self.assertEqual(
-            self.cnx._socket.send_compressed, self.cnx._socket.send
-        )
+        self.assertEqual(self.cnx._socket.recv_compressed, self.cnx._socket.recv)
+        self.assertEqual(self.cnx._socket.send_compressed, self.cnx._socket.send)
 
     def test__post_connection(self):
         """Executes commands after connection has been established"""
@@ -1335,11 +1287,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             cnx.connect(**config)
             cnx.close()
         except errors.Error as err:
-            self.fail(
-                "Failed connecting to '{}': {}".format(
-                    config["host"], str(err)
-                )
-            )
+            self.fail("Failed connecting to '{}': {}".format(config["host"], str(err)))
 
         config["host"] = tests.fake_hostname()
         self.assertRaises(errors.InterfaceError, cnx.connect, **config)
@@ -1439,12 +1387,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             sleep(2)
             with self.assertRaises(exp_errors) as context:
                 cnx.cmd_query("SELECT VERSION()")
-                self.assertIn(
-                    context.exception.errno, [exp_err_no, exp_err_no2]
-                )
-                self.assertIn(
-                    context.exception.msg, [exp_err_msg, exp_err_msg2]
-                )
+                self.assertIn(context.exception.errno, [exp_err_no, exp_err_no2])
+                self.assertIn(context.exception.msg, [exp_err_msg, exp_err_msg2])
 
     def test_ping(self):
         """Ping the MySQL server"""
@@ -1469,9 +1413,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         class TestConverterWrong:
             ...
 
-        self.assertRaises(
-            TypeError, self.cnx.set_converter_class, TestConverterWrong
-        )
+        self.assertRaises(TypeError, self.cnx.set_converter_class, TestConverterWrong)
 
         class TestConverter(MySQLConverterBase):
             ...
@@ -1482,9 +1424,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_get_server_version(self):
         """Get the MySQL version"""
-        self.assertEqual(
-            self.cnx._server_version, self.cnx.get_server_version()
-        )
+        self.assertEqual(self.cnx._server_version, self.cnx.get_server_version())
 
     def test_get_server_info(self):
         """Get the original MySQL version information"""
@@ -1498,9 +1438,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_connection_id(self):
         """MySQL connection ID"""
-        self.assertEqual(
-            self.cnx._handshake["server_threadid"], self.cnx.connection_id
-        )
+        self.assertEqual(self.cnx._handshake["server_threadid"], self.cnx.connection_id)
 
         del self.cnx._handshake["server_threadid"]
         self.assertIsNone(self.cnx.connection_id)
@@ -1567,9 +1505,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx.set_charset_collation("utf8mb3")
         self.assertEqual(310, self.cnx._charset_id)
 
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx.set_charset_collation, 666
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx.set_charset_collation, 666)
         self.assertRaises(
             errors.ProgrammingError, self.cnx.set_charset_collation, "spam"
         )
@@ -1624,12 +1560,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_set_client_flags(self):
         """Set the client flags"""
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx.set_client_flags, "Spam"
-        )
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx.set_client_flags, 0
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx.set_client_flags, "Spam")
+        self.assertRaises(errors.ProgrammingError, self.cnx.set_client_flags, 0)
 
         default_flags = constants.ClientFlag.get_default()
 
@@ -1732,15 +1664,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         for kwargs, exp in cases:
             self.assertTrue(isinstance(self.cnx.cursor(**kwargs), exp))
 
-        self.assertRaises(
-            ValueError, self.cnx.cursor, prepared=True, buffered=True
-        )
-        self.assertRaises(
-            ValueError, self.cnx.cursor, dictionary=True, raw=True
-        )
-        self.assertRaises(
-            ValueError, self.cnx.cursor, named_tuple=True, raw=True
-        )
+        self.assertRaises(ValueError, self.cnx.cursor, prepared=True, buffered=True)
+        self.assertRaises(ValueError, self.cnx.cursor, dictionary=True, raw=True)
+        self.assertRaises(ValueError, self.cnx.cursor, named_tuple=True, raw=True)
 
         # Test when connection is closed
         self.cnx.close()
@@ -1776,19 +1702,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         fp = io.BytesIO(data)
         self.cnx._socket = None
-        self.assertRaises(
-            errors.OperationalError, self.cnx._send_data, fp, False
-        )
+        self.assertRaises(errors.OperationalError, self.cnx._send_data, fp, False)
         # Nothing to read, but try to send empty packet
-        self.assertRaises(
-            errors.OperationalError, self.cnx._send_data, fp, True
-        )
+        self.assertRaises(errors.OperationalError, self.cnx._send_data, fp, True)
 
     def test__handle_binary_ok(self):
         """Handle a Binary OK packet"""
         packet = bytearray(
-            b"\x0c\x00\x00\x01"
-            b"\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            b"\x0c\x00\x00\x01" b"\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         )
 
         exp = {
@@ -1805,9 +1726,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             b"\x4e\x43\x54\x49\x4f\x4e\x20\x74\x65\x73\x74\x2e\x53\x50\x41"
             b"\x4d\x20\x64\x6f\x65\x73\x20\x6e\x6f\x74\x20\x65\x78\x69\x73\x74"
         )
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx._handle_binary_ok, packet
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx._handle_binary_ok, packet)
 
     def test_cmd_stmt_prepare(self):
         """Prepare a MySQL statement"""
@@ -1882,28 +1801,20 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 )
             ]
         )
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx.cmd_stmt_prepare, stmt
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_stmt_prepare, stmt)
 
     def test__handle_binary_result(self):
         self.cnx._socket.sock = tests.DummySocket()
 
-        self.assertRaises(
-            errors.InterfaceError, self.cnx._handle_binary_result, None
-        )
+        self.assertRaises(errors.InterfaceError, self.cnx._handle_binary_result, None)
         self.assertRaises(
             errors.InterfaceError,
             self.cnx._handle_binary_result,
             bytearray(b"\x00\x00\x00"),
         )
 
-        self.assertEqual(
-            OK_PACKET_RESULT, self.cnx._handle_binary_result(OK_PACKET)
-        )
-        self.assertEqual(
-            EOF_PACKET_RESULT, self.cnx._handle_binary_result(EOF_PACKET)
-        )
+        self.assertEqual(OK_PACKET_RESULT, self.cnx._handle_binary_result(OK_PACKET))
+        self.assertEqual(EOF_PACKET_RESULT, self.cnx._handle_binary_result(EOF_PACKET))
 
         self.assertRaises(
             errors.ProgrammingError, self.cnx._handle_binary_result, ERR_PACKET
@@ -1941,9 +1852,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         )
 
         # statement does not exists
-        self.assertRaises(
-            errors.DatabaseError, self.cnx.cmd_stmt_execute, *params
-        )
+        self.assertRaises(errors.DatabaseError, self.cnx.cmd_stmt_execute, *params)
 
         # prepare and execute
         self.cnx.cmd_stmt_prepare(stmt)
@@ -1970,16 +1879,12 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             stmt_info["parameters"],
             0,
         )
-        self.assertRaises(
-            errors.ProgrammingError, self.cnx.cmd_stmt_execute, *params
-        )
+        self.assertRaises(errors.ProgrammingError, self.cnx.cmd_stmt_execute, *params)
 
     def test_cmd_reset_connection(self):
         """Resets session without re-authenticating"""
         if tests.MYSQL_VERSION < (5, 7, 3):
-            self.assertRaises(
-                errors.NotSupportedError, self.cnx.cmd_reset_connection
-            )
+            self.assertRaises(errors.NotSupportedError, self.cnx.cmd_reset_connection)
         else:
             exp_session_id = self.cnx.connection_id
             self.cnx.cmd_query("SET @ham = 2")
@@ -1992,7 +1897,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     @unittest.skipIf(os.environ.get("PB2WORKDIR"), "Do not run on PB2")
     @unittest.skipIf(
         tests.MYSQL_VERSION <= (5, 7, 1),
-        "Shutdown CMD " "not tested with MySQL version 5.6 (BugOra17422299)",
+        "Shutdown CMD not tested with MySQL version 5.6 (BugOra17422299)",
     )
     def test_shutdown(self):
         """Shutting down a connection"""
@@ -2011,9 +1916,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(aborted_clients, cur.fetchone()[1])
 
         test_shutdown_cnx.shutdown()
-        self.assertRaises(
-            socket.error, test_shutdown_cnx._socket.sock.getsockname
-        )
+        self.assertRaises(socket.error, test_shutdown_cnx._socket.sock.getsockname)
         cur.execute(sql)
         self.assertEqual(str(int(aborted_clients) + 1), cur.fetchone()[1])
 
@@ -2048,9 +1951,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     def test_default_allow_local_infile(self):
         cur = self.cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS local_data")
-        cur.execute(
-            "CREATE TABLE local_data " "(id int, c1 VARCHAR(6), c2 VARCHAR(6))"
-        )
+        cur.execute("CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
         data_file = os.path.join("tests", "data", "local_data.csv")
         cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
@@ -2071,9 +1972,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     def test_allow_local_infile(self):
         cur = self.cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS local_data")
-        cur.execute(
-            "CREATE TABLE local_data " "(id int, c1 VARCHAR(6), c2 VARCHAR(6))"
-        )
+        cur.execute("CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
         data_file = os.path.join("tests", "data", "local_data.csv")
         cur = self.cnx.cursor()
         sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
@@ -2110,8 +2009,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         def create_table():
             def_cur.execute(
-                "DROP TABLE IF EXISTS {}.local_data_in_path"
-                "".format(database)
+                "DROP TABLE IF EXISTS {}.local_data_in_path".format(database)
             )
             def_cur.execute(
                 "CREATE TABLE {}.local_data_in_path "
@@ -2125,19 +2023,13 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 "".format(database)
             )
             cur.execute(sql, (data_file,))
-            cur.execute(
-                "SELECT * FROM {}.local_data_in_path" "".format(database)
-            )
+            cur.execute("SELECT * FROM {}.local_data_in_path".format(database))
 
             self.assertEqual(exp, cur.fetchall())
-            cur.execute(
-                "TRUNCATE TABLE {}.local_data_in_path" "".format(database)
-            )
+            cur.execute("TRUNCATE TABLE {}.local_data_in_path".format(database))
             cur.close()
 
-        def verify_load_fails(
-            cur, data_file, err_msgs, exception=errors.DatabaseError
-        ):
+        def verify_load_fails(cur, data_file, err_msgs, exception=errors.DatabaseError):
             sql = (
                 "LOAD DATA LOCAL INFILE %s INTO TABLE {}.local_data_in_path"
                 "".format(database)
@@ -2181,9 +2073,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         create_table()
         # Verify defaults
         settings = def_settings.copy()
-        self.assertEqual(
-            constants.DEFAULT_CONFIGURATION["allow_local_infile"], False
-        )
+        self.assertEqual(constants.DEFAULT_CONFIGURATION["allow_local_infile"], False)
         self.assertEqual(
             constants.DEFAULT_CONFIGURATION["allow_local_infile_in_path"], None
         )
@@ -2317,9 +2207,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cnx = connector_class(**settings)
         cur = cnx.cursor()
         data_file = os.path.join("tests", "data", "local_data.csv")
-        verify_load_fails(
-            cur, data_file, ("file request rejected", "not found in")
-        )
+        verify_load_fails(cur, data_file, ("file request rejected", "not found in"))
 
         # Changing allow_local_infile_in_path
         cnx = connector_class(**settings)
@@ -2397,9 +2285,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             settings["allow_local_infile_in_path"] = data_dir
             cnx = connector_class(**settings)
             cur = cnx.cursor()
-            verify_load_fails(
-                cur, link, "link is not allowed", errors.OperationalError
-            )
+            verify_load_fails(cur, link, "link is not allowed", errors.OperationalError)
             cnx.close()
             try:
                 os.remove(link)
@@ -2407,9 +2293,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 pass
 
         # Clean up
-        def_cur.execute(
-            "DROP TABLE IF EXISTS {}.local_data_in_path" "".format(database)
-        )
+        def_cur.execute("DROP TABLE IF EXISTS {}.local_data_in_path".format(database))
         def_cur.close()
 
     @tests.foreach_cnx()
@@ -2448,9 +2332,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         cur.execute(get_attrs.format(pseudo_thread_id))
         rows = cur.fetchall()
         res_dict = dict(rows)
-        if CMySQLConnection is not None and isinstance(
-            self.cnx, CMySQLConnection
-        ):
+        if CMySQLConnection is not None and isinstance(self.cnx, CMySQLConnection):
             expected_attrs = {
                 "_source_host": socket.gethostname(),
                 "_connector_name": "mysql-connector-python",
@@ -2473,9 +2355,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 expected_attrs[attr_name],
                 res_dict[attr_name],
                 "Attribute {} with value {} differs of {}"
-                "".format(
-                    attr_name, res_dict[attr_name], expected_attrs[attr_name]
-                ),
+                "".format(attr_name, res_dict[attr_name], expected_attrs[attr_name]),
             )
 
     @unittest.skipIf(
@@ -2508,15 +2388,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
             # The test should pass only if the following condition is hold:
             # -  Contain one the following values  ["TLSv1.2", "TLSv1.3"]
-            if [
-                arg
-                for arg in ["TLSv1.2", "TLSv1.3"]
-                if arg in tls_versions_arg
-            ]:
-                if (
-                    not TLS_V1_3_SUPPORTED
-                    and "TLSv1.2" not in tls_versions_arg
-                ):
+            if [arg for arg in ["TLSv1.2", "TLSv1.3"] if arg in tls_versions_arg]:
+                if not TLS_V1_3_SUPPORTED and "TLSv1.2" not in tls_versions_arg:
                     with self.assertRaises(NotSupportedError) as context:
                         _ = connector_class(**settings)
                         self.assertIn(
@@ -2539,9 +2412,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             # are no longer allowed if the following conditions hold:
             # - Does not contain one the following values  ["TLSv1.2", "TLSv1.3"]
             # - Contain one the following values  ["TLSv1", "TLSv1.1"]
-            elif [
-                arg for arg in ["TLSv1", "TLSv1.1"] if arg in tls_versions_arg
-            ]:
+            elif [arg for arg in ["TLSv1", "TLSv1.1"] if arg in tls_versions_arg]:
                 with self.assertRaises(NotSupportedError) as context:
                     _ = connector_class(**settings)
                 self.assertTrue(
@@ -2584,8 +2455,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             _ = connector_class(**settings)
         self.assertTrue(
             ("At least one" in str(context.exception)),
-            "Unexpected exception message found: {}"
-            "".format(context.exception),
+            "Unexpected exception message found: {}".format(context.exception),
         )
 
         # Empty tls_ciphersuites list using dict settings
@@ -2595,8 +2465,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             _ = connector_class(**settings)
         self.assertTrue(
             ("No valid cipher suite" in str(context.exception)),
-            "Unexpected exception message found: {}"
-            "".format(context.exception),
+            "Unexpected exception message found: {}".format(context.exception),
         )
 
         # Empty tls_ciphersuites list without tls-versions
@@ -2606,8 +2475,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             _ = connector_class(**settings)
         self.assertTrue(
             ("No valid cipher suite" in str(context.exception)),
-            "Unexpected exception message found: {}"
-            "".format(context.exception),
+            "Unexpected exception message found: {}".format(context.exception),
         )
 
         # Given tls-version not in ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
@@ -2629,8 +2497,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             _ = connector_class(**settings)
         self.assertTrue(
             ("At least one TLS" in str(context.exception)),
-            "Unexpected exception message found: {}"
-            "".format(context.exception),
+            "Unexpected exception message found: {}".format(context.exception),
         )
 
         # Verify unkown cipher suite case?
@@ -2646,8 +2513,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             _ = connector_class(**settings)
         self.assertTrue(
             ("not recognized" in str(context.exception)),
-            "Unexpected exception message found: {}"
-            "".format(context.exception),
+            "Unexpected exception message found: {}".format(context.exception),
         )
 
         # Verify unkown cipher suite case?
@@ -2667,9 +2533,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             "connection used: {}."
         )
 
-        supported_tls = check_tls_versions_support(
-            ["TLSv1.2", "TLSv1.1", "TLSv1"]
-        )
+        supported_tls = check_tls_versions_support(["TLSv1.2", "TLSv1.1", "TLSv1"])
         if not supported_tls:
             self.fail("No TLS version to test: {}".format(supported_tls))
 
@@ -2709,8 +2573,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             self.assertEqual(
                 res[0][1],
                 exp_ver,
-                "On test case {}, {}"
-                "".format(test_ver, err_msg.format(exp_ver, res)),
+                "On test case {}, {}".format(test_ver, err_msg.format(exp_ver, res)),
             )
 
         # Verify given TLS cipher suite is used
@@ -2757,8 +2620,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertIn(
             res[0][1],
             exp_res,
-            "Unexpected TLS version found"
-            ": {} not in {}".format(res[0][1], exp_res),
+            "Unexpected TLS version found: {} not in {}".format(res[0][1], exp_res),
         )
 
         if "TLSv1.1" in supported_tls:
@@ -2774,7 +2636,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             self.assertNotEqual(
                 res[0][1],
                 "TLSv1.2",
-                "Unexpected TLS version " "found: {}".format(res[0][1]),
+                "Unexpected TLS version found: {}".format(res[0][1]),
             )
 
         # Verify error when TLSv1.3 is not supported.
@@ -2791,7 +2653,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             self.assertEqual(
                 res[0][1],
                 "TLSv1.3",
-                "Unexpected TLS version " "found: {}".format(res),
+                "Unexpected TLS version found: {}".format(res),
             )
 
     def test_connection_attributes_user_defined(self):
@@ -2925,9 +2787,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         tests.MYSQL_VERSION < (8, 0, 19),
         "MySQL 8.0.19+ is required for DNS SRV",
     )
-    @unittest.skipIf(
-        not HAVE_DNSPYTHON, "dnspython module is required for DNS SRV"
-    )
+    @unittest.skipIf(not HAVE_DNSPYTHON, "dnspython module is required for DNS SRV")
     def test_dns_srv(self):
         config = tests.get_mysql_config().copy()
         config.pop("unix_socket", None)
@@ -2996,12 +2856,9 @@ class WL13335(tests.MySQLConnectorTests):
                 "CREATE USER '{}'@'{}' IDENTIFIED BY "
                 "'{}'".format(self.user, host, self.passw)
             )
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'".format(self.user, host))
             cnx.cmd_query(
-                "GRANT ALL ON *.* TO '{}'@'{}'" "".format(self.user, host)
-            )
-            cnx.cmd_query(
-                "ALTER USER '{}'@'{}' PASSWORD EXPIRE"
-                "".format(self.user, host)
+                "ALTER USER '{}'@'{}' PASSWORD EXPIRE".format(self.user, host)
             )
         cnx.close()
 
@@ -3081,12 +2938,8 @@ class WL14110(tests.MySQLConnectorTests):
                 self.skipTest("Plugin authentication_ldap_sasl not available")
 
             try:
-                cnx.cmd_query(
-                    "DROP USER '{}'@'{}'".format(self.user, self.host)
-                )
-                cnx.cmd_query(
-                    "DROP USER '{}'@'{}'".format("common", self.host)
-                )
+                cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
             except:
                 pass
 
@@ -3096,12 +2949,8 @@ class WL14110(tests.MySQLConnectorTests):
                 "".format(self.user, self.host)
             )
 
-            cnx.cmd_query(
-                "CREATE USER '{}'@'{}'" "".format("common", self.host)
-            )
-            cnx.cmd_query(
-                "GRANT ALL ON *.* TO '{}'@'{}'" "".format("common", self.host)
-            )
+            cnx.cmd_query("CREATE USER '{}'@'{}'".format("common", self.host))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'".format("common", self.host))
 
     def tearDown(self):
         return
@@ -3120,8 +2969,7 @@ class WL14110(tests.MySQLConnectorTests):
         # Not running with c-ext if plugin libraries are not setup
         if (
             self.cnx.__class__ == CMySQLConnection
-            and os.getenv("TEST_AUTHENTICATION_LDAP_SASL_CLIENT_CEXT", None)
-            is None
+            and os.getenv("TEST_AUTHENTICATION_LDAP_SASL_CLIENT_CEXT", None) is None
         ):
             return
         conn_args = {
@@ -3240,9 +3088,7 @@ class WL13994(tests.MySQLConnectorTests):
                         available = True
 
             if not available:
-                self.skipTest(
-                    "Plugin authentication_ldap_simple not available"
-                )
+                self.skipTest("Plugin authentication_ldap_simple not available")
 
             identified_by = "CN=test1,CN=Users,DC=mysql,DC=local"
 
@@ -3251,9 +3097,7 @@ class WL13994(tests.MySQLConnectorTests):
                 "WITH authentication_ldap_simple AS"
                 "'{}'".format(self.user, self.host, identified_by)
             )
-            cnx.cmd_query(
-                "GRANT ALL ON *.* TO '{}'@'{}'" "".format(self.user, self.host)
-            )
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'".format(self.user, self.host))
             cnx.cmd_query("FLUSH PRIVILEGES")
 
     def tearDown(self):
@@ -3328,25 +3172,19 @@ class WL13994(tests.MySQLConnectorTests):
         with self.assertRaises(InterfaceError) as context:
             _ = self.cnx.__class__(**conn_args)
         self.assertEqual(
-            "Clear password authentication is not supported over "
-            "insecure channels",
+            "Clear password authentication is not supported over insecure channels",
             context.exception.msg,
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Unix socket is used in unix by default if not popped or set to None
-        conn_args["unix_socket"] = tests.get_mysql_config().get(
-            "unix_socket", None
-        )
+        conn_args["unix_socket"] = tests.get_mysql_config().get("unix_socket", None)
         with self.assertRaises(InterfaceError) as context:
             _ = self.cnx.__class__(**conn_args)
         self.assertEqual(
-            "Clear password authentication is not supported over "
-            "insecure channels",
+            "Clear password authentication is not supported over insecure channels",
             context.exception.msg,
-            "Unexpected exception message found: {}"
-            "".format(context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Attempt connection with verify certificate set to True
@@ -3439,12 +3277,8 @@ class WL14263(tests.MySQLConnectorTests):
                 self.skipTest("Plugin authentication_ldap_sasl not available")
 
             try:
-                cnx.cmd_query(
-                    "DROP USER '{}'@'{}'".format(self.user, self.host)
-                )
-                cnx.cmd_query(
-                    "DROP USER '{}'@'{}'".format("common", self.host)
-                )
+                cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, self.host))
+                cnx.cmd_query("DROP USER '{}'@'{}'".format("common", self.host))
             except:
                 pass
 
@@ -3454,12 +3288,8 @@ class WL14263(tests.MySQLConnectorTests):
                 "".format(self.user, self.host)
             )
 
-            cnx.cmd_query(
-                "CREATE USER '{}'@'{}'" "".format("common", self.host)
-            )
-            cnx.cmd_query(
-                "GRANT ALL ON *.* TO '{}'@'{}'" "".format("common", self.host)
-            )
+            cnx.cmd_query("CREATE USER '{}'@'{}'".format("common", self.host))
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'".format("common", self.host))
 
     def tearDown(self):
         cnx = connection.MySQLConnection(**self.config)
@@ -3478,8 +3308,7 @@ class WL14263(tests.MySQLConnectorTests):
         # Not running with c-ext if plugin libraries are not setup
         if (
             self.cnx.__class__ == CMySQLConnection
-            and os.getenv("TEST_AUTHENTICATION_LDAP_SASL_CLIENT_CEXT", None)
-            is None
+            and os.getenv("TEST_AUTHENTICATION_LDAP_SASL_CLIENT_CEXT", None) is None
         ):
             return
         conn_args = {
@@ -3662,13 +3491,8 @@ class WL13334(tests.MySQLConnectorTests):
             _ = connect(**settings)
 
         self.assertTrue(
-            (
-                "Unable to connect to any of the target hosts"
-                in context.exception.msg
-            ),
-            "Unexpected exception message found: {}".format(
-                context.exception.msg
-            ),
+            ("Unable to connect to any of the target hosts" in context.exception.msg),
+            "Unexpected exception message found: {}".format(context.exception.msg),
         )
 
         # Verify connection is successful
@@ -3755,10 +3579,7 @@ class WL14213(tests.MySQLConnectorTests):
             )
 
             cnx.cmd_query("CREATE USER '{}'".format("mysql_engineering"))
-            cnx.cmd_query(
-                "GRANT ALL ON myconnpy.* TO '{}'"
-                "".format("mysql_engineering")
-            )
+            cnx.cmd_query("GRANT ALL ON myconnpy.* TO '{}'".format("mysql_engineering"))
             cnx.cmd_query(
                 "GRANT PROXY on '{}' TO '{}@{}'"
                 "".format("mysql_engineering", self.user, self.host)
@@ -3781,8 +3602,7 @@ class WL14213(tests.MySQLConnectorTests):
         # Not running with c-ext if plugin libraries are not setup
         if (
             self.cnx.__class__ == CMySQLConnection
-            and os.getenv("TEST_AUTHENTICATION_LDAP_SASL_KRB_CEXT", None)
-            is None
+            and os.getenv("TEST_AUTHENTICATION_LDAP_SASL_KRB_CEXT", None) is None
         ):
             return
         conn_args = {
@@ -3802,13 +3622,13 @@ class WL14213(tests.MySQLConnectorTests):
             self.assertIn(
                 "Lost connection to MySQL server",
                 context.exception.msg,
-                "not the expected error {}" "".format(context.exception.msg),
+                "not the expected error {}".format(context.exception.msg),
             )
         else:
             self.assertIn(
-                "Unable to retrieve credentials with the given " "password",
+                "Unable to retrieve credentials with the given password",
                 context.exception.msg,
-                "not the expected " "error {}".format(context.exception.msg),
+                "not the expected error {}".format(context.exception.msg),
             )
 
         # Attempt connection with empty krb_service_principal
@@ -3936,9 +3756,7 @@ class WL14237_not_supported(tests.MySQLConnectorTests):
                 self.assertListEqual([], cur.get_attributes())
                 cur.add_attribute("attr_1", "attr_val")
                 # verify get_attributes returns a single attribute that was set
-                self.assertListEqual(
-                    [("attr_1", "attr_val")], cur.get_attributes()
-                )
+                self.assertListEqual([("attr_1", "attr_val")], cur.get_attributes())
 
                 with warnings.catch_warnings(record=True) as warn:
                     warnings.resetwarnings()
@@ -3988,9 +3806,7 @@ class WL14237(tests.MySQLConnectorTests):
         test_table = "wl14237"
         with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
             with cnx.cursor() as cur:
-                cur.execute(
-                    'INSTALL COMPONENT "file://component_query_attributes"'
-                )
+                cur.execute('INSTALL COMPONENT "file://component_query_attributes"')
                 cur.execute(f"DROP TABLE IF EXISTS {test_table}")
                 cur.execute(
                     f"""
@@ -4007,9 +3823,7 @@ class WL14237(tests.MySQLConnectorTests):
         test_table = "wl14237"
         with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
             with cnx.cursor() as cur:
-                cur.execute(
-                    'UNINSTALL COMPONENT "file://component_query_attributes"'
-                )
+                cur.execute('UNINSTALL COMPONENT "file://component_query_attributes"')
                 cur.execute(f"DROP TABLE {test_table}")
 
     def setUp(self):
@@ -4064,9 +3878,7 @@ class WL14237(tests.MySQLConnectorTests):
                     self.assertListEqual([], cur.get_attributes())
                     cur.add_attribute(attr_name, attr_val)
                     # verify get_attributes returns the single attribute set
-                    self.assertListEqual(
-                        [(attr_name, attr_val)], cur.get_attributes()
-                    )
+                    self.assertListEqual([(attr_name, attr_val)], cur.get_attributes())
                     cur.execute(
                         self.query_insert.format(
                             test_table=self.test_table,
@@ -4076,9 +3888,7 @@ class WL14237(tests.MySQLConnectorTests):
                     )
                     cnx.commit()
                     # Check that attribute values are correct
-                    self._check_attribute_values_are_correct(
-                        attr_name, my_value
-                    )
+                    self._check_attribute_values_are_correct(attr_name, my_value)
                     cur.clear_attributes()
 
         self._empty_table()
@@ -4101,9 +3911,7 @@ class WL14237(tests.MySQLConnectorTests):
                 )
                 cnx.commit()
                 # Check the number of attributes values sent so far
-                cur.execute(
-                    "SELECT count(*) FROM wl14237 WHERE value IS NOT NULL"
-                )
+                cur.execute("SELECT count(*) FROM wl14237 WHERE value IS NOT NULL")
                 self.assertEqual([(len(added_attrs),)], cur.fetchall())
                 # Check that attribute values are correct
                 self._check_attribute_values_are_correct(attr_name, my_value)
@@ -4113,9 +3921,7 @@ class WL14237(tests.MySQLConnectorTests):
 
         self._empty_table()
 
-    def _test_3_query_attr_add_attribute_error_bad_name_par(
-        self, prepared=False
-    ):
+    def _test_3_query_attr_add_attribute_error_bad_name_par(self, prepared=False):
         "Test add_attribute() invalid name parameter."
         attr_name_invalid = [1, 1.5, ["invalid"], b"invalid", object]
         attr_val = "valid"
@@ -4138,9 +3944,7 @@ class WL14237(tests.MySQLConnectorTests):
                 value=attr_val,
             )
 
-    def _test_4_query_attr_add_attribute_error_bad_value_par(
-        self, prepared=False
-    ):
+    def _test_4_query_attr_add_attribute_error_bad_value_par(self, prepared=False):
         "Test add_attribute() invalid value parameter."
         attr_name = "invalid"
         attr_values_not_supported = [
@@ -4179,8 +3983,7 @@ class WL14237(tests.MySQLConnectorTests):
                 )
             else:
                 cur.execute(
-                    f"SELECT"
-                    f" mysql_query_attribute_string('{attr_name}') AS 'QA'"
+                    f"SELECT mysql_query_attribute_string('{attr_name}') AS 'QA'"
                 )
             res = cur.fetchall()
             # Check that attribute values are correct
@@ -4205,9 +4008,7 @@ class WL14237(tests.MySQLConnectorTests):
         cur2.add_attribute("attr_2", 2)
         cur1.add_attribute("attr_3", 3)
 
-        self.assertListEqual(
-            [("attr_1", 1), ("attr_3", 3)], cur1.get_attributes()
-        )
+        self.assertListEqual([("attr_1", 1), ("attr_3", 3)], cur1.get_attributes())
 
         self.assertListEqual([("attr_2", 2)], cur2.get_attributes())
 
@@ -4217,9 +4018,7 @@ class WL14237(tests.MySQLConnectorTests):
             f" mysql_query_attribute_string('attr_3') AS 'QA2'"
         )
 
-        cur2.execute(
-            f"SELECT" f" mysql_query_attribute_string('attr_2') AS 'QA1'"
-        )
+        cur2.execute(f"SELECT mysql_query_attribute_string('attr_2') AS 'QA1'")
 
         res = cur1.fetchall()
         # Check that attribute values are correct in cur1
@@ -4229,9 +4028,7 @@ class WL14237(tests.MySQLConnectorTests):
         # Check that attribute values are correct in cur2
         self.assertEqual(("2",), res[0])
 
-    def _check_query_attrs_names_not_checked_for_uniqueness(
-        self, prepared=False
-    ):
+    def _check_query_attrs_names_not_checked_for_uniqueness(self, prepared=False):
         "Check attribute names are not checked for uniqueness"
         with self.cnx.__class__(**self.config) as cnx:
             cur = cnx.cursor(prepared=prepared)
@@ -4256,9 +4053,7 @@ class WL14237(tests.MySQLConnectorTests):
             cur.add_attribute("", 1)
             cur.add_attribute("attr_1", 3)
 
-            cur.execute(
-                f"SELECT" f" mysql_query_attribute_string('attr_1') AS 'QA'"
-            )
+            cur.execute(f"SELECT mysql_query_attribute_string('attr_1') AS 'QA'")
 
             res = cur.fetchall()
             # Check that attribute values are correct in cur1
@@ -4307,9 +4102,7 @@ class WL14237(tests.MySQLConnectorTests):
     @tests.foreach_cnx()
     def test_9_query_attr_add_attribute_error_bad_value_par_prepared_cur(self):
         "Test add_attribute() invalid value parameter, prepared stmt."
-        self._test_4_query_attr_add_attribute_error_bad_value_par(
-            prepared=True
-        )
+        self._test_4_query_attr_add_attribute_error_bad_value_par(prepared=True)
 
     @tests.foreach_cnx(MySQLConnection)
     def test_10_query_attr_individual_send_simple_check_prepared_cur(self):

@@ -110,8 +110,7 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
             deps = _PLUGINS_DEPENDENCIES.get(module.name)
             if deps and not all(deps):
                 LOGGER.warning(
-                    f"{module.name} authentication plugin has missing "
-                    "dependencies"
+                    f"{module.name} authentication plugin has missing dependencies"
                 )
                 continue
             else:
@@ -137,27 +136,19 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLNativePasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin(
-            "mysql_native_password"
-        )
+        self.plugin_class = authentication.get_auth_plugin("mysql_native_password")
 
     def test_class(self):
-        self.assertEqual(
-            "mysql_native_password", self.plugin_class.plugin_name
-        )
+        self.assertEqual("mysql_native_password", self.plugin_class.plugin_name)
         self.assertEqual(False, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
 
         auth_plugin = self.plugin_class(None, password="spam")
-        self.assertRaises(
-            mysql.connector.InterfaceError, auth_plugin.prepare_password
-        )
+        self.assertRaises(mysql.connector.InterfaceError, auth_plugin.prepare_password)
 
         auth_plugin = self.plugin_class(123456, password="spam")  # too long
-        self.assertRaises(
-            mysql.connector.InterfaceError, auth_plugin.prepare_password
-        )
+        self.assertRaises(mysql.connector.InterfaceError, auth_plugin.prepare_password)
 
         empty = b""
         auth_data = (
@@ -182,9 +173,7 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLClearPasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin(
-            "mysql_clear_password"
-        )
+        self.plugin_class = authentication.get_auth_plugin("mysql_clear_password")
 
     def test_class(self):
         self.assertEqual("mysql_clear_password", self.plugin_class.plugin_name)
@@ -192,9 +181,7 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
     def test_prepare_password(self):
         exp = b"spam\x00"
-        auth_plugin = self.plugin_class(
-            None, password="spam", ssl_enabled=True
-        )
+        auth_plugin = self.plugin_class(None, password="spam", ssl_enabled=True)
         self.assertEqual(exp, auth_plugin.prepare_password())
         self.assertEqual(exp, auth_plugin.auth_response())
 
@@ -212,9 +199,7 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
 
     def test_prepare_password(self):
         exp = b"spam\x00"
-        auth_plugin = self.plugin_class(
-            None, password="spam", ssl_enabled=True
-        )
+        auth_plugin = self.plugin_class(None, password="spam", ssl_enabled=True)
         self.assertEqual(exp, auth_plugin.prepare_password())
         self.assertEqual(exp, auth_plugin.auth_response())
 
@@ -237,9 +222,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
     def test_auth_response(self):
         # Test unsupported mechanism error message
         auth_data = b"UNKOWN-METHOD"
-        auth_plugin = self.plugin_class(
-            auth_data, username="user", password="spam"
-        )
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
         with self.assertRaises(InterfaceError) as context:
             auth_plugin.auth_response()
         self.assertIn(
@@ -266,9 +249,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             "got header: {}".format(auth_plugin.auth_response()),
         )
 
-        auth_plugin = self.plugin_class(
-            auth_data, username="user", password="spam"
-        )
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
 
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
@@ -348,16 +329,14 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             with self.assertRaises(InterfaceError) as context:
                 auth_plugin.auth_finalize(bad_proof)
             self.assertIn(
-                "proof is not well formated.",
+                "proof is not well formated",
                 context.exception.msg,
                 "not the expected: {}".format(context.exception.msg),
             )
 
         # verify an error is shown it the server can not prove it self.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_finalize(
-                bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=")
-            )
+            auth_plugin.auth_finalize(bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
         self.assertIn(
             "Unable to proof server identity",
             context.exception.msg,
@@ -367,15 +346,13 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
     def test_auth_response256(self):
         # Test unsupported mechanism error message
         auth_data = b"UNKOWN-METHOD"
-        auth_plugin = self.plugin_class(
-            auth_data, username="user", password="spam"
-        )
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
         with self.assertRaises(InterfaceError) as context:
             auth_plugin.auth_response()
         self.assertIn(
             'sasl authentication method "UNKOWN-METHOD"',
             context.exception.msg,
-            "not the expected error {}" "".format(context.exception.msg),
+            "not the expected error {}".format(context.exception.msg),
         )
         self.assertIn(
             "is not supported",
@@ -396,9 +373,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             "got header: {}".format(auth_plugin.auth_response()),
         )
 
-        auth_plugin = self.plugin_class(
-            auth_data, username="user", password="spam"
-        )
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
 
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
@@ -452,9 +427,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
         # verify an error is shown if server response is not well formated.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_continue(
-                bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54")
-            )
+            auth_plugin.auth_continue(bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54"))
         self.assertIn(
             "Incomplete reponse",
             context.exception.msg,
@@ -463,9 +436,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
         # verify an error is shown if server does not authenticate response.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_continue(
-                bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40")
-            )
+            auth_plugin.auth_continue(bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40"))
         self.assertIn(
             "Unable to authenticate resp",
             context.exception.msg,
@@ -478,16 +449,14 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             with self.assertRaises(InterfaceError) as context:
                 auth_plugin.auth_finalize(bad_proof)
             self.assertIn(
-                "proof is not well formated.",
+                "proof is not well formated",
                 context.exception.msg,
                 "not the expected: {}".format(context.exception.msg),
             )
 
         # verify an error is shown it the server can not prove it self.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_finalize(
-                bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=")
-            )
+            auth_plugin.auth_finalize(bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
         self.assertIn(
             "Unable to proof server identity",
             context.exception.msg,
@@ -576,15 +545,11 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             cnx.cmd_query("FLUSH PRIVILEGES")
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin(
-            "MySQLKerberosAuthPlugin"
-        )
+        self.plugin_class = authentication.get_auth_plugin("MySQLKerberosAuthPlugin")
         if self.skip_reason is not None:
             self.skipTest(self.skip_reason)
 
-    def _get_kerberos_tgt(
-        self, user=None, password=None, realm=None, expired=False
-    ):
+    def _get_kerberos_tgt(self, user=None, password=None, realm=None, expired=False):
         """Obtain and cache Kerberos ticket-granting ticket.
 
         Call `kinit` with a specified user and password for obtaining and
@@ -1087,9 +1052,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                     """
                 )
             except DatabaseError:
-                cls.skip_reason = (
-                    "Plugin cleartext_plugin_server not available"
-                )
+                cls.skip_reason = "Plugin cleartext_plugin_server not available"
                 return
             cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_1f}'")
             cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_2f}'")
@@ -1183,21 +1146,13 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                 # Create kwargs options for the provided user
                 kwargs = {"username": user}
                 if perm[0] is not None:
-                    kwargs["password"] = (
-                        self.password1 if perm[0] else "invalid"
-                    )
+                    kwargs["password"] = self.password1 if perm[0] else "invalid"
                 if perm[1] is not None:
-                    kwargs["password1"] = (
-                        self.password1 if perm[1] else "invalid"
-                    )
+                    kwargs["password1"] = self.password1 if perm[1] else "invalid"
                 if perm[2] is not None:
-                    kwargs["password2"] = (
-                        self.password2 if perm[2] else "invalid"
-                    )
+                    kwargs["password2"] = self.password2 if perm[2] else "invalid"
                 if perm[3] is not None:
-                    kwargs["password3"] = (
-                        self.password3 if perm[3] else "invalid"
-                    )
+                    kwargs["password3"] = self.password3 if perm[3] else "invalid"
                 LOGGER.debug(
                     "Test change user to '%s' using '%s'. (Expected %s)",
                     user,
@@ -1222,9 +1177,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
         """Test connection 'user_1f' password permutations."""
         permutations = []
         for perm in itertools.product([True, False, None], repeat=4):
-            permutations.append(
-                (perm, perm[1] or (perm[0] and perm[1] is None))
-            )
+            permutations.append((perm, perm[1] or (perm[0] and perm[1] is None)))
         self._test_connection(self.cnx.__class__, permutations, self.user_1f)
 
     @tests.foreach_cnx()
@@ -1235,8 +1188,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
             permutations.append(
                 (
                     perm,
-                    perm[2]
-                    and ((perm[0] and perm[1] is not False) or perm[1]),
+                    perm[2] and ((perm[0] and perm[1] is not False) or perm[1]),
                 )
             )
         self._test_connection(self.cnx.__class__, permutations, self.user_2f)

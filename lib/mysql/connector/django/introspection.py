@@ -176,8 +176,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         field_info = {line[0]: InfoLine(*line) for line in cursor.fetchall()}
 
         cursor.execute(
-            f"SELECT * FROM {self.connection.ops.quote_name(table_name)} "
-            "LIMIT 1"
+            f"SELECT * FROM {self.connection.ops.quote_name(table_name)} LIMIT 1"
         )
 
         def to_int(i):
@@ -219,9 +218,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
 
     def get_indexes(self, cursor, table_name):
         """Return indexes from table."""
-        cursor.execute(
-            f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}"
-        )
+        cursor.execute(f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}")
         # Do a two-pass search for indexes: on first pass check which indexes
         # are multicolumn, on second pass check which single-column indexes
         # are present.
@@ -296,9 +293,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         storage engine if the table doesn't exist.
         """
         cursor.execute(
-            "SELECT engine "
-            "FROM information_schema.tables "
-            "WHERE table_name = %s",
+            "SELECT engine FROM information_schema.tables WHERE table_name = %s",
             [table_name],
         )
         result = cursor.fetchone()
@@ -311,9 +306,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
     def _parse_constraint_columns(self, check_clause, columns):
         check_columns = OrderedSet()
         statement = sqlparse.parse(check_clause)[0]
-        tokens = (
-            token for token in statement.flatten() if not token.is_whitespace
-        )
+        tokens = (token for token in statement.flatten() if not token.is_whitespace)
         for token in tokens:
             if (
                 token.ttype == sqlparse.tokens.Name
@@ -348,9 +341,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     "unique": False,
                     "index": False,
                     "check": False,
-                    "foreign_key": (ref_table, ref_column)
-                    if ref_column
-                    else None,
+                    "foreign_key": (ref_table, ref_column) if ref_column else None,
                 }
                 if self.connection.features.supports_index_column_ordering:
                     constraints[constraint]["orders"] = []
@@ -374,8 +365,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         if self.connection.features.can_introspect_check_constraints:
             unnamed_constraints_index = 0
             columns = {
-                info.name
-                for info in self.get_table_description(cursor, table_name)
+                info.name for info in self.get_table_description(cursor, table_name)
             }
             type_query = """
                 SELECT cc.constraint_name, cc.check_clause
@@ -399,9 +389,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 # a column.
                 if set(constraint_columns) == {constraint}:
                     unnamed_constraints_index += 1
-                    constraint = (
-                        f"__unnamed_constraint_{unnamed_constraints_index}__"
-                    )
+                    constraint = f"__unnamed_constraint_{unnamed_constraints_index}__"
                 constraints[constraint] = {
                     "columns": constraint_columns,
                     "primary_key": False,
@@ -411,9 +399,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     "foreign_key": None,
                 }
         # Now add in the indexes
-        cursor.execute(
-            f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}"
-        )
+        cursor.execute(f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}")
         for _, _, index, _, column, order, type_ in [
             x[:6] + (x[10],) for x in cursor.fetchall()
         ]:
@@ -433,9 +419,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             )
             constraints[index]["columns"].add(column)
             if self.connection.features.supports_index_column_ordering:
-                constraints[index]["orders"].append(
-                    "DESC" if order == "D" else "ASC"
-                )
+                constraints[index]["orders"].append("DESC" if order == "D" else "ASC")
         # Convert the sorted sets to lists
         for constraint in constraints.values():
             constraint["columns"] = list(constraint["columns"])
