@@ -65,7 +65,7 @@
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
 # set version if not defined through 'rpmbuild'
-%{!?version: %global version 8.0.29}
+%{!?version: %global version 8.0.30}
 
 %global with_openssl_opts ""
 
@@ -252,6 +252,9 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Mon Apr 18 2022  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.30-1
+- Updated for 8.0.30
+
 * Tue Jan 18 2022  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.29-1
 - Updated for 8.0.29
 

@@ -32,7 +32,7 @@ The file version.py gets installed and is available after installation
 as mysql.connector.version.
 """
 
-VERSION = (8, 0, 29, "", 1)
+VERSION = (8, 0, 30, "", 1)
 
 # pylint: disable=consider-using-f-string
 if VERSION[3] and VERSION[4]:
