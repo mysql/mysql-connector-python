@@ -16,6 +16,7 @@ v8.0.30
 - WL#15035: Enforce PEP 7 and PEP 8 coding style
 - WL#14822: Refactor the authentication plugin mechanism
 - WL#14815: Support OpenSSL 3.0
+- BUG#28821983: Fix rounding errors for decimal values
 
 v8.0.29
 =======

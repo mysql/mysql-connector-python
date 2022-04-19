@@ -6867,3 +6867,49 @@ class BugOra33747585(tests.MySQLConnectorTests):
                 """
             )
             _ = cur.fetchall()
+
+
+class BugOra328821983(tests.MySQLConnectorTests):
+    """BUG#328821983: Fix rounding errors when using decimal.Decimal."""
+
+    @foreach_cnx()
+    def test_decimal_update(self):
+        table = "BugOra328821983"
+        with self.cnx.cursor() as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {table}")
+            cur.execute(
+                f"""
+                CREATE TABLE {table} (
+                    id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    value DECIMAL(32,8) NOT NULL
+                )
+                """
+            )
+            cur.execute(
+                f"INSERT INTO {table} VALUES (NULL, %s)",
+                (Decimal("100000000000.00000001"),),
+            )
+            cur.execute(f"SELECT value FROM {table}")
+            res = cur.fetchall()[0][0]
+            self.assertEqual(res, Decimal("100000000000.00000001"))
+
+            # Use this value to increment the decimal field
+            value = Decimal("0.00000101")
+
+            # Test update with tuple as placeholders
+            query = f"UPDATE {table} SET value=(value + %s) WHERE id=%s"
+            cur.execute(query, (value, 1))
+
+            cur.execute(f"SELECT value FROM {table}")
+            res = cur.fetchall()[0][0]
+            self.assertEqual(res, Decimal("100000000000.00000102"))
+
+            # Test update with dictionary as placeholders
+            query = f"UPDATE {table} SET value=(value + %(value)s) WHERE id=%(id)s"
+            cur.execute(query, {"value": value, "id": 1})
+
+            cur.execute(f"SELECT value FROM {table}")
+            res = cur.fetchall()[0][0]
+            self.assertEqual(res, Decimal("100000000000.00000203"))
+
+            cur.execute(f"DROP TABLE IF EXISTS {table}")

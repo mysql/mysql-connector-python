@@ -1922,6 +1922,10 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
         if (new_value == Py_None) {
             PyTuple_SET_ITEM(prepared, i, PyBytes_FromString("NULL"));
         }
+        else if (strcmp((value)->ob_type->tp_name, "decimal.Decimal") == 0) {
+            Py_INCREF(new_value);
+            PyTuple_SET_ITEM(prepared, i, new_value);
+        }
         else if (PyBytes_Check(new_value)) {
             PyObject *quoted = PyBytes_FromFormat("'%s'", PyBytes_AsString(new_value));
             PyTuple_SET_ITEM(prepared, i, quoted);

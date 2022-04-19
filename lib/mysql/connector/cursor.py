@@ -32,6 +32,7 @@ import re
 import weakref
 
 from collections import namedtuple
+from decimal import Decimal
 
 from .abstracts import NAMED_TUPLE_CACHE, MySQLCursorAbstract
 from .constants import ServerFlag
@@ -396,11 +397,12 @@ class MySQLCursor(CursorBase):
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
             res = {}
-            for key, value in list(params.items()):
+            for key, value in params.items():
                 conv = value
                 conv = to_mysql(conv)
                 conv = escape(conv)
-                conv = quote(conv)
+                if not isinstance(value, Decimal):
+                    conv = quote(conv)
                 res[key.encode()] = conv
         except Exception as err:
             raise ProgrammingError(
@@ -412,15 +414,18 @@ class MySQLCursor(CursorBase):
     def _process_params(self, params):
         """Process query parameters."""
         try:
-            res = params
+            res = params[:]
 
             to_mysql = self._connection.converter.to_mysql
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
 
-            res = [to_mysql(i) for i in res]
-            res = [escape(i) for i in res]
-            res = [quote(i) for i in res]
+            res = [to_mysql(value) for value in res]
+            res = [escape(value) for value in res]
+            res = [
+                quote(value) if not isinstance(params[i], Decimal) else value
+                for i, value in enumerate(res)
+            ]
         except Exception as err:
             raise ProgrammingError(
                 f"Failed processing format-parameters; {err}"
@@ -607,8 +612,6 @@ class MySQLCursor(CursorBase):
                         raise ProgrammingError(
                             "Not all parameters were used in the SQL statement"
                         )
-                    # for p in self._process_params(params):
-                    #    tmp = tmp.replace(b'%s',p,1)
                 values.append(tmp)
             if fmt in stmt:
                 stmt = stmt.replace(fmt, b",".join(values), 1)
