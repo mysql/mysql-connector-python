@@ -96,7 +96,7 @@ Version:       %{version}
 Release:       1%{?version_extra:.%{version_extra}}%{?byte_code_only:.1}%{?dist}
 License:       Copyright (c) 2015, 2021, Oracle and/or its affiliates. Under %{?license_type} license as shown in the Description field.
 URL:           https://dev.mysql.com/downloads/connector/python/
-Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python%{?product_suffix}-%{version}.tar.gz
+Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python%{?product_suffix}-%{version}-src.tar.gz
 
 %{!?with_mysql_capi:BuildRequires: mysql-devel}
 
@@ -201,7 +201,7 @@ and information about the MySQL software. Also please see the
 documentation and the manual for more information.
 
 %prep
-%setup -q
+%setup -q -n mysql-connector-python%{?product_suffix}-%{version}-src
 
 %install
 %{?scl:scl enable %{scl} - << \EOF}
@@ -218,13 +218,13 @@ COMMON_INSTALL_ARGS="\
 "
 
 %if 0%{?extra_compile_args:1}
-EXTRA_COMPILE_ARGS=%extra_compile_args
+EXTRA_COMPILE_ARGS="%{extra_compile_args}"
 %else
 EXTRA_COMPILE_ARGS=""
 %endif
 
 %if 0%{?extra_link_args:1}
-EXTRA_LINK_ARGS=%extra_link_args
+EXTRA_LINK_ARGS="%{extra_link_args}"
 %else
 EXTRA_LINK_ARGS=""
 %endif
