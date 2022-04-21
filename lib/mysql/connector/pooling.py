@@ -164,11 +164,9 @@ def _get_failover_connection(**kwargs):
             "every router"
         )
 
-    failover.sort(key=lambda x: x["priority"], reverse=True)
-
     server_directory = {}
     server_priority_list = []
-    for server in failover:
+    for server in sorted(failover, key=lambda x: x["priority"], reverse=True):
         if server["priority"] not in server_directory:
             server_directory[server["priority"]] = [server]
             server_priority_list.append(server["priority"])

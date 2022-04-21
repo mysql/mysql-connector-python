@@ -3486,7 +3486,7 @@ class WL13334(tests.MySQLConnectorTests):
             "passwd": passw,
         }
 
-        # connection must fail with error: "Unable to connect to any of the target hosts"
+        # Connection must fail with error: "Unable to connect to any of the target hosts"
         with self.assertRaises(InterfaceError) as context:
             _ = connect(**settings)
 
@@ -3499,8 +3499,13 @@ class WL13334(tests.MySQLConnectorTests):
         settings["failover"].append(
             {"host": host, "port": port, "user": user, "priority": 100}
         )
-        # connection must be successful
-        _ = connect(**cnx_config)
+        # Connection must be successful
+        _ = connect(**settings)
+
+        # Test 'failover' using a tuple instead
+        settings["failover"] = tuple(settings["failover"])
+        # Connection must be successful
+        _ = connect(**settings)
 
 
 @unittest.skipIf(
