@@ -39,6 +39,7 @@ import unittest
 import tests
 
 from mysql.connector.constants import ClientFlag, ServerFlag
+from mysql.connector.version import VERSION
 
 try:
     from _mysql_connector import MySQL, MySQLError, MySQLInterfaceError
@@ -295,7 +296,9 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         exp = {
             "comment": "",
-            "name": "utf8_general_ci",
+            "name": "utf8mb3_general_ci"
+            if VERSION[:3] >= (8, 0, 30)
+            else "utf8_general_ci",
             "mbmaxlen": 3,
             "number": 33,
             "mbminlen": 1,
