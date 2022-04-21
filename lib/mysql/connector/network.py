@@ -32,7 +32,6 @@
 import os
 import socket
 import struct
-import sys
 import zlib
 
 from collections import deque
@@ -278,43 +277,7 @@ class BaseMySQLSocket:
                 errno=2055, values=(self.get_address(), _strioerror(err))
             ) from err
 
-    def recv_py26_plain(self):
-        """Receive packets from the MySQL server"""
-        try:
-            # Read the header of the MySQL packet, 4 bytes
-            header = bytearray(b"")
-            header_len = 0
-            while header_len < 4:
-                chunk = self.sock.recv(4 - header_len)
-                if not chunk:
-                    raise InterfaceError(errno=2013)
-                header += chunk
-                header_len = len(header)
-
-            # Save the packet number and payload length
-            self._packet_number = header[3]
-            payload_len = struct.unpack("<I", header[0:3] + b"\x00")[0]
-
-            # Read the payload
-            rest = payload_len
-            payload = init_bytearray(b"")
-            while rest > 0:
-                chunk = self.sock.recv(rest)
-                if not chunk:
-                    raise InterfaceError(errno=2013)
-                payload += chunk
-                rest = payload_len - len(payload)
-            return header + payload
-        except IOError as err:
-            raise OperationalError(
-                errno=2055, values=(self.get_address(), _strioerror(err))
-            ) from err
-
-    if sys.version_info[0:2] == (2, 6):
-        recv = recv_py26_plain
-        recv_plain = recv_py26_plain
-    else:
-        recv = recv_plain
+    recv = recv_plain
 
     def _split_zipped_payload(self, packet_bunch):
         """Split compressed payload"""

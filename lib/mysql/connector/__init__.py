@@ -70,7 +70,6 @@ from .errors import (  # pylint: disable=redefined-builtin
     Warning,
     custom_error_exception,
 )
-from .optionfiles import read_option_files
 from .pooling import connect
 
 Connect = connect
@@ -97,6 +96,7 @@ __all__ = [
     "NotSupportedError",
     "DataError",
     "IntegrityError",
+    "PoolError",
     "ProgrammingError",
     "OperationalError",
     "InternalError",

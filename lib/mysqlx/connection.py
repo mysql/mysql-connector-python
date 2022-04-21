@@ -2723,16 +2723,16 @@ def _validate_settings(settings):
             )
         except (AttributeError, ValueError) as err:
             raise InterfaceError(f"Invalid SSL Mode '{settings['ssl-mode']}'") from err
-        if not "ssl-ca" in settings and settings["ssl-mode"] in [
+        if "ssl-ca" not in settings and settings["ssl-mode"] in [
             SSLMode.VERIFY_IDENTITY,
             SSLMode.VERIFY_CA,
         ]:
             raise InterfaceError("Cannot verify Server without CA")
 
-    if "ssl-crl" in settings and not "ssl-ca" in settings:
+    if "ssl-crl" in settings and "ssl-ca" not in settings:
         raise InterfaceError("CA Certificate not provided")
 
-    if "ssl-key" in settings and not "ssl-cert" in settings:
+    if "ssl-key" in settings and "ssl-cert" not in settings:
         raise InterfaceError("Client Certificate not provided")
 
     if "ssl-ca" in settings and settings.get("ssl-mode") not in [
@@ -2880,7 +2880,7 @@ def _validate_connection_attributes(settings):
             return
         if not (
             conn_attrs.startswith("[") and conn_attrs.endswith("]")
-        ) and not conn_attrs in ["False", "false", "True", "true"]:
+        ) and conn_attrs not in ["False", "false", "True", "true"]:
             raise InterfaceError(
                 "The value of 'connection-attributes' must be a boolean or a "
                 f"list of key-value pairs, found: '{conn_attrs}'"
