@@ -38,14 +38,14 @@
 #
 # pylint: disable=C0103,C0116,W0511,R0912,R0914,R0915
 
-import os
-import sys
-import re
 import argparse
-from subprocess import Popen, PIPE, STDOUT
-from datetime import datetime
-from shutil import copytree, rmtree, copyfile
+import os
+import re
+import sys
 
+from datetime import datetime
+from shutil import copyfile, copytree, rmtree
+from subprocess import PIPE, STDOUT, Popen
 
 ##############################################################################
 #
@@ -57,7 +57,9 @@ product_name = "mysql-connector-python"
 
 debian_support_dir = "cpydist/data/deb"
 
-no_debug_filter = r'^(byte-compiling|copying|creating /|dpkg-source: warning: ignoring deletion)'
+no_debug_filter = (
+    r"^(byte-compiling|copying|creating /|dpkg-source: warning: ignoring deletion)"
+)
 
 script_name = os.path.basename(__file__).replace(".py", "")
 
@@ -71,63 +73,33 @@ script_name = os.path.basename(__file__).replace(".py", "")
 
 parser = argparse.ArgumentParser(description=__doc__)
 
-parser.add_argument("source_directory",
-                    nargs=1,
-                    help="Source directory")
-parser.add_argument("--with-mysql-capi",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--with-openssl-include-dir",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--with-openssl-lib-dir",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--with-protobuf-include-dir",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--with-protobuf-lib-dir",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--with-protoc",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--extra-compile-args",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--extra-link-args",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--label",
-                    action="store",
-                    default="",
-                    help="")
-parser.add_argument("--byte-code-only",
-                    action="store_const",
-                    const="1",
-                    default="",
-                    help="")
-parser.add_argument("--skip-vendor",
-                    action="store_const",
-                    const="1",
-                    default="",
-                    help="")
-parser.add_argument("--dry-run",
-                    action="store_true",
-                    help="Run without modifying anything")
-parser.add_argument("--debug", "-d",
-                    action="count",
-                    default=0,
-                    dest="debug",
-                    help="Enable debug trace output")
+parser.add_argument("source_directory", nargs=1, help="Source directory")
+parser.add_argument("--with-mysql-capi", action="store", default="", help="")
+parser.add_argument("--with-openssl-include-dir", action="store", default="", help="")
+parser.add_argument("--with-openssl-lib-dir", action="store", default="", help="")
+parser.add_argument("--with-protobuf-include-dir", action="store", default="", help="")
+parser.add_argument("--with-protobuf-lib-dir", action="store", default="", help="")
+parser.add_argument("--with-protoc", action="store", default="", help="")
+parser.add_argument("--extra-compile-args", action="store", default="", help="")
+parser.add_argument("--extra-link-args", action="store", default="", help="")
+parser.add_argument("--label", action="store", default="", help="")
+parser.add_argument(
+    "--byte-code-only", action="store_const", const="1", default="", help=""
+)
+parser.add_argument(
+    "--skip-vendor", action="store_const", const="1", default="", help=""
+)
+parser.add_argument(
+    "--dry-run", action="store_true", help="Run without modifying anything"
+)
+parser.add_argument(
+    "--debug",
+    "-d",
+    action="count",
+    default=0,
+    dest="debug",
+    help="Enable debug trace output",
+)
 
 options = parser.parse_args()
 
@@ -145,11 +117,13 @@ options = parser.parse_args()
 # A a convention, start debug messages in uppercase. Except debug
 # messages, start in lowercase unless a symbol like "OSError"
 
+
 def print_splash(msg):
     print()
     print("########")
     print("######## WARNING: %s" % (msg))
     print("########")
+
 
 def print_info(msg):
     if options.debug:
@@ -157,20 +131,25 @@ def print_info(msg):
     else:
         print("INFO[%s]: %s" % (script_name, msg))
 
+
 def print_warning(msg):
     print("WARNING[%s]: %s" % (script_name, msg))
+
 
 def print_error(msg):
     print("ERROR[%s]: %s" % (script_name, msg))
     sys.exit(1)
 
-def print_debug(msg, level = 1):
+
+def print_debug(msg, level=1):
     if options.debug and level <= options.debug:
         print("DEBUG[%s]: %s" % (script_name, msg))
+
 
 # ----------------------------------------------------------------------
 # Read the "CHANGES.txt" file for entries
 # ----------------------------------------------------------------------
+
 
 def get_changes():
     """Get changes from CHANGES.txt."""
@@ -189,6 +168,7 @@ def get_changes():
                 found_items = True
 
     return log_lines
+
 
 ##############################################################################
 #
@@ -217,8 +197,12 @@ if not os.path.isdir(debian_support_dir):
 
 sys.path.insert(0, os.path.join(cwd, "lib"))
 
-from mysql.connector.version import EDITION, VERSION, VERSION_EXTRA # pylint: disable=C0413
-from mysql.connector.utils import linux_distribution                # pylint: disable=C0413
+from mysql.connector.utils import linux_distribution  # pylint: disable=C0413
+from mysql.connector.version import (  # pylint: disable=C0413
+    EDITION,
+    VERSION,
+    VERSION_EXTRA,
+)
 
 version_text_short = "{0}.{1}.{2}".format(*VERSION[0:3])
 
@@ -239,8 +223,7 @@ else:
 sign = False
 edition = EDITION
 codename = linux_dist[2].lower()
-version_extra = "-{0}".format(VERSION_EXTRA) \
-    if VERSION_EXTRA else ""
+version_extra = "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
 
 # Get if commercial from the directory name
 is_commercial = bool("commercial" in os.path.basename(cwd))
@@ -255,14 +238,14 @@ basename_tar = "%(name)s%(label)s-%(version)s%(version_extra)s-src" % {
     "name": product_name,
     "label": "-%s" % options.label if options.label else "",
     "version": version_text_short,
-    "version_extra": version_extra
+    "version_extra": version_extra,
 }
 
 basename_orig_tar = "%(name)s%(label)s_%(version)s%(version_extra)s.orig" % {
     "name": product_name,
     "label": "-%s" % options.label if options.label else "",
     "version": version_text_short,
-    "version_extra": version_extra
+    "version_extra": version_extra,
 }
 
 print_info("basename_tar       : %s" % (basename_tar))
@@ -285,6 +268,7 @@ for change_line in get_changes():
 #
 ##############################################################################
 
+
 def rename_tar():
 
     # Here "orig" is not "original", but the TAR naming the Deb build needs
@@ -294,11 +278,13 @@ def rename_tar():
 
     copyfile(tarball, orig_tarball)
 
+
 ##############################################################################
 #
 #  Function to pupulate the "debian" directory
 #
 ##############################################################################
+
 
 def populate_debian():
     """Copy and make files ready in the debian/ folder."""
@@ -325,26 +311,28 @@ def populate_debian():
         match = regex.match(line)
         if match:
             version = match.groups()[0]
-            line = line.replace(version,
-                                "{0}.{1}.{2}-1".format(*VERSION[0:3]))
+            line = line.replace(version, "{0}.{1}.{2}-1".format(*VERSION[0:3]))
         if first_line:
             if options.label:
                 line = line.replace(
                     "mysql-connector-python",
-                    "mysql-connector-python-%s" % (options.label))
+                    "mysql-connector-python-%s" % (options.label),
+                )
             line = line.replace("UNRELEASED", codename)
-            line = line.replace("-1",
-                                "{version_extra}-1{platform}{version}"
-                                .format(platform=platform,
-                                        version=platform_version,
-                                        version_extra=version_extra))
+            line = line.replace(
+                "-1",
+                "{version_extra}-1{platform}{version}".format(
+                    platform=platform,
+                    version=platform_version,
+                    version_extra=version_extra,
+                ),
+            )
             first_line = False
         if "* Changes here." in line:
             for change in log_lines:
                 new_changelog.append(change)
         elif line.startswith(" --") and "@" in line:
-            utcnow = datetime.utcnow().strftime(
-                "%a, %d %b %Y %H:%M:%S +0000")
+            utcnow = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
             line = re.sub(r"( -- .* <.*@.*>  ).*", r"\1" + utcnow, line)
             new_changelog.append(line + "\n")
         else:
@@ -360,7 +348,10 @@ def populate_debian():
         with open(control_file, "r") as fp:
             control = fp.readlines()
 
-        print_info("changing control '%s' Source, Package and Conflicts fields" % (control_file))
+        print_info(
+            "changing control '%s' Source, Package and Conflicts fields"
+            % (control_file)
+        )
 
         new_control = []
         add_label_regex = re.compile(r"^((?:Source|Package): mysql-connector-python)")
@@ -401,11 +392,13 @@ def populate_debian():
     with open(control_file, "w") as fp:
         fp.write(new_control)
 
+
 ##############################################################################
 #
 #  Function to create the package
 #
 ##############################################################################
+
 
 def make_dpkg():
     """Create Debian package in the source distribution folder."""
@@ -418,26 +411,24 @@ def make_dpkg():
     print_info("creating Debian package using '%s'" % (cmd))
 
     env = os.environ.copy()
-    env["MYSQL_CAPI"]                    = options.with_mysql_capi
-    env["OPENSSL_INCLUDE_DIR"]           = options.with_openssl_include_dir
-    env["OPENSSL_LIB_DIR"]               = options.with_openssl_lib_dir
+    env["MYSQL_CAPI"] = options.with_mysql_capi
+    env["OPENSSL_INCLUDE_DIR"] = options.with_openssl_include_dir
+    env["OPENSSL_LIB_DIR"] = options.with_openssl_lib_dir
     env["MYSQLXPB_PROTOBUF_INCLUDE_DIR"] = options.with_protobuf_include_dir
-    env["MYSQLXPB_PROTOBUF_LIB_DIR"]     = options.with_protobuf_lib_dir
-    env["MYSQLXPB_PROTOC"]               = options.with_protoc
-    env["WITH_CEXT"]                     = "1"
-    env["EXTRA_COMPILE_ARGS"]            = options.extra_compile_args
-    env["EXTRA_LINK_ARGS"]               = options.extra_link_args
-    env["SKIP_VENDOR"]                   = options.skip_vendor
-    env["LABEL"]                         = options.label or "0"
-    env["BYTE_CODE_ONLY"]                = options.byte_code_only
-    env["DH_VERBOSE"]                    = "1"
+    env["MYSQLXPB_PROTOBUF_LIB_DIR"] = options.with_protobuf_lib_dir
+    env["MYSQLXPB_PROTOC"] = options.with_protoc
+    env["WITH_CEXT"] = "1"
+    env["EXTRA_COMPILE_ARGS"] = options.extra_compile_args
+    env["EXTRA_LINK_ARGS"] = options.extra_link_args
+    env["SKIP_VENDOR"] = options.skip_vendor
+    env["LABEL"] = options.label or "0"
+    env["BYTE_CODE_ONLY"] = options.byte_code_only
+    env["DH_VERBOSE"] = "1"
 
     success = True
-    with Popen(cmd,
-               stdout=PIPE,
-               stderr=STDOUT,
-               universal_newlines=True,
-               env=env) as proc:
+    with Popen(
+        cmd, stdout=PIPE, stderr=STDOUT, universal_newlines=True, env=env
+    ) as proc:
         stdout, stderr = proc.communicate()
         for line in stdout.split("\n"):
             if "error:" in line or "E: " in line:
@@ -458,6 +449,7 @@ def make_dpkg():
                     success = False
 
     return success
+
 
 ##############################################################################
 #
