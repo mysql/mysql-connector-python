@@ -295,7 +295,7 @@ class SocketStream:
             raise OperationalError("MySQLx Connection not available")
         try:
             self._socket.sendall(data)
-        except socket.error as err:
+        except OSError as err:
             raise OperationalError(f"Unexpected socket error: {err}") from err
 
     def close(self):
@@ -305,7 +305,7 @@ class SocketStream:
         try:
             self._socket.shutdown(socket.SHUT_RDWR)
             self._socket.close()
-        except socket.error:
+        except OSError:
             # On [Errno 107] Transport endpoint is not connected
             pass
         self._socket = None
@@ -475,10 +475,10 @@ class SocketStream:
 
 
 def catch_network_exception(func):
-    """Decorator used to catch socket.error or RuntimeError.
+    """Decorator used to catch OSError or RuntimeError.
 
     Raises:
-        :class:`mysqlx.InterfaceError`: If `socket.Error` or `RuntimeError`
+        :class:`mysqlx.InterfaceError`: If `OSError` or `RuntimeError`
                                         is raised.
     """
 
@@ -808,7 +808,7 @@ class Connection:
                 self._authenticate()
                 self.protocol.set_compression(algorithm)
                 return
-            except (socket.error, RuntimeError) as err:
+            except (OSError, RuntimeError) as err:
                 error = err
                 router.set_unavailable()
 
@@ -1558,7 +1558,7 @@ class ConnectionPool(queue.Queue):
             else:
                 try:
                     cnx.close_connection()
-                except (RuntimeError, socket.error, InterfaceError):
+                except (RuntimeError, OSError, InterfaceError):
                     pass
                 finally:
                     self.remove_connection(cnx)
@@ -1927,15 +1927,11 @@ class PoolsManager:
                             if not cnx.keep_open:
                                 cnx.reset()
                             set_mysqlx_wait_timeout(cnx)
-                        except (RuntimeError, socket.error, InterfaceError):
+                        except (RuntimeError, OSError, InterfaceError):
                             # Unable to reset connection, close and remove
                             try:
                                 cnx.close_connection()
-                            except (
-                                RuntimeError,
-                                socket.error,
-                                InterfaceError,
-                            ):
+                            except (RuntimeError, OSError, InterfaceError):
                                 pass
                             finally:
                                 pool.remove_connection(cnx)
@@ -1951,11 +1947,7 @@ class PoolsManager:
                                 else:
                                     try:
                                         cnx.close_connection()
-                                    except (
-                                        RuntimeError,
-                                        socket.error,
-                                        InterfaceError,
-                                    ):
+                                    except (RuntimeError, OSError, InterfaceError):
                                         pass
                                     finally:
                                         pool.remove_connection(cnx)
@@ -1965,11 +1957,7 @@ class PoolsManager:
                                 pool.track_connection(cnx)
                                 cnx.connect()
                                 set_mysqlx_wait_timeout(cnx)
-                            except (
-                                RuntimeError,
-                                socket.error,
-                                InterfaceError,
-                            ):
+                            except (RuntimeError, OSError, InterfaceError):
                                 pass
                             finally:
                                 # Server must be down, take down idle
@@ -1982,11 +1970,7 @@ class PoolsManager:
                                         )
                                         cnx.close_connection()
                                         pool.remove_connection(cnx)
-                                    except (
-                                        RuntimeError,
-                                        socket.error,
-                                        InterfaceError,
-                                    ):
+                                    except (RuntimeError, OSError, InterfaceError):
                                         pass
                         return cnx
                 elif pool.open_connections < pool.pool_max_size:

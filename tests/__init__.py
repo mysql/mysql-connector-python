@@ -155,14 +155,14 @@ class DummySocket:
 
     def recv(self, bufsize=4096, flags=0):
         if self._raise_socket_error:
-            raise socket.error(self._raise_socket_error)
+            raise OSError(self._raise_socket_error)
         res = self._server_replies[0:bufsize]
         self._server_replies = self._server_replies[bufsize:]
         return res
 
     def recv_into(self, buffer_, nbytes=0, flags=0):
         if self._raise_socket_error:
-            raise socket.error(self._raise_socket_error)
+            raise OSError(self._raise_socket_error)
         if nbytes == 0:
             nbytes = len(buffer_)
         try:
@@ -176,7 +176,7 @@ class DummySocket:
 
     def send(self, string, flags=0):
         if self._raise_socket_error:
-            raise socket.error(self._raise_socket_error)
+            raise OSError(self._raise_socket_error)
         self._client_sends.append(bytearray(string))
         return len(string)
 

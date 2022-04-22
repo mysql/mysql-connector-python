@@ -852,7 +852,7 @@ class DummyMySQLRequestHandler(BaseRequestHandler):
 
     def handle(self):
         if self.server.sock_error:
-            raise socket.error(self.server.socket_error)
+            raise OSError(self.server.socket_error)
 
         res = self._server_replies[0:bufsize]
         self._server_replies = self._server_replies[bufsize:]

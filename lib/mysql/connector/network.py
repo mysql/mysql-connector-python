@@ -130,7 +130,7 @@ class BaseMySQLSocket:
             self.sock.shutdown(socket.SHUT_RDWR)
             self.sock.close()
             del self._packet_queue
-        except (socket.error, AttributeError):
+        except (AttributeError, OSError):
             pass
 
     def close_connection(self):
@@ -138,7 +138,7 @@ class BaseMySQLSocket:
         try:
             self.sock.close()
             del self._packet_queue
-        except (socket.error, AttributeError):
+        except (AttributeError, OSError):
             pass
 
     def __del__(self):

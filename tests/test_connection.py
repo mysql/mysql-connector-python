@@ -1916,7 +1916,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(aborted_clients, cur.fetchone()[1])
 
         test_shutdown_cnx.shutdown()
-        self.assertRaises(socket.error, test_shutdown_cnx._socket.sock.getsockname)
+        self.assertRaises(OSError, test_shutdown_cnx._socket.sock.getsockname)
         cur.execute(sql)
         self.assertEqual(str(int(aborted_clients) + 1), cur.fetchone()[1])
 

@@ -420,12 +420,12 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
             sock = network.MySQLTCPSocket(host=addr, port=self._port, force_ipv6=force)
             sock.set_connection_timeout(1)
             sock.open_connection()
-        except (errors.InterfaceError, socket.error):
+        except (errors.InterfaceError, OSError):
             if not should_raise:
-                self.fail("{0} incorrectly raised socket.error".format(addr))
+                self.fail("{0} incorrectly raised OSError".format(addr))
         else:
             if should_raise:
-                self.fail("{0} should have raised socket.error".format(addr))
+                self.fail("{0} should have raised OSError".format(addr))
             else:
                 self.assertEqual(
                     family,
