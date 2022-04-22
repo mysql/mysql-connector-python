@@ -650,18 +650,13 @@ MySQL_use_unicode(MySQL *self, PyObject *args)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_affected_rows(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromUnsignedLongLong((&self->session)->affected_rows);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromUnsignedLongLong((&self->session)->affected_rows);
 }
 
 /**
@@ -671,18 +666,13 @@ MySQL_st_affected_rows(MySQL *self)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_client_flag(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromLong((&self->session)->client_flag);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromLong((&self->session)->client_flag);
 }
 
 /**
@@ -692,18 +682,13 @@ MySQL_st_client_flag(MySQL *self)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_field_count(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromLong((&self->session)->field_count);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromLong((&self->session)->field_count);
 }
 
 /**
@@ -713,18 +698,13 @@ MySQL_st_field_count(MySQL *self)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_insert_id(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromUnsignedLongLong((&self->session)->insert_id);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromUnsignedLongLong((&self->session)->insert_id);
 }
 
 /**
@@ -734,18 +714,13 @@ MySQL_st_insert_id(MySQL *self)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_server_capabilities(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromLong((&self->session)->server_capabilities);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromLong((&self->session)->server_capabilities);
 }
 
 /**
@@ -755,18 +730,13 @@ MySQL_st_server_capabilities(MySQL *self)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_server_status(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromLong((&self->session)->server_status);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromLong((&self->session)->server_status);
 }
 
 /**
@@ -776,18 +746,13 @@ MySQL_st_server_status(MySQL *self)
 
   @param    self    MySQL instance
 
-  @return   PyInt_Type or PyNone
+  @return   PyInt_Type
     @retval PyInt_Type  OK
-    @retval PyNone      no active session
 */
 PyObject *
 MySQL_st_warning_count(MySQL *self)
 {
-    if (&self->session) {
-        return PyLong_FromLong((&self->session)->warning_count);
-    }
-
-    Py_RETURN_NONE;
+    return PyLong_FromLong((&self->session)->warning_count);
 }
 
 /**
@@ -2644,7 +2609,7 @@ MySQL_fetch_row(MySQL *self)
         if (field_type == MYSQL_TYPE_TINY || field_type == MYSQL_TYPE_SHORT ||
             field_type == MYSQL_TYPE_LONG || field_type == MYSQL_TYPE_LONGLONG ||
             field_type == MYSQL_TYPE_INT24 || field_type == MYSQL_TYPE_YEAR) {
-            if (field_flags && ZEROFILL_FLAG) {
+            if (field_flags & ZEROFILL_FLAG) {
                 PyTuple_SET_ITEM(result_row, i, PyLong_FromString(row[i], NULL, 10));
             }
             else {
