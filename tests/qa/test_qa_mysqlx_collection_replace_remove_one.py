@@ -258,6 +258,10 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertEqual(len(result), 0)
         self.schema.drop_collection("mycoll1")
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @tests.foreach_session()
     def test_collection_remove_one2(self):
         """Test remove_one() when matching ID not found - succeeds and
@@ -337,6 +341,10 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertIsNone(result3)
         self.schema.drop_collection("mycoll3")
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @unittest.skipUnless(tests.ARCH_64BIT, "Test available only for 64 bit platforms")
     @unittest.skipIf(os.name == "nt", "Test not available for Windows")
     @tests.foreach_session()

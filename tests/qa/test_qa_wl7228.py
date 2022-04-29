@@ -73,8 +73,8 @@ class WL7228Tests(tests.MySQLConnectorTests):
             config["use_pure"] = use_pure
             with mysql.connector.connect(**config) as cnx:
                 with cnx.cursor() as _:
-                    self.assertEqual(cnx._user, "root")
-                    self.assertEqual(cnx._password, "")
+                    self.assertEqual(cnx._user, config["user"])
+                    self.assertEqual(cnx._password, config["password"])
                     self.assertEqual(cnx._database, "cpy_data")
                     self.assertEqual(cnx._use_unicode, True)
                     self.assertEqual(cnx._autocommit, True)
@@ -97,8 +97,8 @@ class WL7228Tests(tests.MySQLConnectorTests):
         for cls in self.all_cnx_classes:
             with cls(**config) as cnx:
                 with cnx.cursor() as _:
-                    self.assertEqual(cnx._user, "root")
-                    self.assertEqual(cnx._password, "")
+                    self.assertEqual(cnx._user, config["user"])
+                    self.assertEqual(cnx._password, config["password"])
                     self.assertEqual(cnx._database, "ex_data")
                     self.assertEqual(cnx._buffered, False)
                     self.assertEqual(cnx._force_ipv6, True)
