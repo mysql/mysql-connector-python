@@ -103,6 +103,8 @@ FOREIGN KEY (id_t1) REFERENCES django_t1(id) ON DELETE CASCADE
 # Have to load django.db to make importing db backend work for Django < 1.6
 import django.db  # pylint: disable=W0611
 
+from django.core.exceptions import ImproperlyConfigured
+from django.db import connection
 from django.db.backends.signals import connection_created
 from django.db.utils import DEFAULT_DB_ALIAS, load_backend
 from django.utils.safestring import SafeText
@@ -120,6 +122,37 @@ if DJANGO_AVAILABLE:
         DjangoMySQLConverter,
     )
     from mysql.connector.django.introspection import DatabaseIntrospection
+
+
+@unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")
+class DjangoSettings(tests.MySQLConnectorTests):
+    """Test the Django settings."""
+
+    def test_get_connection_params(self):
+        config = tests.get_mysql_config()
+        settings_dict = connection.settings_dict.copy()
+
+        # The default isolation_level should be None
+        database_wrapper = DatabaseWrapper(settings_dict)
+        self.assertIsNone(database_wrapper.isolation_level)
+
+        # An invalid isolation_level should raise ImproperlyConfigured
+        settings_dict["OPTIONS"]["isolation_level"] = "invalid_level"
+        with self.assertRaises(ImproperlyConfigured):
+            _ = DatabaseWrapper(settings_dict).get_connection_params()
+
+        # Test a valid isolation_level
+        settings_dict["OPTIONS"]["isolation_level"] = "read committed"
+        database_wrapper = DatabaseWrapper(settings_dict)
+        connection_params = database_wrapper.get_connection_params()
+        self.assertEqual(database_wrapper.isolation_level, "read committed")
+        self.assertEqual(connection_params["database"], config["database"])
+
+        # Test session isolation level integration
+        with database_wrapper.cursor() as cur:
+            cur.execute("SELECT @@transaction_isolation")
+            res = cur.fetchall()
+            self.assertEqual(res[0][0], "READ-COMMITTED")
 
 
 @unittest.skipIf(not DJANGO_AVAILABLE, "Django not available")

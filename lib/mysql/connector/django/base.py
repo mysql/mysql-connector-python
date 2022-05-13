@@ -266,6 +266,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "iendswith": "LIKE CONCAT('%%', {})",
     }
 
+    isolation_level = None
     isolation_levels = {
         "read uncommitted",
         "read committed",
@@ -338,12 +339,25 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             # Need potentially affected rows on UPDATE
             mysql.connector.constants.ClientFlag.FOUND_ROWS,
         ]
+
         try:
-            kwargs.update(settings_dict["OPTIONS"])
+            options = settings_dict["OPTIONS"].copy()
+            isolation_level = options.pop("isolation_level")
+            if isolation_level:
+                isolation_level = isolation_level.lower()
+                if isolation_level not in self.isolation_levels:
+                    valid_levels = ", ".join(
+                        f"'{level}'" for level in sorted(self.isolation_levels)
+                    )
+                    raise ImproperlyConfigured(
+                        f"Invalid transaction isolation level '{isolation_level}' "
+                        f"specified.\nUse one of {valid_levels}, or None."
+                    )
+            self.isolation_level = isolation_level
+            kwargs.update(options)
         except KeyError:
             # OPTIONS missing is OK
             pass
-
         return kwargs
 
     def get_new_connection(self, conn_params):
@@ -361,6 +375,12 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             # for NULL. Disabling this brings this aspect of MySQL in line
             # with SQL standards.
             assignments.append("SET SQL_AUTO_IS_NULL = 0")
+
+        if self.isolation_level:
+            assignments.append(
+                "SET SESSION TRANSACTION ISOLATION LEVEL "
+                f"{self.isolation_level.upper()}"
+            )
 
         if assignments:
             with self.cursor() as cursor:
@@ -565,7 +585,7 @@ class DjangoMySQLConverter(MySQLConverter):
         if not value:
             return None
 
-        dt = super()._datetime_to_python(value)
+        dt = MySQLConverter._datetime_to_python(value)
         if dt is None:
             return None
         if settings.USE_TZ and timezone.is_naive(dt):
