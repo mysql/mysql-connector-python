@@ -63,7 +63,7 @@ class MySQLConverterBase:
 
     def set_charset(self, charset):
         """Set character set"""
-        if charset == "utf8mb4":
+        if charset in ("utf8mb4", "utf8mb3"):
             charset = "utf8"
         if charset is not None:
             self.charset = charset

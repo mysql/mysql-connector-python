@@ -36,6 +36,9 @@ import tests
 
 from mysql.connector import constants, errors
 
+# Set the character mapping for the server version being used
+constants.CharacterSet.set_mysql_version(tests.MYSQL_VERSION)
+
 
 class Helpers(tests.MySQLConnectorTests):
     def test_flag_is_set(self):
@@ -345,9 +348,11 @@ class CharacterSetTests(tests.MySQLConnectorTests):
 
     """Tests for constants.CharacterSet"""
 
+    utf8_charset = "utf8mb3" if tests.MYSQL_VERSION[:2] == (8, 0) else "utf8"
+
     def test_get_info(self):
         """Get info about charset using MySQL ID"""
-        exp = ("utf8", "utf8_general_ci")
+        exp = (self.utf8_charset, f"{self.utf8_charset}_general_ci")
         data = 33
         self.assertEqual(exp, constants.CharacterSet.get_info(data))
 
@@ -357,7 +362,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
 
     def test_get_desc(self):
         """Get info about charset using MySQL ID as string"""
-        exp = "utf8/utf8_general_ci"
+        exp = f"{self.utf8_charset}/{self.utf8_charset}_general_ci"
         data = 33
         self.assertEqual(exp, constants.CharacterSet.get_desc(data))
 
@@ -380,7 +385,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
     def test_get_charset_info(self):
         """Get info about charset by name and collation"""
         func = constants.CharacterSet.get_charset_info
-        exp = (209, "utf8", "utf8_esperanto_ci")
+        exp = (209, self.utf8_charset, f"{self.utf8_charset}_esperanto_ci")
         data = exp[1:]
 
         self.assertEqual(exp, func(data[0], data[1]))
@@ -431,7 +436,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
             "cp1257",
             "latin5",
             "armscii8",
-            "utf8",
+            self.utf8_charset,
             "ucs2",
             "cp866",
             "keybcs2",
@@ -448,7 +453,6 @@ class CharacterSetTests(tests.MySQLConnectorTests):
             "cp932",
             "eucjpms",
             "gb18030",
-            "utf8mb3",
         )
 
         self.assertEqual(exp, constants.CharacterSet.get_supported())

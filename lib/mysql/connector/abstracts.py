@@ -976,7 +976,7 @@ class MySQLConnectionAbstract(ABC):
         Returns a string.
         """
         encoding = CharacterSet.get_info(self._charset_id)[0]
-        if encoding in ("utf8mb4", "binary"):
+        if encoding in ("utf8mb4", "utf8mb3", "binary"):
             return "utf8"
         return encoding
 

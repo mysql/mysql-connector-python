@@ -133,6 +133,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._server_version = self._check_server_version(
             self._handshake["server_version_original"]
         )
+        CharacterSet.set_mysql_version(self._server_version)
 
     @property
     def _server_status(self):

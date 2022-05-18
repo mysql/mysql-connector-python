@@ -296,9 +296,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         exp = {
             "comment": "",
-            "name": "utf8mb3_general_ci"
-            if VERSION[:3] >= (8, 0, 30)
-            else "utf8_general_ci",
+            "name": "utf8mb3_general_ci",
             "mbmaxlen": 3,
             "number": 33,
             "mbminlen": 1,

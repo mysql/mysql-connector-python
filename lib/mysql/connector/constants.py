@@ -32,7 +32,7 @@ import warnings
 
 from abc import ABC, ABCMeta
 
-from .charsets import MYSQL_CHARACTER_SETS
+from .charsets import MYSQL_CHARACTER_SETS, MYSQL_CHARACTER_SETS_57
 from .errors import ProgrammingError
 
 MAX_PACKET_LENGTH = 16777215
@@ -678,9 +678,21 @@ class CharacterSet(_Constants):
     """
 
     desc = MYSQL_CHARACTER_SETS
+    mysql_version = (8, 0)
 
     # Multi-byte character sets which use 5c (backslash) in characters
     slash_charsets = (1, 13, 28, 84, 87, 88)
+
+    @classmethod
+    def set_mysql_version(cls, version):
+        """Set the MySQL major version and change the charset mapping if is 5.7.
+
+        Args:
+            version (tuple): MySQL version tuple.
+        """
+        cls.mysql_version = version[:2]
+        if cls.mysql_version == (5, 7):
+            cls.desc = MYSQL_CHARACTER_SETS_57
 
     @classmethod
     def get_info(cls, setid):
@@ -757,6 +769,8 @@ class CharacterSet(_Constants):
             except IndexError:
                 ProgrammingError(f"Character set ID {charset} unknown")
 
+        if charset in ("utf8", "utf-8") and cls.mysql_version == (8, 0):
+            charset = "utf8mb4"
         if charset is not None and collation is None:
             info = cls.get_default_collation(charset)
             return (info[2], info[1], info[0])

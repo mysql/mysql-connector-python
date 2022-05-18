@@ -44,6 +44,7 @@ from .abstracts import MySQLConnectionAbstract
 from .authentication import get_auth_plugin
 from .constants import (
     NET_BUFFER_LENGTH,
+    CharacterSet,
     ClientFlag,
     FieldType,
     ServerCmd,
@@ -172,6 +173,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._server_version = self._check_server_version(
             handshake["server_version_original"]
         )
+        CharacterSet.set_mysql_version(self._server_version)
 
         if not handshake["capabilities"] & ClientFlag.SSL:
             if self._auth_plugin == "mysql_clear_password":
