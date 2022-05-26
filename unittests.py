@@ -373,7 +373,8 @@ _UNITTESTS_CMD_ARGS = {
     ("", "--unix-socket"): {
         "dest": "unix_socket_folder",
         "metavar": "NAME",
-        "help": "Folder where UNIX Sockets will be created",
+        "help": "Folder where UNIX Sockets will be created or the unix socket "
+        "to be used with an external server.",
     },
     ("", "--ipv6"): {
         "dest": "ipv6",
@@ -953,12 +954,11 @@ def main():
         mysql_server.client_config = {
             "host": options.host,
             "port": options.port,
-            "unix_socket": mysql_server.unix_socket,
             "user": options.user,
             "password": options.password,
             "database": "myconnpy",
             "connection_timeout": 60,
-            "unix_socket": None,
+            "unix_socket": options.unix_socket_folder,
         }
 
         mysql_server.xplugin_config = {
@@ -967,7 +967,7 @@ def main():
             "user": options.user,
             "password": options.password,
             "schema": "myconnpy",
-            "socket": None,
+            "socket": options.unix_socket_folder,
         }
 
         tests.MYSQL_SERVERS.append(mysql_server)

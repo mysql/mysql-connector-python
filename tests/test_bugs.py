@@ -5073,6 +5073,8 @@ class Bug26484601(tests.MySQLConnectorTests):
         config = tests.get_mysql_config().copy()
         config["tls_versions"] = tls_version
         config["ssl_ca"] = ""
+        if "unix_socket" in config:
+            del config["unix_socket"]
         cnx = connection.MySQLConnection(**config)
         query = "SHOW STATUS LIKE 'ssl_version%'"
         cur = cnx.cursor()

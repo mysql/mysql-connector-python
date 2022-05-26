@@ -321,31 +321,6 @@ class MySQLUnixSocketTests(tests.MySQLConnectorTests):
             except errors.Error as err:
                 self.fail(str(err))
 
-    @unittest.skipIf(
-        tests.MYSQL_EXTERNAL_SERVER,
-        "Test not available for external MySQL servers",
-    )
-    @unittest.skipIf(
-        not tests.SSL_AVAILABLE,
-        "Could not test switch to SSL. Make sure Python supports SSL.",
-    )
-    def test_switch_to_ssl(self):
-        """Switch the socket to use SSL"""
-        args = {
-            "ca": os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"),
-            "cert": os.path.join(tests.SSL_DIR, "tests_client_cert.pem"),
-            "key": os.path.join(tests.SSL_DIR, "tests_client_key.pem"),
-            "cipher_suites": "AES256-SHA",
-        }
-        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)
-
-        # Handshake failure
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(4)
-        sock.connect(self._unix_socket)
-        self.cnx.sock = sock
-        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)
-
 
 class MySQLTCPSocketTests(tests.MySQLConnectorTests):
 

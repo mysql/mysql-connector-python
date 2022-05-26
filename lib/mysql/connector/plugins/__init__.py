@@ -28,15 +28,9 @@
 
 """Base Authentication Plugin class."""
 
-import logging
-
 from abc import ABC
 
 from .. import errors
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class BaseAuthPlugin(ABC):

@@ -77,7 +77,6 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
         hash2 = hash2.digest()
         xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
         hash3 = struct.pack("32B", *xored)
-
         return hash3
 
     def _full_authentication(self):

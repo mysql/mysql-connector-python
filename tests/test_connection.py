@@ -74,7 +74,7 @@ from mysql.connector import (
 )
 from mysql.connector.conversion import MySQLConverter, MySQLConverterBase
 from mysql.connector.errors import InterfaceError, NotSupportedError, ProgrammingError
-from mysql.connector.network import TLS_V1_3_SUPPORTED
+from mysql.connector.network import TLS_V1_3_SUPPORTED, MySQLTCPSocket, MySQLUnixSocket
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.pooling import HAVE_DNSPYTHON
 from mysql.connector.utils import linux_distribution
@@ -163,6 +163,8 @@ class ConnectionTests:
 class MySQLConnectionTests(tests.MySQLConnectorTests):
     def setUp(self):
         config = tests.get_mysql_config()
+        if "unix_socket" in config:
+            del config["unix_socket"]
         self.cnx = connection.MySQLConnection(**config)
 
     def tearDown(self):
@@ -1240,7 +1242,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
     )
     def test__get_connection(self):
         """Get connection based on configuration"""
-        if os.name != "nt":
+        if os.name == "posix" and self.cnx.unix_socket:
             res = self.cnx._get_connection()
             self.assertTrue(isinstance(res, network.MySQLUnixSocket))
 
@@ -1291,6 +1293,53 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         config["host"] = tests.fake_hostname()
         self.assertRaises(errors.InterfaceError, cnx.connect, **config)
+
+    @unittest.skipUnless(os.name == "posix", "Platform does not support unix sockets")
+    @unittest.skipUnless(tests.SSL_AVAILABLE, "Python has no SSL support")
+    def test_connect_with_unix_socket(self):
+        """Test connect with unix_socket and SSL connection options."""
+        config = tests.get_mysql_config()
+        if tests.MYSQL_EXTERNAL_SERVER:
+            if config.get("unix_socket") is None:
+                self.skipTest(
+                    "The 'unix_socket' is not present in the external server "
+                    "connection arguments"
+                )
+                return
+        else:
+            config.update(
+                {
+                    "ssl_ca": os.path.abspath(
+                        os.path.join(tests.SSL_DIR, "tests_CA_cert.pem")
+                    ),
+                    "ssl_cert": os.path.abspath(
+                        os.path.join(tests.SSL_DIR, "tests_client_cert.pem")
+                    ),
+                    "ssl_key": os.path.abspath(
+                        os.path.join(tests.SSL_DIR, "tests_client_key.pem")
+                    ),
+                }
+            )
+            config["unix_socket"] = tests.MYSQL_SERVERS[0].unix_socket
+
+        cnx_classes = [MySQLConnection]
+        if CMySQLConnection:
+            cnx_classes.append(CMySQLConnection)
+
+        # SSL should be disabled when using unix socket
+        for cls in cnx_classes:
+            with cls(**config) as cnx:
+                self.assertTrue(cnx._ssl_disabled)
+                if isinstance(cnx, MySQLConnection):
+                    self.assertIsInstance(cnx._socket, MySQLUnixSocket)
+        del config["unix_socket"]
+
+        # SSL should be enabled when unix socket is not being used
+        for cls in cnx_classes:
+            with cls(**config) as cnx:
+                self.assertFalse(cnx._ssl_disabled)
+                if isinstance(cnx, MySQLConnection):
+                    self.assertIsInstance(cnx._socket, MySQLTCPSocket)
 
     def test_reconnect(self):
         """Reconnecting to the MySQL Server"""

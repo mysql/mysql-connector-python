@@ -183,6 +183,13 @@ class MySQLConnectionAbstract(ABC):
         return self
 
     @property
+    def is_secure(self):
+        """Return True if is a secure connection."""
+        return self._ssl_active or (
+            self._unix_socket is not None and os.name == "posix"
+        )
+
+    @property
     def have_next_result(self):
         """Return if have next result."""
         return self._have_next_result
@@ -566,12 +573,6 @@ class MySQLConnectionAbstract(ABC):
         if "ssl_disabled" in config:
             self._ssl_disabled = config.pop("ssl_disabled")
 
-        if self._ssl_disabled and self._auth_plugin == "mysql_clear_password":
-            raise InterfaceError(
-                "Clear password authentication is not "
-                "supported over insecure channels"
-            )
-
         # Other configuration
         set_ssl_flag = False
         for key, value in config.items():
@@ -592,6 +593,15 @@ class MySQLConnectionAbstract(ABC):
                     setattr(self, attribute, value.strip())
                 except AttributeError:
                     setattr(self, attribute, value)
+
+        # Disable SSL for unix socket connections
+        if self._unix_socket and os.name == "posix":
+            self._ssl_disabled = True
+
+        if self._ssl_disabled and self._auth_plugin == "mysql_clear_password":
+            raise InterfaceError(
+                "Clear password authentication is not supported over insecure channels"
+            )
 
         if set_ssl_flag:
             if "verify_cert" not in self._ssl:

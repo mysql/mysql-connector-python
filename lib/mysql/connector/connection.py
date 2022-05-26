@@ -176,12 +176,11 @@ class MySQLConnection(MySQLConnectionAbstract):
         CharacterSet.set_mysql_version(self._server_version)
 
         if not handshake["capabilities"] & ClientFlag.SSL:
-            if self._auth_plugin == "mysql_clear_password":
-                err_msg = (
-                    "Clear password authentication is not supported "
-                    "over insecure channels"
+            if self._auth_plugin == "mysql_clear_password" and not self.is_secure:
+                raise InterfaceError(
+                    "Clear password authentication is not supported over "
+                    "insecure channels"
                 )
-                raise InterfaceError(err_msg)
             if self._ssl.get("verify_cert"):
                 raise InterfaceError(
                     "SSL is required but the server doesn't support it",
@@ -223,7 +222,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         reply back. Raises any error coming from MySQL.
         """
         self._ssl_active = False
-        if client_flags & ClientFlag.SSL:
+        if not self._ssl_disabled and (client_flags & ClientFlag.SSL):
             packet = self._protocol.make_auth_ssl(
                 charset=charset, client_flags=client_flags
             )
@@ -310,14 +309,14 @@ class MySQLConnection(MySQLConnectionAbstract):
                 auth_data,
                 username=username or self._user,
                 password=password,
-                ssl_enabled=self._ssl_active,
+                ssl_enabled=self.is_secure,
             )
             packet = self._auth_continue(auth, new_auth_plugin, auth_data)
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)
             auth = get_auth_plugin(new_auth_plugin)(
-                auth_data, password=password, ssl_enabled=self._ssl_active
+                auth_data, password=password, ssl_enabled=self.is_secure
             )
             if new_auth_plugin == "caching_sha2_password":
                 response = auth.auth_response()
@@ -352,14 +351,14 @@ class MySQLConnection(MySQLConnectionAbstract):
             None,
             username=self._user,
             password=password,
-            ssl_enabled=self._ssl_active,
+            ssl_enabled=self.is_secure,
         )
         packet = self._auth_continue(auth, auth_plugin, packet)
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)
             auth = get_auth_plugin(auth_plugin)(
-                auth_data, password=password, ssl_enabled=self._ssl_active
+                auth_data, password=password, ssl_enabled=self.is_secure
             )
             if auth_plugin == "caching_sha2_password":
                 response = auth.auth_response()
@@ -504,7 +503,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         Returns subclass of MySQLBaseSocket.
         """
         conn = None
-        if self.unix_socket and os.name != "nt":
+        if self._unix_socket and os.name == "posix":
             conn = MySQLUnixSocket(unix_socket=self.unix_socket)
         else:
             conn = MySQLTCPSocket(

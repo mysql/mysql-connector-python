@@ -32,6 +32,7 @@
 import os
 import socket
 import struct
+import warnings
 import zlib
 
 from collections import deque
@@ -503,6 +504,13 @@ class MySQLUnixSocket(BaseMySQLSocket):
             ) from err
         except Exception as err:
             raise InterfaceError(str(err)) from err
+
+    def switch_to_ssl(self, *args, **kwargs):  # pylint: disable=unused-argument
+        """Switch the socket to use SSL."""
+        warnings.warn(
+            "SSL is disabled when using unix socket connections",
+            Warning,
+        )
 
 
 class MySQLTCPSocket(BaseMySQLSocket):
