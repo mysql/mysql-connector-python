@@ -621,7 +621,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if not self.is_connected():
             raise OperationalError("MySQL Connection not available.")
         if cursor_class is not None:
-            if not issubclass(cursor_class, MySQLCursorAbstract):
+            if not issubclass(cursor_class, CMySQLCursor):
                 raise ProgrammingError(
                     "Cursor class needs be to subclass of cursor_cext.CMySQLCursor"
                 )

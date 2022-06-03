@@ -1694,6 +1694,18 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             isinstance(self.cnx.cursor(cursor_class=TrueCursor), TrueCursor)
         )
 
+        if HAVE_CMYSQL:
+            self.assertRaises(
+                errors.ProgrammingError,
+                self.cnx.cursor,
+                cursor_class=cursor_cext.CMySQLCursor,
+            )
+            self.assertRaises(
+                errors.ProgrammingError,
+                self.cnx.cursor,
+                cursor_class=cursor_cext.CMySQLCursorBufferedRaw,
+            )
+
         cases = [
             ({}, cursor.MySQLCursor),
             ({"buffered": True}, cursor.MySQLCursorBuffered),

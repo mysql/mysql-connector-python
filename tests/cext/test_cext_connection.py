@@ -35,7 +35,7 @@ import unittest
 
 import tests
 
-from mysql.connector import errors
+from mysql.connector import cursor, cursor_cext, errors
 from mysql.connector.connection import MySQLConnection
 from mysql.connector.connection_cext import CMySQLConnection
 from mysql.connector.constants import ClientFlag, flag_is_set
@@ -158,3 +158,56 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx.close()
         self.assertIsNone(self.cnx.connection_id)
         self.cnx.connect()
+
+    def test_cursor(self):
+        """Test CEXT cursors."""
+
+        class FalseCursor:
+            ...
+
+        class TrueCursor(cursor_cext.CMySQLCursor):
+            ...
+
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.cursor, cursor_class=FalseCursor
+        )
+        self.assertTrue(
+            isinstance(self.cnx.cursor(cursor_class=TrueCursor), TrueCursor)
+        )
+
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.cursor, cursor_class=cursor.MySQLCursor
+        )
+        self.assertRaises(
+            errors.ProgrammingError,
+            self.cnx.cursor,
+            cursor_class=cursor.MySQLCursorBuffered,
+        )
+
+        cases = [
+            ({}, cursor_cext.CMySQLCursor),
+            ({"buffered": True}, cursor_cext.CMySQLCursorBuffered),
+            ({"raw": True}, cursor_cext.CMySQLCursorRaw),
+            ({"buffered": True, "raw": True}, cursor_cext.CMySQLCursorBufferedRaw),
+            ({"prepared": True}, cursor_cext.CMySQLCursorPrepared),
+            ({"dictionary": True}, cursor_cext.CMySQLCursorDict),
+            ({"named_tuple": True}, cursor_cext.CMySQLCursorNamedTuple),
+            (
+                {"dictionary": True, "buffered": True},
+                cursor_cext.CMySQLCursorBufferedDict,
+            ),
+            (
+                {"named_tuple": True, "buffered": True},
+                cursor_cext.CMySQLCursorBufferedNamedTuple,
+            ),
+        ]
+        for kwargs, exp in cases:
+            self.assertTrue(isinstance(self.cnx.cursor(**kwargs), exp))
+
+        self.assertRaises(ValueError, self.cnx.cursor, prepared=True, buffered=True)
+        self.assertRaises(ValueError, self.cnx.cursor, dictionary=True, raw=True)
+        self.assertRaises(ValueError, self.cnx.cursor, named_tuple=True, raw=True)
+
+        # Test when connection is closed
+        self.cnx.close()
+        self.assertRaises(errors.OperationalError, self.cnx.cursor)
