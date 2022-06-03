@@ -1455,8 +1455,13 @@ MySQL_escape_string(MySQL *self, PyObject *value)
     to = PyBytes_FromStringAndSize(NULL, from_size * 2 + 1);
     to_str = PyBytes_AsString(to);
 
+#if MYSQL_VERSION_ID >= 50706
+    escaped_size = (Py_ssize_t)mysql_real_escape_string_quote(&self->session, to_str, from_str,
+                                                              (unsigned long)from_size, '\'');
+#else
     escaped_size = (Py_ssize_t)mysql_real_escape_string(&self->session, to_str, from_str,
                                                         (unsigned long)from_size);
+#endif
 
     _PyBytes_Resize(&to, escaped_size);
     Py_XDECREF(from);

@@ -6915,3 +6915,28 @@ class BugOra328821983(tests.MySQLConnectorTests):
             self.assertEqual(res, Decimal("100000000000.00000203"))
 
             cur.execute(f"DROP TABLE IF EXISTS {table}")
+
+
+class BugOra34228442(tests.MySQLConnectorTests):
+    """BUG#34228442: Fix NO_BACKSLASH_ESCAPES SQL mode support in c-ext."""
+
+    @foreach_cnx()
+    def test_no_backslash_escapes(self):
+        table = "BugOra34228442"
+        self.cnx.sql_mode = [constants.SQLMode.NO_BACKSLASH_ESCAPES]
+        with self.cnx.cursor() as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {table}")
+            cur.execute(
+                f"""
+                CREATE TABLE {table} (
+                    `id` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `text` VARCHAR(255)
+                )
+                """
+            )
+            cur.execute(f"INSERT INTO {table} (`text`) VALUES ('test')")
+            cur.execute(f"SELECT text FROM {table} WHERE text = %s", ["test"])
+            res = cur.fetchall()
+            self.assertEqual(res[0][0], "test")
+            self.assertEqual(self.cnx.sql_mode, "NO_BACKSLASH_ESCAPES")
+            cur.execute(f"DROP TABLE IF EXISTS {table}")

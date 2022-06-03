@@ -17,6 +17,7 @@ v8.0.30
 - WL#15035: Enforce PEP 7 and PEP 8 coding style
 - WL#14822: Refactor the authentication plugin mechanism
 - WL#14815: Support OpenSSL 3.0
+- BUG#34228442: Fix NO_BACKSLASH_ESCAPES SQL mode support in c-ext
 - BUG#34127959: Add isolation level support in Django backend
 - BUG#33923516: Allow tuple of dictionaries as "failover" argument
 - BUG#28821983: Fix rounding errors for decimal values
