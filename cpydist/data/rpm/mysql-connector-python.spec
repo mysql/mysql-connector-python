@@ -26,7 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-%global requires_py_protobuf_version 3.0.0
+%global requires_py_protobuf_version 3.11.0
 %global wants_py_dnspython_version 1.16.0
 
 %undefine _package_note_file
@@ -175,11 +175,15 @@ Requires:      python38
 # Some operations requires DNSPYTHON but this is not a strict
 # requirement for the RPM install as currently few RPM platforms has
 # the required version as RPMs. Users need to install using PIP.
-# Most of the linux distros except fedora got older version of python3-protobuf.
 %if 0%{?fedora}
 Requires:      python3-dns >= %{wants_py_dnspython_version}
-Requires:      python3-protobuf >= %{requires_py_protobuf_version}
 %endif
+
+# We have no python3-protobuf on EL7, too old versions on EL8 and openSUSE 15
+%if 0%{?fedora} || 0%{?rhel} >= 9
+Requires:      python3-protobuf >= %{requires_py_protobuf_version}, python3-protobuf < 4
+%endif
+
 
 %description -n mysql-connector-python3%{?product_suffix}
 MySQL Connector/Python enables Python programs to access MySQL

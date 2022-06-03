@@ -347,7 +347,7 @@ try:
 except (ImportError, SyntaxError, TypeError) as err:
     HAVE_PROTOBUF = False
     HAVE_PROTOBUF_ERROR = (
-        err if PROTOBUF_VERSION is not None else "Protobuf >=3.0.0 is required"
+        err if PROTOBUF_VERSION is not None else "Protobuf >=3.11.0 is required"
     )
     if not HAVE_MYSQLXPB_CEXT:
         raise ImportError(f"Protobuf is not available: {HAVE_PROTOBUF_ERROR}") from err
