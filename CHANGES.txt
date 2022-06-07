@@ -17,6 +17,7 @@ v8.0.30
 - WL#15035: Enforce PEP 7 and PEP 8 coding style
 - WL#14822: Refactor the authentication plugin mechanism
 - WL#14815: Support OpenSSL 3.0
+- BUG#34231226: Generated classes do not work with the latest Protobuf
 - BUG#34228442: Fix NO_BACKSLASH_ESCAPES SQL mode support in c-ext
 - BUG#34223015: Invalidate the usage of non-compatible cursor types
 - BUG#34127959: Add isolation level support in Django backend
