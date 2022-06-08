@@ -1889,6 +1889,38 @@ class MySQLxCollectionTests(tests.MySQLxTests):
         result = collection.modify("").unset(["young"])
         self.assertRaises(mysqlx.ProgrammingError, result.execute)
 
+        # test empty strings in collection fields
+        for string in ("", " ", "  "):
+            self.assertRaises(
+                mysqlx.ProgrammingError,
+                collection.modify("$._id == 1").set,
+                string,
+                {"name": "Maria", "age": 78},
+            )
+            self.assertRaises(
+                mysqlx.ProgrammingError,
+                collection.modify("$._id == 1").unset,
+                string,
+            )
+            self.assertRaises(
+                mysqlx.ProgrammingError,
+                collection.modify("$._id == 1").change,
+                string,
+                {"name": "Maria", "age": 78},
+            )
+            self.assertRaises(
+                mysqlx.ProgrammingError,
+                collection.modify("$._id == 1").array_insert,
+                string,
+                [2, 3, 4],
+            )
+            self.assertRaises(
+                mysqlx.ProgrammingError,
+                collection.modify("$._id == 1").array_append,
+                string,
+                [2, 3, 4],
+            )
+
         self.schema.drop_collection(collection_name)
 
     @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 4), "Unavailable")

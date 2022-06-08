@@ -776,6 +776,10 @@ class ExprParser:
         )
 
     def document_field(self):
+        if not self.tokens:
+            raise ValueError("Empty string cannot be used as document field")
+        if self.cur_token_type_is(TokenType.DOLLAR):
+            self.consume_token(TokenType.DOLLAR)
         col_id = Message("Mysqlx.Expr.ColumnIdentifier")
         if self.cur_token_type_is(TokenType.IDENT):
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")

@@ -718,6 +718,9 @@ class UpdateSpec:
         update_type (int): The update type.
         source (str): The source.
         value (Optional[str]): The value.
+
+    Raises:
+        ProgrammingError: If `source` is invalid.
     """
 
     def __init__(self, update_type, source, value=None):
@@ -725,10 +728,10 @@ class UpdateSpec:
             self._table_set(source, value)
         else:
             self.update_type = update_type
-            self.source = source
-            if len(source) > 0 and source[0] == "$":
-                self.source = source[1:]
-            self.source = ExprParser(self.source, False).document_field().identifier
+            try:
+                self.source = ExprParser(source, False).document_field().identifier
+            except ValueError as err:
+                raise ProgrammingError(f"{err}")
             self.value = value
 
     def _table_set(self, source, value):
@@ -897,7 +900,7 @@ class ModifyStatement(FilterableStatement):
             )
         self._update_ops["patch"] = UpdateSpec(
             mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.MERGE_PATCH"),
-            "",
+            "$",
             doc.expr() if isinstance(doc, ExprParser) else doc,
         )
         self._changed = True
