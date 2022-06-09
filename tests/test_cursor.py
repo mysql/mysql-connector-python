@@ -335,11 +335,12 @@ class MySQLCursorTests(tests.TestsCursor):
 
     def test_next(self):
         """MySQLCursor object next()-method"""
-        self.check_method(self.cur, "next")
+        self.check_method(self.cur, "__next__")
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
         self.cur = cursor.MySQLCursor(self.cnx)
         self.assertRaises(StopIteration, self.cur.__next__)
+        self.assertRaises(StopIteration, next, self.cur)
         self.cur.execute("SELECT BINARY 'ham'")
         exp = (bytearray(b"ham"),)
         self.assertEqual(exp, next(self.cur))

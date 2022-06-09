@@ -731,7 +731,7 @@ class UpdateSpec:
             try:
                 self.source = ExprParser(source, False).document_field().identifier
             except ValueError as err:
-                raise ProgrammingError(f"{err}")
+                raise ProgrammingError(f"{err}") from err
             self.value = value
 
     def _table_set(self, source, value):

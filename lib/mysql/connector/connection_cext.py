@@ -33,7 +33,7 @@ import platform
 import socket
 
 from . import version
-from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
+from .abstracts import MySQLConnectionAbstract
 from .constants import CharacterSet, ClientFlag, FieldFlag, ServerFlag, ShutdownType
 from .errors import (
     InterfaceError,

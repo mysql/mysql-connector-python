@@ -359,10 +359,6 @@ class MySQLCursor(CursorBase):
         if self._executed is None:
             raise InterfaceError(ERR_NO_RESULT_TO_FETCH)
 
-    def next(self):
-        """Used for iterating over the result set."""
-        return self.__next__()
-
     def __next__(self):
         """
         Used for iterating over the result set. Calles self.fetchone()

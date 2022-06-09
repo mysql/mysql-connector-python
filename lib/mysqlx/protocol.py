@@ -431,11 +431,12 @@ class Protocol:
         Returns:
             list: A list of ``Any`` or ``Scalar`` objects.
         """
-        build_value = (
-            lambda value: build_scalar(value).get_message()
-            if is_scalar
-            else self._create_any(value).get_message()
-        )
+
+        def build_value(value):
+            if is_scalar:
+                return build_scalar(value).get_message()
+            return self._create_any(value).get_message()
+
         bindings = stmt.get_bindings()
         binding_map = stmt.get_binding_map()
 

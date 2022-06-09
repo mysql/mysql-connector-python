@@ -162,7 +162,7 @@ class MySQLProtocol:
             if conn_attrs[attr_name] is None:
                 conn_attrs[attr_name] = ""
         conn_attrs_len = (
-            sum([len(x) + len(conn_attrs[x]) for x in conn_attrs])
+            sum(len(x) + len(conn_attrs[x]) for x in conn_attrs)
             + len(conn_attrs.keys())
             + len(conn_attrs.values())
         )
@@ -810,8 +810,7 @@ class MySQLProtocol:
                     "Failed executing prepared statement: data values does not"
                     " match number of parameters"
                 )
-            for pos, _ in enumerate(data):
-                value = data[pos]
+            for pos, value in enumerate(data):
                 _flags = 0
                 if value is None:
                     null_bitmap[(pos // 8)] |= 1 << (pos % 8)
