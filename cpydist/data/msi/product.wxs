@@ -18,8 +18,9 @@
     <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED39" Secure="yes" />
     <Property Id="PREVIOUSVERSIONSINSTALLED310" Secure="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED311" Secure="yes" />
 
-	<Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
+    <Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
@@ -31,13 +32,13 @@
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED37"/>
     </Upgrade>
-	<Upgrade Id="29739579-22ec-4df7-905f-05ca0d778c41">
+    <Upgrade Id="29739579-22ec-4df7-905f-05ca0d778c41">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED38"/>
     </Upgrade>
-	<Upgrade Id="180e8431-7c58-4b72-b206-c6d7bd5487d6">
+    <Upgrade Id="180e8431-7c58-4b72-b206-c6d7bd5487d6">
       <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
@@ -48,6 +49,12 @@
        Minimum="1.0.0"
        Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
        Property="PREVIOUSVERSIONSINSTALLED310"/>
+    </Upgrade>
+    <Upgrade Id="9b50203f-fa8d-4397-b8a4-391b1b89072a">
+      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
+       Minimum="1.0.0"
+       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
+       Property="PREVIOUSVERSIONSINSTALLED311"/>
     </Upgrade>
 
     <!-- Obtain location of the Python interpreters installed on the system-->
@@ -137,6 +144,28 @@
       <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
       <RegistrySearch Id="Python310InstallPathCurrent32" Root="HKCU" Type="raw"
        Key="Software\Python\PythonCore\3.10-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+
+    <!-- Python 3.11 -->
+    <Property Id="PYTHON311INSTALLPATH_ALL">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python311InstallPathAll64" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.11\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python311InstallPathAll32" Root="HKLM" Type="raw"
+       Key="Software\Python\PythonCore\3.11-32\InstallPath" Win64="no"/>
+      <?endif?>
+    </Property>
+    <Property Id="PYTHON311INSTALLPATH_CURRENT">
+      <?if "$(var.Platform)"="x64" ?>
+      <RegistrySearch Id="Python311InstallPathCurrent64" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.11\InstallPath" Win64="yes"/>
+      <?else?>
+      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
+      <RegistrySearch Id="Python311InstallPathCurrent32" Root="HKCU" Type="raw"
+       Key="Software\Python\PythonCore\3.11-32\InstallPath" Win64="no"/>
       <?endif?>
     </Property>
 
@@ -246,6 +275,32 @@
                 <Directory Id="DjangoDir310" Name="django"/>
                 <Directory Id="ConnectorLocalesDir310" Name="locales">
                   <Directory Id="LocalesEngDir310" Name="eng"/>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <Directory Id="INSTALLDIRP311" Name="Python311">
+        <Directory Id="PythonLibDir311" Name="Lib">
+          <Directory Id="SitePackagesDir311" Name="site-packages">
+            <Directory Id="EggInfoDir311" Name="mysql_connector_python-$(var.FullVersion)-py3.11.egg-info"/>
+            <Directory Id="MySQLXPackageDir311" Name="mysqlx">
+              <Directory Id="MySQLXPB2Dir311" Name="protobuf"/>
+              <Directory Id="MySQLXLocalesDir311" Name="locales">
+                <Directory Id="MySQLXLocalesEngDir311" Name="eng"/>
+              </Directory>
+            </Directory>
+            <Directory Id="MySQLPackageDir311" Name="mysql">
+              <Directory Id="VendorDir311" Name="vendor">
+                <Directory Id="VendorPluginDir311" Name="plugin"/>
+              </Directory>
+              <Directory Id="ConnectorPackageDir311" Name="connector">
+                <Directory Id="ConnectorPluginsDir311" Name="plugins"/>
+                <Directory Id="DjangoDir311" Name="django"/>
+                <Directory Id="ConnectorLocalesDir311" Name="locales">
+                  <Directory Id="LocalesEngDir311" Name="eng"/>
                 </Directory>
               </Directory>
             </Directory>
@@ -425,6 +480,32 @@
         <?endif?>
       </Feature>
       <?endif?>
+
+      <!-- Python 3.11 -->
+      <?if $(var.BDist311) != "" ?>
+      <Feature Id="Python311" Title="C/py for Python 3.11" Level="1"
+               ConfigurableDirectory ="INSTALLDIRP311" Absent="allow">
+        <Condition Level='0'>Not PYTHON311INSTALLPATH_ALL AND Not PYTHON311INSTALLPATH_CURRENT AND Not Installed</Condition>
+        <ComponentRef Id="EggInfo311"/>
+        <ComponentRef Id="MySQLPackage311"/>
+        <?if $(var.HaveCExt311) = 1 ?>
+        <ComponentRef Id="Vendor311"/>
+        <ComponentRef Id="VendorPlugin311"/>
+        <?endif?>
+        <ComponentRef Id="ConnectorPackage311"/>
+        <ComponentRef Id="ConnectorPlugins311"/>
+        <ComponentRef Id="ConnectorLocales311"/>
+        <ComponentRef Id="LocalesEng311"/>
+        <ComponentRef Id="DjangoBackend311"/>
+        <ComponentRef Id="MySQLXPackage311"/>
+        <ComponentRef Id="MySQLXPackagePB2311"/>
+        <ComponentRef Id="MySQLXLocales311"/>
+        <ComponentRef Id="MySQLXLocalesEng311"/>
+        <?if $(var.HaveCExt311) = 1 ?>
+        <ComponentRef Id="CExtension311"/>
+        <?endif?>
+      </Feature>
+      <?endif?>
     </Feature>
 
     <!-- Python 3.7 -->
@@ -446,6 +527,11 @@
     <CustomAction Id="SetInstallDirCurrentP310" Property="INSTALLDIRP310" Value="[PYTHON310INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP310" Property="INSTALLDIRP310" Value="[PYTHON310INSTALLPATH_ALL]"/>
     <CustomAction Id="ErrDebug310" Error="Installdir: [INSTALLDIRP310]"/>
+
+    <!-- Python 3.11 -->
+    <CustomAction Id="SetInstallDirCurrentP311" Property="INSTALLDIRP311" Value="[PYTHON311INSTALLPATH_CURRENT]"/>
+    <CustomAction Id="SetInstallDirAllP311" Property="INSTALLDIRP311" Value="[PYTHON311INSTALLPATH_ALL]"/>
+    <CustomAction Id="ErrDebug311" Error="Installdir: [INSTALLDIRP311]"/>
 
     <UIRef Id="WixUI_CPY"/>
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
@@ -469,6 +555,9 @@
       <!-- Python 3.10 -->
       <Custom Action="SetInstallDirCurrentP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_ALL</Custom>
+      <!-- Python 3.11 -->
+      <Custom Action="SetInstallDirCurrentP311" After="AppSearch">NOT Installed AND PYTHON311INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP311" After="AppSearch">NOT Installed AND PYTHON311INSTALLPATH_ALL</Custom>
     </InstallExecuteSequence>
 
     <InstallUISequence>
@@ -485,6 +574,9 @@
       <!-- Python 3.10 -->
       <Custom Action="SetInstallDirCurrentP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP310" After="AppSearch">NOT Installed AND PYTHON310INSTALLPATH_ALL</Custom>
+      <!-- Python 3.11 -->
+      <Custom Action="SetInstallDirCurrentP311" After="AppSearch">NOT Installed AND PYTHON311INSTALLPATH_CURRENT</Custom>
+      <Custom Action="SetInstallDirAllP311" After="AppSearch">NOT Installed AND PYTHON311INSTALLPATH_ALL</Custom>
     </InstallUISequence>
   </Product>
 </Wix>

@@ -131,6 +131,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Topic :: Database",
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
@@ -142,6 +143,6 @@ setup(
     extras_require={
         "dns-srv": ["dnspython>=1.16.0,<=2.1.0"],
         "compression": ["lz4>=2.1.6,<=3.1.3", "zstandard>=0.12.0,<=0.15.2"],
-        "gssapi": ["gssapi>=1.6.9,<=1.7.3"],
+        "gssapi": ["gssapi>=1.6.9,<=1.8.1"],
     },
 )

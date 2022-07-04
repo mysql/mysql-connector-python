@@ -569,7 +569,7 @@ class MySQLConnectorTests(unittest.TestCase):
         )
 
     def check_args(self, function, supported_arguments):
-        argspec = inspect.getargspec(function)
+        argspec = inspect.getfullargspec(function)
         function_arguments = dict(zip(argspec[0][1:], argspec[3]))
         for argument, default in function_arguments.items():
             try:

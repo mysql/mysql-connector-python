@@ -2224,7 +2224,7 @@ class Session:
         return Protobuf.use_pure
 
     @use_pure.setter
-    def use_pure(self, value):
+    def use_pure(self, value):  # pylint: disable=no-self-use
         if not isinstance(value, bool):
             raise ProgrammingError("'use_pure' option should be True or False")
         Protobuf.set_use_pure(value)

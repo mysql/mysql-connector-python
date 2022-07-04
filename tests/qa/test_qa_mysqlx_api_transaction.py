@@ -132,7 +132,7 @@ class APIResultTests(tests.MySQLxTests):
         ).execute()
         self.assertEqual(collection.count(), 2)
         sp = self.session.set_savepoint("SavedPoint")
-        self.assertEquals(sp, "SavedPoint")
+        self.assertEqual(sp, "SavedPoint")
         collection.add(
             {"name": "Robb Stark", "age": 25},
             {"name": "Brandon Stark", "age": 15},
