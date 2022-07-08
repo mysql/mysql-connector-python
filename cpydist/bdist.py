@@ -33,19 +33,21 @@ Creates a binary distribution.
 
 import logging
 import os
+import shutil
 
-from distutils import log
-from distutils.command.bdist import bdist
-from distutils.dir_util import copy_tree, mkpath, remove_tree
-from distutils.file_util import copy_file
-from distutils.sysconfig import get_python_version
-from distutils.util import byte_compile
+from pathlib import Path
+from sysconfig import get_platform, get_python_version
 
-from . import COMMON_USER_OPTIONS, EDITION, LOGGER, VERSION_TEXT
-from .utils import add_docs, write_info_bin, write_info_src
+try:
+    from setuptools.logging import set_threshold
+except ImportError:
+    set_threshold = None
+
+from . import COMMON_USER_OPTIONS, EDITION, LOGGER, VERSION_TEXT, Command
+from .utils import add_docs, copy_tree, write_info_bin, write_info_src
 
 
-class DistBinary(bdist):
+class DistBinary(Command):
     """Create a generic binary distribution.
 
     DistBinary is meant to replace distutils.bdist.
@@ -53,20 +55,47 @@ class DistBinary(bdist):
 
     description = "create a built (binary) distribution"
     user_options = COMMON_USER_OPTIONS + [
+        ("bdist-base=", "b", "temporary directory for creating built distributions"),
+        (
+            "plat-name=",
+            "p",
+            "platform name to embed in generated filenames "
+            "(default: %s)" % get_platform(),
+        ),
         (
             "bdist-dir=",
             "d",
             "temporary directory for creating the distribution",
         ),
-        ("dist-dir=", "d", "directory to put final built distributions in"),
+        (
+            "dist-dir=",
+            "d",
+            "directory to put final built distributions in " "[default: dist]",
+        ),
+        (
+            "owner=",
+            "u",
+            "Owner name used when creating a tar file" " [default: current user]",
+        ),
+        (
+            "group=",
+            "g",
+            "Group name used when creating a tar file" " [default: current group]",
+        ),
     ]
+
     boolean_options = ["debug", "byte-code-only", "keep-temp"]
     log = LOGGER
 
     def initialize_options(self):
         """Initialize the options."""
-        bdist.initialize_options(self)
         self.bdist_dir = None
+        self.bdist_base = None
+        self.dist_dir = None
+        self.plat_name = None
+        self.skip_build = 0
+        self.group = None
+        self.owner = None
         self.byte_code_only = False
         self.label = None
         self.edition = EDITION
@@ -75,34 +104,39 @@ class DistBinary(bdist):
 
     def finalize_options(self):
         """Finalize the options."""
-        bdist.finalize_options(self)
+
+        if self.plat_name is None:
+            self.plat_name = self.get_finalized_command("build").plat_name
+
+        if self.bdist_base is None:
+            build_base = self.get_finalized_command("build").build_base
+            self.bdist_base = os.path.join(build_base, f"bdist.{self.plat_name}")
+
+        if self.dist_dir is None:
+            self.dist_dir = "dist"
+
+        if self.bdist_dir is None:
+            self.bdist_dir = os.path.join(self.dist_dir, f"bdist.{self.plat_name}")
+
+        if self.debug:
+            self.log.setLevel(logging.DEBUG)
+            if set_threshold:
+                # Set setuptools logging level to DEBUG
+                set_threshold(1)
 
         def _get_fullname():
-            label = "-{}".format(self.label) if self.label else ""
-            python_version = (
-                "-py{}".format(get_python_version()) if self.byte_code_only else ""
-            )
-            return "{name}{label}-{version}{edition}{pyver}".format(
-                name=self.distribution.get_name(),
-                label=label,
-                version=self.distribution.get_version(),
-                edition=self.edition or "",
-                pyver=python_version,
-            )
+            label = f"-{self.label if self.label else ''}"
+            python_version = f"-py{get_python_version() if self.byte_code_only else ''}"
+            name = self.distribution.get_name()
+            version = self.distribution.get_version()
+            edition = self.edition or ""
+            return f"{name}{label}-{version}{edition}{python_version}"
 
         self.distribution.get_fullname = _get_fullname
 
-        if self.bdist_dir is None:
-            self.bdist_dir = os.path.join(
-                self.dist_dir, "bdist.{}".format(self.plat_name)
-            )
-        if self.debug:
-            self.log.setLevel(logging.DEBUG)
-            log.set_threshold(1)  # Set Distutils logging level to DEBUG
-
     def _remove_sources(self):
         """Remove Python source files from the build directory."""
-        for base, dirs, files in os.walk(self.bdist_dir):
+        for base, _, files in os.walk(self.bdist_dir):
             for filename in files:
                 if filename.endswith(".py"):
                     filepath = os.path.join(base, filename)
@@ -111,13 +145,13 @@ class DistBinary(bdist):
 
     def _copy_from_pycache(self, start_dir):
         """Copy .py files from __pycache__."""
-        for base, dirs, files in os.walk(start_dir):
+        for base, _, files in os.walk(start_dir):
             for filename in files:
                 if filename.endswith(".pyc"):
                     filepath = os.path.join(base, filename)
-                    new_name = "{}.pyc".format(filename.split(".")[0])
+                    new_name = f"{filename.split('.')[0]}.pyc"
                     os.rename(filepath, os.path.join(base, "..", new_name))
-        for base, dirs, files in os.walk(start_dir):
+        for base, _, files in os.walk(start_dir):
             if base.endswith("__pycache__"):
                 os.rmdir(base)
 
@@ -154,12 +188,8 @@ class DistBinary(bdist):
 
         # compile and remove sources
         if self.byte_code_only:
-            byte_compile(
-                installed_files,
-                optimize=0,
-                force=True,
-                prefix=install.install_dir,
-            )
+            install.compile = True
+            install.byte_compile(installed_files)
             self._remove_sources()
             if get_python_version().startswith("3"):
                 self.log.info("Copying byte code from __pycache__")
@@ -176,15 +206,15 @@ class DistBinary(bdist):
             ("docs/INFO_BIN", "INFO_BIN"),
         ]
 
-        copy_tree(self.bdist_dir, self.dist_target)
-        mkpath(os.path.join(self.dist_target))
+        copy_tree(self.bdist_dir, self.dist_target, dirs_exist_ok=True)
+        Path(self.dist_target).mkdir(parents=True, exist_ok=True)
         for src, dst in info_files:
             if dst is None:
-                dest_name, _ = copy_file(src, self.dist_target)
+                shutil.copyfile(src, self.dist_target)
             else:
-                dest_name, _ = copy_file(src, os.path.join(self.dist_target, dst))
+                shutil.copyfile(src, os.path.join(self.dist_target, dst))
 
         add_docs(os.path.join(self.dist_target, "docs"))
 
         if not self.keep_temp:
-            remove_tree(self.build_base, dry_run=self.dry_run)
+            shutil.rmtree(self.build_base)

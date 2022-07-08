@@ -35,23 +35,27 @@ import shutil
 import sys
 import tempfile
 
-from distutils import log
-from distutils.command.install import install
-from distutils.command.install_lib import install_lib
-from distutils.core import Command
-from distutils.dir_util import mkpath, remove_tree
-from distutils.sysconfig import get_config_vars, get_python_version
-from distutils.version import LooseVersion
 from glob import glob
+from pathlib import Path
 from subprocess import PIPE, Popen, check_call
+from sysconfig import get_config_vars, get_python_version
 
+from setuptools import Command
 from setuptools.command.build_ext import build_ext
+from setuptools.command.install import install
+from setuptools.command.install_lib import install_lib
+
+try:
+    from setuptools.logging import set_threshold
+except ImportError:
+    set_threshold = None
 
 from .utils import (
     ARCH,
     ARCH_64BIT,
     get_openssl_libs,
     mysql_c_api_info,
+    parse_loose_version,
     write_info_bin,
     write_info_src,
 )
@@ -171,7 +175,9 @@ class BaseCommand(Command):
         """Finalize the options."""
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(1)  # Set Distutils logging level to DEBUG
+            if set_threshold:
+                # Set setuptools logging level to DEBUG
+                set_threshold(1)
 
         if not self.with_mysql_capi:
             self.with_mysql_capi = os.environ.get("MYSQL_CAPI")
@@ -222,10 +228,11 @@ class BaseCommand(Command):
         """Remove temporary build files."""
         if not self.keep_temp:
             cmd_build = self.get_finalized_command("build")
-            remove_tree(cmd_build.build_base, dry_run=self.dry_run)
+            if not self.dry_run:
+                shutil.rmtree(cmd_build.build_base)
             vendor_folder = os.path.join(os.getcwd(), self.vendor_folder)
             if os.path.exists(vendor_folder):
-                remove_tree(vendor_folder)
+                shutil.rmtree(vendor_folder)
             elif os.name == "nt":
                 libssl, libcrypto = self._get_openssl_libs(ext="dll")
                 libraries = ["libmysql.dll", libssl, libcrypto]
@@ -267,19 +274,19 @@ class BaseCommand(Command):
             plugin_list = [
                 (
                     "LDAP",
-                    "authentication_ldap_sasl_client.{}".format(plugin_ext),
+                    f"authentication_ldap_sasl_client.{plugin_ext}",
                 ),
                 (
                     "Kerberos",
-                    "authentication_kerberos_client.{}".format(plugin_ext),
+                    f"authentication_kerberos_client.{plugin_ext}",
                 ),
                 (
                     "OCI IAM",
-                    "authentication_oci_client.{}".format(plugin_ext),
+                    f"authentication_oci_client.{plugin_ext}",
                 ),
                 (
                     "FIDO",
-                    "authentication_fido_client.{}".format(plugin_ext),
+                    f"authentication_fido_client.{plugin_ext}",
                 ),
             ]
             for plugin_name, plugin_file in plugin_list:
@@ -326,15 +333,21 @@ class BaseCommand(Command):
 
         # mysql/vendor
         if not os.path.exists(self.vendor_folder):
-            mkpath(os.path.join(os.getcwd(), self.vendor_folder))
+            Path(os.path.join(os.getcwd(), self.vendor_folder)).mkdir(
+                parents=True, exist_ok=True
+            )
 
         # mysql/vendor/plugin
         if not os.path.exists(os.path.join(self.vendor_folder, "plugin")):
-            mkpath(os.path.join(os.getcwd(), self.vendor_folder, "plugin"))
+            Path(os.path.join(os.getcwd(), self.vendor_folder, "plugin")).mkdir(
+                parents=True, exist_ok=True
+            )
 
         # mysql/vendor/private
         if not os.path.exists(os.path.join(self.vendor_folder, "private")):
-            mkpath(os.path.join(os.getcwd(), self.vendor_folder, "private"))
+            Path(os.path.join(os.getcwd(), self.vendor_folder, "private")).mkdir(
+                parents=True, exist_ok=True
+            )
 
         # Copy vendor libraries to 'mysql/vendor' folder
         self.log.info("Copying vendor libraries")
@@ -398,7 +411,7 @@ class BaseCommand(Command):
                         continue
                     dst = os.path.join(os.getcwd(), self.vendor_folder, "private")
                     self.log.info("copying %s -> %s", src, dst)
-                    shutil.copy(src, dst)
+                    shutil.copy2(src, dst)
 
             # include sasl2 libs
             sasl2_libs = []
@@ -443,7 +456,7 @@ class BaseCommand(Command):
                 self.vendor_folder, "private", "sasl2"
             )
             if not os.path.exists(sasl2_libs_private_path):
-                mkpath(sasl2_libs_private_path)
+                Path(sasl2_libs_private_path).mkdir(parents=True, exist_ok=True)
 
             # Copy vendor libraries to 'mysql/vendor/private/sasl2' folder
             self.log.info("Copying vendor libraries")
@@ -456,7 +469,7 @@ class BaseCommand(Command):
                         continue
                     dst = os.path.join(os.getcwd(), sasl2_libs_private_path)
                     self.log.info("copying %s -> %s", src, dst)
-                    shutil.copy(src, dst)
+                    shutil.copy2(src, dst)
 
         self.distribution.package_data = {
             "mysql": [
@@ -480,7 +493,8 @@ class BuildExt(build_ext, BaseCommand):
 
     def _get_mysql_version(self):
         if os.name == "posix" and self._mysql_info:
-            mysql_version = "{}.{}.{}".format(*self._mysql_info["version"][:3])
+            major, minor, patch = self._mysql_info["version"][:3]
+            mysql_version = f"{major}.{minor}.{patch}"
         elif os.name == "nt" and os.path.isdir(self.with_mysql_capi):
             mysql_version_h = os.path.join(
                 self.with_mysql_capi, "include", "mysql_version.h"
@@ -488,9 +502,9 @@ class BuildExt(build_ext, BaseCommand):
             with open(mysql_version_h, "rb") as fp:
                 for line in fp.readlines():
                     if b"#define LIBMYSQL_VERSION" in line:
-                        mysql_version = LooseVersion(
+                        mysql_version = parse_loose_version(
                             line.split()[2].replace(b'"', b"").decode()
-                        ).version
+                        )
                         break
         else:
             mysql_version = None
@@ -512,7 +526,7 @@ class BuildExt(build_ext, BaseCommand):
 
         for lib in libs:
             self.log.info("copying %s -> %s", lib, self._build_mysql_lib_dir)
-            shutil.copy(lib, self._build_mysql_lib_dir)
+            shutil.copy2(lib, self._build_mysql_lib_dir)
 
         # Remove all but static libraries to force static linking
         if os.name == "posix":
@@ -594,7 +608,7 @@ class BuildExt(build_ext, BaseCommand):
         command = [self.with_protoc, "-I"]
         command.append(os.path.join(base_path, "protocol"))
         command.extend(glob(os.path.join(base_path, "protocol", "*.proto")))
-        command.append("--cpp_out={0}".format(base_path))
+        command.append(f"--cpp_out={base_path}")
         self.log.info("Running protoc command: %s", " ".join(command))
         check_call(command)
 
@@ -715,22 +729,22 @@ class BuildExt(build_ext, BaseCommand):
                         "install_name_tool",
                         "-change",
                         libssl,
-                        "@loader_path/mysql/vendor/{0}".format(libssl),
+                        f"@loader_path/mysql/vendor/{libssl}",
                         build_ext.get_ext_fullpath(self, "_mysql_connector"),
                     ]
-                    self.log.info("Executing: {0}".format(" ".join(cmd_libssl)))
+                    self.log.info("Executing: %s", " ".join(cmd_libssl))
                     proc = Popen(cmd_libssl, stdout=PIPE, universal_newlines=True)
-                    stdout, _ = proc.communicate()
+                    proc.communicate()
                     cmd_libcrypto = [
                         "install_name_tool",
                         "-change",
                         libcrypto,
-                        "@loader_path/mysql/vendor/{0}".format(libcrypto),
+                        f"@loader_path/mysql/vendor/{libcrypto}",
                         build_ext.get_ext_fullpath(self, "_mysql_connector"),
                     ]
-                    self.log.info("Executing: {0}".format(" ".join(cmd_libcrypto)))
+                    self.log.info("Executing: %s", " ".join(cmd_libcrypto))
                     proc = Popen(cmd_libcrypto, stdout=PIPE, universal_newlines=True)
-                    stdout, _ = proc.communicate()
+                    proc.communicate()
 
         # Generate docs/INFO_BIN
         if self.with_mysql_capi:
@@ -770,7 +784,7 @@ class InstallLib(install_lib):
     def run(self):
         """Run the command."""
         if not os.path.exists(self.build_dir):
-            mkpath(self.build_dir)
+            Path(self.build_dir).mkdir(parents=True, exist_ok=True)
 
         self.build()
 
@@ -785,7 +799,7 @@ class InstallLib(install_lib):
                 for base, _, files in os.walk(self.install_dir):
                     for filename in files:
                         if filename.endswith(".pyc"):
-                            new_name = "{0}.pyc".format(filename.split(".")[0])
+                            new_name = f"{filename.split('.')[0]}.pyc"
                             os.rename(
                                 os.path.join(base, filename),
                                 os.path.join(base, "..", new_name),

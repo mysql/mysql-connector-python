@@ -33,17 +33,21 @@ Creates a source distribution.
 
 import logging
 import os
+import shutil
 import sys
 
-from distutils import log
-from distutils.command.sdist import sdist
-from distutils.dir_util import copy_tree, create_tree, mkpath, remove_tree
-from distutils.file_util import copy_file, move_file
-from distutils.filelist import FileList
-from distutils.sysconfig import get_python_version
+from pathlib import Path
+from sysconfig import get_python_version
+
+from setuptools.command.sdist import sdist
+
+try:
+    from setuptools.logging import set_threshold
+except ImportError:
+    set_threshold = None
 
 from . import COMMON_USER_OPTIONS, EDITION, LOGGER, VERSION
-from .utils import get_dist_name, write_info_bin, write_info_src
+from .utils import copy_tree, create_tree, get_dist_name, write_info_bin, write_info_src
 
 
 class DistSource(sdist):
@@ -104,23 +108,24 @@ class DistSource(sdist):
         """Finalize the options."""
 
         def _get_fullname():
-            return "{name}{label}-{version}{edition}".format(
-                name=self.distribution.get_name(),
-                label="-{}".format(self.label) if self.label else "",
-                version=self.distribution.get_version(),
-                edition=self.edition or "",
-            )
+            name = self.distribution.get_name()
+            label = f"-{self.label if self.label else ''}"
+            version = self.distribution.get_version()
+            edition = self.edition or ""
+            return f"{name}{label}-{version}{edition}"
 
         self.distribution.get_fullname = _get_fullname
         sdist.finalize_options(self)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(1)  # Set Distutils logging level to DEBUG
+            if set_threshold:
+                # Set setuptools logging level to DEBUG
+                set_threshold(1)
 
     def make_release_tree(self, base_dir, files):
         """Make the release tree."""
-        self.mkpath(base_dir)
-        create_tree(base_dir, files, dry_run=self.dry_run)
+        Path(base_dir).mkdir(parents=True, exist_ok=True)
+        create_tree(base_dir, files)
 
         if not files:
             self.log.warning("no files to distribute -- empty manifest?")
@@ -131,7 +136,7 @@ class DistSource(sdist):
                 self.log.warning("'%s' not a regular file -- skipping", filename)
             else:
                 dest = os.path.join(base_dir, filename)
-                self.copy_file(filename, dest)
+                shutil.copyfile(filename, dest)
 
         self.distribution.metadata.write_pkg_info(base_dir)
 
@@ -140,14 +145,8 @@ class DistSource(sdist):
         self.log.info("generating INFO_SRC and INFO_BIN files")
         write_info_src(VERSION)
         write_info_bin()
-
         self.distribution.data_files = None
-        self.filelist = FileList()
-        for cmd_name in self.get_sub_commands():
-            self.run_command(cmd_name)
-
-        self.get_file_list()
-        self.make_distribution()
+        super().run()
 
 
 class SourceGPL(sdist):
@@ -158,8 +157,8 @@ class SourceGPL(sdist):
     generate RPM or other packages.
     """
 
-    description = "create a source distribution for Python v{}.x".format(
-        get_python_version()[0]
+    description = (
+        f"create a source distribution for Python v{get_python_version()[0]}.x"
     )
     user_options = [
         ("debug", None, "turn debugging on"),
@@ -212,11 +211,11 @@ class SourceGPL(sdist):
 
         with open("README.txt", "r") as file_handler:
             license = file_handler.read()
-            self.distribution.metadata.long_description += "\n{}".format(license)
+            self.distribution.metadata.long_description += f"\n{license}"
 
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(1)  # Set Distutils logging level to DEBUG
+            set_threshold(1)  # Set Setuptools logging level to DEBUG
 
     def run(self):
         """Run the command."""
@@ -253,10 +252,10 @@ class SourceGPL(sdist):
         # we need the py2.x converted to py2 in the filename
         old_egginfo = cmd_egginfo.get_outputs()[0]
         new_egginfo = old_egginfo.replace(
-            "-py{}".format(sys.version[:3]),
-            "-py{}".format(get_python_version()[0]),
+            f"-py{sys.version[:3]}",
+            f"-py{get_python_version()[0]}",
         )
-        move_file(old_egginfo, new_egginfo)
+        shutil.move(old_egginfo, new_egginfo)
 
         # create distribution
         info_files = [
@@ -268,11 +267,11 @@ class SourceGPL(sdist):
             ("docs/INFO_BIN", "INFO_BIN"),
         ]
 
-        copy_tree(self.bdist_dir, self.dist_target)
-        mkpath(os.path.join(self.dist_target))
+        copy_tree(self.bdist_dir, self.dist_target, dirs_exist_ok=True)
+        Path(self.dist_target).mkdir(parents=True, exist_ok=True)
 
         for src, dst in info_files:
-            copy_file(src, os.path.join(self.dist_target, dst))
+            shutil.copyfile(src, os.path.join(self.dist_target, dst))
 
         if not self.keep_temp:
             remove_tree(self.build_base, dry_run=self.dry_run)

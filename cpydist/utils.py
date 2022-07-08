@@ -34,21 +34,23 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import struct
 import subprocess
 import sys
 import tarfile
 
 from datetime import datetime
-from distutils.dir_util import mkpath
-from distutils.errors import DistutilsInternalError
-from distutils.file_util import copy_file
-from distutils.spawn import find_executable
-from distutils.sysconfig import get_python_version
-from distutils.version import LooseVersion
 from glob import glob
+from pathlib import Path
 from subprocess import PIPE, Popen
+from sysconfig import get_python_version
 from xml.dom.minidom import parse, parseString
+
+try:
+    from setuptools.errors import InternalError
+except ImportError:
+    InternalError = Exception
 
 try:
     from dateutil.tz import tzlocal
@@ -165,13 +167,12 @@ def _mysql_c_api_info_win(mysql_capi):
     with open(mysql_version_h, "rb") as fp:
         for line in fp.readlines():
             if b"#define LIBMYSQL_VERSION" in line:
-                version = LooseVersion(
+                version = parse_loose_version(
                     line.split()[2].replace(b'"', b"").decode()
-                ).version
+                )
                 if tuple(version) < MYSQL_C_API_MIN_VERSION:
                     LOGGER.error(
-                        "MySQL C API {} or later required"
-                        "".format(MYSQL_C_API_MIN_VERSION)
+                        "MySQL C API %s or later required", MYSQL_C_API_MIN_VERSION
                     )
                     sys.exit(1)
                 break
@@ -182,7 +183,7 @@ def _mysql_c_api_info_win(mysql_capi):
 
     # Get libmysql.dll arch
     connc_64bit = _win_dll_is64bit(os.path.join(mysql_capi, "lib", "libmysql.dll"))
-    LOGGER.debug("connc_64bit: {0}".format(connc_64bit))
+    LOGGER.debug("connc_64bit: %s", connc_64bit)
     info["arch"] = "x86_64" if connc_64bit else "i386"
     LOGGER.debug("# _mysql_c_api_info_win info: %s", info)
 
@@ -206,9 +207,7 @@ def mysql_c_api_info(mysql_config):
     process = Popen([mysql_config], stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate()
     if not stdout:
-        raise ValueError(
-            "Error executing command: {} ({})".format(mysql_config, stderr)
-        )
+        raise ValueError(f"Error executing command: {mysql_config} ({stderr})")
 
     # Parse the output. Try to be future safe in case new options
     # are added. This might of course fail.
@@ -277,7 +276,7 @@ def get_git_info():
         dict: A dict containing the information about the last commit.
     """
     is_git_repo = False
-    if find_executable("git") is not None:
+    if shutil.which("git"):
         # Check if it's a Git repository
         proc = Popen(["git", "--no-pager", "branch"], universal_newlines=True)
         proc.communicate()
@@ -327,13 +326,13 @@ def write_info_src(version):
     git_info = get_git_info()
     if git_info:
         with open(os.path.join("docs", "INFO_SRC"), "w") as info_src:
-            info_src.write("version: {}\n".format(version))
+            info_src.write(f"version: {version}\n")
             if git_info:
-                info_src.write("branch: {}\n".format(git_info["branch"]))
+                info_src.write(f"branch: {git_info['branch']}\n")
                 if git_info.get("date"):
-                    info_src.write("date: {}\n".format(git_info["date"]))
-                info_src.write("commit: {}\n".format(git_info["commit"]))
-                info_src.write("short: {}\n".format(git_info["short"]))
+                    info_src.write(f"date: {git_info['date']}\n")
+                info_src.write(f"commit: {git_info['commit']}\n")
+                info_src.write(f"short: {git_info['short']}\n")
         return True
     return False
 
@@ -349,12 +348,12 @@ def write_info_bin(mysql_version=None, compiler=None):
     """
     now = NOW.strftime("%Y-%m-%d %H:%M:%S %z")
     with open(os.path.join("docs", "INFO_BIN"), "w") as info_bin:
-        info_bin.write("build-date: {}\n".format(now))
-        info_bin.write("os-info: {}\n".format(platform.platform()))
+        info_bin.write(f"build-date: {now}\n")
+        info_bin.write(f"os-info: {platform.platform()}\n")
         if mysql_version:
-            info_bin.write("mysql-version: {}\n".format(mysql_version))
+            info_bin.write(f"mysql-version: {mysql_version}\n")
         if compiler:
-            info_bin.write("compiler: {}\n".format(compiler))
+            info_bin.write(f"compiler: {compiler}\n")
 
 
 def _parse_release_file(release_file):
@@ -457,13 +456,12 @@ def get_dist_name(
     if edition:
         name.append(edition)
     if label:
-        name.append("-{}".format(label))
-    name.append("-{}".format(distribution.metadata.version))
+        name.append(f"-{label}")
+    name.append(f"-{distribution.metadata.version}")
     if not source_only_dist or python_version:
-        pyver = python_version or get_python_version()
-        name.append("-py{}".format(pyver))
+        name.append(f"-py{python_version or get_python_version()}")
     if platname:
-        name.append("-{}".format(platname))
+        name.append(f"-{platname}")
     return "".join(name)
 
 
@@ -507,7 +505,7 @@ def unarchive_targz(tarball):
 
 def add_docs(doc_path, doc_files=None):
     """Prepare documentation files for Connector/Python."""
-    mkpath(doc_path)
+    Path(doc_path).mkdir(parents=True, exist_ok=True)
 
     if not doc_files:
         doc_files = [
@@ -531,7 +529,7 @@ def add_docs(doc_path, doc_files=None):
 
         if not os.path.exists(doc_file):
             # don't copy yourself
-            copy_file(doc_file, doc_path)
+            shutil.copy2(doc_file, doc_path)
 
 
 # Windows MSI descriptor parser
@@ -583,7 +581,7 @@ def _append_child_from_unparsed_xml(father_node, unparsed_xml):
                 father_node.appendChild(childNode)
             return
 
-    raise DistutilsInternalError(
+    raise InternalError(
         "Could not Append append elements to the Windows msi descriptor."
     )
 
@@ -658,3 +656,58 @@ def get_openssl_libs(openssl_lib_dir, ext=None):
     if not libssl or not libcrypto:
         return (None, None)
     return (os.path.basename(libssl[0]), os.path.basename(libcrypto[0]))
+
+
+def parse_loose_version(version):
+    """Parse a loose version number.
+
+    Args:
+        version (str): Version string.
+
+    Returns the numeric version that can contain strings.
+    """
+    regex = re.compile(r"(\d+ | [a-z]+ | \.)", re.VERBOSE)
+    components = [comp for comp in regex.split(version) if comp and comp != "."]
+    for idx, obj in enumerate(components):
+        try:
+            components[idx] = int(obj)
+        except ValueError:
+            pass
+    return components
+
+
+def create_tree(base_dir, files):
+    """Create empty directories under 'base_dir' needed to put 'files' there.
+
+    Args:
+        base_dir (str): Name of the base directory.
+        files (list): List of filenames to be interpreted relative to 'base_dir'.
+    """
+    # Get the list of directories to create
+    directories = set()
+    for filename in files:
+        directories.add(os.path.join(base_dir, os.path.dirname(filename)))
+
+    # Create them
+    for directory in sorted(directories):
+        Path(directory).mkdir(parents=True, exist_ok=True)
+
+
+def copy_tree(src, dst, dirs_exist_ok=False):
+    """Recursively copy an entire directory tree rooted at src to a directory dst.
+
+    This is a helper function to add the missing `dir_exist_ok` parameter in
+    `shutil.copytree()` function on Python 3.7. Which basically removes the contents
+    of the destination directory.
+
+    Args:
+        src (str): Source directory.
+        dst (str): Destination directory.
+        dirs_exist_ok (bool): Overwrite destination folder.
+    """
+    if sys.version_info[:3] >= (3, 8, 0):
+        shutil.copytree(src, dst, dirs_exist_ok=dirs_exist_ok)
+    else:
+        if dirs_exist_ok and os.path.exists(dst):
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)

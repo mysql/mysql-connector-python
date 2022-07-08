@@ -26,15 +26,19 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+import logging
 import os
 import re
 import subprocess
 
-from distutils import log
-from distutils.errors import DistutilsError
+try:
+    from setuptools.errors import BaseError, OptionError
+except ImportError:
+    BaseError = Exception
 
 WIX_INSTALL_PATH = r"C:\Program Files (x86)\Windows Installer XML v3.5"
 WIX_REQUIRED_VERSION = "3.5"
+LOGGER = logging.getLogger("cpydist")
 
 
 def find_candle_bindir(wix_install_path):
@@ -53,7 +57,7 @@ def find_candle_bindir(wix_install_path):
     if os.path.isfile(candle) and os.access(candle, os.X_OK):
         return (candle, wix_install_path)
 
-    raise DistutilsError("Could not find candle.exe under %s" % wix_install_path)
+    raise BaseError(f"Could not find candle.exe under {wix_install_path}")
 
 
 def check_wix_install(
@@ -66,7 +70,7 @@ def check_wix_install(
     Check whether the WiX tools are available in given wix_install_path
     and also check the wix_required_version.
 
-    Raises DistutilsError when the tools are not available or
+    Raises BaseError when the tools are not available or
     when the version is not correct.
     """
     if dry_run:
@@ -89,17 +93,15 @@ def check_wix_install(
     # Lines like "Windows Installer XML Toolset Compiler version 3.10.1.2213"
     m = re.search(r"version\s+(?P<major>\d+)\.(?P<minor>\d+)", verline)
     if not m:
-        raise DistutilsError(
-            "Can't parse version output from candle.exe: {}".format(verline)
-        )
+        raise BaseError(f"Can't parse version output from candle.exe: {verline}")
     wix_version = [int(m.group("major")), int(m.group("minor"))]
     wix_min_version = [int(i) for i in wix_required_version.split(".")[:2]]
     if wix_version[0] < wix_min_version[0] or (
         wix_version[0] == wix_min_version[0] and wix_version[1] < wix_min_version[1]
     ):
-        raise DistutilsError(
-            "Minimal WiX v{}, we found v{}"
-            "".format(".".join(wix_min_version), ".".join(wix_version))
+        raise BaseError(
+            f"Minimal WiX v{'.'.join(wix_min_version)}, "
+            f"we found v{'.'.join(wix_version)}"
         )
 
 
@@ -154,12 +156,12 @@ class WiX:
 
         Run the given command with arguments.
 
-        Raises DistutilsError on errors.
+        Raises BaseError on errors.
         """
         cmd = [os.path.join(self._bin, cmdname)]
         cmd += cmdargs
 
-        log.info("Running: %s", " ".join(cmd))
+        LOGGER.info("Running: %s", " ".join(cmd))
         prc = subprocess.Popen(
             " ".join(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
@@ -168,25 +170,23 @@ class WiX:
         for line in stdoutdata.splitlines():
             try:
                 if "warning" in line:
-                    log.info(line)
+                    LOGGER.info(line)
                 elif "error" in line:
-                    raise DistutilsError("WiX Error: " + line)
+                    raise BaseError(f"WiX Error: {line}")
             except TypeError:
                 if b"warning" in line:
-                    log.info(line)
+                    LOGGER.info(line)
                 elif b"error" in line:
-                    raise DistutilsError("WiX Error: " + line.decode("utf8"))
-            except DistutilsError:
+                    raise BaseError(f"WiX Error: {line.decode('utf8')}")
+            except BaseError:
                 raise
 
         if prc.returncode:
-            raise DistutilsError(
-                "%s exited with return code %d" % (cmdname, prc.returncode)
-            )
+            raise BaseError(f"{cmdname} exited with return code {prc.returncode}")
 
     def compile(self, wxs=None, out=None, parameters=None):
         wxs = wxs or self._wxs
-        log.info("WiX: Compiling %s" % wxs)
+        LOGGER.info("WiX: Compiling %s", wxs)
         out = out or self._out
 
         cmdargs = [
@@ -207,7 +207,7 @@ class WiX:
             params = self._parameters
 
         for parameter, value in params.items():
-            cmdargs.append("-d%s=%s" % (parameter, value))
+            cmdargs.append(f"-d{parameter}={value}")
 
         self._run_tool("candle.exe", cmdargs)
 
@@ -218,29 +218,29 @@ class WiX:
         if data_path is None:
             data_path = cwd
         msi_out = self._msi_out or wixobj.replace(".wixobj", ".msi")
-        log.info("WiX: Linking %s" % wixobj)
+        LOGGER.info("WiX: Linking %s", wixobj)
 
         # light.exe -b option does not seem to work, we change to buld dir
-        print("cwd: {}".format(cwd))
+        print(f"cwd: {cwd}")
         os.chdir(base_path)
-        print("base_path: {}".format(base_path))
+        print(f"base_path: {base_path}")
         wxlfile = os.path.join(data_path, "cpydist\\data\\msi\\WixUI_en-us.wxl")
-        print("wxlfile loc file: {}".format(wxlfile))
+        print(f"wxlfile loc file: {wxlfile}")
 
         cmdargs = [
-            r"-loc {0}".format(wxlfile),
+            rf"-loc {wxlfile}",
             r"-ext WixUIExtension",
             r"-cultures:en-us",
             r"-nologo",
             r"-sw1076",
-            r"-out %s" % msi_out,
-            r"{}\cpy_product_desc.wixobj".format(data_path),
-            r"{}\cpy_msi_gui.wixobj".format(data_path),
-            r"{}\PY37.wixobj".format(data_path),
-            r"{}\PY38.wixobj".format(data_path),
-            r"{}\PY39.wixobj".format(data_path),
-            r"{}\PY310.wixobj".format(data_path),
-            r"{}\PY311.wixobj".format(data_path),
+            rf"-out {msi_out}",
+            rf"{data_path}\cpy_product_desc.wixobj",
+            rf"{data_path}\cpy_msi_gui.wixobj",
+            rf"{data_path}\PY37.wixobj",
+            rf"{data_path}\PY38.wixobj",
+            rf"{data_path}\PY39.wixobj",
+            rf"{data_path}\PY310.wixobj",
+            rf"{data_path}\PY311.wixobj",
         ]
 
         self._run_tool("light.exe", cmdargs)

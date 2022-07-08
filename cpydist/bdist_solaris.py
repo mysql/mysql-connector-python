@@ -32,16 +32,25 @@
 import logging
 import os
 import platform
+import shutil
 import subprocess
+import tarfile
 import time
 
-from distutils import log
-from distutils.archive_util import make_tarball
-from distutils.command.bdist import bdist
-from distutils.errors import DistutilsExecError
-from distutils.file_util import copy_file
+from pathlib import Path
+
+try:
+    from setuptools.errors import ExecError
+except ImportError:
+    ExecError = Exception
+
+try:
+    from setuptools.logging import set_threshold
+except ImportError:
+    set_threshold = None
 
 from . import COMMON_USER_OPTIONS, VERSION_EXTRA, VERSION_TEXT, BaseCommand
+from .bdist import DistBinary as bdist
 from .utils import write_info_bin, write_info_src
 
 SOLARIS_PKGS = {"pure": os.path.join("cpydist", "data", "solaris")}
@@ -72,19 +81,18 @@ class DistSolaris(bdist, BaseCommand):
         (
             "platform=",
             "p",
-            "name of the platform in resulting file (default '{0}')".format(platf_n),
+            f"name of the platform in resulting file (default '{platf_n}')",
         ),
         (
             "platform-version=",
             "v",
-            "version of the platform in resulting file "
-            "(default '{0}')".format(platf_v),
+            f"version of the platform in resulting file (default '{platf_v}')",
         ),
         (
             "platform-version=",
             "a",
             "architecture, i.e. 'sparc' or 'x86' in the resulting file "
-            "(default '{0}')".format(platf_a),
+            f"(default '{platf_a}')",
         ),
         (
             "trans",
@@ -99,7 +107,7 @@ class DistSolaris(bdist, BaseCommand):
         BaseCommand.initialize_options(self)
         self.name = self.distribution.get_name()
         self.version = self.distribution.get_version()
-        self.version_extra = "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
+        self.version_extra = f"-{VERSION_EXTRA if VERSION_EXTRA else ''}"
         self.keep_temp = None
         self.create_dmg = False
         self.dist_dir = None
@@ -108,9 +116,7 @@ class DistSolaris(bdist, BaseCommand):
         self.platform_version = self.platf_v
         self.architecture = self.platf_a
         self.debug = False
-        self.sun_pkg_name = "{0}-{1}{2}.pkg".format(
-            self.name, self.version, self.version_extra
-        )
+        self.sun_pkg_name = f"{self.name}-{self.version}{self.version_extra}.pkg"
         self.dstroot = "dstroot"
         self.sign = False
         self.identity = "MySQL Connector/Python"
@@ -123,24 +129,26 @@ class DistSolaris(bdist, BaseCommand):
         self.set_undefined_options("bdist", ("dist_dir", "dist_dir"))
         if self.debug:
             self.log.setLevel(logging.DEBUG)
-            log.set_threshold(1)  # Set Distutils logging level to DEBUG
+            if set_threshold:
+                # Set setuptools logging level to DEBUG
+                set_threshold(1)
 
     def _prepare_pkg_base(self, template_name, data_dir, root=""):
         """Create and populate the src base directory."""
         self.log.info("-> _prepare_pkg_base()")
-        self.log.info("  template_name: {}".format(template_name))
-        self.log.info("  data_dir: {}".format(data_dir))
-        self.log.info("  root: {}".format(root))
+        self.log.info("  template_name: %s", template_name)
+        self.log.info("  data_dir: %s", data_dir)
+        self.log.info("  root: %s", root)
 
         # copy and create necessary files
         sun_dist_name = template_name.format(self.name, self.version)
-        self.sun_pkg_name = "{}.pkg".format(sun_dist_name)
-        self.log.info("  sun_pkg_name: {}".format(self.sun_pkg_name))
+        self.sun_pkg_name = f"{sun_dist_name}.pkg"
+        self.log.info("  sun_pkg_name: %s", self.sun_pkg_name)
 
         sun_path = os.path.join(root, self.dstroot)
-        self.log.info("  sun_path: {}".format(sun_path))
+        self.log.info("  sun_path: %s", sun_path)
         cwd = os.path.join(os.getcwd())
-        self.log.info("Current directory: {}".format(cwd))
+        self.log.info("Current directory: %s", cwd)
 
         copy_file_src_dst = []
 
@@ -156,7 +164,7 @@ class DistSolaris(bdist, BaseCommand):
 
         lic = "(GPL)"
         sun_pkg_info = os.path.join(sun_path, "pkginfo")
-        self.log.info("sun_pkg_info path: {0}".format(sun_pkg_info))
+        self.log.info("sun_pkg_info path: %s", sun_pkg_info)
         with open(sun_pkg_info, "w") as f_pkg_info:
             f_pkg_info.write(
                 PKGINFO.format(
@@ -206,31 +214,30 @@ class DistSolaris(bdist, BaseCommand):
         ]
 
         for src, dst in copy_file_src_dst:
-            copy_file(src, dst)
+            shutil.copyfile(src, dst)
 
     def _create_pkg(self, template_name, dmg=False, sign=False, root="", identity=""):
         """Create the Solaris package using the OS dependent commands."""
         self.log.info("-> _create_pkg()")
-        self.log.info("template_name: {}".format(template_name))
-        self.log.info("identity: {}".format(identity))
+        self.log.info("template_name: %s", template_name)
+        self.log.info("identity: %s", identity)
 
         sun_dist_name = template_name.format(self.name, self.version)
-        self.sun_pkg_name = "{}.pkg".format(sun_dist_name)
+        self.sun_pkg_name = f"{sun_dist_name}.pkg"
         sun_pkg_contents = os.path.join(self.sun_pkg_name, "Contents")
 
-        self.log.info("sun_dist_name: {}".format(sun_dist_name))
-        self.log.info("sun_pkg_name: {}".format(self.sun_pkg_name))
-        self.log.info("sun_pkg_contents: {}".format(sun_pkg_contents))
+        self.log.info("sun_dist_name: %s", sun_dist_name)
+        self.log.info("sun_pkg_name: %s", self.sun_pkg_name)
+        self.log.info("sun_pkg_contents: %s", sun_pkg_contents)
 
         sun_path = os.path.join(root, self.dstroot)
         os.chdir(sun_path)
-        self.log.info("Root directory for Prototype: {}".format(os.getcwd()))
+        self.log.info("Root directory for Prototype: %s", os.getcwd())
 
         # Creating a Prototype file, this contains a table of contents of the
         # Package, that is suitable to be used for the package creation tool.
         self.log.info(
-            "Creating Prototype file on {} to describe files to "
-            "install".format(self.dstroot)
+            f"Creating Prototype file on {self.dstroot} to describe files to install"
         )
 
         prototype_path = "Prototype"
@@ -241,8 +248,8 @@ class DistSolaris(bdist, BaseCommand):
             pkgp_p = subprocess.Popen(cmd, shell=False, stdout=f_out, stderr=f_out)
             res = pkgp_p.wait()
             if res != 0:
-                self.log.error("pkgproto command failed with: {}".format(res))
-                raise DistutilsExecError("pkgproto command failed with: {}".format(res))
+                self.log.error(f"pkgproto command failed with: {res}")
+                raise ExecError(f"pkgproto command failed with: {res}")
             f_out.flush()
 
         # log Prototype contents
@@ -284,20 +291,23 @@ class DistSolaris(bdist, BaseCommand):
         # Create Solaris package running the package creation command pkgmk
         self.log.info("Creating package with pkgmk")
 
-        self.log.info("Root directory for pkgmk: {}".format(os.getcwd()))
+        self.log.info("Root directory for pkgmk: %s", os.getcwd())
         self.spawn(["pkgmk", "-o", "-r", ".", "-d", "../", "-f", prototype_path])
         os.chdir("../")
         if self.debug:
-            self.log.info("current directory: {}".format(os.getcwd()))
+            self.log.info("current directory: %s", os.getcwd())
 
         # gzip the package folder
         self.log.info("creating tarball")
 
-        make_tarball(self.sun_pkg_name, self.name, compress="gzip")
+        archive_name = f"{self.sun_pkg_name}.tar.gz"
+        self.log.info("Creating tar archive '%s'", archive_name)
+        with tarfile.open(archive_name, "w|gz") as tar:
+            tar.add(self.name)
 
         if self.trans:
             self.log.info("Transforming package into data stream with pkgtrans")
-            self.log.info("Current directory: {}".format(os.getcwd()))
+            self.log.info("Current directory: %s", os.getcwd())
             self.spawn(
                 [
                     "pkgtrans",
@@ -312,18 +322,13 @@ class DistSolaris(bdist, BaseCommand):
             for filename in files:
                 if filename.endswith(".gz") or filename.endswith(".pkg"):
                     new_name = filename.replace(
-                        "{}".format(self.version),
-                        "{}{}{}{}-{}".format(
-                            self.version,
-                            self.version_extra,
-                            self.platform,
-                            self.platform_version,
-                            self.architecture,
-                        ),
+                        f"{self.version}",
+                        f"{self.version}{self.version_extra}{self.platform}"
+                        f"{self.platform_version}-{self.architecture}",
                     )
                     file_path = os.path.join(base, filename)
                     file_dest = os.path.join(self.started_dir, self.dist_dir, new_name)
-                    copy_file(file_path, file_dest)
+                    shutil.copyfile(file_path, file_dest)
             break
 
     def run(self):
@@ -352,7 +357,7 @@ class DistSolaris(bdist, BaseCommand):
 
         template_name = ["{}"]
         if self.label:
-            template_name.append("-{}".format(self.label))
+            template_name.append(f"-{self.label}")
         template_name.append("-{}")
 
         self._prepare_pkg_base("".join(template_name), data_dir, root=sun_root)

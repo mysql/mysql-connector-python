@@ -36,18 +36,22 @@ import shutil
 import sys
 import zipfile
 
-from distutils.dir_util import copy_tree
-from distutils.errors import DistutilsError, DistutilsOptionError
-from distutils.sysconfig import get_python_version
-from distutils.util import get_platform
-from distutils.version import LooseVersion
+from sysconfig import get_platform, get_python_version
+
+try:
+    from setuptools.errors import BaseError, OptionError
+except ImportError:
+    BaseError = Exception
+    OptionError = Exception
 
 from . import EDITION, VERSION, VERSION_EXTRA, VERSION_TEXT, BaseCommand, wix
 from .utils import (
     ARCH_64BIT,
     add_arch_dep_elems,
+    copy_tree,
     get_magic_tag,
     get_openssl_libs,
+    parse_loose_version,
     write_info_bin,
     write_info_src,
 )
@@ -71,20 +75,20 @@ class DistMSI(BaseCommand):
             "wix-install=",
             None,
             "location of the Windows Installer XML installation"
-            "(default: {})".format(wix.WIX_INSTALL_PATH),
+            f"(default: {wix.WIX_INSTALL_PATH})",
         ),
         (
             "wix-required-version=",
             None,
             "required version the Windows Installer XML installation"
-            "(default: {})".format(wix.WIX_REQUIRED_VERSION),
+            f"(default: {wix.WIX_REQUIRED_VERSION})",
         ),
         ("python-version=", None, "target Python version"),
         (
             "prepare-stage",
             "p",
-            "only stage installation for this python {} version, used later for"
-            "a single msi".format(get_python_version()[:3]),
+            f"only stage installation for this python {get_python_version()[:3]} "
+            "version, used later for a single msi",
         ),
         (
             "combine-stage",
@@ -141,13 +145,13 @@ class DistMSI(BaseCommand):
             )
 
         if self.python_version not in self._supported_versions:
-            raise DistutilsOptionError(
-                "The --python-version {} should be a supported version, one "
-                "of {}".format(self.python_version, ",".join(self._supported_versions))
+            raise OptionError(
+                f"The --python-version {self.python_version} should be a supported "
+                f"version, one of {','.join(self._supported_versions)}"
             )
 
         if self.python_version[0] != get_python_version()[0]:
-            raise DistutilsError(
+            raise BaseError(
                 "Python v3 distributions need to be build with a "
                 "supported Python v3 installation."
             )
@@ -184,8 +188,10 @@ class DistMSI(BaseCommand):
             self.log.error("MySQL C API should be a directory")
             sys.exit(1)
         self.log.info("# Locating OpeenSSL libraries")
-        copy_tree(os.path.join(connc_loc, "lib"), self._connc_lib)
-        copy_tree(os.path.join(connc_loc, "include"), self._connc_include)
+        copy_tree(os.path.join(connc_loc, "lib"), self._connc_lib, dirs_exist_ok=True)
+        copy_tree(
+            os.path.join(connc_loc, "include"), self._connc_include, dirs_exist_ok=True
+        )
 
         self.log.info("# self.with_openssl_lib_dir: %s", self.with_openssl_lib_dir)
 
@@ -209,8 +215,8 @@ class DistMSI(BaseCommand):
             src = os.path.join(openssl_lib_dir, filename)
             self.log.info("Using %s: located in %s", filename, src)
             dst = self._connc_lib
-            self.log.info("copying {0} -> {1}".format(src, dst))
-            shutil.copy(src, dst)
+            self.log.info("copying %s -> %s", src, dst)
+            shutil.copy2(src, dst)
 
         for lib_file in os.listdir(self._connc_lib):
             if os.name == "posix" and not lib_file.endswith(".a"):
@@ -234,17 +240,14 @@ class DistMSI(BaseCommand):
 
     def _get_wixobj_name(self, myc_version=None):
         """Get the name for the wixobj-file."""
-        mycver = myc_version or self.distribution.metadata.version
-        name_fmt = (
-            "mysql-connector-python{label}-{conver}{version_extra}"
-            "{edition}-{arch}.wixobj"
-        )
-        return name_fmt.format(
-            label="-{}".format(self.label) if self.label else "",
-            conver=mycver,
-            edition=self.edition,
-            version_extra="-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else "",
-            arch="windows-x86-64bit" if ARCH_64BIT else "windows-x86-32bit",
+        if not myc_version:
+            myc_version = self.distribution.metadata.version
+        label = f"-{self.label if self.label else ''}"
+        version_extra = f"-{VERSION_EXTRA if VERSION_EXTRA else ''}"
+        arch = "windows-x86-64bit" if ARCH_64BIT else "windows-x86-32bit"
+        return (
+            f"mysql-connector-python{label}-{myc_version}{version_extra}"
+            f"{self.edition}-{arch}.wixobj"
         )
 
     def _find_bdist_paths(self):
@@ -258,7 +261,8 @@ class DistMSI(BaseCommand):
                 "Lib",
                 "site-packages",
             )
-            zip_fn = "{}.zip".format(DIST_PATH_FORMAT.format(*py_ver.split(".")))
+            dist_path = DIST_PATH_FORMAT.format(*py_ver.split("."))
+            zip_fn = f"{dist_path}.zip"
 
             self.log.info("Locating zip: %s at %s", zip_fn, os.path.curdir)
             bdist_path = None
@@ -292,7 +296,7 @@ class DistMSI(BaseCommand):
         mycver = self.distribution.metadata.version
         match = re.match(r"(\d+)\.(\d+).(\d+).*", mycver)
         if not match:
-            raise ValueError("Failed parsing version from {}".format(mycver))
+            raise ValueError(f"Failed parsing version from {mycver}")
         (major, minor, patch) = match.groups()
         pyver = self.python_version
         pymajor = pyver[0]
@@ -302,12 +306,11 @@ class DistMSI(BaseCommand):
         try:
             upgrade_code = upgrade_codes[mycver[0:3]][pyver]
         except KeyError:
-            raise DistutilsError(
-                "No upgrade code found for version v{cpy_ver}, "
-                "Python v{py_ver}".format(cpy_ver=mycver, py_ver=pyver)
+            raise BaseError(
+                f"No upgrade code found for version v{mycver}, Python v{pyver}"
             )
         self.log.info(
-            "upgrade code for v%s, Python v%s: %s", mycver, pyver, upgrade_code
+            f"upgrade code for v%s, Python v%s: %s", mycver, pyver, upgrade_code
         )
 
         self.pyver_bdist_paths = self._find_bdist_paths()
@@ -419,32 +422,30 @@ class DistMSI(BaseCommand):
         self.log.debug("Using WiX preprocessor variables: %s", repr(params))
         for py_ver in self._supported_versions:
             ver = py_ver.split(".")
-            params["BDist{}{}".format(*ver)] = ""
+            params[f"BDist{ver[0]}{ver[1]}"] = ""
 
             if ver[0] == "3" and int(ver[1]) >= 5:
                 pyd_ext = ".cp%s%s-%s.pyd" % (ver[0], ver[1], pyd_arch)
             else:
                 pyd_ext = ".pyd"
 
-            params["CExtLibName{}{}".format(*ver)] = "_mysql_connector{}".format(
-                pyd_ext
-            )
-            params["CExtXPBName{}{}".format(*ver)] = "_mysqlxpb{}".format(pyd_ext)
-            params["HaveCExt{}{}".format(*ver)] = 0
-            params["HaveLdapLibs{}{}".format(*ver)] = 0
-            params["HaveKerberosLibs{}{}".format(*ver)] = 0
-            params["HaveOCILibs{}{}".format(*ver)] = 0
-            params["HavePlugin{}{}".format(*ver)] = 0
+            params[f"CExtLibName{ver[0]}{ver[1]}"] = f"_mysql_connector{pyd_ext}"
+            params[f"CExtXPBName{ver[0]}{ver[1]}"] = f"_mysqlxpb{pyd_ext}"
+            params[f"HaveCExt{ver[0]}{ver[1]}"] = 0
+            params[f"HaveLdapLibs{ver[0]}{ver[1]}"] = 0
+            params[f"HaveKerberosLibs{ver[0]}{ver[1]}"] = 0
+            params[f"HaveOCILibs{ver[0]}{ver[1]}"] = 0
+            params[f"HavePlugin{ver[0]}{ver[1]}"] = 0
 
             if py_ver in self.pyver_bdist_paths:
-                params["BDist{}{}".format(*ver)] = self.pyver_bdist_paths[py_ver]
+                params[f"BDist{ver[0]}{ver[1]}"] = self.pyver_bdist_paths[py_ver]
                 if os.path.exists(
                     os.path.join(
                         self.pyver_bdist_paths[py_ver],
-                        params["CExtLibName{}{}".format(*ver)],
+                        params[f"CExtLibName{ver[0]}{ver[1]}"],
                     )
                 ):
-                    params["HaveCExt{}{}".format(*ver)] = 1
+                    params[f"HaveCExt{ver[0]}{ver[1]}"] = 1
                 have_plugins = False
                 if os.path.exists(
                     os.path.join(
@@ -455,7 +456,7 @@ class DistMSI(BaseCommand):
                         "authentication_ldap_sasl_client.dll",
                     )
                 ):
-                    params["HaveLdapLibs{}{}".format(*ver)] = 1
+                    params[f"HaveLdapLibs{ver[0]}{ver[1]}"] = 1
                     have_plugins = True
                 if os.path.exists(
                     os.path.join(
@@ -466,7 +467,7 @@ class DistMSI(BaseCommand):
                         "authentication_kerberos_client.dll",
                     )
                 ):
-                    params["HaveKerberosLibs{}{}".format(*ver)] = 1
+                    params[f"HaveKerberosLibs{ver[0]}{ver[1]}"] = 1
                     have_plugins = True
                 if os.path.exists(
                     os.path.join(
@@ -477,10 +478,10 @@ class DistMSI(BaseCommand):
                         "authentication_oci_client.dll",
                     )
                 ):
-                    params["HaveOCILibs{}{}".format(*ver)] = 1
+                    params[f"HaveOCILibs{ver[0]}{ver[1]}"] = 1
                     have_plugins = True
                 if have_plugins:
-                    params["HavePlugin{}{}".format(*ver)] = 1
+                    params[f"HavePlugin{ver[0]}{ver[1]}"] = 1
 
         self.log.info("### wixer params:")
         for param in params:
@@ -491,7 +492,7 @@ class DistMSI(BaseCommand):
             try:
                 wixer.compile()
                 wixer.link()
-            except DistutilsError:
+            except BaseError:
                 raise
 
         if not self.keep_temp and not dry_run:
@@ -543,9 +544,9 @@ class DistMSI(BaseCommand):
             with open(mysql_version_h, "rb") as fp:
                 for line in fp.readlines():
                     if b"#define LIBMYSQL_VERSION" in line:
-                        mysql_version = LooseVersion(
+                        mysql_version = parse_loose_version(
                             line.split()[2].replace(b'"', b"").decode()
-                        ).version
+                        )
                         break
 
         return mysql_version
@@ -564,9 +565,7 @@ class DistMSI(BaseCommand):
             self._prepare()
 
         if self.prepare_stage:
-            zip_fn = os.path.join(
-                self.dist_dir, "{}.zip".format(os.path.abspath(self.prefix))
-            )
+            zip_fn = os.path.join(self.dist_dir, f"{os.path.abspath(self.prefix)}.zip")
             self.log.info("generating stage: %s", zip_fn)
             with zipfile.ZipFile(zip_fn, "w", zipfile.ZIP_DEFLATED) as zip_f:
                 # Read all directory, subdirectories and file lists
