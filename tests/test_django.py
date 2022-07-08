@@ -435,7 +435,14 @@ class CustomDjangoMySQLConverterTests(tests.MySQLConnectorTests):
         }
         cnx = self.create_connection()
         cnx.close()
-        del settings.DATABASES['default']['OPTIONS']
+
+    def test_init_command(self):
+        settings.DATABASES["default"]["OPTIONS"] = {
+            "init_command": "SET foo='bar'",
+        }
+        cnx = self.create_connection()
+        cnx.close()
+        del settings.DATABASES["default"]["OPTIONS"]
 
 
 class BugOra20106629(tests.MySQLConnectorTests):
