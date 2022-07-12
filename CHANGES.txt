@@ -8,6 +8,11 @@ Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.31
+=======
+
+- BUG#28491115: Connector/Python crashes on 0 time value
+
 v8.0.30
 =======
 

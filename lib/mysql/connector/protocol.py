@@ -539,6 +539,8 @@ class MySQLProtocol:
     def _parse_binary_time(packet):
         """Parse a time value from a binary packet"""
         length = packet[0]
+        if not length:
+            return (packet[1:], datetime.timedelta())
         data = packet[1 : length + 1]
         mcs = 0
         if length > 8:

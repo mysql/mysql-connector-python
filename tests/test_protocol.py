@@ -431,6 +431,10 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
                 datetime.timedelta(10, 58530, 230000),
                 bytearray(b"\x0c\x00\x0a\x00\x00\x00" b"\x10\x0f\x1e\x70\x82\x03\x00"),
             ),
+            (
+                datetime.timedelta(0),
+                bytearray(b"\x00"),
+            ),
         ]
         for exp, data in cases:
             res = self._protocol._parse_binary_time(data + b"\x00\x00")

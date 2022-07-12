@@ -46,6 +46,7 @@ import io
 import os
 import pickle
 import platform
+import struct
 import sys
 import tempfile
 import time
@@ -6940,3 +6941,41 @@ class BugOra34228442(tests.MySQLConnectorTests):
             self.assertEqual(res[0][0], "test")
             self.assertEqual(self.cnx.sql_mode, "NO_BACKSLASH_ESCAPES")
             cur.execute(f"DROP TABLE IF EXISTS {table}")
+
+
+class BugOra28491115(tests.MySQLConnectorTests):
+    """BUG#28491115: MySQL-Connector-Python Crashes On 0 Time Value.
+
+    a) The mysql-python-connector binary protocol appears to crash on
+    time value of 0 because it does not deal with payload of size 0
+    correctly.
+    b) When querying a TIME field that is set to 00:00:00,
+    mysql.connector throws an exception when trying to unpack the
+    result.
+
+    Also fixes BUG#34006512 (Mysql.Connector Throws Exception When Time Field Is 0).
+    """
+
+    @foreach_cnx()
+    def test_crash_on_time_0value(self):
+        table_name = "BugOra28491115"
+        with self.cnx.cursor(prepared=True) as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+            cur.execute(f"CREATE TABLE {table_name} (a TIME)")
+            cur.execute(f"INSERT INTO {table_name} VALUES (0)")
+            cur.execute(f"SELECT * FROM {table_name}")
+            res = cur.fetchall()
+            self.assertEqual(res[0][0], timedelta(0))
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+    @foreach_cnx()
+    def test_exception_when_time_field_is_0(self):
+        table_name = "BugOra34006512"
+        with self.cnx.cursor(prepared=True) as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+            cur.execute(f"CREATE TEMPORARY TABLE {table_name} (b TIME)")
+            cur.execute(f"INSERT INTO {table_name} SET b='00:00'")
+            cur.execute(f"SELECT * FROM {table_name}")
+            res = cur.fetchall()
+            self.assertEqual(res[0][0], timedelta(0))
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
