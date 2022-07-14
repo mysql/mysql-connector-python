@@ -503,8 +503,10 @@ class MySQLCursorTests(tests.TestsCursor):
             ("Warning", 1292, "Truncated incorrect DOUBLE value: 'a'"),
             ("Warning", 1292, "Truncated incorrect DOUBLE value: 'b'"),
         ]
-        self.assertTrue(tests.cmp_result(exp, self.cur._fetch_warnings()))
+        res = self.cur._fetch_warnings()
+        self.assertTrue(tests.cmp_result(exp, res))
         self.assertEqual(len(exp), self.cur._warning_count)
+        self.assertEqual(len(res), self.cur.warning_count)
 
     def test__handle_noresultset(self):
         """MySQLCursor object _handle_noresultset()-method"""

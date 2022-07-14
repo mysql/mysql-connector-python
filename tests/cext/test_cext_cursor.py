@@ -108,6 +108,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         res = cur._fetch_warnings()
         self.assertTrue(tests.cmp_result(exp, res))
         self.assertEqual(len(exp), cur._warning_count)
+        self.assertEqual(len(res), cur.warning_count)
 
     def test_execute(self):
         self.cnx.get_warnings = True
