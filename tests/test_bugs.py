@@ -6979,3 +6979,44 @@ class BugOra28491115(tests.MySQLConnectorTests):
             res = cur.fetchall()
             self.assertEqual(res[0][0], timedelta(0))
             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+
+class BugOra34283402(tests.MySQLConnectorTests):
+    """BUG#34283402: Binary data starting with 0x00 are returned as empty string.
+
+    This patch fixes an issue introduced by BUG#33747585 that fixed the
+    UnicodeDecodeError raised in the c-ext implementation when using an
+    expression as a column without an alias.
+    """
+
+    @foreach_cnx()
+    def test_binary_data_started_with_0x00(self):
+        table_name = "BugOra34283402"
+        exp = [
+            (bytearray(b'\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff\x00'),),
+            (bytearray(b'\x11"\x003DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff'),),
+            (bytearray(b'\x00\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff'),),
+        ]
+        with self.cnx.cursor() as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+            cur.execute(
+                f"""
+                    CREATE TABLE `{table_name}` (
+                        `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+                        `data` binary(16) DEFAULT NULL,
+                        PRIMARY KEY (`id`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+                """
+            )
+            cur.execute(
+                f"""
+                    INSERT INTO {table_name} (data) VALUES
+                    (0x112233445566778899aabbccddeeff00),
+                    (0x11220033445566778899aabbccddeeff),
+                    (0x00112233445566778899aabbccddeeff)
+                """
+            )
+            cur.execute(f"SELECT data FROM {table_name}")
+            res = cur.fetchall()
+            self.assertEqual(exp, res)
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")

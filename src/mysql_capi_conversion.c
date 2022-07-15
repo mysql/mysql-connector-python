@@ -674,10 +674,6 @@ mytopy_string(const char *data, enum_field_types field_type,
         return PyByteArray_FromStringAndSize(data, field_length);
     }
 
-    if (data[0] == '\0') {
-        return PyUnicode_FromString("");
-    }
-
     /* 'binary' charset = 63 */
     if (use_unicode && (field_type == MYSQL_TYPE_JSON || field_charsetnr != 63)) {
         return PyUnicode_Decode(data, field_length, charset, NULL);

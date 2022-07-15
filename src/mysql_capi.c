@@ -244,26 +244,47 @@ fetch_fields(MYSQL_RES *result, unsigned int num_fields, MY_CHARSET_INFO *cs,
             return NULL;  // decode error
         PyTuple_SET_ITEM(field, 1, decoded);
 
-        decoded = mytopy_string(myfs[i].table, myfs[i].type, 45, myfs[i].table_length, charset,
-                                use_unicode);
+        if (myfs[i].table[0] == '\0') {
+            decoded = PyUnicode_FromString("");
+        }
+        else {
+            decoded = mytopy_string(myfs[i].table, myfs[i].type, 45, myfs[i].table_length,
+                                    charset, use_unicode);
+        }
         if (NULL == decoded)
             return NULL;  // decode error
         PyTuple_SET_ITEM(field, 2, decoded);
 
-        decoded = mytopy_string(myfs[i].org_table, myfs[i].type, 45, myfs[i].org_table_length,
-                                charset, use_unicode);
+        if (myfs[i].org_table[0] == '\0') {
+            decoded = PyUnicode_FromString("");
+        }
+        else {
+            decoded = mytopy_string(myfs[i].org_table, myfs[i].type, 45,
+                                    myfs[i].org_table_length, charset, use_unicode);
+        }
         if (NULL == decoded)
             return NULL;  // decode error
         PyTuple_SET_ITEM(field, 3, decoded);
 
-        decoded = mytopy_string(myfs[i].name, myfs[i].type, 45, myfs[i].name_length, charset,
-                                use_unicode);
+        if (myfs[i].name[0] == '\0') {
+            decoded = PyUnicode_FromString("");
+        }
+        else {
+            decoded = mytopy_string(myfs[i].name, myfs[i].type, 45, myfs[i].name_length,
+                                    charset, use_unicode);
+        }
         if (NULL == decoded)
             return NULL;  // decode error
         PyTuple_SET_ITEM(field, 4, decoded);
 
-        decoded = mytopy_string(myfs[i].org_name, myfs[i].type, 45, myfs[i].org_name_length,
-                                charset, use_unicode);
+
+        if (myfs[i].org_name[0] == '\0') {
+            decoded = PyUnicode_FromString("");
+        }
+        else {
+            decoded = mytopy_string(myfs[i].org_name, myfs[i].type, 45,
+                                    myfs[i].org_name_length, charset, use_unicode);
+        }
         if (NULL == decoded)
             return NULL;  // decode error
         PyTuple_SET_ITEM(field, 5, decoded);
