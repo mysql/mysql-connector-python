@@ -1658,6 +1658,12 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx.database = exp
         self.assertEqual(exp, self.cnx.database)
 
+    def test_non_existent_database(self):
+        """Test the raise of ProgrammingError when using a non-existent database."""
+        with self.assertRaises(errors.ProgrammingError) as context:
+            self.cnx.database = "non_existent_database"
+        self.assertIn("Unknown database", context.exception.msg)
+
     def test_autocommit(self):
         for exp in [False, True]:
             self.cnx.autocommit = exp

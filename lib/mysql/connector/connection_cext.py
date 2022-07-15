@@ -186,7 +186,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
     @database.setter
     def database(self, value):
         """Set the current database"""
-        self._cmysql.select_db(value)
+        try:
+            self._cmysql.select_db(value)
+        except MySQLInterfaceError as err:
+            raise get_mysql_exception(
+                msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
+            ) from err
 
     @property
     def in_transaction(self):
@@ -331,14 +336,19 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def info_query(self, query):
         """Send a query which only returns 1 row"""
-        self._cmysql.query(query)
         first_row = ()
-        if self._cmysql.have_result_set:
-            first_row = self._cmysql.fetch_row()
-            if self._cmysql.fetch_row():
-                self._cmysql.free_result()
-                raise InterfaceError("Query should not return more than 1 row")
-        self._cmysql.free_result()
+        try:
+            self._cmysql.query(query)
+            if self._cmysql.have_result_set:
+                first_row = self._cmysql.fetch_row()
+                if self._cmysql.fetch_row():
+                    self._cmysql.free_result()
+                    raise InterfaceError("Query should not return more than 1 row")
+            self._cmysql.free_result()
+        except MySQLInterfaceError as err:
+            raise get_mysql_exception(
+                msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
+            ) from err
 
         return first_row
 

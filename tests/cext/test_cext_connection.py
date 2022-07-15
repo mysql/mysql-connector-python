@@ -211,3 +211,9 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         # Test when connection is closed
         self.cnx.close()
         self.assertRaises(errors.OperationalError, self.cnx.cursor)
+
+    def test_non_existent_database(self):
+        """Test the raise of ProgrammingError when using a non existent database."""
+        with self.assertRaises(errors.ProgrammingError) as context:
+            self.cnx.database = "non_existent_database"
+        self.assertIn("Unknown database", context.exception.msg)

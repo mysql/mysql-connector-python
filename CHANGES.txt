@@ -13,6 +13,7 @@ v8.0.31
 
 - BUG#34283402: Binary data starting with 0x00 are returned as empty string
 - BUG#28491115: Connector/Python crashes on 0 time value
+- BUG#28295478: Align exception types raised by pure Python and c-ext
 - BUG#27634910: Add warning count method to cursors
 
 v8.0.30

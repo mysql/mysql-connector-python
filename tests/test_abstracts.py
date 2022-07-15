@@ -163,6 +163,11 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         for query, exp in queries:
             self.assertEqual(exp, self.cnx.info_query(query))
 
+        # Test invalid query raised error
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.info_query, "SELECT invalid query"
+        )
+
     @foreach_cnx()
     def test_cmd_init_db(self):
         self.assertRaises(
