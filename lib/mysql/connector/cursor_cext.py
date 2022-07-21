@@ -430,9 +430,14 @@ class CMySQLCursor(MySQLCursorAbstract):
         try:
             argnames = []
             argtypes = []
+
+            # MySQL itself does support calling procedures with their full
+            # name <database>.<procedure_name>. It's necessary to split
+            # by '.' and grab the procedure name from procname.
+            procname_abs = procname.split(".")[-1]
             if args:
                 for idx, arg in enumerate(args):
-                    argname = argfmt.format(name=procname, index=idx + 1)
+                    argname = argfmt.format(name=procname_abs, index=idx + 1)
                     argnames.append(argname)
                     if isinstance(arg, tuple):
                         argtypes.append(f" CAST({argname} AS {arg[1]})")

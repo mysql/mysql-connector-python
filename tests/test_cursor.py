@@ -801,12 +801,22 @@ class MySQLCursorTests(tests.TestsCursor):
             "BEGIN SET pConCat := CONCAT(pStr1, pStr2); END;"
         )
 
+        stmt_create5 = f"""
+            CREATE PROCEDURE {cnx.database}.myconnpy_sp_5(IN user_value INT)
+            BEGIN
+                SET @user_value = user_value;
+                SELECT @user_value AS 'user_value', CURRENT_TIMESTAMP as
+                'timestamp';
+            END
+        """
+
         try:
             cur = cnx.cursor()
             cur.execute(stmt_create1)
             cur.execute(stmt_create2)
             cur.execute(stmt_create3)
             cur.execute(stmt_create4)
+            cur.execute(stmt_create5)
         except errors.Error as err:
             self.fail("Failed setting up test stored routine; {0}".format(err))
         cur.close()
@@ -818,6 +828,7 @@ class MySQLCursorTests(tests.TestsCursor):
             "myconnpy_sp_2",
             "myconnpy_sp_3",
             "myconnpy_sp_4",
+            f"{cnx.database}.myconnpy_sp_5",
         )
         stmt_drop = "DROP PROCEDURE IF EXISTS {procname}"
 
@@ -871,6 +882,11 @@ class MySQLCursorTests(tests.TestsCursor):
         result = self.cur.callproc(
             "myconnpy_sp_4", (exp[0], (exp[1], "CHAR"), (0, "CHAR"))
         )
+        self.assertTrue(isinstance(self.cur._stored_results, list))
+        self.assertEqual(exp, result)
+
+        exp = (5,)
+        result = self.cur.callproc(f"{self.cnx.database}.myconnpy_sp_5", exp)
         self.assertTrue(isinstance(self.cur._stored_results, list))
         self.assertEqual(exp, result)
 
