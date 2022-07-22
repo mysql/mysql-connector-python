@@ -681,13 +681,16 @@ class BuildExt(build_ext, BaseCommand):
                 ext.extra_compile_args.append("-Wno-unknown-pragmas")
 
         if os.name != "nt":
-            cmd_gcc_ver = ["gcc", "-v"]
-            self.log.info("Executing: {0}".format(" ".join(cmd_gcc_ver)))
-            proc = Popen(cmd_gcc_ver, stdout=PIPE, universal_newlines=True)
+            is_macos = platform.system() == "Darwin"
+            cc = os.environ.get("CC", "clang" if is_macos else "gcc")
+            cxx = os.environ.get("CXX", "clang++" if is_macos else "g++")
+            cmd_cc_ver = [cc, "-v"]
+            self.log.info("Executing: %s", " ".join(cmd_cc_ver))
+            proc = Popen(cmd_cc_ver, stdout=PIPE, universal_newlines=True)
             self.log.info(proc.communicate())
-            cmd_gpp_ver = ["g++", "-v"]
-            self.log.info("Executing: {0}".format(" ".join(cmd_gcc_ver)))
-            proc = Popen(cmd_gpp_ver, stdout=PIPE, universal_newlines=True)
+            cmd_cxx_ver = [cxx, "-v"]
+            self.log.info("Executing: %s", " ".join(cmd_cxx_ver))
+            proc = Popen(cmd_cxx_ver, stdout=PIPE, universal_newlines=True)
             self.log.info(proc.communicate())
 
         # Remove disabled extensions
