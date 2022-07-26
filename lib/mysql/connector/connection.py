@@ -1161,6 +1161,11 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns a dict()
         """
+        if not isinstance(charset, int):
+            raise ValueError("charset must be an integer")
+        if charset < 0:
+            raise ValueError("charset should be either zero or a postive integer")
+
         self._mfa_nfactor = 1
         self._user = username
         self._password = password

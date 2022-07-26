@@ -72,6 +72,7 @@ from mysql.connector import (
     errors,
     network,
 )
+from mysql.connector.constants import DEFAULT_CONFIGURATION
 from mysql.connector.conversion import MySQLConverter, MySQLConverterBase
 from mysql.connector.errors import InterfaceError, NotSupportedError, ProgrammingError
 from mysql.connector.network import TLS_V1_3_SUPPORTED, MySQLTCPSocket, MySQLUnixSocket
@@ -740,6 +741,14 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             username="ham",
             password="spam",
             database="mysql",
+        )
+        self.assertRaises(
+            ValueError,
+            self.cnx.cmd_change_user,
+            username="ham",
+            password="spam",
+            database="mysql",
+            charset=-1,
         )
 
     def test__do_handshake(self):
@@ -1550,6 +1559,16 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         self.cnx.set_charset_collation(collation="greek_bin")
         self.assertEqual(70, self.cnx._charset_id)
+
+        for charset in {None, "", 0}:
+            # expecting default charset
+            self.cnx.set_charset_collation(charset=charset)
+            self.assertEqual(DEFAULT_CONFIGURATION["charset"], self.cnx.charset)
+
+        for collation in {None, ""}:
+            # expecting default charset
+            self.cnx.set_charset_collation(collation=collation)
+            self.assertEqual(DEFAULT_CONFIGURATION["charset"], self.cnx.charset)
 
         utf8_charset = "utf8mb3" if tests.MYSQL_VERSION[:2] == (8, 0) else "utf8"
         self.cnx.set_charset_collation(utf8_charset)

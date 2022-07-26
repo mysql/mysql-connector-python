@@ -1007,6 +1007,12 @@ class MySQLConnectionAbstract(ABC):
            set_charset('latin1','latin1_general_ci')
 
         """
+        err_msg = "{} should be either integer, string or None"
+        if not isinstance(charset, (int, str)) and charset is not None:
+            raise ValueError(err_msg.format("charset"))
+        if not isinstance(collation, str) and collation is not None:
+            raise ValueError("collation should be either string or None")
+
         if charset:
             if isinstance(charset, int):
                 (
@@ -1021,13 +1027,20 @@ class MySQLConnectionAbstract(ABC):
                     collation_name,
                 ) = CharacterSet.get_charset_info(charset, collation)
             else:
-                raise ValueError("charset should be either integer, string or None")
+                raise ValueError(err_msg.format("charset"))
         elif collation:
             (
                 self._charset_id,
                 charset_name,
                 collation_name,
             ) = CharacterSet.get_charset_info(collation=collation)
+        else:
+            charset = DEFAULT_CONFIGURATION["charset"]
+            (
+                self._charset_id,
+                charset_name,
+                collation_name,
+            ) = CharacterSet.get_charset_info(charset, collation=None)
 
         self._execute_query(f"SET NAMES '{charset_name}' COLLATE '{collation_name}'")
 

@@ -38,7 +38,7 @@ import tests
 from mysql.connector import cursor, cursor_cext, errors
 from mysql.connector.connection import MySQLConnection
 from mysql.connector.connection_cext import CMySQLConnection
-from mysql.connector.constants import ClientFlag, flag_is_set
+from mysql.connector.constants import DEFAULT_CONFIGURATION, ClientFlag, flag_is_set
 
 
 class CMySQLConnectionTests(tests.MySQLConnectorTests):
@@ -217,3 +217,15 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         with self.assertRaises(errors.ProgrammingError) as context:
             self.cnx.database = "non_existent_database"
         self.assertIn("Unknown database", context.exception.msg)
+
+    def test_set_charset_collation(self):
+        """Set the character set and collation"""
+        for charset in {None, "", 0}:
+            # expecting default charset
+            self.cnx.set_charset_collation(charset=charset)
+            self.assertEqual(DEFAULT_CONFIGURATION["charset"], self.cnx.charset)
+
+        for collation in {None, ""}:
+            # expecting default charset
+            self.cnx.set_charset_collation(collation=collation)
+            self.assertEqual(DEFAULT_CONFIGURATION["charset"], self.cnx.charset)
