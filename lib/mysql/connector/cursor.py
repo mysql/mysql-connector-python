@@ -520,8 +520,11 @@ class MySQLCursor(CursorBase):
         if not operation:
             return None
 
-        if not self._connection:
-            raise ProgrammingError("Cursor is not connected")
+        try:
+            if not self._connection:
+                raise ProgrammingError
+        except (ProgrammingError, ReferenceError) as err:
+            raise ProgrammingError("Cursor is not connected") from err
 
         self._connection.handle_unread_result()
 

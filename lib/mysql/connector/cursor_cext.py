@@ -244,8 +244,11 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not operation:
             return None
 
-        if not self._cnx or self._cnx.is_closed():
-            raise ProgrammingError("Cursor is not connected", 2055)
+        try:
+            if not self._cnx or self._cnx.is_closed():
+                raise ProgrammingError
+        except (ProgrammingError, ReferenceError) as err:
+            raise ProgrammingError("Cursor is not connected", 2055) from err
         self._cnx.handle_unread_result()
 
         stmt = ""
@@ -352,8 +355,11 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not operation or not seq_params:
             return None
 
-        if not self._cnx:
-            raise ProgrammingError("Cursor is not connected")
+        try:
+            if not self._cnx:
+                raise ProgrammingError
+        except (ProgrammingError, ReferenceError) as err:
+            raise ProgrammingError("Cursor is not connected") from err
         self._cnx.handle_unread_result()
 
         if not isinstance(seq_params, (list, tuple)):
@@ -1008,8 +1014,11 @@ class CMySQLCursorPrepared(CMySQLCursor):
         if not operation:
             return
 
-        if not self._cnx or self._cnx.is_closed():
-            raise ProgrammingError("Cursor is not connected", 2055)
+        try:
+            if not self._cnx or self._cnx.is_closed():
+                raise ProgrammingError
+        except (ProgrammingError, ReferenceError) as err:
+            raise ProgrammingError("Cursor is not connected", 2055) from err
 
         self._cnx.handle_unread_result(prepared=True)
 

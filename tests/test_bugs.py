@@ -7020,3 +7020,28 @@ class BugOra34283402(tests.MySQLConnectorTests):
             res = cur.fetchall()
             self.assertEqual(exp, res)
             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+
+class BugOra21463298(tests.MySQLConnectorTests):
+    """BUG#21463298: Fix weakly-referenced object no longer exists exception.
+
+    Connector/Python cursors contain a weak reference to the connection,
+    and a weak reference to an object is not enough to keep the object
+    alive. So when the connection object is destroyed and the cursor is
+    used, a ReferenceError exception is raised saying that the
+    weakly-referenced object no longer exists.
+
+    With this patch a ProgrammingError exception is raised instead saying
+    the cursor is not connected.
+    """
+
+    @foreach_cnx()
+    def test_weakly_referenced_error(self):
+        config = tests.get_mysql_config()
+
+        def get_cursor():
+            return self.cnx.__class__(**config).cursor()
+
+        with self.assertRaises(errors.ProgrammingError) as context:
+            get_cursor().execute("SELECT SLEEP(1)")
+        self.assertEqual(context.exception.msg, "Cursor is not connected")
