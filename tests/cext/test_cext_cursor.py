@@ -658,6 +658,103 @@ class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
         cur.execute("SELECT 1")
         self.assertTrue(cur.with_rows)
 
+    def test_executemany(self):
+        tbl = "myconnpy_cursor"
+        self.setup_table(self.cnx, tbl)
+
+        stmt_insert = "INSERT INTO {0} (col1,col2) VALUES (%s,%s)".format(tbl)
+        stmt_select = "SELECT col1,col2 FROM {0} ORDER BY col1".format(tbl)
+
+        cur = self._get_cursor(self.cnx)
+
+        res = cur.executemany(stmt_insert, [(1, 100), (2, 200), (3, 300)])
+        self.assertEqual(3, cur.rowcount)
+
+        res = cur.executemany("SELECT %s", [("f",), ("o",), ("o",)])
+        self.assertEqual(3, cur.rowcount)
+
+        data = [{"id": 2}, {"id": 3}]
+        stmt = "SELECT * FROM {0} WHERE col1 <= %(id)s".format(tbl)
+        cur.executemany(stmt, data)
+        self.assertEqual(5, cur.rowcount)
+
+        cur.execute(stmt_select)
+        self.assertEqual(
+            [(1, "100"), (2, "200"), (3, "300")],
+            cur.fetchall(),
+            "Multi insert test failed",
+        )
+
+        data = [{"id": 2}, {"id": 3}]
+        stmt = "DELETE FROM {0} WHERE col1 = %(id)s".format(tbl)
+        cur.executemany(stmt, data)
+        self.assertEqual(2, cur.rowcount)
+
+        stmt = "TRUNCATE TABLE {0}".format(tbl)
+        cur.execute(stmt)
+
+        stmt = (
+            "/*comment*/INSERT/*comment*/INTO/*comment*/{0}(col1,col2)VALUES"
+            "/*comment*/(%s,%s/*comment*/)/*comment()*/ON DUPLICATE KEY UPDATE"
+            " col1 = VALUES(col1)"
+        ).format(tbl)
+
+        cur.executemany(stmt, [(4, 100), (5, 200), (6, 300)])
+        self.assertEqual(3, cur.rowcount)
+
+        cur.execute(stmt_select)
+        self.assertEqual(
+            [(4, "100"), (5, "200"), (6, "300")],
+            cur.fetchall(),
+            "Multi insert test failed",
+        )
+
+        stmt = "TRUNCATE TABLE {0}".format(tbl)
+        cur.execute(stmt)
+
+        stmt = (
+            "INSERT INTO/*comment*/{0}(col1,col2)VALUES"
+            "/*comment*/(%s,'/*100*/')/*comment()*/ON DUPLICATE KEY UPDATE "
+            "col1 = VALUES(col1)"
+        ).format(tbl)
+
+        cur.executemany(stmt, [(4,), (5,)])
+        self.assertEqual(2, cur.rowcount)
+
+        cur.execute(stmt_select)
+        self.assertEqual(
+            [(4, "/*100*/"), (5, "/*100*/")],
+            cur.fetchall(),
+            "Multi insert test failed",
+        )
+
+        # BugOra21529893
+        table_name = "BugOra21529893"
+        data_list = [
+            [
+                ("A", "B"),
+            ],
+            [
+                ("C", "D"),
+                ("O", "P"),
+            ],
+        ]
+        stmt = f"select %s,%s from {table_name} a,{table_name} b"
+        cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+        cur.execute(
+            f"create table {table_name}(c1 char(32),c2 longblob)DEFAULT CHARSET utf8"
+        )
+        cur.execute(f"insert into {table_name} values('1','1'),('2','2'),('3','3')")
+        for data in data_list:
+            cur.executemany(stmt, data)
+            self.assertEqual(9 * len(data), cur.rowcount)
+            self.assertEqual([data[-1] for _ in range(9)], cur.fetchall())
+            self.assertEqual(9 * len(data), cur.rowcount)
+            self.assertEqual([], cur.fetchall())
+        cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+        cur.close()
+
 
 class CMySQLCursorRawTests(tests.CMySQLCursorTests):
     def _get_cursor(self, cnx=None):

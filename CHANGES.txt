@@ -17,6 +17,7 @@ v8.0.31
 - BUG#28491115: Connector/Python crashes on 0 time value
 - BUG#28295478: Align exception types raised by pure Python and c-ext
 - BUG#27634910: Add warning count method to cursors
+- BUG#21529893: Resultset handling not proper in C-Python with c-ext
 - BUG#21463298: Fix weakly-referenced object no longer exists exception
 - BUG#21402805: Unbound local error when charset name is given as empty to set_charset_collation()
 

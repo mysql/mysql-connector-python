@@ -351,7 +351,27 @@ class CMySQLCursor(MySQLCursorAbstract):
             raise InterfaceError(f"Failed executing the operation; {err}") from None
 
     def executemany(self, operation, seq_params):
-        """Execute the given operation multiple times"""
+        """Execute the given operation multiple times
+
+        The executemany() method will execute the operation iterating
+        over the list of parameters in seq_params.
+
+        Example: Inserting 3 new employees and their phone number
+
+        data = [
+            ('Jane','555-001'),
+            ('Joe', '555-001'),
+            ('John', '555-003')
+            ]
+        stmt = "INSERT INTO employees (name, phone) VALUES ('%s','%s)"
+        cursor.executemany(stmt, data)
+
+        INSERT statements are optimized by batching the data, that is
+        using the MySQL multiple rows syntax.
+
+        Results are discarded! If they are needed, consider looping over
+        data using the execute() method.
+        """
         if not operation or not seq_params:
             return None
 
@@ -377,22 +397,18 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         rowcnt = 0
         try:
+            # When processing read ops (e.g., SELECT), rowcnt is updated
+            # based on self._rowcount. For write ops (e.g., INSERT) is
+            # updated based on self._affected_rows.
+            # The variable self._description is None for write ops, that's
+            # why we use it as indicator for updating rowcnt.
             for params in seq_params:
                 self.execute(operation, params)
-                try:
-                    while True:
-                        if self._description:
-                            rowcnt += len(self._cnx.get_rows()[0])
-                        else:
-                            rowcnt += self._affected_rows
-                        if not self.nextset():
-                            break
-                except StopIteration:
-                    # No more results
-                    pass
-
+                if self.with_rows and self._cnx.unread_result:
+                    self.fetchall()
+                rowcnt += self._rowcount if self.description else self._affected_rows
         except (ValueError, TypeError) as err:
-            raise ProgrammingError(f"Failed executing the operation; {err}") from err
+            raise InterfaceError(f"Failed executing the operation; {err}") from None
 
         self._rowcount = rowcnt
         return None
@@ -769,6 +785,17 @@ class CMySQLCursorBuffered(CMySQLCursor):
         """
         self._check_executed()
         return self._fetch_row()
+
+    @property
+    def with_rows(self):
+        """Returns whether the cursor could have rows returned
+
+        This property returns True when rows are available,
+        which will need to be fetched.
+
+        Returns True or False.
+        """
+        return self._rows is not None
 
 
 class CMySQLCursorRaw(CMySQLCursor):
