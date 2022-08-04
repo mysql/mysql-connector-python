@@ -91,6 +91,7 @@ DEFAULT_CONFIGURATION = {
     'krb_service_principal': None,
     'oci_config_file': None,
     'fido_callback': None,
+    'init_command': None,
 }
 
 CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')

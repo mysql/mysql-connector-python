@@ -138,6 +138,8 @@ class MySQLConnectionAbstract(object):
 
         self._consume_results = False
 
+        self._init_command = None
+
     def __enter__(self):
         return self
 
@@ -545,6 +547,11 @@ class MySQLConnectionAbstract(object):
         if self._ssl_disabled and self._auth_plugin == "mysql_clear_password":
             raise errors.InterfaceError("Clear password authentication is not "
                                         "supported over insecure channels")
+
+        # If an init_command is set, keep it, so we can execute it in _post_connection
+        if "init_command" in config:
+            self._init_command = config["init_command"]
+            del config["init_command"]
 
         # Other configuration
         set_ssl_flag = False
@@ -1031,6 +1038,8 @@ class MySQLConnectionAbstract(object):
             self.time_zone = self._time_zone
         if self._sql_mode:
             self.sql_mode = self._sql_mode
+        if self._init_command:
+            self._execute_query(self._init_command)
 
     @abstractmethod
     def disconnect(self):
