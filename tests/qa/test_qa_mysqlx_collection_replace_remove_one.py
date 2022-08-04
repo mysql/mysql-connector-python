@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -96,10 +96,7 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertEqual(result["company"], "pqr")
         result["name"] = "abc"
         result["company"] = "mnc"
-        self.assertRaises(
-            mysqlx.ProgrammingError,
-            collection.replace_one, "1", result
-        )
+        self.assertRaises(mysqlx.ProgrammingError, collection.replace_one, "1", result)
         self.schema.drop_collection("mycoll3")
 
     @tests.foreach_session()
@@ -177,9 +174,7 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         result = collection.find("$.age == 21").execute().fetch_one()
         self.assertEqual(result["name"], "abc")
         upsert = {"name": "new", "age": 22}
-        collection.add_or_replace_one(
-            3, upsert
-        )  # id exist, so it adds with that id
+        collection.add_or_replace_one(3, upsert)  # id exist, so it adds with that id
         result = collection.find("_id == 3").execute().fetch_one()
         self.assertEqual(result["name"], "new")
         self.schema.drop_collection("mycoll2")
@@ -212,9 +207,7 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         result = collection.find("$.age == 21").execute().fetch_one()
         self.assertEqual(result["name"], "abc")
         upsert = {"comp": 369, "age": 22}
-        collection.add_or_replace_one(
-            1, upsert
-        )  # id exist, so it adds with that id
+        collection.add_or_replace_one(1, upsert)  # id exist, so it adds with that id
         result = collection.find("_id == 1").execute().fetch_one()
         self.assertEqual(result["comp"], 369)
         self.schema.drop_collection("mycoll3")
@@ -265,6 +258,10 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertEqual(len(result), 0)
         self.schema.drop_collection("mycoll1")
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @tests.foreach_session()
     def test_collection_remove_one2(self):
         """Test remove_one() when matching ID not found - succeeds and
@@ -293,15 +290,9 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         result = collection.find("$.age == 21").execute().fetch_one()
         self.assertEqual(result["name"], "joy")
         result["name"] = "abc"
-        self.assertRaises(
-            mysqlx.ProgrammingError,
-            collection.replace_one, None, result
-        )
+        self.assertRaises(mysqlx.ProgrammingError, collection.replace_one, None, result)
         result["name"] = "new"
-        self.assertRaises(
-            mysqlx.ProgrammingError,
-            collection.replace_one, "", result
-        )
+        self.assertRaises(mysqlx.ProgrammingError, collection.replace_one, "", result)
         self.schema.drop_collection("mycoll1")
 
     @tests.foreach_session()
@@ -328,9 +319,7 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertEqual(len(result), 5)
         self.schema.drop_collection("mycoll2")
 
-    @unittest.skipUnless(
-        tests.ARCH_64BIT, "Test available only for 64 bit platforms"
-    )
+    @unittest.skipUnless(tests.ARCH_64BIT, "Test available only for 64 bit platforms")
     @unittest.skipIf(os.name == "nt", "Test not available for Windows")
     @tests.foreach_session()
     def test_collection_replace3(self):
@@ -352,9 +341,11 @@ class CollectionReplaceRemoveOneTests(tests.MySQLxTests):
         self.assertIsNone(result3)
         self.schema.drop_collection("mycoll3")
 
-    @unittest.skipUnless(
-        tests.ARCH_64BIT, "Test available only for 64 bit platforms"
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
     )
+    @unittest.skipUnless(tests.ARCH_64BIT, "Test available only for 64 bit platforms")
     @unittest.skipIf(os.name == "nt", "Test not available for Windows")
     @tests.foreach_session()
     def test_collection_replace4(self):

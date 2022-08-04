@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -30,6 +30,7 @@ import unittest
 
 import mysql.connector
 import tests
+
 from mysql.connector.errors import DatabaseError, PoolError
 
 
@@ -71,7 +72,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
             self.assertRaises(
                 mysql.connector.errors.PoolError,
                 mysql.connector.connect,
-                **config
+                **config,
             )
 
     def test_negative_poolsize(self):
@@ -86,7 +87,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
             self.assertRaises(
                 mysql.connector.errors.PoolError,
                 mysql.connector.connect,
-                **config
+                **config,
             )
 
     def test_spchar_name(self):
@@ -123,9 +124,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
         config["pool_size"] = 5
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
-            self.assertRaises(
-                AttributeError, mysql.connector.connect, **config
-            )
+            self.assertRaises(AttributeError, mysql.connector.connect, **config)
 
     def test_numbers_name(self):
         """Test with pool name having only numbers."""
@@ -146,9 +145,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
         config["pool_size"] = 5
         for use_pure in self.use_pure_options:
             config["use_pure"] = use_pure
-            self.assertRaises(
-                AttributeError, mysql.connector.connect, **config
-            )
+            self.assertRaises(AttributeError, mysql.connector.connect, **config)
 
     def test_multipool_samename(self):
         """Test with multiple pool name having same name.
@@ -180,9 +177,7 @@ class WL6080Tests(tests.MySQLConnectorTests):
             config["pool_name"] = "newname{}".format(idx)
             config["pool_size"] = 5
             try:
-                cnx_list.append(
-                    mysql.connector.connect(pool_name=config["pool_name"])
-                )
+                cnx_list.append(mysql.connector.connect(pool_name=config["pool_name"]))
             except DatabaseError as err:
                 self.assertEqual(err.errno, 1040)
             except PoolError:

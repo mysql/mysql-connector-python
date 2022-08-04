@@ -164,6 +164,7 @@
                 <Directory Id="VendorPluginDir37" Name="plugin"/>
               </Directory>
               <Directory Id="ConnectorPackageDir37" Name="connector">
+                <Directory Id="ConnectorPluginsDir37" Name="plugins"/>
                 <Directory Id="DjangoDir37" Name="django"/>
                 <Directory Id="ConnectorLocalesDir37" Name="locales">
                   <Directory Id="LocalesEngDir37" Name="eng"/>
@@ -189,6 +190,7 @@
                 <Directory Id="VendorPluginDir38" Name="plugin"/>
               </Directory>
               <Directory Id="ConnectorPackageDir38" Name="connector">
+                <Directory Id="ConnectorPluginsDir38" Name="plugins"/>
                 <Directory Id="DjangoDir38" Name="django"/>
                 <Directory Id="ConnectorLocalesDir38" Name="locales">
                   <Directory Id="LocalesEngDir38" Name="eng"/>
@@ -214,6 +216,7 @@
                 <Directory Id="VendorPluginDir39" Name="plugin"/>
               </Directory>
               <Directory Id="ConnectorPackageDir39" Name="connector">
+                <Directory Id="ConnectorPluginsDir39" Name="plugins"/>
                 <Directory Id="DjangoDir39" Name="django"/>
                 <Directory Id="ConnectorLocalesDir39" Name="locales">
                   <Directory Id="LocalesEngDir39" Name="eng"/>
@@ -239,6 +242,7 @@
                 <Directory Id="VendorPluginDir310" Name="plugin"/>
               </Directory>
               <Directory Id="ConnectorPackageDir310" Name="connector">
+                <Directory Id="ConnectorPluginsDir310" Name="plugins"/>
                 <Directory Id="DjangoDir310" Name="django"/>
                 <Directory Id="ConnectorLocalesDir310" Name="locales">
                   <Directory Id="LocalesEngDir310" Name="eng"/>
@@ -330,6 +334,7 @@
         <ComponentRef Id="VendorPlugin37"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage37"/>
+        <ComponentRef Id="ConnectorPlugins37"/>
         <ComponentRef Id="ConnectorLocales37"/>
         <ComponentRef Id="LocalesEng37"/>
         <ComponentRef Id="DjangoBackend37"/>
@@ -355,6 +360,7 @@
         <ComponentRef Id="VendorPlugin38"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage38"/>
+        <ComponentRef Id="ConnectorPlugins38"/>
         <ComponentRef Id="ConnectorLocales38"/>
         <ComponentRef Id="LocalesEng38"/>
         <ComponentRef Id="DjangoBackend38"/>
@@ -380,6 +386,7 @@
         <ComponentRef Id="VendorPlugin39"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage39"/>
+        <ComponentRef Id="ConnectorPlugins39"/>
         <ComponentRef Id="ConnectorLocales39"/>
         <ComponentRef Id="LocalesEng39"/>
         <ComponentRef Id="DjangoBackend39"/>
@@ -405,6 +412,7 @@
         <ComponentRef Id="VendorPlugin310"/>
         <?endif?>
         <ComponentRef Id="ConnectorPackage310"/>
+        <ComponentRef Id="ConnectorPlugins310"/>
         <ComponentRef Id="ConnectorLocales310"/>
         <ComponentRef Id="LocalesEng310"/>
         <ComponentRef Id="DjangoBackend310"/>

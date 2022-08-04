@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -62,11 +62,11 @@ unittests.py has exit status 0 when tests were ran successfully, 1 otherwise.
 
 """
 import os
-import sys
-import shutil
 import platform
-import time
 import re
+import shutil
+import sys
+import time
 import unittest
 
 try:
@@ -74,6 +74,7 @@ try:
 except ImportError:
     # Python 3
     from urllib.parse import urlsplit
+
 import logging
 
 try:
@@ -89,6 +90,7 @@ except ImportError:
     from unittest import _TextTestResult as TextTestResult
 
 import tests
+
 from tests import mysqld
 
 _TOPDIR = os.path.dirname(os.path.realpath(__file__))
@@ -97,13 +99,16 @@ tests.setup_logger(LOGGER)
 
 # Only run for supported Python Versions
 if not (((2, 6) <= sys.version_info < (3, 0)) or sys.version_info >= (3, 3)):
-    LOGGER.error("Python v%d.%d is not supported",
-                 sys.version_info[0], sys.version_info[1])
+    LOGGER.error(
+        "Python v%d.%d is not supported",
+        sys.version_info[0],
+        sys.version_info[1],
+    )
     sys.exit(1)
 else:
-    sys.path.insert(0, os.path.join(_TOPDIR, 'lib'))
+    sys.path.insert(0, os.path.join(_TOPDIR, "lib"))
     sys.path.insert(0, os.path.join(_TOPDIR))
-    tests.TEST_BUILD_DIR = os.path.join(_TOPDIR, 'build', 'testing')
+    tests.TEST_BUILD_DIR = os.path.join(_TOPDIR, "build", "testing")
     sys.path.insert(0, tests.TEST_BUILD_DIR)
 
 # MySQL option file template. Platform specifics dynamically added later.
@@ -164,271 +169,289 @@ general_log_file = general_{name}.log
 """
 
 # Platform specifics
-if os.name == 'nt':
-    MY_CNF += '\n'.join((
-        "ssl-ca = {ssl_ca}",
-        "ssl-cert = {ssl_cert}",
-        "ssl-key = {ssl_key}",
-    ))
-    MYSQL_DEFAULT_BASE = os.environ.get("MYSQL", os.path.join(
-        "C:/", "Program Files", "MySQL", "MySQL Server 8.0"))
+if os.name == "nt":
+    MY_CNF += "\n".join(
+        (
+            "ssl-ca = {ssl_ca}",
+            "ssl-cert = {ssl_cert}",
+            "ssl-key = {ssl_key}",
+        )
+    )
+    MYSQL_DEFAULT_BASE = os.environ.get(
+        "MYSQL",
+        os.path.join("C:/", "Program Files", "MySQL", "MySQL Server 8.0"),
+    )
 else:
-    MY_CNF += '\n'.join((
-        "ssl-ca = {ssl_ca}",
-        "ssl-cert = {ssl_cert}",
-        "ssl-key = {ssl_key}",
-        "innodb_flush_method = O_DIRECT",
-    ))
-    MYSQL_DEFAULT_BASE = os.environ.get("MYSQL", os.path.join(
-        "/", "usr", "local", "mysql"))
+    MY_CNF += "\n".join(
+        (
+            "ssl-ca = {ssl_ca}",
+            "ssl-cert = {ssl_cert}",
+            "ssl-key = {ssl_key}",
+            "innodb_flush_method = O_DIRECT",
+        )
+    )
+    MYSQL_DEFAULT_BASE = os.environ.get(
+        "MYSQL", os.path.join("/", "usr", "local", "mysql")
+    )
 
 MY_CNF += "\nssl={ssl}"
 
 MYSQL_DEFAULT_TOPDIR = _TOPDIR
 
 _UNITTESTS_CMD_ARGS = {
-    ('-T', '--one-test'): {
-        'dest': 'onetest', 'metavar': 'NAME',
-        'help': (
-            'Particular test to execute, format: '
-            '<module>[.<class>[.<method>]]. For example, to run a particular '
-            'test BugOra13392739.test_reconnect() from the tests.test_bugs '
-            'module, use following value for the -T option: '
-            ' tests.test_bugs.BugOra13392739.test_reconnect')
+    ("-T", "--one-test"): {
+        "dest": "onetest",
+        "metavar": "NAME",
+        "help": (
+            "Particular test to execute, format: "
+            "<module>[.<class>[.<method>]]. For example, to run a particular "
+            "test BugOra13392739.test_reconnect() from the tests.test_bugs "
+            "module, use following value for the -T option: "
+            " tests.test_bugs.BugOra13392739.test_reconnect"
+        ),
     },
-
-    ('-t', '--test'): {
-        'dest': 'testcase', 'metavar': 'NAME',
-        'help': 'Tests to execute, see --help-tests for more information'
+    ("-t", "--test"): {
+        "dest": "testcase",
+        "metavar": "NAME",
+        "help": "Tests to execute, see --help-tests for more information",
     },
-
-    ('-l', '--log'): {
-        'dest': 'logfile', 'metavar': 'NAME', 'default': None,
-        'help': 'Log file location (if not given, logging is disabled)'
+    ("-l", "--log"): {
+        "dest": "logfile",
+        "metavar": "NAME",
+        "default": None,
+        "help": "Log file location (if not given, logging is disabled)",
     },
-
-    ('', '--force'): {
-        'dest': 'force', 'action': 'store_true', 'default': False,
-        'help': 'Remove previous MySQL test installation.'
+    ("", "--force"): {
+        "dest": "force",
+        "action": "store_true",
+        "default": False,
+        "help": "Remove previous MySQL test installation.",
     },
-
-    ('', '--keep'): {
-        'dest': 'keep', 'action': "store_true", 'default': False,
-        'help': 'Keep MySQL installation (i.e. for debugging)'
+    ("", "--keep"): {
+        "dest": "keep",
+        "action": "store_true",
+        "default": False,
+        "help": "Keep MySQL installation (i.e. for debugging)",
     },
-
-    ('', '--debug'): {
-        'dest': 'debug', 'action': 'store_true', 'default': False,
-        'help': 'Show/Log debugging messages'
+    ("", "--debug"): {
+        "dest": "debug",
+        "action": "store_true",
+        "default": False,
+        "help": "Show/Log debugging messages",
     },
-
-    ('', '--verbosity'): {
-        'dest': 'verbosity', 'metavar': 'NUMBER', 'default': 0, 'type': int,
-        'help': 'Verbosity of unittests (default 0)',
-        'type_optparse': 'int'
+    ("", "--verbosity"): {
+        "dest": "verbosity",
+        "metavar": "NUMBER",
+        "default": 0,
+        "type": int,
+        "help": "Verbosity of unittests (default 0)",
+        "type_optparse": "int",
     },
-
-    ('', '--stats'): {
-        'dest': 'stats', 'default': False, 'action': 'store_true',
-        'help': "Show timings of each individual test."
+    ("", "--stats"): {
+        "dest": "stats",
+        "default": False,
+        "action": "store_true",
+        "help": "Show timings of each individual test.",
     },
-
-    ('', '--stats-host'): {
-        'dest': 'stats_host', 'default': None, 'metavar': 'NAME',
-        'help': (
+    ("", "--stats-host"): {
+        "dest": "stats_host",
+        "default": None,
+        "metavar": "NAME",
+        "help": (
             "MySQL server for saving unittest statistics. Specify this option "
-            "to start saving results to a database. Implies --stats.")
+            "to start saving results to a database. Implies --stats."
+        ),
     },
-
-    ('', '--stats-port'): {
-        'dest': 'stats_port', 'default': 3306, 'metavar': 'PORT',
-        'help': (
+    ("", "--stats-port"): {
+        "dest": "stats_port",
+        "default": 3306,
+        "metavar": "PORT",
+        "help": (
             "TCP/IP port of the MySQL server for saving unittest statistics. "
-            "Implies --stats. (default 3306)")
+            "Implies --stats. (default 3306)"
+        ),
     },
-
-    ('', '--stats-user'): {
-        'dest': 'stats_user', 'default': 'root', 'metavar': 'NAME',
-        'help': (
+    ("", "--stats-user"): {
+        "dest": "stats_user",
+        "default": "root",
+        "metavar": "NAME",
+        "help": (
             "User for connecting with the MySQL server for saving unittest "
-            "statistics. Implies --stats. (default root)")
+            "statistics. Implies --stats. (default root)"
+        ),
     },
-
-    ('', '--stats-password'): {
-        'dest': 'stats_password', 'default': '', 'metavar': 'PASSWORD',
-        'help': (
+    ("", "--stats-password"): {
+        "dest": "stats_password",
+        "default": "",
+        "metavar": "PASSWORD",
+        "help": (
             "Password for connecting with the MySQL server for saving unittest "
-            "statistics. Implies --stats. (default to no password)")
+            "statistics. Implies --stats. (default to no password)"
+        ),
     },
-
-    ('', '--stats-db'): {
-        'dest': 'stats_db', 'default': 'test', 'metavar': 'NAME',
-        'help': (
+    ("", "--stats-db"): {
+        "dest": "stats_db",
+        "default": "test",
+        "metavar": "NAME",
+        "help": (
             "Database name for saving unittest statistics. "
-            "Implies --stats. (default test)")
+            "Implies --stats. (default test)"
+        ),
     },
-
-    ('', '--with-mysql'): {
-        'dest': 'mysql_basedir', 'metavar': 'NAME',
-        'default': MYSQL_DEFAULT_BASE,
-        'help': (
-            "Installation folder of the MySQL server. "
-            "(default {default})").format(default=MYSQL_DEFAULT_BASE)
+    ("", "--with-mysql"): {
+        "dest": "mysql_basedir",
+        "metavar": "NAME",
+        "default": MYSQL_DEFAULT_BASE,
+        "help": (
+            "Installation folder of the MySQL server. " "(default {default})"
+        ).format(default=MYSQL_DEFAULT_BASE),
     },
-
-    ('', '--with-mysql-share'): {
-        'dest': 'mysql_sharedir', 'metavar': 'NAME',
-        'default': None,
-        'help': (
-            "share folder of the MySQL server (default <basedir>/share)")
+    ("", "--with-mysql-share"): {
+        "dest": "mysql_sharedir",
+        "metavar": "NAME",
+        "default": None,
+        "help": "share folder of the MySQL server (default <basedir>/share)",
     },
-
-    ('', '--mysql-topdir'): {
-        'dest': 'mysql_topdir', 'metavar': 'NAME',
-        'default': MYSQL_DEFAULT_TOPDIR,
-        'help': (
+    ("", "--mysql-topdir"): {
+        "dest": "mysql_topdir",
+        "metavar": "NAME",
+        "default": MYSQL_DEFAULT_TOPDIR,
+        "help": (
             "Where to bootstrap the new MySQL instances for testing. "
-            "(default {default})").format(default=MYSQL_DEFAULT_TOPDIR)
+            "(default {default})"
+        ).format(default=MYSQL_DEFAULT_TOPDIR),
     },
-
-    ('', '--secure-file-priv'): {
-        'dest': 'secure_file_priv', 'metavar': 'DIRECTORY',
-        'default': None,
-        'help': (
-            "MySQL server option, can be empty to disable")
+    ("", "--secure-file-priv"): {
+        "dest": "secure_file_priv",
+        "metavar": "DIRECTORY",
+        "default": None,
+        "help": "MySQL server option, can be empty to disable",
     },
-
-    ('', '--bind-address'): {
-        'dest': 'bind_address', 'metavar': 'NAME', 'default': '127.0.0.1',
-        'help': 'IP address to bind to'
+    ("", "--bind-address"): {
+        "dest": "bind_address",
+        "metavar": "NAME",
+        "default": "127.0.0.1",
+        "help": "IP address to bind to",
     },
-
-    ('-H', '--host'): {
-        'dest': 'host',
-        'metavar': 'NAME',
-        'default': os.environ.get('MYSQL_HOST', '127.0.0.1'),
-        'help': 'Hostname or IP address for TCP/IP connections to use in a '
-                'bootstrapped server or to use with an external server.'
+    ("-H", "--host"): {
+        "dest": "host",
+        "metavar": "NAME",
+        "default": os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        "help": "Hostname or IP address for TCP/IP connections to use in a "
+        "bootstrapped server or to use with an external server.",
     },
-
-    ('-P', '--port'): {
-        'dest': 'port',
-        'metavar': 'NUMBER',
-        'default': os.environ.get('MYSQL_PORT', 3306),
-        'type': int,
-        'help': 'First TCP/IP port to use in a bootstrapped server or to use '
-                'with an external server.',
-        'type_optparse': int,
+    ("-P", "--port"): {
+        "dest": "port",
+        "metavar": "NUMBER",
+        "default": os.environ.get("MYSQL_PORT", 3306),
+        "type": int,
+        "help": "First TCP/IP port to use in a bootstrapped server or to use "
+        "with an external server.",
+        "type_optparse": int,
     },
-
-    ('', '--mysqlx-port'): {
-        'dest': 'mysqlx_port',
-        'metavar': 'NUMBER',
-        'default': os.environ.get('MYSQLX_PORT', 33060),
-        'type': int,
-        'help': 'First TCP/IP port to use for the mysqlx protocol in a '
-                'bootstrapped server or to use with an external server.',
-        'type_optparse': int,
+    ("", "--mysqlx-port"): {
+        "dest": "mysqlx_port",
+        "metavar": "NUMBER",
+        "default": os.environ.get("MYSQLX_PORT", 33060),
+        "type": int,
+        "help": "First TCP/IP port to use for the mysqlx protocol in a "
+        "bootstrapped server or to use with an external server.",
+        "type_optparse": int,
     },
-
-    ('', '--user'): {
-        'dest': 'user',
-        'default': os.environ.get('MYSQL_USER', 'root'),
-        'metavar': 'NAME',
-        'help': "User to use with an external server."
+    ("", "--user"): {
+        "dest": "user",
+        "default": os.environ.get("MYSQL_USER", "root"),
+        "metavar": "NAME",
+        "help": "User to use with an external server.",
     },
-
-    ('', '--password'): {
-        'dest': 'password',
-        'default': os.environ.get('MYSQL_PASSWORD', ''),
-        'metavar': 'PASSWORD',
-        'help': "Password to use with an external server."
+    ("", "--password"): {
+        "dest": "password",
+        "default": os.environ.get("MYSQL_PASSWORD", ""),
+        "metavar": "PASSWORD",
+        "help": "Password to use with an external server.",
     },
-
-    ('', '--unix-socket'): {
-        'dest': 'unix_socket_folder', 'metavar': 'NAME',
-        'help': 'Folder where UNIX Sockets will be created'
+    ("", "--unix-socket"): {
+        "dest": "unix_socket_folder",
+        "metavar": "NAME",
+        "help": "Folder where UNIX Sockets will be created or the unix socket "
+        "to be used with an external server.",
     },
-
-    ('', '--ipv6'): {
-        'dest': 'ipv6', 'action': 'store_true', 'default': False,
-        'help': (
-            'Use IPv6 to run tests. This sets --bind-address=:: --host=::1.'
-        ),
+    ("", "--ipv6"): {
+        "dest": "ipv6",
+        "action": "store_true",
+        "default": False,
+        "help": "Use IPv6 to run tests. This sets --bind-address=:: --host=::1.",
     },
-
-    ('', '--with-django'): {
-        'dest': 'django_path', 'metavar': 'NAME',
-        'default': None,
-        'help': ("Location of Django (none installed source)")
+    ("", "--with-django"): {
+        "dest": "django_path",
+        "metavar": "NAME",
+        "default": None,
+        "help": "Location of Django (none installed source)",
     },
-
-    ('', '--help-tests'): {
-        'dest': 'show_tests', 'action': 'store_true',
-        'help': ("Show extra information about test groups")
+    ("", "--help-tests"): {
+        "dest": "show_tests",
+        "action": "store_true",
+        "help": "Show extra information about test groups",
     },
-
-    ('', '--skip-install'): {
-        'dest': 'skip_install', 'action': 'store_true', 'default': False,
-        'help': (
-            'Skip installation of Connector/Python, reuse previous.'
-        ),
+    ("", "--skip-install"): {
+        "dest": "skip_install",
+        "action": "store_true",
+        "default": False,
+        "help": "Skip installation of Connector/Python, reuse previous.",
     },
-
-    ('', '--use-external-server'): {
-        'dest': 'use_external_server',
-        'action': 'store_true',
-        'default': False,
-        'help': 'Use an external server instead of bootstrap a server.',
+    ("", "--use-external-server"): {
+        "dest": "use_external_server",
+        "action": "store_true",
+        "default": False,
+        "help": "Use an external server instead of bootstrap a server.",
     },
-
-    ('', '--with-mysql-capi'): {
-        'dest': 'mysql_capi', 'metavar': 'NAME',
-        'default': None,
-        'help': ("Location of MySQL C API installation "
-                 "or full path to mysql_config")
+    ("", "--with-mysql-capi"): {
+        "dest": "mysql_capi",
+        "metavar": "NAME",
+        "default": None,
+        "help": "Location of MySQL C API installation or full path to mysql_config",
     },
-
-    ('', '--with-openssl-include-dir'): {
-        'dest': 'openssl_include_dir', 'metavar': 'NAME',
-        'default': os.environ.get("MYSQLXPB_OPENSSL_INCLUDE_DIR"),
-        'help': ("Location of OpenSSL include directory")
+    ("", "--with-openssl-include-dir"): {
+        "dest": "openssl_include_dir",
+        "metavar": "NAME",
+        "default": os.environ.get("MYSQLXPB_OPENSSL_INCLUDE_DIR"),
+        "help": ("Location of OpenSSL include directory"),
     },
-
-    ('', '--with-openssl-lib-dir'): {
-        'dest': 'openssl_lib_dir', 'metavar': 'NAME',
-        'default': os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR"),
-        'help': ("Location of OpenSSL library directory")
+    ("", "--with-openssl-lib-dir"): {
+        "dest": "openssl_lib_dir",
+        "metavar": "NAME",
+        "default": os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR"),
+        "help": "Location of OpenSSL library directory",
     },
-
-    ('', '--with-protobuf-include-dir'): {
-        'dest': 'protobuf_include_dir', 'metavar': 'NAME',
-        'default': os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR"),
-        'help': ("Location of Protobuf include directory")
+    ("", "--with-protobuf-include-dir"): {
+        "dest": "protobuf_include_dir",
+        "metavar": "NAME",
+        "default": os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR"),
+        "help": "Location of Protobuf include directory",
     },
-
-    ('', '--with-protobuf-lib-dir'): {
-        'dest': 'protobuf_lib_dir', 'metavar': 'NAME',
-        'default': os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR"),
-        'help': ("Location of Protobuf library directory")
+    ("", "--with-protobuf-lib-dir"): {
+        "dest": "protobuf_lib_dir",
+        "metavar": "NAME",
+        "default": os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR"),
+        "help": "Location of Protobuf library directory",
     },
-
-    ('', '--with-protoc'): {
-        'dest': 'protoc', 'metavar': 'NAME',
-        'default': os.environ.get("MYSQLXPB_PROTOC"),
-        'help': ("Location of Protobuf protoc binary")
+    ("", "--with-protoc"): {
+        "dest": "protoc",
+        "metavar": "NAME",
+        "default": os.environ.get("MYSQLXPB_PROTOC"),
+        "help": "Location of Protobuf protoc binary",
     },
-
-    ('', '--extra-compile-args'): {
-        'dest': 'extra_compile_args', 'metavar': 'NAME',
-        'default': None,
-        'help': ("Extra compile args for the C extension")
+    ("", "--extra-compile-args"): {
+        "dest": "extra_compile_args",
+        "metavar": "NAME",
+        "default": None,
+        "help": "Extra compile args for the C extension",
     },
-
-    ('', '--extra-link-args'): {
-        'dest': 'extra_link_args', 'metavar': 'NAME',
-        'default': None,
-        'help': ("Extra link args for the C extension")
+    ("", "--extra-link-args"): {
+        "dest": "extra_link_args",
+        "metavar": "NAME",
+        "default": None,
+        "help": "Extra link args for the C extension",
     },
 }
 
@@ -445,7 +468,7 @@ def _get_arg_parser():
         """Remove items from dictionary ending with _optparse"""
         new_dict = {}
         for key in adict.keys():
-            if not key.endswith('_optparse'):
+            if not key.endswith("_optparse"):
                 new_dict[key] = adict[key]
         return new_dict
 
@@ -481,25 +504,25 @@ def _show_help(msg=None, parser=None, exit_code=0):
 
 def get_stats_tablename():
     return "myconnpy_{version}".format(
-        version='_'.join(
-            [str(i) for i in mysql.connector.__version_info__[0:3]]
-        )
+        version="_".join([str(i) for i in mysql.connector.__version_info__[0:3]])
     )
 
 
 def get_stats_field(pyver=None, myver=None):
     if not pyver:
-        pyver = '.'.join([str(i) for i in sys.version_info[0:2]])
+        pyver = ".".join([str(i) for i in sys.version_info[0:2]])
     if not myver:
-        myver = '.'.join([str(i) for i in tests.MYSQL_SERVERS[0].version[0:2]])
+        myver = ".".join([str(i) for i in tests.MYSQL_SERVERS[0].version[0:2]])
     return "py{python}my{mysql}".format(
-        python=pyver.replace('.', ''), mysql=myver.replace('.', ''))
+        python=pyver.replace(".", ""), mysql=myver.replace(".", "")
+    )
 
 
 class StatsTestResult(TextTestResult):
     """Store test results in a database"""
-    separator1 = '=' * 78
-    separator2 = '-' * 78
+
+    separator1 = "=" * 78
+    separator2 = "-" * 78
 
     def __init__(self, stream, descriptions, verbosity, dbcnx=None):
         super(StatsTestResult, self).__init__(stream, descriptions, verbosity)
@@ -515,8 +538,7 @@ class StatsTestResult(TextTestResult):
 
     @staticmethod
     def get_description(test):  # pylint: disable=R0201
-        """Return test description, if needed truncated to 60 characters
-        """
+        """Return test description, if needed truncated to 60 characters"""
         return "{0:.<60s} ".format(str(test)[0:58])
 
     def startTest(self, test):
@@ -536,11 +558,8 @@ class StatsTestResult(TextTestResult):
             stmt = (
                 "INSERT INTO {table} (test_case, {field}) "
                 "VALUES (%s, %s) ON DUPLICATE KEY UPDATE {field} = %s"
-            ).format(table=get_stats_tablename(),
-                     field=get_stats_field())
-            cur.execute(stmt,
-                        (str(test), self.elapsed_time, self.elapsed_time)
-            )
+            ).format(table=get_stats_tablename(), field=get_stats_field())
+            cur.execute(stmt, (str(test), self.elapsed_time, self.elapsed_time))
             cur.close()
 
     def _save_not_ok(self, test):
@@ -548,8 +567,7 @@ class StatsTestResult(TextTestResult):
         stmt = (
             "INSERT INTO {table} (test_case, {field}) "
             "VALUES (%s, %s) ON DUPLICATE KEY UPDATE {field} = %s"
-        ).format(table=get_stats_tablename(),
-                 field=get_stats_field())
+        ).format(table=get_stats_tablename(), field=get_stats_field())
         cur.execute(stmt, (str(test), -1, -1))
         cur.close()
 
@@ -590,23 +608,40 @@ class StatsTestResult(TextTestResult):
 
 class StatsTestRunner(unittest.TextTestRunner):
     """Committing results test results"""
+
     resultclass = StatsTestResult
 
-    def __init__(self, stream=sys.stderr, descriptions=False, verbosity=1,
-                 failfast=False, buffer=False, resultclass=None, dbcnx=None):
+    def __init__(
+        self,
+        stream=sys.stderr,
+        descriptions=False,
+        verbosity=1,
+        failfast=False,
+        buffer=False,
+        resultclass=None,
+        dbcnx=None,
+    ):
         try:
             super(StatsTestRunner, self).__init__(
-                stream=sys.stderr, descriptions=descriptions, verbosity=verbosity,
-                failfast=False, buffer=False)
+                stream=sys.stderr,
+                descriptions=descriptions,
+                verbosity=verbosity,
+                failfast=False,
+                buffer=False,
+            )
         except TypeError:
             # Compatibility with Python v2.6
             super(StatsTestRunner, self).__init__(
-                stream=sys.stderr, descriptions=descriptions, verbosity=verbosity)
+                stream=sys.stderr,
+                descriptions=descriptions,
+                verbosity=verbosity,
+            )
         self._dbcnx = dbcnx
 
     def _makeResult(self):
-        return self.resultclass(self.stream, self.descriptions,
-                                self.verbosity, dbcnx=self._dbcnx)
+        return self.resultclass(
+            self.stream, self.descriptions, self.verbosity, dbcnx=self._dbcnx
+        )
 
     def run(self, test):
         result = super(StatsTestRunner, self).run(test)
@@ -626,33 +661,53 @@ class BasicTestResult(TextTestResult):
             self.stream.write("s")
             self.stream.flush()
 
-        tests.MESSAGES['SKIPPED'].append(reason)
+        tests.MESSAGES["SKIPPED"].append(reason)
 
 
 class BasicTestRunner(unittest.TextTestRunner):
     """Basic test runner"""
+
     resultclass = BasicTestResult
 
-    def __init__(self, stream=sys.stderr, descriptions=False, verbosity=1,
-                 failfast=False, buffer=False, warnings='ignore'):
+    def __init__(
+        self,
+        stream=sys.stderr,
+        descriptions=False,
+        verbosity=1,
+        failfast=False,
+        buffer=False,
+        warnings="ignore",
+    ):
         try:
             super(BasicTestRunner, self).__init__(
-                stream=stream, descriptions=descriptions,
-                verbosity=verbosity, failfast=failfast, buffer=buffer,
-                warnings=warnings)
+                stream=stream,
+                descriptions=descriptions,
+                verbosity=verbosity,
+                failfast=failfast,
+                buffer=buffer,
+                warnings=warnings,
+            )
         except TypeError:
             # Python v3.1
             super(BasicTestRunner, self).__init__(
-                stream=stream, descriptions=descriptions, verbosity=verbosity)
+                stream=stream, descriptions=descriptions, verbosity=verbosity
+            )
 
 
 class Python26TestRunner(unittest.TextTestRunner):
     """Python v2.6/3.1 Test Runner backporting needed functionality"""
 
-    def __init__(self, stream=sys.stderr, descriptions=False, verbosity=1,
-                 failfast=False, buffer=False):
+    def __init__(
+        self,
+        stream=sys.stderr,
+        descriptions=False,
+        verbosity=1,
+        failfast=False,
+        buffer=False,
+    ):
         super(Python26TestRunner, self).__init__(
-            stream=stream, descriptions=descriptions, verbosity=verbosity)
+            stream=stream, descriptions=descriptions, verbosity=verbosity
+        )
 
     def _makeResult(self):
         return BasicTestResult(self.stream, self.descriptions, self.verbosity)
@@ -662,16 +717,16 @@ def setup_stats_db(cnx):
     """Setup the database for storing statistics"""
     cur = cnx.cursor()
 
-    supported_python = ('2.6', '2.7', '3.1', '3.2', '3.3', '3.4')
-    supported_mysql = ('5.1', '5.5', '5.6', '5.7')
+    supported_python = ("2.6", "2.7", "3.1", "3.2", "3.3", "3.4")
+    supported_mysql = ("5.1", "5.5", "5.6", "5.7")
 
     columns = []
     for pyver in supported_python:
         for myver in supported_mysql:
             columns.append(
                 " py{python}my{mysql} DECIMAL(8,4) DEFAULT -1".format(
-                    python=pyver.replace('.', ''),
-                    mysql=myver.replace('.', ''))
+                    python=pyver.replace(".", ""), mysql=myver.replace(".", "")
+                )
             )
 
     create_table = (
@@ -680,46 +735,56 @@ def setup_stats_db(cnx):
         " {pymycols}, "
         " PRIMARY KEY (test_case)"
         ") ENGINE=InnoDB"
-    ).format(table=get_stats_tablename(),
-             pymycols=', '.join(columns))
+    ).format(table=get_stats_tablename(), pymycols=", ".join(columns))
 
     try:
         cur.execute(create_table)
     except mysql.connector.ProgrammingError as err:
         if err.errno != 1050:
             raise
-        LOGGER.info("Using exists table '{0}' for saving statistics".format(
-            get_stats_tablename()))
+        LOGGER.info(
+            "Using exists table '{0}' for saving statistics".format(
+                get_stats_tablename()
+            )
+        )
     else:
-        LOGGER.info("Created table '{0}' for saving statistics".format(
-            get_stats_tablename()))
+        LOGGER.info(
+            "Created table '{0}' for saving statistics".format(get_stats_tablename())
+        )
     cur.close()
 
 
 def init_mysql_server(port, options):
     """Initialize a MySQL Server"""
-    name = 'server{0}'.format(len(tests.MYSQL_SERVERS) + 1)
-    extra_args = [{
-        "version": (5, 7, 17),
-        "options": {"mysqlx_bind_address": "mysqlx_bind_address={0}".format("::"
-                    if tests.IPV6_AVAILABLE else "0.0.0.0")}
-    }]
+    name = "server{0}".format(len(tests.MYSQL_SERVERS) + 1)
+    extra_args = [
+        {
+            "version": (5, 7, 17),
+            "options": {
+                "mysqlx_bind_address": "mysqlx_bind_address={0}".format(
+                    "::" if tests.IPV6_AVAILABLE else "0.0.0.0"
+                )
+            },
+        }
+    ]
 
     if options.secure_file_priv is not None:
-        extra_args += [{
-            "version": (5, 5, 53),
-            "options": {"secure_file_priv": "secure_file_priv = %s" % options.secure_file_priv}
-        }]
+        extra_args += [
+            {
+                "version": (5, 5, 53),
+                "options": {
+                    "secure_file_priv": "secure_file_priv = %s"
+                    % options.secure_file_priv
+                },
+            }
+        ]
     else:
-        extra_args += [{
-            "version": (5, 5, 53),
-            "options": {"secure_file_priv": ""}
-        }]
+        extra_args += [{"version": (5, 5, 53), "options": {"secure_file_priv": ""}}]
 
     try:
         mysql_server = mysqld.MySQLServer(
             basedir=options.mysql_basedir,
-            topdir=os.path.join(options.mysql_topdir, 'cpy_' + name),
+            topdir=os.path.join(options.mysql_topdir, "cpy_" + name),
             cnf=MY_CNF,
             bind_address=options.bind_address,
             port=port,
@@ -731,16 +796,20 @@ def init_mysql_server(port, options):
             ssl_key="tests_server_key.pem",
             name=name,
             extra_args=extra_args,
-            sharedir=options.mysql_sharedir)
+            sharedir=options.mysql_sharedir,
+        )
     except tests.mysqld.MySQLBootstrapError as err:
-        LOGGER.error("Failed initializing MySQL server "
-                     "'{name}': {error}".format(
-            name=name, error=str(err)))
+        LOGGER.error(
+            "Failed initializing MySQL server "
+            "'{name}': {error}".format(name=name, error=str(err))
+        )
         sys.exit(1)
 
     if len(mysql_server.unix_socket) > 103:
-        LOGGER.error("Unix socket file is to long for mysqld (>103). "
-                     "Consider using --unix-socket")
+        LOGGER.error(
+            "Unix socket file is to long for mysqld (>103). "
+            "Consider using --unix-socket"
+        )
         sys.exit(1)
 
     mysql_server._debug = options.debug
@@ -752,44 +821,46 @@ def init_mysql_server(port, options):
             mysql_server.stop()
             if not mysql_server.wait_down():
                 LOGGER.error(
-                    "Failed shutting down the MySQL server '{name}'".format(
-                        name=name))
+                    "Failed shutting down the MySQL server '{name}'".format(name=name)
+                )
                 sys.exit(1)
         mysql_server.remove()
     else:
         if mysql_server.check_running():
             LOGGER.info(
                 "Reusing previously bootstrapped MySQL server '{name}'".format(
-                    name=name))
+                    name=name
+                )
+            )
             have_to_bootstrap = False
         else:
             LOGGER.warning(
                 "Can not connect to previously bootstrapped "
-                "MySQL Server '{name}'; forcing bootstrapping".format(
-                    name=name))
+                "MySQL Server '{name}'; forcing bootstrapping".format(name=name)
+            )
             mysql_server.remove()
 
     tests.MYSQL_VERSION = mysql_server.version
     tests.MYSQL_LICENSE = mysql_server.license
-    tests.MYSQL_VERSION_TXT = '.'.join([str(i) for i in mysql_server.version])
+    tests.MYSQL_VERSION_TXT = ".".join([str(i) for i in mysql_server.version])
     tests.MYSQL_SERVERS.append(mysql_server)
 
     mysql_server.client_config = {
-        'host': options.host,
-        'port': port,
-        'unix_socket': mysql_server.unix_socket,
-        'user': 'root',
-        'password': '',
-        'database': 'myconnpy',
-        'connection_timeout': 60,
+        "host": options.host,
+        "port": port,
+        "unix_socket": mysql_server.unix_socket,
+        "user": "root",
+        "password": "",
+        "database": "myconnpy",
+        "connection_timeout": 60,
     }
 
     mysql_server.xplugin_config = {
-        'host': options.host,
-        'port': options.mysqlx_port,
-        'user': 'root',
-        'password': '',
-        'schema': 'myconnpy'
+        "host": options.host,
+        "port": options.mysqlx_port,
+        "user": "root",
+        "password": "",
+        "schema": "myconnpy",
     }
 
     if mysql_server.version >= (5, 7, 15):
@@ -802,14 +873,19 @@ def init_mysql_server(port, options):
         try:
             mysql_server.bootstrap()
         except tests.mysqld.MySQLBootstrapError as exc:
-            LOGGER.error("Failed bootstrapping MySQL server '{name}': "
-                         "{error}".format(name=name, error=str(exc)))
+            LOGGER.error(
+                "Failed bootstrapping MySQL server '{name}': "
+                "{error}".format(name=name, error=str(exc))
+            )
             sys.exit(1)
         mysql_server.start()
         if not mysql_server.wait_up():
-            LOGGER.error("Failed to start the MySQL server '{name}'. "
-                         "Check error log.".format(name=name))
+            LOGGER.error(
+                "Failed to start the MySQL server '{name}'. "
+                "Check error log.".format(name=name)
+            )
             sys.exit(1)
+
 
 def main():
     parser = _get_arg_parser()
@@ -821,7 +897,7 @@ def main():
         options = options[0]
 
     if options.show_tests:
-        sys.path.insert(0, os.path.join(os.getcwd(), 'lib'))
+        sys.path.insert(0, os.path.join(os.getcwd(), "lib"))
         for name, _, description in tests.get_test_modules():
             print("{0:22s} {1}".format(name, description))
         sys.exit()
@@ -829,28 +905,30 @@ def main():
     tests.setup_logger(LOGGER, debug=options.debug, logfile=options.logfile)
     LOGGER.info(
         "MySQL Connector/Python unittest using Python v{0}".format(
-            '.'.join([str(v) for v in sys.version_info[0:3]])))
+            ".".join([str(v) for v in sys.version_info[0:3]])
+        )
+    )
 
     # Check if we can test IPv6
     if options.ipv6:
         if not tests.IPV6_AVAILABLE:
             LOGGER.error("Can not test IPv6: not available on your system")
             sys.exit(1)
-        options.bind_address = '::'
-        options.host = '::1'
+        options.bind_address = "::"
+        options.host = "::1"
         LOGGER.info("Testing using IPv6. Binding to :: and using host ::1")
     else:
         tests.IPV6_AVAILABLE = False
 
     if not options.mysql_sharedir:
-        options.mysql_sharedir = os.path.join(options.mysql_basedir, 'share')
+        options.mysql_sharedir = os.path.join(options.mysql_basedir, "share")
         LOGGER.debug("Setting default sharedir: %s", options.mysql_sharedir)
     if options.mysql_topdir != MYSQL_DEFAULT_TOPDIR:
         # Make sure the topdir is absolute
         if not os.path.isabs(options.mysql_topdir):
             options.mysql_topdir = os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),
-                options.mysql_topdir
+                options.mysql_topdir,
             )
 
     # If Django was supplied, add Django to PYTHONPATH
@@ -858,10 +936,10 @@ def main():
         sys.path.insert(0, options.django_path)
         try:
             import django
+
             tests.DJANGO_VERSION = django.VERSION[0:3]
         except ImportError:
-            msg = "Could not find django package at {0}".format(
-                options.django_path)
+            msg = "Could not find django package at {0}".format(options.django_path)
             LOGGER.error(msg)
             sys.exit(1)
 
@@ -874,23 +952,22 @@ def main():
         name = "server{}".format(len(tests.MYSQL_SERVERS) + 1)
         mysql_server = mysqld.MySQLExternalServer(MY_CNF, name)
         mysql_server.client_config = {
-            'host': options.host,
-            'port': options.port,
-            'unix_socket': mysql_server.unix_socket,
-            'user': options.user,
-            'password': options.password,
-            'database': 'myconnpy',
-            'connection_timeout': 60,
-            'unix_socket': None,
+            "host": options.host,
+            "port": options.port,
+            "user": options.user,
+            "password": options.password,
+            "database": "myconnpy",
+            "connection_timeout": 60,
+            "unix_socket": options.unix_socket_folder,
         }
 
         mysql_server.xplugin_config = {
-            'host': options.host,
-            'port': options.mysqlx_port,
-            'user': options.user,
-            'password': options.password,
-            'schema': 'myconnpy',
-            'socket': None,
+            "host": options.host,
+            "port": options.mysqlx_port,
+            "user": options.user,
+            "password": options.password,
+            "schema": "myconnpy",
+            "socket": options.unix_socket_folder,
         }
 
         tests.MYSQL_SERVERS.append(mysql_server)
@@ -899,29 +976,26 @@ def main():
         version_re = re.compile(r"^(\d+)\.(\d+)\.(\d+)+", re.ASCII)
         try:
             import mysql.connector
+
             with mysql.connector.connect(
-                    host=options.host,
-                    port=options.port,
-                    user=options.user,
-                    password=options.password
+                host=options.host,
+                port=options.port,
+                user=options.user,
+                password=options.password,
             ) as cnx:
                 with cnx.cursor() as cur:
                     cur = cnx.cursor()
                     # Create database for testing
                     LOGGER.info("Creating 'myconnpy' database")
                     cur.execute("DROP DATABASE IF EXISTS myconnpy")
-                    cur.execute(
-                        "CREATE DATABASE myconnpy CHARACTER SET utf8mb4"
-                    )
+                    cur.execute("CREATE DATABASE myconnpy CHARACTER SET utf8mb4")
 
                     # Version
                     cur.execute("SELECT VERSION()")
                     res = cur.fetchone()
                     match = version_re.match(res[0])
                     if not match:
-                        raise ValueError(
-                            "Invalid version number '{}'".format(res[0])
-                        )
+                        raise ValueError("Invalid version number '{}'".format(res[0]))
                     ver = tuple(map(int, match.groups()))
 
                     # License
@@ -947,9 +1021,7 @@ def main():
             tests.MYSQL_LICENSE = mysql_server.license
             tests.MYSQL_VERSION_TXT = ".".join(map(str, mysql_server.version))
         except Exception as err:
-            LOGGER.error(
-                "Failed connecting to the external MySQL server: %s", err
-            )
+            LOGGER.error("Failed connecting to the external MySQL server: %s", err)
             sys.exit(1)
     else:
         # Bootstrap MySQL server
@@ -957,10 +1029,12 @@ def main():
 
     tests.MYSQL_CAPI = options.mysql_capi
     if not options.skip_install:
-        protobuf_include_dir = options.protobuf_include_dir or \
-            os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR")
-        protobuf_lib_dir = options.protobuf_lib_dir or \
-            os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
+        protobuf_include_dir = options.protobuf_include_dir or os.environ.get(
+            "MYSQLXPB_PROTOBUF_INCLUDE_DIR"
+        )
+        protobuf_lib_dir = options.protobuf_lib_dir or os.environ.get(
+            "MYSQLXPB_PROTOBUF_LIB_DIR"
+        )
         protoc = options.protoc or os.environ.get("MYSQLXPB_PROTOC")
         if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
             if not protobuf_include_dir:
@@ -973,10 +1047,12 @@ def main():
                 LOGGER.error("Unable to find Protobuf protoc binary.")
                 sys.exit(1)
 
-        openssl_include_dir = options.openssl_include_dir or \
-            os.environ.get("MYSQLXPB_OPENSSL_INCLUDE_DIR")
-        openssl_lib_dir = options.openssl_lib_dir or \
-            os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR")
+        openssl_include_dir = options.openssl_include_dir or os.environ.get(
+            "MYSQLXPB_OPENSSL_INCLUDE_DIR"
+        )
+        openssl_lib_dir = options.openssl_lib_dir or os.environ.get(
+            "MYSQLXPB_OPENSSL_LIB_DIR"
+        )
         if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
             if not openssl_include_dir:
                 LOGGER.error("Unable to find OpenSSL include directory.")
@@ -985,15 +1061,19 @@ def main():
                 LOGGER.error("Unable to find OpenSSL library directory.")
                 sys.exit(1)
 
-        tests.install_connector(_TOPDIR, tests.TEST_BUILD_DIR,
-                                openssl_include_dir,
-                                openssl_lib_dir,
-                                protobuf_include_dir,
-                                protobuf_lib_dir,
-                                protoc,
-                                options.mysql_capi,
-                                options.extra_compile_args,
-                                options.extra_link_args, options.debug)
+        tests.install_connector(
+            _TOPDIR,
+            tests.TEST_BUILD_DIR,
+            openssl_include_dir,
+            openssl_lib_dir,
+            protobuf_include_dir,
+            protobuf_lib_dir,
+            protoc,
+            options.mysql_capi,
+            options.extra_compile_args,
+            options.extra_link_args,
+            options.debug,
+        )
 
     # Which tests cases to run
     testcases = []
@@ -1013,13 +1093,12 @@ def main():
     else:
         testcases = [mod[1] for mod in tests.get_test_modules()]
 
-
     # Load tests
     test_loader = unittest.TestLoader()
     testsuite = None
     if testcases:
         # Check if we nee to test anything with the C Extension
-        if any(['cext' in case for case in testcases]):
+        if any(["cext" in case for case in testcases]):
             # Try to load the C Extension, and try to load the MySQL library
             tests.check_c_extension()
         testsuite = test_loader.loadTestsFromNames(testcases)
@@ -1032,9 +1111,11 @@ def main():
         for i in range(1, tests.MYSQL_SERVERS_NEEDED):
             init_mysql_server(port=(options.port + i), options=options)
 
-    LOGGER.info("Using MySQL server version %s %s",
-                '.'.join([str(v) for v in tests.MYSQL_VERSION[0:3]]),
-                tests.MYSQL_LICENSE)
+    LOGGER.info(
+        "Using MySQL server version %s %s",
+        ".".join([str(v) for v in tests.MYSQL_VERSION[0:3]]),
+        tests.MYSQL_LICENSE,
+    )
 
     LOGGER.info("Starting unit tests")
     was_successful = False
@@ -1043,21 +1124,21 @@ def main():
         if options.stats:
             if options.stats_host:
                 stats_db_info = {
-                    'host': options.stats_host,
-                    'port': options.stats_port,
-                    'user': options.stats_user,
-                    'password': options.stats_password,
-                    'database': options.stats_db,
+                    "host": options.stats_host,
+                    "port": options.stats_port,
+                    "user": options.stats_user,
+                    "password": options.stats_password,
+                    "database": options.stats_db,
                 }
                 cnxstats = mysql.connector.connect(**stats_db_info)
                 setup_stats_db(cnxstats)
             else:
                 cnxstats = None
-            result = StatsTestRunner(
-                verbosity=options.verbosity, dbcnx=cnxstats).run(testsuite)
+            result = StatsTestRunner(verbosity=options.verbosity, dbcnx=cnxstats).run(
+                testsuite
+            )
         elif sys.version_info[0:2] == (2, 6):
-            result = Python26TestRunner(verbosity=options.verbosity).run(
-                testsuite)
+            result = Python26TestRunner(verbosity=options.verbosity).run(testsuite)
         else:
             result = BasicTestRunner(verbosity=options.verbosity).run(testsuite)
         was_successful = result.wasSuccessful()
@@ -1066,15 +1147,15 @@ def main():
         was_successful = False
 
     # Log messages added by test cases
-    for msg in tests.MESSAGES['WARNINGS']:
+    for msg in tests.MESSAGES["WARNINGS"]:
         LOGGER.warning(msg)
-    for msg in tests.MESSAGES['INFO']:
+    for msg in tests.MESSAGES["INFO"]:
         LOGGER.info(msg)
 
     # Show skipped tests
-    if len(tests.MESSAGES['SKIPPED']):
-        LOGGER.info("Skipped tests: %d", len(tests.MESSAGES['SKIPPED']))
-        for msg in tests.MESSAGES['SKIPPED']:
+    if len(tests.MESSAGES["SKIPPED"]):
+        LOGGER.info("Skipped tests: %d", len(tests.MESSAGES["SKIPPED"]))
+        for msg in tests.MESSAGES["SKIPPED"]:
             LOGGER.info("Skipped: " + msg)
 
     # Clean up
@@ -1127,5 +1208,5 @@ def main():
     sys.exit(not was_successful)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

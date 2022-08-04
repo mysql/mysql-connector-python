@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,8 +28,9 @@
 
 """MySQL X API results tests."""
 
-import tests
 import unittest
+
+import tests
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
@@ -121,12 +122,9 @@ class APIResultTests(tests.MySQLxTests):
         """testing the MCPY-357 issue(multiple resultset)."""
         self.session.sql("drop table if exists t7").execute()
         self.session.sql("drop procedure if exists sproc").execute()
+        self.session.sql("create table t7(_id int, name varchar(32))").execute()
         self.session.sql(
-            "create table t7(_id int, name varchar(32))"
-        ).execute()
-        self.session.sql(
-            "insert into t7(_id,name) "
-            "values (1,'abc'),(2,'def'),(3,'ghi'),(4,'jkl')"
+            "insert into t7(_id,name) values (1,'abc'),(2,'def'),(3,'ghi'),(4,'jkl')"
         ).execute()
         self.session.sql(
             "create procedure sproc() begin "

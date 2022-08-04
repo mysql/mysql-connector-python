@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,7 +34,7 @@ import tests
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
 class TableUpdateTests(tests.MySQLxTests):
-    """Tests for table.update(). """
+    """Tests for table.update()."""
 
     @tests.foreach_session()
     def test_table_update1(self):
@@ -109,9 +109,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update6(self):
         """Test the table.update with multiple set with different datatypes."""
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql(
-            "create table t6(a int , b varchar(32), c date)"
-        ).execute()
+        self.session.sql("create table t6(a int , b varchar(32), c date)").execute()
         table = self.schema.get_table("t6")
         table.insert().values(1, "abc", "2000-10-20").values(
             2, "def", "2000-10-20"
@@ -130,9 +128,7 @@ class TableUpdateTests(tests.MySQLxTests):
         self.session.sql("create table t7(a int , b int)").execute()
         table = self.schema.get_table("t7")
         table.insert().values(1, 3).values(2, 2).values(3, 1).execute()
-        table.update().set("b", 10).sort("b ASC").limit(1).where(
-            "false"
-        ).execute()
+        table.update().set("b", 10).sort("b ASC").limit(1).where("false").execute()
         result2 = table.select().where("a == 3").execute()
         row = result2.fetch_all()
         self.assertEqual(row[0]["b"], 1)
@@ -161,9 +157,7 @@ class TableUpdateTests(tests.MySQLxTests):
         self.session.sql("drop table if exists t9").execute()
         self.session.sql("create table t9(a int , b int)").execute()
         table = self.schema.get_table("t9")
-        table.insert().values(1, 10).values(2, 11).values(1, 11).values(
-            2, 10
-        ).execute()
+        table.insert().values(1, 10).values(2, 11).values(1, 11).values(2, 10).execute()
         table.update().set("a", 10).sort("a ASC", "b DESC").limit(1).where(
             "true"
         ).execute()
@@ -210,15 +204,8 @@ class TableUpdateTests(tests.MySQLxTests):
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
         ).execute()
-        result = (
-            table.update().where("n->'$.name' IN 'a'").set("id", 4).execute()
-        )
-        result1 = (
-            table.update()
-            .where("a->'$.age' IN [22,24]")
-            .set("id", 5)
-            .execute()
-        )
+        result = table.update().where("n->'$.name' IN 'a'").set("id", 4).execute()
+        result1 = table.update().where("a->'$.age' IN [22,24]").set("id", 5).execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(result1.get_affected_items_count(), 2)
         self.session.sql("drop table if exists t1").execute()
@@ -232,17 +219,9 @@ class TableUpdateTests(tests.MySQLxTests):
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
         ).execute()
-        result = (
-            table.update()
-            .where("n->'$.name' NOT IN 'a'")
-            .set("id", 4)
-            .execute()
-        )
+        result = table.update().where("n->'$.name' NOT IN 'a'").set("id", 4).execute()
         result1 = (
-            table.update()
-            .where("a->'$.age' NOT IN [22,24]")
-            .set("id", 5)
-            .execute()
+            table.update().where("a->'$.age' NOT IN [22,24]").set("id", 5).execute()
         )
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(result1.get_affected_items_count(), 0)
@@ -322,9 +301,7 @@ class TableUpdateTests(tests.MySQLxTests):
         ).execute()
         result = (
             table.update()
-            .where(
-                '{"company":"abc","vehicle":"car"} IN addinfo->$.additionalinfo'
-            )
+            .where('{"company":"abc","vehicle":"car"} IN addinfo->$.additionalinfo')
             .set("n", {"name": "sad"})
             .sort("id DESC")
             .limit(2)
@@ -344,9 +321,7 @@ class TableUpdateTests(tests.MySQLxTests):
         )
         result3 = (
             table.update()
-            .where(
-                '{"company":"abc","vehicle":"car"} NOT IN addinfo->$.additionalinfo'
-            )
+            .where('{"company":"abc","vehicle":"car"} NOT IN addinfo->$.additionalinfo')
             .set("n", {"name": "changedname"})
             .execute()
         )
@@ -365,17 +340,9 @@ class TableUpdateTests(tests.MySQLxTests):
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
         ).execute()
-        result = (
-            table.update()
-            .where("n->'$.name' OVERLAPS 'a'")
-            .set("id", 4)
-            .execute()
-        )
+        result = table.update().where("n->'$.name' OVERLAPS 'a'").set("id", 4).execute()
         result1 = (
-            table.update()
-            .where("a->'$.age' OVERLAPS [22,24]")
-            .set("id", 5)
-            .execute()
+            table.update().where("a->'$.age' OVERLAPS [22,24]").set("id", 5).execute()
         )
         assert result.get_affected_items_count() == 1
         assert result1.get_affected_items_count() == 2
@@ -391,10 +358,7 @@ class TableUpdateTests(tests.MySQLxTests):
             2, '{"name":"b"}', '{"age":24}'
         ).execute()
         result = (
-            table.update()
-            .where("n->'$.name' NOT OVERLAPS 'a'")
-            .set("id", 4)
-            .execute()
+            table.update().where("n->'$.name' NOT OVERLAPS 'a'").set("id", 4).execute()
         )
         result1 = (
             table.update()
@@ -451,7 +415,7 @@ class TableUpdateTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_overlaps_table_update4(self):
-        """"OVERLAPS operator with dict on LHS and dict on RHS."""
+        """OVERLAPS operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t4").execute()
         self.session.sql(
             "create table t4(id JSON, n JSON, a JSON, addinfo JSON)"

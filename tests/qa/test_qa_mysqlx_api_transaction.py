@@ -91,9 +91,7 @@ class APIResultTests(tests.MySQLxTests):
         self.assertEqual(collection.count(), 4)
         # Should give error as the savepoint is already released and doesn't
         # exist anymore
-        self.assertRaises(
-            mysqlx.OperationalError, self.session.release_savepoint, sp
-        )
+        self.assertRaises(mysqlx.OperationalError, self.session.release_savepoint, sp)
         self.session.commit()
         self.schema.drop_collection("mycoll2")
 
@@ -142,9 +140,7 @@ class APIResultTests(tests.MySQLxTests):
         self.assertEqual(collection.count(), 4)
         self.session.release_savepoint("SavedPoint")
         self.assertEqual(collection.count(), 4)
-        self.assertRaises(
-            mysqlx.OperationalError, self.session.release_savepoint, sp
-        )
+        self.assertRaises(mysqlx.OperationalError, self.session.release_savepoint, sp)
         self.session.commit()
         self.schema.drop_collection("mycoll4")
 
@@ -195,9 +191,7 @@ class APIResultTests(tests.MySQLxTests):
         self.assertEqual(collection.count(), 4)
         self.session.rollback_to(sp1)
         self.assertEqual(collection.count(), 2)
-        self.assertRaises(
-            mysqlx.OperationalError, self.session.release_savepoint, sp2
-        )
+        self.assertRaises(mysqlx.OperationalError, self.session.release_savepoint, sp2)
         self.session.commit()
         self.schema.drop_collection("mycoll6")
 
@@ -257,9 +251,7 @@ class APIResultTests(tests.MySQLxTests):
         sp = self.session.set_savepoint()
         collection.add({"name": "Robb", "age": 25}).execute()
         self.assertEqual(collection.count(), 3)
-        self.assertRaises(
-            mysqlx.OperationalError, self.session.release_savepoint, sp
-        )
+        self.assertRaises(mysqlx.OperationalError, self.session.release_savepoint, sp)
         self.schema.drop_collection("mycoll8")
 
     @tests.foreach_session()
@@ -276,9 +268,7 @@ class APIResultTests(tests.MySQLxTests):
         sp = self.session.set_savepoint()
         collection.add({"name": "Robb", "age": 25}).execute()
         self.assertEqual(collection.count(), 3)
-        self.assertRaises(
-            mysqlx.OperationalError, self.session.release_savepoint, sp
-        )
+        self.assertRaises(mysqlx.OperationalError, self.session.release_savepoint, sp)
         # self.assertEqual(collection.count(), 2)
         self.schema.drop_collection("mycoll9")
 
@@ -293,9 +283,7 @@ class APIResultTests(tests.MySQLxTests):
             {"name": "Sansa Stark", "age": 20},
         ).execute()
         self.assertEqual(collection.count(), 2)
-        self.assertRaises(
-            mysqlx.ProgrammingError, self.session.set_savepoint, ""
-        )
+        self.assertRaises(mysqlx.ProgrammingError, self.session.set_savepoint, "")
         self.schema.drop_collection("mycoll10")
 
     @tests.foreach_session()
@@ -585,9 +573,7 @@ class APIResultTests(tests.MySQLxTests):
         sp = self.session.set_savepoint("SavedPoint")
         collection.add({"name": "Robb Stark", "age": 25}).execute()
         self.assertEqual(collection.count(), 3)
-        self.assertRaises(
-            mysqlx.ProgrammingError, self.session.rollback_to, ""
-        )
+        self.assertRaises(mysqlx.ProgrammingError, self.session.rollback_to, "")
         self.session.commit()
         self.schema.drop_collection("mycoll23")
 
@@ -605,9 +591,7 @@ class APIResultTests(tests.MySQLxTests):
         sp = self.session.set_savepoint("SavedPoint")
         collection.add({"name": "Robb Stark", "age": 25}).execute()
         self.assertEqual(collection.count(), 3)
-        self.assertRaises(
-            mysqlx.ProgrammingError, self.session.release_savepoint, ""
-        )
+        self.assertRaises(mysqlx.ProgrammingError, self.session.release_savepoint, "")
         self.session.commit()
         self.schema.drop_collection("mycoll24")
 
@@ -622,9 +606,7 @@ class APIResultTests(tests.MySQLxTests):
             {"name": "Sansa Stark", "age": 20},
         ).execute()
         self.assertEqual(collection.count(), 2)
-        self.assertRaises(
-            mysqlx.ProgrammingError, self.session.set_savepoint, " "
-        )
+        self.assertRaises(mysqlx.ProgrammingError, self.session.set_savepoint, " ")
         collection.add({"name": "Robb", "age": 25}).execute()
         self.session.commit()
         self.schema.drop_collection("mycoll25")

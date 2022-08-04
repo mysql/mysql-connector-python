@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,8 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Implementation of the X protocol for MySQL servers.
-"""
+"""Implementation of the X protocol for MySQL servers."""
 
 import logging
 import struct
@@ -37,31 +36,47 @@ from io import BytesIO
 
 try:
     import lz4.frame
+
     HAVE_LZ4 = True
 except ImportError:
     HAVE_LZ4 = False
 
 try:
     import zstandard as zstd
+
     HAVE_ZSTD = True
 except ImportError:
     HAVE_ZSTD = False
 
-from .errors import (InterfaceError, NotSupportedError, OperationalError,
-                     ProgrammingError)
-from .expr import (ExprParser, build_expr, build_scalar, build_bool_scalar,
-                   build_int_scalar, build_unsigned_int_scalar)
+from .errors import (
+    InterfaceError,
+    NotSupportedError,
+    OperationalError,
+    ProgrammingError,
+)
+from .expr import (
+    ExprParser,
+    build_bool_scalar,
+    build_expr,
+    build_int_scalar,
+    build_scalar,
+    build_unsigned_int_scalar,
+)
 from .helpers import encode_to_bytes, get_item_or_attr
+from .protobuf import (
+    CRUD_PREPARE_MAPPING,
+    PROTOBUF_REPEATED_TYPES,
+    SERVER_MESSAGES,
+    Message,
+    mysqlxpb_enum,
+)
 from .result import Column
-from .protobuf import (CRUD_PREPARE_MAPPING, SERVER_MESSAGES,
-                       PROTOBUF_REPEATED_TYPES, Message, mysqlxpb_enum)
-
 
 _COMPRESSION_THRESHOLD = 1000
 _LOGGER = logging.getLogger("mysqlx")
 
 
-class Compressor(object):
+class Compressor:
     """Implements compression/decompression using `zstd_stream`, `lz4_message`
     and `deflate_stream` algorithms.
 
@@ -71,6 +86,7 @@ class Compressor(object):
     .. versionadded:: 8.0.21
 
     """
+
     def __init__(self, algorithm):
         self._algorithm = algorithm
         if algorithm == "zstd_stream":
@@ -128,7 +144,7 @@ class Compressor(object):
         return decompressed
 
 
-class MessageReader(object):
+class MessageReader:
     """Implements a Message Reader.
 
     Args:
@@ -136,6 +152,7 @@ class MessageReader(object):
 
     .. versionadded:: 8.0.21
     """
+
     def __init__(self, socket_stream):
         self._stream = socket_stream
         self._compressor = None
@@ -160,13 +177,15 @@ class MessageReader(object):
         frame_size, frame_type = struct.unpack("<LB", self._stream.read(5))
 
         if frame_type == 10:
-            raise ProgrammingError("The connected server does not have the "
-                                   "MySQL X protocol plugin enabled or "
-                                   "protocol mismatch")
+            raise ProgrammingError(
+                "The connected server does not have the "
+                "MySQL X protocol plugin enabled or "
+                "protocol mismatch"
+            )
 
         frame_payload = self._stream.read(frame_size - 1)
         if frame_type not in SERVER_MESSAGES:
-            raise ValueError("Unknown message type: {}".format(frame_type))
+            raise ValueError(f"Unknown message type: {frame_type}")
 
         # Do not parse empty notices, Message requires a type in payload
         if frame_type == 11 and frame_payload == b"":
@@ -179,11 +198,9 @@ class MessageReader(object):
             stream = BytesIO(self._compressor.decompress(frame_msg["payload"]))
             bytes_processed = 0
             while bytes_processed < uncompressed_size:
-                payload_size, msg_type = \
-                    struct.unpack("<LB", stream.read(5))
+                payload_size, msg_type = struct.unpack("<LB", stream.read(5))
                 payload = stream.read(payload_size - 1)
-                self._msg_queue.append(
-                    Message.from_server_message(msg_type, payload))
+                self._msg_queue.append(Message.from_server_message(msg_type, payload))
                 bytes_processed += payload_size + 4
             return self._msg_queue.pop(0) if self._msg_queue else None
 
@@ -227,7 +244,7 @@ class MessageReader(object):
         self._compressor = Compressor(algorithm) if algorithm else None
 
 
-class MessageWriter(object):
+class MessageWriter:
     """Implements a Message Writer.
 
     Args:
@@ -236,6 +253,7 @@ class MessageWriter(object):
     .. versionadded:: 8.0.21
 
     """
+
     def __init__(self, socket_stream):
         self._stream = socket_stream
         self._compressor = None
@@ -260,13 +278,16 @@ class MessageWriter(object):
             msg_payload = Message("Mysqlx.Connection.Compression")
             msg_payload["payload"] = compressed
 
-            output = b"".join([
-                encode_to_bytes(msg_first_fields.serialize_partial_to_string())[:-2],
-                encode_to_bytes(msg_payload.serialize_partial_to_string())
-            ])
+            output = b"".join(
+                [
+                    encode_to_bytes(msg_first_fields.serialize_partial_to_string())[
+                        :-2
+                    ],
+                    encode_to_bytes(msg_payload.serialize_partial_to_string()),
+                ]
+            )
 
-            msg_comp_id = \
-                mysqlxpb_enum("Mysqlx.ClientMessages.Type.COMPRESSION")
+            msg_comp_id = mysqlxpb_enum("Mysqlx.ClientMessages.Type.COMPRESSION")
             header = struct.pack("<LB", len(output) + 1, msg_comp_id)
             self._stream.sendall(b"".join([header, output]))
         else:
@@ -284,7 +305,7 @@ class MessageWriter(object):
         self._compressor = Compressor(algorithm) if algorithm else None
 
 
-class Protocol(object):
+class Protocol:
     """Implements the MySQL X Protocol.
 
     Args:
@@ -293,6 +314,7 @@ class Protocol(object):
 
     .. versionchanged:: 8.0.21
     """
+
     def __init__(self, reader, writer):
         self._reader = reader
         self._writer = writer
@@ -301,11 +323,11 @@ class Protocol(object):
 
     @property
     def compression_algorithm(self):
-        """str: The compresion algorithm.
-        """
+        """str: The compresion algorithm."""
         return self._compression_algorithm
 
-    def _apply_filter(self, msg, stmt):
+    @staticmethod
+    def _apply_filter(msg, stmt):
         """Apply filter.
 
         Args:
@@ -334,31 +356,44 @@ class Protocol(object):
             value = Message("Mysqlx.Datatypes.Scalar.String", value=arg)
             scalar = Message("Mysqlx.Datatypes.Scalar", type=8, v_string=value)
             return Message("Mysqlx.Datatypes.Any", type=1, scalar=scalar)
-        elif isinstance(arg, bool):
-            return Message("Mysqlx.Datatypes.Any", type=1,
-                           scalar=build_bool_scalar(arg))
-        elif isinstance(arg, int):
+        if isinstance(arg, bool):
+            return Message(
+                "Mysqlx.Datatypes.Any", type=1, scalar=build_bool_scalar(arg)
+            )
+        if isinstance(arg, int):
             if arg < 0:
-                return Message("Mysqlx.Datatypes.Any", type=1,
-                               scalar=build_int_scalar(arg))
-            return Message("Mysqlx.Datatypes.Any", type=1,
-                           scalar=build_unsigned_int_scalar(arg))
-        elif isinstance(arg, tuple) and len(arg) == 2:
+                return Message(
+                    "Mysqlx.Datatypes.Any",
+                    type=1,
+                    scalar=build_int_scalar(arg),
+                )
+            return Message(
+                "Mysqlx.Datatypes.Any",
+                type=1,
+                scalar=build_unsigned_int_scalar(arg),
+            )
+        if isinstance(arg, tuple) and len(arg) == 2:
             arg_key, arg_value = arg
-            obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
-                              key=arg_key, value=self._create_any(arg_value))
-            obj = Message("Mysqlx.Datatypes.Object",
-                          fld=[obj_fld.get_message()])
+            obj_fld = Message(
+                "Mysqlx.Datatypes.Object.ObjectField",
+                key=arg_key,
+                value=self._create_any(arg_value),
+            )
+            obj = Message("Mysqlx.Datatypes.Object", fld=[obj_fld.get_message()])
             return Message("Mysqlx.Datatypes.Any", type=2, obj=obj)
-        elif isinstance(arg, dict) or (isinstance(arg, (list, tuple)) and
-                                       isinstance(arg[0], dict)):
+        if isinstance(arg, dict) or (
+            isinstance(arg, (list, tuple)) and isinstance(arg[0], dict)
+        ):
             array_values = []
             for items in arg:
                 obj_flds = []
                 for key, value in items.items():
                     # Array can only handle Any types, Mysqlx.Datatypes.Any.obj
-                    obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
-                                      key=key, value=self._create_any(value))
+                    obj_fld = Message(
+                        "Mysqlx.Datatypes.Object.ObjectField",
+                        key=key,
+                        value=self._create_any(value),
+                    )
                     obj_flds.append(obj_fld.get_message())
                 msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
                 msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
@@ -367,11 +402,14 @@ class Protocol(object):
             msg = Message("Mysqlx.Datatypes.Array")
             msg["value"] = array_values
             return Message("Mysqlx.Datatypes.Any", type=3, array=msg)
-        elif isinstance(arg, list):
+        if isinstance(arg, list):
             obj_flds = []
             for key, value in arg:
-                obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
-                                  key=key, value=self._create_any(value))
+                obj_fld = Message(
+                    "Mysqlx.Datatypes.Object.ObjectField",
+                    key=key,
+                    value=self._create_any(value),
+                )
                 obj_flds.append(obj_fld.get_message())
             msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
             msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
@@ -393,8 +431,12 @@ class Protocol(object):
         Returns:
             list: A list of ``Any`` or ``Scalar`` objects.
         """
-        build_value = lambda value: build_scalar(value).get_message() \
-            if is_scalar else self._create_any(value).get_message()
+
+        def build_value(value):
+            if is_scalar:
+                return build_scalar(value).get_message()
+            return self._create_any(value).get_message()
+
         bindings = stmt.get_bindings()
         binding_map = stmt.get_binding_map()
 
@@ -405,12 +447,14 @@ class Protocol(object):
         count = len(binding_map)
         args = count * [None]
         if count != len(bindings):
-            raise ProgrammingError("The number of bind parameters and "
-                                   "placeholders do not match")
+            raise ProgrammingError(
+                "The number of bind parameters and placeholders do not match"
+            )
         for name, value in bindings.items():
             if name not in binding_map:
-                raise ProgrammingError("Unable to find placeholder for "
-                                       "parameter: {0}".format(name))
+                raise ProgrammingError(
+                    f"Unable to find placeholder for parameter: {name}"
+                )
             pos = binding_map[name]
             args[pos] = build_value(value)
         return args
@@ -423,40 +467,51 @@ class Protocol(object):
             result (Result): A `Result` based type object.
         """
         if msg["type"] == 1:
-            warn_msg = Message.from_message("Mysqlx.Notice.Warning",
-                                            msg["payload"])
+            warn_msg = Message.from_message("Mysqlx.Notice.Warning", msg["payload"])
             self._warnings.append(warn_msg.msg)
-            _LOGGER.warning("Protocol.process_frame Received Warning Notice "
-                            "code %s: %s", warn_msg.code, warn_msg.msg)
+            _LOGGER.warning(
+                "Protocol.process_frame Received Warning Notice code %s: %s",
+                warn_msg.code,
+                warn_msg.msg,
+            )
             result.append_warning(warn_msg.level, warn_msg.code, warn_msg.msg)
         elif msg["type"] == 2:
-            Message.from_message("Mysqlx.Notice.SessionVariableChanged",
-                                 msg["payload"])
+            Message.from_message("Mysqlx.Notice.SessionVariableChanged", msg["payload"])
         elif msg["type"] == 3:
             sess_state_msg = Message.from_message(
-                "Mysqlx.Notice.SessionStateChanged", msg["payload"])
+                "Mysqlx.Notice.SessionStateChanged", msg["payload"]
+            )
             if sess_state_msg["param"] == mysqlxpb_enum(
-                    "Mysqlx.Notice.SessionStateChanged.Parameter."
-                    "GENERATED_DOCUMENT_IDS"):
+                "Mysqlx.Notice.SessionStateChanged.Parameter.GENERATED_DOCUMENT_IDS"
+            ):
                 result.set_generated_ids(
-                    [get_item_or_attr(
-                        get_item_or_attr(value, 'v_octets'), 'value').decode()
-                     for value in sess_state_msg["value"]])
+                    [
+                        get_item_or_attr(
+                            get_item_or_attr(value, "v_octets"), "value"
+                        ).decode()
+                        for value in sess_state_msg["value"]
+                    ]
+                )
             else:  # Following results are unitary and not a list
-                sess_state_value = sess_state_msg["value"][0] \
-                    if isinstance(sess_state_msg["value"],
-                                  tuple(PROTOBUF_REPEATED_TYPES)) \
+                sess_state_value = (
+                    sess_state_msg["value"][0]
+                    if isinstance(
+                        sess_state_msg["value"], tuple(PROTOBUF_REPEATED_TYPES)
+                    )
                     else sess_state_msg["value"]
+                )
                 if sess_state_msg["param"] == mysqlxpb_enum(
-                        "Mysqlx.Notice.SessionStateChanged.Parameter."
-                        "ROWS_AFFECTED"):
+                    "Mysqlx.Notice.SessionStateChanged.Parameter.ROWS_AFFECTED"
+                ):
                     result.set_rows_affected(
-                        get_item_or_attr(sess_state_value, "v_unsigned_int"))
+                        get_item_or_attr(sess_state_value, "v_unsigned_int")
+                    )
                 elif sess_state_msg["param"] == mysqlxpb_enum(
-                        "Mysqlx.Notice.SessionStateChanged.Parameter."
-                        "GENERATED_INSERT_ID"):
-                    result.set_generated_insert_id(get_item_or_attr(
-                        sess_state_value, "v_unsigned_int"))
+                    "Mysqlx.Notice.SessionStateChanged.Parameter.GENERATED_INSERT_ID"
+                ):
+                    result.set_generated_insert_id(
+                        get_item_or_attr(sess_state_value, "v_unsigned_int")
+                    )
 
     def _read_message(self, result):
         """Read message.
@@ -470,14 +525,13 @@ class Protocol(object):
             except RuntimeError as err:
                 warnings = repr(result.get_warnings())
                 if warnings:
-                    raise RuntimeError(
-                        "{} reason: {}".format(err, warnings))
+                    raise RuntimeError(f"{err} reason: {warnings}") from err
             if msg.type == "Mysqlx.Error":
                 raise OperationalError(msg["msg"], msg["code"])
-            elif msg.type == "Mysqlx.Notice.Frame":
+            if msg.type == "Mysqlx.Notice.Frame":
                 try:
                     self._process_frame(msg, result)
-                except:
+                except (AttributeError, KeyError):
                     continue
             elif msg.type == "Mysqlx.Sql.StmtExecuteOk":
                 return None
@@ -515,7 +569,8 @@ class Protocol(object):
         msg = Message("Mysqlx.Connection.CapabilitiesGet")
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_GET"),
-            msg)
+            msg,
+        )
         msg = self._reader.read_message()
         while msg.type == "Mysqlx.Notice.Frame":
             msg = self._reader.read_message()
@@ -535,7 +590,7 @@ class Protocol(object):
             mysqlx.protobuf.Message: MySQL X Protobuf Message.
         """
         if not kwargs:
-            return
+            return None
         capabilities = Message("Mysqlx.Connection.Capabilities")
         for key, value in kwargs.items():
             capability = Message("Mysqlx.Connection.Capability")
@@ -544,9 +599,11 @@ class Protocol(object):
                 items = value
                 obj_flds = []
                 for item in items:
-                    obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
-                                      key=item,
-                                      value=self._create_any(items[item]))
+                    obj_fld = Message(
+                        "Mysqlx.Datatypes.Object.ObjectField",
+                        key=item,
+                        value=self._create_any(items[item]),
+                    )
                     obj_flds.append(obj_fld.get_message())
                 msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
                 msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
@@ -559,7 +616,8 @@ class Protocol(object):
         msg["capabilities"] = capabilities
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CAPABILITIES_SET"),
-            msg)
+            msg,
+        )
 
         try:
             return self.read_ok()
@@ -584,8 +642,10 @@ class Protocol(object):
             msg["auth_data"] = auth_data
         if initial_response is not None:
             msg["initial_response"] = initial_response
-        self._writer.write_message(mysqlxpb_enum(
-            "Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_START"), msg)
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_START"),
+            msg,
+        )
 
     def read_auth_continue(self):
         """Read authenticate continue.
@@ -601,8 +661,9 @@ class Protocol(object):
         while msg.type == "Mysqlx.Notice.Frame":
             msg = self._reader.read_message()
         if msg.type != "Mysqlx.Session.AuthenticateContinue":
-            raise InterfaceError("Unexpected message encountered during "
-                                 "authentication handshake")
+            raise InterfaceError(
+                "Unexpected message encountered during authentication handshake"
+            )
         return msg["auth_data"]
 
     def send_auth_continue(self, auth_data):
@@ -611,10 +672,11 @@ class Protocol(object):
         Args:
             auth_data (str): Authentication data.
         """
-        msg = Message("Mysqlx.Session.AuthenticateContinue",
-                      auth_data=auth_data)
-        self._writer.write_message(mysqlxpb_enum(
-            "Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_CONTINUE"), msg)
+        msg = Message("Mysqlx.Session.AuthenticateContinue", auth_data=auth_data)
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_AUTHENTICATE_CONTINUE"),
+            msg,
+        )
 
     def read_auth_ok(self):
         """Read authenticate OK.
@@ -653,18 +715,18 @@ class Protocol(object):
             elif msg.type == "Mysqlx.Crud.Delete":
                 _, msg = self.build_delete(stmt)
             else:
-                raise ValueError("Invalid message type: {}".format(msg_type))
+                raise ValueError(f"Invalid message type: {msg_type}")
             # Build 'limit_expr' message
             position = len(stmt.get_bindings())
             placeholder = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.PLACEHOLDER")
             msg_limit_expr = Message("Mysqlx.Crud.LimitExpr")
-            msg_limit_expr["row_count"] = Message("Mysqlx.Expr.Expr",
-                                                  type=placeholder,
-                                                  position=position)
+            msg_limit_expr["row_count"] = Message(
+                "Mysqlx.Expr.Expr", type=placeholder, position=position
+            )
             if msg.type == "Mysqlx.Crud.Find":
-                msg_limit_expr["offset"] = Message("Mysqlx.Expr.Expr",
-                                                   type=placeholder,
-                                                   position=position + 1)
+                msg_limit_expr["offset"] = Message(
+                    "Mysqlx.Expr.Expr", type=placeholder, position=position + 1
+                )
             msg["limit_expr"] = msg_limit_expr
 
         oneof_type, oneof_op = CRUD_PREPARE_MAPPING[msg_type]
@@ -677,12 +739,13 @@ class Protocol(object):
 
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.PREPARE_PREPARE"),
-            msg_prepare)
+            msg_prepare,
+        )
 
         try:
             self.read_ok()
-        except InterfaceError:
-            raise NotSupportedError
+        except InterfaceError as err:
+            raise NotSupportedError from err
 
     def send_prepare_execute(self, msg_type, msg, stmt):
         """
@@ -707,14 +770,17 @@ class Protocol(object):
             msg_execute["args"].extend(args)
 
         if stmt.has_limit:
-            msg_execute["args"].extend([
-                self._create_any(stmt.get_limit_row_count()).get_message(),
-                self._create_any(stmt.get_limit_offset()).get_message()
-            ])
+            msg_execute["args"].extend(
+                [
+                    self._create_any(stmt.get_limit_row_count()).get_message(),
+                    self._create_any(stmt.get_limit_offset()).get_message(),
+                ]
+            )
 
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.PREPARE_EXECUTE"),
-            msg_execute)
+            msg_execute,
+        )
 
     def send_prepare_deallocate(self, stmt_id):
         """
@@ -729,7 +795,8 @@ class Protocol(object):
         msg_dealloc["stmt_id"] = stmt_id
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.PREPARE_DEALLOCATE"),
-            msg_dealloc)
+            msg_dealloc,
+        )
         self.read_ok()
 
     def send_msg_without_ps(self, msg_type, msg, stmt):
@@ -749,9 +816,7 @@ class Protocol(object):
             if msg.type == "Mysqlx.Crud.Find":
                 msg_limit["offset"] = stmt.get_limit_offset()
             msg["limit"] = msg_limit
-        is_scalar = False \
-            if msg_type == "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE" \
-               else True
+        is_scalar = msg_type != "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"
         args = self._get_binding_args(stmt, is_scalar=is_scalar)
         if args:
             msg["args"].extend(args)
@@ -784,27 +849,28 @@ class Protocol(object):
 
         .. versionadded:: 8.0.16
         """
-        data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
-                                   if stmt.is_doc_based() else
-                                   "Mysqlx.Crud.DataModel.TABLE")
-        collection = Message("Mysqlx.Crud.Collection",
-                             name=stmt.target.name,
-                             schema=stmt.schema.name)
-        msg = Message("Mysqlx.Crud.Find", data_model=data_model,
-                      collection=collection)
+        data_model = mysqlxpb_enum(
+            "Mysqlx.Crud.DataModel.DOCUMENT"
+            if stmt.is_doc_based()
+            else "Mysqlx.Crud.DataModel.TABLE"
+        )
+        collection = Message(
+            "Mysqlx.Crud.Collection",
+            name=stmt.target.name,
+            schema=stmt.schema.name,
+        )
+        msg = Message("Mysqlx.Crud.Find", data_model=data_model, collection=collection)
         if stmt.has_projection:
             msg["projection"] = stmt.get_projection_expr()
         self._apply_filter(msg, stmt)
 
         if stmt.is_lock_exclusive():
-            msg["locking"] = \
-                mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.EXCLUSIVE_LOCK")
+            msg["locking"] = mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.EXCLUSIVE_LOCK")
         elif stmt.is_lock_shared():
-            msg["locking"] = \
-                mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.SHARED_LOCK")
+            msg["locking"] = mysqlxpb_enum("Mysqlx.Crud.Find.RowLock.SHARED_LOCK")
 
-        if stmt.lock_contention > 0:
-            msg["locking_options"] = stmt.lock_contention
+        if stmt.lock_contention.value > 0:
+            msg["locking_options"] = stmt.lock_contention.value
 
         return "Mysqlx.ClientMessages.Type.CRUD_FIND", msg
 
@@ -823,14 +889,19 @@ class Protocol(object):
 
         .. versionadded:: 8.0.16
         """
-        data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
-                                   if stmt.is_doc_based() else
-                                   "Mysqlx.Crud.DataModel.TABLE")
-        collection = Message("Mysqlx.Crud.Collection",
-                             name=stmt.target.name,
-                             schema=stmt.schema.name)
-        msg = Message("Mysqlx.Crud.Update", data_model=data_model,
-                      collection=collection)
+        data_model = mysqlxpb_enum(
+            "Mysqlx.Crud.DataModel.DOCUMENT"
+            if stmt.is_doc_based()
+            else "Mysqlx.Crud.DataModel.TABLE"
+        )
+        collection = Message(
+            "Mysqlx.Crud.Collection",
+            name=stmt.target.name,
+            schema=stmt.schema.name,
+        )
+        msg = Message(
+            "Mysqlx.Crud.Update", data_model=data_model, collection=collection
+        )
         self._apply_filter(msg, stmt)
         for _, update_op in stmt.get_update_ops().items():
             operation = Message("Mysqlx.Crud.UpdateOperation")
@@ -857,13 +928,19 @@ class Protocol(object):
 
         .. versionadded:: 8.0.16
         """
-        data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
-                                   if stmt.is_doc_based() else
-                                   "Mysqlx.Crud.DataModel.TABLE")
-        collection = Message("Mysqlx.Crud.Collection", name=stmt.target.name,
-                             schema=stmt.schema.name)
-        msg = Message("Mysqlx.Crud.Delete", data_model=data_model,
-                      collection=collection)
+        data_model = mysqlxpb_enum(
+            "Mysqlx.Crud.DataModel.DOCUMENT"
+            if stmt.is_doc_based()
+            else "Mysqlx.Crud.DataModel.TABLE"
+        )
+        collection = Message(
+            "Mysqlx.Crud.Collection",
+            name=stmt.target.name,
+            schema=stmt.schema.name,
+        )
+        msg = Message(
+            "Mysqlx.Crud.Delete", data_model=data_model, collection=collection
+        )
         self._apply_filter(msg, stmt)
         return "Mysqlx.ClientMessages.Type.CRUD_DELETE", msg
 
@@ -883,21 +960,29 @@ class Protocol(object):
 
         .. versionadded:: 8.0.16
         """
-        msg = Message("Mysqlx.Sql.StmtExecute", namespace=namespace, stmt=stmt,
-                      compact_metadata=False)
+        msg = Message(
+            "Mysqlx.Sql.StmtExecute",
+            namespace=namespace,
+            stmt=stmt,
+            compact_metadata=False,
+        )
 
         if fields:
             obj_flds = []
             for key, value in fields.items():
-                obj_fld = Message("Mysqlx.Datatypes.Object.ObjectField",
-                                  key=key, value=self._create_any(value))
+                obj_fld = Message(
+                    "Mysqlx.Datatypes.Object.ObjectField",
+                    key=key,
+                    value=self._create_any(value),
+                )
                 obj_flds.append(obj_fld.get_message())
             msg_obj = Message("Mysqlx.Datatypes.Object", fld=obj_flds)
             msg_any = Message("Mysqlx.Datatypes.Any", type=2, obj=msg_obj)
             msg["args"] = [msg_any.get_message()]
         return "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE", msg
 
-    def build_insert(self, stmt):
+    @staticmethod
+    def build_insert(stmt):
         """Build insert statement.
 
         Args:
@@ -912,19 +997,25 @@ class Protocol(object):
 
         .. versionadded:: 8.0.16
         """
-        data_model = mysqlxpb_enum("Mysqlx.Crud.DataModel.DOCUMENT"
-                                   if stmt.is_doc_based() else
-                                   "Mysqlx.Crud.DataModel.TABLE")
-        collection = Message("Mysqlx.Crud.Collection",
-                             name=stmt.target.name,
-                             schema=stmt.schema.name)
-        msg = Message("Mysqlx.Crud.Insert", data_model=data_model,
-                      collection=collection)
+        data_model = mysqlxpb_enum(
+            "Mysqlx.Crud.DataModel.DOCUMENT"
+            if stmt.is_doc_based()
+            else "Mysqlx.Crud.DataModel.TABLE"
+        )
+        collection = Message(
+            "Mysqlx.Crud.Collection",
+            name=stmt.target.name,
+            schema=stmt.schema.name,
+        )
+        msg = Message(
+            "Mysqlx.Crud.Insert", data_model=data_model, collection=collection
+        )
 
         if hasattr(stmt, "_fields"):
             for field in stmt._fields:
-                expr = ExprParser(field, not stmt.is_doc_based()) \
-                    .parse_table_insert_field()
+                expr = ExprParser(
+                    field, not stmt.is_doc_based()
+                ).parse_table_insert_field()
                 msg["projection"].extend([expr.get_message()])
 
         for value in stmt.get_values():
@@ -987,14 +1078,20 @@ class Protocol(object):
                 break
             if msg.type != "Mysqlx.Resultset.ColumnMetaData":
                 raise InterfaceError("Unexpected msg type")
-            col = Column(msg["type"], msg["catalog"], msg["schema"],
-                         msg["table"], msg["original_table"],
-                         msg["name"], msg["original_name"],
-                         msg.get("length", 21),
-                         msg.get("collation", 0),
-                         msg.get("fractional_digits", 0),
-                         msg.get("flags", 16),
-                         msg.get("content_type"))
+            col = Column(
+                msg["type"],
+                msg["catalog"],
+                msg["schema"],
+                msg["table"],
+                msg["original_table"],
+                msg["name"],
+                msg["original_name"],
+                msg.get("length", 21),
+                msg.get("collation", 0),
+                msg.get("fractional_digits", 0),
+                msg.get("flags", 16),
+                msg.get("content_type"),
+            )
             columns.append(col)
         return columns
 
@@ -1006,36 +1103,37 @@ class Protocol(object):
         """
         msg = self._reader.read_message()
         if msg.type == "Mysqlx.Error":
-            raise InterfaceError("Mysqlx.Error: {}".format(msg["msg"]),
-                                 errno=msg["code"])
+            raise InterfaceError(f"Mysqlx.Error: {msg['msg']}", errno=msg["code"])
         if msg.type != "Mysqlx.Ok":
             raise InterfaceError("Unexpected message encountered")
 
     def send_connection_close(self):
         """Send connection close."""
         msg = Message("Mysqlx.Connection.Close")
-        self._writer.write_message(mysqlxpb_enum(
-            "Mysqlx.ClientMessages.Type.CON_CLOSE"), msg)
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CLOSE"), msg
+        )
 
     def send_close(self):
         """Send close."""
         msg = Message("Mysqlx.Session.Close")
-        self._writer.write_message(mysqlxpb_enum(
-            "Mysqlx.ClientMessages.Type.SESS_CLOSE"), msg)
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_CLOSE"), msg
+        )
 
     def send_expect_open(self):
         """Send expectation."""
-        cond_key = mysqlxpb_enum(
-            "Mysqlx.Expect.Open.Condition.Key.EXPECT_FIELD_EXIST")
+        cond_key = mysqlxpb_enum("Mysqlx.Expect.Open.Condition.Key.EXPECT_FIELD_EXIST")
         msg_oc = Message("Mysqlx.Expect.Open.Condition")
         msg_oc["condition_key"] = cond_key
         msg_oc["condition_value"] = "6.1"
 
         msg_eo = Message("Mysqlx.Expect.Open")
-        msg_eo['cond'] = [msg_oc.get_message()]
+        msg_eo["cond"] = [msg_oc.get_message()]
 
-        self._writer.write_message(mysqlxpb_enum(
-            "Mysqlx.ClientMessages.Type.EXPECT_OPEN"), msg_eo)
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.EXPECT_OPEN"), msg_eo
+        )
 
     def send_reset(self, keep_open=None):
         """Send reset session message.
@@ -1056,8 +1154,9 @@ class Protocol(object):
                 keep_open = False
         if keep_open:
             msg["keep_open"] = True
-        self._writer.write_message(mysqlxpb_enum(
-            "Mysqlx.ClientMessages.Type.SESS_RESET"), msg)
+        self._writer.write_message(
+            mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_RESET"), msg
+        )
         self.read_ok()
         if keep_open:
             return True

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -47,18 +47,14 @@
 
 #define MODULE_SUCCESS_VALUE(val) val
 #define MODULE_ERROR_VALUE NULL
-#define MODULE_DEF(ob, name, methods, doc) \
-    {static struct PyModuleDef moduledef = { \
-        PyModuleDef_HEAD_INIT, \
-        name, \
-        doc, \
-        -1, \
-        methods, \
-        NULL, NULL, NULL, NULL, \
-    }; \
-    ob = PyModule_Create(&moduledef); }
+#define MODULE_DEF(ob, name, methods, doc)                                         \
+    {                                                                              \
+        static struct PyModuleDef moduledef = {                                    \
+            PyModuleDef_HEAD_INIT, name, doc, -1, methods, NULL, NULL, NULL, NULL, \
+        };                                                                         \
+        ob = PyModule_Create(&moduledef);                                          \
+    }
 #define MODULE_INIT PyMODINIT_FUNC PyInit__mysql_connector(void)
-
 
 PyObject *MySQLError;
 PyObject *MySQLInterfaceError;
@@ -67,365 +63,282 @@ PyObject *MySQLInterfaceError;
  * class _mysql_connector.MySQL
  */
 
-static PyMemberDef MySQL_members[]=
-{
+static PyMemberDef MySQL_members[] = {
     {"have_result_set", T_OBJECT, offsetof(MySQL, have_result_set), 0,
      "True if current session has result set"},
     {"converter_str_fallback", T_OBJECT, offsetof(MySQL, converter_str_fallback), 0,
      "True for fallback to converting unsupported types to str"},
-    {NULL}  /* Sentinel */
+    {NULL} /* Sentinel */
 };
 
-static PyMethodDef MySQL_methods[]=
-{
-    {"affected_rows", (PyCFunction)MySQL_affected_rows,
-     METH_NOARGS,
-	 "Returns num of rows changed by the last statement"},
-    {"autocommit", (PyCFunction)MySQL_autocommit,
-     METH_O,
-     "Set autocommit mode"},
+static PyMethodDef MySQL_methods[] = {
+    {"affected_rows", (PyCFunction)MySQL_affected_rows, METH_NOARGS,
+     "Returns num of rows changed by the last statement"},
+    {"autocommit", (PyCFunction)MySQL_autocommit, METH_O, "Set autocommit mode"},
 
-    {"buffered", (PyCFunction)MySQL_buffered,
-     METH_VARARGS,
+    {"buffered", (PyCFunction)MySQL_buffered, METH_VARARGS,
      "Set and get current setting of buffered"},
 
-    {"change_user", (PyCFunction)MySQL_change_user,
-     METH_VARARGS | METH_KEYWORDS,
+    {"change_user", (PyCFunction)MySQL_change_user, METH_VARARGS | METH_KEYWORDS,
      "Changes the user and causes db to become the default"},
-    {"connect", (PyCFunction)MySQL_connect,
-     METH_VARARGS | METH_KEYWORDS,
+    {"connect", (PyCFunction)MySQL_connect, METH_VARARGS | METH_KEYWORDS,
      "Connect with a MySQL server"},
-    {"consume_result", (PyCFunction)MySQL_consume_result,
-     METH_NOARGS,
-	 "Consumes the result by reading all rows"},
-    {"convert_to_mysql", (PyCFunction)MySQL_convert_to_mysql,
-     METH_VARARGS,
-	 "Convert Python objects to MySQL values"},
-    {"close", (PyCFunction)MySQL_close,
-     METH_NOARGS,
-     "Closes an open connection."},
-    {"character_set_name", (PyCFunction)MySQL_character_set_name,
-     METH_NOARGS,
+    {"consume_result", (PyCFunction)MySQL_consume_result, METH_NOARGS,
+     "Consumes the result by reading all rows"},
+    {"convert_to_mysql", (PyCFunction)MySQL_convert_to_mysql, METH_VARARGS,
+     "Convert Python objects to MySQL values"},
+    {"close", (PyCFunction)MySQL_close, METH_NOARGS, "Closes an open connection."},
+    {"character_set_name", (PyCFunction)MySQL_character_set_name, METH_NOARGS,
      "Returns the default character set name for the current connection"},
-    {"commit", (PyCFunction)MySQL_commit,
-     METH_NOARGS,
-	 "Commits the current transaction"},
-    {"connected", (PyCFunction)MySQL_connected,
-     METH_NOARGS,
-	 "Returns True when connected; False otherwise"},
+    {"commit", (PyCFunction)MySQL_commit, METH_NOARGS, "Commits the current transaction"},
+    {"connected", (PyCFunction)MySQL_connected, METH_NOARGS,
+     "Returns True when connected; False otherwise"},
 
-    {"escape_string", (PyCFunction)MySQL_escape_string,
-     METH_O,
-	 "Create a legal SQL string that you can use in an SQL statement"},
+    {"escape_string", (PyCFunction)MySQL_escape_string, METH_O,
+     "Create a legal SQL string that you can use in an SQL statement"},
 
-    {"fetch_fields", (PyCFunction)MySQL_fetch_fields,
-     METH_VARARGS | METH_KEYWORDS,
-	 "Fetch information about fields in result set"},
-    {"fetch_row", (PyCFunction)MySQL_fetch_row,
-     METH_VARARGS | METH_KEYWORDS,
-	 "Fetch a row"},
+    {"fetch_fields", (PyCFunction)MySQL_fetch_fields, METH_VARARGS | METH_KEYWORDS,
+     "Fetch information about fields in result set"},
+    {"fetch_row", (PyCFunction)MySQL_fetch_row, METH_VARARGS | METH_KEYWORDS, "Fetch a row"},
 
-    {"field_count", (PyCFunction)MySQL_field_count,
-     METH_NOARGS,
-	 "Returns number of columns for the most recent query"},
-    {"free_result", (PyCFunction)MySQL_free_result,
-     METH_NOARGS,
-	 "Returns number of columns for the most recent query"},
+    {"field_count", (PyCFunction)MySQL_field_count, METH_NOARGS,
+     "Returns number of columns for the most recent query"},
+    {"free_result", (PyCFunction)MySQL_free_result, METH_NOARGS,
+     "Returns number of columns for the most recent query"},
 
-
-    {"get_character_set_info", (PyCFunction)MySQL_get_character_set_info,
-     METH_NOARGS,
+    {"get_character_set_info", (PyCFunction)MySQL_get_character_set_info, METH_NOARGS,
      "Provides information about the default client character set"},
-    {"get_client_info", (PyCFunction)MySQL_get_client_info,
-     METH_NOARGS,
+    {"get_client_info", (PyCFunction)MySQL_get_client_info, METH_NOARGS,
      "Returns a string that represents the client library version"},
-    {"get_client_version", (PyCFunction)MySQL_get_client_version,
-     METH_NOARGS,
+    {"get_client_version", (PyCFunction)MySQL_get_client_version, METH_NOARGS,
      "Returns a tuple that represents the client library version"},
-    {"get_host_info", (PyCFunction)MySQL_get_host_info,
-     METH_NOARGS,
+    {"get_host_info", (PyCFunction)MySQL_get_host_info, METH_NOARGS,
      "Returns a string describing the type of connection in use"},
-    {"get_proto_info", (PyCFunction)MySQL_get_proto_info,
-     METH_NOARGS,
+    {"get_proto_info", (PyCFunction)MySQL_get_proto_info, METH_NOARGS,
      "Returns the protocol version used by current connection"},
-    {"get_server_info", (PyCFunction)MySQL_get_server_info,
-     METH_NOARGS,
+    {"get_server_info", (PyCFunction)MySQL_get_server_info, METH_NOARGS,
      "Returns a string that represents the server version number"},
-    {"get_server_version", (PyCFunction)MySQL_get_server_version,
-     METH_NOARGS,
+    {"get_server_version", (PyCFunction)MySQL_get_server_version, METH_NOARGS,
      "Returns the version number of the server as a tuple"},
-    {"get_ssl_cipher", (PyCFunction)MySQL_get_ssl_cipher,
-     METH_NOARGS,
+    {"get_ssl_cipher", (PyCFunction)MySQL_get_ssl_cipher, METH_NOARGS,
      "Returns the SSL cipher used for the given connection"},
 
-    {"hex_string", (PyCFunction)MySQL_hex_string,
-     METH_O,
+    {"hex_string", (PyCFunction)MySQL_hex_string, METH_O,
      "Encode string in hexadecimal format"},
 
-	{"insert_id", (PyCFunction)MySQL_insert_id,
-	 METH_VARARGS | METH_KEYWORDS,
-	 "Returns the value generated for an AUTO_INCREMENT column"},
+    {"insert_id", (PyCFunction)MySQL_insert_id, METH_VARARGS | METH_KEYWORDS,
+     "Returns the value generated for an AUTO_INCREMENT column"},
 
-    {"more_results", (PyCFunction)MySQL_more_results,
-     METH_NOARGS,
-	 "Returns True if more results exists"},
+    {"more_results", (PyCFunction)MySQL_more_results, METH_NOARGS,
+     "Returns True if more results exists"},
 
-    {"next_result", (PyCFunction)MySQL_next_result,
-     METH_NOARGS,
-	 "Reads next statement result and returns if more results are available"},
-    {"num_fields", (PyCFunction)MySQL_num_fields,
-     METH_NOARGS,
-	 "Returns number of fields in result set"},
-    {"num_rows", (PyCFunction)MySQL_num_rows,
-     METH_NOARGS,
-	 "Returns number of rows in result set"},
+    {"next_result", (PyCFunction)MySQL_next_result, METH_NOARGS,
+     "Reads next statement result and returns if more results are available"},
+    {"num_fields", (PyCFunction)MySQL_num_fields, METH_NOARGS,
+     "Returns number of fields in result set"},
+    {"num_rows", (PyCFunction)MySQL_num_rows, METH_NOARGS,
+     "Returns number of rows in result set"},
 
-    {"ping", (PyCFunction)MySQL_ping,
-     METH_NOARGS,
-	 "Checks whether the connection to the server is working"},
-    {"query", (PyCFunction)MySQL_query,
-     METH_VARARGS | METH_KEYWORDS,
-	 "Execute the SQL statement"},
+    {"ping", (PyCFunction)MySQL_ping, METH_NOARGS,
+     "Checks whether the connection to the server is working"},
+    {"query", (PyCFunction)MySQL_query, METH_VARARGS | METH_KEYWORDS,
+     "Execute the SQL statement"},
 
-    {"stmt_prepare", (PyCFunction)MySQL_stmt_prepare,
-     METH_VARARGS,
-	 "Prepare the SQL statement"},
+    {"stmt_prepare", (PyCFunction)MySQL_stmt_prepare, METH_VARARGS,
+     "Prepare the SQL statement"},
 
-    {"raw", (PyCFunction)MySQL_raw,
-     METH_VARARGS,
-     "Set and get current raw setting"},
-    {"refresh", (PyCFunction)MySQL_refresh,
-     METH_VARARGS,
+    {"raw", (PyCFunction)MySQL_raw, METH_VARARGS, "Set and get current raw setting"},
+    {"refresh", (PyCFunction)MySQL_refresh, METH_VARARGS,
      "Flush tables, caches or reset replication server info"},
-    {"reset_connection", (PyCFunction)MySQL_reset_connection,
-     METH_NOARGS,
+    {"reset_connection", (PyCFunction)MySQL_reset_connection, METH_NOARGS,
      "Resets current connection"},
-    {"rollback", (PyCFunction)MySQL_rollback,
-     METH_NOARGS,
-	 "Rolls back the current transaction"},
+    {"rollback", (PyCFunction)MySQL_rollback, METH_NOARGS,
+     "Rolls back the current transaction"},
 
-    {"select_db", (PyCFunction)MySQL_select_db,
-     METH_O,
+    {"select_db", (PyCFunction)MySQL_select_db, METH_O,
      "Causes the database specified by db to become the default database"},
-    {"set_character_set", (PyCFunction)MySQL_set_character_set,
-     METH_VARARGS,
+    {"set_character_set", (PyCFunction)MySQL_set_character_set, METH_VARARGS,
      "Set the default character set for the current connection"},
-    {"set_load_data_local_infile_option",
-     (PyCFunction)MySQL_set_load_data_local_infile_option, METH_VARARGS,
-     "Set the load_data_local_infile_option for the current connection"},
-    {"shutdown", (PyCFunction)MySQL_shutdown,
-     METH_VARARGS,
-     "Ask MySQL server to shut down"},
-    {"stat", (PyCFunction)MySQL_stat,
-     METH_NOARGS,
+    {"set_load_data_local_infile_option", (PyCFunction)MySQL_set_load_data_local_infile_option,
+     METH_VARARGS, "Set the load_data_local_infile_option for the current connection"},
+    {"shutdown", (PyCFunction)MySQL_shutdown, METH_VARARGS, "Ask MySQL server to shut down"},
+    {"stat", (PyCFunction)MySQL_stat, METH_NOARGS,
      "Returns server information like uptime, running threads, .."},
-    {"st_affected_rows", (PyCFunction)MySQL_st_affected_rows,
-     METH_NOARGS,
-	 "Returns affected rows"},
-    {"st_client_flag", (PyCFunction)MySQL_st_client_flag,
-     METH_NOARGS,
-	 "Returns client flags for current session"},
-    {"st_insert_id", (PyCFunction)MySQL_st_insert_id,
-     METH_NOARGS,
-	 "Returns insert ID"},
-    {"st_field_count", (PyCFunction)MySQL_st_field_count,
-     METH_NOARGS,
-	 "Returns field count"},
-    {"st_server_capabilities", (PyCFunction)MySQL_st_server_capabilities,
-     METH_NOARGS,
-	 "Returns server capabilities"},
-    {"st_server_status", (PyCFunction)MySQL_st_server_status,
-     METH_NOARGS,
-	 "Returns server status flag"},
-    {"st_warning_count", (PyCFunction)MySQL_st_warning_count,
-     METH_NOARGS,
-	 "Returns warning count"},
+    {"st_affected_rows", (PyCFunction)MySQL_st_affected_rows, METH_NOARGS,
+     "Returns affected rows"},
+    {"st_client_flag", (PyCFunction)MySQL_st_client_flag, METH_NOARGS,
+     "Returns client flags for current session"},
+    {"st_insert_id", (PyCFunction)MySQL_st_insert_id, METH_NOARGS, "Returns insert ID"},
+    {"st_field_count", (PyCFunction)MySQL_st_field_count, METH_NOARGS, "Returns field count"},
+    {"st_server_capabilities", (PyCFunction)MySQL_st_server_capabilities, METH_NOARGS,
+     "Returns server capabilities"},
+    {"st_server_status", (PyCFunction)MySQL_st_server_status, METH_NOARGS,
+     "Returns server status flag"},
+    {"st_warning_count", (PyCFunction)MySQL_st_warning_count, METH_NOARGS,
+     "Returns warning count"},
 
-    {"thread_id", (PyCFunction)MySQL_thread_id,
-     METH_NOARGS,
-	 "Returns the thread ID of the current connection"},
+    {"thread_id", (PyCFunction)MySQL_thread_id, METH_NOARGS,
+     "Returns the thread ID of the current connection"},
 
-    {"use_unicode", (PyCFunction)MySQL_use_unicode,
-     METH_VARARGS,
+    {"use_unicode", (PyCFunction)MySQL_use_unicode, METH_VARARGS,
      "Set and get current use_unicode setting"},
 
-    {"warning_count", (PyCFunction)MySQL_warning_count,
-     METH_NOARGS,
-	 "Returns the number of errors, warnings, and notes"},
+    {"warning_count", (PyCFunction)MySQL_warning_count, METH_NOARGS,
+     "Returns the number of errors, warnings, and notes"},
 
-    {NULL}  /* Sentinel */
+    {NULL} /* Sentinel */
 };
 
-PyTypeObject MySQLType=
-{
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "_mysql_connector.MySQL",  /*tp_name*/
-    sizeof(MySQL),             /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    (destructor)MySQL_dealloc, /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,        /*tp_flags*/
-    "MySQL objects",           /* tp_doc */
-    0,		               	   /* tp_traverse */
-    0,		               	   /* tp_clear */
-    0,		                   /* tp_richcompare */
-    0,		                   /* tp_weaklistoffset */
-    0,		                   /* tp_iter */
-    0,		                   /* tp_iternext */
-    MySQL_methods,             /* tp_methods */
-    MySQL_members,             /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)MySQL_init,      /* tp_init */
-    0,                         /* tp_alloc */
-    MySQL_new,                 /* tp_new */
+PyTypeObject MySQLType = {
+    PyVarObject_HEAD_INIT(NULL, 0) "_mysql_connector.MySQL", /*tp_name*/
+    sizeof(MySQL),                                           /*tp_basicsize*/
+    0,                                                       /*tp_itemsize*/
+    (destructor)MySQL_dealloc,                               /*tp_dealloc*/
+    0,                                                       /*tp_print*/
+    0,                                                       /*tp_getattr*/
+    0,                                                       /*tp_setattr*/
+    0,                                                       /*tp_compare*/
+    0,                                                       /*tp_repr*/
+    0,                                                       /*tp_as_number*/
+    0,                                                       /*tp_as_sequence*/
+    0,                                                       /*tp_as_mapping*/
+    0,                                                       /*tp_hash */
+    0,                                                       /*tp_call*/
+    0,                                                       /*tp_str*/
+    0,                                                       /*tp_getattro*/
+    0,                                                       /*tp_setattro*/
+    0,                                                       /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,                                      /*tp_flags*/
+    "MySQL objects",                                         /* tp_doc */
+    0,                                                       /* tp_traverse */
+    0,                                                       /* tp_clear */
+    0,                                                       /* tp_richcompare */
+    0,                                                       /* tp_weaklistoffset */
+    0,                                                       /* tp_iter */
+    0,                                                       /* tp_iternext */
+    MySQL_methods,                                           /* tp_methods */
+    MySQL_members,                                           /* tp_members */
+    0,                                                       /* tp_getset */
+    0,                                                       /* tp_base */
+    0,                                                       /* tp_dict */
+    0,                                                       /* tp_descr_get */
+    0,                                                       /* tp_descr_set */
+    0,                                                       /* tp_dictoffset */
+    (initproc)MySQL_init,                                    /* tp_init */
+    0,                                                       /* tp_alloc */
+    MySQL_new,                                               /* tp_new */
 };
 
 /*
  * class _mysql_connector.MySQLPrepStmt
  */
 
-static PyMemberDef MySQLPrepStmt_members[]=
-{
+static PyMemberDef MySQLPrepStmt_members[] = {
     {"have_result_set", T_OBJECT, offsetof(MySQLPrepStmt, have_result_set), 0,
      "True if statement has result set"},
     {"param_count", T_LONG, offsetof(MySQLPrepStmt, param_count), 1,
      "Returns the number of parameter markers present in the prepared statement"},
     {"converter_str_fallback", T_OBJECT, offsetof(MySQLPrepStmt, converter_str_fallback), 0,
      "True for fallback to converting unsupported types to str"},
-    {NULL}  /* Sentinel */
+    {NULL} /* Sentinel */
 };
 
-static PyMethodDef MySQLPrepStmt_methods[]=
-{
-    {"stmt_execute", (PyCFunction)MySQLPrepStmt_execute,
-     METH_VARARGS,
-	 "Executes the prepared statement"},
-    {"fetch_fields", (PyCFunction)MySQLPrepStmt_fetch_fields,
-     METH_VARARGS,
-	 "Fetch information about fields in result set"},
-    {"fetch_row", (PyCFunction)MySQLPrepStmt_fetch_row,
-     METH_VARARGS,
-	 "Returns the next row in the result set"},
-    {"stmt_close", (PyCFunction)MySQLPrepStmt_close,
-     METH_VARARGS,
-	 "Closes the prepared statement"},
-    {"stmt_reset", (PyCFunction)MySQLPrepStmt_reset,
-     METH_VARARGS,
-	 "Resets a prepared statement on client and server to state after prepare"},
-    {"free_result", (PyCFunction)MySQLPrepStmt_free_result,
-     METH_NOARGS,
-	 "Releases memory associated with the result set produced by execution of the prepared statement"},
+static PyMethodDef MySQLPrepStmt_methods[] = {
+    {"stmt_execute", (PyCFunction)MySQLPrepStmt_execute, METH_VARARGS,
+     "Executes the prepared statement"},
+    {"fetch_fields", (PyCFunction)MySQLPrepStmt_fetch_fields, METH_VARARGS,
+     "Fetch information about fields in result set"},
+    {"fetch_row", (PyCFunction)MySQLPrepStmt_fetch_row, METH_VARARGS,
+     "Returns the next row in the result set"},
+    {"stmt_close", (PyCFunction)MySQLPrepStmt_close, METH_VARARGS,
+     "Closes the prepared statement"},
+    {"stmt_reset", (PyCFunction)MySQLPrepStmt_reset, METH_VARARGS,
+     "Resets a prepared statement on client and server to state after prepare"},
+    {"free_result", (PyCFunction)MySQLPrepStmt_free_result, METH_NOARGS,
+     "Releases memory associated with the result set produced by execution of the prepared "
+     "statement"},
 
-    {NULL}  /* Sentinel */
+    {NULL} /* Sentinel */
 };
 
-PyTypeObject MySQLPrepStmtType=
-{
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "_mysql_connector.MySQLPrepStmt",   /* tp_name */
-    sizeof(MySQLPrepStmt),              /* tp_basicsize */
-    0,                                  /* tp_itemsize */
-    (destructor)MySQLPrepStmt_dealloc,  /* tp_dealloc */
-    0,                                  /* tp_print */
-    0,                                  /* tp_getattr */
-    0,                                  /* tp_setattr */
-    0,                                  /* tp_compare */
-    0,                                  /* tp_repr */
-    0,                                  /* tp_as_number */
-    0,                                  /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash */
-    0,                                  /* tp_call */
-    0,                                  /* tp_str */
-    0,                                  /* tp_getattro */
-    0,                                  /* tp_setattro */
-    0,                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    "MySQLPrepStmt objects",            /* tp_doc */
-    0,                                  /* tp_traverse */
-    0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
-    0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
-    0,                                  /* tp_iternext */
-    MySQLPrepStmt_methods,              /* tp_methods */
-    MySQLPrepStmt_members,              /* tp_members */
-    0,                                  /* tp_getset */
-    0,                                  /* tp_base */
-    0,                                  /* tp_dict */
-    0,                                  /* tp_descr_get */
-    0,                                  /* tp_descr_set */
-    0,                                  /* tp_dictoffset */
-    (initproc)MySQLPrepStmt_init,       /* tp_init */
-    0,                                  /* tp_alloc */
-    MySQLPrepStmt_new,                  /* tp_new */
+PyTypeObject MySQLPrepStmtType = {
+    PyVarObject_HEAD_INIT(NULL, 0) "_mysql_connector.MySQLPrepStmt", /* tp_name */
+    sizeof(MySQLPrepStmt),                                           /* tp_basicsize */
+    0,                                                               /* tp_itemsize */
+    (destructor)MySQLPrepStmt_dealloc,                               /* tp_dealloc */
+    0,                                                               /* tp_print */
+    0,                                                               /* tp_getattr */
+    0,                                                               /* tp_setattr */
+    0,                                                               /* tp_compare */
+    0,                                                               /* tp_repr */
+    0,                                                               /* tp_as_number */
+    0,                                                               /* tp_as_sequence */
+    0,                                                               /* tp_as_mapping */
+    0,                                                               /* tp_hash */
+    0,                                                               /* tp_call */
+    0,                                                               /* tp_str */
+    0,                                                               /* tp_getattro */
+    0,                                                               /* tp_setattro */
+    0,                                                               /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                                              /* tp_flags */
+    "MySQLPrepStmt objects",                                         /* tp_doc */
+    0,                                                               /* tp_traverse */
+    0,                                                               /* tp_clear */
+    0,                                                               /* tp_richcompare */
+    0,                                                               /* tp_weaklistoffset */
+    0,                                                               /* tp_iter */
+    0,                                                               /* tp_iternext */
+    MySQLPrepStmt_methods,                                           /* tp_methods */
+    MySQLPrepStmt_members,                                           /* tp_members */
+    0,                                                               /* tp_getset */
+    0,                                                               /* tp_base */
+    0,                                                               /* tp_dict */
+    0,                                                               /* tp_descr_get */
+    0,                                                               /* tp_descr_set */
+    0,                                                               /* tp_dictoffset */
+    (initproc)MySQLPrepStmt_init,                                    /* tp_init */
+    0,                                                               /* tp_alloc */
+    MySQLPrepStmt_new,                                               /* tp_new */
 };
 
-static PyMethodDef module_methods[]=
-{
-    {"datetime_to_mysql", (PyCFunction)datetime_to_mysql,
-     METH_O,
+static PyMethodDef module_methods[] = {
+    {"datetime_to_mysql", (PyCFunction)datetime_to_mysql, METH_O,
      "Convert a Python datetime.datetime to MySQL DATETIME"},
-    {"time_to_mysql", (PyCFunction)time_to_mysql,
-     METH_O,
+    {"time_to_mysql", (PyCFunction)time_to_mysql, METH_O,
      "Convert a Python datetime.time to MySQL TIME"},
-    {"date_to_mysql", (PyCFunction)date_to_mysql,
-     METH_O,
+    {"date_to_mysql", (PyCFunction)date_to_mysql, METH_O,
      "Convert a Python datetime.date to MySQL DATE"},
-    {NULL}  /* Sentinel */
+    {NULL} /* Sentinel */
 };
 
-
-#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
+#ifndef PyMODINIT_FUNC /* declarations for DLL import/export */
 #define PyMODINIT_FUNC void
 #endif
 MODULE_INIT
 {
-    PyObject* mod;
+    PyObject *mod;
 
-    if (PyType_Ready(&MySQLType) < 0)
-    {
+    if (PyType_Ready(&MySQLType) < 0) {
         return MODULE_ERROR_VALUE;
     }
 
-    if (PyType_Ready(&MySQLPrepStmtType) < 0)
-    {
+    if (PyType_Ready(&MySQLPrepStmtType) < 0) {
         return MODULE_ERROR_VALUE;
     }
 
     MODULE_DEF(mod, "_mysql_connector", module_methods,
                "Python C Extension using MySQL Connector/C");
 
-    if (mod == NULL)
-    {
+    if (mod == NULL) {
         return MODULE_ERROR_VALUE;
     }
 
-    MySQLError = PyErr_NewException("_mysql_connector.MySQLError",
-                                    PyExc_Exception, NULL);
+    MySQLError = PyErr_NewException("_mysql_connector.MySQLError", PyExc_Exception, NULL);
     Py_INCREF(MySQLError);
     PyModule_AddObject(mod, "MySQLError", MySQLError);
 
-    MySQLInterfaceError = PyErr_NewException(
-        "_mysql_connector.MySQLInterfaceError", MySQLError, NULL);
+    MySQLInterfaceError =
+        PyErr_NewException("_mysql_connector.MySQLInterfaceError", MySQLError, NULL);
     Py_INCREF(MySQLInterfaceError);
     PyModule_AddObject(mod, "MySQLInterfaceError", MySQLInterfaceError);
 

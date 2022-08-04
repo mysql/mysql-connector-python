@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,17 +31,17 @@
 """Testing connection.CMySQLConnection class using the C Extension
 """
 
-import tests
 import unittest
 
-from mysql.connector import errors
-from mysql.connector.constants import ClientFlag, flag_is_set
+import tests
+
+from mysql.connector import cursor, cursor_cext, errors
 from mysql.connector.connection import MySQLConnection
 from mysql.connector.connection_cext import CMySQLConnection
+from mysql.connector.constants import ClientFlag, flag_is_set
 
 
 class CMySQLConnectionTests(tests.MySQLConnectorTests):
-
     def setUp(self):
         config = tests.get_mysql_config()
         self.cnx = CMySQLConnection(**config)
@@ -50,11 +50,14 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test__info_query(self):
         query = "SELECT 1, 'a', 2, 'b'"
-        exp = (1, 'a', 2, 'b')
+        exp = (1, "a", 2, "b")
         self.assertEqual(exp, self.cnx.info_query(query))
 
-        self.assertRaises(errors.InterfaceError, self.cnx.info_query,
-                          "SHOW VARIABLES LIKE '%char%'")
+        self.assertRaises(
+            errors.InterfaceError,
+            self.cnx.info_query,
+            "SHOW VARIABLES LIKE '%char%'",
+        )
 
     def test_client_flags(self):
         defaults = ClientFlag.default
@@ -81,11 +84,11 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_cmd_init_db(self):
         query = "SELECT DATABASE()"
-        self.cnx.cmd_init_db('mysql')
-        self.assertEqual('mysql', self.cnx.info_query(query)[0])
+        self.cnx.cmd_init_db("mysql")
+        self.assertEqual("mysql", self.cnx.info_query(query)[0])
 
-        self.cnx.cmd_init_db('myconnpy')
-        self.assertEqual('myconnpy', self.cnx.info_query(query)[0])
+        self.cnx.cmd_init_db("myconnpy")
+        self.assertEqual("myconnpy", self.cnx.info_query(query)[0])
 
     def test_cmd_query(self):
         query = "SHOW STATUS LIKE 'Aborted_c%'"
@@ -93,31 +96,31 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
         charset = 45 if tests.MYSQL_VERSION < (8, 0, 0) else 255
         exp = {
-            'eof': {'status_flag': 32, 'warning_count': 0},
-            'columns': [
-                ['Variable_name', 253, None, None, None, None, 0, 1, charset],
-                ('Value', 253, None, None, None, None, 1, 0, charset)
-            ]
+            "eof": {"status_flag": 32, "warning_count": 0},
+            "columns": [
+                ["Variable_name", 253, None, None, None, None, 0, 1, charset],
+                ("Value", 253, None, None, None, None, 1, 0, charset),
+            ],
         }
 
         if tests.MYSQL_VERSION >= (5, 7, 10):
-            exp['columns'][0][7] = 4097
-            exp['eof']['status_flag'] = 16385
+            exp["columns"][0][7] = 4097
+            exp["eof"]["status_flag"] = 16385
 
-        exp['columns'][0] = tuple(exp['columns'][0])
+        exp["columns"][0] = tuple(exp["columns"][0])
 
         self.assertEqual(exp, info)
 
         rows = self.cnx.get_rows()[0]
-        vars = [ row[0] for row in rows ]
+        vars = [row[0] for row in rows]
         self.assertEqual(2, len(rows))
 
         vars.sort()
-        exp = ['Aborted_clients', 'Aborted_connects']
+        exp = ["Aborted_clients", "Aborted_connects"]
         self.assertEqual(exp, vars)
 
-        exp = ['Value', 'Variable_name']
-        fields = [fld[0] for fld in info['columns']]
+        exp = ["Value", "Variable_name"]
+        fields = [fld[0] for fld in info["columns"]]
         fields.sort()
         self.assertEqual(exp, fields)
 
@@ -125,13 +128,18 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
         info = self.cnx.cmd_query("SET @a = 1")
         exp = {
-            'warning_count': 0, 'insert_id': 0, 'affected_rows': 0,
-            'server_status': 0, 'field_count': 0
+            "warning_count": 0,
+            "insert_id": 0,
+            "affected_rows": 0,
+            "server_status": 0,
+            "field_count": 0,
         }
         self.assertEqual(exp, info)
 
-    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 3),
-                     "MySQL >= 5.7.3 is required for reset command")
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (5, 7, 3),
+        "MySQL >= 5.7.3 is required for reset command",
+    )
     def test_cmd_reset_connection(self):
         """Resets session without re-authenticating"""
         exp_session_id = self.cnx.connection_id
@@ -141,14 +149,65 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
         self.cnx.cmd_query("SELECT @ham")
         self.assertEqual(exp_session_id, self.cnx.connection_id)
 
-        exp = (b'2',)
+        exp = (b"2",)
         self.assertNotEqual(exp, self.cnx.get_rows()[0][0])
 
     def test_connection_id(self):
         """MySQL connection ID"""
-        self.assertEqual(self.cnx._cmysql.thread_id(),
-                         self.cnx.connection_id)
+        self.assertEqual(self.cnx._cmysql.thread_id(), self.cnx.connection_id)
         self.cnx.close()
         self.assertIsNone(self.cnx.connection_id)
         self.cnx.connect()
 
+    def test_cursor(self):
+        """Test CEXT cursors."""
+
+        class FalseCursor:
+            ...
+
+        class TrueCursor(cursor_cext.CMySQLCursor):
+            ...
+
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.cursor, cursor_class=FalseCursor
+        )
+        self.assertTrue(
+            isinstance(self.cnx.cursor(cursor_class=TrueCursor), TrueCursor)
+        )
+
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.cursor, cursor_class=cursor.MySQLCursor
+        )
+        self.assertRaises(
+            errors.ProgrammingError,
+            self.cnx.cursor,
+            cursor_class=cursor.MySQLCursorBuffered,
+        )
+
+        cases = [
+            ({}, cursor_cext.CMySQLCursor),
+            ({"buffered": True}, cursor_cext.CMySQLCursorBuffered),
+            ({"raw": True}, cursor_cext.CMySQLCursorRaw),
+            ({"buffered": True, "raw": True}, cursor_cext.CMySQLCursorBufferedRaw),
+            ({"prepared": True}, cursor_cext.CMySQLCursorPrepared),
+            ({"dictionary": True}, cursor_cext.CMySQLCursorDict),
+            ({"named_tuple": True}, cursor_cext.CMySQLCursorNamedTuple),
+            (
+                {"dictionary": True, "buffered": True},
+                cursor_cext.CMySQLCursorBufferedDict,
+            ),
+            (
+                {"named_tuple": True, "buffered": True},
+                cursor_cext.CMySQLCursorBufferedNamedTuple,
+            ),
+        ]
+        for kwargs, exp in cases:
+            self.assertTrue(isinstance(self.cnx.cursor(**kwargs), exp))
+
+        self.assertRaises(ValueError, self.cnx.cursor, prepared=True, buffered=True)
+        self.assertRaises(ValueError, self.cnx.cursor, dictionary=True, raw=True)
+        self.assertRaises(ValueError, self.cnx.cursor, named_tuple=True, raw=True)
+
+        # Test when connection is closed
+        self.cnx.close()
+        self.assertRaises(errors.OperationalError, self.cnx.cursor)

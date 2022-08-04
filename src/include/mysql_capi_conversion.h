@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -33,48 +33,45 @@
 
 #include <Python.h>
 
-PyObject*
+PyObject *
 pytomy_date(PyObject *obj);
 
-PyObject*
+PyObject *
 pytomy_datetime(PyObject *obj);
 
-PyObject*
+PyObject *
 pytomy_timedelta(PyObject *obj);
 
-PyObject*
+PyObject *
 pytomy_decimal(PyObject *obj);
 
-PyObject*
+PyObject *
 pytomy_time(PyObject *obj);
 
-PyObject*
+PyObject *
 mytopy_date(const char *data);
 
-PyObject*
+PyObject *
 mytopy_datetime(const char *data, const unsigned long length);
 
-PyObject*
+PyObject *
 mytopy_time(const char *data, const unsigned long length);
 
-PyObject*
+PyObject *
 datetime_to_mysql(PyObject *self, PyObject *datetime);
 
-PyObject*
+PyObject *
 time_to_mysql(PyObject *self, PyObject *time);
 
-PyObject*
+PyObject *
 date_to_mysql(PyObject *self, PyObject *date);
 
-PyObject*
+PyObject *
 mytopy_bit(const char *data, const unsigned long length);
 
-PyObject*
-mytopy_string(const char *data,
-              enum_field_types field_type,
-              const unsigned int field_charsetnr,
-              const unsigned long field_length,
-              const char *charset,
-              unsigned int use_unicode);
+PyObject *
+mytopy_string(const char *data, enum_field_types field_type,
+              const unsigned int field_charsetnr, const unsigned long field_length,
+              const char *charset, unsigned int use_unicode);
 
 #endif /* MYCONNPY_MYSQL_CAPI_CONVERSION_H */

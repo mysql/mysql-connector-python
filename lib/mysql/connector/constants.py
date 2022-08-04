@@ -26,15 +26,14 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Various MySQL constants and character sets
-"""
+"""Various MySQL constants and character sets."""
 
-import ssl
 import warnings
 
-from .utils import make_abc
+from abc import ABC, ABCMeta
+
+from .charsets import MYSQL_CHARACTER_SETS, MYSQL_CHARACTER_SETS_57
 from .errors import ProgrammingError
-from .charsets import MYSQL_CHARACTER_SETS
 
 MAX_PACKET_LENGTH = 16777215
 NET_BUFFER_LENGTH = 8192
@@ -43,58 +42,58 @@ MAX_MYSQL_TABLE_COLUMNS = 4096
 PARAMETER_COUNT_AVAILABLE = 8
 
 DEFAULT_CONFIGURATION = {
-    'database': None,
-    'user': '',
-    'password': '',
-    'password1': '',
-    'password2': '',
-    'password3': '',
-    'host': '127.0.0.1',
-    'port': 3306,
-    'unix_socket': None,
-    'use_unicode': True,
-    'charset': 'utf8mb4',
-    'collation': None,
-    'converter_class': None,
-    'converter_str_fallback': False,
-    'autocommit': False,
-    'time_zone': None,
-    'sql_mode': None,
-    'get_warnings': False,
-    'raise_on_warnings': False,
-    'connection_timeout': None,
-    'client_flags': 0,
-    'compress': False,
-    'buffered': False,
-    'raw': False,
-    'ssl_ca': None,
-    'ssl_cert': None,
-    'ssl_key': None,
-    'ssl_verify_cert': False,
-    'ssl_verify_identity': False,
-    'ssl_cipher': None,
-    'tls_ciphersuites': None,
-    'ssl_disabled': False,
-    'tls_versions': None,
-    'passwd': None,
-    'db': None,
-    'connect_timeout': None,
-    'dsn': None,
-    'force_ipv6': False,
-    'auth_plugin': None,
-    'allow_local_infile': False,
-    'allow_local_infile_in_path': None,
-    'consume_results': False,
-    'conn_attrs': None,
-    'dns_srv': False,
-    'use_pure': False,
-    'krb_service_principal': None,
-    'oci_config_file': None,
-    'fido_callback': None,
+    "database": None,
+    "user": "",
+    "password": "",
+    "password1": "",
+    "password2": "",
+    "password3": "",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "unix_socket": None,
+    "use_unicode": True,
+    "charset": "utf8mb4",
+    "collation": None,
+    "converter_class": None,
+    "converter_str_fallback": False,
+    "autocommit": False,
+    "time_zone": None,
+    "sql_mode": None,
+    "get_warnings": False,
+    "raise_on_warnings": False,
+    "connection_timeout": None,
+    "client_flags": 0,
+    "compress": False,
+    "buffered": False,
+    "raw": False,
+    "ssl_ca": None,
+    "ssl_cert": None,
+    "ssl_key": None,
+    "ssl_verify_cert": False,
+    "ssl_verify_identity": False,
+    "ssl_cipher": None,
+    "tls_ciphersuites": None,
+    "ssl_disabled": False,
+    "tls_versions": None,
+    "passwd": None,
+    "db": None,
+    "connect_timeout": None,
+    "dsn": None,
+    "force_ipv6": False,
+    "auth_plugin": None,
+    "allow_local_infile": False,
+    "allow_local_infile_in_path": None,
+    "consume_results": False,
+    "conn_attrs": None,
+    "dns_srv": False,
+    "use_pure": False,
+    "krb_service_principal": None,
+    "oci_config_file": None,
+    "fido_callback": None,
     'init_command': None,
 }
 
-CNX_POOL_ARGS = ('pool_name', 'pool_size', 'pool_reset_session')
+CNX_POOL_ARGS = ("pool_name", "pool_size", "pool_reset_session")
 
 TLS_VERSIONS = ["TLSv1.2", "TLSv1.3"]
 
@@ -111,27 +110,25 @@ def flag_is_set(flag, flags):
 
 
 def _obsolete_option(name, new_name, value):
-    warnings.warn('The option "{}" has been deprecated, use "{}" instead.'
-                  ''.format(name, new_name), category=DeprecationWarning)
+    warnings.warn(
+        f'The option "{name}" has been deprecated, use "{new_name}" instead.',
+        category=DeprecationWarning,
+    )
     return value
 
 
-class _Constants(object):
-    """
-    Base class for constants
-    """
-    prefix = ''
-    desc = {}
+class _Constants(ABC):
+    """Base class for constants."""
 
-    def __new__(cls):
-        raise TypeError("Can not instanciate from %s" % cls.__name__)
+    prefix = ""
+    desc = {}
 
     @classmethod
     def get_desc(cls, name):
         """Get description of given constant"""
         try:
             return cls.desc[name][1]
-        except:
+        except (IndexError, KeyError):
             return None
 
     @classmethod
@@ -147,16 +144,15 @@ class _Constants(object):
         """get full information about given constant"""
         res = ()
         try:
-            res = ["%s : %s" % (k, v[1]) for k, v in cls.desc.items()]
-        except Exception as err:  # pylint: disable=W0703
-            res = ('No information found in constant class.%s' % err)
+            res = [f"{k} : {v[1]}" for k, v in cls.desc.items()]
+        except (AttributeError, IndexError) as err:
+            res = f"No information found in constant class. {err}"
 
         return res
 
 
 class _Flags(_Constants):
-    """Base class for classes describing flags
-    """
+    """Base class for classes describing flags"""
 
     @classmethod
     def get_bit_info(cls, value):
@@ -171,9 +167,9 @@ class _Flags(_Constants):
 
 
 class FieldType(_Constants):
-    """MySQL Field Types
-    """
-    prefix = 'FIELD_TYPE_'
+    """MySQL Field Types"""
+
+    prefix = "FIELD_TYPE_"
     DECIMAL = 0x00
     TINY = 0x01
     SHORT = 0x02
@@ -184,54 +180,54 @@ class FieldType(_Constants):
     TIMESTAMP = 0x07
     LONGLONG = 0x08
     INT24 = 0x09
-    DATE = 0x0a
-    TIME = 0x0b
-    DATETIME = 0x0c
-    YEAR = 0x0d
-    NEWDATE = 0x0e
-    VARCHAR = 0x0f
+    DATE = 0x0A
+    TIME = 0x0B
+    DATETIME = 0x0C
+    YEAR = 0x0D
+    NEWDATE = 0x0E
+    VARCHAR = 0x0F
     BIT = 0x10
-    JSON = 0xf5
-    NEWDECIMAL = 0xf6
-    ENUM = 0xf7
-    SET = 0xf8
-    TINY_BLOB = 0xf9
-    MEDIUM_BLOB = 0xfa
-    LONG_BLOB = 0xfb
-    BLOB = 0xfc
-    VAR_STRING = 0xfd
-    STRING = 0xfe
-    GEOMETRY = 0xff
+    JSON = 0xF5
+    NEWDECIMAL = 0xF6
+    ENUM = 0xF7
+    SET = 0xF8
+    TINY_BLOB = 0xF9
+    MEDIUM_BLOB = 0xFA
+    LONG_BLOB = 0xFB
+    BLOB = 0xFC
+    VAR_STRING = 0xFD
+    STRING = 0xFE
+    GEOMETRY = 0xFF
 
     desc = {
-        'DECIMAL': (0x00, 'DECIMAL'),
-        'TINY': (0x01, 'TINY'),
-        'SHORT': (0x02, 'SHORT'),
-        'LONG': (0x03, 'LONG'),
-        'FLOAT': (0x04, 'FLOAT'),
-        'DOUBLE': (0x05, 'DOUBLE'),
-        'NULL': (0x06, 'NULL'),
-        'TIMESTAMP': (0x07, 'TIMESTAMP'),
-        'LONGLONG': (0x08, 'LONGLONG'),
-        'INT24': (0x09, 'INT24'),
-        'DATE': (0x0a, 'DATE'),
-        'TIME': (0x0b, 'TIME'),
-        'DATETIME': (0x0c, 'DATETIME'),
-        'YEAR': (0x0d, 'YEAR'),
-        'NEWDATE': (0x0e, 'NEWDATE'),
-        'VARCHAR': (0x0f, 'VARCHAR'),
-        'BIT': (0x10, 'BIT'),
-        'JSON': (0xf5, 'JSON'),
-        'NEWDECIMAL': (0xf6, 'NEWDECIMAL'),
-        'ENUM': (0xf7, 'ENUM'),
-        'SET': (0xf8, 'SET'),
-        'TINY_BLOB': (0xf9, 'TINY_BLOB'),
-        'MEDIUM_BLOB': (0xfa, 'MEDIUM_BLOB'),
-        'LONG_BLOB': (0xfb, 'LONG_BLOB'),
-        'BLOB': (0xfc, 'BLOB'),
-        'VAR_STRING': (0xfd, 'VAR_STRING'),
-        'STRING': (0xfe, 'STRING'),
-        'GEOMETRY': (0xff, 'GEOMETRY'),
+        "DECIMAL": (0x00, "DECIMAL"),
+        "TINY": (0x01, "TINY"),
+        "SHORT": (0x02, "SHORT"),
+        "LONG": (0x03, "LONG"),
+        "FLOAT": (0x04, "FLOAT"),
+        "DOUBLE": (0x05, "DOUBLE"),
+        "NULL": (0x06, "NULL"),
+        "TIMESTAMP": (0x07, "TIMESTAMP"),
+        "LONGLONG": (0x08, "LONGLONG"),
+        "INT24": (0x09, "INT24"),
+        "DATE": (0x0A, "DATE"),
+        "TIME": (0x0B, "TIME"),
+        "DATETIME": (0x0C, "DATETIME"),
+        "YEAR": (0x0D, "YEAR"),
+        "NEWDATE": (0x0E, "NEWDATE"),
+        "VARCHAR": (0x0F, "VARCHAR"),
+        "BIT": (0x10, "BIT"),
+        "JSON": (0xF5, "JSON"),
+        "NEWDECIMAL": (0xF6, "NEWDECIMAL"),
+        "ENUM": (0xF7, "ENUM"),
+        "SET": (0xF8, "SET"),
+        "TINY_BLOB": (0xF9, "TINY_BLOB"),
+        "MEDIUM_BLOB": (0xFA, "MEDIUM_BLOB"),
+        "LONG_BLOB": (0xFB, "LONG_BLOB"),
+        "BLOB": (0xFC, "BLOB"),
+        "VAR_STRING": (0xFD, "VAR_STRING"),
+        "STRING": (0xFE, "STRING"),
+        "GEOMETRY": (0xFF, "GEOMETRY"),
     }
 
     @classmethod
@@ -240,25 +236,33 @@ class FieldType(_Constants):
         return [
             cls.VARCHAR,
             cls.ENUM,
-            cls.VAR_STRING, cls.STRING,
+            cls.VAR_STRING,
+            cls.STRING,
         ]
 
     @classmethod
     def get_binary_types(cls):
         """Get the list of all binary types"""
         return [
-            cls.TINY_BLOB, cls.MEDIUM_BLOB,
-            cls.LONG_BLOB, cls.BLOB,
+            cls.TINY_BLOB,
+            cls.MEDIUM_BLOB,
+            cls.LONG_BLOB,
+            cls.BLOB,
         ]
 
     @classmethod
     def get_number_types(cls):
         """Get the list of all number types"""
         return [
-            cls.DECIMAL, cls.NEWDECIMAL,
-            cls.TINY, cls.SHORT, cls.LONG,
-            cls.FLOAT, cls.DOUBLE,
-            cls.LONGLONG, cls.INT24,
+            cls.DECIMAL,
+            cls.NEWDECIMAL,
+            cls.TINY,
+            cls.SHORT,
+            cls.LONG,
+            cls.FLOAT,
+            cls.DOUBLE,
+            cls.LONGLONG,
+            cls.INT24,
             cls.BIT,
             cls.YEAR,
         ]
@@ -267,7 +271,8 @@ class FieldType(_Constants):
     def get_timestamp_types(cls):
         """Get the list of all timestamp types"""
         return [
-            cls.DATETIME, cls.TIMESTAMP,
+            cls.DATETIME,
+            cls.TIMESTAMP,
         ]
 
 
@@ -276,7 +281,8 @@ class FieldFlag(_Flags):
 
     Field flags as found in MySQL sources mysql-src/include/mysql_com.h
     """
-    _prefix = ''
+
+    _prefix = ""
     NOT_NULL = 1 << 0
     PRI_KEY = 1 << 1
     UNIQUE_KEY = 1 << 2
@@ -305,37 +311,36 @@ class FieldFlag(_Flags):
     FIELD_IS_RENAMED = 1 << 21
 
     desc = {
-        'NOT_NULL': (1 << 0, "Field can't be NULL"),
-        'PRI_KEY': (1 << 1, "Field is part of a primary key"),
-        'UNIQUE_KEY': (1 << 2, "Field is part of a unique key"),
-        'MULTIPLE_KEY': (1 << 3, "Field is part of a key"),
-        'BLOB': (1 << 4, "Field is a blob"),
-        'UNSIGNED': (1 << 5, "Field is unsigned"),
-        'ZEROFILL': (1 << 6, "Field is zerofill"),
-        'BINARY': (1 << 7, "Field is binary  "),
-        'ENUM': (1 << 8, "field is an enum"),
-        'AUTO_INCREMENT': (1 << 9, "field is a autoincrement field"),
-        'TIMESTAMP': (1 << 10, "Field is a timestamp"),
-        'SET': (1 << 11, "field is a set"),
-        'NO_DEFAULT_VALUE': (1 << 12, "Field doesn't have default value"),
-        'ON_UPDATE_NOW': (1 << 13, "Field is set to NOW on UPDATE"),
-        'NUM': (1 << 14, "Field is num (for clients)"),
-
-        'PART_KEY': (1 << 15, "Intern; Part of some key"),
-        'GROUP': (1 << 14, "Intern: Group field"),  # Same as NUM
-        'UNIQUE': (1 << 16, "Intern: Used by sql_yacc"),
-        'BINCMP': (1 << 17, "Intern: Used by sql_yacc"),
-        'GET_FIXED_FIELDS': (1 << 18, "Used to get fields in item tree"),
-        'FIELD_IN_PART_FUNC': (1 << 19, "Field part of partition func"),
-        'FIELD_IN_ADD_INDEX': (1 << 20, "Intern: Field used in ADD INDEX"),
-        'FIELD_IS_RENAMED': (1 << 21, "Intern: Field is being renamed"),
+        "NOT_NULL": (1 << 0, "Field can't be NULL"),
+        "PRI_KEY": (1 << 1, "Field is part of a primary key"),
+        "UNIQUE_KEY": (1 << 2, "Field is part of a unique key"),
+        "MULTIPLE_KEY": (1 << 3, "Field is part of a key"),
+        "BLOB": (1 << 4, "Field is a blob"),
+        "UNSIGNED": (1 << 5, "Field is unsigned"),
+        "ZEROFILL": (1 << 6, "Field is zerofill"),
+        "BINARY": (1 << 7, "Field is binary  "),
+        "ENUM": (1 << 8, "field is an enum"),
+        "AUTO_INCREMENT": (1 << 9, "field is a autoincrement field"),
+        "TIMESTAMP": (1 << 10, "Field is a timestamp"),
+        "SET": (1 << 11, "field is a set"),
+        "NO_DEFAULT_VALUE": (1 << 12, "Field doesn't have default value"),
+        "ON_UPDATE_NOW": (1 << 13, "Field is set to NOW on UPDATE"),
+        "NUM": (1 << 14, "Field is num (for clients)"),
+        "PART_KEY": (1 << 15, "Intern; Part of some key"),
+        "GROUP": (1 << 14, "Intern: Group field"),  # Same as NUM
+        "UNIQUE": (1 << 16, "Intern: Used by sql_yacc"),
+        "BINCMP": (1 << 17, "Intern: Used by sql_yacc"),
+        "GET_FIXED_FIELDS": (1 << 18, "Used to get fields in item tree"),
+        "FIELD_IN_PART_FUNC": (1 << 19, "Field part of partition func"),
+        "FIELD_IN_ADD_INDEX": (1 << 20, "Intern: Field used in ADD INDEX"),
+        "FIELD_IS_RENAMED": (1 << 21, "Intern: Field is being renamed"),
     }
 
 
 class ServerCmd(_Constants):
-    """MySQL Server Commands
-    """
-    _prefix = 'COM_'
+    """MySQL Server Commands"""
+
+    _prefix = "COM_"
     SLEEP = 0
     QUIT = 1
     INIT_DB = 2
@@ -370,38 +375,38 @@ class ServerCmd(_Constants):
     RESET_CONNECTION = 31
 
     desc = {
-        'SLEEP': (0, 'SLEEP'),
-        'QUIT': (1, 'QUIT'),
-        'INIT_DB': (2, 'INIT_DB'),
-        'QUERY': (3, 'QUERY'),
-        'FIELD_LIST': (4, 'FIELD_LIST'),
-        'CREATE_DB': (5, 'CREATE_DB'),
-        'DROP_DB': (6, 'DROP_DB'),
-        'REFRESH': (7, 'REFRESH'),
-        'SHUTDOWN': (8, 'SHUTDOWN'),
-        'STATISTICS': (9, 'STATISTICS'),
-        'PROCESS_INFO': (10, 'PROCESS_INFO'),
-        'CONNECT': (11, 'CONNECT'),
-        'PROCESS_KILL': (12, 'PROCESS_KILL'),
-        'DEBUG': (13, 'DEBUG'),
-        'PING': (14, 'PING'),
-        'TIME': (15, 'TIME'),
-        'DELAYED_INSERT': (16, 'DELAYED_INSERT'),
-        'CHANGE_USER': (17, 'CHANGE_USER'),
-        'BINLOG_DUMP': (18, 'BINLOG_DUMP'),
-        'TABLE_DUMP': (19, 'TABLE_DUMP'),
-        'CONNECT_OUT': (20, 'CONNECT_OUT'),
-        'REGISTER_REPLICA': (21, 'REGISTER_REPLICA'),
-        'STMT_PREPARE': (22, 'STMT_PREPARE'),
-        'STMT_EXECUTE': (23, 'STMT_EXECUTE'),
-        'STMT_SEND_LONG_DATA': (24, 'STMT_SEND_LONG_DATA'),
-        'STMT_CLOSE': (25, 'STMT_CLOSE'),
-        'STMT_RESET': (26, 'STMT_RESET'),
-        'SET_OPTION': (27, 'SET_OPTION'),
-        'STMT_FETCH': (28, 'STMT_FETCH'),
-        'DAEMON': (29, 'DAEMON'),
-        'BINLOG_DUMP_GTID': (30, 'BINLOG_DUMP_GTID'),
-        'RESET_CONNECTION': (31, 'RESET_CONNECTION'),
+        "SLEEP": (0, "SLEEP"),
+        "QUIT": (1, "QUIT"),
+        "INIT_DB": (2, "INIT_DB"),
+        "QUERY": (3, "QUERY"),
+        "FIELD_LIST": (4, "FIELD_LIST"),
+        "CREATE_DB": (5, "CREATE_DB"),
+        "DROP_DB": (6, "DROP_DB"),
+        "REFRESH": (7, "REFRESH"),
+        "SHUTDOWN": (8, "SHUTDOWN"),
+        "STATISTICS": (9, "STATISTICS"),
+        "PROCESS_INFO": (10, "PROCESS_INFO"),
+        "CONNECT": (11, "CONNECT"),
+        "PROCESS_KILL": (12, "PROCESS_KILL"),
+        "DEBUG": (13, "DEBUG"),
+        "PING": (14, "PING"),
+        "TIME": (15, "TIME"),
+        "DELAYED_INSERT": (16, "DELAYED_INSERT"),
+        "CHANGE_USER": (17, "CHANGE_USER"),
+        "BINLOG_DUMP": (18, "BINLOG_DUMP"),
+        "TABLE_DUMP": (19, "TABLE_DUMP"),
+        "CONNECT_OUT": (20, "CONNECT_OUT"),
+        "REGISTER_REPLICA": (21, "REGISTER_REPLICA"),
+        "STMT_PREPARE": (22, "STMT_PREPARE"),
+        "STMT_EXECUTE": (23, "STMT_EXECUTE"),
+        "STMT_SEND_LONG_DATA": (24, "STMT_SEND_LONG_DATA"),
+        "STMT_CLOSE": (25, "STMT_CLOSE"),
+        "STMT_RESET": (26, "STMT_RESET"),
+        "SET_OPTION": (27, "SET_OPTION"),
+        "STMT_FETCH": (28, "STMT_FETCH"),
+        "DAEMON": (29, "DAEMON"),
+        "BINLOG_DUMP_GTID": (30, "BINLOG_DUMP_GTID"),
+        "RESET_CONNECTION": (31, "RESET_CONNECTION"),
     }
 
 
@@ -410,6 +415,7 @@ class ClientFlag(_Flags):
 
     Client options as found in the MySQL sources mysql-src/include/mysql_com.h
     """
+
     LONG_PASSWD = 1 << 0
     FOUND_ROWS = 1 << 1
     LONG_FLAG = 1 << 2
@@ -441,35 +447,46 @@ class ClientFlag(_Flags):
     MULTI_FACTOR_AUTHENTICATION = 1 << 28
 
     desc = {
-        'LONG_PASSWD': (1 << 0, 'New more secure passwords'),
-        'FOUND_ROWS': (1 << 1, 'Found instead of affected rows'),
-        'LONG_FLAG': (1 << 2, 'Get all column flags'),
-        'CONNECT_WITH_DB': (1 << 3, 'One can specify db on connect'),
-        'NO_SCHEMA': (1 << 4, "Don't allow database.table.column"),
-        'COMPRESS': (1 << 5, 'Can use compression protocol'),
-        'ODBC': (1 << 6, 'ODBC client'),
-        'LOCAL_FILES': (1 << 7, 'Can use LOAD DATA LOCAL'),
-        'IGNORE_SPACE': (1 << 8, "Ignore spaces before ''"),
-        'PROTOCOL_41': (1 << 9, 'New 4.1 protocol'),
-        'INTERACTIVE': (1 << 10, 'This is an interactive client'),
-        'SSL': (1 << 11, 'Switch to SSL after handshake'),
-        'IGNORE_SIGPIPE': (1 << 12, 'IGNORE sigpipes'),
-        'TRANSACTIONS': (1 << 13, 'Client knows about transactions'),
-        'RESERVED': (1 << 14, 'Old flag for 4.1 protocol'),
-        'SECURE_CONNECTION': (1 << 15, 'New 4.1 authentication'),
-        'MULTI_STATEMENTS': (1 << 16, 'Enable/disable multi-stmt support'),
-        'MULTI_RESULTS': (1 << 17, 'Enable/disable multi-results'),
-        'PS_MULTI_RESULTS': (1 << 18, 'Multi-results in PS-protocol'),
-        'PLUGIN_AUTH': (1 << 19, 'Client supports plugin authentication'),
-        'CONNECT_ARGS': (1 << 20, 'Client supports connection attributes'),
-        'PLUGIN_AUTH_LENENC_CLIENT_DATA': (1 << 21,
-                                           'Enable authentication response packet to be larger than 255 bytes'),
-        'CAN_HANDLE_EXPIRED_PASSWORDS': (1 << 22, "Don't close the connection for a connection with expired password"),
-        'SESION_TRACK': (1 << 23, 'Capable of handling server state change information'),
-        'DEPRECATE_EOF': (1 << 24, 'Client no longer needs EOF packet'),
-        'CLIENT_QUERY_ATTRIBUTES': (1 << 27, 'Support optional extension for query parameters'),
-        'SSL_VERIFY_SERVER_CERT': (1 << 30, ''),
-        'REMEMBER_OPTIONS': (1 << 31, ''),
+        "LONG_PASSWD": (1 << 0, "New more secure passwords"),
+        "FOUND_ROWS": (1 << 1, "Found instead of affected rows"),
+        "LONG_FLAG": (1 << 2, "Get all column flags"),
+        "CONNECT_WITH_DB": (1 << 3, "One can specify db on connect"),
+        "NO_SCHEMA": (1 << 4, "Don't allow database.table.column"),
+        "COMPRESS": (1 << 5, "Can use compression protocol"),
+        "ODBC": (1 << 6, "ODBC client"),
+        "LOCAL_FILES": (1 << 7, "Can use LOAD DATA LOCAL"),
+        "IGNORE_SPACE": (1 << 8, "Ignore spaces before ''"),
+        "PROTOCOL_41": (1 << 9, "New 4.1 protocol"),
+        "INTERACTIVE": (1 << 10, "This is an interactive client"),
+        "SSL": (1 << 11, "Switch to SSL after handshake"),
+        "IGNORE_SIGPIPE": (1 << 12, "IGNORE sigpipes"),
+        "TRANSACTIONS": (1 << 13, "Client knows about transactions"),
+        "RESERVED": (1 << 14, "Old flag for 4.1 protocol"),
+        "SECURE_CONNECTION": (1 << 15, "New 4.1 authentication"),
+        "MULTI_STATEMENTS": (1 << 16, "Enable/disable multi-stmt support"),
+        "MULTI_RESULTS": (1 << 17, "Enable/disable multi-results"),
+        "PS_MULTI_RESULTS": (1 << 18, "Multi-results in PS-protocol"),
+        "PLUGIN_AUTH": (1 << 19, "Client supports plugin authentication"),
+        "CONNECT_ARGS": (1 << 20, "Client supports connection attributes"),
+        "PLUGIN_AUTH_LENENC_CLIENT_DATA": (
+            1 << 21,
+            "Enable authentication response packet to be larger than 255 bytes",
+        ),
+        "CAN_HANDLE_EXPIRED_PASSWORDS": (
+            1 << 22,
+            "Don't close the connection for a connection with expired password",
+        ),
+        "SESION_TRACK": (
+            1 << 23,
+            "Capable of handling server state change information",
+        ),
+        "DEPRECATE_EOF": (1 << 24, "Client no longer needs EOF packet"),
+        "CLIENT_QUERY_ATTRIBUTES": (
+            1 << 27,
+            "Support optional extension for query parameters",
+        ),
+        "SSL_VERIFY_SERVER_CERT": (1 << 30, ""),
+        "REMEMBER_OPTIONS": (1 << 31, ""),
     }
 
     default = [
@@ -500,7 +517,8 @@ class ServerFlag(_Flags):
 
     Server flags as found in the MySQL sources mysql-src/include/mysql_com.h
     """
-    _prefix = 'SERVER_'
+
+    _prefix = "SERVER_"
     STATUS_IN_TRANS = 1 << 0
     STATUS_AUTOCOMMIT = 1 << 1
     MORE_RESULTS_EXISTS = 1 << 3
@@ -517,56 +535,72 @@ class ServerFlag(_Flags):
     SERVER_SESSION_STATE_CHANGED = 1 << 14
 
     desc = {
-        'SERVER_STATUS_IN_TRANS': (1 << 0,
-                                   'Transaction has started'),
-        'SERVER_STATUS_AUTOCOMMIT': (1 << 1,
-                                     'Server in auto_commit mode'),
-        'SERVER_MORE_RESULTS_EXISTS': (1 << 3,
-                                       'Multi query - '
-                                       'next query exists'),
-        'SERVER_QUERY_NO_GOOD_INDEX_USED': (1 << 4, ''),
-        'SERVER_QUERY_NO_INDEX_USED': (1 << 5, ''),
-        'SERVER_STATUS_CURSOR_EXISTS': (1 << 6,
-                                        'Set when server opened a read-only '
-                                        'non-scrollable cursor for a query.'),
-        'SERVER_STATUS_LAST_ROW_SENT': (1 << 7,
-                                        'Set when a read-only cursor is '
-                                        'exhausted'),
-        'SERVER_STATUS_DB_DROPPED': (1 << 8, 'A database was dropped'),
-        'SERVER_STATUS_NO_BACKSLASH_ESCAPES': (1 << 9, ''),
-        'SERVER_STATUS_METADATA_CHANGED': (1024,
-                                           'Set if after a prepared statement '
-                                           'reprepare we discovered that the '
-                                           'new statement returns a different '
-                                           'number of result set columns.'),
-        'SERVER_QUERY_WAS_SLOW': (2048, ''),
-        'SERVER_PS_OUT_PARAMS': (4096,
-                                 'To mark ResultSet containing output '
-                                 'parameter values.'),
-        'SERVER_STATUS_IN_TRANS_READONLY': (8192,
-                                            'Set if multi-statement '
-                                            'transaction is a read-only '
-                                            'transaction.'),
-        'SERVER_SESSION_STATE_CHANGED': (1 << 14,
-                                         'Session state has changed on the '
-                                         'server because of the execution of '
-                                         'the last statement'),
+        "SERVER_STATUS_IN_TRANS": (1 << 0, "Transaction has started"),
+        "SERVER_STATUS_AUTOCOMMIT": (1 << 1, "Server in auto_commit mode"),
+        "SERVER_MORE_RESULTS_EXISTS": (
+            1 << 3,
+            "Multi query - next query exists",
+        ),
+        "SERVER_QUERY_NO_GOOD_INDEX_USED": (1 << 4, ""),
+        "SERVER_QUERY_NO_INDEX_USED": (1 << 5, ""),
+        "SERVER_STATUS_CURSOR_EXISTS": (
+            1 << 6,
+            "Set when server opened a read-only non-scrollable cursor for a query.",
+        ),
+        "SERVER_STATUS_LAST_ROW_SENT": (
+            1 << 7,
+            "Set when a read-only cursor is exhausted",
+        ),
+        "SERVER_STATUS_DB_DROPPED": (1 << 8, "A database was dropped"),
+        "SERVER_STATUS_NO_BACKSLASH_ESCAPES": (1 << 9, ""),
+        "SERVER_STATUS_METADATA_CHANGED": (
+            1024,
+            "Set if after a prepared statement "
+            "reprepare we discovered that the "
+            "new statement returns a different "
+            "number of result set columns.",
+        ),
+        "SERVER_QUERY_WAS_SLOW": (2048, ""),
+        "SERVER_PS_OUT_PARAMS": (
+            4096,
+            "To mark ResultSet containing output parameter values.",
+        ),
+        "SERVER_STATUS_IN_TRANS_READONLY": (
+            8192,
+            "Set if multi-statement transaction is a read-only transaction.",
+        ),
+        "SERVER_SESSION_STATE_CHANGED": (
+            1 << 14,
+            "Session state has changed on the "
+            "server because of the execution of "
+            "the last statement",
+        ),
     }
 
 
-class RefreshOption_meta(type):
-    @property
-    def SLAVE(self):
-        return _obsolete_option("RefreshOption.SLAVE", "RefreshOption.REPLICA",
-                                RefreshOption.REPLICA)
+class RefreshOptionMeta(ABCMeta):
+    """RefreshOption Metaclass."""
 
-@make_abc(RefreshOption_meta)
-class RefreshOption(_Constants):
-    """MySQL Refresh command options
+    @property
+    def SLAVE(self):  # pylint: disable=bad-mcs-method-argument,invalid-name
+        """Return the deprecated alias of RefreshOption.REPLICA.
+
+        Raises a warning about this attribute deprecation.
+        """
+        return _obsolete_option(
+            "RefreshOption.SLAVE",
+            "RefreshOption.REPLICA",
+            RefreshOption.REPLICA,
+        )
+
+
+class RefreshOption(_Constants, metaclass=RefreshOptionMeta):
+    """MySQL Refresh command options.
 
     Options used when sending the COM_REFRESH server command.
     """
-    _prefix = 'REFRESH_'
+
+    _prefix = "REFRESH_"
     GRANT = 1 << 0
     LOG = 1 << 1
     TABLES = 1 << 2
@@ -576,14 +610,14 @@ class RefreshOption(_Constants):
     REPLICA = 1 << 6
 
     desc = {
-        'GRANT': (1 << 0, 'Refresh grant tables'),
-        'LOG': (1 << 1, 'Start on new log file'),
-        'TABLES': (1 << 2, 'close all tables'),
-        'HOST': (1 << 3, 'Flush host cache'),
-        'STATUS': (1 << 4, 'Flush status variables'),
-        'THREADS': (1 << 5, 'Flush thread cache'),
-        'REPLICA': (1 << 6, 'Reset source info and restart replica thread'),
-        'SLAVE': (1 << 6, 'Deprecated option; use REPLICA instead.'),
+        "GRANT": (1 << 0, "Refresh grant tables"),
+        "LOG": (1 << 1, "Start on new log file"),
+        "TABLES": (1 << 2, "close all tables"),
+        "HOST": (1 << 3, "Flush host cache"),
+        "STATUS": (1 << 4, "Flush status variables"),
+        "THREADS": (1 << 5, "Flush thread cache"),
+        "REPLICA": (1 << 6, "Reset source info and restart replica thread"),
+        "SLAVE": (1 << 6, "Deprecated option; use REPLICA instead."),
     }
 
 
@@ -592,7 +626,8 @@ class ShutdownType(_Constants):
 
     Shutdown types used by the COM_SHUTDOWN server command.
     """
-    _prefix = ''
+
+    _prefix = ""
     SHUTDOWN_DEFAULT = 0
     SHUTDOWN_WAIT_CONNECTIONS = 1
     SHUTDOWN_WAIT_TRANSACTIONS = 2
@@ -603,31 +638,32 @@ class ShutdownType(_Constants):
     KILL_CONNECTION = 255
 
     desc = {
-        'SHUTDOWN_DEFAULT': (
+        "SHUTDOWN_DEFAULT": (
             SHUTDOWN_DEFAULT,
-            "defaults to SHUTDOWN_WAIT_ALL_BUFFERS"),
-        'SHUTDOWN_WAIT_CONNECTIONS': (
+            "defaults to SHUTDOWN_WAIT_ALL_BUFFERS",
+        ),
+        "SHUTDOWN_WAIT_CONNECTIONS": (
             SHUTDOWN_WAIT_CONNECTIONS,
-            "wait for existing connections to finish"),
-        'SHUTDOWN_WAIT_TRANSACTIONS': (
+            "wait for existing connections to finish",
+        ),
+        "SHUTDOWN_WAIT_TRANSACTIONS": (
             SHUTDOWN_WAIT_TRANSACTIONS,
-            "wait for existing trans to finish"),
-        'SHUTDOWN_WAIT_UPDATES': (
+            "wait for existing trans to finish",
+        ),
+        "SHUTDOWN_WAIT_UPDATES": (
             SHUTDOWN_WAIT_UPDATES,
-            "wait for existing updates to finish"),
-        'SHUTDOWN_WAIT_ALL_BUFFERS': (
+            "wait for existing updates to finish",
+        ),
+        "SHUTDOWN_WAIT_ALL_BUFFERS": (
             SHUTDOWN_WAIT_ALL_BUFFERS,
-            "flush InnoDB and other storage engine buffers"),
-        'SHUTDOWN_WAIT_CRITICAL_BUFFERS': (
+            "flush InnoDB and other storage engine buffers",
+        ),
+        "SHUTDOWN_WAIT_CRITICAL_BUFFERS": (
             SHUTDOWN_WAIT_CRITICAL_BUFFERS,
-            "don't flush InnoDB buffers, "
-            "flush other storage engines' buffers"),
-        'KILL_QUERY': (
-            KILL_QUERY,
-            "(no description)"),
-        'KILL_CONNECTION': (
-            KILL_CONNECTION,
-            "(no description)"),
+            "don't flush InnoDB buffers, flush other storage engines' buffers",
+        ),
+        "KILL_QUERY": (KILL_QUERY, "(no description)"),
+        "KILL_CONNECTION": (KILL_CONNECTION, "(no description)"),
     }
 
 
@@ -641,10 +677,23 @@ class CharacterSet(_Constants):
     The list is hardcode so we avoid a database query when getting the
     name of the used character set or collation.
     """
+
     desc = MYSQL_CHARACTER_SETS
+    mysql_version = (8, 0)
 
     # Multi-byte character sets which use 5c (backslash) in characters
     slash_charsets = (1, 13, 28, 84, 87, 88)
+
+    @classmethod
+    def set_mysql_version(cls, version):
+        """Set the MySQL major version and change the charset mapping if is 5.7.
+
+        Args:
+            version (tuple): MySQL version tuple.
+        """
+        cls.mysql_version = version[:2]
+        if cls.mysql_version == (5, 7):
+            cls.desc = MYSQL_CHARACTER_SETS_57
 
     @classmethod
     def get_info(cls, setid):
@@ -660,8 +709,7 @@ class CharacterSet(_Constants):
         try:
             return cls.desc[setid][0:2]
         except IndexError:
-            raise ProgrammingError(
-                "Character set '{0}' unsupported".format(setid))
+            raise ProgrammingError(f"Character set '{setid}' unsupported") from None
 
     @classmethod
     def get_desc(cls, name):
@@ -672,10 +720,8 @@ class CharacterSet(_Constants):
 
         Returns a tuple.
         """
-        try:
-            return "%s/%s" % cls.get_info(name)
-        except:
-            raise
+        charset, collation = cls.get_info(name)
+        return f"{charset}/{collation}"
 
     @classmethod
     def get_default_collation(cls, charset):
@@ -689,9 +735,8 @@ class CharacterSet(_Constants):
             try:
                 info = cls.desc[charset]
                 return info[1], info[0], charset
-            except:
-                ProgrammingError("Character set ID '%s' unsupported." % (
-                    charset))
+            except (IndexError, KeyError):
+                ProgrammingError(f"Character set ID '{charset}' unsupported")
 
         for cid, info in enumerate(cls.desc):
             if info is None:
@@ -699,7 +744,7 @@ class CharacterSet(_Constants):
             if info[0] == charset and info[2] is True:
                 return info[1], info[0], cid
 
-        raise ProgrammingError("Character set '%s' unsupported." % (charset))
+        raise ProgrammingError(f"Character set '{charset}' unsupported")
 
     @classmethod
     def get_charset_info(cls, charset=None, collation=None):
@@ -723,27 +768,27 @@ class CharacterSet(_Constants):
                 info = cls.desc[charset]
                 return (charset, info[0], info[1])
             except IndexError:
-                ProgrammingError("Character set ID {0} unknown.".format(
-                    charset))
+                ProgrammingError(f"Character set ID {charset} unknown")
 
+        if charset in ("utf8", "utf-8") and cls.mysql_version == (8, 0):
+            charset = "utf8mb4"
         if charset is not None and collation is None:
             info = cls.get_default_collation(charset)
             return (info[2], info[1], info[0])
-        elif charset is None and collation is not None:
+        if charset is None and collation is not None:
             for cid, info in enumerate(cls.desc):
                 if info is None:
                     continue
                 if collation == info[1]:
                     return (cid, info[0], info[1])
-            raise ProgrammingError("Collation '{0}' unknown.".format(collation))
-        else:
-            for cid, info in enumerate(cls.desc):
-                if info is None:
-                    continue
-                if info[0] == charset and info[1] == collation:
-                    return (cid, info[0], info[1])
-            _ = cls.get_default_collation(charset)
-            raise ProgrammingError("Collation '{0}' unknown.".format(collation))
+            raise ProgrammingError(f"Collation '{collation}' unknown")
+        for cid, info in enumerate(cls.desc):
+            if info is None:
+                continue
+            if info[0] == charset and info[1] == collation:
+                return (cid, info[0], info[1])
+        _ = cls.get_default_collation(charset)
+        raise ProgrammingError(f"Collation '{collation}' unknown")
 
     @classmethod
     def get_supported(cls):
@@ -767,39 +812,40 @@ class SQLMode(_Constants):
 
     See http://dev.mysql.com/doc/refman/5.6/en/server-sql-mode.html
     """
-    _prefix = 'MODE_'
-    REAL_AS_FLOAT = 'REAL_AS_FLOAT'
-    PIPES_AS_CONCAT = 'PIPES_AS_CONCAT'
-    ANSI_QUOTES = 'ANSI_QUOTES'
-    IGNORE_SPACE = 'IGNORE_SPACE'
-    NOT_USED = 'NOT_USED'
-    ONLY_FULL_GROUP_BY = 'ONLY_FULL_GROUP_BY'
-    NO_UNSIGNED_SUBTRACTION = 'NO_UNSIGNED_SUBTRACTION'
-    NO_DIR_IN_CREATE = 'NO_DIR_IN_CREATE'
-    POSTGRESQL = 'POSTGRESQL'
-    ORACLE = 'ORACLE'
-    MSSQL = 'MSSQL'
-    DB2 = 'DB2'
-    MAXDB = 'MAXDB'
-    NO_KEY_OPTIONS = 'NO_KEY_OPTIONS'
-    NO_TABLE_OPTIONS = 'NO_TABLE_OPTIONS'
-    NO_FIELD_OPTIONS = 'NO_FIELD_OPTIONS'
-    MYSQL323 = 'MYSQL323'
-    MYSQL40 = 'MYSQL40'
-    ANSI = 'ANSI'
-    NO_AUTO_VALUE_ON_ZERO = 'NO_AUTO_VALUE_ON_ZERO'
-    NO_BACKSLASH_ESCAPES = 'NO_BACKSLASH_ESCAPES'
-    STRICT_TRANS_TABLES = 'STRICT_TRANS_TABLES'
-    STRICT_ALL_TABLES = 'STRICT_ALL_TABLES'
-    NO_ZERO_IN_DATE = 'NO_ZERO_IN_DATE'
-    NO_ZERO_DATE = 'NO_ZERO_DATE'
-    INVALID_DATES = 'INVALID_DATES'
-    ERROR_FOR_DIVISION_BY_ZERO = 'ERROR_FOR_DIVISION_BY_ZERO'
-    TRADITIONAL = 'TRADITIONAL'
-    NO_AUTO_CREATE_USER = 'NO_AUTO_CREATE_USER'
-    HIGH_NOT_PRECEDENCE = 'HIGH_NOT_PRECEDENCE'
-    NO_ENGINE_SUBSTITUTION = 'NO_ENGINE_SUBSTITUTION'
-    PAD_CHAR_TO_FULL_LENGTH = 'PAD_CHAR_TO_FULL_LENGTH'
+
+    _prefix = "MODE_"
+    REAL_AS_FLOAT = "REAL_AS_FLOAT"
+    PIPES_AS_CONCAT = "PIPES_AS_CONCAT"
+    ANSI_QUOTES = "ANSI_QUOTES"
+    IGNORE_SPACE = "IGNORE_SPACE"
+    NOT_USED = "NOT_USED"
+    ONLY_FULL_GROUP_BY = "ONLY_FULL_GROUP_BY"
+    NO_UNSIGNED_SUBTRACTION = "NO_UNSIGNED_SUBTRACTION"
+    NO_DIR_IN_CREATE = "NO_DIR_IN_CREATE"
+    POSTGRESQL = "POSTGRESQL"
+    ORACLE = "ORACLE"
+    MSSQL = "MSSQL"
+    DB2 = "DB2"
+    MAXDB = "MAXDB"
+    NO_KEY_OPTIONS = "NO_KEY_OPTIONS"
+    NO_TABLE_OPTIONS = "NO_TABLE_OPTIONS"
+    NO_FIELD_OPTIONS = "NO_FIELD_OPTIONS"
+    MYSQL323 = "MYSQL323"
+    MYSQL40 = "MYSQL40"
+    ANSI = "ANSI"
+    NO_AUTO_VALUE_ON_ZERO = "NO_AUTO_VALUE_ON_ZERO"
+    NO_BACKSLASH_ESCAPES = "NO_BACKSLASH_ESCAPES"
+    STRICT_TRANS_TABLES = "STRICT_TRANS_TABLES"
+    STRICT_ALL_TABLES = "STRICT_ALL_TABLES"
+    NO_ZERO_IN_DATE = "NO_ZERO_IN_DATE"
+    NO_ZERO_DATE = "NO_ZERO_DATE"
+    INVALID_DATES = "INVALID_DATES"
+    ERROR_FOR_DIVISION_BY_ZERO = "ERROR_FOR_DIVISION_BY_ZERO"
+    TRADITIONAL = "TRADITIONAL"
+    NO_AUTO_CREATE_USER = "NO_AUTO_CREATE_USER"
+    HIGH_NOT_PRECEDENCE = "HIGH_NOT_PRECEDENCE"
+    NO_ENGINE_SUBSTITUTION = "NO_ENGINE_SUBSTITUTION"
+    PAD_CHAR_TO_FULL_LENGTH = "PAD_CHAR_TO_FULL_LENGTH"
 
     @classmethod
     def get_desc(cls, name):
@@ -820,14 +866,23 @@ class SQLMode(_Constants):
         """
         res = []
         for key in vars(cls).keys():
-            if not key.startswith('_') \
-                    and not hasattr(getattr(cls, key), '__call__'):
+            if not key.startswith("_") and not hasattr(getattr(cls, key), "__call__"):
                 res.append(key)
         return tuple(sorted(res))
 
-CONN_ATTRS_DN = ["_pid", "_platform", "_source_host", "_client_name",
-                 "_client_license", "_client_version", "_os", "_connector_name",
-                 "_connector_license", "_connector_version"]
+
+CONN_ATTRS_DN = [
+    "_pid",
+    "_platform",
+    "_source_host",
+    "_client_name",
+    "_client_license",
+    "_client_version",
+    "_os",
+    "_connector_name",
+    "_connector_license",
+    "_connector_version",
+]
 
 # TLS v1.0 cipher suites IANI to OpenSSL name translation
 TLSV1_CIPHER_SUITES = {
@@ -837,65 +892,51 @@ TLSV1_CIPHER_SUITES = {
     "TLS_RSA_WITH_RC4_128_SHA": "RC4-SHA",
     "TLS_RSA_WITH_IDEA_CBC_SHA": "IDEA-CBC-SHA",
     "TLS_RSA_WITH_3DES_EDE_CBC_SHA": "DES-CBC3-SHA",
-
     "TLS_DH_DSS_WITH_3DES_EDE_CBC_SHA": "Not implemented.",
     "TLS_DH_RSA_WITH_3DES_EDE_CBC_SHA": "Not implemented.",
     "TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA": "DHE-DSS-DES-CBC3-SHA",
     "TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA": "DHE-RSA-DES-CBC3-SHA",
-
     "TLS_DH_anon_WITH_RC4_128_MD5": "ADH-RC4-MD5",
     "TLS_DH_anon_WITH_3DES_EDE_CBC_SHA": "ADH-DES-CBC3-SHA",
-
     # AES cipher suites from RFC3268, extending TLS v1.0
     "TLS_RSA_WITH_AES_128_CBC_SHA": "AES128-SHA",
     "TLS_RSA_WITH_AES_256_CBC_SHA": "AES256-SHA",
-
     "TLS_DH_DSS_WITH_AES_128_CBC_SHA": "DH-DSS-AES128-SHA",
     "TLS_DH_DSS_WITH_AES_256_CBC_SHA": "DH-DSS-AES256-SHA",
     "TLS_DH_RSA_WITH_AES_128_CBC_SHA": "DH-RSA-AES128-SHA",
     "TLS_DH_RSA_WITH_AES_256_CBC_SHA": "DH-RSA-AES256-SHA",
-
     "TLS_DHE_DSS_WITH_AES_128_CBC_SHA": "DHE-DSS-AES128-SHA",
     "TLS_DHE_DSS_WITH_AES_256_CBC_SHA": "DHE-DSS-AES256-SHA",
     "TLS_DHE_RSA_WITH_AES_128_CBC_SHA": "DHE-RSA-AES128-SHA",
     "TLS_DHE_RSA_WITH_AES_256_CBC_SHA": "DHE-RSA-AES256-SHA",
-
     "TLS_DH_anon_WITH_AES_128_CBC_SHA": "ADH-AES128-SHA",
     "TLS_DH_anon_WITH_AES_256_CBC_SHA": "ADH-AES256-SHA",
-
     # Camellia cipher suites from RFC4132, extending TLS v1.0
     "TLS_RSA_WITH_CAMELLIA_128_CBC_SHA": "CAMELLIA128-SHA",
     "TLS_RSA_WITH_CAMELLIA_256_CBC_SHA": "CAMELLIA256-SHA",
-
     "TLS_DH_DSS_WITH_CAMELLIA_128_CBC_SHA": "DH-DSS-CAMELLIA128-SHA",
     "TLS_DH_DSS_WITH_CAMELLIA_256_CBC_SHA": "DH-DSS-CAMELLIA256-SHA",
     "TLS_DH_RSA_WITH_CAMELLIA_128_CBC_SHA": "DH-RSA-CAMELLIA128-SHA",
     "TLS_DH_RSA_WITH_CAMELLIA_256_CBC_SHA": "DH-RSA-CAMELLIA256-SHA",
-
     "TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA": "DHE-DSS-CAMELLIA128-SHA",
     "TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA": "DHE-DSS-CAMELLIA256-SHA",
     "TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA": "DHE-RSA-CAMELLIA128-SHA",
     "TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA": "DHE-RSA-CAMELLIA256-SHA",
-
     "TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA": "ADH-CAMELLIA128-SHA",
     "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA": "ADH-CAMELLIA256-SHA",
-
     # SEED cipher suites from RFC4162, extending TLS v1.0
     "TLS_RSA_WITH_SEED_CBC_SHA": "SEED-SHA",
-
     "TLS_DH_DSS_WITH_SEED_CBC_SHA": "DH-DSS-SEED-SHA",
     "TLS_DH_RSA_WITH_SEED_CBC_SHA": "DH-RSA-SEED-SHA",
-
     "TLS_DHE_DSS_WITH_SEED_CBC_SHA": "DHE-DSS-SEED-SHA",
     "TLS_DHE_RSA_WITH_SEED_CBC_SHA": "DHE-RSA-SEED-SHA",
-
     "TLS_DH_anon_WITH_SEED_CBC_SHA": "ADH-SEED-SHA",
-
     # GOST cipher suites from draft-chudov-cryptopro-cptls, extending TLS v1.0
     "TLS_GOSTR341094_WITH_28147_CNT_IMIT": "GOST94-GOST89-GOST89",
     "TLS_GOSTR341001_WITH_28147_CNT_IMIT": "GOST2001-GOST89-GOST89",
     "TLS_GOSTR341094_WITH_NULL_GOSTR3411": "GOST94-NULL-GOST94",
-    "TLS_GOSTR341001_WITH_NULL_GOSTR3411": "GOST2001-NULL-GOST94"}
+    "TLS_GOSTR341001_WITH_NULL_GOSTR3411": "GOST2001-NULL-GOST94",
+}
 
 # TLS v1.1 cipher suites IANI to OpenSSL name translation
 TLSV1_1_CIPHER_SUITES = TLSV1_CIPHER_SUITES
@@ -903,47 +944,38 @@ TLSV1_1_CIPHER_SUITES = TLSV1_CIPHER_SUITES
 # TLS v1.2 cipher suites IANI to OpenSSL name translation
 TLSV1_2_CIPHER_SUITES = {
     "TLS_RSA_WITH_NULL_SHA256": "NULL-SHA256",
-
     "TLS_RSA_WITH_AES_128_CBC_SHA256": "AES128-SHA256",
     "TLS_RSA_WITH_AES_256_CBC_SHA256": "AES256-SHA256",
     "TLS_RSA_WITH_AES_128_GCM_SHA256": "AES128-GCM-SHA256",
     "TLS_RSA_WITH_AES_256_GCM_SHA384": "AES256-GCM-SHA384",
-
     "TLS_DH_RSA_WITH_AES_128_CBC_SHA256": "DH-RSA-AES128-SHA256",
     "TLS_DH_RSA_WITH_AES_256_CBC_SHA256": "DH-RSA-AES256-SHA256",
     "TLS_DH_RSA_WITH_AES_128_GCM_SHA256": "DH-RSA-AES128-GCM-SHA256",
     "TLS_DH_RSA_WITH_AES_256_GCM_SHA384": "DH-RSA-AES256-GCM-SHA384",
-
     "TLS_DH_DSS_WITH_AES_128_CBC_SHA256": "DH-DSS-AES128-SHA256",
     "TLS_DH_DSS_WITH_AES_256_CBC_SHA256": "DH-DSS-AES256-SHA256",
     "TLS_DH_DSS_WITH_AES_128_GCM_SHA256": "DH-DSS-AES128-GCM-SHA256",
     "TLS_DH_DSS_WITH_AES_256_GCM_SHA384": "DH-DSS-AES256-GCM-SHA384",
-
     "TLS_DHE_RSA_WITH_AES_128_CBC_SHA256": "DHE-RSA-AES128-SHA256",
     "TLS_DHE_RSA_WITH_AES_256_CBC_SHA256": "DHE-RSA-AES256-SHA256",
     "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256": "DHE-RSA-AES128-GCM-SHA256",
     "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384": "DHE-RSA-AES256-GCM-SHA384",
-
     "TLS_DHE_DSS_WITH_AES_128_CBC_SHA256": "DHE-DSS-AES128-SHA256",
     "TLS_DHE_DSS_WITH_AES_256_CBC_SHA256": "DHE-DSS-AES256-SHA256",
     "TLS_DHE_DSS_WITH_AES_128_GCM_SHA256": "DHE-DSS-AES128-GCM-SHA256",
     "TLS_DHE_DSS_WITH_AES_256_GCM_SHA384": "DHE-DSS-AES256-GCM-SHA384",
-
     "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256": "ECDHE-RSA-AES128-SHA256",
     "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384": "ECDHE-RSA-AES256-SHA384",
     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256": "ECDHE-RSA-AES128-GCM-SHA256",
     "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384": "ECDHE-RSA-AES256-GCM-SHA384",
-
     "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256": "ECDHE-ECDSA-AES128-SHA256",
     "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384": "ECDHE-ECDSA-AES256-SHA384",
     "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": "ECDHE-ECDSA-AES128-GCM-SHA256",
     "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": "ECDHE-ECDSA-AES256-GCM-SHA384",
-
     "TLS_DH_anon_WITH_AES_128_CBC_SHA256": "ADH-AES128-SHA256",
     "TLS_DH_anon_WITH_AES_256_CBC_SHA256": "ADH-AES256-SHA256",
     "TLS_DH_anon_WITH_AES_128_GCM_SHA256": "ADH-AES128-GCM-SHA256",
     "TLS_DH_anon_WITH_AES_256_GCM_SHA384": "ADH-AES256-GCM-SHA384",
-
     "RSA_WITH_AES_128_CCM": "AES128-CCM",
     "RSA_WITH_AES_256_CCM": "AES256-CCM",
     "DHE_RSA_WITH_AES_128_CCM": "DHE-RSA-AES128-CCM",
@@ -956,7 +988,6 @@ TLSV1_2_CIPHER_SUITES = {
     "ECDHE_ECDSA_WITH_AES_256_CCM": "ECDHE-ECDSA-AES256-CCM",
     "ECDHE_ECDSA_WITH_AES_128_CCM_8": "ECDHE-ECDSA-AES128-CCM8",
     "ECDHE_ECDSA_WITH_AES_256_CCM_8": "ECDHE-ECDSA-AES256-CCM8",
-
     # ARIA cipher suites from RFC6209, extending TLS v1.2
     "TLS_RSA_WITH_ARIA_128_GCM_SHA256": "ARIA128-GCM-SHA256",
     "TLS_RSA_WITH_ARIA_256_GCM_SHA384": "ARIA256-GCM-SHA384",
@@ -974,40 +1005,33 @@ TLSV1_2_CIPHER_SUITES = {
     "TLS_DHE_PSK_WITH_ARIA_256_GCM_SHA384": "DHE-PSK-ARIA256-GCM-SHA384",
     "TLS_RSA_PSK_WITH_ARIA_128_GCM_SHA256": "RSA-PSK-ARIA128-GCM-SHA256",
     "TLS_RSA_PSK_WITH_ARIA_256_GCM_SHA384": "RSA-PSK-ARIA256-GCM-SHA384",
-
     # Camellia HMAC-Based cipher suites from RFC6367, extending TLS v1.2
     "TLS_ECDHE_ECDSA_WITH_CAMELLIA_128_CBC_SHA256": "ECDHE-ECDSA-CAMELLIA128-SHA256",
     "TLS_ECDHE_ECDSA_WITH_CAMELLIA_256_CBC_SHA384": "ECDHE-ECDSA-CAMELLIA256-SHA384",
     "TLS_ECDHE_RSA_WITH_CAMELLIA_128_CBC_SHA256": "ECDHE-RSA-CAMELLIA128-SHA256",
     "TLS_ECDHE_RSA_WITH_CAMELLIA_256_CBC_SHA384": "ECDHE-RSA-CAMELLIA256-SHA384",
-
     # Pre-shared keying (PSK) cipher suites",
     "PSK_WITH_NULL_SHA": "PSK-NULL-SHA",
     "DHE_PSK_WITH_NULL_SHA": "DHE-PSK-NULL-SHA",
     "RSA_PSK_WITH_NULL_SHA": "RSA-PSK-NULL-SHA",
-
     "PSK_WITH_RC4_128_SHA": "PSK-RC4-SHA",
     "PSK_WITH_3DES_EDE_CBC_SHA": "PSK-3DES-EDE-CBC-SHA",
     "PSK_WITH_AES_128_CBC_SHA": "PSK-AES128-CBC-SHA",
     "PSK_WITH_AES_256_CBC_SHA": "PSK-AES256-CBC-SHA",
-
     "DHE_PSK_WITH_RC4_128_SHA": "DHE-PSK-RC4-SHA",
     "DHE_PSK_WITH_3DES_EDE_CBC_SHA": "DHE-PSK-3DES-EDE-CBC-SHA",
     "DHE_PSK_WITH_AES_128_CBC_SHA": "DHE-PSK-AES128-CBC-SHA",
     "DHE_PSK_WITH_AES_256_CBC_SHA": "DHE-PSK-AES256-CBC-SHA",
-
     "RSA_PSK_WITH_RC4_128_SHA": "RSA-PSK-RC4-SHA",
     "RSA_PSK_WITH_3DES_EDE_CBC_SHA": "RSA-PSK-3DES-EDE-CBC-SHA",
     "RSA_PSK_WITH_AES_128_CBC_SHA": "RSA-PSK-AES128-CBC-SHA",
     "RSA_PSK_WITH_AES_256_CBC_SHA": "RSA-PSK-AES256-CBC-SHA",
-
     "PSK_WITH_AES_128_GCM_SHA256": "PSK-AES128-GCM-SHA256",
     "PSK_WITH_AES_256_GCM_SHA384": "PSK-AES256-GCM-SHA384",
     "DHE_PSK_WITH_AES_128_GCM_SHA256": "DHE-PSK-AES128-GCM-SHA256",
     "DHE_PSK_WITH_AES_256_GCM_SHA384": "DHE-PSK-AES256-GCM-SHA384",
     "RSA_PSK_WITH_AES_128_GCM_SHA256": "RSA-PSK-AES128-GCM-SHA256",
     "RSA_PSK_WITH_AES_256_GCM_SHA384": "RSA-PSK-AES256-GCM-SHA384",
-
     "PSK_WITH_AES_128_CBC_SHA256": "PSK-AES128-CBC-SHA256",
     "PSK_WITH_AES_256_CBC_SHA384": "PSK-AES256-CBC-SHA384",
     "PSK_WITH_NULL_SHA256": "PSK-NULL-SHA256",
@@ -1020,7 +1044,6 @@ TLSV1_2_CIPHER_SUITES = {
     "RSA_PSK_WITH_AES_256_CBC_SHA384": "RSA-PSK-AES256-CBC-SHA384",
     "RSA_PSK_WITH_NULL_SHA256": "RSA-PSK-NULL-SHA256",
     "RSA_PSK_WITH_NULL_SHA384": "RSA-PSK-NULL-SHA384",
-
     "ECDHE_PSK_WITH_RC4_128_SHA": "ECDHE-PSK-RC4-SHA",
     "ECDHE_PSK_WITH_3DES_EDE_CBC_SHA": "ECDHE-PSK-3DES-EDE-CBC-SHA",
     "ECDHE_PSK_WITH_AES_128_CBC_SHA": "ECDHE-PSK-AES128-CBC-SHA",
@@ -1030,19 +1053,14 @@ TLSV1_2_CIPHER_SUITES = {
     "ECDHE_PSK_WITH_NULL_SHA": "ECDHE-PSK-NULL-SHA",
     "ECDHE_PSK_WITH_NULL_SHA256": "ECDHE-PSK-NULL-SHA256",
     "ECDHE_PSK_WITH_NULL_SHA384": "ECDHE-PSK-NULL-SHA384",
-
     "PSK_WITH_CAMELLIA_128_CBC_SHA256": "PSK-CAMELLIA128-SHA256",
     "PSK_WITH_CAMELLIA_256_CBC_SHA384": "PSK-CAMELLIA256-SHA384",
-
     "DHE_PSK_WITH_CAMELLIA_128_CBC_SHA256": "DHE-PSK-CAMELLIA128-SHA256",
     "DHE_PSK_WITH_CAMELLIA_256_CBC_SHA384": "DHE-PSK-CAMELLIA256-SHA384",
-
     "RSA_PSK_WITH_CAMELLIA_128_CBC_SHA256": "RSA-PSK-CAMELLIA128-SHA256",
     "RSA_PSK_WITH_CAMELLIA_256_CBC_SHA384": "RSA-PSK-CAMELLIA256-SHA384",
-
     "ECDHE_PSK_WITH_CAMELLIA_128_CBC_SHA256": "ECDHE-PSK-CAMELLIA128-SHA256",
     "ECDHE_PSK_WITH_CAMELLIA_256_CBC_SHA384": "ECDHE-PSK-CAMELLIA256-SHA384",
-
     "PSK_WITH_AES_128_CCM": "PSK-AES128-CCM",
     "PSK_WITH_AES_256_CCM": "PSK-AES256-CCM",
     "DHE_PSK_WITH_AES_128_CCM": "DHE-PSK-AES128-CCM",
@@ -1051,7 +1069,6 @@ TLSV1_2_CIPHER_SUITES = {
     "PSK_WITH_AES_256_CCM_8": "PSK-AES256-CCM8",
     "DHE_PSK_WITH_AES_128_CCM_8": "DHE-PSK-AES128-CCM8",
     "DHE_PSK_WITH_AES_256_CCM_8": "DHE-PSK-AES256-CCM8",
-
     # ChaCha20-Poly1305 cipher suites, extending TLS v1.2
     "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256": "ECDHE-RSA-CHACHA20-POLY1305",
     "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256": "ECDHE-ECDSA-CHACHA20-POLY1305",
@@ -1059,7 +1076,8 @@ TLSV1_2_CIPHER_SUITES = {
     "TLS_PSK_WITH_CHACHA20_POLY1305_SHA256": "PSK-CHACHA20-POLY1305",
     "TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256": "ECDHE-PSK-CHACHA20-POLY1305",
     "TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256": "DHE-PSK-CHACHA20-POLY1305",
-    "TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256": "RSA-PSK-CHACHA20-POLY1305"}
+    "TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256": "RSA-PSK-CHACHA20-POLY1305",
+}
 
 # TLS v1.3 cipher suites IANI to OpenSSL name translation
 TLSV1_3_CIPHER_SUITES = {
@@ -1067,16 +1085,19 @@ TLSV1_3_CIPHER_SUITES = {
     "TLS_AES_256_GCM_SHA384": "TLS_AES_256_GCM_SHA384",
     "TLS_CHACHA20_POLY1305_SHA256": "TLS_CHACHA20_POLY1305_SHA256",
     "TLS_AES_128_CCM_SHA256": "TLS_AES_128_CCM_SHA256",
-    "TLS_AES_128_CCM_8_SHA256": "TLS_AES_128_CCM_8_SHA256"}
+    "TLS_AES_128_CCM_8_SHA256": "TLS_AES_128_CCM_8_SHA256",
+}
 
 TLS_CIPHER_SUITES = {
     "TLSv1": TLSV1_CIPHER_SUITES,
     "TLSv1.1": TLSV1_1_CIPHER_SUITES,
     "TLSv1.2": TLSV1_2_CIPHER_SUITES,
-    "TLSv1.3": TLSV1_3_CIPHER_SUITES}
+    "TLSv1.3": TLSV1_3_CIPHER_SUITES,
+}
 
 OPENSSL_CS_NAMES = {
     "TLSv1": TLSV1_CIPHER_SUITES.values(),
     "TLSv1.1": TLSV1_1_CIPHER_SUITES.values(),
     "TLSv1.2": TLSV1_2_CIPHER_SUITES.values(),
-    "TLSv1.3": TLSV1_3_CIPHER_SUITES.values()}
+    "TLSv1.3": TLSV1_3_CIPHER_SUITES.values(),
+}

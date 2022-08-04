@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -33,10 +33,12 @@
 
 import os.path
 import unittest
+
 import mysql.connector
-from mysql.connector import Error
-from tests import foreach_cnx, cnx_config
 import tests
+
+from mysql.connector import Error
+from tests import cnx_config, foreach_cnx
 
 try:
     from mysql.connector.connection_cext import CMySQLConnection
@@ -57,9 +59,8 @@ class Bug21879859(tests.MySQLConnectorTests):
         cur.execute("CREATE TABLE {0} (c1 VARCHAR(1024))".format(self.table))
         cur.execute(
             "CREATE PROCEDURE {1}() BEGIN SELECT 1234; "
-            "SELECT t from {0}; SELECT '' from {0}; END".format(
-                self.table, self.proc
-            ));
+            "SELECT t from {0}; SELECT '' from {0}; END".format(self.table, self.proc)
+        )
 
     def tearDown(self):
         cnx = mysql.connector.connect(**tests.get_mysql_config())

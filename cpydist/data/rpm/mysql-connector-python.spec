@@ -26,8 +26,10 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-%global requires_py_protobuf_version 3.0.0
+%global requires_py_protobuf_version 3.11.0
 %global wants_py_dnspython_version 1.16.0
+
+%undefine _package_note_file
 
 %if 0%{?suse_version} == 1315
 %global dist            .sles12
@@ -63,7 +65,7 @@
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
 # set version if not defined through 'rpmbuild'
-%{!?version: %global version 8.0.29}
+%{!?version: %global version 8.0.30}
 
 %global with_openssl_opts ""
 
@@ -94,7 +96,7 @@ Version:       %{version}
 Release:       1%{?version_extra:.%{version_extra}}%{?byte_code_only:.1}%{?dist}
 License:       Copyright (c) 2015, 2021, Oracle and/or its affiliates. Under %{?license_type} license as shown in the Description field.
 URL:           https://dev.mysql.com/downloads/connector/python/
-Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python%{?product_suffix}-%{version}.tar.gz
+Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python%{?product_suffix}-%{version}-src.tar.gz
 
 %{!?with_mysql_capi:BuildRequires: mysql-devel}
 
@@ -173,11 +175,15 @@ Requires:      python38
 # Some operations requires DNSPYTHON but this is not a strict
 # requirement for the RPM install as currently few RPM platforms has
 # the required version as RPMs. Users need to install using PIP.
-# Most of the linux distros except fedora got older version of python3-protobuf.
 %if 0%{?fedora}
 Requires:      python3-dns >= %{wants_py_dnspython_version}
-Requires:      python3-protobuf >= %{requires_py_protobuf_version}
 %endif
+
+# We have no python3-protobuf on EL7, too old versions on EL8 and openSUSE 15
+%if 0%{?fedora} || 0%{?rhel} >= 9
+Requires:      python3-protobuf >= %{requires_py_protobuf_version}, python3-protobuf < 4
+%endif
+
 
 %description -n mysql-connector-python3%{?product_suffix}
 MySQL Connector/Python enables Python programs to access MySQL
@@ -199,7 +205,7 @@ and information about the MySQL software. Also please see the
 documentation and the manual for more information.
 
 %prep
-%setup -q
+%setup -q -n mysql-connector-python%{?product_suffix}-%{version}-src
 
 %install
 %{?scl:scl enable %{scl} - << \EOF}
@@ -216,13 +222,13 @@ COMMON_INSTALL_ARGS="\
 "
 
 %if 0%{?extra_compile_args:1}
-EXTRA_COMPILE_ARGS=%extra_compile_args
+EXTRA_COMPILE_ARGS="%{extra_compile_args}"
 %else
 EXTRA_COMPILE_ARGS=""
 %endif
 
 %if 0%{?extra_link_args:1}
-EXTRA_LINK_ARGS=%extra_link_args
+EXTRA_LINK_ARGS="%{extra_link_args}"
 %else
 EXTRA_LINK_ARGS=""
 %endif
@@ -250,6 +256,9 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Mon Apr 18 2022  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.30-1
+- Updated for 8.0.30
+
 * Tue Jan 18 2022  Nuno Mariz <nuno.mariz@oracle.com> - 8.0.29-1
 - Updated for 8.0.29
 

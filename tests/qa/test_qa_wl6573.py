@@ -169,9 +169,7 @@ class WL6936Tests(tests.MySQLConnectorTests):
         """
         with self.cnx.cursor() as cur:
             self.cnx.start_transaction()
-            with self.assertRaises(
-                mysql.connector.errors.ProgrammingError
-            ) as context:
+            with self.assertRaises(mysql.connector.errors.ProgrammingError) as context:
                 cur.execute("Invalid SQL Statement")
                 _ = cur.fetchall()
             self.assertEqual(context.exception.errno, 1064)

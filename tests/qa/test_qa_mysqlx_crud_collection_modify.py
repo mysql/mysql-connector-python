@@ -1,4 +1,4 @@
-# Copyright (c) 2021, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -47,9 +47,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test basic collection.modify."""
         self._drop_collection_if_exists("mycoll1")
         collection = self.schema.create_collection("mycoll1")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         collection.modify("$._id==2").set("$.name", "c").execute()
         result = collection.find("$._id==2").execute()
         row = result.fetch_all()
@@ -61,9 +59,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test the collection.modify without condition."""
         self._drop_collection_if_exists("mycoll2")
         collection = self.schema.create_collection("mycoll2")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         try:
             collection.modify().set("$.name", "c").execute()
         except TypeError:
@@ -77,9 +73,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test the collection.modify UNSET."""
         self._drop_collection_if_exists("mycoll3")
         collection = self.schema.create_collection("mycoll3")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         collection.modify("$._id==2").set("$.name", "c").execute()
         result = collection.modify("$._id==1").unset("$.name").execute()
         self.assertEqual(result.get_affected_items_count(), 1)
@@ -90,9 +84,7 @@ class CollectionAddTests(tests.MySQLxTests):
         """Test the collection.modify change."""
         self._drop_collection_if_exists("mycoll4")
         collection = self.schema.create_collection("mycoll4")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         collection.modify("$._id==2").set("age", 21).execute()
         collection.modify("$._id ==2").change(
             "age", 22
@@ -118,9 +110,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 8, "c1": 3},
             {"_id": 9, "c1": 2},
         ).execute()
-        collection.modify("TRUE").set("$.c1", 100).sort("$._id DESC").limit(
-            3
-        ).execute()
+        collection.modify("TRUE").set("$.c1", 100).sort("$._id DESC").limit(3).execute()
         result = collection.find("$._id ==8").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["c1"], 100)
@@ -141,9 +131,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 8, "c1": 3},
             {"_id": 9, "c1": 2},
         ).execute()
-        collection.modify("$._id == :_id").bind("_id", 2).set(
-            "$.c1", 100
-        ).execute()
+        collection.modify("$._id == :_id").bind("_id", 2).set("$.c1", 100).execute()
         result = collection.find("$._id ==2").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["c1"], 100)
@@ -175,9 +163,7 @@ class CollectionAddTests(tests.MySQLxTests):
             }
         ).execute()
         collection.modify("$._id==1").array_append("$.no", 2).execute()
-        collection.modify("$._id==1").array_append(
-            "$.dates", "04/06/2018"
-        ).execute()
+        collection.modify("$._id==1").array_append("$.dates", "04/06/2018").execute()
         collection.modify("$._id==1").array_append(
             "$.email", mysqlx.expr("UPPER($.email)")
         ).execute()
@@ -236,9 +222,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 1, "name": "a", "age": 10},
             {"_id": 2, "name": "b", "age": 20},
         ).execute()
-        result = (
-            collection.modify("$._id==1").unset("$.name", "$.age").execute()
-        )
+        result = collection.modify("$._id==1").unset("$.name", "$.age").execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.schema.drop_collection("mycoll11")
 
@@ -302,9 +286,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 1, "name": "a", "age": 10},
             {"_id": 2, "name": "b", "age": 20},
         ).execute()
-        collection.modify("1 == 1").set("$.name", "c").where(
-            "$._id == 2"
-        ).execute()
+        collection.modify("1 == 1").set("$.name", "c").where("$._id == 2").execute()
         result = collection.find().execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["name"], "a")
@@ -376,22 +358,14 @@ class CollectionAddTests(tests.MySQLxTests):
             },
             {"_id": 2, "name": "b", "age": 24},
         ).execute()
-        result = (
-            collection.modify("$.name IN 'a'").set("$.name", "c").execute()
-        )
+        result = collection.modify("$.name IN 'a'").set("$.name", "c").execute()
         result1 = (
             collection.modify("$.age IN [22,24]")
             .set("$.name", "changed_age*@#$")
             .execute()
         )
-        result2 = (
-            collection.modify('{"a1":"x1"} IN $.prof').unset("$.age").execute()
-        )
-        result3 = (
-            collection.modify('"x1" IN $.prof.a1')
-            .set("$.name", "xyz")
-            .execute()
-        )
+        result2 = collection.modify('{"a1":"x1"} IN $.prof').unset("$.age").execute()
+        result3 = collection.modify('"x1" IN $.prof.a1').set("$.name", "xyz").execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(result1.get_affected_items_count(), 2)
         self.assertEqual(result2.get_affected_items_count(), 1)
@@ -412,23 +386,17 @@ class CollectionAddTests(tests.MySQLxTests):
             },
             {"_id": 2, "name": "b", "age": 24},
         ).execute()
-        result = (
-            collection.modify("$.name NOT IN 'a'").set("$.name", "c").execute()
-        )
+        result = collection.modify("$.name NOT IN 'a'").set("$.name", "c").execute()
         result1 = (
             collection.modify("$.age NOT IN [22,23]")
             .set("$.name", "changed_age*@#$")
             .execute()
         )
         result2 = (
-            collection.modify('{"a1":"z1"} NOT IN $.prof')
-            .unset("$.age")
-            .execute()
+            collection.modify('{"a1":"z1"} NOT IN $.prof').unset("$.age").execute()
         )
         result3 = (
-            collection.modify('"z1" NOT IN $.prof.a1')
-            .set("$.name", "xyz")
-            .execute()
+            collection.modify('"z1" NOT IN $.prof.a1').set("$.name", "xyz").execute()
         )
         self.assertEqual(result.get_affected_items_count(), 1)
         self.assertEqual(result1.get_affected_items_count(), 1)
@@ -519,9 +487,7 @@ class CollectionAddTests(tests.MySQLxTests):
             },
         ).execute()
         result = (
-            collection.modify(
-                '{"company":"abc","vehicle":"car"} IN $.additionalinfo'
-            )
+            collection.modify('{"company":"abc","vehicle":"car"} IN $.additionalinfo')
             .set("$.name", "sad")
             .sort("$._id DESC")
             .limit(2)
@@ -665,9 +631,9 @@ class CollectionAddTests(tests.MySQLxTests):
                 },
             },
         ).execute()
-        collection.modify("$._id == :id").patch(
-            {"address": {"_id": "21"}}
-        ).bind("id", "2").execute()
+        collection.modify("$._id == :id").patch({"address": {"_id": "21"}}).bind(
+            "id", "2"
+        ).execute()
         result = collection.find("$._id == '2'").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["address"]["_id"], "21")
@@ -782,9 +748,7 @@ class CollectionAddTests(tests.MySQLxTests):
         result = collection.find("$._id == '1234'").execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["director"]["name"], "James C")
-        self.assertEqual(
-            row[0]["awards"]["SecondAward"]["movie"], "AFRICAN EGG"
-        )
+        self.assertEqual(row[0]["awards"]["SecondAward"]["movie"], "AFRICAN EGG")
         collection.modify("_id = :id").patch(
             {
                 "$.director.awards.SecondAward": None,
@@ -904,13 +868,9 @@ class CollectionAddTests(tests.MySQLxTests):
         result = collection.find().execute()
         row = result.fetch_all()
         self.assertEqual(row[0]["actors"]["SideActor"]["name"], "New Actor")
+        self.assertEqual(row[0]["additionalinfo"]["director"]["field 2"], "two")
         self.assertEqual(
-            row[0]["additionalinfo"]["director"]["field 2"], "two"
-        )
-        self.assertEqual(
-            row[0]["additionalinfo"]["director"]["awards"]["FirstAward"][
-                "year"
-            ],
+            row[0]["additionalinfo"]["director"]["awards"]["FirstAward"]["year"],
             2002,
         )  # Testing .patch will not modify other fields than target
         self.schema.drop_collection("mycoll9")
@@ -951,9 +911,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 1, "name": "a", "age": 10},
             {"_id": 2, "name": "b", "age": 20},
         ).execute()
-        result = (
-            collection.modify("$._id==1").unset("$.name", "$.age").execute()
-        )
+        result = collection.modify("$._id==1").unset("$.name", "$.age").execute()
         self.assertEqual(result.get_affected_items_count(), 1)
         self.schema.drop_collection("mycoll11")
 
@@ -1082,11 +1040,13 @@ class CollectionAddTests(tests.MySQLxTests):
             }
         ).execute()
         collection.modify("true").patch(
-            mysqlx.expr('{"actors": {"MainActor": {"birthdate": "11 Nov 1975"}}}'
-        )).execute()
+            mysqlx.expr('{"actors": {"MainActor": {"birthdate": "11 Nov 1975"}}}')
+        ).execute()
         collection.modify("true").patch(
-            mysqlx.expr('{"additionalinfo": {"director": {"title": CONCAT(UPPER($.additionalinfo.director.awards.FirstAward.award), " OF THE YEAR")}}}'
-        )).execute()
+            mysqlx.expr(
+                '{"additionalinfo": {"director": {"title": CONCAT(UPPER($.additionalinfo.director.awards.FirstAward.award), " OF THE YEAR")}}}'
+            )
+        ).execute()
         result = collection.get_one("1234")
         self.assertEqual(
             result["additionalinfo"]["director"]["title"],
@@ -1122,14 +1082,13 @@ class CollectionAddTests(tests.MySQLxTests):
                         )
                     }
                 }
-
             }
         ).execute()
         result = collection.get_one("1234")
         self.assertEqual(result["actors"]["MainActor"]["age"], 35)
         collection.modify("true").patch(
-            mysqlx.expr('{"actors": {"MainActor": {"birthdate": Year(CURDATE())}}}'
-        )).execute()
+            mysqlx.expr('{"actors": {"MainActor": {"birthdate": Year(CURDATE())}}}')
+        ).execute()
         result = collection.get_one("1234")
         current_year = datetime.date.today().year
         self.assertEqual(result["actors"]["MainActor"]["birthdate"], current_year)
@@ -1157,9 +1116,7 @@ class CollectionAddTests(tests.MySQLxTests):
         self._drop_collection_if_exists("mycoll15")
         collection = self.schema.create_collection("mycoll15")
         collection.add({"_id": 1, "name": "a", "age": 10}).execute()
-        collection.modify("true").patch(
-            '{"nullfield" : [null, null]}'
-        ).execute()
+        collection.modify("true").patch('{"nullfield" : [null, null]}').execute()
         result = collection.find().execute()
         row = result.fetch_all()[0]
         self.assertEqual(len(row["nullfield"]), 2)
@@ -1204,9 +1161,7 @@ class CollectionAddTests(tests.MySQLxTests):
                 {"_id": 2, "name": "b", "age": 24},
             ).execute()
             result = (
-                collection.modify("$.name OVERLAPS 'a'")
-                .set("$.name", "c")
-                .execute()
+                collection.modify("$.name OVERLAPS 'a'").set("$.name", "c").execute()
             )
             result1 = (
                 collection.modify("$.age OVERLAPS [22,24]")
@@ -1254,9 +1209,7 @@ class CollectionAddTests(tests.MySQLxTests):
             {"_id": 2, "name": "b", "age": 24},
         ).execute()
         result = (
-            collection.modify("$.name NOT OVERLAPS 'a'")
-            .set("$.name", "c")
-            .execute()
+            collection.modify("$.name NOT OVERLAPS 'a'").set("$.name", "c").execute()
         )
         result1 = (
             collection.modify("$.age NOT OVERLAPS [22,23]")
@@ -1322,9 +1275,7 @@ class CollectionAddTests(tests.MySQLxTests):
             .execute()
         )
         result2 = (
-            collection.modify(
-                '["car","bike"] NOT OVERLAPS $.additionalinfo.vehicle'
-            )
+            collection.modify('["car","bike"] NOT OVERLAPS $.additionalinfo.vehicle')
             .set("$.age", "25")
             .execute()
         )
@@ -1376,9 +1327,7 @@ class CollectionAddTests(tests.MySQLxTests):
             .execute()
         )
         result1 = (
-            collection.modify(
-                '{"vehicle":"car"} NOT OVERLAPS $.additionalinfo'
-            )
+            collection.modify('{"vehicle":"car"} NOT OVERLAPS $.additionalinfo')
             .set("$.age", 26)
             .execute()
         )

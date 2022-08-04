@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -180,9 +180,7 @@ class WL6148Tests(tests.MySQLConnectorTests):
         out = cursor.fetchone()[0]
         self.assertEqual(exp, out)
         # Update the table data
-        altStmt = (
-            "UPDATE customer2 set name='same name' where i = ? and age = ?"
-        )
+        altStmt = "UPDATE customer2 set name='same name' where i = ? and age = ?"
         cursor.execute(
             altStmt,
             (

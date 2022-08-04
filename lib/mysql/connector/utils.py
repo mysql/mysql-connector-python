@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,25 +26,35 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Utilities
-"""
+"""Utilities."""
 
 import os
-import subprocess
-from stringprep import (in_table_a1, in_table_b1, in_table_c11, in_table_c12,
-                        in_table_c21_c22, in_table_c3, in_table_c4, in_table_c5,
-                        in_table_c6, in_table_c7, in_table_c8, in_table_c9,
-                        in_table_c12, in_table_d1, in_table_d2)
 import platform
 import struct
+import subprocess
 import sys
 import unicodedata
 
 from decimal import Decimal
 from functools import lru_cache
+from stringprep import (
+    in_table_a1,
+    in_table_b1,
+    in_table_c3,
+    in_table_c4,
+    in_table_c5,
+    in_table_c6,
+    in_table_c7,
+    in_table_c8,
+    in_table_c9,
+    in_table_c11,
+    in_table_c12,
+    in_table_c21_c22,
+    in_table_d1,
+    in_table_d2,
+)
 
 from .custom_types import HexLiteral
-
 
 __MYSQL_DEBUG__ = False
 
@@ -53,19 +63,16 @@ NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
 
 def intread(buf):
     """Unpacks the given buffer to an integer"""
-    try:
-        if isinstance(buf, int):
-            return buf
-        length = len(buf)
-        if length == 1:
-            return buf[0]
-        elif length <= 4:
-            tmp = buf + b'\x00'*(4-length)
-            return struct.unpack('<I', tmp)[0]
-        tmp = buf + b'\x00'*(8-length)
-        return struct.unpack('<Q', tmp)[0]
-    except:
-        raise
+    if isinstance(buf, int):
+        return buf
+    length = len(buf)
+    if length == 1:
+        return buf[0]
+    if length <= 4:
+        tmp = buf + b"\x00" * (4 - length)
+        return struct.unpack("<I", tmp)[0]
+    tmp = buf + b"\x00" * (8 - length)
+    return struct.unpack("<Q", tmp)[0]
 
 
 def int1store(i):
@@ -75,9 +82,8 @@ def int1store(i):
     Returns string.
     """
     if i < 0 or i > 255:
-        raise ValueError('int1store requires 0 <= i <= 255')
-    else:
-        return bytearray(struct.pack('<B', i))
+        raise ValueError("int1store requires 0 <= i <= 255")
+    return bytearray(struct.pack("<B", i))
 
 
 def int2store(i):
@@ -87,9 +93,8 @@ def int2store(i):
     Returns string.
     """
     if i < 0 or i > 65535:
-        raise ValueError('int2store requires 0 <= i <= 65535')
-    else:
-        return bytearray(struct.pack('<H', i))
+        raise ValueError("int2store requires 0 <= i <= 65535")
+    return bytearray(struct.pack("<H", i))
 
 
 def int3store(i):
@@ -99,9 +104,8 @@ def int3store(i):
     Returns string.
     """
     if i < 0 or i > 16777215:
-        raise ValueError('int3store requires 0 <= i <= 16777215')
-    else:
-        return bytearray(struct.pack('<I', i)[0:3])
+        raise ValueError("int3store requires 0 <= i <= 16777215")
+    return bytearray(struct.pack("<I", i)[0:3])
 
 
 def int4store(i):
@@ -111,9 +115,8 @@ def int4store(i):
     Returns string.
     """
     if i < 0 or i > 4294967295:
-        raise ValueError('int4store requires 0 <= i <= 4294967295')
-    else:
-        return bytearray(struct.pack('<I', i))
+        raise ValueError("int4store requires 0 <= i <= 4294967295")
+    return bytearray(struct.pack("<I", i))
 
 
 def int8store(i):
@@ -123,9 +126,8 @@ def int8store(i):
     Returns string.
     """
     if i < 0 or i > 18446744073709551616:
-        raise ValueError('int8store requires 0 <= i <= 2^64')
-    else:
-        return bytearray(struct.pack('<Q', i))
+        raise ValueError("int8store requires 0 <= i <= 2^64")
+    return bytearray(struct.pack("<Q", i))
 
 
 def intstore(i):
@@ -138,7 +140,7 @@ def intstore(i):
     returns string.
     """
     if i < 0 or i > 18446744073709551616:
-        raise ValueError('intstore requires 0 <= i <=  2^64')
+        raise ValueError("intstore requires 0 <= i <=  2^64")
 
     if i <= 255:
         formed_string = int1store
@@ -160,16 +162,16 @@ def lc_int(i):
     with the information of how much bytes the encoded int takes.
     """
     if i < 0 or i > 18446744073709551616:
-        raise ValueError('Requires 0 <= i <= 2^64')
+        raise ValueError("Requires 0 <= i <= 2^64")
 
     if i < 251:
-        return bytearray(struct.pack('<B', i))
-    elif i <= 65535:
-        return b'\xfc' + bytearray(struct.pack('<H', i))
-    elif i <= 16777215:
-        return b'\xfd' + bytearray(struct.pack('<I', i)[0:3])
+        return bytearray(struct.pack("<B", i))
+    if i <= 65535:
+        return b"\xfc" + bytearray(struct.pack("<H", i))
+    if i <= 16777215:
+        return b"\xfd" + bytearray(struct.pack("<I", i)[0:3])
 
-    return b'\xfe' + bytearray(struct.pack('<Q', i))
+    return b"\xfe" + bytearray(struct.pack("<Q", i))
 
 
 def read_bytes(buf, size):
@@ -223,16 +225,16 @@ def read_lc_string(buf):
 
     if fst <= 250:  # \xFA
         length = fst
-        return (buf[1 + length:], buf[1:length + 1])
-    elif fst == 252:
+        return (buf[1 + length :], buf[1 : length + 1])
+    if fst == 252:
         lsize = 2
     elif fst == 253:
         lsize = 3
-    if fst == 254:
+    elif fst == 254:
         lsize = 8
 
-    length = intread(buf[1:lsize + 1])
-    return (buf[lsize + length + 1:], buf[lsize + 1:length + lsize + 1])
+    length = intread(buf[1 : lsize + 1])
+    return (buf[lsize + length + 1 :], buf[lsize + 1 : length + lsize + 1])
 
 
 def read_lc_string_list(buf):
@@ -260,7 +262,7 @@ def read_lc_string_list(buf):
         else:
             if first <= 250:
                 length = first
-                byteslst.append(buf[(pos + 1):length + (pos + 1)])
+                byteslst.append(buf[(pos + 1) : length + (pos + 1)])
                 pos += 1 + length
             else:
                 lsize = 0
@@ -268,9 +270,8 @@ def read_lc_string_list(buf):
                     lsize = sizes[first]
                 except KeyError:
                     return None
-                length = intread(buf[(pos + 1):lsize + (pos + 1)])
-                byteslst.append(
-                    buf[pos + 1 + lsize:length + lsize + (pos + 1)])
+                length = intread(buf[(pos + 1) : lsize + (pos + 1)])
+                byteslst.append(buf[pos + 1 + lsize : length + lsize + (pos + 1)])
                 pos += 1 + lsize + length
 
     return tuple(byteslst)
@@ -283,18 +284,18 @@ def read_string(buf, end=None, size=None):
     Returns a tuple (trucated buffer, string).
     """
     if end is None and size is None:
-        raise ValueError('read_string() needs either end or size')
+        raise ValueError("read_string() needs either end or size")
 
     if end is not None:
         try:
             idx = buf.index(end)
-        except ValueError:
-            raise ValueError("end byte not present in buffer")
-        return (buf[idx + 1:], buf[0:idx])
-    elif size is not None:
+        except ValueError as err:
+            raise ValueError("end byte not present in buffer") from err
+        return (buf[idx + 1 :], buf[0:idx])
+    if size is not None:
         return read_bytes(buf, size)
 
-    raise ValueError('read_string() needs either end or size (weird)')
+    raise ValueError("read_string() needs either end or size (weird)")
 
 
 def read_int(buf, size):
@@ -302,12 +303,7 @@ def read_int(buf, size):
 
     Returns a tuple (truncated buffer, int)
     """
-
-    try:
-        res = intread(buf[0:size])
-    except:
-        raise
-
+    res = intread(buf[0:size])
     return (buf[size:], res)
 
 
@@ -323,16 +319,15 @@ def read_lc_int(buf):
     lcbyte = buf[0]
     if lcbyte == 251:
         return (buf[1:], None)
-    elif lcbyte < 251:
+    if lcbyte < 251:
         return (buf[1:], int(lcbyte))
-    elif lcbyte == 252:
-        return (buf[3:], struct.unpack('<xH', buf[0:3])[0])
-    elif lcbyte == 253:
-        return (buf[4:], struct.unpack('<I', buf[1:4] + b'\x00')[0])
-    elif lcbyte == 254:
-        return (buf[9:], struct.unpack('<xQ', buf[0:9])[0])
-    else:
-        raise ValueError("Failed reading length encoded integer")
+    if lcbyte == 252:
+        return (buf[3:], struct.unpack("<xH", buf[0:3])[0])
+    if lcbyte == 253:
+        return (buf[4:], struct.unpack("<I", buf[1:4] + b"\x00")[0])
+    if lcbyte == 254:
+        return (buf[9:], struct.unpack("<xQ", buf[0:9])[0])
+    raise ValueError("Failed reading length encoded integer")
 
 
 #
@@ -341,8 +336,8 @@ def read_lc_int(buf):
 def _digest_buffer(buf):
     """Debug function for showing buffers"""
     if not isinstance(buf, str):
-        return ''.join(["\\x%02x" % c for c in buf])
-    return ''.join(["\\x%02x" % ord(c) for c in buf])
+        return "".join([f"\\x{c:02x}" for c in buf])
+    return "".join([f"\\x{ord(c):02x}" for c in buf])
 
 
 def print_buffer(abuffer, prefix=None, limit=30):
@@ -352,7 +347,7 @@ def print_buffer(abuffer, prefix=None, limit=30):
             digest = _digest_buffer(abuffer[0:limit])
         else:
             digest = _digest_buffer(abuffer)
-        print(prefix + ': ' + digest)
+        print(prefix + ": " + digest)
     else:
         print(_digest_buffer(abuffer))
 
@@ -367,7 +362,7 @@ def _parse_os_release():
     os_release_file = os.path.join("/etc", "os-release")
     if not os.path.exists(os_release_file):
         return distro
-    with open(os_release_file) as file_obj:
+    with open(os_release_file, encoding="utf-8") as file_obj:
         for line in file_obj:
             key_value = line.split("=")
             if len(key_value) != 2:
@@ -387,7 +382,7 @@ def _parse_lsb_release():
     distro = {}
     lsb_release_file = os.path.join("/etc", "lsb-release")
     if os.path.exists(lsb_release_file):
-        with open(lsb_release_file) as file_obj:
+        with open(lsb_release_file, encoding="utf-8") as file_obj:
             for line in file_obj:
                 key_value = line.split("=")
                 if len(key_value) != 2:
@@ -405,10 +400,9 @@ def _parse_lsb_release_command():
         A dictionary containing release information.
     """
     distro = {}
-    with open(os.devnull, "w") as devnull:
+    with open(os.devnull, "w", encoding="utf-8") as devnull:
         try:
-            stdout = subprocess.check_output(
-                ("lsb_release", "-a"), stderr=devnull)
+            stdout = subprocess.check_output(("lsb_release", "-a"), stderr=devnull)
         except OSError:
             return None
         lines = stdout.decode(sys.getfilesystemencoding()).splitlines()
@@ -434,21 +428,27 @@ def linux_distribution():
     """
     distro = _parse_lsb_release()
     if distro:
-        return (distro.get("distrib_id", ""),
-                distro.get("distrib_release", ""),
-                distro.get("distrib_codename", ""))
+        return (
+            distro.get("distrib_id", ""),
+            distro.get("distrib_release", ""),
+            distro.get("distrib_codename", ""),
+        )
 
     distro = _parse_lsb_release_command()
     if distro:
-        return (distro.get("distributor_id", ""),
-                distro.get("release", ""),
-                distro.get("codename", ""))
+        return (
+            distro.get("distributor_id", ""),
+            distro.get("release", ""),
+            distro.get("codename", ""),
+        )
 
     distro = _parse_os_release()
     if distro:
-        return (distro.get("name", ""),
-                distro.get("version_id", ""),
-                distro.get("version_codename", ""))
+        return (
+            distro.get("name", ""),
+            distro.get("version_id", ""),
+            distro.get("version_codename", ""),
+        )
 
     return ("", "", "")
 
@@ -459,37 +459,40 @@ def _get_unicode_read_direction(unicode_str):
     We assume that the direction is "L-to-R" if the first character does not
     indicate the direction is "R-to-L" or an "AL" (Arabic Letter).
     """
-    if unicode_str and unicodedata.bidirectional(unicode_str[0]) in ("R", "AL"):
+    if unicode_str and unicodedata.bidirectional(unicode_str[0]) in (
+        "R",
+        "AL",
+    ):
         return "R-to-L"
     return "L-to-R"
 
 
 def _get_unicode_direction_rule(unicode_str):
     """
-        1) The characters in section 5.8 MUST be prohibited.
+    1) The characters in section 5.8 MUST be prohibited.
 
-        2) If a string contains any RandALCat character, the string MUST NOT
-           contain any LCat character.
+    2) If a string contains any RandALCat character, the string MUST NOT
+       contain any LCat character.
 
-        3) If a string contains any RandALCat character, a RandALCat
-           character MUST be the first character of the string, and a
-           RandALCat character MUST be the last character of the string.
+    3) If a string contains any RandALCat character, a RandALCat
+       character MUST be the first character of the string, and a
+       RandALCat character MUST be the last character of the string.
     """
     read_dir = _get_unicode_read_direction(unicode_str)
 
     # point 3)
     if read_dir == "R-to-L":
         if not (in_table_d1(unicode_str[0]) and in_table_d1(unicode_str[-1])):
-            raise ValueError("Invalid unicode Bidirectional sequence, if the "
-                             "first character is RandALCat, the final character"
-                             "must be RandALCat too.")
+            raise ValueError(
+                "Invalid unicode Bidirectional sequence, if the "
+                "first character is RandALCat, the final character"
+                "must be RandALCat too."
+            )
         # characters from in_table_d2 are prohibited.
-        return {"Bidirectional Characters requirement 2 [StringPrep, d2]":
-                in_table_d2}
+        return {"Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d2}
 
     # characters from in_table_d1 are prohibited.
-    return {"Bidirectional Characters requirement 2 [StringPrep, d2]":
-            in_table_d1}
+    return {"Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d1}
 
 
 def validate_normalized_unicode_string(normalized_str):
@@ -526,7 +529,7 @@ def validate_normalized_unicode_string(normalized_str):
         "Inappropriate for plain text characters [StringPrep, C.6]": in_table_c6,
         "Inappropriate for canonical representation characters [StringPrep, C.7]": in_table_c7,
         "Change display properties or deprecated characters [StringPrep, C.8]": in_table_c8,
-        "Tagging characters [StringPrep, C.9]": in_table_c9
+        "Tagging characters [StringPrep, C.9]": in_table_c9,
     }
 
     try:
@@ -535,8 +538,8 @@ def validate_normalized_unicode_string(normalized_str):
         return normalized_str, str(err)
 
     for char in normalized_str:
-        for rule in rules:
-            if rules[rule](char) and char != u' ':
+        for rule, func in rules.items():
+            if func(char) and char != " ":
                 return char, rule
 
     return None
@@ -562,42 +565,24 @@ def normalize_unicode_string(a_string):
     # non-ASCII space characters [StringPrep, C.1.2] are mapped to ' ' (U+0020)
     # "commonly mapped to nothing" characters [StringPrep, B.1] are mapped to ''
     nstr_list = [
-        u' ' if in_table_c12(char) else u'' if in_table_b1(char) else char
-        for char in a_string]
+        " " if in_table_c12(char) else "" if in_table_b1(char) else char
+        for char in a_string
+    ]
 
-    nstr = u''.join(nstr_list)
+    nstr = "".join(nstr_list)
 
     # Per rfc4013 2.2. Use NFKC Normalization Form Compatibility Composition
     # Characters are decomposed by compatibility, then recomposed by canonical
     # equivalence.
-    nstr = unicodedata.normalize('NFKC', nstr)
+    nstr = unicodedata.normalize("NFKC", nstr)
     if not nstr:
         # Normilization results in empty string.
-        return u''
+        return ""
 
     return nstr
 
 
-def make_abc(base_class):
-    """Decorator used to create a abstract base class.
-
-    We use this decorator to create abstract base classes instead of
-    using the abc-module. The decorator makes it possible to do the
-    same in both Python v2 and v3 code.
-    """
-    def wrapper(class_):
-        """Wrapper"""
-        attrs = class_.__dict__.copy()
-        for attr in '__dict__', '__weakref__':
-            attrs.pop(attr, None)  # ignore missing attributes
-
-        bases = class_.__bases__
-        bases = (class_,) + bases
-        return base_class(class_.__name__, bases, attrs)
-    return wrapper
-
-
-def init_bytearray(payload=b'', encoding='utf-8'):
+def init_bytearray(payload=b"", encoding="utf-8"):
     """Initialize a bytearray from the payload."""
     if isinstance(payload, bytearray):
         return payload
@@ -606,8 +591,8 @@ def init_bytearray(payload=b'', encoding='utf-8'):
     if not isinstance(payload, bytes):
         try:
             return bytearray(payload.encode(encoding=encoding))
-        except AttributeError:
-            raise ValueError("payload must be a str or bytes")
+        except AttributeError as err:
+            raise ValueError("payload must be a str or bytes") from err
 
     return bytearray(payload)
 
@@ -623,11 +608,11 @@ def get_platform():
             plat["arch"] = "i386"
         else:
             plat["arch"] = platform.architecture()
-        plat["version"] = "Windows-{}".format(platform.win32_ver()[1])
+        plat["version"] = f"Windows-{platform.win32_ver()[1]}"
     else:
         plat["arch"] = platform.machine()
         if platform.system() == "Darwin":
-            plat["version"] = "{}-{}".format("macOS", platform.mac_ver()[0])
+            plat["version"] = f"macOS-{platform.mac_ver()[0]}"
         else:
             plat["version"] = "-".join(linux_distribution()[0:2])
 

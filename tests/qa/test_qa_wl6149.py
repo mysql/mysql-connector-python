@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,15 +26,16 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-import mysql.connector
-import tests
+import argparse
 import unittest
 
+from datetime import time
+
+import mysql.connector
+import tests
 
 from mysql.connector import errors
-from datetime import time
 from mysql.connector.constants import ClientFlag
-import argparse
 
 
 @unittest.skipIf(
@@ -93,9 +94,7 @@ class WL6149Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_datetime")
             cur.execute("CREATE TABLE t_datetime (t1 datetime(3))")
-            cur.execute(
-                "insert into t_datetime values ('2038-01-19 03:14:07.11')"
-            )
+            cur.execute("insert into t_datetime values ('2038-01-19 03:14:07.11')")
             self.cnx.commit()
             cur.execute("SELECT * from t_datetime")
             exp = b"2038-01-19 03:14:07.110"
@@ -115,9 +114,7 @@ class WL6149Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_alt_datetime")
             cur.execute("CREATE TABLE t_alt_datetime (t1 datetime(3))")
-            cur.execute(
-                "insert into t_alt_datetime values ('2038-01-19 03:14:07.11')"
-            )
+            cur.execute("insert into t_alt_datetime values ('2038-01-19 03:14:07.11')")
             self.cnx.commit()
             cur.execute("SELECT * from t_alt_datetime")
             exp = b"2038-01-19 03:14:07.110"
@@ -138,9 +135,7 @@ class WL6149Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_alt_timestamp")
             cur.execute("CREATE TABLE t_alt_timestamp (t1 timestamp(4))")
-            cur.execute(
-                "insert into t_alt_timestamp values ('2011-01-19 03:14:07.11')"
-            )
+            cur.execute("insert into t_alt_timestamp values ('2011-01-19 03:14:07.11')")
             self.cnx.commit()
             cur.execute("SELECT * from t_alt_timestamp")
             exp = b"2011-01-19 03:14:07.1100"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,14 +32,13 @@
 import os
 import sys
 
+sys.path.insert(0, ".")
+
 from setuptools import Extension, find_packages, setup
 
 from cpydist import BuildExt, Install, InstallLib
 from cpydist.bdist import DistBinary
-from cpydist.bdist_deb import DistDeb
-from cpydist.bdist_macos import DistMacOS
 from cpydist.bdist_msi import DistMSI
-from cpydist.bdist_rpm import DistRPM
 from cpydist.bdist_solaris import DistSolaris
 from cpydist.sdist import DistSource
 
@@ -56,10 +55,7 @@ with open(version_py, "rb") as fp:
 
 COMMAND_CLASSES = {
     "bdist": DistBinary,
-    "bdist_deb": DistDeb,
-    "bdist_macos": DistMacOS,
     "bdist_msi": DistMSI,
-    "bdist_rpm": DistRPM,
     "bdist_solaris": DistSolaris,
     "build_ext": BuildExt,
     "install": Install,
@@ -72,32 +68,36 @@ if DistWheel is not None:
 
 # C extensions
 EXTENSIONS = [
-    Extension("_mysql_connector",
-              sources=[
-                  "src/exceptions.c",
-                  "src/mysql_capi.c",
-                  "src/mysql_capi_conversion.c",
-                  "src/mysql_connector.c",
-                  "src/force_cpp_linkage.cc",
-              ],
-              include_dirs=["src/include"]),
-    Extension(name="_mysqlxpb",
-              define_macros=[("PY3", 1,)] if sys.version_info[0] == 3 else [],
-              sources=[
-                  "src/mysqlxpb/mysqlx/mysqlx.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_connection.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_crud.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_cursor.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_datatypes.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_expect.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_expr.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_notice.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_prepare.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_resultset.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_session.pb.cc",
-                  "src/mysqlxpb/mysqlx/mysqlx_sql.pb.cc",
-                  "src/mysqlxpb/mysqlxpb.cc",
-              ])
+    Extension(
+        "_mysql_connector",
+        sources=[
+            "src/exceptions.c",
+            "src/mysql_capi.c",
+            "src/mysql_capi_conversion.c",
+            "src/mysql_connector.c",
+            "src/force_cpp_linkage.cc",
+        ],
+        include_dirs=["src/include"],
+    ),
+    Extension(
+        name="_mysqlxpb",
+        define_macros=[("PY3", 1)] if sys.version_info[0] == 3 else [],
+        sources=[
+            "src/mysqlxpb/mysqlx/mysqlx.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_connection.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_crud.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_cursor.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_datatypes.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_expect.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_expr.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_notice.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_prepare.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_resultset.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_session.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_sql.pb.cc",
+            "src/mysqlxpb/mysqlxpb.cc",
+        ],
+    ),
 ]
 
 LONG_DESCRIPTION = """
@@ -134,14 +134,14 @@ setup(
         "Topic :: Database",
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
-        "Topic :: Software Development :: Libraries :: Python Modules"
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     ext_modules=EXTENSIONS,
     cmdclass=COMMAND_CLASSES,
-    install_requires=["protobuf>=3.0.0"],
+    install_requires=["protobuf>=3.11.0,<=3.20.1"],
     extras_require={
-        "dns-srv": ["dnspython>=1.16.0"],
-        "compression": ["lz4>=2.1.6", "zstandard>=0.12.0"],
-        "gssapi": ["gssapi>=1.6.9"],
-    }
+        "dns-srv": ["dnspython>=1.16.0,<=2.1.0"],
+        "compression": ["lz4>=2.1.6,<=3.1.3", "zstandard>=0.12.0,<=0.15.2"],
+        "gssapi": ["gssapi>=1.6.9,<=1.7.3"],
+    },
 )

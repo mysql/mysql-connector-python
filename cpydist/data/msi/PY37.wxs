@@ -33,14 +33,14 @@
         <File Id="LibMySQLDLL37" Name="libmysql.dll"
          Source="$(var.LibMySQLDLL)" DiskId="1"/>
         <?if "$(var.Platform)"="x64" ?>
-          <File Id="LIBcrypto37" Name="libcrypto-1_1-x64.dll"
+          <File Id="LIBcrypto37" Name="$(var.LIBcrypto)"
            Source="$(var.LIBcryptoDLL)" DiskId="1"/>
-          <File Id="LIBSSL37" Name="libssl-1_1-x64.dll"
+          <File Id="LIBSSL37" Name="$(var.LIBSSL)"
            Source="$(var.LIBSSLDLL)" DiskId="1"/>
         <?else?>
-          <File Id="LIBcrypto37" Name="libcrypto-1_1.dll"
+          <File Id="LIBcrypto37" Name="$(var.LIBcrypto)"
            Source="$(var.LIBcryptoDLL)" DiskId="1"/>
-          <File Id="LIBSSL37" Name="libssl-1_1.dll"
+          <File Id="LIBSSL37" Name="$(var.LIBSSL)"
            Source="$(var.LIBSSLDLL)" DiskId="1"/>
         <?endif?>
       </Component>
@@ -138,15 +138,15 @@
       <?if $(var.HaveCExt37) = 1 ?>
       <Component Id="Vendor37" Guid="103f2914-be39-11ea-98b1-04ea56793316" Win64="$(var.Win64)">
         <?if "$(var.Platform)"="x64" ?>
-          <File Id="libcrypto_1_137" Name="libcrypto-1_1-x64.dll"
-           Source="$(var.BDist37)\mysql\vendor\libcrypto-1_1-x64.dll" DiskId="1"/>
-          <File Id="libssl_1_137" Name="libssl-1_1-x64.dll"
-           Source="$(var.BDist37)\mysql\vendor\libssl-1_1-x64.dll" DiskId="1"/>
+          <File Id="libcrypto_1_137" Name="$(var.LIBcrypto)"
+           Source="$(var.BDist37)\mysql\vendor\$(var.LIBcrypto)" DiskId="1"/>
+          <File Id="libssl_1_137" Name="$(var.LIBSSL)"
+           Source="$(var.BDist37)\mysql\vendor\$(var.LIBSSL)" DiskId="1"/>
         <?else?>
-          <File Id="libcrypto_1_137" Name="libcrypto-1_1.dll"
-           Source="$(var.BDist37)\mysql\vendor\libcrypto-1_1.dll" DiskId="1"/>
-          <File Id="libssl_1_137" Name="libssl-1_1.dll"
-           Source="$(var.BDist37)\mysql\vendor\libssl-1_1.dll" DiskId="1"/>
+          <File Id="libcrypto_1_137" Name="$(var.LIBcrypto)"
+           Source="$(var.BDist37)\mysql\vendor\$(var.LIBcrypto)" DiskId="1"/>
+          <File Id="libssl_1_137" Name="$(var.LIBSSL)"
+           Source="$(var.BDist37)\mysql\vendor\$(var.LIBSSL)" DiskId="1"/>
         <?endif?>
         <?if $(var.HaveLdapLibs37) = 1 ?>
         <File Id="libsasl37" Name="libsasl.dll"
@@ -221,6 +221,27 @@
         <File Id="cursorcextpy37" Name="cursor_cext.$(var.PyExt)"
          Source="$(var.BDist37)\mysql\connector\cursor_cext.$(var.PyExt)" DiskId="1"/>
         <?endif?>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ConnectorPluginsDir37">
+      <Component Id="ConnectorPlugins37" Guid="2dd53ef3-3607-4e49-9e88-946082846780" Win64="$(var.Win64)">
+        <File Id="plugins_initpy37" Name="__init__.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\__init__.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_kerberos_clientpy37" Name="authentication_kerberos_client.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\authentication_kerberos_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_ldap_sasl_clientpy37" Name="authentication_ldap_sasl_client.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\authentication_ldap_sasl_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="authentication_oci_clientpy37" Name="authentication_oci_client.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\authentication_oci_client.$(var.PyExt)" DiskId="1"/>
+        <File Id="caching_sha2_passwordpy37" Name="caching_sha2_password.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\caching_sha2_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysql_clear_passwordpy37" Name="mysql_clear_password.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\mysql_clear_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysql_native_passwordpy37" Name="mysql_native_password.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\mysql_native_password.$(var.PyExt)" DiskId="1"/>
+        <File Id="sha256_passwordpy37" Name="sha256_password.$(var.PyExt)"
+         Source="$(var.BDist37)\mysql\connector\plugins\sha256_password.$(var.PyExt)" DiskId="1"/>
       </Component>
     </DirectoryRef>
 
