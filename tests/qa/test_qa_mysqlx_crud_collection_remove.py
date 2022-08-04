@@ -108,9 +108,7 @@ class CollectionRemoveTests(tests.MySQLxTests):
             {"_id": 4, "c1": 7},
             {"_id": 5, "c1": 6},
         ).execute()
-        collection.remove("1 == 1").limit(
-            2, 2
-        ).execute()  # deprecated since 8.0.12
+        collection.remove("1 == 1").limit(2, 2).execute()  # deprecated since 8.0.12
         self.assertEqual(collection.count(), 3)
         self.schema.drop_collection("mycoll4")
 
@@ -397,9 +395,7 @@ class CollectionRemoveTests(tests.MySQLxTests):
         result1 = collection.remove(
             '{"vehicle":"car"} NOT IN $.additionalinfo'
         ).execute()
-        result2 = collection.remove(
-            '{"company":"mno"} IN $.additionalinfo'
-        ).execute()
+        result2 = collection.remove('{"company":"mno"} IN $.additionalinfo').execute()
         result3 = collection.remove(
             '{"company":"abc","vehicle":"car"} NOT IN $.additionalinfo'
         ).execute()
@@ -473,9 +469,7 @@ class CollectionRemoveTests(tests.MySQLxTests):
         ).execute()
         result = collection.remove("$.name NOT OVERLAPS 'a'").execute()
         result1 = collection.remove("$.age NOT OVERLAPS [22,24]").execute()
-        result2 = collection.remove(
-            '{"a1":"x1"} NOT OVERLAPS $.prof'
-        ).execute()
+        result2 = collection.remove('{"a1":"x1"} NOT OVERLAPS $.prof').execute()
         result3 = collection.remove('"d1" NOT OVERLAPS $.prof.g1').execute()
         self.assertEqual(result.get_affected_items_count(), 3)
         self.assertEqual(result1.get_affected_items_count(), 0)
@@ -539,9 +533,7 @@ class CollectionRemoveTests(tests.MySQLxTests):
                 },
             },
         ).execute()
-        result1 = collection.remove(
-            '["happy","joy"] OVERLAPS $.name'
-        ).execute()
+        result1 = collection.remove('["happy","joy"] OVERLAPS $.name').execute()
         # adding data
         collection.add(
             {

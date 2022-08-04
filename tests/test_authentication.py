@@ -33,16 +33,20 @@
 """
 
 import getpass
+import importlib
 import inspect
 import itertools
 import logging
 import os
+import pkgutil
 import subprocess
-import tests
 import time
 import unittest
 
 import mysql.connector
+import mysql.connector.plugins as plugins
+import tests
+
 from mysql.connector import authentication
 from mysql.connector.errors import (
     DatabaseError,
@@ -50,6 +54,16 @@ from mysql.connector.errors import (
     OperationalError,
     ProgrammingError,
 )
+
+try:
+    import cryptography
+except ImportError:
+    cryptography = None
+
+try:
+    import gssapi
+except ImportError:
+    gssapi = None
 
 try:
     import oci
@@ -65,13 +79,11 @@ except ImportError:
 
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
-_STANDARD_PLUGINS = (
-    "mysql_native_password",
-    "mysql_clear_password",
-    "sha256_password",
-    "authentication_ldap_sasl_client",
-    "authentication_kerberos_client",
-)
+_PLUGINS_DEPENDENCIES = {
+    "authentication_kerberos_client": (gssapi,),
+    "authentication_ldap_sasl_client": (gssapi,),
+    "authentication_oci_client": (cryptography, oci),
+}
 
 
 class AuthenticationModuleTests(tests.MySQLConnectorTests):
@@ -79,59 +91,44 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
     """Tests globals and functions of the authentication module"""
 
     def test_get_auth_plugin(self):
-        self.assertRaises(mysql.connector.NotSupportedError,
-                          authentication.get_auth_plugin, 'spam')
+        self.assertRaises(
+            mysql.connector.NotSupportedError,
+            authentication.get_auth_plugin,
+            "spam",
+        )
 
-        self.assertRaises(mysql.connector.NotSupportedError,
-                          authentication.get_auth_plugin, '')
+        self.assertRaises(
+            mysql.connector.NotSupportedError,
+            authentication.get_auth_plugin,
+            "",
+        )
 
         # Test using standard plugins
+        plugin_list = []
         plugin_classes = {}
-        for name, obj in inspect.getmembers(authentication):
-            if inspect.isclass(obj) and hasattr(obj, 'plugin_name'):
-                if obj.plugin_name and name != "MySQLSSPIKerberosAuthPlugin":
-                    plugin_classes[obj.plugin_name] = obj
-        for plugin_name in _STANDARD_PLUGINS:
-            self.assertEqual(plugin_classes[plugin_name],
-                             authentication.get_auth_plugin(plugin_name),
-                             "Failed getting class for {0}".format(plugin_name))
+        for module in pkgutil.iter_modules(plugins.__path__):
+            deps = _PLUGINS_DEPENDENCIES.get(module.name)
+            if deps and not all(deps):
+                LOGGER.warning(
+                    f"{module.name} authentication plugin has missing dependencies"
+                )
+                continue
+            else:
+                plugin_list.append(module.name)
 
-
-class BaseAuthPluginTests(tests.MySQLConnectorTests):
-
-    """Tests authentication.BaseAuthPlugin"""
-
-    def test_class(self):
-        self.assertEqual('', authentication.BaseAuthPlugin.plugin_name)
-        self.assertEqual(False, authentication.BaseAuthPlugin.requires_ssl)
-
-    def test___init__(self):
-        base = authentication.BaseAuthPlugin('ham')
-        self.assertEqual('ham', base._auth_data)
-        self.assertEqual(None, base._username)
-        self.assertEqual(None, base._password)
-        self.assertEqual(None, base._database)
-        self.assertEqual(False, base._ssl_enabled)
-
-        base = authentication.BaseAuthPlugin(
-            'spam', username='ham', password='secret',
-            database='test', ssl_enabled=True)
-        self.assertEqual('spam', base._auth_data)
-        self.assertEqual('ham', base._username)
-        self.assertEqual('secret', base._password)
-        self.assertEqual('test', base._database)
-        self.assertEqual(True, base._ssl_enabled)
-
-    def test_prepare_password(self):
-        base = authentication.BaseAuthPlugin('ham')
-        self.assertRaises(NotImplementedError, base.prepare_password)
-
-    def test_auth_response(self):
-        base = authentication.BaseAuthPlugin('ham')
-        self.assertRaises(NotImplementedError, base.auth_response)
-
-        base.requires_ssl = True
-        self.assertRaises(mysql.connector.InterfaceError, base.auth_response)
+            plugin_module = importlib.import_module(
+                f"mysql.connector.plugins.{module.name}"
+            )
+            if hasattr(plugin_module, "AUTHENTICATION_PLUGIN_CLASS"):
+                plugin_classes[module.name] = getattr(
+                    plugin_module, plugin_module.AUTHENTICATION_PLUGIN_CLASS
+                )
+        for plugin_name in plugin_list:
+            self.assertEqual(
+                plugin_classes[plugin_name],
+                authentication.get_auth_plugin(plugin_name),
+                "Failed getting class for {0}".format(plugin_name),
+            )
 
 
 class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
@@ -139,36 +136,34 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLNativePasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLNativePasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin("mysql_native_password")
 
     def test_class(self):
-        self.assertEqual('mysql_native_password', self.plugin_class.plugin_name)
+        self.assertEqual("mysql_native_password", self.plugin_class.plugin_name)
         self.assertEqual(False, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
 
-        auth_plugin = self.plugin_class(None, password='spam')
-        self.assertRaises(mysql.connector.InterfaceError,
-                          auth_plugin.prepare_password)
+        auth_plugin = self.plugin_class(None, password="spam")
+        self.assertRaises(mysql.connector.InterfaceError, auth_plugin.prepare_password)
 
-        auth_plugin = self.plugin_class(123456, password='spam')  # too long
-        self.assertRaises(mysql.connector.InterfaceError,
-                          auth_plugin.prepare_password)
+        auth_plugin = self.plugin_class(123456, password="spam")  # too long
+        self.assertRaises(mysql.connector.InterfaceError, auth_plugin.prepare_password)
 
-        empty = b''
+        empty = b""
         auth_data = (
-            b'\x2d\x3e\x33\x25\x5b\x7d\x25\x3c\x40\x6b'
-            b'\x7b\x47\x30\x5b\x57\x25\x51\x48\x55\x53'
-            )
+            b"\x2d\x3e\x33\x25\x5b\x7d\x25\x3c\x40\x6b"
+            b"\x7b\x47\x30\x5b\x57\x25\x51\x48\x55\x53"
+        )
         auth_response = (
-            b'\x73\xb8\xf0\x4b\x3a\xa5\x7c\x46\xb9\x84'
-            b'\x90\x50\xab\xc0\x3a\x0f\x8f\xad\x51\xa3'
+            b"\x73\xb8\xf0\x4b\x3a\xa5\x7c\x46\xb9\x84"
+            b"\x90\x50\xab\xc0\x3a\x0f\x8f\xad\x51\xa3"
         )
 
-        auth_plugin = self.plugin_class('\x3f'*20, password=None)
+        auth_plugin = self.plugin_class("\x3f" * 20, password=None)
         self.assertEqual(empty, auth_plugin.prepare_password())
 
-        auth_plugin = self.plugin_class(auth_data, password='spam')
+        auth_plugin = self.plugin_class(auth_data, password="spam")
         self.assertEqual(auth_response, auth_plugin.prepare_password())
         self.assertEqual(auth_response, auth_plugin.auth_response())
 
@@ -178,15 +173,15 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLClearPasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLClearPasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin("mysql_clear_password")
 
     def test_class(self):
-        self.assertEqual('mysql_clear_password', self.plugin_class.plugin_name)
+        self.assertEqual("mysql_clear_password", self.plugin_class.plugin_name)
         self.assertEqual(True, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
-        exp = b'spam\x00'
-        auth_plugin = self.plugin_class(None, password='spam', ssl_enabled=True)
+        exp = b"spam\x00"
+        auth_plugin = self.plugin_class(None, password="spam", ssl_enabled=True)
         self.assertEqual(exp, auth_plugin.prepare_password())
         self.assertEqual(exp, auth_plugin.auth_response())
 
@@ -196,182 +191,102 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLSHA256PasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLSHA256PasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin("sha256_password")
 
     def test_class(self):
-        self.assertEqual('sha256_password', self.plugin_class.plugin_name)
+        self.assertEqual("sha256_password", self.plugin_class.plugin_name)
         self.assertEqual(True, self.plugin_class.requires_ssl)
 
     def test_prepare_password(self):
-        exp = b'spam\x00'
-        auth_plugin = self.plugin_class(None, password='spam', ssl_enabled=True)
+        exp = b"spam\x00"
+        auth_plugin = self.plugin_class(None, password="spam", ssl_enabled=True)
         self.assertEqual(exp, auth_plugin.prepare_password())
         self.assertEqual(exp, auth_plugin.auth_response())
 
 
+@unittest.skipIf(gssapi is None, "Module gssapi is required")
 class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
     """Tests authentication.MySQLLdapSaslPasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLLdapSaslPasswordAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin(
+            "authentication_ldap_sasl_client"
+        )
 
     def test_class(self):
-        self.assertEqual("authentication_ldap_sasl_client",
-                         self.plugin_class.plugin_name)
+        self.assertEqual(
+            "authentication_ldap_sasl_client", self.plugin_class.plugin_name
+        )
         self.assertEqual(False, self.plugin_class.requires_ssl)
 
     def test_auth_response(self):
         # Test unsupported mechanism error message
-        auth_data = b'UNKOWN-METHOD'
-        auth_plugin = self.plugin_class(auth_data, username="user",
-                                        password="spam")
+        auth_data = b"UNKOWN-METHOD"
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
         with self.assertRaises(InterfaceError) as context:
             auth_plugin.auth_response()
-        self.assertIn("sasl authentication method", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
-        self.assertIn("is not supported", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
-        with self.assertRaises(NotImplementedError) as context:
-            auth_plugin.prepare_password()
+        self.assertIn(
+            "sasl authentication method",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
+        self.assertIn(
+            "is not supported",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
 
         # Test SCRAM-SHA-1 mechanism is accepted
-        auth_data = b'SCRAM-SHA-1'
-
-        auth_plugin = self.plugin_class(auth_data, username="",
-                                        password="")
-
-        # Verify the format of the first message from client.
-        exp = b'n,a=,n=,r='
-        client_first_nsg = auth_plugin.auth_response()
-        self.assertTrue(client_first_nsg.startswith(exp),
-                        "got header: {}".format(auth_plugin.auth_response()))
-
-        auth_plugin = self.plugin_class(auth_data, username="user",
-                                        password="spam")
-
-        # Verify the length of the client's nonce in r=
-        cnonce = client_first_nsg[(len(b'n,a=,n=,r=')):]
-        r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
-
-        # Verify the format of the first message from client.
-        exp = b'n,a=user,n=user,r='
-        client_first_nsg = auth_plugin.auth_response()
-        self.assertTrue(client_first_nsg.startswith(exp),
-                        "got header: {}".format(auth_plugin.auth_response()))
-
-        # Verify the length of the client's nonce in r=
-        cnonce = client_first_nsg[(len(exp)):]
-        r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected cnonce legth {}, response {}"
-                         "".format(len(cnonce), client_first_nsg))
-
-        # Verify that a user name that requires character mapping is mapped
-        auth_plugin = self.plugin_class(auth_data, username=u"u\u1680ser",
-                                        password="spam")
-        exp = b'n,a=u ser,n=u ser,r='
-        client_first_nsg = auth_plugin.auth_response()
-        self.assertTrue(client_first_nsg.startswith(exp),
-                        "got header: {}".format(auth_plugin.auth_response()))
-
-        # Verify the length of the client's nonce in r=
-        cnonce = client_first_nsg[(len(exp)):]
-        r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
-
-        bad_responses = [None, "", "v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
-        for bad_res in bad_responses:
-            # verify an error is shown if server response is not as expected.
-            with self.assertRaises(InterfaceError) as context:
-                auth_plugin.auth_continue(bad_res)
-            self.assertIn("Unexpected server message", context.exception.msg,
-                          "not the expected: {}".format(context.exception.msg))
-
-        # verify an error is shown if server response is not well formated.
-        with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_continue(
-                bytearray("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54".encode()))
-        self.assertIn("Incomplete reponse", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
-
-        # verify an error is shown if server does not authenticate response.
-        with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_continue(
-                bytearray("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40".encode()))
-        self.assertIn("Unable to authenticate resp", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
-
-        bad_proofs = [None, "", b"5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
-        for bad_proof in bad_proofs:
-            # verify an error is shown if server proof is not well formated.
-            with self.assertRaises(InterfaceError) as context:
-                auth_plugin.auth_finalize(bad_proof)
-            self.assertIn("proof is not well formated.", context.exception.msg,
-                          "not the expected: {}".format(context.exception.msg))
-
-        # verify an error is shown it the server can not prove it self.
-        with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_finalize(
-                bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
-        self.assertIn("Unable to proof server identity", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
-
-    def test_auth_response256(self):
-        # Test unsupported mechanism error message
-        auth_data = b'UNKOWN-METHOD'
-        auth_plugin = self.plugin_class(auth_data, username="user",
-                                        password="spam")
-        with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_response()
-        self.assertIn('sasl authentication method "UNKOWN-METHOD"',
-                      context.exception.msg, "not the expected error {}"
-                      "".format(context.exception.msg))
-        self.assertIn("is not supported", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
-        with self.assertRaises(NotImplementedError) as context:
-            auth_plugin.prepare_password()
-
-        # Test SCRAM-SHA-256 mechanism is accepted
-        auth_data = b'SCRAM-SHA-256'
+        auth_data = b"SCRAM-SHA-1"
 
         auth_plugin = self.plugin_class(auth_data, username="", password="")
 
         # Verify the format of the first message from client.
-        exp = b'n,a=,n=,r='
+        exp = b"n,a=,n=,r="
         client_first_nsg = auth_plugin.auth_response()
-        self.assertTrue(client_first_nsg.startswith(exp),
-                        "got header: {}".format(auth_plugin.auth_response()))
+        self.assertTrue(
+            client_first_nsg.startswith(exp),
+            "got header: {}".format(auth_plugin.auth_response()),
+        )
 
-        auth_plugin = self.plugin_class(auth_data, username="user",
-                                        password="spam")
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
 
         # Verify the length of the client's nonce in r=
-        cnonce = client_first_nsg[(len(b'n,a=,n=,r=')):]
+        cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
         r_len = len(cnonce)
         self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
 
         # Verify the format of the first message from client.
-        exp = b'n,a=user,n=user,r='
+        exp = b"n,a=user,n=user,r="
         client_first_nsg = auth_plugin.auth_response()
-        self.assertTrue(client_first_nsg.startswith(exp),
-                        "got header: {}".format(auth_plugin.auth_response()))
+        self.assertTrue(
+            client_first_nsg.startswith(exp),
+            "got header: {}".format(auth_plugin.auth_response()),
+        )
 
         # Verify the length of the client's nonce in r=
-        cnonce = client_first_nsg[(len(exp)):]
+        cnonce = client_first_nsg[(len(exp)) :]
         r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected cnonce legth {}, response {}"
-                         "".format(len(cnonce), client_first_nsg))
+        self.assertEqual(
+            32,
+            r_len,
+            "Unexpected cnonce legth {}, response {}"
+            "".format(len(cnonce), client_first_nsg),
+        )
 
         # Verify that a user name that requires character mapping is mapped
-        auth_plugin = self.plugin_class(auth_data, username=u"u\u1680ser",
-                                        password="spam")
-        exp = b'n,a=u ser,n=u ser,r='
+        auth_plugin = self.plugin_class(
+            auth_data, username="u\u1680ser", password="spam"
+        )
+        exp = b"n,a=u ser,n=u ser,r="
         client_first_nsg = auth_plugin.auth_response()
-        self.assertTrue(client_first_nsg.startswith(exp),
-                        "got header: {}".format(auth_plugin.auth_response()))
+        self.assertTrue(
+            client_first_nsg.startswith(exp),
+            "got header: {}".format(auth_plugin.auth_response()),
+        )
 
         # Verify the length of the client's nonce in r=
-        cnonce = client_first_nsg[(len(exp)):]
+        cnonce = client_first_nsg[(len(exp)) :]
         r_len = len(cnonce)
         self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
 
@@ -380,47 +295,183 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             # verify an error is shown if server response is not as expected.
             with self.assertRaises(InterfaceError) as context:
                 auth_plugin.auth_continue(bad_res)
-            self.assertIn("Unexpected server message", context.exception.msg,
-                          "not the expected: {}".format(context.exception.msg))
+            self.assertIn(
+                "Unexpected server message",
+                context.exception.msg,
+                "not the expected: {}".format(context.exception.msg),
+            )
 
         # verify an error is shown if server response is not well formated.
         with self.assertRaises(InterfaceError) as context:
             auth_plugin.auth_continue(
-                bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54"))
-        self.assertIn("Incomplete reponse", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
+                bytearray("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54".encode())
+            )
+        self.assertIn(
+            "Incomplete reponse",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
 
         # verify an error is shown if server does not authenticate response.
         with self.assertRaises(InterfaceError) as context:
             auth_plugin.auth_continue(
-                bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40"))
-        self.assertIn("Unable to authenticate resp", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
+                bytearray("r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40".encode())
+            )
+        self.assertIn(
+            "Unable to authenticate resp",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
 
         bad_proofs = [None, "", b"5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
         for bad_proof in bad_proofs:
             # verify an error is shown if server proof is not well formated.
             with self.assertRaises(InterfaceError) as context:
                 auth_plugin.auth_finalize(bad_proof)
-            self.assertIn("proof is not well formated.", context.exception.msg,
-                          "not the expected: {}".format(context.exception.msg))
+            self.assertIn(
+                "proof is not well formated",
+                context.exception.msg,
+                "not the expected: {}".format(context.exception.msg),
+            )
 
         # verify an error is shown it the server can not prove it self.
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_finalize(
-                bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
-        self.assertIn("Unable to proof server identity", context.exception.msg,
-                      "not the expected error {}".format(context.exception.msg))
+            auth_plugin.auth_finalize(bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
+        self.assertIn(
+            "Unable to proof server identity",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
+
+    def test_auth_response256(self):
+        # Test unsupported mechanism error message
+        auth_data = b"UNKOWN-METHOD"
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_response()
+        self.assertIn(
+            'sasl authentication method "UNKOWN-METHOD"',
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
+        self.assertIn(
+            "is not supported",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
+
+        # Test SCRAM-SHA-256 mechanism is accepted
+        auth_data = b"SCRAM-SHA-256"
+
+        auth_plugin = self.plugin_class(auth_data, username="", password="")
+
+        # Verify the format of the first message from client.
+        exp = b"n,a=,n=,r="
+        client_first_nsg = auth_plugin.auth_response()
+        self.assertTrue(
+            client_first_nsg.startswith(exp),
+            "got header: {}".format(auth_plugin.auth_response()),
+        )
+
+        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
+
+        # Verify the length of the client's nonce in r=
+        cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
+        r_len = len(cnonce)
+        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+
+        # Verify the format of the first message from client.
+        exp = b"n,a=user,n=user,r="
+        client_first_nsg = auth_plugin.auth_response()
+        self.assertTrue(
+            client_first_nsg.startswith(exp),
+            "got header: {}".format(auth_plugin.auth_response()),
+        )
+
+        # Verify the length of the client's nonce in r=
+        cnonce = client_first_nsg[(len(exp)) :]
+        r_len = len(cnonce)
+        self.assertEqual(
+            32,
+            r_len,
+            "Unexpected cnonce legth {}, response {}"
+            "".format(len(cnonce), client_first_nsg),
+        )
+
+        # Verify that a user name that requires character mapping is mapped
+        auth_plugin = self.plugin_class(
+            auth_data, username="u\u1680ser", password="spam"
+        )
+        exp = b"n,a=u ser,n=u ser,r="
+        client_first_nsg = auth_plugin.auth_response()
+        self.assertTrue(
+            client_first_nsg.startswith(exp),
+            "got header: {}".format(auth_plugin.auth_response()),
+        )
+
+        # Verify the length of the client's nonce in r=
+        cnonce = client_first_nsg[(len(exp)) :]
+        r_len = len(cnonce)
+        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+
+        bad_responses = [None, "", "v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
+        for bad_res in bad_responses:
+            # verify an error is shown if server response is not as expected.
+            with self.assertRaises(InterfaceError) as context:
+                auth_plugin.auth_continue(bad_res)
+            self.assertIn(
+                "Unexpected server message",
+                context.exception.msg,
+                "not the expected: {}".format(context.exception.msg),
+            )
+
+        # verify an error is shown if server response is not well formated.
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_continue(bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,w54"))
+        self.assertIn(
+            "Incomplete reponse",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
+
+        # verify an error is shown if server does not authenticate response.
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_continue(bytearray(b"r=/ZT33fXoR/BZT,s=IApa7ZwqQ/ZT,i=40"))
+        self.assertIn(
+            "Unable to authenticate resp",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
+
+        bad_proofs = [None, "", b"5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
+        for bad_proof in bad_proofs:
+            # verify an error is shown if server proof is not well formated.
+            with self.assertRaises(InterfaceError) as context:
+                auth_plugin.auth_finalize(bad_proof)
+            self.assertIn(
+                "proof is not well formated",
+                context.exception.msg,
+                "not the expected: {}".format(context.exception.msg),
+            )
+
+        # verify an error is shown it the server can not prove it self.
+        with self.assertRaises(InterfaceError) as context:
+            auth_plugin.auth_finalize(bytearray(b"v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM="))
+        self.assertIn(
+            "Unable to proof server identity",
+            context.exception.msg,
+            "not the expected error {}".format(context.exception.msg),
+        )
 
 
 @unittest.skipIf(
     os.getenv("TEST_AUTHENTICATION_KERBEROS") is None,
-    "Run tests only if the plugin is configured"
+    "Run tests only if the plugin is configured",
 )
 @unittest.skipIf(os.name == "nt", "Tests not available for Windows")
 @unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 24),
-    "Authentication with Kerberos not supported"
+    "Authentication with Kerberos not supported",
 )
 class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     """Test authentication.MySQLKerberosAuthPlugin.
@@ -444,7 +495,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             config_vars=(
                 (
                     "authentication_kerberos_service_principal",
-                    "mysql_service/kerberos_auth_host@MYSQL.LOCAL"
+                    "mysql_service/kerberos_auth_host@MYSQL.LOCAL",
                 ),
                 (
                     "authentication_kerberos_service_key_tab",
@@ -494,13 +545,11 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             cnx.cmd_query("FLUSH PRIVILEGES")
 
     def setUp(self):
-        self.plugin_class = authentication.MySQLKerberosAuthPlugin
+        self.plugin_class = authentication.get_auth_plugin("MySQLKerberosAuthPlugin")
         if self.skip_reason is not None:
             self.skipTest(self.skip_reason)
 
-    def _get_kerberos_tgt(
-        self, user=None, password=None, realm=None, expired=False
-    ):
+    def _get_kerberos_tgt(self, user=None, password=None, realm=None, expired=False):
         """Obtain and cache Kerberos ticket-granting ticket.
 
         Call `kinit` with a specified user and password for obtaining and
@@ -517,7 +566,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             cmd,
             stdin=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            stdout=subprocess.DEVNULL
+            stdout=subprocess.DEVNULL,
         )
         _, err = proc.communicate(password.encode("utf-8"))
 
@@ -545,7 +594,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
                     ProgrammingError,
                 ),
                 conn_class,
-                **config
+                **config,
             )
             return
 
@@ -601,8 +650,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     def test_class(self):
         self.assertEqual(
-            "authentication_kerberos_client",
-            self.plugin_class.plugin_name
+            "authentication_kerberos_client", self.plugin_class.plugin_name
         )
         self.assertEqual(False, self.plugin_class.requires_ssl)
 
@@ -938,7 +986,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     @unittest.skipIf(
         getpass.getuser() != "test1",
-        "Test only available for system user 'test1'"
+        "Test only available for system user 'test1'",
     )
     @tests.foreach_cnx()
     def test_nocache_nouser(self):
@@ -955,7 +1003,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
 @unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 28),
-    "Multi Factor Authentication not supported"
+    "Multi Factor Authentication not supported",
 )
 class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
     """Test Multi Factor Authentication.
@@ -1004,9 +1052,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                     """
                 )
             except DatabaseError:
-                cls.skip_reason = (
-                    "Plugin cleartext_plugin_server not available"
-                )
+                cls.skip_reason = "Plugin cleartext_plugin_server not available"
                 return
             cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_1f}'")
             cnx.cmd_query(f"DROP USER IF EXISTS '{cls.user_2f}'")
@@ -1072,7 +1118,9 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                 config["password3"] = self.password3 if perm[3] else "invalid"
             LOGGER.debug(
                 "Test connection with user '%s' using '%s'. (Expected %s)",
-                user, perm, "SUCCESS" if valid else "FAIL",
+                user,
+                perm,
+                "SUCCESS" if valid else "FAIL",
             )
             if valid:
                 with cls(**config) as cnx:
@@ -1107,7 +1155,9 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                     kwargs["password3"] = self.password3 if perm[3] else "invalid"
                 LOGGER.debug(
                     "Test change user to '%s' using '%s'. (Expected %s)",
-                    user, perm, "SUCCESS" if valid else "FAIL",
+                    user,
+                    perm,
+                    "SUCCESS" if valid else "FAIL",
                 )
                 # Change user to the provided user
                 if valid:
@@ -1127,9 +1177,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
         """Test connection 'user_1f' password permutations."""
         permutations = []
         for perm in itertools.product([True, False, None], repeat=4):
-            permutations.append(
-                (perm, perm[1] or (perm[0] and perm[1] is None))
-            )
+            permutations.append((perm, perm[1] or (perm[0] and perm[1] is None)))
         self._test_connection(self.cnx.__class__, permutations, self.user_1f)
 
     @tests.foreach_cnx()
@@ -1140,10 +1188,7 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
             permutations.append(
                 (
                     perm,
-                    perm[2] and
-                    (
-                        (perm[0] and perm[1] is not False) or perm[1]
-                    ),
+                    perm[2] and ((perm[0] and perm[1] is not False) or perm[1]),
                 )
             )
         self._test_connection(self.cnx.__class__, permutations, self.user_2f)
@@ -1158,10 +1203,9 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
             permutations.append(
                 (
                     perm,
-                    perm[2] and perm[3] and
-                    (
-                        (perm[0] and perm[1] is not False) or perm[1]
-                    ),
+                    perm[2]
+                    and perm[3]
+                    and ((perm[0] and perm[1] is not False) or perm[1]),
                 )
             )
         self._test_connection(self.cnx.__class__, permutations, self.user_3f)
@@ -1171,30 +1215,10 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
 
 @unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 27),
-    "Authentication with OCI IAM not supported"
+    "Authentication with OCI IAM not supported",
 )
-class MySQLIAMAuthPluginTests(tests.MySQLConnectorTests):
-    """Test authentication.MySQLKerberosAuthPlugin.
-
-    Implemented by WL#14710: Support for OCI IAM authentication.
-    """
-
-    @unittest.skipIf(oci, "Not testing with OCI is installed")
-    def test_OCI_SDK_not_installed_error(self):
-        # verify an error is raised due to missing OCI SDK
-        plugin_name = "authentication_oci_client"
-        auth_plugin_class = authentication.get_auth_plugin(plugin_name)
-        auth_plugin = auth_plugin_class("spam_auth_data")
-        self.assertIsInstance(auth_plugin, authentication.MySQL_OCI_AuthPlugin)
-        self.assertRaises(
-            ProgrammingError,
-            auth_plugin.auth_response
-        )
-
-
 @unittest.skipIf(
-    tests.MYSQL_VERSION < (8, 0, 29),
-    "Authentication with FIDO not supported"
+    tests.MYSQL_VERSION < (8, 0, 29), "Authentication with FIDO not supported"
 )
 @unittest.skipUnless(HAVE_CMYSQL, "C Extension not available")
 class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
@@ -1206,6 +1230,7 @@ class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
     @tests.foreach_cnx(CMySQLConnection)
     def test_invalid_fido_callback(self):
         """Test invalid 'fido_callback' option."""
+
         def my_callback():
             ...
 

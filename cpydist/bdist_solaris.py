@@ -1,4 +1,4 @@
-# Copyright (c) 2019, Oracle and/or its affiliates.
+# Copyright (c) 2019, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -41,9 +41,8 @@ from distutils.command.bdist import bdist
 from distutils.errors import DistutilsExecError
 from distutils.file_util import copy_file
 
-from . import BaseCommand, COMMON_USER_OPTIONS, VERSION_EXTRA, VERSION_TEXT
-from .utils import write_info_src, write_info_bin
-
+from . import COMMON_USER_OPTIONS, VERSION_EXTRA, VERSION_TEXT, BaseCommand
+from .utils import write_info_bin, write_info_src
 
 SOLARIS_PKGS = {"pure": os.path.join("cpydist", "data", "solaris")}
 PKGINFO = (
@@ -69,19 +68,29 @@ class DistSolaris(bdist, BaseCommand):
     platf_a = "sparc" if platform.processor() == "sparc" else "x86"
     description = "create a Solaris distribution"
     user_options = COMMON_USER_OPTIONS + [
-        ("dist-dir=", "d",
-         "directory to put final built distributions in"),
-        ("platform=", "p",
-         "name of the platform in resulting file "
-         "(default '{0}')".format(platf_n)),
-        ("platform-version=", "v",
-         "version of the platform in resulting file "
-         "(default '{0}')".format(platf_v)),
-        ("platform-version=", "a",
-         "architecture, i.e. 'sparc' or 'x86' in the resulting file "
-         "(default '{0}')".format(platf_a)),
-        ('trans', "t",
-         "transform the package into data stream (default 'False')"),
+        ("dist-dir=", "d", "directory to put final built distributions in"),
+        (
+            "platform=",
+            "p",
+            "name of the platform in resulting file (default '{0}')".format(platf_n),
+        ),
+        (
+            "platform-version=",
+            "v",
+            "version of the platform in resulting file "
+            "(default '{0}')".format(platf_v),
+        ),
+        (
+            "platform-version=",
+            "a",
+            "architecture, i.e. 'sparc' or 'x86' in the resulting file "
+            "(default '{0}')".format(platf_a),
+        ),
+        (
+            "trans",
+            "t",
+            "transform the package into data stream (default 'False')",
+        ),
     ]
 
     def initialize_options(self):
@@ -90,8 +99,7 @@ class DistSolaris(bdist, BaseCommand):
         BaseCommand.initialize_options(self)
         self.name = self.distribution.get_name()
         self.version = self.distribution.get_version()
-        self.version_extra = "-{0}".format(VERSION_EXTRA) \
-                             if VERSION_EXTRA else ""
+        self.version_extra = "-{0}".format(VERSION_EXTRA) if VERSION_EXTRA else ""
         self.keep_temp = None
         self.create_dmg = False
         self.dist_dir = None
@@ -100,8 +108,9 @@ class DistSolaris(bdist, BaseCommand):
         self.platform_version = self.platf_v
         self.architecture = self.platf_a
         self.debug = False
-        self.sun_pkg_name = "{0}-{1}{2}.pkg".format(self.name, self.version,
-                                                    self.version_extra)
+        self.sun_pkg_name = "{0}-{1}{2}.pkg".format(
+            self.name, self.version, self.version_extra
+        )
         self.dstroot = "dstroot"
         self.sign = False
         self.identity = "MySQL Connector/Python"
@@ -138,8 +147,10 @@ class DistSolaris(bdist, BaseCommand):
         # No special folder for GPL or commercial. Files inside the directory
         # will determine what it is.
         data_path = os.path.join(
-            sun_path, "usr", "share",
-            template_name.format(self.name, self.version)
+            sun_path,
+            "usr",
+            "share",
+            template_name.format(self.name, self.version),
         )
         self.mkpath(data_path)
 
@@ -147,37 +158,57 @@ class DistSolaris(bdist, BaseCommand):
         sun_pkg_info = os.path.join(sun_path, "pkginfo")
         self.log.info("sun_pkg_info path: {0}".format(sun_pkg_info))
         with open(sun_pkg_info, "w") as f_pkg_info:
-            f_pkg_info.write(PKGINFO.format(ver=self.version, lic=lic,
-                                            pkg=self.name,
-                                            tstamp=time.ctime()))
+            f_pkg_info.write(
+                PKGINFO.format(
+                    ver=self.version,
+                    lic=lic,
+                    pkg=self.name,
+                    tstamp=time.ctime(),
+                )
+            )
             f_pkg_info.close()
 
         data_path = os.path.join(
-            sun_path, "usr", "share",
-            template_name.format(self.name, self.version)
+            sun_path,
+            "usr",
+            "share",
+            template_name.format(self.name, self.version),
         )
         copy_file_src_dst += [
-            (os.path.join(cwd, "README.txt"),
-             os.path.join(data_path, "README.txt")),
-            (os.path.join(cwd, "LICENSE.txt"),
-             os.path.join(data_path, "LICENSE.txt")),
-            (os.path.join(cwd, "CHANGES.txt"),
-             os.path.join(data_path, "CHANGES.txt")),
-            (os.path.join(cwd, "docs", "INFO_SRC"),
-             os.path.join(data_path, "INFO_SRC")),
-            (os.path.join(cwd, "docs", "INFO_BIN"),
-             os.path.join(data_path, "INFO_BIN")),
-            (os.path.join(cwd, "README.rst"),
-             os.path.join(data_path, "README.rst")),
-            (os.path.join(cwd, "CONTRIBUTING.rst"),
-             os.path.join(data_path, "CONTRIBUTING.rst")),
+            (
+                os.path.join(cwd, "README.txt"),
+                os.path.join(data_path, "README.txt"),
+            ),
+            (
+                os.path.join(cwd, "LICENSE.txt"),
+                os.path.join(data_path, "LICENSE.txt"),
+            ),
+            (
+                os.path.join(cwd, "CHANGES.txt"),
+                os.path.join(data_path, "CHANGES.txt"),
+            ),
+            (
+                os.path.join(cwd, "docs", "INFO_SRC"),
+                os.path.join(data_path, "INFO_SRC"),
+            ),
+            (
+                os.path.join(cwd, "docs", "INFO_BIN"),
+                os.path.join(data_path, "INFO_BIN"),
+            ),
+            (
+                os.path.join(cwd, "README.rst"),
+                os.path.join(data_path, "README.rst"),
+            ),
+            (
+                os.path.join(cwd, "CONTRIBUTING.rst"),
+                os.path.join(data_path, "CONTRIBUTING.rst"),
+            ),
         ]
 
         for src, dst in copy_file_src_dst:
             copy_file(src, dst)
 
-    def _create_pkg(self, template_name, dmg=False, sign=False, root="",
-                    identity=""):
+    def _create_pkg(self, template_name, dmg=False, sign=False, root="", identity=""):
         """Create the Solaris package using the OS dependent commands."""
         self.log.info("-> _create_pkg()")
         self.log.info("template_name: {}".format(template_name))
@@ -197,21 +228,21 @@ class DistSolaris(bdist, BaseCommand):
 
         # Creating a Prototype file, this contains a table of contents of the
         # Package, that is suitable to be used for the package creation tool.
-        self.log.info("Creating Prototype file on {} to describe files to "
-                      "install".format(self.dstroot))
+        self.log.info(
+            "Creating Prototype file on {} to describe files to "
+            "install".format(self.dstroot)
+        )
 
         prototype_path = "Prototype"
         proto_tmp = "Prototype_temp"
 
         with open(proto_tmp, "w") as f_out:
             cmd = ["pkgproto", "."]
-            pkgp_p = subprocess.Popen(cmd, shell=False, stdout=f_out,
-                                      stderr=f_out)
+            pkgp_p = subprocess.Popen(cmd, shell=False, stdout=f_out, stderr=f_out)
             res = pkgp_p.wait()
             if res != 0:
                 self.log.error("pkgproto command failed with: {}".format(res))
-                raise DistutilsExecError("pkgproto command failed with: {}"
-                                         "".format(res))
+                raise DistutilsExecError("pkgproto command failed with: {}".format(res))
             f_out.flush()
 
         # log Prototype contents
@@ -254,8 +285,7 @@ class DistSolaris(bdist, BaseCommand):
         self.log.info("Creating package with pkgmk")
 
         self.log.info("Root directory for pkgmk: {}".format(os.getcwd()))
-        self.spawn(["pkgmk", "-o", "-r", ".", "-d", "../", "-f",
-                    prototype_path])
+        self.spawn(["pkgmk", "-o", "-r", ".", "-d", "../", "-f", prototype_path])
         os.chdir("../")
         if self.debug:
             self.log.info("current directory: {}".format(os.getcwd()))
@@ -266,31 +296,33 @@ class DistSolaris(bdist, BaseCommand):
         make_tarball(self.sun_pkg_name, self.name, compress="gzip")
 
         if self.trans:
-            self.log.info("Transforming package into data stream with "
-                          "pkgtrans")
+            self.log.info("Transforming package into data stream with pkgtrans")
             self.log.info("Current directory: {}".format(os.getcwd()))
-            self.spawn([
-                "pkgtrans",
-                "-s",
-                os.getcwd(),
-                os.path.join(os.getcwd(), self.sun_pkg_name),
-                self.name
-            ])
+            self.spawn(
+                [
+                    "pkgtrans",
+                    "-s",
+                    os.getcwd(),
+                    os.path.join(os.getcwd(), self.sun_pkg_name),
+                    self.name,
+                ]
+            )
 
         for base, _, files in os.walk(os.getcwd()):
             for filename in files:
                 if filename.endswith(".gz") or filename.endswith(".pkg"):
                     new_name = filename.replace(
                         "{}".format(self.version),
-                        "{}{}{}{}-{}".format(self.version,
-                                             self.version_extra,
-                                             self.platform,
-                                             self.platform_version,
-                                             self.architecture)
+                        "{}{}{}{}-{}".format(
+                            self.version,
+                            self.version_extra,
+                            self.platform,
+                            self.platform_version,
+                            self.architecture,
+                        ),
                     )
                     file_path = os.path.join(base, filename)
-                    file_dest = os.path.join(self.started_dir,
-                                             self.dist_dir, new_name)
+                    file_dest = os.path.join(self.started_dir, self.dist_dir, new_name)
                     copy_file(file_path, file_dest)
             break
 
@@ -309,8 +341,7 @@ class DistSolaris(bdist, BaseCommand):
 
         data_dir = SOLARIS_PKGS["pure"]
         sun_root = os.path.join(build_base, "sun_pure")
-        cmd_install = self.reinitialize_command("install",
-                                                reinit_subcommands=1)
+        cmd_install = self.reinitialize_command("install", reinit_subcommands=1)
         cmd_install.byte_code_only = self.byte_code_only
         cmd_install.compile = self.byte_code_only
         cmd_install.distribution.metadata.name = metadata_name
@@ -325,11 +356,13 @@ class DistSolaris(bdist, BaseCommand):
         template_name.append("-{}")
 
         self._prepare_pkg_base("".join(template_name), data_dir, root=sun_root)
-        self._create_pkg("".join(template_name),
-                         dmg=self.create_dmg,
-                         root=sun_root,
-                         sign=self.sign,
-                         identity=self.identity)
+        self._create_pkg(
+            "".join(template_name),
+            dmg=self.create_dmg,
+            root=sun_root,
+            sign=self.sign,
+            identity=self.identity,
+        )
 
         os.chdir(self.started_dir)
 

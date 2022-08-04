@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,16 +26,31 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-from django.db.backends.mysql.schema import DatabaseSchemaEditor as MySQLDatabaseSchemaEditor
+"""Database schema editor."""
+
+from django.db.backends.mysql.schema import (
+    DatabaseSchemaEditor as MySQLDatabaseSchemaEditor,
+)
 
 
 class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
+    """This class is responsible for emitting schema-changing statements to the
+    databases.
+    """
 
     def quote_value(self, value):
+        """Quote value."""
         self.connection.ensure_connection()
         if isinstance(value, str):
-            value = value.replace('%', '%%')
+            value = value.replace("%", "%%")
         quoted = self.connection.connection.converter.escape(value)
         if isinstance(value, str) and isinstance(quoted, bytes):
             quoted = quoted.decode()
         return quoted
+
+    def prepare_default(self, value):
+        """Implement the required abstract method.
+
+        MySQL has requires_literal_defaults=False, therefore return the value.
+        """
+        return value

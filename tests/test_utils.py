@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,6 +32,7 @@
 import struct
 
 import tests
+
 from mysql.connector import utils
 
 
@@ -44,25 +45,26 @@ class UtilsTests(tests.MySQLConnectorTests):
 
     def _check_int_result(self, result, exp, data):
         if not isinstance(result, bytearray):
-            self.fail("Wrong result. Expected {0}, we got {1}".format(
-                     (type(exp), type(result))))
+            self.fail(
+                "Wrong result. Expected {0}, we got {1}".format(
+                    (type(exp), type(result))
+                )
+            )
         elif exp != result:
-            self.fail("Wrong result. Expected {0}, we got {1}".format(
-                     (data, result)))
+            self.fail("Wrong result. Expected {0}, we got {1}".format((data, result)))
 
     def test_intread(self):
         """Use intread to read from valid strings."""
         try:
             for i in range(4):
-                utils.intread(bytearray(b'a') * (i + 1))
+                utils.intread(bytearray(b"a") * (i + 1))
         except ValueError as err:
-            self.fail("intread failed calling 'int{0}read: {1}".format(
-                     int(i) + 1, err))
+            self.fail("intread failed calling 'int{0}read: {1}".format(int(i) + 1, err))
 
     def test_int1store(self):
         """Use int1store to pack an integer (2^8) as a string."""
         data = 2 ** (8 - 1)
-        exp = struct.pack('<B', data)
+        exp = struct.pack("<B", data)
 
         try:
             result = utils.int1store(data)
@@ -74,7 +76,7 @@ class UtilsTests(tests.MySQLConnectorTests):
     def test_int2store(self):
         """Use int2store to pack an integer (2^16) as a string."""
         data = 2 ** (16 - 1)
-        exp = struct.pack('<H', data)
+        exp = struct.pack("<H", data)
 
         try:
             result = utils.int2store(data)
@@ -86,7 +88,7 @@ class UtilsTests(tests.MySQLConnectorTests):
     def test_int3store(self):
         """Use int3store to pack an integer (2^24) as a string."""
         data = 2 ** (24 - 1)
-        exp = struct.pack('<I', data)[0:3]
+        exp = struct.pack("<I", data)[0:3]
 
         try:
             result = utils.int3store(data)
@@ -98,7 +100,7 @@ class UtilsTests(tests.MySQLConnectorTests):
     def test_int4store(self):
         """Use int4store to pack an integer (2^32) as a string."""
         data = 2 ** (32 - 1)
-        exp = struct.pack('<I', data)
+        exp = struct.pack("<I", data)
 
         try:
             result = utils.int4store(data)
@@ -110,7 +112,7 @@ class UtilsTests(tests.MySQLConnectorTests):
     def test_int8store(self):
         """Use int8store to pack an integer (2^64) as a string."""
         data = 2 ** (64 - 1)
-        exp = struct.pack('<Q', data)
+        exp = struct.pack("<Q", data)
 
         try:
             result = utils.int8store(data)
@@ -129,13 +131,12 @@ class UtilsTests(tests.MySQLConnectorTests):
             self.fail("intstore failed with 'int{0}store: {1}".format(i, err))
 
     def test_lc_int(self):
-        prefix = (b'', b'\xfc', b'\xfd', b'\xfe')
+        prefix = (b"", b"\xfc", b"\xfd", b"\xfe")
         intstore = (1, 2, 3, 8)
         try:
-            for i, j in enumerate((128, 251, 2**24-1, 2**64-1)):
+            for i, j in enumerate((128, 251, 2**24 - 1, 2**64 - 1)):
                 lenenc = utils.lc_int(j)
-                exp = prefix[i] + \
-                    getattr(utils, 'int{0}store'.format(intstore[i]))(j)
+                exp = prefix[i] + getattr(utils, "int{0}store".format(intstore[i]))(j)
                 self.assertEqual(exp, lenenc)
         except ValueError as err:
             self.fail("length_encoded_int failed for size {0}".format(j, err))
@@ -153,8 +154,10 @@ class UtilsTests(tests.MySQLConnectorTests):
             self.fail("Failed reading bytes using read_bytes.")
         else:
             if result != exp or len(result) != expsize:
-                self.fail("Wrong result. Expected: '%s' / %d, got '%s'/%d" %
-                         (exp, expsize, result, len(result)))
+                self.fail(
+                    "Wrong result. Expected: '%s' / %d, got '%s'/%d"
+                    % (exp, expsize, result, len(result))
+                )
 
     def test_read_lc_string_1(self):
         """Read a length code string from a buffer ( <= 250 bytes)"""
@@ -164,46 +167,50 @@ class UtilsTests(tests.MySQLConnectorTests):
 
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
-            self.fail("Wrong result. Expected '{0}', got '{1}'".format(
-                expsize, len(result)))
+            self.fail(
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
+            )
 
     def test_read_lc_string_2(self):
         """Read a length code string from a buffer ( <= 2^16 bytes)"""
         exp = bytearray(b"a" * 2 ** (16 - 1))
         expsize = len(exp)
-        lcs = bytearray(b'\xfc') + utils.int2store(expsize) + exp
+        lcs = bytearray(b"\xfc") + utils.int2store(expsize) + exp
 
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
-            self.fail("Wrong result. Expected '{0}', got '{1}'".format(
-                expsize, len(result)))
+            self.fail(
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
+            )
 
     def test_read_lc_string_3(self):
         """Read a length code string from a buffer ( <= 2^24 bytes)"""
         exp = bytearray(b"a" * 2 ** (24 - 1))
         expsize = len(exp)
-        lcs = bytearray(b'\xfd') + utils.int3store(expsize) + exp
+        lcs = bytearray(b"\xfd") + utils.int3store(expsize) + exp
 
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
-            self.fail("Wrong result. Expected '{0}', got '{1}'".format(
-                expsize, len(result)))
+            self.fail(
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
+            )
 
     def test_read_lc_string_8(self):
         """Read a length code string from a buffer ( <= 2^64 bytes)"""
-        exp = bytearray(b"a" * 2 ** 24)
+        exp = bytearray(b"a" * 2**24)
         expsize = len(exp)
-        lcs = bytearray(b'\xfe') + utils.int8store(expsize) + exp
+        lcs = bytearray(b"\xfe") + utils.int8store(expsize) + exp
 
         (_, result) = utils.read_lc_string(lcs)
         if result != exp or len(result) != expsize:
-            self.fail("Wrong result. Expected '{0}', got '{1}'".format(
-                expsize, len(result)))
+            self.fail(
+                "Wrong result. Expected '{0}', got '{1}'".format(expsize, len(result))
+            )
 
     def test_read_lc_string_5(self):
         """Read a length code string from a buffer which is 'NULL'"""
-        exp = bytearray(b'abc')
-        lcs = bytearray(b'\xfb') + exp
+        exp = bytearray(b"abc")
+        lcs = bytearray(b"\xfb") + exp
 
         (rest, result) = utils.read_lc_string(lcs)
         if result != None or rest != exp:
@@ -211,10 +218,10 @@ class UtilsTests(tests.MySQLConnectorTests):
 
     def test_read_string_1(self):
         """Read a string from a buffer up until a certain character."""
-        buf = bytearray(b'abcdef\x00ghijklm')
-        exp = bytearray(b'abcdef')
-        exprest = bytearray(b'ghijklm')
-        end = bytearray(b'\x00')
+        buf = bytearray(b"abcdef\x00ghijklm")
+        exp = bytearray(b"abcdef")
+        exprest = bytearray(b"ghijklm")
+        end = bytearray(b"\x00")
 
         (rest, result) = utils.read_string(buf, end=end)
         self.assertEqual(exp, result)
@@ -222,9 +229,9 @@ class UtilsTests(tests.MySQLConnectorTests):
 
     def test_read_string_2(self):
         """Read a string from a buffer up until a certain size."""
-        buf = bytearray(b'abcdefghijklm')
-        exp = bytearray(b'abcdef')
-        exprest = bytearray(b'ghijklm')
+        buf = bytearray(b"abcdefghijklm")
+        exp = bytearray(b"abcdef")
+        exprest = bytearray(b"ghijklm")
         size = 6
 
         (rest, result) = utils.read_string(buf, size=size)
@@ -233,7 +240,7 @@ class UtilsTests(tests.MySQLConnectorTests):
 
     def test_read_int(self):
         """Read an integer from a buffer."""
-        buf = bytearray(b'34581adbkdasdf')
+        buf = bytearray(b"34581adbkdasdf")
 
         self.assertEqual(51, utils.read_int(buf, 1)[1])
         self.assertEqual(13363, utils.read_int(buf, 2)[1])
@@ -245,57 +252,78 @@ class UtilsTests(tests.MySQLConnectorTests):
         """Read a length encoded integer from a buffer."""
         exp = 2 ** (8 - 1)
         lcs = utils.intstore(exp)
-        self.assertEqual(exp, utils.read_lc_int(lcs)[1],
-                         "Failed getting length coded int(250)")
+        self.assertEqual(
+            exp,
+            utils.read_lc_int(lcs)[1],
+            "Failed getting length coded int(250)",
+        )
 
         exp = 2 ** (8 - 1)
         lcs = utils.intstore(251) + utils.intstore(exp)
-        self.assertEqual(None, utils.read_lc_int(lcs)[1],
-                         "Failed getting length coded int(250)")
+        self.assertEqual(
+            None,
+            utils.read_lc_int(lcs)[1],
+            "Failed getting length coded int(250)",
+        )
 
         exp = 2 ** (16 - 1)
         lcs = utils.intstore(252) + utils.intstore(exp)
-        self.assertEqual(exp, utils.read_lc_int(lcs)[1],
-                         "Failed getting length coded int(2^16-1)")
+        self.assertEqual(
+            exp,
+            utils.read_lc_int(lcs)[1],
+            "Failed getting length coded int(2^16-1)",
+        )
 
         exp = 2 ** (24 - 1)
         lcs = utils.intstore(253) + utils.intstore(exp)
-        self.assertEqual(exp, utils.read_lc_int(lcs)[1],
-                         "Failed getting length coded int(2^24-1)")
+        self.assertEqual(
+            exp,
+            utils.read_lc_int(lcs)[1],
+            "Failed getting length coded int(2^24-1)",
+        )
 
         exp = 12321848580485677055
-        lcs = bytearray(b'\xfe\xff\xff\xff\xff\xff\xff\xff\xaa\xdd\xdd')
-        exprest = bytearray(b'\xdd\xdd')
-        self.assertEqual((exprest, exp), utils.read_lc_int(lcs),
-                         "Failed getting length coded long long")
+        lcs = bytearray(b"\xfe\xff\xff\xff\xff\xff\xff\xff\xaa\xdd\xdd")
+        exprest = bytearray(b"\xdd\xdd")
+        self.assertEqual(
+            (exprest, exp),
+            utils.read_lc_int(lcs),
+            "Failed getting length coded long long",
+        )
 
     def test_normalize_unicode_string(self):
         """Test normalize an unicode string"""
         # Test cases    Input    Output    Comments
         test_cases = [
-            (u"I\u00ADX", u"IX", "SOFT HYPHEN mapped to nothing"),
-            (u"user", u"user", "no transformation"),
-            (u"USER", u"USER", "case preserved, will not match #2"),
-            (u"\u00AA", u"a", "output is NFKC, input in ISO 8859-1"),
-            (u"\u2168", u"IX", "output is NFKC, will match #1"),
-            (u"\u0007", u"\u0007", "Error - prohibited character"),
-            (u"\u0627\u0031", u"\u0627\u0031", "Error - bidirectional check")
+            ("I\u00ADX", "IX", "SOFT HYPHEN mapped to nothing"),
+            ("user", "user", "no transformation"),
+            ("USER", "USER", "case preserved, will not match #2"),
+            ("\u00AA", "a", "output is NFKC, input in ISO 8859-1"),
+            ("\u2168", "IX", "output is NFKC, will match #1"),
+            ("\u0007", "\u0007", "Error - prohibited character"),
+            ("\u0627\u0031", "\u0627\u0031", "Error - bidirectional check"),
         ]
 
-        for input_str, output, comment  in test_cases:
+        for input_str, output, comment in test_cases:
             res = utils.normalize_unicode_string(input_str)
             self.assertEqual(output, res)
         self.maxDiff = None
         # Test cases    Input    Output    Expected Error
         test_error_cases = [
-            (u"\u0007", "Error - prohibited character",
-             "ASCII control characters [StringPrep, C.2.1]"),
-            (u"\u0627\u0031", "Error - bidirectional check",
-             "Invalid unicode Bidirectional sequence, if the first character "
-             "is RandALCat, the final charactermust be RandALCat too.")
+            (
+                "\u0007",
+                "Error - prohibited character",
+                "ASCII control characters [StringPrep, C.2.1]",
+            ),
+            (
+                "\u0627\u0031",
+                "Error - bidirectional check",
+                "Invalid unicode Bidirectional sequence, if the first character "
+                "is RandALCat, the final charactermust be RandALCat too.",
+            ),
         ]
 
-        for input_str, output, comment  in test_error_cases:
+        for input_str, output, comment in test_error_cases:
             res = utils.normalize_unicode_string(input_str)
             _, b_rule = utils.validate_normalized_unicode_string(res)
             self.assertEqual(comment, b_rule)

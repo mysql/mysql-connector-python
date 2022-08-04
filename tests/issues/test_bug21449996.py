@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,13 +28,15 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-import mysql.connector
-from tests import foreach_cnx
-import tests
 import unittest
 
+import mysql.connector
+import tests
+
+from tests import foreach_cnx
+
 # using "/" (slash) to avoid windows scape characters
-DATA_FILE = "/".join(['tests', 'data', 'random_big_bin.csv'])
+DATA_FILE = "/".join(["tests", "data", "random_big_bin.csv"])
 
 
 @unittest.skipIf(
@@ -42,13 +44,14 @@ DATA_FILE = "/".join(['tests', 'data', 'random_big_bin.csv'])
     "Test not available for external MySQL servers",
 )
 class Bug21449996(tests.MySQLConnectorTests):
-
     def setUp(self):
-        self.table_name = 'Bug21449996'
+        self.table_name = "Bug21449996"
         cnx = mysql.connector.connect(**tests.get_mysql_config())
         cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.table_name)
-        cnx.cmd_query("CREATE TABLE {0} (c1 BLOB) DEFAULT CHARSET=latin1"
-                      "".format(self.table_name))
+        cnx.cmd_query(
+            "CREATE TABLE {0} (c1 BLOB) DEFAULT CHARSET=latin1"
+            "".format(self.table_name)
+        )
         cnx.close()
 
     def tearDown(self):
@@ -60,8 +63,10 @@ class Bug21449996(tests.MySQLConnectorTests):
     def test_load_data_compressed(self):
         try:
             cur = self.cnx.cursor()
-            sql = ("LOAD DATA LOCAL INFILE '{0}' INTO TABLE {1} CHARACTER "
-                   "SET latin1".format(DATA_FILE, self.table_name))
+            sql = (
+                "LOAD DATA LOCAL INFILE '{0}' INTO TABLE {1} CHARACTER "
+                "SET latin1".format(DATA_FILE, self.table_name)
+            )
             cur.execute(sql)
         except mysql.connector.errors.InterfaceError as exc:
             raise

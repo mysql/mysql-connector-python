@@ -134,31 +134,12 @@ override_dh_installdocs:
 # the Python 3 default install this is provided by "python3-distutils".
 # Debian 9 and Ubuntu 16 lacks "python3-distutils" but has "sysconfig"
 # anyway.
-
-ifeq ($(shell lsb_release --short --codename),stretch)
-  SUBSTVARS = -Vpython3-distutils:Depends=
-else ifeq ($(shell lsb_release --short --codename),xenial)
-  SUBSTVARS = -Vpython3-distutils:Depends=
-else
-  SUBSTVARS = -Vpython3-distutils:Depends="python3-distutils"
-endif
+SUBSTVARS = -Vpython3-distutils:Depends="python3-distutils"
 
 # Python PROTOBUF is required to communicate with the server using a pure
-# Python implementation of the protocol. Ubuntu 16.04 lacks a recent enough Python
-# protobuf module and then can't communicate using pure Python. But if installing
-# the C extension Deb it can be used for the communication instead. At least
-# if using the default settings to use the binary driver.
-#
-# So on Ubuntu 16.04 instead letting the pure Python Deb depend on Python protobuf,
-# we let it depend on the C extension Deb. Making it a cross dependency that APT
-# can sort out. If installing using "dpkg" you need to force install or install
-# both Debs at the same time.
-
-ifeq ($(shell lsb_release --short --codename),xenial)
-  SUBSTVARS += -Vpython3-protobuf:Depends='mysql-connector-python$(LIC_EXT)-py3 (= $${binary:Version})'
-else
-  SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (>= 3.0.0)'
-endif
+# Note that at this time, using PROTOBUF 4 is not supported
+SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (>= 3.11.0)'
+SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (<< 4)'
 
 override_dh_gencontrol:
 	dh_gencontrol -- $(SUBSTVARS)

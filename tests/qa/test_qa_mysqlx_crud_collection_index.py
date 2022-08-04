@@ -45,10 +45,8 @@ class CollectionIndexTests(tests.MySQLxTests):
     def _verify_index_creation(self, coll_name, index_name):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, coll_name, index_name
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, coll_name, index_name
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -59,10 +57,8 @@ class CollectionIndexTests(tests.MySQLxTests):
     ):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, coll_name, index_name
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, coll_name, index_name
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -78,18 +74,14 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndex",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
         collection.add({"intField": 1}).execute()
         collection.add({"intField": "10"}).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll1", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll1", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -144,10 +136,8 @@ class CollectionIndexTests(tests.MySQLxTests):
             },
         ).execute()
         collection.add({"intField": 1}).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll3", "myIndexTinyINT"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll3", "myIndexTinyINT"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -168,10 +158,8 @@ class CollectionIndexTests(tests.MySQLxTests):
             },
         ).execute()
         collection.add({"intField": 1}).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll3", "myIndexSmallINT"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll3", "myIndexSmallINT"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -192,10 +180,8 @@ class CollectionIndexTests(tests.MySQLxTests):
             },
         ).execute()
         collection.add({"intField": 1}).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll3", "myIndexMediumINT"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll3", "myIndexMediumINT"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -216,10 +202,8 @@ class CollectionIndexTests(tests.MySQLxTests):
             },
         ).execute()
         collection.add({"intField": 1}).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll3", "myIndexINT"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll3", "myIndexINT"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -240,10 +224,8 @@ class CollectionIndexTests(tests.MySQLxTests):
             },
         ).execute()
         collection.add({"intField": 1}).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll3", "myIndexBigINT"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll3", "myIndexBigINT"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -272,16 +254,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndexReal",
             {
-                "fields": [
-                    {"field": "$.realField", "type": "REAL", "required": True}
-                ],
+                "fields": [{"field": "$.realField", "type": "REAL", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll4", "myIndexReal"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll4", "myIndexReal"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -300,10 +278,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll4", "myIndexFloat"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll4", "myIndexFloat"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -322,10 +298,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll4", "myIndexDouble"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll4", "myIndexDouble"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -344,10 +318,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll4", "myIndexDecimal"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll4", "myIndexDecimal"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -366,10 +338,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll4", "myIndexNumeric"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll4", "myIndexNumeric"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -443,16 +413,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndexDate",
             {
-                "fields": [
-                    {"field": "$.dateField", "type": "DATE", "required": True}
-                ],
+                "fields": [{"field": "$.dateField", "type": "DATE", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll5", "myIndexDate"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll5", "myIndexDate"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -461,16 +427,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndexTime",
             {
-                "fields": [
-                    {"field": "$.timeField", "type": "TIME", "required": True}
-                ],
+                "fields": [{"field": "$.timeField", "type": "TIME", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll5", "myIndexTime"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll5", "myIndexTime"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -483,10 +445,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll5", "myIndexTimestamp"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll5", "myIndexTimestamp"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -505,10 +465,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll5", "myIndexDatetime"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll5", "myIndexDatetime"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -594,10 +552,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll6", "myIndexText"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll6", "myIndexText"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -646,10 +602,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "SPATIAL",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll7", "myIndexGEOJSON"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll7", "myIndexGEOJSON"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -680,16 +634,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndex",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll8", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll8", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -742,10 +692,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll8", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll8", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -783,10 +731,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll9", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll9", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -827,10 +773,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll9", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll9", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -862,10 +806,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll9", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll9", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -930,16 +872,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "index12345678900123456789012",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll10", "index12345678900123456789012"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll10", "index12345678900123456789012"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -1058,9 +996,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndex",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
@@ -1196,10 +1132,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll12", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll12", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -1221,16 +1155,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "myIndex",
             {
-                "fields": [
-                    {"field": "$.intField[1]", "type": "INT", "required": True}
-                ],
+                "fields": [{"field": "$.intField[1]", "type": "INT", "required": True}],
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll12", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll12", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -1270,10 +1200,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        show_indexes_sql = (
-            "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
-                schema_name, "mycoll12", "myIndex"
-            )
+        show_indexes_sql = "SHOW INDEXES FROM `{0}`.`{1}` WHERE Key_name='{2}'".format(
+            schema_name, "mycoll12", "myIndex"
         )
         result = self.session.sql(show_indexes_sql).execute()
         rows = result.fetch_all()
@@ -1408,9 +1336,7 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll23", "decimalIndex")
-        )
+        self.assertTrue(self._verify_index_creation("mycoll23", "decimalIndex"))
         # TODO: Enable the below line once the binding issue is resolved
         # result = collection.find(
         #     ":decimalField IN $.decimalField"
@@ -1423,9 +1349,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "decimalArray1")
-        result = collection.find(
-            "87349829932749.67 OVERLAPS $.decimalField"
-        ).execute()
+        result = collection.find("87349829932749.67 OVERLAPS $.decimalField").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "decimalArray1")
@@ -1440,9 +1364,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "dateIndex",
             {
-                "fields": [
-                    {"field": "$.dateField", "type": "DATE", "array": True}
-                ],
+                "fields": [{"field": "$.dateField", "type": "DATE", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
@@ -1460,9 +1382,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         result = collection.find("'2018-12-12' OVERLAPS $.dateField").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
-        result = collection.find(
-            "'2017-12-12' NOT OVERLAPS $.dateField"
-        ).execute()
+        result = collection.find("'2017-12-12' NOT OVERLAPS $.dateField").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 0)
         collection.drop_index("dateIndex")
@@ -1470,9 +1390,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "timeIndex",
             {
-                "fields": [
-                    {"field": "$.timeField", "type": "TIME", "array": True}
-                ],
+                "fields": [{"field": "$.timeField", "type": "TIME", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
@@ -1504,12 +1422,8 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll23", "datetimeIndex")
-        )
-        result = collection.find(
-            '"2018-12-12 20:12:07" IN $.datetimeField'
-        ).execute()
+        self.assertTrue(self._verify_index_creation("mycoll23", "datetimeIndex"))
+        result = collection.find('"2018-12-12 20:12:07" IN $.datetimeField').execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
         result = collection.find(
@@ -1563,9 +1477,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         stmt = collection.create_index(
             "123myIndex",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1575,16 +1487,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "index12345678900123456789012",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "CHAR(100)", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "CHAR(100)", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
         self.assertTrue(
-            self._verify_index_creation(
-                "mycoll25", "index12345678900123456789012"
-            )
+            self._verify_index_creation("mycoll25", "index12345678900123456789012")
         )
 
         stmt = collection.create_index(
@@ -1605,9 +1513,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         stmt = collection.create_index(
             "@$^myIndex",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1616,9 +1522,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         stmt = collection.create_index(
             "",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1627,9 +1531,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "   ",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1638,9 +1540,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             None,
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1649,9 +1549,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "-myIndex",
             {
-                "fields": [
-                    {"field": "$.intField", "type": "INT", "array": True}
-                ],
+                "fields": [{"field": "$.intField", "type": "INT", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1677,9 +1575,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         stmt = collection.create_index(
             "mismatchIndex",
             {
-                "fields": [
-                    {"field": "$.charField", "type": "SIGNED", "array": True}
-                ],
+                "fields": [{"field": "$.charField", "type": "SIGNED", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1701,18 +1597,14 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "duplicateIndex",
             {
-                "fields": [
-                    {"field": "$.dateField", "type": "DATE", "array": True}
-                ],
+                "fields": [{"field": "$.dateField", "type": "DATE", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
         stmt = collection.create_index(
             "duplicateIndex",
             {
-                "fields": [
-                    {"field": "$.dateField", "type": "DATE", "array": True}
-                ],
+                "fields": [{"field": "$.dateField", "type": "DATE", "array": True}],
                 "type": "INDEX",
             },
         )
@@ -1738,9 +1630,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         stmt = collection.create_index(
             "falseArrayIndex",
             {
-                "fields": [
-                    {"field": "$.dateField", "type": "DATE", "array": False}
-                ],
+                "fields": [{"field": "$.dateField", "type": "DATE", "array": False}],
                 "type": "INDEX",
             },
         )
@@ -1753,15 +1643,11 @@ class CollectionIndexTests(tests.MySQLxTests):
         """Test creating an index on empty array field - should pass."""
         self._drop_collection_if_exists("mycoll29")
         collection = self.schema.create_collection("mycoll29")
-        collection.add(
-            {"_id": 1, "name": "emptyArray", "emptyField": []}
-        ).execute()
+        collection.add({"_id": 1, "name": "emptyArray", "emptyField": []}).execute()
         collection.create_index(
             "emptyArrayIndex",
             {
-                "fields": [
-                    {"field": "$.emptyField", "type": "SIGNED", "array": True}
-                ],
+                "fields": [{"field": "$.emptyField", "type": "SIGNED", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
@@ -1791,9 +1677,7 @@ class CollectionIndexTests(tests.MySQLxTests):
             "GENERATED ALWAYS AS (JSON_EXTRACT(doc, '$.dateField')) NOT NULL, "
             "ADD INDEX `notnullIndex`(`$dateField`)".format(schema_name)
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll30", "notnullIndex")
-        )
+        self.assertTrue(self._verify_index_creation("mycoll30", "notnullIndex"))
         collection.drop_index("notnullIndex")
 
         self.assertRaises(
@@ -1808,9 +1692,7 @@ class CollectionIndexTests(tests.MySQLxTests):
             "(JSON_EXTRACT(doc, '$.intField')) NOT NULL, "
             "ADD INDEX `notnullIndex`(`$intField`)".format(schema_name)
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll30", "notnullIndex")
-        )
+        self.assertTrue(self._verify_index_creation("mycoll30", "notnullIndex"))
         collection.drop_index("notnullIndex")
 
         self.assertRaises(
@@ -1855,9 +1737,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         )
         self.schema.drop_collection("mycoll31")
 
-    @unittest.skipUnless(
-        tests.ARCH_64BIT, "Test available only for 64 bit platforms"
-    )
+    @unittest.skipUnless(tests.ARCH_64BIT, "Test available only for 64 bit platforms")
     @unittest.skipIf(os.name == "nt", "Test not available for Windows")
     @tests.foreach_session()
     def test_collection_index32(self):
@@ -1914,24 +1794,18 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "dateArrayIndex",
             {
-                "fields": [
-                    {"field": "$.dateField", "type": "DATE", "array": True}
-                ],
+                "fields": [{"field": "$.dateField", "type": "DATE", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll32", "dateArrayIndex")
-        )
+        self.assertTrue(self._verify_index_creation("mycoll32", "dateArrayIndex"))
         # Casting is required due to server Bug#29752056.
         # Once this is fixed it should work without casting
         result = collection.find("'2019-12-12' OVERLAPS $.dateField").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "dateArray1")
-        result = (
-            collection.modify("true").set("name", "modifiedArray").execute()
-        )
+        result = collection.modify("true").set("name", "modifiedArray").execute()
         result = (
             collection.find(":dateField OVERLAPS $.dateField")
             .bind({"dateField": "2018-12-12"})
@@ -1980,9 +1854,7 @@ class CollectionIndexTests(tests.MySQLxTests):
         """Test creating an index on array field which contains None value."""
         self._drop_collection_if_exists("mycoll34")
         collection = self.schema.create_collection("mycoll34")
-        collection.add(
-            {"_id": 1, "name": "nullArray", "nullField": [None]}
-        ).execute()
+        collection.add({"_id": 1, "name": "nullArray", "nullField": [None]}).execute()
         self.assertRaises(
             mysqlx.OperationalError,
             collection.create_index(
@@ -2038,9 +1910,7 @@ class CollectionIndexTests(tests.MySQLxTests):
             collection.create_index(
                 "invalidIndex",
                 {
-                    "fields": [
-                        {"field": "$.intField", "type": "FLOAT", "array": True}
-                    ],
+                    "fields": [{"field": "$.intField", "type": "FLOAT", "array": True}],
                     "type": "INDEX",
                 },
             ).execute,
@@ -2245,16 +2115,10 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll36", "decimalIndex1")
-        )
-        self.assertTrue(
-            self._verify_index_creation("mycoll36", "decimalIndex2")
-        )
+        self.assertTrue(self._verify_index_creation("mycoll36", "decimalIndex1"))
+        self.assertTrue(self._verify_index_creation("mycoll36", "decimalIndex2"))
         # TODO: enable the below line once the binding issue is resolved
-        result = collection.find(
-            "$.decimalField1 OVERLAPS $.decimalField2"
-        ).execute()
+        result = collection.find("$.decimalField1 OVERLAPS $.decimalField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "decimalArray1")
@@ -2276,18 +2140,14 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "dateIndex1",
             {
-                "fields": [
-                    {"field": "$.dateField1", "type": "DATE", "array": True}
-                ],
+                "fields": [{"field": "$.dateField1", "type": "DATE", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
         collection.create_index(
             "dateIndex2",
             {
-                "fields": [
-                    {"field": "$.dateField2", "type": "DATE", "array": True}
-                ],
+                "fields": [{"field": "$.dateField2", "type": "DATE", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
@@ -2299,15 +2159,11 @@ class CollectionIndexTests(tests.MySQLxTests):
         result = collection.find("$.dateField1 NOT IN $.dateField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
-        result = collection.find(
-            "$.dateField1 OVERLAPS $.dateField2"
-        ).execute()
+        result = collection.find("$.dateField1 OVERLAPS $.dateField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "dateArray1")
-        result = collection.find(
-            "$.dateField1 NOT OVERLAPS $.dateField2"
-        ).execute()
+        result = collection.find("$.dateField1 NOT OVERLAPS $.dateField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "dateArray2")
@@ -2317,18 +2173,14 @@ class CollectionIndexTests(tests.MySQLxTests):
         collection.create_index(
             "timeIndex1",
             {
-                "fields": [
-                    {"field": "$.timeField1", "type": "TIME", "array": True}
-                ],
+                "fields": [{"field": "$.timeField1", "type": "TIME", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
         collection.create_index(
             "timeIndex2",
             {
-                "fields": [
-                    {"field": "$.timeField2", "type": "TIME", "array": True}
-                ],
+                "fields": [{"field": "$.timeField2", "type": "TIME", "array": True}],
                 "type": "INDEX",
             },
         ).execute()
@@ -2343,16 +2195,12 @@ class CollectionIndexTests(tests.MySQLxTests):
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
 
-        result = collection.find(
-            "$.timeField1 OVERLAPS $.timeField2"
-        ).execute()
+        result = collection.find("$.timeField1 OVERLAPS $.timeField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "timeArray1")
 
-        result = collection.find(
-            "$.timeField1 NOT OVERLAPS $.timeField2"
-        ).execute()
+        result = collection.find("$.timeField1 NOT OVERLAPS $.timeField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "timeArray2")
@@ -2386,25 +2234,15 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll36", "datetimeIndex1")
-        )
-        self.assertTrue(
-            self._verify_index_creation("mycoll36", "datetimeIndex2")
-        )
-        result = collection.find(
-            "$.datetimeField1 IN $.datetimeField1"
-        ).execute()
+        self.assertTrue(self._verify_index_creation("mycoll36", "datetimeIndex1"))
+        self.assertTrue(self._verify_index_creation("mycoll36", "datetimeIndex2"))
+        result = collection.find("$.datetimeField1 IN $.datetimeField1").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
-        result = collection.find(
-            "$.datetimeField1 NOT IN $.datetimeField2"
-        ).execute()
+        result = collection.find("$.datetimeField1 NOT IN $.datetimeField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
-        result = collection.find(
-            "$.datetimeField1 OVERLAPS $.datetimeField2"
-        ).execute()
+        result = collection.find("$.datetimeField1 OVERLAPS $.datetimeField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "datetimeArray1")
@@ -2443,31 +2281,21 @@ class CollectionIndexTests(tests.MySQLxTests):
                 "type": "INDEX",
             },
         ).execute()
-        self.assertTrue(
-            self._verify_index_creation("mycoll36", "binaryIndex1")
-        )
-        self.assertTrue(
-            self._verify_index_creation("mycoll36", "binaryIndex2")
-        )
+        self.assertTrue(self._verify_index_creation("mycoll36", "binaryIndex1"))
+        self.assertTrue(self._verify_index_creation("mycoll36", "binaryIndex2"))
         result = collection.find("$.binaryField1 IN $.binaryField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "binaryArray1")
-        result = collection.find(
-            "$.binaryField1 NOT IN $.binaryField2"
-        ).execute()
+        result = collection.find("$.binaryField1 NOT IN $.binaryField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "binaryArray2")
-        result = collection.find(
-            "$.binaryField1 OVERLAPS $.binaryField2"
-        ).execute()
+        result = collection.find("$.binaryField1 OVERLAPS $.binaryField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "binaryArray1")
-        result = collection.find(
-            "$.binaryField1 NOT OVERLAPS $.binaryField2"
-        ).execute()
+        result = collection.find("$.binaryField1 NOT OVERLAPS $.binaryField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "binaryArray2")
@@ -2508,15 +2336,11 @@ class CollectionIndexTests(tests.MySQLxTests):
         result = collection.find("$.charField1 NOT IN $.charField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 2)
-        result = collection.find(
-            "$.charField1 OVERLAPS $.charField2"
-        ).execute()
+        result = collection.find("$.charField1 OVERLAPS $.charField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "charArray1")
-        result = collection.find(
-            "$.charField1 NOT OVERLAPS $.charField2"
-        ).execute()
+        result = collection.find("$.charField1 NOT OVERLAPS $.charField2").execute()
         row = result.fetch_all()
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0]["name"], "charArray2")

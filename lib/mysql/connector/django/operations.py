@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,8 +26,12 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-from django.db.backends.mysql.operations import DatabaseOperations as MySQLDatabaseOperations
+"""Database Operations."""
+
 from django.conf import settings
+from django.db.backends.mysql.operations import (
+    DatabaseOperations as MySQLDatabaseOperations,
+)
 from django.utils import timezone
 
 try:
@@ -39,21 +43,28 @@ else:
 
 
 class DatabaseOperations(MySQLDatabaseOperations):
+    """Database Operations class."""
+
     compiler_module = "mysql.connector.django.compiler"
 
     def regex_lookup(self, lookup_type):
+        """Return the string to use in a query when performing regular
+        expression lookup."""
         if self.connection.mysql_version < (8, 0, 0):
-            if lookup_type == 'regex':
-                return '%s REGEXP BINARY %s'
-            return '%s REGEXP %s'
+            if lookup_type == "regex":
+                return "%s REGEXP BINARY %s"
+            return "%s REGEXP %s"
 
-        match_option = 'c' if lookup_type == 'regex' else 'i'
-        return "REGEXP_LIKE(%s, %s, '%s')" % match_option
+        match_option = "c" if lookup_type == "regex" else "i"
+        return f"REGEXP_LIKE(%s, %s, '{match_option}')"
 
     def adapt_datetimefield_value(self, value):
+        """Transform a datetime value to an object compatible with what is
+        expected by the backend driver for datetime columns."""
         return self.value_to_db_datetime(value)
 
     def value_to_db_datetime(self, value):
+        """Convert value to MySQL DATETIME."""
         if value is None:
             return None
         # MySQL doesn't support tz-aware times
@@ -61,9 +72,7 @@ class DatabaseOperations(MySQLDatabaseOperations):
             if settings.USE_TZ:
                 value = value.astimezone(timezone.utc).replace(tzinfo=None)
             else:
-                raise ValueError(
-                    "MySQL backend does not support timezone-aware times."
-                )
+                raise ValueError("MySQL backend does not support timezone-aware times")
         if not self.connection.features.supports_microsecond_precision:
             value = value.replace(microsecond=0)
         if not self.connection.use_pure:
@@ -71,16 +80,18 @@ class DatabaseOperations(MySQLDatabaseOperations):
         return self.connection.converter.to_mysql(value)
 
     def adapt_timefield_value(self, value):
+        """Transform a time value to an object compatible with what is expected
+        by the backend driver for time columns."""
         return self.value_to_db_time(value)
 
     def value_to_db_time(self, value):
+        """Convert value to MySQL TIME."""
         if value is None:
             return None
 
         # MySQL doesn't support tz-aware times
         if timezone.is_aware(value):
-            raise ValueError("MySQL backend does not support timezone-aware "
-                             "times.")
+            raise ValueError("MySQL backend does not support timezone-aware times")
 
         if not self.connection.use_pure:
             return time_to_mysql(value)

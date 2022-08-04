@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -26,55 +26,77 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+"""Database Client."""
+
+import os
 import subprocess
 
 from django.db.backends.base.client import BaseDatabaseClient
 
 
 class DatabaseClient(BaseDatabaseClient):
-    executable_name = 'mysql'
+    """Encapsulate backend-specific methods for opening a client shell."""
+
+    executable_name = "mysql"
 
     @classmethod
-    def settings_to_cmd_args(cls, settings_dict):
+    def settings_to_cmd_args_env(cls, settings_dict, parameters=None):
         args = [cls.executable_name]
 
-        db = settings_dict['OPTIONS'].get('database', settings_dict['NAME'])
-        user = settings_dict['OPTIONS'].get('user',
-                                            settings_dict['USER'])
-        passwd = settings_dict['OPTIONS'].get('password',
-                                              settings_dict['PASSWORD'])
-        host = settings_dict['OPTIONS'].get('host', settings_dict['HOST'])
-        port = settings_dict['OPTIONS'].get('port', settings_dict['PORT'])
-        defaults_file = settings_dict['OPTIONS'].get('read_default_file')
+        db = settings_dict["OPTIONS"].get("database", settings_dict["NAME"])
+        user = settings_dict["OPTIONS"].get("user", settings_dict["USER"])
+        passwd = settings_dict["OPTIONS"].get("password", settings_dict["PASSWORD"])
+        host = settings_dict["OPTIONS"].get("host", settings_dict["HOST"])
+        port = settings_dict["OPTIONS"].get("port", settings_dict["PORT"])
+        ssl_ca = settings_dict["OPTIONS"].get("ssl_ca")
+        ssl_cert = settings_dict["OPTIONS"].get("ssl_cert")
+        ssl_key = settings_dict["OPTIONS"].get("ssl_key")
+        defaults_file = settings_dict["OPTIONS"].get("read_default_file")
+        charset = settings_dict["OPTIONS"].get("charset")
 
         # --defaults-file should always be the first option
         if defaults_file:
-            args.append('--defaults-file={0}'.format(defaults_file))
+            args.append(f"--defaults-file={defaults_file}")
 
         # Load any custom init_commands. We always force SQL_MODE to TRADITIONAL
         init_command = settings_dict['OPTIONS'].get('init_command', '')
         args.append('--init-command=SET @@session.SQL_MODE=TRADITIONAL;{0}'.format(init_command))
 
         if user:
-            args.append('--user={0}'.format(user))
+            args.append(f"--user={user}")
         if passwd:
-            args.append('--password={0}'.format(passwd))
+            args.append(f"--password={passwd}")
 
         if host:
-            if '/' in host:
-                args.append('--socket={0}'.format(host))
+            if "/" in host:
+                args.append(f"--socket={host}")
             else:
-                args.append('--host={0}'.format(host))
+                args.append(f"--host={host}")
 
         if port:
-            args.append('--port={0}'.format(port))
+            args.append(f"--port={port}")
 
         if db:
-            args.append('--database={0}'.format(db))
+            args.append(f"--database={db}")
 
-        return args
+        if ssl_ca:
+            args.append(f"--ssl-ca={ssl_ca}")
+        if ssl_cert:
+            args.append(f"--ssl-cert={ssl_cert}")
+        if ssl_key:
+            args.append(f"--ssl-key={ssl_key}")
 
-    def runshell(self):
-        args = DatabaseClient.settings_to_cmd_args(
-            self.connection.settings_dict)
-        subprocess.call(args)
+        if charset:
+            args.append(f"--default-character-set={charset}")
+
+        if parameters:
+            args.extend(parameters)
+
+        return args, None
+
+    def runshell(self, parameters=None):
+        args, env = self.settings_to_cmd_args_env(
+            self.connection.settings_dict, parameters
+        )
+        env = {**os.environ, **env} if env else None
+        subprocess.run(args, env=env, check=True)

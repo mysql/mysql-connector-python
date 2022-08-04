@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,11 +28,11 @@
 
 """Tests for connection session reset."""
 
-import tests
 import time
 import unittest
 
 import mysqlx
+import tests
 
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
@@ -58,9 +58,7 @@ class SessionResetTests(tests.MySQLxTests):
         }
         client = mysqlx.get_client(connection_string, client_options)
         session1 = client.get_session()
-        conn_id1 = (
-            session1.sql("select connection_id();").execute().fetch_all()[0][0]
-        )
+        conn_id1 = session1.sql("select connection_id();").execute().fetch_all()[0][0]
         session1.drop_schema("test")
         session1.create_schema("test")
         schema = session1.get_schema("test")
@@ -68,17 +66,13 @@ class SessionResetTests(tests.MySQLxTests):
         if collection.exists_in_database():
             schema.drop_collection("mycoll1")
         collection = schema.create_collection("mycoll1")
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         self.assertEqual(collection.count(), 2)
         schema.drop_collection("mycoll1")
         session1.close()
         time.sleep(10)
         session2 = client.get_session()
-        conn_id2 = (
-            session2.sql("select connection_id();").execute().fetch_all()[0][0]
-        )
+        conn_id2 = session2.sql("select connection_id();").execute().fetch_all()[0][0]
         self.assertNotEqual(conn_id1, conn_id2)
         session2.close()
         client.close()
@@ -97,9 +91,7 @@ class SessionResetTests(tests.MySQLxTests):
         client_options = {"pooling": {"max_size": 1, "queue_timeout": 1000}}
         client = mysqlx.get_client(connection_string, client_options)
         session1 = client.get_session()
-        conn_id1 = (
-            session1.sql("select connection_id();").execute().fetch_all()[0][0]
-        )
+        conn_id1 = session1.sql("select connection_id();").execute().fetch_all()[0][0]
         session1.drop_schema("test")
         session1.create_schema("test")
         schema = session1.get_schema("test")
@@ -109,21 +101,15 @@ class SessionResetTests(tests.MySQLxTests):
         collection = schema.create_collection(
             "mycoll1",
         )
-        collection.add(
-            {"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}
-        ).execute()
+        collection.add({"_id": 1, "name": "a"}, {"_id": 2, "name": "b"}).execute()
         self.assertEqual(collection.count(), 2)
         session1.sql("SET @a = 1000").execute()
         session1.sql("USE test").execute()
-        session1.sql(
-            "CREATE TEMPORARY TABLE temp_tbl(a int, b char(20));"
-        ).execute()
+        session1.sql("CREATE TEMPORARY TABLE temp_tbl(a int, b char(20));").execute()
         session1.close()
         time.sleep(10)
         session2 = client.get_session()
-        conn_id2 = (
-            session2.sql("select connection_id();").execute().fetch_all()[0][0]
-        )
+        conn_id2 = session2.sql("select connection_id();").execute().fetch_all()[0][0]
         a = session2.sql("SELECT @a").execute().fetch_one()[0]
         self.assertIsNone(a)
         self.assertEqual(conn_id1, conn_id2)
@@ -145,16 +131,12 @@ class SessionResetTests(tests.MySQLxTests):
         for _ in range(1, 100):
             session1 = client.get_session()
             conn_id1 = (
-                session1.sql("select connection_id();")
-                .execute()
-                .fetch_all()[0][0]
+                session1.sql("select connection_id();").execute().fetch_all()[0][0]
             )
             session1.close()
             session2 = client.get_session()
             conn_id2 = (
-                session2.sql("select connection_id();")
-                .execute()
-                .fetch_all()[0][0]
+                session2.sql("select connection_id();").execute().fetch_all()[0][0]
             )
             session2.close()
             assert conn_id1 == conn_id2

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -45,19 +45,20 @@ unicode character correctly. Check if the encoding of your terminal
 is set to UTF-8.
 """
 
+
 def main(config):
     output = []
     db = mysql.connector.Connect(**config)
     cursor = db.cursor()
-    
+
     # Show the unicode string we're going to use
-    unistr = u"\u00bfHabla espa\u00f1ol?"
+    unistr = "\u00bfHabla espa\u00f1ol?"
     output.append("Unicode string: %s" % unistr)
-    
+
     # Drop table if exists, and create it new
     stmt_drop = "DROP TABLE IF EXISTS unicode"
     cursor.execute(stmt_drop)
-    
+
     stmt_create = (
         "CREATE TABLE unicode ("
         "    id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT, "
@@ -66,37 +67,38 @@ def main(config):
         ") CHARACTER SET 'utf8'"
     )
     cursor.execute(stmt_create)
-    
+
     # Insert a row
     stmt_insert = "INSERT INTO unicode (str) VALUES (%s)"
     cursor.execute(stmt_insert, (unistr,))
-    
+
     # Select it again and show it
     stmt_select = "SELECT str FROM unicode WHERE id = %s"
     cursor.execute(stmt_select, (1,))
     row = cursor.fetchone()
 
     output.append("Unicode string coming from db: " + row[0])
-    
+
     # Cleaning up, dropping the table again
     cursor.execute(stmt_drop)
-    
+
     cursor.close()
     db.close()
     return output
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     config = {
-        'host': 'localhost',
-        'port': 3306,
-        'database': 'test',
-        'user': 'root',
-        'password': '',
-        'charset': 'utf8',
-        'use_unicode': True,
-        'get_warnings': True,
+        "host": "localhost",
+        "port": 3306,
+        "database": "test",
+        "user": "root",
+        "password": "",
+        "charset": "utf8",
+        "use_unicode": True,
+        "get_warnings": True,
     }
 
     out = main(config)
-    print('\n'.join(out))
+    print("\n".join(out))

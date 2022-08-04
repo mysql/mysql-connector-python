@@ -8,6 +8,24 @@ Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.0.30
+=======
+
+- WL#15212: Update collation mappings
+- WL#15151: Increase to 88 characters per line
+- WL#15137: Fix linting issues
+- WL#15035: Enforce PEP 7 and PEP 8 coding style
+- WL#14822: Refactor the authentication plugin mechanism
+- WL#14815: Support OpenSSL 3.0
+- BUG#34260344: Disallow empty strings in collection fields
+- BUG#34231226: Generated classes do not work with the latest Protobuf
+- BUG#34228442: Fix NO_BACKSLASH_ESCAPES SQL mode support in c-ext
+- BUG#34223015: Invalidate the usage of non-compatible cursor types
+- BUG#34127959: Add isolation level support in Django backend
+- BUG#33923516: Allow tuple of dictionaries as "failover" argument
+- BUG#28821983: Fix rounding errors for decimal values
+- BUG#28295504: Disable SSL when using Unix socket connections
+
 v8.0.29
 =======
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,11 +28,11 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-# This file was auto-generated.
-_GENERATED_ON = '2021-08-11'
-_MYSQL_VERSION = (8, 0, 27)
+"""This module contains the MySQL Server and Client error codes."""
 
-"""This module contains the MySQL Server and Client error codes"""
+# This file was auto-generated.
+_GENERATED_ON = "2021-08-11"
+_MYSQL_VERSION = (8, 0, 27)
 
 # Start MySQL Errors
 OBSOLETE_ER_HASHCHK = 1000

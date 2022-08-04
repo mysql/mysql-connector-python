@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -42,23 +42,23 @@ from datetime import datetime
 
 import mysql.connector
 
-
 # Note that by default MySQL takes invalid timestamps. This is for
 # backward compatibility. As of 5.0, use sql modes NO_ZERO_IN_DATE,NO_ZERO_DATE
 # to prevent this.
 _adate = datetime(1977, 6, 14, 21, 10, 00)
 DATA = [
     (_adate.date(), _adate, _adate.time()),
-    ('0000-00-00', '0000-00-00 00:00:00', '00:00:00'),
-    ('1000-00-00', '9999-00-00 00:00:00', '00:00:00'),
+    ("0000-00-00", "0000-00-00 00:00:00", "00:00:00"),
+    ("1000-00-00", "9999-00-00 00:00:00", "00:00:00"),
 ]
+
 
 def main(config):
     output = []
     db = mysql.connector.Connect(**config)
     cursor = db.cursor()
 
-    tbl = 'myconnpy_dates'
+    tbl = "myconnpy_dates"
 
     cursor.execute('SET sql_mode = ""')
 
@@ -79,14 +79,12 @@ def main(config):
     cursor.execute(stmt_create)
 
     # not using executemany to handle errors better
-    stmt_insert = ("INSERT INTO {0} (c1,c2,c3) VALUES "
-                   "(%s,%s,%s)".format(tbl))
+    stmt_insert = "INSERT INTO {0} (c1,c2,c3) VALUES (%s,%s,%s)".format(tbl)
     for data in DATA:
         try:
             cursor.execute(stmt_insert, data)
         except (mysql.connector.errors.Error, TypeError) as exc:
-            output.append("Failed inserting {0}\nError: {1}\n".format(
-                data, exc))
+            output.append("Failed inserting {0}\nError: {1}\n".format(data, exc))
             cursor.execute(stmt_drop)
             raise
 
@@ -95,12 +93,15 @@ def main(config):
     cursor.execute(stmt_select)
 
     for row in cursor.fetchall():
-        output.append("%3s | %10s | %19s | %8s |" % (
-            row[0],
-            row[1],
-            row[2],
-            row[3],
-        ))
+        output.append(
+            "%3s | %10s | %19s | %8s |"
+            % (
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+            )
+        )
 
     # Cleaning up, dropping the table again
     cursor.execute(stmt_drop)
@@ -110,20 +111,20 @@ def main(config):
     return output
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     #
     # Configure MySQL login and database to use in config.py
     #
     config = {
-        'host': 'localhost',
-        'port': 3306,
-        'database': 'test',
-        'user': 'root',
-        'password': '',
-        'charset': 'utf8',
-        'use_unicode': True,
-        'get_warnings': True,
+        "host": "localhost",
+        "port": 3306,
+        "database": "test",
+        "user": "root",
+        "password": "",
+        "charset": "utf8",
+        "use_unicode": True,
+        "get_warnings": True,
     }
 
     out = main(config)
-    print('\n'.join(out))
+    print("\n".join(out))

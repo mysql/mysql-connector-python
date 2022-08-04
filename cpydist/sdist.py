@@ -1,4 +1,4 @@
-# Copyright (c) 2020, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -37,13 +37,13 @@ import sys
 
 from distutils import log
 from distutils.command.sdist import sdist
-from distutils.dir_util import create_tree, remove_tree, mkpath, copy_tree
+from distutils.dir_util import copy_tree, create_tree, mkpath, remove_tree
 from distutils.file_util import copy_file, move_file
 from distutils.filelist import FileList
 from distutils.sysconfig import get_python_version
 
-from . import VERSION, EDITION, COMMON_USER_OPTIONS, LOGGER
-from .utils import get_dist_name, write_info_src, write_info_bin
+from . import COMMON_USER_OPTIONS, EDITION, LOGGER, VERSION
+from .utils import get_dist_name, write_info_bin, write_info_src
 
 
 class DistSource(sdist):
@@ -54,24 +54,39 @@ class DistSource(sdist):
 
     description = "create a source distribution (tarball, zip file, etc.)"
     user_options = COMMON_USER_OPTIONS + [
-        ("prune", None,
-         "specifically exclude files/directories that should not be "
-         "distributed (build tree, RCS/CVS dirs, etc.) "
-         "[default; disable with --no-prune]"),
-        ("no-prune", None,
-         "don't automatically exclude anything"),
-        ("formats=", None,
-         "formats for source distribution (comma-separated list)"),
-        ("keep-temp", "k",
-         "keep the distribution tree around after creating "
-         "archive file(s)"),
-        ("dist-dir=", "d",
-         "directory to put the source distribution archive(s) in "
-         "[default: dist]"),
-        ("owner=", "u",
-         "Owner name used when creating a tar file [default: current user]"),
-        ("group=", "g",
-         "Group name used when creating a tar file [default: current group]"),
+        (
+            "prune",
+            None,
+            "specifically exclude files/directories that should not be "
+            "distributed (build tree, RCS/CVS dirs, etc.) "
+            "[default; disable with --no-prune]",
+        ),
+        ("no-prune", None, "don't automatically exclude anything"),
+        (
+            "formats=",
+            None,
+            "formats for source distribution (comma-separated list)",
+        ),
+        (
+            "keep-temp",
+            "k",
+            "keep the distribution tree around after creating archive file(s)",
+        ),
+        (
+            "dist-dir=",
+            "d",
+            "directory to put the source distribution archive(s) in [default: dist]",
+        ),
+        (
+            "owner=",
+            "u",
+            "Owner name used when creating a tar file [default: current user]",
+        ),
+        (
+            "group=",
+            "g",
+            "Group name used when creating a tar file [default: current group]",
+        ),
     ]
     boolean_options = ["prune", "force-manifest", "keep-temp"]
     negative_opt = {"no-prune": "prune"}
@@ -87,12 +102,13 @@ class DistSource(sdist):
 
     def finalize_options(self):
         """Finalize the options."""
+
         def _get_fullname():
             return "{name}{label}-{version}{edition}".format(
                 name=self.distribution.get_name(),
                 label="-{}".format(self.label) if self.label else "",
                 version=self.distribution.get_version(),
-                edition=self.edition or ""
+                edition=self.edition or "",
             )
 
         self.distribution.get_fullname = _get_fullname
@@ -112,8 +128,7 @@ class DistSource(sdist):
             self.log.info("copying files to %s...", base_dir)
         for filename in files:
             if not os.path.isfile(filename):
-                self.log.warning("'%s' not a regular file -- skipping",
-                                 filename)
+                self.log.warning("'%s' not a regular file -- skipping", filename)
             else:
                 dest = os.path.join(base_dir, filename)
                 self.copy_file(filename, dest)
@@ -143,18 +158,23 @@ class SourceGPL(sdist):
     generate RPM or other packages.
     """
 
-    description = ("create a source distribution for Python v{}.x"
-                   "".format(get_python_version()[0]))
+    description = "create a source distribution for Python v{}.x".format(
+        get_python_version()[0]
+    )
     user_options = [
-        ("debug", None,
-         "turn debugging on"),
-        ("bdist-dir=", "d",
-         "temporary directory for creating the distribution"),
-        ("keep-temp", "k",
-         "keep the pseudo-installation tree around after "
-         "creating the distribution archive"),
-        ("dist-dir=", "d",
-         "directory to put final built distributions in"),
+        ("debug", None, "turn debugging on"),
+        (
+            "bdist-dir=",
+            "d",
+            "temporary directory for creating the distribution",
+        ),
+        (
+            "keep-temp",
+            "k",
+            "keep the pseudo-installation tree around after "
+            "creating the distribution archive",
+        ),
+        ("dist-dir=", "d", "directory to put final built distributions in"),
     ]
     boolean_options = ["keep-temp"]
     negative_opt = []
@@ -181,8 +201,10 @@ class SourceGPL(sdist):
         # Change classifiers
         new_classifiers = []
         for classifier in self.distribution.metadata.classifiers:
-            if classifier.startswith("Programming Language ::") and \
-                    pyver not in classifier:
+            if (
+                classifier.startswith("Programming Language ::")
+                and pyver not in classifier
+            ):
                 self.log.info("removing classifier %s" % classifier)
                 continue
             new_classifiers.append(classifier)
@@ -190,8 +212,7 @@ class SourceGPL(sdist):
 
         with open("README.txt", "r") as file_handler:
             license = file_handler.read()
-            self.distribution.metadata.long_description += \
-                "\n{}".format(license)
+            self.distribution.metadata.long_description += "\n{}".format(license)
 
         if self.debug:
             self.log.setLevel(logging.DEBUG)
@@ -204,20 +225,20 @@ class SourceGPL(sdist):
         write_info_src(VERSION)
         write_info_bin()
 
-        self.dist_name = get_dist_name(self.distribution,
-                                       source_only_dist=True,
-                                       python_version=get_python_version()[0])
+        self.dist_name = get_dist_name(
+            self.distribution,
+            source_only_dist=True,
+            python_version=get_python_version()[0],
+        )
         self.dist_target = os.path.join(self.dist_dir, self.dist_name)
-        self.log.info("distribution will be available as '%s'",
-                      self.dist_target)
+        self.log.info("distribution will be available as '%s'", self.dist_target)
 
         # build command: just to get the build_base
         cmdbuild = self.get_finalized_command("build")
         self.build_base = cmdbuild.build_base
 
         # install command
-        install = self.reinitialize_command("install_lib",
-                                            reinit_subcommands=1)
+        install = self.reinitialize_command("install_lib", reinit_subcommands=1)
         install.compile = False
         install.warn_dir = 0
         install.install_dir = self.bdist_dir
@@ -233,7 +254,8 @@ class SourceGPL(sdist):
         old_egginfo = cmd_egginfo.get_outputs()[0]
         new_egginfo = old_egginfo.replace(
             "-py{}".format(sys.version[:3]),
-            "-py{}".format(get_python_version()[0]))
+            "-py{}".format(get_python_version()[0]),
+        )
         move_file(old_egginfo, new_egginfo)
 
         # create distribution

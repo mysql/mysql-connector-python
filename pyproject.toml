@@ -1,0 +1,122 @@
+# Copyright (c) 2022, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0, as
+# published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an
+# additional permission to link the program and your derivative works
+# with the separately licensed software that they have included with
+# MySQL.
+#
+# Without limiting anything contained in the foregoing, this file,
+# which is part of MySQL Connector/Python, is also subject to the
+# Universal FOSS Exception, version 1.0, a copy of which can be found at
+# http://oss.oracle.com/licenses/universal-foss-exception.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+
+[build-system]
+requires = ['setuptools', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[tool.isort]
+profile = 'black'
+combine_as_imports = true
+known_first_party = ['mysql.connector', 'mysqlx']
+line_length = 88
+lines_between_types = 1
+skip_glob = [
+    'build/*',
+    'dist/*',
+    'docs/*',
+    'lib/mysql/connector/locales/eng',
+    'lib/mysqlx/locales/eng',
+    'lib/mysqlx/protobuf',
+    'venv/*'
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py37']
+exclude = '''
+(
+  /(
+    \.eggs
+  | \.git
+  | build
+  | dist
+  | docs
+  | lib/mysql/connector/locales/eng
+  | lib/mysqlx/locales/eng
+  | venv
+  )/
+  | lib/mysqlx/protobuf/mysqlx_connection_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_crud_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_cursor_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_expect_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_expr_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_notice_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_prepare_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_resultset_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_session_pb2.py
+  | lib/mysqlx/protobuf/mysqlx_sql_pb2.py
+)
+'''
+
+[tool.coverage.run]
+branch = true
+omit = [
+    '*/dist-packages/*',
+    '*/site-packages/*',
+    'cpydist/*',
+    'examples/*',
+    'setupinfo.py',
+    'tests/*',
+    'unittests.py',
+]
+
+[tool.coverage.html]
+directory = 'build/coverage_html'
+
+[tool.coverage.xml]
+output = 'build/coverage.xml'
+
+[tool.pylint.master]
+load-plugins = ['pylint.extensions.overlapping_exceptions']
+ignore-paths = ['lib/mysqlx/protobuf/mysqlx_*']
+init-hook = 'import sys; sys.path.append("lib")'
+
+[tool.pylint.messages_control]
+disable = [
+    'duplicate-code',
+    'import-outside-toplevel',
+    'too-few-public-methods',
+    'too-many-ancestors',
+    'too-many-arguments',
+    'too-many-branches',
+    'too-many-instance-attributes',
+    'too-many-lines',
+    'too-many-locals',
+    'too-many-nested-blocks',
+    'too-many-public-methods',
+    'too-many-return-statements',
+    'too-many-statements',
+    'wrong-import-order',
+    'wrong-import-position',
+]
+
+[tool.pylint.format]
+good-names = ["i", "f", "db", "dt", "ca", "hi", "pw"]

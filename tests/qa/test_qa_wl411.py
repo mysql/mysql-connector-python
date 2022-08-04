@@ -38,8 +38,7 @@ class WL411Tests(tests.MySQLConnectorTests):
         """Setting the user defined param while resetting session."""
         with self.cnx.cursor() as cur:
             cur.execute(
-                "create table t1 "
-                "(a int, b int generated always as (a + 2) stored)"
+                "create table t1 (a int, b int generated always as (a + 2) stored)"
             )
             cur.execute("insert into t1(a) values(1)")
             cur.execute(" SELECT b from t1")
@@ -51,9 +50,7 @@ class WL411Tests(tests.MySQLConnectorTests):
     def test_create_virtual(self):
         """Resetting the session without any setting any parameter."""
         with self.cnx.cursor() as cur:
-            cur.execute(
-                "create table t2 (a int, b int generated always as (a + 2))"
-            )
+            cur.execute("create table t2 (a int, b int generated always as (a + 2))")
             cur.execute("insert into t2(a) values(1)")
             cur.execute("SELECT b from t2")
             res = cur.fetchone()[0]
@@ -89,12 +86,10 @@ class WL411Tests(tests.MySQLConnectorTests):
     def test_alter_stored(self):
         with self.cnx.cursor() as cur:
             cur.execute(
-                "create table t5 "
-                "(a int, b int generated always as (a + 2) stored)"
+                "create table t5 (a int, b int generated always as (a + 2) stored)"
             )
             cur.execute(
-                "alter table t5 "
-                "modify b int generated always as (a + 3) stored"
+                "alter table t5 modify b int generated always as (a + 3) stored"
             )
             cur.execute("insert into t5(a) values(1)")
             cur.execute("SELECT b from t5")
@@ -105,12 +100,8 @@ class WL411Tests(tests.MySQLConnectorTests):
     @tests.foreach_cnx()
     def test_alter_virtual(self):
         with self.cnx.cursor() as cur:
-            cur.execute(
-                "create table t6 (a int, b int generated always as (a + 2))"
-            )
-            cur.execute(
-                "alter table t6 modify b int generated always as (a + 3)"
-            )
+            cur.execute("create table t6 (a int, b int generated always as (a + 2))")
+            cur.execute("alter table t6 modify b int generated always as (a + 3)")
             cur.execute("insert into t6(a) values(1)")
             cur.execute("SELECT b from t6")
             res = cur.fetchone()[0]
@@ -123,8 +114,7 @@ class WL411Tests(tests.MySQLConnectorTests):
             self.assertRaises(
                 mysql.connector.errors.ProgrammingError,
                 cur.execute,
-                "create table t7 "
-                "(a int, b int generated always as (c op 3) stored)",
+                "create table t7 (a int, b int generated always as (c op 3) stored)",
             )
             cur.execute("drop table if exists t7")
 
@@ -132,8 +122,7 @@ class WL411Tests(tests.MySQLConnectorTests):
     def test_nondefault_gc(self):
         with self.cnx.cursor() as cur:
             cur.execute(
-                "create table t8 "
-                "(a int ,b int generated always as (a + 2) stored)"
+                "create table t8 (a int ,b int generated always as (a + 2) stored)"
             )
             self.assertRaises(
                 mysql.connector.errors.DatabaseError,

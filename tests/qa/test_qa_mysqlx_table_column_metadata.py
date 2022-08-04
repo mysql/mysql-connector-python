@@ -1,4 +1,4 @@
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,7 +34,7 @@ import tests
 
 @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 25), "XPlugin not compatible")
 class TableColumnMetadataTests(tests.MySQLxTests):
-    """Tests for table column metadata. """
+    """Tests for table column metadata."""
 
     @tests.foreach_session()
     def test_get_column_name(self):
@@ -152,9 +152,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_get_fractional_digits(self):
-        self.session.sql(
-            "create table t9(m FLOAT(7,4), s DECIMAL(5,2))"
-        ).execute()
+        self.session.sql("create table t9(m FLOAT(7,4), s DECIMAL(5,2))").execute()
         table = self.schema.get_table("t9")
         table.insert("m", "s").values(0, 0).execute()
         result = table.select().execute()
@@ -202,8 +200,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_get_collation_and_charset(self):
         self.session.sql(
-            "create table t12(_id varchar(32) "
-            "CHARACTER SET utf8 COLLATE utf8_bin)"
+            "create table t12(_id varchar(32) CHARACTER SET utf8 COLLATE utf8_bin)"
         ).execute()
         table = self.schema.get_table("t12")
         result = table.select("_id").execute()
@@ -211,7 +208,6 @@ class TableColumnMetadataTests(tests.MySQLxTests):
             result.columns[0].get_character_set_name() in ("utf8", "utf8mb4")
         )
         self.assertTrue(
-            result.columns[0].get_collation_name()
-            in ("utf8_bin", "utf8mb4_0900_ai_ci")
+            result.columns[0].get_collation_name() in ("utf8_bin", "utf8mb4_0900_ai_ci")
         )
         self.session.sql("drop table t12").execute()
