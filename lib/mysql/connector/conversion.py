@@ -654,7 +654,11 @@ class MySQLConverter(MySQLConverterBase):
     def _blob_to_python(self, value, dsc=None):
         """Convert BLOB data type to Python."""
         if dsc is not None:
-            if dsc[7] & FieldFlag.BLOB and dsc[7] & FieldFlag.BINARY:
+            if (
+                dsc[7] & FieldFlag.BLOB
+                and dsc[7] & FieldFlag.BINARY
+                and dsc[8] == 63  # 'binary' charset
+            ):
                 return bytes(value)
         return self._string_to_python(value, dsc)
 

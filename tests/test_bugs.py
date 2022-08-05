@@ -7045,3 +7045,87 @@ class BugOra21463298(tests.MySQLConnectorTests):
         with self.assertRaises(errors.ProgrammingError) as context:
             get_cursor().execute("SELECT SLEEP(1)")
         self.assertEqual(context.exception.msg, "Cursor is not connected")
+
+
+class BugOra33987119(tests.MySQLConnectorTests):
+    """BUG#33987119: TEXT and with a _bin collation (e.g: utf8mb4_bin) are considered as bytes object.
+
+    An unexpected behaviour happens when using a "_bin" suffixed
+    collation type for the pure Connector/Python implementation.
+    BLOB and BINARY fields are expected to be delivered as bytes
+    objects as this is the expected behaviour, however, TEXT
+    fields are being delivered the same way when using a "_bin"
+    suffixed collation type. This latter is not correct.
+
+    With this patch, the unexpected behaviour is corrected by
+    updating the MySQLConverter._blob_to_python() method.
+    The connector at decoding/delivery time submits TEXT
+    fields to this latter method to determine the final conversion
+    since there is no specific method to handle TEXT datatypes.
+    An extra test is added, it is used the field charset description
+    to cast the incoming field value to the right type.
+    """
+
+    @foreach_cnx(connection.MySQLConnection)
+    def text_datatype_handled_as_binary_for_bin_suffix_collation(self):
+        table_name = "BugOra33987119"
+        tests = [
+            ["TEXT", "VARCHAR(255)", "BLOB"],
+            ["TINYTEXT", "CHAR(255)", "LONGBLOB"],
+            ["MEDIUMTEXT", "TEXT", "TINYBLOB"],
+            ["LONGTEXT", "MEDIUMTEXT", "MEDIUMBLOB"],
+            ["VARCHAR(255)", "TINYTEXT", "BLOB"],
+            ["CHAR(255)", "LONGTEXT", "TINYBLOB"],
+        ]
+        charcoll_map = {
+            "utf8mb4": {
+                "utf8mb4_bin",
+                "utf8mb4_spanish2_ci",
+                "utf8mb4_icelandic_ci",
+            },
+            "utf16": {
+                "utf16_general_ci",
+                "utf16_bin",
+                "utf16_vietnamese_ci",
+            },
+            "greek": {
+                "greek_bin",
+                "greek_general_ci",
+            },
+        }
+        data = ("webmaster@python.org", "very-secret", "I am a blob!")
+        insert_stmt = f"INSERT INTO {table_name} (`email`, `password`, `dummy`) VALUES (%s, %s, %s)"
+        with self.cnx.cursor() as cur:
+            for charset, collation_set in charcoll_map.items():
+                for collation in collation_set:
+                    for t1, t2, t3 in tests:
+                        cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+                        try:
+                            cur.execute(
+                                f"""
+                            CREATE TABLE {table_name} (
+                                `id` int(11) NOT NULL AUTO_INCREMENT,
+                                `email` {t1} NOT NULL,
+                                `password` {t2} NOT NULL,
+                                `dummy` {t3} NOT NULL,
+                                PRIMARY KEY (`id`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET={charset} COLLATE={collation}
+                            AUTO_INCREMENT=1 ;
+                            """
+                            )
+                            cur.execute(insert_stmt, data)
+                            cur.execute(f"SELECT * from {table_name}")
+                            res = cur.fetchall()
+                        except:
+                            self.fail("Something went wrong in the test body!")
+                        else:
+                            try:
+                                for value, target_type in zip(
+                                    res[0], (int, str, str, bytes)
+                                ):
+                                    self.assertEqual(type(value), target_type)
+                            except IndexError as err:
+                                self.fail(f"{err}")
+                        finally:
+                            # always executed
+                            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
