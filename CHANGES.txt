@@ -13,6 +13,7 @@ v8.0.32
 
 - WL#15348: Support MIT Kerberos library on Windows
 - WL#15036: Support for type hints
+- BUG#34556157: Kerberos authorization fails when using SSPI as security interface
 
 v8.0.31
 =======

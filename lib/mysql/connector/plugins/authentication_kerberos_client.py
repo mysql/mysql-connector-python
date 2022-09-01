@@ -397,8 +397,26 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug("targetspn: %s", targetspn)
         _LOGGER.debug("_auth_info is None: %s", _auth_info is None)
 
+        # The Security Support Provider Interface (SSPI) is an interface
+        # that allows us to choose from a set of SSPs available in the
+        # system; the idea of SSPI is to keep interface consistent no
+        # matter what back end (a.k.a., SSP) we choose.
+
+        # When using SSPI we should not use Kerberos directly as SSP,
+        # as remarked in [2], but we can use it indirectly via another
+        # SSP named Negotiate that acts as an application layer between
+        # SSPI and the other SSPs [1].
+
+        # Negotiate can select between Kerberos and NTLM on the fly;
+        # it chooses Kerberos unless it cannot be used by one of the
+        # systems involved in the authentication or the calling
+        # application did not provide sufficient information to use
+        # Kerberos.
+
+        # [1] https://docs.microsoft.com/en-us/windows/win32/secauthn/microsoft-negotiate?source=recommendations
+        # [2] https://docs.microsoft.com/en-us/windows/win32/secauthn/microsoft-kerberos?source=recommendations
         self.clientauth = sspi.ClientAuth(
-            "Kerberos",
+            "Negotiate",
             targetspn=targetspn,
             auth_info=_auth_info,
             scflags=sum(flags),
