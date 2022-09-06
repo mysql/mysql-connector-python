@@ -34,6 +34,7 @@ import io
 import logging
 import os
 import platform
+import ssl
 import socket
 import subprocess
 import sys
@@ -2450,6 +2451,8 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         "This test fails due to a bug on macOS 12",
     )
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 40), "TLSv1.1 incompatible")
+    @unittest.skipUnless(ssl.HAS_TLSv1, "TLSv1 not available")
+    @unittest.skipUnless(ssl.HAS_TLSv1_1, "TLSv1.1 not available")
     @tests.foreach_cnx()
     def test_get_connection_with_tls_version(self):
         if isinstance(self.cnx, connection.MySQLConnection):

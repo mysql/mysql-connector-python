@@ -35,6 +35,7 @@ import logging
 import os
 import platform
 import random
+import ssl
 import socket
 import string
 import struct
@@ -1347,6 +1348,8 @@ class MySQLxSessionTests(tests.MySQLxTests):
         "This test fails due to a bug on macOS 12",
     )
     @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 40), "TLSv1.1 incompatible")
+    @unittest.skipUnless(ssl.HAS_TLSv1, "TLSv1 not available")
+    @unittest.skipUnless(ssl.HAS_TLSv1_1, "TLSv1.1 not available")
     def test_get_session_with_tls_version(self):
         # Test None value is returned if no schema name is specified
         settings = self.connect_kwargs.copy()
