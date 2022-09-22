@@ -450,6 +450,8 @@ def foreach_cnx(*cnx_classes, **extra_config):
                 for key, value in extra_config.items():
                     self.config[key] = value
             for cnx_class in cnx_classes or self.all_cnx_classes:
+                if cnx_class is None:
+                    continue
                 try:
                     self.cnx = cnx_class(**self.config)
                     self._testMethodName = "{0} (using {1})".format(

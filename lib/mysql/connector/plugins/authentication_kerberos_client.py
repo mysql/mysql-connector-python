@@ -35,6 +35,7 @@ import logging
 import os
 import struct
 
+from pathlib import Path
 from typing import Any, Optional, Tuple
 
 from .. import errors
@@ -63,7 +64,9 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 _LOGGER = logging.getLogger(__name__)
 
-AUTHENTICATION_PLUGIN_CLASS = "MySQLKerberosAuthPlugin"
+AUTHENTICATION_PLUGIN_CLASS = (
+    "MySQLSSPIKerberosAuthPlugin" if os.name == "nt" else "MySQLKerberosAuthPlugin"
+)
 
 
 # pylint: disable=c-extension-no-member,no-member
@@ -86,23 +89,59 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         except gssapi.raw.misc.GSSError:
             return getpass.getuser()
 
-    def _acquire_cred_with_password(self, upn: str) -> gssapi.raw.creds.Creds:
-        """Acquire credentials through provided password."""
-        _LOGGER.debug("Attempt to acquire credentials through provided password")
+    @staticmethod
+    def get_store() -> dict:
+        """Get a credentials store dictionary.
 
-        username = gssapi.raw.names.import_name(
-            upn.encode("utf-8"), name_type=gssapi.NameType.user
+        Returns:
+            dict: Credentials store dictionary with the krb5 ccache name.
+
+        Raises:
+            errors.InterfaceError: If 'KRB5CCNAME' environment variable is empty.
+        """
+        krb5ccname = os.environ.get(
+            "KRB5CCNAME",
+            f"/tmp/krb5cc_{os.getuid()}"
+            if os.name == "posix"
+            else Path("%TEMP%").joinpath("krb5cc"),
         )
+        if not krb5ccname:
+            raise errors.InterfaceError(
+                "The 'KRB5CCNAME' environment variable is set to empty"
+            )
+        _LOGGER.debug("Using krb5 ccache name: FILE:%s", krb5ccname)
+        store = {b"ccache": f"FILE:{krb5ccname}".encode("utf-8")}
+        return store
+
+    def _acquire_cred_with_password(self, upn: str) -> gssapi.raw.creds.Creds:
+        """Acquire and store credentials through provided password.
+
+        Args:
+            upn (str): User Principal Name.
+
+        Returns:
+            gssapi.raw.creds.Creds: GSSAPI credentials.
+        """
+        _LOGGER.debug("Attempt to acquire credentials through provided password")
+        user = gssapi.Name(upn, gssapi.NameType.user)
+        password = self._password.encode("utf-8")
 
         try:
             acquire_cred_result = gssapi.raw.acquire_cred_with_password(
-                username, self._password.encode("utf-8"), usage="initiate"
+                user, password, usage="initiate"
+            )
+            creds = acquire_cred_result.creds
+            gssapi.raw.store_cred_into(
+                self.get_store(),
+                creds=creds,
+                mech=gssapi.MechType.kerberos,
+                overwrite=True,
+                set_default=True,
             )
         except gssapi.raw.misc.GSSError as err:
             raise errors.ProgrammingError(
                 f"Unable to acquire credentials with the given password: {err}"
             )
-        creds = acquire_cred_result[0]
         return creds
 
     @staticmethod
@@ -152,7 +191,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug("Username: %s", self._username)
 
         try:
-            # Attempt to retrieve credentials from default cache file
+            # Attempt to retrieve credentials from cache file
             creds: Any = gssapi.Credentials(usage="initiate")
             creds_upn = str(creds.name)
 
@@ -410,10 +449,3 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         _LOGGER.debug("Context completed?: %s", self.clientauth.authenticated)
 
         return resp, self.clientauth.authenticated
-
-
-# pylint: enable=c-extension-no-member,no-member
-
-
-if os.name == "nt":
-    MySQLKerberosAuthPlugin = MySQLSSPIKerberosAuthPlugin  # type: ignore[assignment]

@@ -82,6 +82,7 @@ class MySQLProtocol:
         username: Optional[StrOrBytes],
         password: Optional[str],
         database: Optional[str],
+        auth_plugin_class: str,
         auth_plugin: str,
         auth_data: Optional[bytes],
         ssl_enabled: bool,
@@ -91,7 +92,7 @@ class MySQLProtocol:
             return b"\x00"
 
         try:
-            auth = get_auth_plugin(auth_plugin)(
+            auth = get_auth_plugin(auth_plugin, auth_plugin_class)(
                 auth_data,
                 username=username,
                 password=password,
@@ -124,6 +125,7 @@ class MySQLProtocol:
         ssl_enabled: bool = False,
         auth_plugin: Optional[str] = None,
         conn_attrs: Optional[ConnAttrsType] = None,
+        auth_plugin_class: Optional[str] = None,
     ) -> bytes:
         """Make a MySQL Authentication packet"""
         if handshake is None:
@@ -160,6 +162,7 @@ class MySQLProtocol:
             username,
             password,
             database,
+            auth_plugin_class,
             auth_plugin,
             auth_data,
             ssl_enabled,
@@ -231,6 +234,7 @@ class MySQLProtocol:
         ssl_enabled: bool = False,
         auth_plugin: Optional[str] = None,
         conn_attrs: Optional[ConnAttrsType] = None,
+        auth_plugin_class: Optional[str] = None,
     ) -> bytes:
         """Make a MySQL packet with the Change User command"""
 
@@ -262,6 +266,7 @@ class MySQLProtocol:
             username,
             password,
             database,
+            auth_plugin_class,
             auth_plugin,
             auth_data,
             ssl_enabled,

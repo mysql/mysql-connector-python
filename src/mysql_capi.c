@@ -1098,7 +1098,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
          *tls_versions = NULL, *tls_cipher_suites = NULL;
     PyObject *charset_name = NULL, *compress = NULL, *ssl_verify_cert = NULL,
              *ssl_verify_identity = NULL, *ssl_disabled = NULL, *conn_attrs = NULL,
-             *key = NULL, *value = NULL;
+             *key = NULL, *value = NULL, *use_kerberos_gssapi = Py_False;
     const char *auth_plugin, *plugin_dir;
     unsigned long client_flags = 0;
     unsigned int port = 3306, tmp_uint;
@@ -1144,16 +1144,17 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                              "load_data_local_dir",
                              "oci_config_file",
                              "fido_callback",
+                             "use_kerberos_gssapi",
                              NULL};
 
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzO", kwlist, &host, &user, &password,
+            args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzOO", kwlist, &host, &user, &password,
             &password1, &password2, &password3, &database, &port, &unix_socket, &client_flags,
             &ssl_ca, &ssl_cert, &ssl_key, &ssl_cipher_suites, &tls_versions,
             &tls_cipher_suites, &PyBool_Type, &ssl_verify_cert, &PyBool_Type,
             &ssl_verify_identity, &PyBool_Type, &ssl_disabled, &PyBool_Type, &compress,
             &PyDict_Type, &conn_attrs, &local_infile, &load_data_local_dir, &oci_config_file,
-            &fido_callback)) {
+            &fido_callback, &use_kerberos_gssapi)) {
         return NULL;
     }
 
@@ -1380,6 +1381,23 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         mysql_plugin_options(fido_plugin, "fido_messages_callback",
                              (const void *)(&fido_messages_callback));
     }
+
+#ifdef MS_WINDOWS
+    if (use_kerberos_gssapi == Py_True) {
+        struct st_mysql_client_plugin *kerberos_plugin = \
+            mysql_client_find_plugin(&self->session,
+                "authentication_kerberos_client", MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
+        if (!kerberos_plugin) {
+            raise_with_string(
+                PyUnicode_FromString("The Kerberos authentication plugin could not be loaded"),
+                NULL);
+            return NULL;
+        }
+
+        mysql_plugin_options(kerberos_plugin,
+            "plugin_authentication_kerberos_client_mode", "GSSAPI");
+    }
+#endif
 
     Py_BEGIN_ALLOW_THREADS
     res = mysql_real_connect(&self->session, host, user, password,

@@ -32,7 +32,7 @@ import importlib
 import logging
 
 from functools import lru_cache
-from typing import Type
+from typing import Optional, Type
 
 from .errors import NotSupportedError, ProgrammingError
 from .plugins import BaseAuthPlugin
@@ -47,15 +47,22 @@ DEFAULT_PLUGINS_PKG = "mysql.connector.plugins"
 @lru_cache(maxsize=10, typed=False)
 def get_auth_plugin(
     plugin_name: str,
+    auth_plugin_class: Optional[str] = None,
 ) -> Type[BaseAuthPlugin]:  # AUTH_PLUGIN_CLASS_TYPES:
     """Return authentication class based on plugin name
 
     This function returns the class for the authentication plugin plugin_name.
     The returned class is a subclass of BaseAuthPlugin.
 
-    Raises NotSupportedError when plugin_name is not supported.
+    Args:
+        plugin_name (str): Authentication plugin name.
+        auth_plugin_class (str): Authentication plugin class name.
 
-    Returns subclass of BaseAuthPlugin.
+    Raises:
+        NotSupportedError: When plugin_name is not supported.
+
+    Returns:
+        Subclass of `BaseAuthPlugin`.
     """
     package = DEFAULT_PLUGINS_PKG
     if plugin_name:
@@ -63,11 +70,10 @@ def get_auth_plugin(
             _LOGGER.info("package: %s", package)
             _LOGGER.info("plugin_name: %s", plugin_name)
             plugin_module = importlib.import_module(f".{plugin_name}", package)
-            _LOGGER.info(
-                "AUTHENTICATION_PLUGIN_CLASS: %s",
-                plugin_module.AUTHENTICATION_PLUGIN_CLASS,
-            )
-            return getattr(plugin_module, plugin_module.AUTHENTICATION_PLUGIN_CLASS)
+            if not auth_plugin_class or not hasattr(plugin_module, auth_plugin_class):
+                auth_plugin_class = plugin_module.AUTHENTICATION_PLUGIN_CLASS
+            _LOGGER.info("AUTHENTICATION_PLUGIN_CLASS: %s", auth_plugin_class)
+            return getattr(plugin_module, auth_plugin_class)
         except ModuleNotFoundError as err:
             _LOGGER.warning("Requested Module was not found: %s", err)
         except ValueError as err:

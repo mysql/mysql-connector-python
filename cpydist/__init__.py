@@ -345,7 +345,10 @@ class BaseCommand(Command):
                 src = os.path.join(src_folder, filename)
                 dst = os.path.join(os.getcwd(), self.vendor_folder, dst_folder)
                 self.log.info("copying %s -> %s", src, dst)
-                self.log.info("shutil res: %s", shutil.copy(src, dst))
+                try:
+                    self.log.info("shutil res: %s", shutil.copy(src, dst))
+                except shutil.SameFileError:
+                    pass
 
         if os.name == "nt":
             self.distribution.package_data = {"mysql": ["vendor/plugin/*"]}

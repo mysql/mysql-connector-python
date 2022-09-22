@@ -43,7 +43,7 @@ skip_glob = [
     'lib/mysql/connector/locales/eng',
     'lib/mysqlx/locales/eng',
     'lib/mysqlx/protobuf',
-    'venv/*'
+    'venv/*',
 ]
 
 [tool.black]

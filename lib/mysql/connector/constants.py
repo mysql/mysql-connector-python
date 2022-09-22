@@ -91,6 +91,7 @@ DEFAULT_CONFIGURATION: Dict[str, Optional[Union[str, bool, int]]] = {
     "krb_service_principal": None,
     "oci_config_file": None,
     "fido_callback": None,
+    "kerberos_auth_mode": None,
 }
 
 CNX_POOL_ARGS: Tuple[str, str, str] = ("pool_name", "pool_size", "pool_reset_session")

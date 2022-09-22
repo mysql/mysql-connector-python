@@ -28,9 +28,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""Test module for authentication
-
-"""
+"""Test module for authentication."""
 
 import getpass
 import importlib
@@ -38,6 +36,7 @@ import inspect
 import itertools
 import logging
 import os
+import pathlib
 import pkgutil
 import subprocess
 import time
@@ -62,8 +61,13 @@ except ImportError:
 
 try:
     import gssapi
+
+    from mysql.connector.plugins.authentication_kerberos_client import (
+        MySQLKerberosAuthPlugin,
+    )
 except ImportError:
     gssapi = None
+    MySQLKerberosAuthPlugin = None
 
 try:
     import oci
@@ -466,12 +470,18 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
 @unittest.skipIf(
     os.getenv("TEST_AUTHENTICATION_KERBEROS") is None,
-    "Run tests only if the plugin is configured",
+    "The 'TEST_AUTHENTICATION_KERBEROS' environment variable is not set",
 )
-@unittest.skipIf(os.name == "nt", "Tests not available for Windows")
+@unittest.skipIf(
+    gssapi is None, "The 'gssapi' package is required to run Kerberos tests"
+)
 @unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 24),
     "Authentication with Kerberos not supported",
+)
+@unittest.skipIf(
+    tests.MYSQL_VERSION < (8, 0, 32) and os.name == "nt",
+    "Authentication with Kerberos on Windows is not supported for MySQL <8.0.32",
 )
 class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     """Test authentication.MySQLKerberosAuthPlugin.
@@ -484,35 +494,14 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     other_user = "test3"
     realm = "MYSQL.LOCAL"
     badrealm = "MYSQL2.LOCAL"
+    krb5ccname = os.environ.get("KRB5CCNAME")
+    kinit = os.environ.get("KINIT", "kinit")
     default_config = {}
     plugin_installed_and_active = False
     skip_reason = None
 
     @classmethod
     def setUpClass(cls):
-        is_plugin_available = tests.is_plugin_available(
-            "authentication_kerberos",
-            config_vars=(
-                (
-                    "authentication_kerberos_service_principal",
-                    "mysql_service/kerberos_auth_host@MYSQL.LOCAL",
-                ),
-                (
-                    "authentication_kerberos_service_key_tab",
-                    os.path.join(
-                        os.path.dirname(os.path.realpath(__file__)),
-                        "data",
-                        "kerberos",
-                        "mysql.keytab",
-                    ),
-                ),
-            ),
-        )
-
-        if not is_plugin_available:
-            cls.skip_reason = "Plugin authentication_kerberos not available"
-            return
-
         if not tests.is_host_reachable("100.103.18.98"):
             cls.skip_reason = "Kerberos server is not reachable"
             return
@@ -525,6 +514,10 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             "password": cls.password,
             "auth_plugin": "authentication_kerberos_client",
         }
+
+        # Enable Kerberos GSSPI mode for Windows
+        if os.name == "nt":
+            cls.default_config["kerberos_auth_mode"] = "GSSAPI"
 
         with mysql.connector.connection.MySQLConnection(**config) as cnx:
             cnx.cmd_query(f"DROP USER IF EXISTS'{cls.user}'")
@@ -545,9 +538,17 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             cnx.cmd_query("FLUSH PRIVILEGES")
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin("MySQLKerberosAuthPlugin")
+        self.plugin_class = authentication.get_auth_plugin(
+            "authentication_kerberos_client"
+        )
         if self.skip_reason is not None:
             self.skipTest(self.skip_reason)
+
+    def _kdestroy(self):
+        if os.name == "nt" and self.krb5ccname and os.path.exists(self.krb5ccname):
+            os.remove(self.krb5ccname)
+        else:
+            subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
 
     def _get_kerberos_tgt(self, user=None, password=None, realm=None, expired=False):
         """Obtain and cache Kerberos ticket-granting ticket.
@@ -555,12 +556,21 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         Call `kinit` with a specified user and password for obtaining and
         caching Kerberos ticket-granting ticket.
         """
-        cmd = ["kinit", "{}@{}".format(user or self.user, realm or self.realm)]
+        keytab = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "data",
+            "kerberos",
+            "users.keytab",
+        )
+
+        cmd = [self.kinit]
         if expired:
             cmd.extend(["-l", "0:0:6"])
-
-        if password is None:
-            password = self.password
+        if self.krb5ccname:
+            cmd.extend(["-c", str(self.krb5ccname)])
+        cmd.extend(
+            ["-k", "-t", keytab, "{}@{}".format(user or self.user, realm or self.realm)]
+        )
 
         proc = subprocess.Popen(
             cmd,
@@ -568,7 +578,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             stderr=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
         )
-        _, err = proc.communicate(password.encode("utf-8"))
+        _, err = proc.communicate()
 
         if err:
             raise InterfaceError(
@@ -617,7 +627,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     ):
         """Test with cached valid TGT."""
         # Destroy Kerberos tickets
-        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+        self._kdestroy()
 
         # Obtain and cache Kerberos ticket-granting ticket
         self._get_kerberos_tgt(
@@ -628,12 +638,12 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         self._test_connection(conn_class, config, fail=fail)
 
         # Destroy Kerberos tickets
-        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+        self._kdestroy()
 
     def _test_with_st_cache(self, conn_class, config, fail=False):
         """Test with cached valid ST."""
         # Destroy Kerberos tickets
-        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+        self._kdestroy()
 
         # Obtain and cache Kerberos ticket-granting ticket
         self._get_kerberos_tgt()
@@ -646,7 +656,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         self._test_connection(conn_class, config, fail=fail)
 
         # Destroy Kerberos tickets
-        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+        self._kdestroy()
 
     def test_class(self):
         self.assertEqual(
@@ -746,9 +756,13 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     # Tests with cache is present but contains expired TGT
 
-    @tests.foreach_cnx()
+    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
     def test_tgt_expired(self):
-        """Test with cache expired."""
+        """Test with cache expired.
+
+        NOTE: This test is skipped for MySQLConnection on Windows due to
+              https://github.com/pythongssapi/python-gssapi/issues/302
+        """
         config = self.default_config.copy()
         self._test_with_tgt_cache(
             self.cnx.__class__,
@@ -822,9 +836,13 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     # Tests with TGT in the cache for a different UPN
 
-    @tests.foreach_cnx()
+    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
     def test_tgt_badupn(self):
-        """Test with cached valid TGT with a bad UPN."""
+        """Test with cached valid TGT with a bad UPN.
+
+        NOTE: This test is skipped for MySQLConnection on Windows due to
+              https://github.com/pythongssapi/python-gssapi/issues/302
+        """
         config = self.default_config.copy()
         self._test_with_tgt_cache(
             self.cnx.__class__,
@@ -898,9 +916,13 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     # Tests with TGT in the cache with for a different realm
 
-    @tests.foreach_cnx()
+    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
     def test_tgt_badrealm(self):
-        """Test with cached valid TGT with a bad realm."""
+        """Test with cached valid TGT with a bad realm.
+
+        NOTE: This test is skipped for MySQLConnection on Windows due to
+              https://github.com/pythongssapi/python-gssapi/issues/302
+        """
         config = self.default_config.copy()
         self._test_with_tgt_cache(
             self.cnx.__class__,
@@ -925,9 +947,13 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             fail=True,
         )
 
-    @tests.foreach_cnx()
+    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
     def test_tgt_badrealm_nouser(self):
-        """Test with cached valid TGT with no user with a bad realm."""
+        """Test with cached valid TGT with no user with a bad realm.
+
+        NOTE: This test is skipped for MySQLConnection on Windows due to
+              https://github.com/pythongssapi/python-gssapi/issues/302
+        """
         config = self.default_config.copy()
         del config["user"]
         self._test_with_tgt_cache(
@@ -995,10 +1021,86 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         del config["user"]
 
         # Destroy Kerberos tickets
-        subprocess.run(["kdestroy"], check=True, stderr=subprocess.DEVNULL)
+        self._kdestroy()
 
         # Test connection
         self._test_connection(self.cnx.__class__, config, fail=False)
+
+    # Tests 'kerberos_auth_mode' option
+
+    @unittest.skipIf(os.name == "nt", "Tests not available for Windows")
+    @tests.foreach_cnx()
+    def test_kerberos_auth_mode_sspi(self):
+        """Test 'kerberos_auth_mode=SSPI' on platforms without support for SSPI."""
+        config = self.default_config.copy()
+        config["kerberos_auth_mode"] = "SSPI"
+        self.assertRaises(InterfaceError, self.cnx.__class__, **config)
+
+    @tests.foreach_cnx()
+    def test_kerberos_auth_mode_invalid(self):
+        """Test invalid options for 'kerberos_auth_mode'."""
+        config = self.default_config.copy()
+        for option in ("abc", ["GSSAPI"], 0):
+            config["kerberos_auth_mode"] = option
+            self.assertRaises(InterfaceError, self.cnx.__class__, **config)
+
+    @tests.foreach_cnx()
+    def test_kerberos_auth_mode_valid(self):
+        """Test valid options for 'kerberos_auth_mode'."""
+        # Destroy Kerberos tickets
+        self._kdestroy()
+
+        # Obtain and cache Kerberos ticket-granting ticket
+        self._get_kerberos_tgt()
+
+        config = self.default_config.copy()
+        for option in ("GSSAPI", "GssApi", "gssapi"):
+            config["kerberos_auth_mode"] = option
+            # Test connection
+            self._test_connection(self.cnx.__class__, config, fail=False)
+
+        # Destroy Kerberos tickets
+        self._kdestroy()
+
+    # Tests 'MySQLKerberosAuthPlugin.get_store()' function
+
+    @tests.foreach_cnx()
+    def test_get_store(self):
+        """Test when 'MySQLKerberosAuthPlugin.get_store()."""
+        self.maxDiff = 33333
+        default_krb5ccname = (
+            f"/tmp/krb5cc_{os.getuid()}"
+            if os.name == "posix"
+            else pathlib.Path("%TEMP%").joinpath("krb5cc")
+        )
+
+        # Store current KRB5CCNAME
+        krb5ccname = os.environ.get("KRB5CCNAME")
+
+        # Set KRB5CCNAME environment variable to empty
+        os.environ["KRB5CCNAME"] = ""
+        self.assertRaises(InterfaceError, MySQLKerberosAuthPlugin.get_store)
+
+        # Test using the default KRB5CCNAME environment variable
+        if krb5ccname is None and "KRB5CCNAME" in os.environ:
+            del os.environ["KRB5CCNAME"]
+        self.assertEqual(
+            MySQLKerberosAuthPlugin.get_store(),
+            {b"ccache": f"FILE:{default_krb5ccname}".encode("utf-8")},
+        )
+
+        # Set custom KRB5CCNAME environment variable
+        os.environ["KRB5CCNAME"] = f"{default_krb5ccname}_test"
+        self.assertEqual(
+            MySQLKerberosAuthPlugin.get_store(),
+            {b"ccache": f"FILE:{default_krb5ccname}_test".encode("utf-8")},
+        )
+
+        # Restore KRB5CCNAME in os.environ
+        if krb5ccname is None and "KRB5CCNAME" in os.environ:
+            del os.environ["KRB5CCNAME"]
+        else:
+            os.environ["KRB5CCNAME"] = krb5ccname
 
 
 @unittest.skipIf(

@@ -190,6 +190,7 @@ class MySQLConnectionAbstract(ABC):
 
         self._ssl_active: bool = False
         self._auth_plugin: Optional[str] = None
+        self._auth_plugin_class: Optional[str] = None
         self._pool_config_version: Any = None
         self.converter: Optional[MySQLConverter] = None
         self._converter_class: Optional[Type[MySQLConverter]] = None
@@ -711,6 +712,24 @@ class MySQLConnectionAbstract(ABC):
 
         if self._client_flags & ClientFlag.CONNECT_ARGS:
             self._add_default_conn_attrs()
+
+        if "kerberos_auth_mode" in config and config["kerberos_auth_mode"] is not None:
+            if not isinstance(config["kerberos_auth_mode"], str):
+                raise InterfaceError("'kerberos_auth_mode' must be of type str")
+            kerberos_auth_mode = config["kerberos_auth_mode"].lower()
+            if kerberos_auth_mode == "sspi":
+                if os.name != "nt":
+                    raise InterfaceError(
+                        "'kerberos_auth_mode=SSPI' is only available on Windows"
+                    )
+                self._auth_plugin_class = "MySQLSSPIKerberosAuthPlugin"
+            elif kerberos_auth_mode == "gssapi":
+                self._auth_plugin_class = "MySQLKerberosAuthPlugin"
+            else:
+                raise InterfaceError(
+                    "Invalid 'kerberos_auth_mode' mode. Please use 'SSPI' or 'GSSAPI'"
+                )
+
         if (
             "krb_service_principal" in config
             and config["krb_service_principal"] is not None

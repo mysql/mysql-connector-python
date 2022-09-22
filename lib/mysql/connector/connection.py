@@ -309,6 +309,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             ssl_enabled=self._ssl_active,
             auth_plugin=self._auth_plugin,
             conn_attrs=conn_attrs,
+            auth_plugin_class=self._auth_plugin_class,
         )
         self._socket.send(packet)
         self._auth_switch_request(username, password)
@@ -344,7 +345,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 new_auth_plugin,
                 auth_data,
             ) = self._protocol.parse_auth_switch_request(packet)
-            auth = get_auth_plugin(new_auth_plugin)(
+            auth = get_auth_plugin(new_auth_plugin, self._auth_plugin_class)(
                 auth_data,
                 username=username or self._user,
                 password=password,
@@ -354,7 +355,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)
-            auth = get_auth_plugin(new_auth_plugin)(
+            auth = get_auth_plugin(new_auth_plugin, self._auth_plugin_class)(
                 auth_data, password=password, ssl_enabled=self.is_secure
             )
             if new_auth_plugin == "caching_sha2_password":
@@ -386,7 +387,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         _LOGGER.debug("# MFA N Factor #%d", self._mfa_nfactor)
 
         packet, auth_plugin = self._protocol.parse_auth_next_factor(packet[4:])
-        auth = get_auth_plugin(auth_plugin)(
+        auth = get_auth_plugin(auth_plugin, self._auth_plugin_class)(
             None,
             username=self._user,
             password=password,
@@ -396,7 +397,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if packet[4] == 1:
             auth_data = self._protocol.parse_auth_more_data(packet)
-            auth = get_auth_plugin(auth_plugin)(
+            auth = get_auth_plugin(auth_plugin, self._auth_plugin_class)(
                 auth_data, password=password, ssl_enabled=self.is_secure
             )
             if auth_plugin == "caching_sha2_password":
@@ -563,10 +564,9 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Raises on errors.
         """
-        if self._auth_plugin == "authentication_kerberos_client" and os.name != "nt":
-            if not self._user:
-                cls = get_auth_plugin(self._auth_plugin)
-                self._user = cls.get_user_from_credentials()
+        if self._auth_plugin == "authentication_kerberos_client" and not self._user:
+            cls = get_auth_plugin(self._auth_plugin, self._auth_plugin_class)
+            self._user = cls.get_user_from_credentials()
 
         self._protocol = MySQLProtocol()
         self._socket = self._get_connection()

@@ -280,6 +280,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 }
             )
 
+        if os.name == "nt" and self._auth_plugin_class == "MySQLKerberosAuthPlugin":
+            cnx_kwargs["use_kerberos_gssapi"] = True
+
         try:
             self._cmysql.connect(**cnx_kwargs)
             self._cmysql.converter_str_fallback = self._converter_str_fallback
