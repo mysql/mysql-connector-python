@@ -40,5 +40,5 @@ class MySQLSHA256PasswordAuthPlugin(BaseAuthPlugin):
     Standard Library does not provide this OpenSSL functionality.
     """
 
-    requires_ssl = True
-    plugin_name = "sha256_password"
+    requires_ssl: bool = True
+    plugin_name: str = "sha256_password"

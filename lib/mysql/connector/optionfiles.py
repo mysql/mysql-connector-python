@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="attr-defined"
+
 """Implements parser to parse MySQL option files."""
 
 import codecs
@@ -34,13 +36,17 @@ import os
 import re
 
 from configparser import ConfigParser as SafeConfigParser, MissingSectionHeaderError
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .constants import CNX_POOL_ARGS, DEFAULT_CONFIGURATION
 
-DEFAULT_EXTENSIONS = {"nt": ("ini", "cnf"), "posix": ("cnf",)}
+DEFAULT_EXTENSIONS: Dict[str, Tuple[str, ...]] = {
+    "nt": ("ini", "cnf"),
+    "posix": ("cnf",),
+}
 
 
-def read_option_files(**config):
+def read_option_files(**config: Union[str, List[str]]) -> Dict[str, Any]:
     """
     Read option files for connection parameters.
 
@@ -64,7 +70,7 @@ def read_option_files(**config):
         del config["option_files"]
 
         config_from_file = option_parser.get_groups_as_dict_with_priority(*groups)
-        config_options = {}
+        config_options: Dict[str, Tuple[str, int]] = {}
         for group in groups:
             try:
                 for option, value in config_from_file[group].items():
@@ -105,7 +111,9 @@ def read_option_files(**config):
 class MySQLOptionsParser(SafeConfigParser):
     """This class implements methods to parse MySQL option files"""
 
-    def __init__(self, files=None, keep_dashes=True):
+    def __init__(
+        self, files: Optional[Union[List[str], str]] = None, keep_dashes: bool = True
+    ) -> None:
         """Initialize
 
         If defaults is True, default option files are read first
@@ -115,31 +123,28 @@ class MySQLOptionsParser(SafeConfigParser):
         """
 
         # Regular expression to allow options with no value(For Python v2.6)
-        self.optcre = re.compile(
+        self.optcre: re.Pattern[str] = re.compile(
             r"(?P<option>[^:=\s][^:=]*)"
             r"\s*(?:"
             r"(?P<vi>[:=])\s*"
             r"(?P<value>.*))?$"
         )
 
-        self._options_dict = {}
+        self._options_dict: Dict[str, Dict[str, Tuple[str, int]]] = {}
 
         SafeConfigParser.__init__(self, strict=False)
 
-        self.default_extension = DEFAULT_EXTENSIONS[os.name]
-        self.keep_dashes = keep_dashes
+        self.default_extension: Tuple[str, ...] = DEFAULT_EXTENSIONS[os.name]
+        self.keep_dashes: bool = keep_dashes
 
         if not files:
             raise ValueError("files argument should be given")
-        if isinstance(files, str):
-            self.files = [files]
-        else:
-            self.files = files
+        self.files: List[str] = [files] if isinstance(files, str) else files
 
         self._parse_options(list(self.files))
-        self._sections = self.get_groups_as_dict()
+        self._sections: Dict[str, Dict[str, str]] = self.get_groups_as_dict()
 
-    def optionxform(self, optionstr):
+    def optionxform(self, optionstr: str) -> str:
         """Converts option strings
 
         Converts option strings to lower case and replaces dashes(-) with
@@ -149,7 +154,7 @@ class MySQLOptionsParser(SafeConfigParser):
             optionstr = optionstr.replace("-", "_")
         return optionstr.lower()
 
-    def _parse_options(self, files):
+    def _parse_options(self, files: List[str]) -> None:
         """Parse options from files given as arguments.
          This method checks for !include or !inculdedir directives and if there
          is any, those files included by these directives are also parsed
@@ -201,7 +206,9 @@ class MySQLOptionsParser(SafeConfigParser):
         if not_read_files:
             raise ValueError(f"File(s) {', '.join(not_read_files)} could not be read.")
 
-    def read(self, filenames, encoding=None):
+    def read(  # type: ignore[override]
+        self, filenames: Union[str, List[str]], encoding: Optional[str] = None
+    ) -> List[str]:
         """Read and parse a filename or a list of filenames.
 
         Overridden from ConfigParser and modified so as to allow options
@@ -254,7 +261,7 @@ class MySQLOptionsParser(SafeConfigParser):
             read_ok.append(filename)
         return read_ok
 
-    def get_groups(self, *args):
+    def get_groups(self, *args: str) -> Dict[str, str]:
         """Returns options as a dictionary.
 
         Returns options from all the groups specified as arguments, returns
@@ -264,10 +271,10 @@ class MySQLOptionsParser(SafeConfigParser):
         Returns a dictionary
         """
         if not args:
-            args = self._options_dict.keys()
+            args = tuple(self._options_dict.keys())
 
         options = {}
-        priority = {}
+        priority: Dict[str, int] = {}
         for group in args:
             try:
                 for option, value in [
@@ -286,7 +293,9 @@ class MySQLOptionsParser(SafeConfigParser):
 
         return options
 
-    def get_groups_as_dict_with_priority(self, *args):
+    def get_groups_as_dict_with_priority(
+        self, *args: str
+    ) -> Dict[str, Dict[str, Tuple[str, int]]]:
         """Returns options as dictionary of dictionaries.
 
         Returns options from all the groups specified as arguments. For each
@@ -301,7 +310,7 @@ class MySQLOptionsParser(SafeConfigParser):
         Returns an dictionary of dictionaries
         """
         if not args:
-            args = self._options_dict.keys()
+            args = tuple(self._options_dict.keys())
 
         options = {}
         for group in args:
@@ -316,10 +325,9 @@ class MySQLOptionsParser(SafeConfigParser):
                 )
             except KeyError:
                 pass
-
         return options
 
-    def get_groups_as_dict(self, *args):
+    def get_groups_as_dict(self, *args: str) -> Dict[str, Dict[str, str]]:
         """Returns options as dictionary of dictionaries.
 
         Returns options from all the groups specified as arguments. For each
@@ -330,7 +338,7 @@ class MySQLOptionsParser(SafeConfigParser):
         Returns an dictionary of dictionaries
         """
         if not args:
-            args = self._options_dict.keys()
+            args = tuple(self._options_dict.keys())
 
         options = {}
         for group in args:

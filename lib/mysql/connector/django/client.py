@@ -31,6 +31,8 @@
 import os
 import subprocess
 
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
 from django.db.backends.base.client import BaseDatabaseClient
 
 
@@ -40,7 +42,9 @@ class DatabaseClient(BaseDatabaseClient):
     executable_name = "mysql"
 
     @classmethod
-    def settings_to_cmd_args_env(cls, settings_dict, parameters=None):
+    def settings_to_cmd_args_env(
+        cls, settings_dict: Dict[str, Any], parameters: Optional[Iterable[str]] = None
+    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         args = [cls.executable_name]
 
         db = settings_dict["OPTIONS"].get("database", settings_dict["NAME"])
@@ -93,7 +97,7 @@ class DatabaseClient(BaseDatabaseClient):
 
         return args, None
 
-    def runshell(self, parameters=None):
+    def runshell(self, parameters: Optional[Iterable[str]] = None) -> None:
         args, env = self.settings_to_cmd_args_env(
             self.connection.settings_dict, parameters
         )

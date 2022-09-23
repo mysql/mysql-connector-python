@@ -34,6 +34,7 @@ import struct
 from hashlib import sha1
 
 from .. import errors
+from ..types import StrOrBytes
 from . import BaseAuthPlugin
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -46,17 +47,17 @@ AUTHENTICATION_PLUGIN_CLASS = "MySQLNativePasswordAuthPlugin"
 class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Native Password authentication plugin"""
 
-    requires_ssl = False
-    plugin_name = "mysql_native_password"
+    requires_ssl: bool = False
+    plugin_name: str = "mysql_native_password"
 
-    def prepare_password(self):
+    def prepare_password(self) -> bytes:
         """Prepares and returns password as native MySQL 4.1+ password"""
         if not self._auth_data:
             raise errors.InterfaceError("Missing authentication data (seed)")
 
         if not self._password:
             return b""
-        password = self._password
+        password: StrOrBytes = self._password
 
         if isinstance(self._password, str):
             password = self._password.encode("utf-8")

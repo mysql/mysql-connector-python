@@ -53,15 +53,22 @@ from stringprep import (
     in_table_d1,
     in_table_d2,
 )
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 from .custom_types import HexLiteral
+from .types import StrOrBytes
 
-__MYSQL_DEBUG__ = False
+__MYSQL_DEBUG__: bool = False
 
-NUMERIC_TYPES = (int, float, Decimal, HexLiteral)
+NUMERIC_TYPES: Tuple[Type[int], Type[float], Type[Decimal], Type[HexLiteral]] = (
+    int,
+    float,
+    Decimal,
+    HexLiteral,
+)
 
 
-def intread(buf):
+def intread(buf: Union[int, bytes]) -> int:
     """Unpacks the given buffer to an integer"""
     if isinstance(buf, int):
         return buf
@@ -70,12 +77,12 @@ def intread(buf):
         return buf[0]
     if length <= 4:
         tmp = buf + b"\x00" * (4 - length)
-        return struct.unpack("<I", tmp)[0]
+        return int(struct.unpack("<I", tmp)[0])
     tmp = buf + b"\x00" * (8 - length)
-    return struct.unpack("<Q", tmp)[0]
+    return int(struct.unpack("<Q", tmp)[0])
 
 
-def int1store(i):
+def int1store(i: int) -> bytearray:
     """
     Takes an unsigned byte (1 byte) and packs it as a bytes-object.
 
@@ -86,7 +93,7 @@ def int1store(i):
     return bytearray(struct.pack("<B", i))
 
 
-def int2store(i):
+def int2store(i: int) -> bytearray:
     """
     Takes an unsigned short (2 bytes) and packs it as a bytes-object.
 
@@ -97,7 +104,7 @@ def int2store(i):
     return bytearray(struct.pack("<H", i))
 
 
-def int3store(i):
+def int3store(i: int) -> bytearray:
     """
     Takes an unsigned integer (3 bytes) and packs it as a bytes-object.
 
@@ -108,7 +115,7 @@ def int3store(i):
     return bytearray(struct.pack("<I", i)[0:3])
 
 
-def int4store(i):
+def int4store(i: int) -> bytearray:
     """
     Takes an unsigned integer (4 bytes) and packs it as a bytes-object.
 
@@ -119,7 +126,7 @@ def int4store(i):
     return bytearray(struct.pack("<I", i))
 
 
-def int8store(i):
+def int8store(i: int) -> bytearray:
     """
     Takes an unsigned integer (8 bytes) and packs it as string.
 
@@ -130,7 +137,7 @@ def int8store(i):
     return bytearray(struct.pack("<Q", i))
 
 
-def intstore(i):
+def intstore(i: int) -> bytearray:
     """
     Takes an unsigned integers and packs it as a bytes-object.
 
@@ -156,7 +163,7 @@ def intstore(i):
     return formed_string(i)
 
 
-def lc_int(i):
+def lc_int(i: int) -> bytes:
     """
     Takes an unsigned integer and packs it as bytes,
     with the information of how much bytes the encoded int takes.
@@ -174,7 +181,7 @@ def lc_int(i):
     return b"\xfe" + bytearray(struct.pack("<Q", i))
 
 
-def read_bytes(buf, size):
+def read_bytes(buf: bytes, size: int) -> Tuple[bytes, bytes]:
     """
     Reads bytes from a buffer.
 
@@ -184,7 +191,7 @@ def read_bytes(buf, size):
     return (buf[size:], res)
 
 
-def read_lc_string(buf):
+def read_lc_string(buf: bytes) -> Tuple[bytes, Optional[bytes]]:
     """
     Takes a buffer and reads a length coded string from the start.
 
@@ -237,12 +244,12 @@ def read_lc_string(buf):
     return (buf[lsize + length + 1 :], buf[lsize + 1 : length + lsize + 1])
 
 
-def read_lc_string_list(buf):
+def read_lc_string_list(buf: bytes) -> Optional[Tuple[Optional[bytes], ...]]:
     """Reads all length encoded strings from the given buffer
 
     Returns a list of bytes
     """
-    byteslst = []
+    byteslst: List[Optional[bytes]] = []
 
     sizes = {252: 2, 253: 3, 254: 8}
 
@@ -277,7 +284,11 @@ def read_lc_string_list(buf):
     return tuple(byteslst)
 
 
-def read_string(buf, end=None, size=None):
+def read_string(
+    buf: bytes,
+    end: Optional[bytes] = None,
+    size: Optional[int] = None,
+) -> Tuple[bytes, bytes]:
     """
     Reads a string up until a character or for a given size.
 
@@ -298,7 +309,7 @@ def read_string(buf, end=None, size=None):
     raise ValueError("read_string() needs either end or size (weird)")
 
 
-def read_int(buf, size):
+def read_int(buf: bytes, size: int) -> Tuple[bytes, int]:
     """Read an integer from buffer
 
     Returns a tuple (truncated buffer, int)
@@ -307,7 +318,7 @@ def read_int(buf, size):
     return (buf[size:], res)
 
 
-def read_lc_int(buf):
+def read_lc_int(buf: bytes) -> Tuple[bytes, Optional[int]]:
     """
     Takes a buffer and reads an length code string from the start.
 
@@ -333,14 +344,16 @@ def read_lc_int(buf):
 #
 # For debugging
 #
-def _digest_buffer(buf):
+def _digest_buffer(buf: StrOrBytes) -> str:
     """Debug function for showing buffers"""
     if not isinstance(buf, str):
         return "".join([f"\\x{c:02x}" for c in buf])
     return "".join([f"\\x{ord(c):02x}" for c in buf])
 
 
-def print_buffer(abuffer, prefix=None, limit=30):
+def print_buffer(
+    abuffer: StrOrBytes, prefix: Optional[str] = None, limit: int = 30
+) -> None:
     """Debug function printing output of _digest_buffer()"""
     if prefix:
         if limit and limit > 0:
@@ -352,13 +365,13 @@ def print_buffer(abuffer, prefix=None, limit=30):
         print(_digest_buffer(abuffer))
 
 
-def _parse_os_release():
+def _parse_os_release() -> Dict[str, str]:
     """Parse the contents of /etc/os-release file.
 
     Returns:
         A dictionary containing release information.
     """
-    distro = {}
+    distro: Dict[str, str] = {}
     os_release_file = os.path.join("/etc", "os-release")
     if not os.path.exists(os_release_file):
         return distro
@@ -373,7 +386,7 @@ def _parse_os_release():
     return distro
 
 
-def _parse_lsb_release():
+def _parse_lsb_release() -> Dict[str, str]:
     """Parse the contents of /etc/lsb-release file.
 
     Returns:
@@ -393,7 +406,7 @@ def _parse_lsb_release():
     return distro
 
 
-def _parse_lsb_release_command():
+def _parse_lsb_release_command() -> Optional[Dict[str, str]]:
     """Parse the output of the lsb_release command.
 
     Returns:
@@ -416,7 +429,7 @@ def _parse_lsb_release_command():
     return distro
 
 
-def linux_distribution():
+def linux_distribution() -> Tuple[str, str, str]:
     """Tries to determine the name of the Linux OS distribution name.
 
     First tries to get information from ``/etc/os-release`` file.
@@ -426,7 +439,7 @@ def linux_distribution():
     Returns:
         A tuple with (`name`, `version`, `codename`)
     """
-    distro = _parse_lsb_release()
+    distro: Optional[Dict[str, str]] = _parse_lsb_release()
     if distro:
         return (
             distro.get("distrib_id", ""),
@@ -453,7 +466,7 @@ def linux_distribution():
     return ("", "", "")
 
 
-def _get_unicode_read_direction(unicode_str):
+def _get_unicode_read_direction(unicode_str: str) -> str:
     """Get the readiness direction of the unicode string.
 
     We assume that the direction is "L-to-R" if the first character does not
@@ -467,7 +480,7 @@ def _get_unicode_read_direction(unicode_str):
     return "L-to-R"
 
 
-def _get_unicode_direction_rule(unicode_str):
+def _get_unicode_direction_rule(unicode_str: str) -> Dict[str, Callable[[str], bool]]:
     """
     1) The characters in section 5.8 MUST be prohibited.
 
@@ -495,7 +508,9 @@ def _get_unicode_direction_rule(unicode_str):
     return {"Bidirectional Characters requirement 2 [StringPrep, d2]": in_table_d1}
 
 
-def validate_normalized_unicode_string(normalized_str):
+def validate_normalized_unicode_string(
+    normalized_str: str,
+) -> Optional[Tuple[str, str]]:
     """Check for Prohibited Output according to rfc4013 profile.
 
     This profile specifies the following characters as prohibited input:
@@ -545,7 +560,7 @@ def validate_normalized_unicode_string(normalized_str):
     return None
 
 
-def normalize_unicode_string(a_string):
+def normalize_unicode_string(a_string: str) -> str:
     """normalizes a unicode string according to rfc4013
 
     Normalization of a unicode string according to rfc4013: The SASLprep profile
@@ -582,7 +597,9 @@ def normalize_unicode_string(a_string):
     return nstr
 
 
-def init_bytearray(payload=b"", encoding="utf-8"):
+def init_bytearray(
+    payload: Union[int, StrOrBytes] = b"", encoding: str = "utf-8"
+) -> bytearray:
     """Initialize a bytearray from the payload."""
     if isinstance(payload, bytearray):
         return payload
@@ -598,9 +615,9 @@ def init_bytearray(payload=b"", encoding="utf-8"):
 
 
 @lru_cache()
-def get_platform():
+def get_platform() -> Dict[str, Union[str, Tuple[str, str]]]:
     """Return a dict with the platform arch and OS version."""
-    plat = {"arch": None, "version": None}
+    plat: Dict[str, Union[str, Tuple[str, str]]] = {"arch": "", "version": ""}
     if os.name == "nt":
         if "64" in platform.architecture()[0]:
             plat["arch"] = "x86_64"

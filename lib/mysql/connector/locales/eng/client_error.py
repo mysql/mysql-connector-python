@@ -45,25 +45,17 @@ CR_CONN_HOST_ERROR = "Can't connect to MySQL server on '%-.100s:%u' (%s)"
 CR_IPSOCK_ERROR = "Can't create TCP/IP socket (%s)"
 CR_UNKNOWN_HOST = "Unknown MySQL server host '%-.100s' (%s)"
 CR_SERVER_GONE_ERROR = "MySQL server has gone away"
-CR_VERSION_ERROR = (
-    "Protocol mismatch; server version = %s, client version = %s"
-)
+CR_VERSION_ERROR = "Protocol mismatch; server version = %s, client version = %s"
 CR_OUT_OF_MEMORY = "MySQL client ran out of memory"
 CR_WRONG_HOST_INFO = "Wrong host info"
 CR_LOCALHOST_CONNECTION = "Localhost via UNIX socket"
 CR_TCP_CONNECTION = "%-.100s via TCP/IP"
 CR_SERVER_HANDSHAKE_ERR = "Error in server handshake"
 CR_SERVER_LOST = "Lost connection to MySQL server during query"
-CR_COMMANDS_OUT_OF_SYNC = (
-    "Commands out of sync; you can't run this command now"
-)
+CR_COMMANDS_OUT_OF_SYNC = "Commands out of sync; you can't run this command now"
 CR_NAMEDPIPE_CONNECTION = "Named pipe: %-.32s"
-CR_NAMEDPIPEWAIT_ERROR = (
-    "Can't wait for named pipe to host: %-.64s  pipe: %-.32s (%s)"
-)
-CR_NAMEDPIPEOPEN_ERROR = (
-    "Can't open named pipe to host: %-.64s  pipe: %-.32s (%s)"
-)
+CR_NAMEDPIPEWAIT_ERROR = "Can't wait for named pipe to host: %-.64s  pipe: %-.32s (%s)"
+CR_NAMEDPIPEOPEN_ERROR = "Can't open named pipe to host: %-.64s  pipe: %-.32s (%s)"
 CR_NAMEDPIPESETSTATE_ERROR = (
     "Can't set state of named pipe to host: %-.64s  pipe: %-.32s (%s)"
 )
@@ -86,9 +78,7 @@ CR_INVALID_PARAMETER_NO = "Invalid parameter number"
 CR_INVALID_BUFFER_USE = (
     "Can't send long data for non-string/non-binary data types (parameter: %s)"
 )
-CR_UNSUPPORTED_PARAM_TYPE = (
-    "Using unsupported buffer type: %s  (parameter: %s)"
-)
+CR_UNSUPPORTED_PARAM_TYPE = "Using unsupported buffer type: %s  (parameter: %s)"
 CR_SHARED_MEMORY_CONNECTION = "Shared memory: %-.100s"
 CR_SHARED_MEMORY_CONNECT_REQUEST_ERROR = (
     "Can't open shared memory; client could not create request event (%s)"
@@ -99,11 +89,15 @@ CR_SHARED_MEMORY_CONNECT_ANSWER_ERROR = (
 CR_SHARED_MEMORY_CONNECT_FILE_MAP_ERROR = (
     "Can't open shared memory; server could not allocate file mapping (%s)"
 )
-CR_SHARED_MEMORY_CONNECT_MAP_ERROR = "Can't open shared memory; server could not get pointer to file mapping (%s)"
+CR_SHARED_MEMORY_CONNECT_MAP_ERROR = (
+    "Can't open shared memory; server could not get pointer to file mapping (%s)"
+)
 CR_SHARED_MEMORY_FILE_MAP_ERROR = (
     "Can't open shared memory; client could not allocate file mapping (%s)"
 )
-CR_SHARED_MEMORY_MAP_ERROR = "Can't open shared memory; client could not get pointer to file mapping (%s)"
+CR_SHARED_MEMORY_MAP_ERROR = (
+    "Can't open shared memory; client could not get pointer to file mapping (%s)"
+)
 CR_SHARED_MEMORY_EVENT_ERROR = (
     "Can't open shared memory; client could not create %s event (%s)"
 )
@@ -119,18 +113,18 @@ CR_UNUSED_1 = "Connection using old (pre-4.1.1) authentication protocol refused 
 CR_FETCH_CANCELED = "Row retrieval was canceled by mysql_stmt_close() call"
 CR_NO_DATA = "Attempt to read column without prior row fetch"
 CR_NO_STMT_METADATA = "Prepared statement contains no metadata"
-CR_NO_RESULT_SET = "Attempt to read a row while there is no result set associated with the statement"
-CR_NOT_IMPLEMENTED = "This feature is not implemented yet"
-CR_SERVER_LOST_EXTENDED = (
-    "Lost connection to MySQL server at '%s', system error: %s"
+CR_NO_RESULT_SET = (
+    "Attempt to read a row while there is no result set associated with the statement"
 )
+CR_NOT_IMPLEMENTED = "This feature is not implemented yet"
+CR_SERVER_LOST_EXTENDED = "Lost connection to MySQL server at '%s', system error: %s"
 CR_STMT_CLOSED = "Statement closed indirectly because of a preceding %s() call"
 CR_NEW_STMT_METADATA = "The number of columns in the result set differs from the number of bound buffers. You must reset the statement, rebind the result set columns, and execute the statement again"
-CR_ALREADY_CONNECTED = "This handle is already connected. Use a separate handle for each connection."
-CR_AUTH_PLUGIN_CANNOT_LOAD = "Authentication plugin '%s' cannot be loaded: %s"
-CR_DUPLICATE_CONNECTION_ATTR = (
-    "There is an attribute with the same name already"
+CR_ALREADY_CONNECTED = (
+    "This handle is already connected. Use a separate handle for each connection."
 )
+CR_AUTH_PLUGIN_CANNOT_LOAD = "Authentication plugin '%s' cannot be loaded: %s"
+CR_DUPLICATE_CONNECTION_ATTR = "There is an attribute with the same name already"
 CR_AUTH_PLUGIN_ERR = "Authentication plugin '%s' reported error: %s"
 CR_INSECURE_API_ERR = "Insecure API function call: '%s' Use instead: '%s'"
 CR_FILE_NAME_TOO_LONG = "File name is too long"
@@ -144,7 +138,9 @@ CR_COMPRESSION_WRONGLY_CONFIGURED = (
 CR_KERBEROS_USER_NOT_FOUND = (
     "SSO user not found, Please perform SSO authentication using kerberos."
 )
-CR_LOAD_DATA_LOCAL_INFILE_REJECTED = "LOAD DATA LOCAL INFILE file request rejected due to restrictions on access."
+CR_LOAD_DATA_LOCAL_INFILE_REJECTED = (
+    "LOAD DATA LOCAL INFILE file request rejected due to restrictions on access."
+)
 CR_LOAD_DATA_LOCAL_INFILE_REALPATH_FAIL = (
     "Determining the real path for '%s' failed with error (%s): %s"
 )

@@ -27,17 +27,128 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 """Python exceptions."""
+from typing import Dict, Mapping, Optional, Tuple, Type, Union
 
 from .locales import get_client_error
+from .types import StrOrBytes
 from .utils import read_bytes, read_int
 
-# _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is ued by the
+
+class Error(Exception):
+    """Exception that is base class for all other error exceptions"""
+
+    def __init__(
+        self,
+        msg: Optional[str] = None,
+        errno: Optional[int] = None,
+        values: Optional[Tuple[Union[int, str], ...]] = None,
+        sqlstate: Optional[str] = None,
+    ) -> None:
+        super().__init__()
+        self.msg = msg
+        self._full_msg = self.msg
+        self.errno = errno or -1
+        self.sqlstate = sqlstate
+
+        if not self.msg and (2000 <= self.errno < 3000):
+            self.msg = get_client_error(self.errno)
+            if values is not None:
+                try:
+                    self.msg = self.msg % values
+                except TypeError as err:
+                    self.msg = f"{self.msg} (Warning: {err})"
+        elif not self.msg:
+            self._full_msg = self.msg = "Unknown error"
+
+        if self.msg and self.errno != -1:
+            fields = {"errno": self.errno, "msg": self.msg}
+            if self.sqlstate:
+                fmt = "{errno} ({state}): {msg}"
+                fields["state"] = self.sqlstate
+            else:
+                fmt = "{errno}: {msg}"
+            self._full_msg = fmt.format(**fields)
+
+        self.args = (self.errno, self._full_msg, self.sqlstate)
+
+    def __str__(self) -> str:
+        return self._full_msg
+
+
+class Warning(Exception):  # pylint: disable=redefined-builtin
+    """Exception for important warnings"""
+
+
+class InterfaceError(Error):
+    """Exception for errors related to the interface"""
+
+
+class DatabaseError(Error):
+    """Exception for errors related to the database"""
+
+
+class InternalError(DatabaseError):
+    """Exception for errors internal database errors"""
+
+
+class OperationalError(DatabaseError):
+    """Exception for errors related to the database's operation"""
+
+
+class ProgrammingError(DatabaseError):
+    """Exception for errors programming errors"""
+
+
+class IntegrityError(DatabaseError):
+    """Exception for errors regarding relational integrity"""
+
+
+class DataError(DatabaseError):
+    """Exception for errors reporting problems with processed data"""
+
+
+class NotSupportedError(DatabaseError):
+    """Exception for errors when an unsupported database feature was used"""
+
+
+class PoolError(Error):
+    """Exception for errors relating to connection pooling"""
+
+
+ErrorClassTypes = Union[
+    Type[Error],
+    Type[InterfaceError],
+    Type[DatabaseError],
+    Type[InternalError],
+    Type[OperationalError],
+    Type[ProgrammingError],
+    Type[IntegrityError],
+    Type[DataError],
+    Type[NotSupportedError],
+    Type[PoolError],
+]
+ErrorTypes = Union[
+    Error,
+    InterfaceError,
+    DatabaseError,
+    InternalError,
+    OperationalError,
+    ProgrammingError,
+    IntegrityError,
+    DataError,
+    NotSupportedError,
+    PoolError,
+]
+# _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is used by the
 # function custom_error_exception. _ERROR_EXCEPTIONS (at bottom of module)
 # is similar, but hardcoded exceptions.
-_CUSTOM_ERROR_EXCEPTIONS = {}
+_CUSTOM_ERROR_EXCEPTIONS: Dict[int, ErrorClassTypes] = {}
 
 
-def custom_error_exception(error=None, exception=None):
+def custom_error_exception(
+    error: Optional[Union[int, Dict[int, Optional[ErrorClassTypes]]]] = None,
+    exception: Optional[ErrorClassTypes] = None,
+) -> Mapping[int, Optional[ErrorClassTypes]]:
     """Define custom exceptions for MySQL server errors
 
     This function defines custom exceptions for MySQL server errors and
@@ -92,7 +203,7 @@ def custom_error_exception(error=None, exception=None):
         if not isinstance(errno, int):
             raise ValueError("Error number should be an integer")
         try:
-            if not issubclass(_exception, Exception):
+            if _exception is None or not issubclass(_exception, Exception):
                 raise TypeError
         except TypeError as err:
             raise ValueError("Exception should be subclass of Exception") from err
@@ -101,7 +212,9 @@ def custom_error_exception(error=None, exception=None):
     return _CUSTOM_ERROR_EXCEPTIONS
 
 
-def get_mysql_exception(errno, msg=None, sqlstate=None):
+def get_mysql_exception(
+    errno: int, msg: Optional[str] = None, sqlstate: Optional[str] = None
+) -> ErrorTypes:
     """Get the exception matching the MySQL error
 
     This function will return an exception based on the SQLState. The given
@@ -136,7 +249,7 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
         return DatabaseError(msg=msg, errno=errno, sqlstate=sqlstate)
 
 
-def get_exception(packet):
+def get_exception(packet: bytes) -> ErrorTypes:
     """Returns an exception object based on the MySQL error
 
     Returns an exception object based on the MySQL error in the given
@@ -152,7 +265,7 @@ def get_exception(packet):
     except IndexError as err:
         return InterfaceError(f"Failed getting Error information ({err})")
 
-    sqlstate = None
+    sqlstate: Optional[StrOrBytes] = None
     try:
         packet = packet[5:]
         packet, errno = read_int(packet, 2)
@@ -169,85 +282,10 @@ def get_exception(packet):
     except (IndexError, UnicodeError) as err:
         return InterfaceError(f"Failed getting Error information ({err})")
     else:
-        return get_mysql_exception(errno, errmsg, sqlstate)
+        return get_mysql_exception(errno, errmsg, sqlstate)  # type: ignore[arg-type]
 
 
-class Error(Exception):
-    """Exception that is base class for all other error exceptions"""
-
-    def __init__(self, msg=None, errno=None, values=None, sqlstate=None):
-        super().__init__()
-        self.msg = msg
-        self._full_msg = self.msg
-        self.errno = errno or -1
-        self.sqlstate = sqlstate
-
-        if not self.msg and (2000 <= self.errno < 3000):
-            self.msg = get_client_error(self.errno)
-            if values is not None:
-                try:
-                    self.msg = self.msg % values
-                except TypeError as err:
-                    self.msg = f"{self.msg} (Warning: {err})"
-        elif not self.msg:
-            self._full_msg = self.msg = "Unknown error"
-
-        if self.msg and self.errno != -1:
-            fields = {"errno": self.errno, "msg": self.msg}
-            if self.sqlstate:
-                fmt = "{errno} ({state}): {msg}"
-                fields["state"] = self.sqlstate
-            else:
-                fmt = "{errno}: {msg}"
-            self._full_msg = fmt.format(**fields)
-
-        self.args = (self.errno, self._full_msg, self.sqlstate)
-
-    def __str__(self):
-        return self._full_msg
-
-
-class Warning(Exception):  # pylint: disable=redefined-builtin
-    """Exception for important warnings"""
-
-
-class InterfaceError(Error):
-    """Exception for errors related to the interface"""
-
-
-class DatabaseError(Error):
-    """Exception for errors related to the database"""
-
-
-class InternalError(DatabaseError):
-    """Exception for errors internal database errors"""
-
-
-class OperationalError(DatabaseError):
-    """Exception for errors related to the database's operation"""
-
-
-class ProgrammingError(DatabaseError):
-    """Exception for errors programming errors"""
-
-
-class IntegrityError(DatabaseError):
-    """Exception for errors regarding relational integrity"""
-
-
-class DataError(DatabaseError):
-    """Exception for errors reporting problems with processed data"""
-
-
-class NotSupportedError(DatabaseError):
-    """Exception for errors when an unsupported database feature was used"""
-
-
-class PoolError(Error):
-    """Exception for errors relating to connection pooling"""
-
-
-_SQLSTATE_CLASS_EXCEPTION = {
+_SQLSTATE_CLASS_EXCEPTION: Dict[str, ErrorClassTypes] = {
     "02": DataError,  # no data
     "07": DatabaseError,  # dynamic SQL error
     "08": OperationalError,  # connection exception
@@ -281,7 +319,7 @@ _SQLSTATE_CLASS_EXCEPTION = {
     "HY": DatabaseError,  # default when no SQLState provided by MySQL server
 }
 
-_ERROR_EXCEPTIONS = {
+_ERROR_EXCEPTIONS: Dict[int, ErrorClassTypes] = {
     1243: ProgrammingError,
     1210: ProgrammingError,
     2002: InterfaceError,

@@ -26,11 +26,16 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="override"
+
 """Database schema editor."""
+from typing import Any
 
 from django.db.backends.mysql.schema import (
     DatabaseSchemaEditor as MySQLDatabaseSchemaEditor,
 )
+
+from mysql.connector.types import EscapeSupportedTypes
 
 
 class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
@@ -38,7 +43,10 @@ class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
     databases.
     """
 
-    def quote_value(self, value):
+    def quote_value(
+        self,
+        value: EscapeSupportedTypes,
+    ) -> EscapeSupportedTypes:
         """Quote value."""
         self.connection.ensure_connection()
         if isinstance(value, str):
@@ -48,7 +56,7 @@ class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
             quoted = quoted.decode()
         return quoted
 
-    def prepare_default(self, value):
+    def prepare_default(self, value: Any) -> Any:
         """Implement the required abstract method.
 
         MySQL has requires_literal_defaults=False, therefore return the value.

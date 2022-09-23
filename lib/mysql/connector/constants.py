@@ -31,17 +31,18 @@
 import warnings
 
 from abc import ABC, ABCMeta
+from typing import Dict, List, Optional, Sequence, Tuple, Union, ValuesView
 
 from .charsets import MYSQL_CHARACTER_SETS, MYSQL_CHARACTER_SETS_57
 from .errors import ProgrammingError
 
-MAX_PACKET_LENGTH = 16777215
-NET_BUFFER_LENGTH = 8192
-MAX_MYSQL_TABLE_COLUMNS = 4096
+MAX_PACKET_LENGTH: int = 16777215
+NET_BUFFER_LENGTH: int = 8192
+MAX_MYSQL_TABLE_COLUMNS: int = 4096
 # Flag used to send the Query Attributes with 0 (or more) parameters.
-PARAMETER_COUNT_AVAILABLE = 8
+PARAMETER_COUNT_AVAILABLE: int = 8
 
-DEFAULT_CONFIGURATION = {
+DEFAULT_CONFIGURATION: Dict[str, Optional[Union[str, bool, int]]] = {
     "database": None,
     "user": "",
     "password": "",
@@ -92,14 +93,14 @@ DEFAULT_CONFIGURATION = {
     "fido_callback": None,
 }
 
-CNX_POOL_ARGS = ("pool_name", "pool_size", "pool_reset_session")
+CNX_POOL_ARGS: Tuple[str, str, str] = ("pool_name", "pool_size", "pool_reset_session")
 
-TLS_VERSIONS = ["TLSv1.2", "TLSv1.3"]
+TLS_VERSIONS: List[str] = ["TLSv1.2", "TLSv1.3"]
 
-DEPRECATED_TLS_VERSIONS = ["TLSv1", "TLSv1.1"]
+DEPRECATED_TLS_VERSIONS: List[str] = ["TLSv1", "TLSv1.1"]
 
 
-def flag_is_set(flag, flags):
+def flag_is_set(flag: int, flags: int) -> bool:
     """Checks if the flag is set
 
     Returns boolean"""
@@ -108,7 +109,7 @@ def flag_is_set(flag, flags):
     return False
 
 
-def _obsolete_option(name, new_name, value):
+def _obsolete_option(name: str, new_name: str, value: int) -> int:
     warnings.warn(
         f'The option "{name}" has been deprecated, use "{new_name}" instead.',
         category=DeprecationWarning,
@@ -119,11 +120,11 @@ def _obsolete_option(name, new_name, value):
 class _Constants(ABC):
     """Base class for constants."""
 
-    prefix = ""
-    desc = {}
+    prefix: str = ""
+    desc: Dict[str, Tuple[int, str]] = {}
 
     @classmethod
-    def get_desc(cls, name):
+    def get_desc(cls, name: str) -> Optional[str]:
         """Get description of given constant"""
         try:
             return cls.desc[name][1]
@@ -131,7 +132,7 @@ class _Constants(ABC):
             return None
 
     @classmethod
-    def get_info(cls, setid):
+    def get_info(cls, setid: int) -> Union[Optional[str], Tuple[str, str]]:
         """Get information about given constant"""
         for name, info in cls.desc.items():
             if info[0] == setid:
@@ -139,9 +140,9 @@ class _Constants(ABC):
         return None
 
     @classmethod
-    def get_full_info(cls):
+    def get_full_info(cls) -> Union[str, Sequence[str]]:
         """get full information about given constant"""
-        res = ()
+        res: Union[str, List[str]] = []
         try:
             res = [f"{k} : {v[1]}" for k, v in cls.desc.items()]
         except (AttributeError, IndexError) as err:
@@ -154,7 +155,7 @@ class _Flags(_Constants):
     """Base class for classes describing flags"""
 
     @classmethod
-    def get_bit_info(cls, value):
+    def get_bit_info(cls, value: int) -> List[str]:
         """Get the name of all bits set
 
         Returns a list of strings."""
@@ -168,37 +169,37 @@ class _Flags(_Constants):
 class FieldType(_Constants):
     """MySQL Field Types"""
 
-    prefix = "FIELD_TYPE_"
-    DECIMAL = 0x00
-    TINY = 0x01
-    SHORT = 0x02
-    LONG = 0x03
-    FLOAT = 0x04
-    DOUBLE = 0x05
-    NULL = 0x06
-    TIMESTAMP = 0x07
-    LONGLONG = 0x08
-    INT24 = 0x09
-    DATE = 0x0A
-    TIME = 0x0B
-    DATETIME = 0x0C
-    YEAR = 0x0D
-    NEWDATE = 0x0E
-    VARCHAR = 0x0F
-    BIT = 0x10
-    JSON = 0xF5
-    NEWDECIMAL = 0xF6
-    ENUM = 0xF7
-    SET = 0xF8
-    TINY_BLOB = 0xF9
-    MEDIUM_BLOB = 0xFA
-    LONG_BLOB = 0xFB
-    BLOB = 0xFC
-    VAR_STRING = 0xFD
-    STRING = 0xFE
-    GEOMETRY = 0xFF
+    prefix: str = "FIELD_TYPE_"
+    DECIMAL: int = 0x00
+    TINY: int = 0x01
+    SHORT: int = 0x02
+    LONG: int = 0x03
+    FLOAT: int = 0x04
+    DOUBLE: int = 0x05
+    NULL: int = 0x06
+    TIMESTAMP: int = 0x07
+    LONGLONG: int = 0x08
+    INT24: int = 0x09
+    DATE: int = 0x0A
+    TIME: int = 0x0B
+    DATETIME: int = 0x0C
+    YEAR: int = 0x0D
+    NEWDATE: int = 0x0E
+    VARCHAR: int = 0x0F
+    BIT: int = 0x10
+    JSON: int = 0xF5
+    NEWDECIMAL: int = 0xF6
+    ENUM: int = 0xF7
+    SET: int = 0xF8
+    TINY_BLOB: int = 0xF9
+    MEDIUM_BLOB: int = 0xFA
+    LONG_BLOB: int = 0xFB
+    BLOB: int = 0xFC
+    VAR_STRING: int = 0xFD
+    STRING: int = 0xFE
+    GEOMETRY: int = 0xFF
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "DECIMAL": (0x00, "DECIMAL"),
         "TINY": (0x01, "TINY"),
         "SHORT": (0x02, "SHORT"),
@@ -230,7 +231,7 @@ class FieldType(_Constants):
     }
 
     @classmethod
-    def get_string_types(cls):
+    def get_string_types(cls) -> List[int]:
         """Get the list of all string types"""
         return [
             cls.VARCHAR,
@@ -240,7 +241,7 @@ class FieldType(_Constants):
         ]
 
     @classmethod
-    def get_binary_types(cls):
+    def get_binary_types(cls) -> List[int]:
         """Get the list of all binary types"""
         return [
             cls.TINY_BLOB,
@@ -250,7 +251,7 @@ class FieldType(_Constants):
         ]
 
     @classmethod
-    def get_number_types(cls):
+    def get_number_types(cls) -> List[int]:
         """Get the list of all number types"""
         return [
             cls.DECIMAL,
@@ -267,7 +268,7 @@ class FieldType(_Constants):
         ]
 
     @classmethod
-    def get_timestamp_types(cls):
+    def get_timestamp_types(cls) -> List[int]:
         """Get the list of all timestamp types"""
         return [
             cls.DATETIME,
@@ -281,35 +282,35 @@ class FieldFlag(_Flags):
     Field flags as found in MySQL sources mysql-src/include/mysql_com.h
     """
 
-    _prefix = ""
-    NOT_NULL = 1 << 0
-    PRI_KEY = 1 << 1
-    UNIQUE_KEY = 1 << 2
-    MULTIPLE_KEY = 1 << 3
-    BLOB = 1 << 4
-    UNSIGNED = 1 << 5
-    ZEROFILL = 1 << 6
-    BINARY = 1 << 7
+    _prefix: str = ""
+    NOT_NULL: int = 1 << 0
+    PRI_KEY: int = 1 << 1
+    UNIQUE_KEY: int = 1 << 2
+    MULTIPLE_KEY: int = 1 << 3
+    BLOB: int = 1 << 4
+    UNSIGNED: int = 1 << 5
+    ZEROFILL: int = 1 << 6
+    BINARY: int = 1 << 7
 
-    ENUM = 1 << 8
-    AUTO_INCREMENT = 1 << 9
-    TIMESTAMP = 1 << 10
-    SET = 1 << 11
+    ENUM: int = 1 << 8
+    AUTO_INCREMENT: int = 1 << 9
+    TIMESTAMP: int = 1 << 10
+    SET: int = 1 << 11
 
-    NO_DEFAULT_VALUE = 1 << 12
-    ON_UPDATE_NOW = 1 << 13
-    NUM = 1 << 14
-    PART_KEY = 1 << 15
-    GROUP = 1 << 14  # SAME AS NUM !!!!!!!????
-    UNIQUE = 1 << 16
-    BINCMP = 1 << 17
+    NO_DEFAULT_VALUE: int = 1 << 12
+    ON_UPDATE_NOW: int = 1 << 13
+    NUM: int = 1 << 14
+    PART_KEY: int = 1 << 15
+    GROUP: int = 1 << 14  # SAME AS NUM !!!!!!!????
+    UNIQUE: int = 1 << 16
+    BINCMP: int = 1 << 17
 
-    GET_FIXED_FIELDS = 1 << 18
-    FIELD_IN_PART_FUNC = 1 << 19
-    FIELD_IN_ADD_INDEX = 1 << 20
-    FIELD_IS_RENAMED = 1 << 21
+    GET_FIXED_FIELDS: int = 1 << 18
+    FIELD_IN_PART_FUNC: int = 1 << 19
+    FIELD_IN_ADD_INDEX: int = 1 << 20
+    FIELD_IS_RENAMED: int = 1 << 21
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "NOT_NULL": (1 << 0, "Field can't be NULL"),
         "PRI_KEY": (1 << 1, "Field is part of a primary key"),
         "UNIQUE_KEY": (1 << 2, "Field is part of a unique key"),
@@ -339,41 +340,41 @@ class FieldFlag(_Flags):
 class ServerCmd(_Constants):
     """MySQL Server Commands"""
 
-    _prefix = "COM_"
-    SLEEP = 0
-    QUIT = 1
-    INIT_DB = 2
-    QUERY = 3
-    FIELD_LIST = 4
-    CREATE_DB = 5
-    DROP_DB = 6
-    REFRESH = 7
-    SHUTDOWN = 8
-    STATISTICS = 9
-    PROCESS_INFO = 10
-    CONNECT = 11
-    PROCESS_KILL = 12
-    DEBUG = 13
-    PING = 14
-    TIME = 15
-    DELAYED_INSERT = 16
-    CHANGE_USER = 17
-    BINLOG_DUMP = 18
-    TABLE_DUMP = 19
-    CONNECT_OUT = 20
-    REGISTER_REPLICA = 21
-    STMT_PREPARE = 22
-    STMT_EXECUTE = 23
-    STMT_SEND_LONG_DATA = 24
-    STMT_CLOSE = 25
-    STMT_RESET = 26
-    SET_OPTION = 27
-    STMT_FETCH = 28
-    DAEMON = 29
-    BINLOG_DUMP_GTID = 30
-    RESET_CONNECTION = 31
+    _prefix: str = "COM_"
+    SLEEP: int = 0
+    QUIT: int = 1
+    INIT_DB: int = 2
+    QUERY: int = 3
+    FIELD_LIST: int = 4
+    CREATE_DB: int = 5
+    DROP_DB: int = 6
+    REFRESH: int = 7
+    SHUTDOWN: int = 8
+    STATISTICS: int = 9
+    PROCESS_INFO: int = 10
+    CONNECT: int = 11
+    PROCESS_KILL: int = 12
+    DEBUG: int = 13
+    PING: int = 14
+    TIME: int = 15
+    DELAYED_INSERT: int = 16
+    CHANGE_USER: int = 17
+    BINLOG_DUMP: int = 18
+    TABLE_DUMP: int = 19
+    CONNECT_OUT: int = 20
+    REGISTER_REPLICA: int = 21
+    STMT_PREPARE: int = 22
+    STMT_EXECUTE: int = 23
+    STMT_SEND_LONG_DATA: int = 24
+    STMT_CLOSE: int = 25
+    STMT_RESET: int = 26
+    SET_OPTION: int = 27
+    STMT_FETCH: int = 28
+    DAEMON: int = 29
+    BINLOG_DUMP_GTID: int = 30
+    RESET_CONNECTION: int = 31
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "SLEEP": (0, "SLEEP"),
         "QUIT": (1, "QUIT"),
         "INIT_DB": (2, "INIT_DB"),
@@ -415,37 +416,37 @@ class ClientFlag(_Flags):
     Client options as found in the MySQL sources mysql-src/include/mysql_com.h
     """
 
-    LONG_PASSWD = 1 << 0
-    FOUND_ROWS = 1 << 1
-    LONG_FLAG = 1 << 2
-    CONNECT_WITH_DB = 1 << 3
-    NO_SCHEMA = 1 << 4
-    COMPRESS = 1 << 5
-    ODBC = 1 << 6
-    LOCAL_FILES = 1 << 7
-    IGNORE_SPACE = 1 << 8
-    PROTOCOL_41 = 1 << 9
-    INTERACTIVE = 1 << 10
-    SSL = 1 << 11
-    IGNORE_SIGPIPE = 1 << 12
-    TRANSACTIONS = 1 << 13
-    RESERVED = 1 << 14
-    SECURE_CONNECTION = 1 << 15
-    MULTI_STATEMENTS = 1 << 16
-    MULTI_RESULTS = 1 << 17
-    PS_MULTI_RESULTS = 1 << 18
-    PLUGIN_AUTH = 1 << 19
-    CONNECT_ARGS = 1 << 20
-    PLUGIN_AUTH_LENENC_CLIENT_DATA = 1 << 21
-    CAN_HANDLE_EXPIRED_PASSWORDS = 1 << 22
-    SESION_TRACK = 1 << 23
-    DEPRECATE_EOF = 1 << 24
-    CLIENT_QUERY_ATTRIBUTES = 1 << 27
-    SSL_VERIFY_SERVER_CERT = 1 << 30
-    REMEMBER_OPTIONS = 1 << 31
-    MULTI_FACTOR_AUTHENTICATION = 1 << 28
+    LONG_PASSWD: int = 1 << 0
+    FOUND_ROWS: int = 1 << 1
+    LONG_FLAG: int = 1 << 2
+    CONNECT_WITH_DB: int = 1 << 3
+    NO_SCHEMA: int = 1 << 4
+    COMPRESS: int = 1 << 5
+    ODBC: int = 1 << 6
+    LOCAL_FILES: int = 1 << 7
+    IGNORE_SPACE: int = 1 << 8
+    PROTOCOL_41: int = 1 << 9
+    INTERACTIVE: int = 1 << 10
+    SSL: int = 1 << 11
+    IGNORE_SIGPIPE: int = 1 << 12
+    TRANSACTIONS: int = 1 << 13
+    RESERVED: int = 1 << 14
+    SECURE_CONNECTION: int = 1 << 15
+    MULTI_STATEMENTS: int = 1 << 16
+    MULTI_RESULTS: int = 1 << 17
+    PS_MULTI_RESULTS: int = 1 << 18
+    PLUGIN_AUTH: int = 1 << 19
+    CONNECT_ARGS: int = 1 << 20
+    PLUGIN_AUTH_LENENC_CLIENT_DATA: int = 1 << 21
+    CAN_HANDLE_EXPIRED_PASSWORDS: int = 1 << 22
+    SESION_TRACK: int = 1 << 23
+    DEPRECATE_EOF: int = 1 << 24
+    CLIENT_QUERY_ATTRIBUTES: int = 1 << 27
+    SSL_VERIFY_SERVER_CERT: int = 1 << 30
+    REMEMBER_OPTIONS: int = 1 << 31
+    MULTI_FACTOR_AUTHENTICATION: int = 1 << 28
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "LONG_PASSWD": (1 << 0, "New more secure passwords"),
         "FOUND_ROWS": (1 << 1, "Found instead of affected rows"),
         "LONG_FLAG": (1 << 2, "Get all column flags"),
@@ -488,7 +489,7 @@ class ClientFlag(_Flags):
         "REMEMBER_OPTIONS": (1 << 31, ""),
     }
 
-    default = [
+    default: List[int] = [
         LONG_PASSWD,
         LONG_FLAG,
         CONNECT_WITH_DB,
@@ -501,7 +502,7 @@ class ClientFlag(_Flags):
     ]
 
     @classmethod
-    def get_default(cls):
+    def get_default(cls) -> int:
         """Get the default client options set
 
         Returns a flag with all the default client options set"""
@@ -517,23 +518,23 @@ class ServerFlag(_Flags):
     Server flags as found in the MySQL sources mysql-src/include/mysql_com.h
     """
 
-    _prefix = "SERVER_"
-    STATUS_IN_TRANS = 1 << 0
-    STATUS_AUTOCOMMIT = 1 << 1
-    MORE_RESULTS_EXISTS = 1 << 3
-    QUERY_NO_GOOD_INDEX_USED = 1 << 4
-    QUERY_NO_INDEX_USED = 1 << 5
-    STATUS_CURSOR_EXISTS = 1 << 6
-    STATUS_LAST_ROW_SENT = 1 << 7
-    STATUS_DB_DROPPED = 1 << 8
-    STATUS_NO_BACKSLASH_ESCAPES = 1 << 9
-    SERVER_STATUS_METADATA_CHANGED = 1 << 10
-    SERVER_QUERY_WAS_SLOW = 1 << 11
-    SERVER_PS_OUT_PARAMS = 1 << 12
-    SERVER_STATUS_IN_TRANS_READONLY = 1 << 13
-    SERVER_SESSION_STATE_CHANGED = 1 << 14
+    _prefix: str = "SERVER_"
+    STATUS_IN_TRANS: int = 1 << 0
+    STATUS_AUTOCOMMIT: int = 1 << 1
+    MORE_RESULTS_EXISTS: int = 1 << 3
+    QUERY_NO_GOOD_INDEX_USED: int = 1 << 4
+    QUERY_NO_INDEX_USED: int = 1 << 5
+    STATUS_CURSOR_EXISTS: int = 1 << 6
+    STATUS_LAST_ROW_SENT: int = 1 << 7
+    STATUS_DB_DROPPED: int = 1 << 8
+    STATUS_NO_BACKSLASH_ESCAPES: int = 1 << 9
+    SERVER_STATUS_METADATA_CHANGED: int = 1 << 10
+    SERVER_QUERY_WAS_SLOW: int = 1 << 11
+    SERVER_PS_OUT_PARAMS: int = 1 << 12
+    SERVER_STATUS_IN_TRANS_READONLY: int = 1 << 13
+    SERVER_SESSION_STATE_CHANGED: int = 1 << 14
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "SERVER_STATUS_IN_TRANS": (1 << 0, "Transaction has started"),
         "SERVER_STATUS_AUTOCOMMIT": (1 << 1, "Server in auto_commit mode"),
         "SERVER_MORE_RESULTS_EXISTS": (
@@ -581,7 +582,7 @@ class RefreshOptionMeta(ABCMeta):
     """RefreshOption Metaclass."""
 
     @property
-    def SLAVE(self):  # pylint: disable=bad-mcs-method-argument,invalid-name
+    def SLAVE(self) -> int:  # pylint: disable=bad-mcs-method-argument,invalid-name
         """Return the deprecated alias of RefreshOption.REPLICA.
 
         Raises a warning about this attribute deprecation.
@@ -599,16 +600,16 @@ class RefreshOption(_Constants, metaclass=RefreshOptionMeta):
     Options used when sending the COM_REFRESH server command.
     """
 
-    _prefix = "REFRESH_"
-    GRANT = 1 << 0
-    LOG = 1 << 1
-    TABLES = 1 << 2
-    HOST = 1 << 3
-    STATUS = 1 << 4
-    THREADS = 1 << 5
-    REPLICA = 1 << 6
+    _prefix: str = "REFRESH_"
+    GRANT: int = 1 << 0
+    LOG: int = 1 << 1
+    TABLES: int = 1 << 2
+    HOST: int = 1 << 3
+    STATUS: int = 1 << 4
+    THREADS: int = 1 << 5
+    REPLICA: int = 1 << 6
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "GRANT": (1 << 0, "Refresh grant tables"),
         "LOG": (1 << 1, "Start on new log file"),
         "TABLES": (1 << 2, "close all tables"),
@@ -626,17 +627,17 @@ class ShutdownType(_Constants):
     Shutdown types used by the COM_SHUTDOWN server command.
     """
 
-    _prefix = ""
-    SHUTDOWN_DEFAULT = 0
-    SHUTDOWN_WAIT_CONNECTIONS = 1
-    SHUTDOWN_WAIT_TRANSACTIONS = 2
-    SHUTDOWN_WAIT_UPDATES = 8
-    SHUTDOWN_WAIT_ALL_BUFFERS = 16
-    SHUTDOWN_WAIT_CRITICAL_BUFFERS = 17
-    KILL_QUERY = 254
-    KILL_CONNECTION = 255
+    _prefix: str = ""
+    SHUTDOWN_DEFAULT: int = 0
+    SHUTDOWN_WAIT_CONNECTIONS: int = 1
+    SHUTDOWN_WAIT_TRANSACTIONS: int = 2
+    SHUTDOWN_WAIT_UPDATES: int = 8
+    SHUTDOWN_WAIT_ALL_BUFFERS: int = 16
+    SHUTDOWN_WAIT_CRITICAL_BUFFERS: int = 17
+    KILL_QUERY: int = 254
+    KILL_CONNECTION: int = 255
 
-    desc = {
+    desc: Dict[str, Tuple[int, str]] = {
         "SHUTDOWN_DEFAULT": (
             SHUTDOWN_DEFAULT,
             "defaults to SHUTDOWN_WAIT_ALL_BUFFERS",
@@ -677,14 +678,14 @@ class CharacterSet(_Constants):
     name of the used character set or collation.
     """
 
-    desc = MYSQL_CHARACTER_SETS
-    mysql_version = (8, 0)
+    desc: List[Optional[Tuple[str, str, bool]]] = MYSQL_CHARACTER_SETS  # type: ignore[assignment]
+    mysql_version: Tuple[int, ...] = (8, 0)
 
     # Multi-byte character sets which use 5c (backslash) in characters
-    slash_charsets = (1, 13, 28, 84, 87, 88)
+    slash_charsets: Tuple[int, ...] = (1, 13, 28, 84, 87, 88)
 
     @classmethod
-    def set_mysql_version(cls, version):
+    def set_mysql_version(cls, version: Tuple[int, ...]) -> None:
         """Set the MySQL major version and change the charset mapping if is 5.7.
 
         Args:
@@ -695,7 +696,7 @@ class CharacterSet(_Constants):
             cls.desc = MYSQL_CHARACTER_SETS_57
 
     @classmethod
-    def get_info(cls, setid):
+    def get_info(cls, setid: int) -> Tuple[str, str]:
         """Retrieves character set information as tuple using an ID
 
         Retrieves character set and collation information based on the
@@ -711,7 +712,7 @@ class CharacterSet(_Constants):
             raise ProgrammingError(f"Character set '{setid}' unsupported") from None
 
     @classmethod
-    def get_desc(cls, name):
+    def get_desc(cls, name: int) -> str:  # type: ignore[override]
         """Retrieves character set information as string using an ID
 
         Retrieves character set and collation information based on the
@@ -723,7 +724,7 @@ class CharacterSet(_Constants):
         return f"{charset}/{collation}"
 
     @classmethod
-    def get_default_collation(cls, charset):
+    def get_default_collation(cls, charset: Union[int, str]) -> Tuple[str, str, int]:
         """Retrieves the default collation for given character set
 
         Raises ProgrammingError when character set is not supported.
@@ -746,7 +747,9 @@ class CharacterSet(_Constants):
         raise ProgrammingError(f"Character set '{charset}' unsupported")
 
     @classmethod
-    def get_charset_info(cls, charset=None, collation=None):
+    def get_charset_info(
+        cls, charset: Optional[Union[int, str]] = None, collation: Optional[str] = None
+    ) -> Tuple[int, str, str]:
         """Get character set information using charset name and/or collation
 
         Retrieves character set and collation information given character
@@ -762,6 +765,7 @@ class CharacterSet(_Constants):
 
         Returns a tuple with (id, characterset name, collation)
         """
+        info: Optional[Union[Tuple[str, str, bool], Tuple[str, str, int]]] = None
         if isinstance(charset, int):
             try:
                 info = cls.desc[charset]
@@ -790,7 +794,7 @@ class CharacterSet(_Constants):
         raise ProgrammingError(f"Collation '{collation}' unknown")
 
     @classmethod
-    def get_supported(cls):
+    def get_supported(cls) -> Tuple[str, ...]:
         """Retrieves a list with names of all supproted character sets
 
         Returns a tuple.
@@ -812,50 +816,50 @@ class SQLMode(_Constants):
     See http://dev.mysql.com/doc/refman/5.6/en/server-sql-mode.html
     """
 
-    _prefix = "MODE_"
-    REAL_AS_FLOAT = "REAL_AS_FLOAT"
-    PIPES_AS_CONCAT = "PIPES_AS_CONCAT"
-    ANSI_QUOTES = "ANSI_QUOTES"
-    IGNORE_SPACE = "IGNORE_SPACE"
-    NOT_USED = "NOT_USED"
-    ONLY_FULL_GROUP_BY = "ONLY_FULL_GROUP_BY"
-    NO_UNSIGNED_SUBTRACTION = "NO_UNSIGNED_SUBTRACTION"
-    NO_DIR_IN_CREATE = "NO_DIR_IN_CREATE"
-    POSTGRESQL = "POSTGRESQL"
-    ORACLE = "ORACLE"
-    MSSQL = "MSSQL"
-    DB2 = "DB2"
-    MAXDB = "MAXDB"
-    NO_KEY_OPTIONS = "NO_KEY_OPTIONS"
-    NO_TABLE_OPTIONS = "NO_TABLE_OPTIONS"
-    NO_FIELD_OPTIONS = "NO_FIELD_OPTIONS"
-    MYSQL323 = "MYSQL323"
-    MYSQL40 = "MYSQL40"
-    ANSI = "ANSI"
-    NO_AUTO_VALUE_ON_ZERO = "NO_AUTO_VALUE_ON_ZERO"
-    NO_BACKSLASH_ESCAPES = "NO_BACKSLASH_ESCAPES"
-    STRICT_TRANS_TABLES = "STRICT_TRANS_TABLES"
-    STRICT_ALL_TABLES = "STRICT_ALL_TABLES"
-    NO_ZERO_IN_DATE = "NO_ZERO_IN_DATE"
-    NO_ZERO_DATE = "NO_ZERO_DATE"
-    INVALID_DATES = "INVALID_DATES"
-    ERROR_FOR_DIVISION_BY_ZERO = "ERROR_FOR_DIVISION_BY_ZERO"
-    TRADITIONAL = "TRADITIONAL"
-    NO_AUTO_CREATE_USER = "NO_AUTO_CREATE_USER"
-    HIGH_NOT_PRECEDENCE = "HIGH_NOT_PRECEDENCE"
-    NO_ENGINE_SUBSTITUTION = "NO_ENGINE_SUBSTITUTION"
-    PAD_CHAR_TO_FULL_LENGTH = "PAD_CHAR_TO_FULL_LENGTH"
+    _prefix: str = "MODE_"
+    REAL_AS_FLOAT: str = "REAL_AS_FLOAT"
+    PIPES_AS_CONCAT: str = "PIPES_AS_CONCAT"
+    ANSI_QUOTES: str = "ANSI_QUOTES"
+    IGNORE_SPACE: str = "IGNORE_SPACE"
+    NOT_USED: str = "NOT_USED"
+    ONLY_FULL_GROUP_BY: str = "ONLY_FULL_GROUP_BY"
+    NO_UNSIGNED_SUBTRACTION: str = "NO_UNSIGNED_SUBTRACTION"
+    NO_DIR_IN_CREATE: str = "NO_DIR_IN_CREATE"
+    POSTGRESQL: str = "POSTGRESQL"
+    ORACLE: str = "ORACLE"
+    MSSQL: str = "MSSQL"
+    DB2: str = "DB2"
+    MAXDB: str = "MAXDB"
+    NO_KEY_OPTIONS: str = "NO_KEY_OPTIONS"
+    NO_TABLE_OPTIONS: str = "NO_TABLE_OPTIONS"
+    NO_FIELD_OPTIONS: str = "NO_FIELD_OPTIONS"
+    MYSQL323: str = "MYSQL323"
+    MYSQL40: str = "MYSQL40"
+    ANSI: str = "ANSI"
+    NO_AUTO_VALUE_ON_ZERO: str = "NO_AUTO_VALUE_ON_ZERO"
+    NO_BACKSLASH_ESCAPES: str = "NO_BACKSLASH_ESCAPES"
+    STRICT_TRANS_TABLES: str = "STRICT_TRANS_TABLES"
+    STRICT_ALL_TABLES: str = "STRICT_ALL_TABLES"
+    NO_ZERO_IN_DATE: str = "NO_ZERO_IN_DATE"
+    NO_ZERO_DATE: str = "NO_ZERO_DATE"
+    INVALID_DATES: str = "INVALID_DATES"
+    ERROR_FOR_DIVISION_BY_ZERO: str = "ERROR_FOR_DIVISION_BY_ZERO"
+    TRADITIONAL: str = "TRADITIONAL"
+    NO_AUTO_CREATE_USER: str = "NO_AUTO_CREATE_USER"
+    HIGH_NOT_PRECEDENCE: str = "HIGH_NOT_PRECEDENCE"
+    NO_ENGINE_SUBSTITUTION: str = "NO_ENGINE_SUBSTITUTION"
+    PAD_CHAR_TO_FULL_LENGTH: str = "PAD_CHAR_TO_FULL_LENGTH"
 
     @classmethod
-    def get_desc(cls, name):
+    def get_desc(cls, name: str) -> Optional[str]:
         raise NotImplementedError
 
     @classmethod
-    def get_info(cls, setid):
+    def get_info(cls, setid: int) -> Optional[str]:
         raise NotImplementedError
 
     @classmethod
-    def get_full_info(cls):
+    def get_full_info(cls) -> Tuple[str, ...]:
         """Returns a sequence of all available SQL Modes
 
         This class method returns a tuple containing all SQL Mode names. The
@@ -870,7 +874,7 @@ class SQLMode(_Constants):
         return tuple(sorted(res))
 
 
-CONN_ATTRS_DN = [
+CONN_ATTRS_DN: List[str] = [
     "_pid",
     "_platform",
     "_source_host",
@@ -884,7 +888,7 @@ CONN_ATTRS_DN = [
 ]
 
 # TLS v1.0 cipher suites IANI to OpenSSL name translation
-TLSV1_CIPHER_SUITES = {
+TLSV1_CIPHER_SUITES: Dict[str, str] = {
     "TLS_RSA_WITH_NULL_MD5": "NULL-MD5",
     "TLS_RSA_WITH_NULL_SHA": "NULL-SHA",
     "TLS_RSA_WITH_RC4_128_MD5": "RC4-MD5",
@@ -938,10 +942,10 @@ TLSV1_CIPHER_SUITES = {
 }
 
 # TLS v1.1 cipher suites IANI to OpenSSL name translation
-TLSV1_1_CIPHER_SUITES = TLSV1_CIPHER_SUITES
+TLSV1_1_CIPHER_SUITES: Dict[str, str] = TLSV1_CIPHER_SUITES
 
 # TLS v1.2 cipher suites IANI to OpenSSL name translation
-TLSV1_2_CIPHER_SUITES = {
+TLSV1_2_CIPHER_SUITES: Dict[str, str] = {
     "TLS_RSA_WITH_NULL_SHA256": "NULL-SHA256",
     "TLS_RSA_WITH_AES_128_CBC_SHA256": "AES128-SHA256",
     "TLS_RSA_WITH_AES_256_CBC_SHA256": "AES256-SHA256",
@@ -1079,7 +1083,7 @@ TLSV1_2_CIPHER_SUITES = {
 }
 
 # TLS v1.3 cipher suites IANI to OpenSSL name translation
-TLSV1_3_CIPHER_SUITES = {
+TLSV1_3_CIPHER_SUITES: Dict[str, str] = {
     "TLS_AES_128_GCM_SHA256": "TLS_AES_128_GCM_SHA256",
     "TLS_AES_256_GCM_SHA384": "TLS_AES_256_GCM_SHA384",
     "TLS_CHACHA20_POLY1305_SHA256": "TLS_CHACHA20_POLY1305_SHA256",
@@ -1087,14 +1091,14 @@ TLSV1_3_CIPHER_SUITES = {
     "TLS_AES_128_CCM_8_SHA256": "TLS_AES_128_CCM_8_SHA256",
 }
 
-TLS_CIPHER_SUITES = {
+TLS_CIPHER_SUITES: Dict[str, Dict[str, str]] = {
     "TLSv1": TLSV1_CIPHER_SUITES,
     "TLSv1.1": TLSV1_1_CIPHER_SUITES,
     "TLSv1.2": TLSV1_2_CIPHER_SUITES,
     "TLSv1.3": TLSV1_3_CIPHER_SUITES,
 }
 
-OPENSSL_CS_NAMES = {
+OPENSSL_CS_NAMES: Dict[str, ValuesView[str]] = {
     "TLSv1": TLSV1_CIPHER_SUITES.values(),
     "TLSv1.1": TLSV1_1_CIPHER_SUITES.values(),
     "TLSv1.2": TLSV1_2_CIPHER_SUITES.values(),

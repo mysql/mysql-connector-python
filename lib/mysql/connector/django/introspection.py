@@ -26,9 +26,12 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="override,attr-defined,call-arg"
+
 """Database Introspection."""
 
 from collections import namedtuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import sqlparse
 
@@ -43,7 +46,23 @@ from django.utils.datastructures import OrderedSet
 
 from mysql.connector.constants import FieldType
 
-FieldInfo = namedtuple(
+# from .base import CursorWrapper produces a circular import error,
+# avoiding importing CursorWrapper explicitly, using a documented
+# trick; write the imports inside if TYPE_CHECKING: so that they
+# are not executed at runtime.
+# Ref: https://buildmedia.readthedocs.org/media/pdf/mypy/stable/mypy.pdf [page 42]
+if TYPE_CHECKING:
+    # CursorWraper is used exclusively for type hinting
+    from mysql.connector.django.base import CursorWrapper
+
+# Based on my investigation, named tuples to
+# comply with mypy need to define a static list or tuple
+# for field_names (second argument). In this case, the field
+# names are created dynamically for FieldInfo which triggers
+# a mypy error. The solution is not straightforward since
+# FieldInfo attributes are Django version dependent. Code
+# refactory is needed to fix this issue.
+FieldInfo = namedtuple(  # type: ignore[misc]
     "FieldInfo",
     BaseFieldInfo._fields + ("extra", "is_unsigned", "has_json_constraint"),
 )
@@ -54,7 +73,7 @@ if DJANGO_VERSION < (3, 2, 0):
         "is_unsigned",
     )
 else:
-    InfoLine = namedtuple(
+    InfoLine = namedtuple(  # type: ignore[no-redef]
         "InfoLine",
         "col_name data_type max_len num_prec num_scale extra column_default "
         "collation is_unsigned",
@@ -86,8 +105,8 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         FieldType.VAR_STRING: "CharField",
     }
 
-    def get_field_type(self, data_type, description):
-        field_type = super().get_field_type(data_type, description)
+    def get_field_type(self, data_type: str, description: FieldInfo) -> str:
+        field_type = super().get_field_type(data_type, description)  # type: ignore[arg-type]
         if "auto_increment" in description.extra:
             if field_type == "IntegerField":
                 return "AutoField"
@@ -108,7 +127,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return "JSONField"
         return field_type
 
-    def get_table_list(self, cursor):
+    def get_table_list(self, cursor: "CursorWrapper") -> List[TableInfo]:
         """Return a list of table and view names in the current database."""
         cursor.execute("SHOW FULL TABLES")
         return [
@@ -116,12 +135,14 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for row in cursor.fetchall()
         ]
 
-    def get_table_description(self, cursor, table_name):
+    def get_table_description(
+        self, cursor: "CursorWrapper", table_name: str
+    ) -> List[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface."
         """
-        json_constraints = {}
+        json_constraints: Dict[Any, Any] = {}
         # A default collation for the given table.
         cursor.execute(
             """
@@ -179,7 +200,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             f"SELECT * FROM {self.connection.ops.quote_name(table_name)} LIMIT 1"
         )
 
-        def to_int(i):
+        def to_int(i: Any) -> Optional[int]:
             return int(i) if i is not None else i
 
         fields = []
@@ -216,7 +237,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 )
         return fields
 
-    def get_indexes(self, cursor, table_name):
+    def get_indexes(
+        self, cursor: "CursorWrapper", table_name: str
+    ) -> Dict[int, Dict[str, bool]]:
         """Return indexes from table."""
         cursor.execute(f"SHOW INDEX FROM {self.connection.ops.quote_name(table_name)}")
         # Do a two-pass search for indexes: on first pass check which indexes
@@ -227,7 +250,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         for row in rows:
             if row[3] > 1:
                 multicol_indexes.add(row[2])
-        indexes = {}
+        indexes: Dict[int, Dict[str, bool]] = {}
         for row in rows:
             if row[2] in multicol_indexes:
                 continue
@@ -241,7 +264,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 indexes[row[4]]["unique"] = True
         return indexes
 
-    def get_primary_key_column(self, cursor, table_name):
+    def get_primary_key_column(
+        self, cursor: "CursorWrapper", table_name: str
+    ) -> Optional[int]:
         """
         Returns the name of the primary key column for the given table
         """
@@ -250,14 +275,18 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 return column[0]
         return None
 
-    def get_sequences(self, cursor, table_name, table_fields=()):
+    def get_sequences(
+        self, cursor: "CursorWrapper", table_name: str, table_fields: Any = ()
+    ) -> List[Dict[str, str]]:
         for field_info in self.get_table_description(cursor, table_name):
             if "auto_increment" in field_info.extra:
                 # MySQL allows only one auto-increment column per table.
                 return [{"table": table_name, "column": field_info.name}]
         return []
 
-    def get_relations(self, cursor, table_name):
+    def get_relations(
+        self, cursor: "CursorWrapper", table_name: str
+    ) -> Dict[str, Tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all relationships to the given table.
@@ -268,12 +297,14 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             relations[my_fieldname] = (other_field, other_table)
         return relations
 
-    def get_key_columns(self, cursor, table_name):
+    def get_key_columns(  # pylint: disable=no-self-use
+        self, cursor: "CursorWrapper", table_name: str
+    ) -> List[Tuple[str, str, str]]:
         """
         Return a list of (column_name, referenced_table_name, referenced_column_name)
         for all key columns in the given table.
         """
-        key_columns = []
+        key_columns: List[Any] = []
         cursor.execute(
             """
             SELECT column_name, referenced_table_name, referenced_column_name
@@ -287,7 +318,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         key_columns.extend(cursor.fetchall())
         return key_columns
 
-    def get_storage_engine(self, cursor, table_name):
+    def get_storage_engine(self, cursor: "CursorWrapper", table_name: str) -> str:
         """
         Retrieve the storage engine for a given table. Return the default
         storage engine if the table doesn't exist.
@@ -303,8 +334,10 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         # pylint: enable=protected-access
         return result[0]
 
-    def _parse_constraint_columns(self, check_clause, columns):
-        check_columns = OrderedSet()
+    def _parse_constraint_columns(
+        self, check_clause: Any, columns: Set[str]
+    ) -> OrderedSet:
+        check_columns: OrderedSet = OrderedSet()
         statement = sqlparse.parse(check_clause)[0]
         tokens = (token for token in statement.flatten() if not token.is_whitespace)
         for token in tokens:
@@ -316,12 +349,14 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 check_columns.add(token.value[1:-1])
         return check_columns
 
-    def get_constraints(self, cursor, table_name):
+    def get_constraints(
+        self, cursor: "CursorWrapper", table_name: str
+    ) -> Dict[str, Any]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across
         one or more columns.
         """
-        constraints = {}
+        constraints: Dict[str, Any] = {}
         # Get the actual constraint names and columns
         name_query = """
             SELECT kc.`constraint_name`, kc.`column_name`,

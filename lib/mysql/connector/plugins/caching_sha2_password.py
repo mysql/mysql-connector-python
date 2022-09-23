@@ -31,6 +31,7 @@
 import struct
 
 from hashlib import sha256
+from typing import Optional
 
 from .. import errors
 from . import BaseAuthPlugin
@@ -45,12 +46,12 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
     Standard Library does not provide this OpenSSL functionality.
     """
 
-    requires_ssl = False
-    plugin_name = "caching_sha2_password"
-    perform_full_authentication = 4
-    fast_auth_success = 3
+    requires_ssl: bool = False
+    plugin_name: str = "caching_sha2_password"
+    perform_full_authentication: int = 4
+    fast_auth_success: int = 3
 
-    def _scramble(self):
+    def _scramble(self) -> bytes:
         """Return a scramble of the password using a Nonce sent by the
         server.
 
@@ -74,23 +75,25 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
         hash2 = sha256()
         hash2.update(sha256(hash1).digest())
         hash2.update(auth_data)
-        hash2 = hash2.digest()
-        xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2)]
+        hash2_digest: bytes = hash2.digest()
+        xored = [h1 ^ h2 for (h1, h2) in zip(hash1, hash2_digest)]
         hash3 = struct.pack("32B", *xored)
         return hash3
 
-    def _full_authentication(self):
+    def _full_authentication(self) -> bytes:
         """Returns password as as clear text"""
         if not self._ssl_enabled:
             raise errors.InterfaceError(f"{self.plugin_name} requires SSL")
         return super().prepare_password()
 
-    def prepare_password(self):
+    def prepare_password(self) -> Optional[bytes]:
         """Prepare and return password.
 
         Returns:
             bytes: Prepared password.
         """
+        if not self._auth_data:
+            return None
         if len(self._auth_data) > 1:
             return self._scramble()
         if self._auth_data[0] == self.perform_full_authentication:

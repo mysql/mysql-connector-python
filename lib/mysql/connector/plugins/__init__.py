@@ -29,12 +29,14 @@
 """Base Authentication Plugin class."""
 
 from abc import ABC
+from typing import Optional, Union
 
 from .. import errors
+from ..types import StrOrBytes
 
 
 class BaseAuthPlugin(ABC):
-    """Base class for authentication plugins
+    """Base class for authentication pluginsF
 
 
     Classes inheriting from BaseAuthPlugin should implement the method
@@ -47,25 +49,29 @@ class BaseAuthPlugin(ABC):
     which was prepared by prepare_password().
     """
 
-    requires_ssl = False
-    plugin_name = ""
+    requires_ssl: int = False
+    plugin_name: str = ""
 
     def __init__(
         self,
-        auth_data,
-        username=None,
-        password=None,
-        database=None,
-        ssl_enabled=False,
-    ):
+        auth_data: Optional[bytes],
+        username: Optional[StrOrBytes] = None,
+        password: Optional[str] = None,
+        database: Optional[str] = None,
+        ssl_enabled: bool = False,
+    ) -> None:
         """Initialization"""
-        self._auth_data = auth_data
-        self._username = username
-        self._password = password
-        self._database = database
-        self._ssl_enabled = ssl_enabled
+        self._auth_data: bytes = auth_data
+        self._username: Optional[str] = (
+            username.decode("utf8")
+            if isinstance(username, (bytes, bytearray))
+            else username
+        )
+        self._password: Optional[str] = password
+        self._database: Optional[str] = database
+        self._ssl_enabled: bool = ssl_enabled
 
-    def prepare_password(self):
+    def prepare_password(self) -> bytes:
         """Prepare and return password as as clear text.
 
         Returns:
@@ -73,14 +79,16 @@ class BaseAuthPlugin(ABC):
         """
         if not self._password:
             return b"\x00"
-        password = self._password
+        password: StrOrBytes = self._password
 
         if isinstance(password, str):
             password = password.encode("utf8")
 
         return password + b"\x00"
 
-    def auth_response(self, auth_data=None):  # pylint: disable=unused-argument
+    def auth_response(
+        self, auth_data: Optional[bytes] = None  # pylint: disable=unused-argument
+    ) -> bytes:
         """Return the prepared password to send to MySQL.
 
         Raises:

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*- # pylint: disable=missing-module-docstring
 
 # Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
@@ -28,13 +28,15 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""This module contains the MySQL Server Character Sets."""
+from typing import List, Optional, Tuple
+
+"""This module contains the MySQL Server Character Sets."""  # pylint: disable=pointless-string-statement
 
 # This file was auto-generated.
-_GENERATED_ON = "2022-05-09"
-_MYSQL_VERSION = (8, 0, 30)
+_GENERATED_ON: str = "2022-05-09"
+_MYSQL_VERSION: Tuple[int, int, int] = (8, 0, 30)
 
-MYSQL_CHARACTER_SETS = [
+MYSQL_CHARACTER_SETS: List[Optional[Tuple[str, str, bool]]] = [
     # (character set name, collation, default)
     None,
     ("big5", "big5_chinese_ci", True),  # 1
@@ -362,7 +364,7 @@ MYSQL_CHARACTER_SETS = [
     ("utf8mb4", "utf8mb4_mn_cyrl_0900_as_cs", False),  # 323
 ]
 
-MYSQL_CHARACTER_SETS_57 = [
+MYSQL_CHARACTER_SETS_57: List[Optional[Tuple[str, str, bool]]] = [
     # (character set name, collation, default)
     None,
     ("big5", "big5_chinese_ci", True),  # 1

@@ -28,6 +28,8 @@
 
 """Database Features."""
 
+from typing import Any, List
+
 from django.db.backends.mysql.features import DatabaseFeatures as MySQLDatabaseFeatures
 from django.utils.functional import cached_property
 
@@ -35,14 +37,14 @@ from django.utils.functional import cached_property
 class DatabaseFeatures(MySQLDatabaseFeatures):
     """Database Features Specification class."""
 
-    empty_fetchmany_value = []
+    empty_fetchmany_value: List[Any] = []
 
     @cached_property
-    def can_introspect_check_constraints(self):
+    def can_introspect_check_constraints(self) -> bool:  # type: ignore[override]
         """Check if backend support introspection CHECK of constraints."""
         return self.connection.mysql_version >= (8, 0, 16)
 
     @cached_property
-    def supports_microsecond_precision(self):
+    def supports_microsecond_precision(self) -> bool:
         """Check if backend support microsecond precision."""
         return self.connection.mysql_version >= (5, 6, 3)

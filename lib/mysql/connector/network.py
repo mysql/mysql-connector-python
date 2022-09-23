@@ -26,6 +26,8 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="attr-defined"
+
 """Module implementing low-level socket communication with MySQL servers.
 """
 
@@ -56,12 +58,15 @@ except ImportError:
     # If import fails, we don't have SSL support.
     TLS_V1_3_SUPPORTED = False
 
+from typing import Any, Deque, List, Optional, Tuple, Union
+
 from .constants import MAX_PACKET_LENGTH
 from .errors import InterfaceError, NotSupportedError, OperationalError
+from .types import StrOrBytesPath
 from .utils import init_bytearray
 
 
-def _strioerror(err):
+def _strioerror(err: IOError) -> str:
     """Reformat the IOError error message
 
     This function reformats the IOError error message.
@@ -71,7 +76,7 @@ def _strioerror(err):
     return f"{err.errno} {err.strerror}"
 
 
-def _prepare_packets(buf, pktnr):
+def _prepare_packets(buf: bytes, pktnr: int) -> List[bytes]:
     """Prepare a packet for sending to the MySQL server"""
     pkts = []
     pllen = len(buf)
@@ -94,38 +99,39 @@ class BaseMySQLSocket:
       mysql.connector.network.MySQLUnixSocket
     """
 
-    def __init__(self):
-        self.sock = None  # holds the socket connection
-        self._connection_timeout = None
-        self._packet_number = -1
-        self._compressed_packet_number = -1
-        self._packet_queue = deque()
-        self.server_host = None
-        self.recvsize = 8192
+    def __init__(self) -> None:
+        # holds the socket connection
+        self.sock: Optional[socket.socket] = None
+        self._connection_timeout: Optional[int] = None
+        self._packet_number: int = -1
+        self._compressed_packet_number: int = -1
+        self._packet_queue: Deque[bytearray] = deque()
+        self.server_host: Optional[str] = None
+        self.recvsize: int = 8192
 
-    def next_packet_number(self):
+    def next_packet_number(self) -> int:
         """Increments the packet number"""
         self._packet_number = self._packet_number + 1
         if self._packet_number > 255:
             self._packet_number = 0
         return self._packet_number
 
-    def next_compressed_packet_number(self):
+    def next_compressed_packet_number(self) -> int:
         """Increments the compressed packet number"""
         self._compressed_packet_number = self._compressed_packet_number + 1
         if self._compressed_packet_number > 255:
             self._compressed_packet_number = 0
         return self._compressed_packet_number
 
-    def open_connection(self):
+    def open_connection(self) -> Any:
         """Open the socket"""
         raise NotImplementedError
 
-    def get_address(self):
+    def get_address(self) -> Any:
         """Get the location of the socket"""
         raise NotImplementedError
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shut down the socket before closing it"""
         try:
             self.sock.shutdown(socket.SHUT_RDWR)
@@ -134,7 +140,7 @@ class BaseMySQLSocket:
         except (AttributeError, OSError):
             pass
 
-    def close_connection(self):
+    def close_connection(self) -> None:
         """Close the socket"""
         try:
             self.sock.close()
@@ -142,10 +148,15 @@ class BaseMySQLSocket:
         except (AttributeError, OSError):
             pass
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.shutdown()
 
-    def send_plain(self, buf, packet_number=None, compressed_packet_number=None):
+    def send_plain(
+        self,
+        buf: bytes,
+        packet_number: Optional[int] = None,
+        compressed_packet_number: Optional[int] = None,
+    ) -> None:
         """Send packets to the MySQL server"""
         # Keep 'compressed_packet_number' for API backward compatibility
         _ = compressed_packet_number
@@ -166,7 +177,12 @@ class BaseMySQLSocket:
 
     send = send_plain
 
-    def send_compressed(self, buf, packet_number=None, compressed_packet_number=None):
+    def send_compressed(
+        self,
+        buf: bytes,
+        packet_number: Optional[int] = None,
+        compressed_packet_number: Optional[int] = None,
+    ) -> None:
         """Send compressed packets to the MySQL server"""
         if packet_number is None:
             self.next_packet_number()
@@ -244,7 +260,7 @@ class BaseMySQLSocket:
             except AttributeError as err:
                 raise OperationalError(errno=2006) from err
 
-    def recv_plain(self):
+    def recv_plain(self) -> bytearray:
         """Receive packets from the MySQL server"""
         try:
             # Read the header of the MySQL packet, 4 bytes
@@ -280,14 +296,14 @@ class BaseMySQLSocket:
 
     recv = recv_plain
 
-    def _split_zipped_payload(self, packet_bunch):
+    def _split_zipped_payload(self, packet_bunch: bytearray) -> None:
         """Split compressed payload"""
         while packet_bunch:
             payload_length = struct.unpack("<I", packet_bunch[0:3] + b"\x00")[0]
             self._packet_queue.append(packet_bunch[0 : payload_length + 4])
             packet_bunch = packet_bunch[payload_length + 4 :]
 
-    def recv_compressed(self):
+    def recv_compressed(self) -> Optional[bytearray]:
         """Receive compressed packets from the MySQL server"""
         try:
             pkt = self._packet_queue.popleft()
@@ -361,8 +377,9 @@ class BaseMySQLSocket:
             return pkt
         except IndexError:
             pass
+        return None
 
-    def set_connection_timeout(self, timeout):
+    def set_connection_timeout(self, timeout: Optional[int]) -> None:
         """Set the connection timeout"""
         self._connection_timeout = timeout
         if self.sock:
@@ -370,14 +387,14 @@ class BaseMySQLSocket:
 
     def switch_to_ssl(
         self,
-        ca,
-        cert,
-        key,
-        verify_cert=False,
-        verify_identity=False,
-        cipher_suites=None,
-        tls_versions=None,
-    ):
+        ca: StrOrBytesPath,
+        cert: StrOrBytesPath,
+        key: StrOrBytesPath,
+        verify_cert: bool = False,
+        verify_identity: bool = False,
+        cipher_suites: Optional[str] = None,
+        tls_versions: Optional[List[str]] = None,
+    ) -> None:
         """Switch the socket to use SSL"""
         if not self.sock:
             raise InterfaceError(errno=2048)
@@ -443,7 +460,7 @@ class BaseMySQLSocket:
 
             if verify_identity:
                 context.check_hostname = True
-                hostnames = [self.server_host]
+                hostnames: List[str] = [self.server_host] if self.server_host else []
                 if os.name == "nt" and self.server_host == "localhost":
                     hostnames = ["localhost", "127.0.0.1"]
                     aliases = socket.gethostbyaddr(self.server_host)
@@ -486,16 +503,18 @@ class MySQLUnixSocket(BaseMySQLSocket):
     Opens a connection through the UNIX socket of the MySQL Server.
     """
 
-    def __init__(self, unix_socket="/tmp/mysql.sock"):
+    def __init__(self, unix_socket: str = "/tmp/mysql.sock") -> None:
         super().__init__()
-        self.unix_socket = unix_socket
+        self.unix_socket: str = unix_socket
 
-    def get_address(self):
+    def get_address(self) -> str:
         return self.unix_socket
 
-    def open_connection(self):
+    def open_connection(self) -> None:
         try:
-            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.sock = socket.socket(
+                socket.AF_UNIX, socket.SOCK_STREAM  # pylint: disable=no-member
+            )
             self.sock.settimeout(self._connection_timeout)
             self.sock.connect(self.unix_socket)
         except IOError as err:
@@ -505,7 +524,9 @@ class MySQLUnixSocket(BaseMySQLSocket):
         except Exception as err:
             raise InterfaceError(str(err)) from err
 
-    def switch_to_ssl(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def switch_to_ssl(
+        self, *args: Any, **kwargs: Any  # pylint: disable=unused-argument
+    ) -> None:
         """Switch the socket to use SSL."""
         warnings.warn(
             "SSL is disabled when using unix socket connections",
@@ -519,20 +540,32 @@ class MySQLTCPSocket(BaseMySQLSocket):
     Opens a TCP/IP connection to the MySQL Server.
     """
 
-    def __init__(self, host="127.0.0.1", port=3306, force_ipv6=False):
+    def __init__(
+        self, host: str = "127.0.0.1", port: int = 3306, force_ipv6: bool = False
+    ) -> None:
         super().__init__()
-        self.server_host = host
-        self.server_port = port
-        self.force_ipv6 = force_ipv6
-        self._family = 0
+        self.server_host: str = host
+        self.server_port: int = port
+        self.force_ipv6: bool = force_ipv6
+        self._family: int = 0
 
-    def get_address(self):
+    def get_address(self) -> str:
         return f"{self.server_host}:{self.server_port}"
 
-    def open_connection(self):
+    def open_connection(self) -> None:
         """Open the TCP/IP connection to the MySQL server"""
+        # pylint: disable=no-member
         # Get address information
-        addrinfo = [None] * 5
+        addrinfo: Union[
+            Tuple[None, None, None, None, None],
+            Tuple[
+                socket.AddressFamily,
+                socket.SocketKind,
+                int,
+                str,
+                Union[Tuple[str, int], Tuple[str, int, int, int]],
+            ],
+        ] = (None, None, None, None, None)
         try:
             addrinfos = socket.getaddrinfo(
                 self.server_host,

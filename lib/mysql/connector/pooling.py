@@ -27,12 +27,15 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 """Implementing pooling of connections to MySQL servers."""
+from __future__ import annotations
 
 import queue
 import random
 import re
 import threading
 
+from types import TracebackType
+from typing import Any, Dict, NoReturn, Optional, Tuple, Type, Union
 from uuid import uuid4
 
 try:
@@ -46,7 +49,7 @@ else:
 try:
     from .connection_cext import CMySQLConnection
 except ImportError:
-    CMySQLConnection = None
+    CMySQLConnection = None  # type: ignore[misc]
 
 from .connection import MySQLConnection
 from .constants import CNX_POOL_ARGS, DEFAULT_CONFIGURATION
@@ -64,14 +67,14 @@ CNX_POOL_MAXSIZE = 32
 CNX_POOL_MAXNAMESIZE = 64
 CNX_POOL_NAMEREGEX = re.compile(r"[^a-zA-Z0-9._:\-*$#]")
 ERROR_NO_CEXT = "MySQL Connector/Python C Extension not available"
-MYSQL_CNX_CLASS = (
+MYSQL_CNX_CLASS: Union[type, Tuple[type, ...]] = (
     MySQLConnection if CMySQLConnection is None else (MySQLConnection, CMySQLConnection)
 )
 
-_CONNECTION_POOLS = {}
+_CONNECTION_POOLS: Dict[str, MySQLConnectionPool] = {}
 
 
-def _get_pooled_connection(**kwargs):
+def _get_pooled_connection(**kwargs: Any) -> PooledMySQLConnection:
     """Return a pooled MySQL connection."""
     # If no pool name specified, generate one
     pool_name = (
@@ -100,7 +103,9 @@ def _get_pooled_connection(**kwargs):
         ) from None
 
 
-def _get_failover_connection(**kwargs):
+def _get_failover_connection(
+    **kwargs: Any,
+) -> Union[PooledMySQLConnection, MySQLConnection, CMySQLConnection]:
     """Return a MySQL connection and try to failover if needed.
 
     An InterfaceError is raise when no MySQL is available. ValueError is
@@ -191,7 +196,9 @@ def _get_failover_connection(**kwargs):
     raise InterfaceError("Unable to connect to any of the target hosts")
 
 
-def connect(*args, **kwargs):
+def connect(
+    *args: Any, **kwargs: Any
+) -> Union[PooledMySQLConnection, MySQLConnection, CMySQLConnection]:
     """Create or get a MySQL connection object.
 
     In its simpliest form, connect() will open a connection to a
@@ -287,7 +294,7 @@ def connect(*args, **kwargs):
     return MySQLConnection(*args, **kwargs)
 
 
-def generate_pool_name(**kwargs):
+def generate_pool_name(**kwargs: Any) -> str:
     """Generate a pool name
 
     This function takes keyword arguments, usually the connection
@@ -326,7 +333,9 @@ class PooledMySQLConnection:
     PoolError.
     """
 
-    def __init__(self, pool, cnx):
+    def __init__(
+        self, pool: MySQLConnectionPool, cnx: Union[MySQLConnection, CMySQLConnection]
+    ) -> None:
         """Initialize
 
         The pool argument must be an instance of MySQLConnectionPoll. cnx
@@ -336,20 +345,25 @@ class PooledMySQLConnection:
             raise AttributeError("pool should be a MySQLConnectionPool")
         if not isinstance(cnx, MYSQL_CNX_CLASS):
             raise AttributeError("cnx should be a MySQLConnection")
-        self._cnx_pool = pool
-        self._cnx = cnx
+        self._cnx_pool: MySQLConnectionPool = pool
+        self._cnx: Union[MySQLConnection, CMySQLConnection] = cnx
 
-    def __enter__(self):
+    def __enter__(self) -> PooledMySQLConnection:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Type[BaseException],
+        exc_value: BaseException,
+        traceback: TracebackType,
+    ) -> None:
         self.close()
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: Any) -> Any:
         """Calls attributes of the MySQLConnection instance"""
         return getattr(self._cnx, attr)
 
-    def close(self):
+    def close(self) -> None:
         """Do not close, but add connection back to pool
 
         The close() method does not close the connection with the
@@ -368,7 +382,7 @@ class PooledMySQLConnection:
             self._cnx = None
 
     @staticmethod
-    def config(**kwargs):
+    def config(**kwargs: Any) -> NoReturn:
         """Configuration is done through the pool"""
         raise PoolError(
             "Configuration for pooled connections should be done through the "
@@ -376,7 +390,7 @@ class PooledMySQLConnection:
         )
 
     @property
-    def pool_name(self):
+    def pool_name(self) -> str:
         """Return the name of the connection pool"""
         return self._cnx_pool.pool_name
 
@@ -384,7 +398,13 @@ class PooledMySQLConnection:
 class MySQLConnectionPool:
     """Class defining a pool of MySQL connections"""
 
-    def __init__(self, pool_size=5, pool_name=None, pool_reset_session=True, **kwargs):
+    def __init__(
+        self,
+        pool_size: int = 5,
+        pool_name: Optional[str] = None,
+        pool_reset_session: bool = True,
+        **kwargs: Any,
+    ) -> None:
         """Initialize
 
         Initialize a MySQL connection pool with a maximum number of
@@ -392,13 +412,15 @@ class MySQLConnectionPool:
         arguments, kwargs, are configuration arguments for MySQLConnection
         instances.
         """
-        self._pool_size = None
-        self._pool_name = None
+        self._pool_size: Optional[int] = None
+        self._pool_name: Optional[str] = None
         self._reset_session = pool_reset_session
         self._set_pool_size(pool_size)
         self._set_pool_name(pool_name or generate_pool_name(**kwargs))
-        self._cnx_config = {}
-        self._cnx_queue = queue.Queue(self._pool_size)
+        self._cnx_config: Dict[str, Any] = {}
+        self._cnx_queue: queue.Queue[
+            Union[MySQLConnection, CMySQLConnection]
+        ] = queue.Queue(self._pool_size)
         self._config_version = uuid4()
 
         if kwargs:
@@ -409,21 +431,21 @@ class MySQLConnectionPool:
                 cnt += 1
 
     @property
-    def pool_name(self):
+    def pool_name(self) -> str:
         """Return the name of the connection pool"""
         return self._pool_name
 
     @property
-    def pool_size(self):
+    def pool_size(self) -> int:
         """Return number of connections managed by the pool"""
         return self._pool_size
 
     @property
-    def reset_session(self):
+    def reset_session(self) -> bool:
         """Return whether to reset session"""
         return self._reset_session
 
-    def set_config(self, **kwargs):
+    def set_config(self, **kwargs: Any) -> None:
         """Set the connection configuration for MySQLConnection instances
 
         This method sets the configuration used for creating MySQLConnection
@@ -444,7 +466,7 @@ class MySQLConnectionPool:
             except AttributeError as err:
                 raise PoolError(f"Connection configuration not valid: {err}") from err
 
-    def _set_pool_size(self, pool_size):
+    def _set_pool_size(self, pool_size: int) -> None:
         """Set the size of the pool
 
         This method sets the size of the pool but it will not resize the pool.
@@ -459,7 +481,7 @@ class MySQLConnectionPool:
             )
         self._pool_size = pool_size
 
-    def _set_pool_name(self, pool_name):
+    def _set_pool_name(self, pool_name: str) -> None:
         r"""Set the name of the pool.
 
         This method checks the validity and sets the name of the pool.
@@ -473,7 +495,7 @@ class MySQLConnectionPool:
             raise AttributeError(f"Pool name '{pool_name}' is too long")
         self._pool_name = pool_name
 
-    def _queue_connection(self, cnx):
+    def _queue_connection(self, cnx: Union[MySQLConnection, CMySQLConnection]) -> None:
         """Put connection back in the queue
 
         This method is putting a connection back in the queue. It will not
@@ -490,7 +512,9 @@ class MySQLConnectionPool:
         except queue.Full as err:
             raise PoolError("Failed adding connection; queue is full") from err
 
-    def add_connection(self, cnx=None):
+    def add_connection(
+        self, cnx: Optional[Union[MySQLConnection, CMySQLConnection]] = None
+    ) -> None:
         """Add a connection to the pool
 
         This method instantiates a MySQLConnection using the configuration
@@ -511,7 +535,7 @@ class MySQLConnectionPool:
                 raise PoolError("Failed adding connection; queue is full")
 
             if not cnx:
-                cnx = connect(**self._cnx_config)
+                cnx = connect(**self._cnx_config)  # type: ignore[assignment]
                 try:
                     if (
                         self._reset_session
@@ -535,7 +559,7 @@ class MySQLConnectionPool:
 
             self._queue_connection(cnx)
 
-    def get_connection(self):
+    def get_connection(self) -> PooledMySQLConnection:
         """Get a connection from the pool
 
         This method returns an PooledMySQLConnection instance which
@@ -569,7 +593,7 @@ class MySQLConnectionPool:
 
             return PooledMySQLConnection(self, cnx)
 
-    def _remove_connections(self):
+    def _remove_connections(self) -> int:
         """Close all connections
 
         This method closes all connections. It returns the number

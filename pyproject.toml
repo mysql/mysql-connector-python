@@ -120,3 +120,29 @@ disable = [
 
 [tool.pylint.format]
 good-names = ["i", "f", "db", "dt", "ca", "hi", "pw"]
+
+[tool.mypy]
+# https://mypy.readthedocs.io/en/stable/command_line.html
+python_version = 3.7
+disallow_untyped_defs = true
+show_error_codes = true
+warn_unused_ignores = true
+allow_redefinition = true
+no_strict_optional = true
+no_implicit_optional = true
+files = [
+    'lib/mysql',
+]
+
+[[tool.mypy.overrides]]
+module = [
+  "_mysql_connector",
+  "cryptography.*",
+  "dns.*",
+  "mysql.*",
+  "oci",
+  "sqlparse",
+  "sspi",
+  "sspicon",
+]
+ignore_missing_imports = true

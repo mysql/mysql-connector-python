@@ -27,18 +27,24 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 """Custom Python types used by MySQL Connector/Python"""
+from __future__ import annotations
+
+from typing import Type
 
 
 class HexLiteral(str):
 
     """Class holding MySQL hex literals"""
 
-    def __new__(cls, str_, charset="utf8"):
+    charset: str = ""
+    original: str = ""
+
+    def __new__(cls: Type[HexLiteral], str_: str, charset: str = "utf8") -> HexLiteral:
         hexed = [f"{i:02x}" for i in str_.encode(charset)]
         obj = str.__new__(cls, "".join(hexed))
         obj.charset = charset
         obj.original = str_
         return obj
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "0x" + self

@@ -26,12 +26,15 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="arg-type,union-attr,call-arg"
+
 """OCI Authentication Plugin."""
 
 import logging
 import os
 
 from base64 import b64encode
+from typing import Any, Dict, Optional
 
 from .. import errors
 
@@ -39,6 +42,7 @@ try:
     from cryptography.exceptions import UnsupportedAlgorithm
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives.asymmetric.types import PRIVATE_KEY_TYPES
 except ImportError:
     raise errors.ProgrammingError("Package 'cryptography' is not installed") from None
 
@@ -61,12 +65,12 @@ AUTHENTICATION_PLUGIN_CLASS = "MySQLOCIAuthPlugin"
 class MySQLOCIAuthPlugin(BaseAuthPlugin):
     """Implement the MySQL OCI IAM authentication plugin."""
 
-    plugin_name = "authentication_oci_client"
-    requires_ssl = False
-    context = None
+    plugin_name: str = "authentication_oci_client"
+    requires_ssl: bool = False
+    context: Any = None
 
     @staticmethod
-    def _prepare_auth_response(signature, oci_config):
+    def _prepare_auth_response(signature: bytes, oci_config: Dict[str, Any]) -> str:
         """Prepare client's authentication response
 
         Prepares client's authentication response in JSON format
@@ -85,7 +89,7 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
         return repr(auth_response).replace(" ", "").replace("'", '"')
 
     @staticmethod
-    def _get_private_key(key_path):
+    def _get_private_key(key_path: str) -> PRIVATE_KEY_TYPES:
         """Get the private_key form the given location"""
         try:
             with open(os.path.expanduser(key_path), "rb") as key_file:
@@ -102,7 +106,9 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
         return private_key
 
     @staticmethod
-    def _get_valid_oci_config(oci_path=None, profile_name="DEFAULT"):
+    def _get_valid_oci_config(
+        oci_path: Optional[str] = None, profile_name: str = "DEFAULT"
+    ) -> Dict[str, Any]:
         """Get a valid OCI config from the given configuration file path"""
         if not oci_path:
             oci_path = config.DEFAULT_LOCATION
@@ -113,6 +119,7 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
             "key_file": (lambda x: os.path.exists(os.path.expanduser(x))),
         }
 
+        oci_config: Dict[str, Any] = {}
         try:
             # key_file is validated by oci.config if present
             oci_config = config.from_file(oci_path, profile_name)
@@ -141,7 +148,7 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
 
         return oci_config
 
-    def auth_response(self, auth_data=None):
+    def auth_response(self, auth_data: Optional[str] = None) -> bytes:  # type: ignore[override]
         """Prepare authentication string for the server."""
         oci_path = auth_data
         _LOGGER.debug("server nonce: %s, len %d", self._auth_data, len(self._auth_data))

@@ -33,24 +33,26 @@ DB API v2.0 (PEP-249).
 
 # Python Db API v2
 # pylint: disable=invalid-name
-apilevel = "2.0"
-threadsafety = 1
-paramstyle = "pyformat"
+apilevel: str = "2.0"
+threadsafety: int = 1
+paramstyle: str = "pyformat"
 
 import datetime
 import time
+
+from typing import Tuple
 
 from . import constants
 
 
 class _DBAPITypeObject:
-    def __init__(self, *values):
-        self.values = values
+    def __init__(self, *values: int) -> None:
+        self.values: Tuple[int, ...] = values
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return other in self.values
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         return other not in self.values
 
 
@@ -59,17 +61,17 @@ Time = datetime.time
 Timestamp = datetime.datetime
 
 
-def DateFromTicks(ticks):
+def DateFromTicks(ticks: int) -> datetime.date:
     """Construct an object holding a date value from the given ticks value."""
     return Date(*time.localtime(ticks)[:3])
 
 
-def TimeFromTicks(ticks):
+def TimeFromTicks(ticks: int) -> datetime.time:
     """Construct an object holding a time value from the given ticks value."""
     return Time(*time.localtime(ticks)[3:6])
 
 
-def TimestampFromTicks(ticks):
+def TimestampFromTicks(ticks: int) -> datetime.datetime:
     """Construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*time.localtime(ticks)[:6])
 

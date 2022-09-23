@@ -36,5 +36,5 @@ AUTHENTICATION_PLUGIN_CLASS = "MySQLClearPasswordAuthPlugin"
 class MySQLClearPasswordAuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Clear Password authentication plugin"""
 
-    requires_ssl = True
-    plugin_name = "mysql_clear_password"
+    requires_ssl: bool = True
+    plugin_name: str = "mysql_clear_password"

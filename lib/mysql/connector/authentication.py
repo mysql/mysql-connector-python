@@ -32,8 +32,10 @@ import importlib
 import logging
 
 from functools import lru_cache
+from typing import Type
 
 from .errors import NotSupportedError, ProgrammingError
+from .plugins import BaseAuthPlugin
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -43,7 +45,9 @@ DEFAULT_PLUGINS_PKG = "mysql.connector.plugins"
 
 
 @lru_cache(maxsize=10, typed=False)
-def get_auth_plugin(plugin_name):
+def get_auth_plugin(
+    plugin_name: str,
+) -> Type[BaseAuthPlugin]:  # AUTH_PLUGIN_CLASS_TYPES:
     """Return authentication class based on plugin name
 
     This function returns the class for the authentication plugin plugin_name.

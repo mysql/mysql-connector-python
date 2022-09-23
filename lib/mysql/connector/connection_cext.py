@@ -26,15 +26,20 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="arg-type,index"
+
 """Connection class using the C Extension."""
 
 import os
 import platform
 import socket
 
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+
 from . import version
 from .abstracts import MySQLConnectionAbstract
 from .constants import CharacterSet, ClientFlag, FieldFlag, ServerFlag, ShutdownType
+from .conversion import MySQLConverter
 from .errors import (
     InterfaceError,
     InternalError,
@@ -43,13 +48,22 @@ from .errors import (
     get_mysql_exception,
 )
 from .protocol import MySQLProtocol
+from .types import (
+    CextEofPacketType,
+    CextResultType,
+    DescriptionType,
+    ParamsSequenceOrDictType,
+    RowType,
+    StatsPacketType,
+    StrOrBytes,
+)
 
 HAVE_CMYSQL = False
 
 try:
     import _mysql_connector
 
-    from _mysql_connector import MySQLInterfaceError
+    from _mysql_connector import MySQLInterfaceError, MySQLPrepStmt
 
     from .cursor_cext import (
         CMySQLCursor,
@@ -73,13 +87,15 @@ else:
 class CMySQLConnection(MySQLConnectionAbstract):
     """Class initiating a MySQL Connection using Connector/C."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """Initialization"""
         if not HAVE_CMYSQL:
             raise RuntimeError("MySQL Connector/Python C Extension not available")
-        self._cmysql = None
-        self._columns = []
-        self._plugin_dir = os.path.join(
+        self._cmysql: Optional[
+            _mysql_connector.MySQL  # pylint: disable=c-extension-no-member
+        ] = None
+        self._columns: List[DescriptionType] = []
+        self._plugin_dir: str = os.path.join(
             os.path.dirname(os.path.abspath(_mysql_connector.__file__)),
             "mysql",
             "vendor",
@@ -94,13 +110,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     else "/usr/lib/mysql/plugin"
                 )
 
-        self.converter = None
+        self.converter: Optional[MySQLConverter] = None
         super().__init__()
 
         if kwargs:
             self.connect(**kwargs)
 
-    def _add_default_conn_attrs(self):
+    def _add_default_conn_attrs(self) -> None:
         """Add default connection attributes"""
         license_chunks = version.LICENSE.split(" ")
         if license_chunks[0] == "GPLv2":
@@ -117,7 +133,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             }
         )
 
-    def _do_handshake(self):
+    def _do_handshake(self) -> None:
         """Gather information of the MySQL server before authentication"""
         self._handshake = {
             "protocol": self._cmysql.get_proto_info(),
@@ -136,11 +152,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
         CharacterSet.set_mysql_version(self._server_version)
 
     @property
-    def _server_status(self):
+    def _server_status(self) -> int:
         """Returns the server status attribute of MYSQL structure"""
         return self._cmysql.st_server_status()
 
-    def set_allow_local_infile_in_path(self, path):
+    def set_allow_local_infile_in_path(self, path: str) -> None:
         """set local_infile_in_path
 
         Set allow_local_infile_in_path.
@@ -149,7 +165,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if self._cmysql:
             self._cmysql.set_load_data_local_infile_option(path)
 
-    def set_unicode(self, value=True):
+    def set_unicode(self, value: bool = True) -> None:
         """Toggle unicode mode
 
         Set whether we return string fields as unicode or not.
@@ -162,13 +178,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
             self.converter.set_unicode(value)
 
     @property
-    def autocommit(self):
+    def autocommit(self) -> bool:
         """Get whether autocommit is on or off"""
         value = self.info_query("SELECT @@session.autocommit")[0]
         return value == 1
 
     @autocommit.setter
-    def autocommit(self, value):
+    def autocommit(self, value: bool) -> None:
         """Toggle autocommit"""
         try:
             self._cmysql.autocommit(value)
@@ -179,12 +195,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
 
     @property
-    def database(self):
+    def database(self) -> str:
         """Get the current database"""
-        return self.info_query("SELECT DATABASE()")[0]
+        return self.info_query("SELECT DATABASE()")[0]  # type: ignore[return-value]
 
     @database.setter
-    def database(self, value):
+    def database(self, value: str) -> None:
         """Set the current database"""
         try:
             self._cmysql.select_db(value)
@@ -194,11 +210,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
 
     @property
-    def in_transaction(self):
+    def in_transaction(self) -> int:
         """MySQL session has started a transaction"""
         return self._server_status & ServerFlag.STATUS_IN_TRANS
 
-    def _open_connection(self):
+    def _open_connection(self) -> None:
         charset_name = CharacterSet.get_info(self._charset_id)[0]
         # pylint: disable=c-extension-no-member
         self._cmysql = _mysql_connector.MySQL(
@@ -235,7 +251,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         tls_versions = self._ssl.get("tls_versions")
         if tls_versions is not None:
-            tls_versions.sort(reverse=True)
+            tls_versions.sort(reverse=True)  # type: ignore[union-attr]
             tls_versions = ",".join(tls_versions)
         if self._ssl.get("tls_ciphersuites") is not None:
             ssl_ciphersuites = self._ssl.get("tls_ciphersuites")[0]
@@ -276,7 +292,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         self._do_handshake()
 
-    def close(self):
+    def close(self) -> None:
         """Disconnect from the MySQL server"""
         if self._cmysql:
             try:
@@ -289,11 +305,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     disconnect = close
 
-    def is_closed(self):
+    def is_closed(self) -> bool:
         """Return True if the connection to MySQL Server is closed."""
         return not self._cmysql.connected()
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Reports whether the connection to MySQL Server is available"""
         if self._cmysql:
             self.handle_unread_result()
@@ -301,7 +317,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return False
 
-    def ping(self, reconnect=False, attempts=1, delay=0):
+    def ping(self, reconnect: bool = False, attempts: int = 1, delay: int = 0) -> None:
         """Check availability of the MySQL server
 
         When reconnect is set to True, one or more attempts are made to try
@@ -330,11 +346,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
         else:
             raise InterfaceError("Connection to MySQL is not available")
 
-    def set_character_set_name(self, charset):
+    def set_character_set_name(self, charset: str) -> None:
         """Sets the default character set name for current connection."""
         self._cmysql.set_character_set(charset)
 
-    def info_query(self, query):
+    def info_query(self, query: StrOrBytes) -> Optional[RowType]:
         """Send a query which only returns 1 row"""
         first_row = ()
         try:
@@ -353,7 +369,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return first_row
 
     @property
-    def connection_id(self):
+    def connection_id(self) -> Optional[int]:
         """MySQL connection ID"""
         try:
             return self._cmysql.thread_id()
@@ -363,8 +379,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return None
 
     def get_rows(
-        self, count=None, binary=False, columns=None, raw=None, prep_stmt=None
-    ):
+        self,
+        count: Optional[int] = None,
+        binary: bool = False,
+        columns: Optional[List[DescriptionType]] = None,
+        raw: Optional[bool] = None,
+        prep_stmt: Optional[MySQLPrepStmt] = None,
+    ) -> Tuple[List[RowType], Optional[CextEofPacketType]]:
         """Get all or a subset of rows returned by the MySQL server"""
         unread_result = prep_stmt.have_result_set if prep_stmt else self.unread_result
         if not (self._cmysql and unread_result):
@@ -373,7 +394,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if raw is None:
             raw = self._raw
 
-        rows = []
+        rows: List[Tuple[Any, ...]] = []
         if count is not None and count <= 0:
             raise AttributeError("count should be 1 or higher, or None")
 
@@ -399,7 +420,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     break
                 row = fetch_row()
             if not row:
-                _eof = self.fetch_eof_columns(prep_stmt)["eof"]
+                _eof: Optional[CextEofPacketType] = self.fetch_eof_columns(prep_stmt)[
+                    "eof"
+                ]  # type: ignore[assignment]
                 if prep_stmt:
                     prep_stmt.free_result()
                     self._unread_result = False
@@ -418,7 +441,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return rows, _eof
 
-    def get_row(self, binary=False, columns=None, raw=None, prep_stmt=None):
+    def get_row(
+        self,
+        binary: bool = False,
+        columns: Optional[List[DescriptionType]] = None,
+        raw: Optional[bool] = None,
+        prep_stmt: Optional[MySQLPrepStmt] = None,
+    ) -> Tuple[Optional[RowType], CextEofPacketType]:
         """Get the next rows returned by the MySQL server"""
         try:
             rows, eof = self.get_rows(
@@ -435,31 +464,31 @@ class CMySQLConnection(MySQLConnectionAbstract):
             # No row available
             return (None, None)
 
-    def next_result(self):
+    def next_result(self) -> Optional[bool]:
         """Reads the next result"""
         if self._cmysql:
             self._cmysql.consume_result()
             return self._cmysql.next_result()
         return None
 
-    def free_result(self):
+    def free_result(self) -> None:
         """Frees the result"""
         if self._cmysql:
             self._cmysql.free_result()
 
-    def commit(self):
+    def commit(self) -> None:
         """Commit current transaction"""
         if self._cmysql:
             self.handle_unread_result()
             self._cmysql.commit()
 
-    def rollback(self):
+    def rollback(self) -> None:
         """Rollback current transaction"""
         if self._cmysql:
             self._cmysql.consume_result()
             self._cmysql.rollback()
 
-    def cmd_init_db(self, database):
+    def cmd_init_db(self, database: str) -> None:
         """Change the current database"""
         try:
             self._cmysql.select_db(database)
@@ -468,7 +497,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
             ) from err
 
-    def fetch_eof_columns(self, prep_stmt=None):
+    def fetch_eof_columns(
+        self, prep_stmt: Optional[MySQLPrepStmt] = None
+    ) -> CextResultType:
         """Fetch EOF and column information"""
         have_result_set = (
             prep_stmt.have_result_set if prep_stmt else self._cmysql.have_result_set
@@ -501,7 +532,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "columns": self._columns,
         }
 
-    def fetch_eof_status(self):
+    def fetch_eof_status(self) -> Optional[CextEofPacketType]:
         """Fetch EOF and status information"""
         if self._cmysql:
             return {
@@ -514,7 +545,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return None
 
-    def cmd_stmt_prepare(self, statement):
+    def cmd_stmt_prepare(self, statement: bytes) -> MySQLPrepStmt:
         """Prepares the SQL statement"""
         if not self._cmysql:
             raise OperationalError("MySQL Connection not available")
@@ -526,7 +557,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
         except MySQLInterfaceError as err:
             raise InterfaceError(str(err)) from err
 
-    def cmd_stmt_execute(self, statement_id, *args):
+    def cmd_stmt_execute(
+        self, statement_id: MySQLPrepStmt, *args: Any
+    ) -> Optional[Union[CextEofPacketType, CextResultType]]:
         """Executes the prepared statement"""
         try:
             statement_id.stmt_execute(*args)
@@ -542,19 +575,25 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._unread_result = True
         return self.fetch_eof_columns(statement_id)
 
-    def cmd_stmt_close(self, statement_id):
+    def cmd_stmt_close(self, statement_id: MySQLPrepStmt) -> None:
         """Closes the prepared statement"""
         if self._unread_result:
             raise InternalError("Unread result found")
         statement_id.stmt_close()
 
-    def cmd_stmt_reset(self, statement_id):
+    def cmd_stmt_reset(self, statement_id: MySQLPrepStmt) -> None:
         """Resets the prepared statement"""
         if self._unread_result:
             raise InternalError("Unread result found")
         statement_id.stmt_reset()
 
-    def cmd_query(self, query, raw=None, buffered=False, raw_as_string=False):
+    def cmd_query(
+        self,
+        query: StrOrBytes,
+        raw: Optional[bool] = None,
+        buffered: bool = False,
+        raw_as_string: bool = False,
+    ) -> Optional[Union[CextEofPacketType, CextResultType]]:
         """Send a query to the MySQL server"""
         self.handle_unread_result()
         if raw is None:
@@ -592,13 +631,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def cursor(
         self,
-        buffered=None,
-        raw=None,
-        prepared=None,
-        cursor_class=None,
-        dictionary=None,
-        named_tuple=None,
-    ):
+        buffered: Optional[bool] = None,
+        raw: Optional[bool] = None,
+        prepared: Optional[bool] = None,
+        cursor_class: Optional[Type[CMySQLCursor]] = None,
+        dictionary: Optional[bool] = None,
+        named_tuple: Optional[bool] = None,
+    ) -> CMySQLCursor:
         """Instantiates and returns a cursor using C Extension
 
         By default, CMySQLCursor is returned. Depending on the options
@@ -673,7 +712,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from None
 
     @property
-    def num_rows(self):
+    def num_rows(self) -> int:
         """Returns number of rows of current result set"""
         if not self._cmysql.have_result_set:
             raise InterfaceError("No result set")
@@ -681,7 +720,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return self._cmysql.num_rows()
 
     @property
-    def warning_count(self):
+    def warning_count(self) -> int:
         """Returns number of warnings"""
         if not self._cmysql:
             return 0
@@ -689,24 +728,26 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return self._cmysql.warning_count()
 
     @property
-    def result_set_available(self):
+    def result_set_available(self) -> bool:
         """Check if a result set is available"""
         if not self._cmysql:
             return False
 
         return self._cmysql.have_result_set
 
-    @property
-    def unread_result(self):
+    @property  # type: ignore[misc]
+    def unread_result(self) -> bool:
         """Check if there are unread results or rows"""
         return self.result_set_available
 
     @property
-    def more_results(self):
+    def more_results(self) -> bool:
         """Check if there are more results"""
         return self._cmysql.more_results()
 
-    def prepare_for_mysql(self, params):
+    def prepare_for_mysql(
+        self, params: ParamsSequenceOrDictType
+    ) -> Union[Sequence[bytes], Dict[str, bytes],]:
         """Prepare parameters for statements
 
         This method is use by cursors to prepared parameters found in the
@@ -714,6 +755,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         Returns dict.
         """
+        result: Union[List[Any], Dict[str, Any]] = []
         if isinstance(params, (list, tuple)):
             if self.converter:
                 result = [
@@ -742,7 +784,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return result
 
-    def consume_results(self):
+    def consume_results(self) -> None:
         """Consume the current result
 
         This method consume the result by reading (consuming) all rows.
@@ -751,15 +793,15 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def cmd_change_user(
         self,
-        username="",
-        password="",
-        database="",
-        charset=45,
-        password1="",
-        password2="",
-        password3="",
-        oci_config_file=None,
-    ):
+        username: str = "",
+        password: str = "",
+        database: str = "",
+        charset: int = 45,
+        password1: str = "",
+        password2: str = "",
+        password3: str = "",
+        oci_config_file: Optional[str] = None,
+    ) -> None:
         """Change the current logged in user"""
         try:
             self._cmysql.change_user(
@@ -780,7 +822,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._charset_id = charset
         self._post_connection()
 
-    def cmd_reset_connection(self):
+    def cmd_reset_connection(self) -> bool:
         """Resets the session state without re-authenticating
 
         Reset command only works on MySQL server 5.7.3 or later.
@@ -793,7 +835,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             self._post_connection()
         return res
 
-    def cmd_refresh(self, options):
+    def cmd_refresh(self, options: int) -> Optional[CextEofPacketType]:
         """Send the Refresh command to the MySQL server"""
         try:
             self.handle_unread_result()
@@ -805,11 +847,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return self.fetch_eof_status()
 
-    def cmd_quit(self):
+    def cmd_quit(self) -> None:
         """Close the current connection with the server"""
         self.close()
 
-    def cmd_shutdown(self, shutdown_type=None):
+    def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> None:
         """Shut down the MySQL Server"""
         if not self._cmysql:
             raise OperationalError("MySQL Connection not available")
@@ -829,7 +871,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
         self.close()
 
-    def cmd_statistics(self):
+    def cmd_statistics(self) -> StatsPacketType:
         """Return statistics from the MySQL server"""
         self.handle_unread_result()
 
@@ -841,29 +883,31 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
             ) from err
 
-    def cmd_process_kill(self, mysql_pid):
+    def cmd_process_kill(self, mysql_pid: int) -> None:
         """Kill a MySQL process"""
         if not isinstance(mysql_pid, int):
             raise ValueError("MySQL PID must be int")
         self.info_query(f"KILL {mysql_pid}")
 
-    def cmd_debug(self):
+    def cmd_debug(self) -> Any:
         """Send the DEBUG command"""
         raise NotImplementedError
 
-    def cmd_ping(self):
+    def cmd_ping(self) -> Any:
         """Send the PING command"""
         raise NotImplementedError
 
-    def cmd_query_iter(self, statements):
+    def cmd_query_iter(self, statements: Any) -> Any:
         """Send one or more statements to the MySQL server"""
         raise NotImplementedError
 
-    def cmd_stmt_send_long_data(self, statement_id, param_id, data):
+    def cmd_stmt_send_long_data(
+        self, statement_id: Any, param_id: Any, data: Any
+    ) -> Any:
         """Send data for a column"""
         raise NotImplementedError
 
-    def handle_unread_result(self, prepared=False):
+    def handle_unread_result(self, prepared: bool = False) -> None:
         """Check whether there is an unread result"""
         unread_result = self._unread_result if prepared is True else self.unread_result
         if self.can_consume_results:
@@ -871,7 +915,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
         elif unread_result:
             raise InternalError("Unread result found")
 
-    def reset_session(self, user_variables=None, session_variables=None):
+    def reset_session(
+        self,
+        user_variables: Optional[Dict[str, Any]] = None,
+        session_variables: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Clears the current active session
 
         This method resets the session state, if the MySQL server is 5.7.3

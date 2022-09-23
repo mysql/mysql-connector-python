@@ -214,6 +214,10 @@
          Source="$(var.BDist39)\mysql\connector\custom_types.$(var.PyExt)" DiskId="1"/>
         <File Id="abstractspy39" Name="abstracts.$(var.PyExt)"
          Source="$(var.BDist39)\mysql\connector\abstracts.$(var.PyExt)" DiskId="1"/>
+        <File Id="typespy39" Name="types.$(var.PyExt)"
+         Source="$(var.BDist39)\mysql\connector\types.$(var.PyExt)" DiskId="1"/>
+        <File Id="pytyped39" Name="py.typed"
+         Source="$(var.BDist39)\mysql\connector\py.typed" DiskId="1"/>
 
         <?if $(var.HaveCExt39) = 1 ?>
         <File Id="connectioncextpy39" Name="connection_cext.$(var.PyExt)"
