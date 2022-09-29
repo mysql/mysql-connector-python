@@ -32,9 +32,9 @@
 
 from __future__ import annotations
 
-import importlib
 import os
 import re
+import warnings
 import weakref
 
 from abc import ABC, abstractmethod
@@ -110,6 +110,7 @@ from .types import (
     SupportedMysqlBinaryProtocolTypes,
     WarningType,
 )
+from .utils import import_object
 
 NAMED_TUPLE_CACHE: weakref.WeakValueDictionary[Any, Any] = weakref.WeakValueDictionary()
 
@@ -186,7 +187,8 @@ class MySQLConnectionAbstract(ABC):
         self._force_ipv6: bool = False
         self._oci_config_file: Optional[str] = None
         self._oci_config_profile: Optional[str] = None
-        self._fido_callback: Optional[Union[str, Callable]] = None
+        self._fido_callback: Optional[Union[str, Callable[[str], None]]] = None
+        self._webauthn_callback: Optional[Union[str, Callable[[str], None]]] = None
         self._krb_service_principal: Optional[str] = None
 
         self._use_unicode: bool = True
@@ -577,6 +579,13 @@ class MySQLConnectionAbstract(ABC):
         except KeyError:
             self._auth_plugin = ""
 
+        # Disallow the usage of some default authentication plugins
+        if self._auth_plugin == "authentication_webauthn_client":
+            raise InterfaceError(
+                f"'{self._auth_plugin}' cannot be used as the default authentication "
+                "plugin"
+            )
+
         # Configure character set and collation
         if "charset" in config or "collation" in config:
             try:
@@ -794,32 +803,54 @@ class MySQLConnectionAbstract(ABC):
                 )
 
         if self._fido_callback:
-            # Import the callable if it's a str
-            if isinstance(self._fido_callback, str):
-                try:
-                    module, callback = self._fido_callback.rsplit(".", 1)
-                except ValueError:
-                    raise ProgrammingError(
-                        f"No callable named '{self._fido_callback}'"
-                    ) from None
-                try:
-                    module = importlib.import_module(module)
-                    self._fido_callback = getattr(module, callback)
-                except (AttributeError, ModuleNotFoundError) as err:
-                    raise ProgrammingError(f"{err}") from err
-            # Check if it's a callable
-            if not callable(self._fido_callback):
-                raise ProgrammingError("Expected a callable for 'fido_callback'")
-            # Check the callable signature if has only 1 positional argument
-            params = len(signature(self._fido_callback).parameters)
-            if params != 1:
-                raise ProgrammingError(
-                    "'fido_callback' requires 1 positional argument, but the "
-                    f"callback provided has {params}"
-                )
+            warn_msg = (
+                "The `fido_callback` connection argument is deprecated and it will be "
+                "removed in a future release of MySQL Connector/Python. "
+                "Use `webauth_callback` instead"
+            )
+            warnings.warn(warn_msg, DeprecationWarning)
+            self._validate_callable("fido_callback", self._fido_callback, 1)
+
+        if self._webauthn_callback:
+            self._validate_callable("webauth_callback", self._webauthn_callback, 1)
 
     def _add_default_conn_attrs(self) -> Any:
         """Add the default connection attributes."""
+
+    @staticmethod
+    def _validate_callable(
+        option_name: str, callback: Union[str, Callable], num_args: int = 0
+    ) -> None:
+        """Validate if it's a Python callable.
+
+         Args:
+             option_name (str): Connection option name.
+             callback (str or callable): The fully qualified path to the callable or
+                                         a callable.
+             num_args (int): Number of positional arguments allowed.
+
+        Raises:
+             ProgrammingError: If `callback` is not valid or wrong number of positional
+                               arguments.
+
+        .. versionadded:: 8.2.0
+        """
+        if isinstance(callback, str):
+            try:
+                callback = import_object(callback)
+            except ValueError as err:
+                raise ProgrammingError(f"{err}") from err
+
+        if not callable(callback):
+            raise ProgrammingError(f"Expected a callable for '{option_name}'")
+
+        # Check if the callable signature has <num_args> positional arguments
+        num_params = len(signature(callback).parameters)
+        if num_params != num_args:
+            raise ProgrammingError(
+                f"'{option_name}' requires {num_args} positional argument, but the "
+                f"callback provided has {num_params}"
+            )
 
     @staticmethod
     def _check_server_version(server_version: StrOrBytes) -> Tuple[int, ...]:

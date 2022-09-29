@@ -58,6 +58,7 @@ from .types import (
     StatsPacketType,
     StrOrBytes,
 )
+from .utils import import_object
 
 HAVE_CMYSQL = False
 
@@ -243,6 +244,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         # pylint: enable=c-extension-no-member
         if not self.isset_client_flag(ClientFlag.CONNECT_ARGS):
             self._conn_attrs = {}
+        fido_callback = self._webauthn_callback or self._fido_callback
         cnx_kwargs = {
             "host": self._host,
             "user": self._user,
@@ -261,7 +263,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "load_data_local_dir": self._allow_local_infile_in_path,
             "oci_config_file": self._oci_config_file,
             "oci_config_profile": self._oci_config_profile,
-            "fido_callback": self._fido_callback,
+            "fido_callback": (
+                import_object(fido_callback)
+                if isinstance(fido_callback, str)
+                else fido_callback
+            ),
         }
 
         tls_versions = self._ssl.get("tls_versions")

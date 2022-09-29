@@ -302,6 +302,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             krb_service_principal=self._krb_service_principal,
             oci_config_file=self._oci_config_file,
             oci_config_profile=self._oci_config_profile,
+            webauthn_callback=self._webauthn_callback,
+            fido_callback=self._fido_callback,
         )
         self._handle_ok(ok_pkt)
 
@@ -1058,6 +1060,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             krb_service_principal=self._krb_service_principal,
             oci_config_file=self._oci_config_file,
             oci_config_profile=self._oci_config_profile,
+            webauthn_callback=self._webauthn_callback,
+            fido_callback=self._fido_callback,
         )
 
         if not (self._client_flags & ClientFlag.CONNECT_WITH_DB) and database:

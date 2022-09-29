@@ -299,7 +299,8 @@ class BaseCommand(Command):
             if self.with_openssl_lib_dir:
                 libssl, libcrypto = self._get_openssl_libs()
                 vendor_libs.append((self.with_openssl_lib_dir, [libssl, libcrypto]))
-                # Copy libssl and libcrypto libraries to 'mysql/vendor/plugin' on macOS
+                # Copy libssl and libcrypto libraries to 'mysql/vendor/plugin' and
+                # libcrypto to 'mysql/vendor/lib' on macOS
                 if platform.system() == "Darwin":
                     vendor_libs.append(
                         (
@@ -310,6 +311,14 @@ class BaseCommand(Command):
                             ],
                         )
                     )
+                    vendor_libs.append(
+                        (
+                            self.with_openssl_lib_dir,
+                            [
+                                Path("lib", libcrypto).as_posix(),
+                            ],
+                        )
+                    )
 
         # Plugins
         bundle_plugin_libs = False
@@ -317,22 +326,11 @@ class BaseCommand(Command):
             plugin_ext = "dll" if os.name == "nt" else "so"
             plugin_path = os.path.join(self.with_mysql_capi, "lib", "plugin")
             plugin_list = [
-                (
-                    "LDAP",
-                    f"authentication_ldap_sasl_client.{plugin_ext}",
-                ),
-                (
-                    "Kerberos",
-                    f"authentication_kerberos_client.{plugin_ext}",
-                ),
-                (
-                    "OCI IAM",
-                    f"authentication_oci_client.{plugin_ext}",
-                ),
-                (
-                    "FIDO",
-                    f"authentication_fido_client.{plugin_ext}",
-                ),
+                ("LDAP", f"authentication_ldap_sasl_client.{plugin_ext}"),
+                ("Kerberos", f"authentication_kerberos_client.{plugin_ext}"),
+                ("OCI IAM", f"authentication_oci_client.{plugin_ext}"),
+                ("FIDO", f"authentication_fido_client.{plugin_ext}"),
+                ("WebAuthn", f"authentication_webauthn_client.{plugin_ext}"),
             ]
 
             for plugin_name, plugin_file in plugin_list:
@@ -390,6 +388,15 @@ class BaseCommand(Command):
         # mysql/vendor/private
         if not Path(self.vendor_folder, "private").exists():
             Path(os.getcwd(), self.vendor_folder, "private").mkdir(
+                parents=True, exist_ok=True
+            )
+
+        # mysql/vendor/lib
+        if (
+            platform.system() == "Darwin"
+            and not Path(self.vendor_folder, "lib").exists()
+        ):
+            Path(os.getcwd(), self.vendor_folder, "lib").mkdir(
                 parents=True, exist_ok=True
             )
 
@@ -541,6 +548,7 @@ class BaseCommand(Command):
         self.distribution.package_data = {
             "mysql": [
                 "vendor/*",
+                "vendor/lib/*",
                 "vendor/plugin/*",
                 "vendor/private/*",
                 "vendor/private/sasl2/*",

@@ -1397,6 +1397,30 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
 
     if (fido_callback && fido_callback != Py_None) {
+        /* verify if the `fido_callback` is a proper callable */
+        if (!PyCallable_Check(fido_callback)) {
+            PyErr_SetString(PyExc_TypeError, "Expected a callable for 'fido_callback'");
+            return NULL;
+        }
+
+#if MYSQL_VERSION_ID >= 80200
+        /* load WebAuthn client authentication plugin if required */
+        struct st_mysql_client_plugin *fido_plugin = mysql_client_find_plugin(
+            &self->session, "authentication_webauthn_client",
+            MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
+        if (!fido_plugin) {
+            raise_with_string(
+                PyUnicode_FromString(
+                    "The WebAuthn authentication plugin could not be loaded"),
+                    NULL);
+                return NULL;
+        }
+
+        /* register callback */
+        mysql_plugin_options(fido_plugin,
+                             "plugin_authentication_webauthn_client_messages_callback",
+                             (const void *)(&fido_messages_callback));
+#else
         /* load FIDO client authentication plugin if required */
         struct st_mysql_client_plugin *fido_plugin = mysql_client_find_plugin(
             &self->session, "authentication_fido_client", MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
@@ -1407,15 +1431,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
             return NULL;
         }
 
-        /* verify if the `fido_callback` is a proper callable */
-        if (!PyCallable_Check(fido_callback)) {
-            PyErr_SetString(PyExc_TypeError, "Expected a callable for 'fido_callback'");
-            return NULL;
-        }
-
         /* register callback */
         mysql_plugin_options(fido_plugin, "fido_messages_callback",
                              (const void *)(&fido_messages_callback));
+#endif
     }
 
 #ifdef MS_WINDOWS

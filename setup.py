@@ -147,5 +147,6 @@ setup(
             "typing-extensions>=3.7.4",
             "zipp>=0.5",
         ],
+        "fido2": ["fido2==1.1.2"],
     },
 )

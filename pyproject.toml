@@ -169,6 +169,7 @@ module = [
   'sspicon',
   'opentelemetry',
   'opentelemetry.*',
+  'fido2.*',
 ]
 ignore_missing_imports = true
 

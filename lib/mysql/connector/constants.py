@@ -91,6 +91,7 @@ DEFAULT_CONFIGURATION: Dict[str, Optional[Union[str, bool, int]]] = {
     "oci_config_file": None,
     "oci_config_profile": None,
     "fido_callback": None,
+    "webauthn_callback": None,
     "kerberos_auth_mode": None,
     "init_command": None,
 }

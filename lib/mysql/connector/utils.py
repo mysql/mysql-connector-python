@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,6 +28,7 @@
 
 """Utilities."""
 
+import importlib
 import os
 import platform
 import struct
@@ -53,7 +54,7 @@ from stringprep import (
     in_table_d1,
     in_table_d2,
 )
-from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from .custom_types import HexLiteral
 from .types import StrOrBytes
@@ -634,3 +635,34 @@ def get_platform() -> Dict[str, Union[str, Tuple[str, str]]]:
             plat["version"] = "-".join(linux_distribution()[0:2])
 
     return plat
+
+
+def import_object(fullpath: str) -> Any:
+    """Import an object from a fully qualified module path.
+
+    Args:
+        obj (str): A string representing the fully qualified name of the object.
+
+    Returns:
+        Object: The imported object.
+
+    Raises:
+        ValueError: If the object can't be imported.
+
+    .. versionadded:: 8.0.33
+    """
+    if not isinstance(fullpath, str):
+        raise ValueError(
+            "'fullpath' should be a str representing the fully qualified name of the "
+            "object to be imported"
+        )
+    try:
+        module_str, callable_str = fullpath.rsplit(".", 1)
+        module = importlib.import_module(module_str)
+        obj = getattr(module, callable_str)
+    except ValueError:
+        raise ValueError(f"No callable named '{fullpath}'") from None
+    except (AttributeError, ModuleNotFoundError) as err:
+        raise ValueError(f"{err}") from err
+
+    return obj

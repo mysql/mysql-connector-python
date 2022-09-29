@@ -74,6 +74,11 @@ except ImportError:
     oci = None
 
 try:
+    import fido2
+except ImportError:
+    fido2 = None
+
+try:
     from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
 except ImportError:
     # Test without C Extension
@@ -86,6 +91,7 @@ _PLUGINS_DEPENDENCIES = {
     "authentication_kerberos_client": (gssapi,),
     "authentication_ldap_sasl_client": (gssapi,),
     "authentication_oci_client": (cryptography, oci),
+    "authentication_webauthn_client": (fido2,),
 }
 
 
@@ -1327,10 +1333,6 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
 
 
 @unittest.skipIf(
-    tests.MYSQL_VERSION < (8, 0, 27),
-    "Authentication with OCI IAM not supported",
-)
-@unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 29), "Authentication with FIDO not supported"
 )
 @unittest.skipUnless(HAVE_CMYSQL, "C Extension not available")
@@ -1356,4 +1358,31 @@ class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
         config["auth_plugin"] = "authentication_fido_client"
         for case in test_cases:
             config["fido_callback"] = case
+            self.assertRaises(ProgrammingError, self.cnx.__class__, **config)
+
+
+@unittest.skipIf(
+    tests.MYSQL_VERSION < (8, 2, 0), "Authentication with WebAuthn not supported"
+)
+class MySQLWebAuthnAuthPluginTests(tests.MySQLConnectorTests):
+    """Test authentication.MySQLWebAuthnAuthPlugin.
+
+    Implemented by WL#11521: Support WebAuthn authentication
+    """
+
+    @tests.foreach_cnx()
+    def test_invalid_webauthn_callback(self):
+        """Test invalid 'webauthn_callback' option."""
+
+        def my_callback():
+            ...
+
+        test_cases = (
+            "abc",  # No callable named 'abc'
+            "abc.abc",  # module 'abc' has no attribute 'abc'
+            my_callback,  # 1 positional argument required
+        )
+        config = tests.get_mysql_config()
+        for case in test_cases:
+            config["webauthn_callback"] = case
             self.assertRaises(ProgrammingError, self.cnx.__class__, **config)
