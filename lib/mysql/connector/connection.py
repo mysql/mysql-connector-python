@@ -261,8 +261,6 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self._auth_plugin,
             )
 
-        _LOGGER.debug("# _do_auth(): user: %s", username)
-        _LOGGER.debug("# _do_auth(): password: %s", password)
 
         packet = self._protocol.make_auth(
             handshake=self._handshake,
