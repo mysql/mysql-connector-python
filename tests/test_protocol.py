@@ -464,6 +464,8 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ("aDateTime", 12, None, None, None, None, 1, 128),
             ("aTime", 11, None, None, None, None, 1, 128),
             ("aNull", 6, None, None, None, None, 1, 128),
+            ("aBlob", 252, None, None, None, None, 1, 144),
+            ("aVarBinary", 253, None, None, None, None, 1, 128),
         ]
 
         packet = bytearray(
@@ -471,6 +473,8 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             b"\x2d\x33\x2e\x31\x34\x31\x35\x39\x04\xd3\x07"
             b"\x01\x1f\x07\xb9\x07\x06\x0e\x15\x21\x0e\x0c"
             b"\x00\x0a\x00\x00\x00\x10\x0f\x1e\x70\x82\x03\x00"
+            b"\x05\xaa\xbb\xcc\xdd\xff"
+            b"\x05\xaa\xbb\xcc\xdd\xff"
         )
 
         # float/double are returned as DECIMAL by MySQL
@@ -482,6 +486,8 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             datetime.datetime(1977, 6, 14, 21, 33, 14),
             datetime.timedelta(10, 58530, 230000),
             None,
+            bytearray(b"\xaa\xbb\xcc\xdd\xff"),
+            bytearray(b"\xaa\xbb\xcc\xdd\xff"),
         )
         res = self._protocol._parse_binary_values(fields, packet)
         self.assertEqual(exp, res)

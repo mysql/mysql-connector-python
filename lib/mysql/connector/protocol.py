@@ -641,7 +641,10 @@ class MySQLProtocol:
                 values.append(value)
             else:
                 (packet, value) = utils.read_lc_string(packet)
-                values.append(value.decode(charset))
+                try:
+                    values.append(value.decode(charset))
+                except UnicodeDecodeError:
+                    values.append(value)
 
         return tuple(values)
 
