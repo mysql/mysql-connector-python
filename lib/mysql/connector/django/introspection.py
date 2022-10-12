@@ -297,7 +297,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             relations[my_fieldname] = (other_field, other_table)
         return relations
 
-    def get_key_columns(  # pylint: disable=no-self-use
+    def get_key_columns(
         self, cursor: "CursorWrapper", table_name: str
     ) -> List[Tuple[str, str, str]]:
         """
