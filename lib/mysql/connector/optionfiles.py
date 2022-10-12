@@ -123,7 +123,7 @@ class MySQLOptionsParser(SafeConfigParser):
         """
 
         # Regular expression to allow options with no value(For Python v2.6)
-        self.optcre: re.Pattern[str] = re.compile(
+        self.optcre: re.Pattern = re.compile(
             r"(?P<option>[^:=\s][^:=]*)"
             r"\s*(?:"
             r"(?P<vi>[:=])\s*"
