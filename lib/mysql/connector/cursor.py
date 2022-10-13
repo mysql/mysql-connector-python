@@ -85,7 +85,7 @@ RE_SQL_ON_DUPLICATE = re.compile(
 RE_SQL_INSERT_STMT = re.compile(
     rf"({SQL_COMMENT}|\s)*INSERT({SQL_COMMENT}|\s)"
     r"*INTO\s+[`'\"]?.+[`'\"]?(?:\.[`'\"]?.+[`'\"]?)"
-    r"{{0,2}}\s+VALUES\s*\(.+(?:\s*,.+)*\)",
+    r"{0,2}\s+VALUES\s*\(.+(?:\s*,.+)*\)",
     re.I | re.M | re.S,
 )
 RE_SQL_INSERT_VALUES = re.compile(r".*VALUES\s*(\(.*\)).*", re.I | re.M | re.S)

@@ -7185,3 +7185,66 @@ class BugOra34689812(tests.MySQLConnectorTests):
             )
             res = cur.fetchall()
             self.assertEqual(res[0], self.data)
+
+
+class BugOra34499578(tests.MySQLConnectorTests):
+    """BUG#34499578: MySQLCursor.executemany() fails to correctly identify BULK data loading ops.
+
+    The MySQLCursor.executemany() method fails to batch insert data since
+    the regular expression (RE) sentinel used does not detect batch cases
+    correctly resulting in using the one-on-one insert, hence an overall
+    performance issue.
+    """
+
+    table_name = "BugOra34499578"
+    field1, field2 = "color", "country"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.table_name}(
+                        {self.field1} char(32),
+                        {self.field2} char(32)
+                    )
+                    """
+                )
+            cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_batch_insert_happens_in_executemany(self):
+        seq_params = [["red", "portugal"], ["green", "mexico"], ["blue", "argentina"]]
+        with self.cnx.cursor() as cur:
+            cur.executemany(
+                f"""
+                INSERT INTO {self.table_name} (
+                    {self.field1},
+                    {self.field2})
+                    VALUES(
+                        %s,
+                        %s
+                    )
+                """,
+                seq_params,
+            )
+            # if batch insert happens, it means all parameters must be
+            # somewhere in the executed statement, else just a parameters
+            # subset is in, particularly the last parameter.
+            self.assertTrue(
+                all(
+                    [
+                        param.encode("utf8", errors="ignore") in cur._executed
+                        for params in seq_params
+                        for param in params
+                    ]
+                ),
+                "Batch insert failed!",
+            )
