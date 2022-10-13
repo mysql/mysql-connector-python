@@ -7129,3 +7129,59 @@ class BugOra33987119(tests.MySQLConnectorTests):
                         finally:
                             # always executed
                             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+
+class BugOra34689812(tests.MySQLConnectorTests):
+    """BUG#34689812: Fix datetime conversion when using prepared cursors.
+
+    When using a prepared cursor, if a datetime column contains 00:00:00 as
+    time, a Python date object is returned instead of datetime.
+
+    This patch inspects the column type instead of relying on the packet
+    length and returns the proper object type.
+    """
+
+    table_name = "BugOra34689812"
+    data = (
+        date(2022, 10, 13),
+        datetime(2022, 10, 13, 0, 0, 0),
+        datetime(2022, 10, 13, 0, 0, 0, 0),
+    )
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            with cnx.cursor(prepared=True) as cur:
+                cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.table_name} (
+                        id INT UNSIGNED NOT NULL AUTO_INCREMENT KEY,
+                        my_date DATE,
+                        my_datetime DATETIME,
+                        my_timestamp TIMESTAMP
+                    )
+                    """
+                )
+                cur.execute(
+                    f"""
+                    INSERT INTO {self.table_name}
+                    (my_date, my_datetime, my_timestamp) VALUES (?, ?, ?)
+                    """,
+                    self.data,
+                )
+            cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_datetime_with_prepared_cursor(self):
+        with self.cnx.cursor(prepared=True) as cur:
+            cur.execute(
+                f"SELECT my_date, my_datetime, my_timestamp FROM {self.table_name}"
+            )
+            res = cur.fetchall()
+            self.assertEqual(res[0], self.data)

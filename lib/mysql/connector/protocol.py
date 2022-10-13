@@ -548,16 +548,19 @@ class MySQLProtocol:
     @staticmethod
     def _parse_binary_timestamp(
         packet: bytes,
+        field_type: int,
     ) -> Tuple[bytes, Optional[Union[datetime.date, datetime.datetime]]]:
         """Parse a timestamp from a binary packet"""
         length = packet[0]
         value = None
         if length == 4:
-            value = datetime.date(
-                year=struct.unpack("<H", packet[1:3])[0],
-                month=packet[3],
-                day=packet[4],
-            )
+            year = struct.unpack("<H", packet[1:3])[0]
+            month = packet[3]
+            day = packet[4]
+            if field_type in (FieldType.DATETIME, FieldType.TIMESTAMP):
+                value = datetime.datetime(year=year, month=month, day=day)
+            else:
+                value = datetime.date(year=year, month=month, day=day)
         elif length >= 7:
             mcs = 0
             if length == 11:
@@ -634,7 +637,7 @@ class MySQLProtocol:
                 FieldType.DATE,
                 FieldType.TIMESTAMP,
             ):
-                (packet, value) = self._parse_binary_timestamp(packet)
+                (packet, value) = self._parse_binary_timestamp(packet, field[1])
                 values.append(value)
             elif field[1] == FieldType.TIME:
                 (packet, value) = self._parse_binary_time(packet)

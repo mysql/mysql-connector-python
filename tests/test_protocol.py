@@ -394,18 +394,24 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         """Parse a timestamp from a binary packet"""
         # Case = Expected value; data
         cases = [
-            (datetime.date(1977, 6, 14), bytearray(b"\x04\xb9\x07\x06\x0e")),
             (
+                FieldType.DATE,
+                datetime.date(1977, 6, 14),
+                bytearray(b"\x04\xb9\x07\x06\x0e"),
+            ),
+            (
+                FieldType.DATETIME,
                 datetime.datetime(1977, 6, 14, 21, 33, 14),
                 bytearray(b"\x07\xb9\x07\x06\x0e\x15\x21\x0e"),
             ),
             (
+                FieldType.TIMESTAMP,
                 datetime.datetime(1977, 6, 14, 21, 33, 14, 345),
                 bytearray(b"\x0b\xb9\x07\x06\x0e\x15\x21\x0e\x59\x01\x00\x00"),
             ),
         ]
-        for exp, data in cases:
-            res = self._protocol._parse_binary_timestamp(data + b"\x00\x00")
+        for field_type, exp, data in cases:
+            res = self._protocol._parse_binary_timestamp(data + b"\x00\x00", field_type)
             self.assertEqual(
                 (b"\x00\x00", exp),
                 res,
