@@ -413,8 +413,9 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         # application did not provide sufficient information to use
         # Kerberos.
 
-        # [1] https://docs.microsoft.com/en-us/windows/win32/secauthn/microsoft-negotiate?source=recommendations
-        # [2] https://docs.microsoft.com/en-us/windows/win32/secauthn/microsoft-kerberos?source=recommendations
+        # prefix: https://docs.microsoft.com/en-us/windows/win32/secauthn
+        # [1] prefix/microsoft-negotiate?source=recommendations
+        # [2] prefix/microsoft-kerberos?source=recommendations
         self.clientauth = sspi.ClientAuth(
             "Negotiate",
             targetspn=targetspn,
