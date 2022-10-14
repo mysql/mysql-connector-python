@@ -63,7 +63,7 @@ MySQL_connected(MySQL *self);
     }
 
 #define IS_CONNECTED(cnx)                                       \
-    if ((PyObject *)MySQL_connected(cnx) == Py_False) {         \
+    if (!cnx->connected) {                                      \
         raise_with_session(&cnx->session, MySQLInterfaceError); \
         return 0;                                               \
     }
@@ -313,7 +313,7 @@ void
 MySQL_dealloc(MySQL *self)
 {
     if (self) {
-        MySQL_free_result(self);
+        Py_XDECREF(MySQL_free_result(self));
         mysql_close(&self->session);
 
         Py_DECREF(self->charset_name);
@@ -503,7 +503,7 @@ MySQL_free_result(MySQL *self)
         Py_END_ALLOW_THREADS
     }
 
-    MySQL_reset_result(self);
+    Py_XDECREF(MySQL_reset_result(self));
 
     Py_RETURN_NONE;
 }
@@ -536,7 +536,7 @@ MySQL_consume_result(MySQL *self)
         Py_END_ALLOW_THREADS
     }
 
-    MySQL_free_result(self);
+    Py_XDECREF(MySQL_free_result(self));
 
     Py_RETURN_NONE;
 }
@@ -781,8 +781,6 @@ MySQL_st_warning_count(MySQL *self)
 
   Return whether the MySQL instance is connected or not.
 
-  This function uses the mysql_ping() C API function.
-
   @param    self    MySQL instance
 
   @return   Boolean Object Py_True or Py_False
@@ -795,7 +793,6 @@ MySQL_connected(MySQL *self)
         Py_RETURN_FALSE;
     }
 
-    self->connected = 1;
     Py_RETURN_TRUE;
 }
 
@@ -1280,9 +1277,9 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
             PyObject *err_msg = PyUnicode_FromString("sha256_password requires SSL");
             PyObject *err_obj = NULL;
             err_obj = PyObject_CallFunctionObjArgs(exc_type, err_msg, NULL);
-            PyObject_SetAttr(err_obj, PyUnicode_FromString("sqlstate"), Py_None);
-            PyObject_SetAttr(err_obj, PyUnicode_FromString("errno"), err_no);
-            PyObject_SetAttr(err_obj, PyUnicode_FromString("msg"), err_msg);
+            PyObject_SetAttrString(err_obj, "sqlstate", Py_None);
+            PyObject_SetAttrString(err_obj, "errno", err_no);
+            PyObject_SetAttrString(err_obj, "msg", err_msg);
             PyErr_SetObject(exc_type, err_obj);
             Py_XDECREF(exc_type);
             Py_XDECREF(err_no);
@@ -2185,7 +2182,7 @@ MySQL_query(MySQL *self, PyObject *args, PyObject *kwds)
     }
 
     if ((&self->session)->field_count == 0) {
-        MySQL_reset_result(self);
+        Py_XDECREF(MySQL_reset_result(self));
         self->have_result_set = Py_False;
         Py_RETURN_TRUE;
     }
@@ -2494,7 +2491,7 @@ MySQL_next_result(MySQL *self)
         Py_RETURN_FALSE;
     }
 
-    MySQL_free_result(self);
+    Py_XDECREF(MySQL_free_result(self));
     // We had a result before, we check if we can get next one
     Py_BEGIN_ALLOW_THREADS
     have_more = mysql_next_result(&self->session);
@@ -2505,7 +2502,7 @@ MySQL_next_result(MySQL *self)
         return NULL;
     }
 
-    MySQL_free_result(self);
+    Py_XDECREF(MySQL_free_result(self));
     return MySQL_handle_result(self);
 }
 

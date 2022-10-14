@@ -84,9 +84,9 @@ raise_with_session(MYSQL *conn, PyObject *exc_type)
         goto ERR;
     }
 
-    PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), sqlstate);
-    PyObject_SetAttr(err_object, PyUnicode_FromString("errno"), error_no);
-    PyObject_SetAttr(err_object, PyUnicode_FromString("msg"), error_msg);
+    PyObject_SetAttrString(err_object, "sqlstate", sqlstate);
+    PyObject_SetAttrString(err_object, "errno", error_no);
+    PyObject_SetAttrString(err_object, "msg", error_msg);
 
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
@@ -144,9 +144,9 @@ raise_with_stmt(MYSQL_STMT *stmt, PyObject *exc_type)
         goto ERR;
     }
 
-    PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), sqlstate);
-    PyObject_SetAttr(err_object, PyUnicode_FromString("errno"), error_no);
-    PyObject_SetAttr(err_object, PyUnicode_FromString("msg"), error_msg);
+    PyObject_SetAttrString(err_object, "sqlstate", sqlstate);
+    PyObject_SetAttrString(err_object, "errno", error_no);
+    PyObject_SetAttrString(err_object, "msg", error_msg);
 
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;
@@ -187,9 +187,9 @@ raise_with_string(PyObject *error_msg, PyObject *exc_type)
     if (!err_object) {
         goto ERR;
     }
-    PyObject_SetAttr(err_object, PyUnicode_FromString("sqlstate"), Py_None);
-    PyObject_SetAttr(err_object, PyUnicode_FromString("errno"), error_no);
-    PyObject_SetAttr(err_object, PyUnicode_FromString("msg"), error_msg);
+    PyObject_SetAttrString(err_object, "sqlstate", Py_None);
+    PyObject_SetAttrString(err_object, "errno", error_no);
+    PyObject_SetAttrString(err_object, "msg", error_msg);
 
     PyErr_SetObject(exc_type, err_object);
     goto CLEANUP;

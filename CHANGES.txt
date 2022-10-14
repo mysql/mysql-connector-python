@@ -17,6 +17,7 @@ v8.0.32
 - BUG#34556157: Kerberos authorization fails when using SSPI as security interface
 - BUG#34499578: MySQLCursor.executemany() fails to correctly identify BULK data loading ops
 - BUG#30089671: Fix decoding VARBINARY columns when using a prepared cursor
+- BUG#28020811: Fix multiple reference leaks in the C extension
 
 v8.0.31
 =======
