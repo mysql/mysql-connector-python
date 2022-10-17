@@ -58,7 +58,7 @@ if DJANGO_AVAILABLE:
             "ENGINE": "mysql.connector.django",
             "NAME": DBCONFIG["database"],
             "USER": "root",
-            "PASSWORD": "",
+            "PASSWORD": DBCONFIG.get("password", ""),
             "HOST": DBCONFIG["host"],
             "PORT": DBCONFIG["port"],
             "TEST_CHARSET": "utf8",
@@ -66,6 +66,7 @@ if DJANGO_AVAILABLE:
             "CONN_MAX_AGE": 0,
             "AUTOCOMMIT": True,
             "TIME_ZONE": None,
+            "CONN_HEALTH_CHECKS": False,
         },
     }
     settings.SECRET_KEY = "django_tests_secret_key"
@@ -131,6 +132,7 @@ class DjangoSettings(tests.MySQLConnectorTests):
     def test_get_connection_params(self):
         config = tests.get_mysql_config()
         settings_dict = connection.settings_dict.copy()
+        settings_dict["OPTIONS"] = {}
 
         # The default isolation_level should be None
         database_wrapper = DatabaseWrapper(settings_dict)
@@ -485,8 +487,6 @@ class CustomDjangoMySQLConverterTests(tests.MySQLConnectorTests):
 
     @staticmethod
     def create_connection(alias=DEFAULT_DB_ALIAS):
-        django.db.connections.ensure_defaults(alias)
-        django.db.connections.prepare_test_settings(alias)
         db = django.db.connections.databases[alias]
         backend = load_backend(db["ENGINE"])
         return backend.DatabaseWrapper(db, alias)
