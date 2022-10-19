@@ -994,7 +994,9 @@ class MySQLConnectionAbstract(ABC):
         if not isinstance(value, bool):
             raise ValueError("Expected a boolean type")
         self._raise_on_warnings = value
-        self._get_warnings = value
+        # Don't disable warning retrieval if raising explicitly disabled
+        if value:
+            self._get_warnings = value
 
     @property
     def unread_result(self) -> bool:

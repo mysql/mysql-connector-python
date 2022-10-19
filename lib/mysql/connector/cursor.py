@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 import weakref
 
 from collections import namedtuple
@@ -484,8 +485,6 @@ class MySQLCursor(CursorBase):
             raise ProgrammingError(f"Failed handling non-resultset; {err}") from None
 
         self._handle_warnings()
-        if self._connection.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(self._warnings[0][1], self._warnings[0][2])
 
     def _handle_resultset(self) -> None:
         """Handles result set
@@ -895,9 +894,27 @@ class MySQLCursor(CursorBase):
         return None
 
     def _handle_warnings(self) -> None:
-        """Handle possible warnings after all results are consumed"""
-        if self._connection.get_warnings is True and self._warning_count:
+        """Handle possible warnings after all results are consumed.
+
+        Raises:
+            Error: Also raises exceptions if raise_on_warnings is set.
+        """
+        if self._connection.get_warnings and self._warning_count:
             self._warnings = self._fetch_warnings()
+
+        if not self._warnings:
+            return
+
+        err = get_mysql_exception(
+            self._warnings[0][1],
+            self._warnings[0][2],
+            warning=not self._connection.raise_on_warnings,
+        )
+
+        if self._connection.raise_on_warnings:
+            raise err
+
+        warnings.warn(err, stacklevel=4)
 
     def _handle_eof(self, eof: EofPacketType) -> None:
         """Handle EOF packet"""
@@ -905,8 +922,6 @@ class MySQLCursor(CursorBase):
         self._nextrow = (None, None)
         self._warning_count = eof["warning_count"]
         self._handle_warnings()
-        if self._connection.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self, raw: bool = False) -> Optional[RowType]:
         """Returns the next row in the result set

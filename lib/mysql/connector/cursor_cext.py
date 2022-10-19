@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 import weakref
 
 from collections import namedtuple
@@ -180,12 +181,12 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         Returns list of tuples or None.
         """
-        warnings = []
+        warns = []
         try:
             # force freeing result
             self._cnx.consume_results()
             _ = self._cnx.cmd_query("SHOW WARNINGS")
-            warnings = self._cnx.get_rows()[0]
+            warns = self._cnx.get_rows()[0]
             self._cnx.consume_results()
         except MySQLInterfaceError as err:
             raise get_mysql_exception(
@@ -194,15 +195,30 @@ class CMySQLCursor(MySQLCursorAbstract):
         except Exception as err:
             raise InterfaceError(f"Failed getting warnings; {err}") from None
 
-        if warnings:
-            return warnings
+        if warns:
+            return warns
 
         return None
 
     def _handle_warnings(self) -> None:
-        """Handle possible warnings after all results are consumed"""
-        if self._cnx.get_warnings is True and self._warning_count:
+        """Handle possible warnings after all results are consumed.
+
+        Raises:
+            Error: Also raises exceptions if raise_on_warnings is set.
+        """
+        if self._cnx.get_warnings and self._warning_count:
             self._warnings = self._fetch_warnings()
+
+        if not self._warnings:
+            return
+
+        err = get_mysql_exception(
+            *self._warnings[0][1:3], warning=not self._cnx.raise_on_warnings
+        )
+        if self._cnx.raise_on_warnings:
+            raise err
+
+        warnings.warn(err, stacklevel=4)
 
     def _handle_result(self, result: Union[CextEofPacketType, CextResultType]) -> None:
         """Handles the result after statement execution"""
@@ -216,8 +232,6 @@ class CMySQLCursor(MySQLCursorAbstract):
             self._affected_rows = result["affected_rows"]
             self._rowcount = -1
             self._handle_warnings()
-            if self._cnx.raise_on_warnings is True and self._warnings:
-                raise get_mysql_exception(*self._warnings[0][1:3])
 
     def _handle_resultset(self) -> None:
         """Handle a result set"""
@@ -229,9 +243,6 @@ class CMySQLCursor(MySQLCursorAbstract):
         """
         self._warning_count = self._cnx.warning_count
         self._handle_warnings()
-        if self._cnx.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(*self._warnings[0][1:3])
-
         if not self._cnx.more_results:
             self._cnx.free_result()
 
@@ -1011,8 +1022,6 @@ class CMySQLCursorPrepared(CMySQLCursor):
         """Handle EOF packet"""
         self._nextrow = (None, None)
         self._handle_warnings()
-        if self._cnx.raise_on_warnings is True and self._warnings:
-            raise get_mysql_exception(self._warnings[0][1], self._warnings[0][2])
 
     def _fetch_row(self, raw: bool = False) -> Optional[RowType]:
         """Returns the next row in the result set

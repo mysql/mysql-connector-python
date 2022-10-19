@@ -75,7 +75,7 @@ class Error(Exception):
         return self._full_msg
 
 
-class Warning(Exception):  # pylint: disable=redefined-builtin
+class Warning(Warning, Exception):  # pylint: disable=redefined-builtin
     """Exception for important warnings"""
 
 
@@ -213,7 +213,10 @@ def custom_error_exception(
 
 
 def get_mysql_exception(
-    errno: int, msg: Optional[str] = None, sqlstate: Optional[str] = None
+    errno: int,
+    msg: Optional[str] = None,
+    sqlstate: Optional[str] = None,
+    warning: Optional[bool] = False,
 ) -> ErrorTypes:
     """Get the exception matching the MySQL error
 
@@ -238,6 +241,8 @@ def get_mysql_exception(
         pass
 
     if not sqlstate:
+        if warning:
+            return Warning(errno, msg)
         return DatabaseError(msg=msg, errno=errno)
 
     try:
