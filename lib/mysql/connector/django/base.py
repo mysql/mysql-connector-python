@@ -360,6 +360,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):  # pylint: disable=abstract-method
             kwargs["host"] = settings_dict["HOST"]
         if settings_dict["PORT"]:
             kwargs["port"] = int(settings_dict["PORT"])
+        if settings_dict.get("OPTIONS", {}).get("init_command"):
+            kwargs["init_command"] = settings_dict["OPTIONS"]["init_command"]
 
         # Raise exceptions for database warnings if DEBUG is on
         kwargs["raise_on_warnings"] = settings.DEBUG

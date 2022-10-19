@@ -575,3 +575,36 @@ class BugOra20106629(tests.MySQLConnectorTests):
         )
         self.cur.execute("SELECT col1, col2 FROM {0}".format(self.tbl), ())
         self.assertEqual(self.cur.fetchall(), [(safe_text, safe_bytes.encode())])
+
+
+class BugOra34467201(tests.MySQLConnectorTests):
+    """BUG#34467201: Add init_command connection option
+
+    With this patch, support for the inti_command option is added as
+    part of the connection settings. This new option allows the user to
+    specify a command to be executed right after the connection is
+    established, that's to say, as part of the connection initialization.
+    """
+
+    var_name = "test_var"
+    var_value = "BugOra34467201"
+
+    def setUp(self):
+        settings.DATABASES["default"]["OPTIONS"] = {
+            "init_command": f"SET @{self.var_name}='{self.var_value}'"
+        }
+        dbconfig = tests.get_mysql_config()
+        self.conn = mysql.connector.connect(**dbconfig)
+        self.cnx = DatabaseWrapper(settings.DATABASES["default"])
+
+    def tearDown(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SET @{self.var_name} = NULL")
+        self.cnx.close()
+        del settings.DATABASES["default"]["OPTIONS"]
+
+    def test_init_command(self):
+        with self.cnx.cursor() as cur:
+            cur.execute(f"SELECT @{self.var_name}")
+            res = cur.fetchall()
+            self.assertEqual((self.var_value,), res[0])

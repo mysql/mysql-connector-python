@@ -198,6 +198,7 @@ class MySQLConnectionAbstract(ABC):
         self._compress: bool = False
 
         self._consume_results: bool = False
+        self._init_command: Optional[str] = None
 
     def __enter__(self) -> MySQLConnectionAbstract:
         return self
@@ -610,6 +611,11 @@ class MySQLConnectionAbstract(ABC):
 
         if "ssl_disabled" in config:
             self._ssl_disabled = config.pop("ssl_disabled")
+
+        # If an init_command is set, keep it, so we can execute it in _post_connection
+        if "init_command" in config:
+            self._init_command = config["init_command"]
+            del config["init_command"]
 
         # Other configuration
         set_ssl_flag = False
@@ -1149,6 +1155,8 @@ class MySQLConnectionAbstract(ABC):
             self.time_zone = self._time_zone
         if self._sql_mode:
             self.sql_mode = self._sql_mode
+        if self._init_command:
+            self._execute_query(self._init_command)
 
     @abstractmethod
     def disconnect(self) -> Any:

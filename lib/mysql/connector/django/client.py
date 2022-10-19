@@ -62,8 +62,9 @@ class DatabaseClient(BaseDatabaseClient):
         if defaults_file:
             args.append(f"--defaults-file={defaults_file}")
 
-        # We force SQL_MODE to TRADITIONAL
-        args.append("--init-command=SET @@session.SQL_MODE=TRADITIONAL")
+        # Load any custom init_commands. We always force SQL_MODE to TRADITIONAL
+        init_command = settings_dict["OPTIONS"].get("init_command", "")
+        args.append(f"--init-command=SET @@session.SQL_MODE=TRADITIONAL;{init_command}")
 
         if user:
             args.append(f"--user={user}")
