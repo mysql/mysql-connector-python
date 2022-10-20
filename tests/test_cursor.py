@@ -1309,6 +1309,29 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         self.assertEqual(statement_id, cur._prepared["statement_id"])
         self.assertEqual(exp, cur.fetchone())
 
+        # Use dict as placeholders
+        data = {"value1": 4, "value2": 5}
+        exp = (6.4031242374328485,)
+        stmt = "SELECT SQRT(POW(%(value1)s, 2) + POW(%(value2)s, 2)) AS hypotenuse"
+        cur.execute(stmt, data)
+        # See BUG#31964167 about this change in 8.0.22
+        statement_id = 4 if tests.MYSQL_VERSION < (8, 0, 24) else 6
+        self.assertEqual(statement_id, cur._prepared["statement_id"])
+        self.assertEqual(exp, cur.fetchone())
+
+        # Re-use statement
+        data = {"value1": 3, "value2": 4}
+        exp = (5.0,)
+        cur.execute(stmt, data)
+        # See BUG#31964167 about this change in 8.0.22
+        statement_id = 5 if tests.MYSQL_VERSION < (8, 0, 24) else 7
+        self.assertEqual(statement_id, cur._prepared["statement_id"])
+        self.assertEqual(exp, cur.fetchone())
+
+        # Raise ProgrammingError if placeholder doesn't exist in dict
+        stmt = "SELECT SQRT(POW(%(value1)s, 2) + POW(%(unknown)s, 2)) AS hypotenuse"
+        self.assertRaises(errors.ProgrammingError, cur.execute, stmt, data)
+
     def test_executemany(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
 
@@ -1327,10 +1350,8 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
 
         tbl = "myconnpy_cursor"
         self._test_execute_setup(self.cnx, tbl)
-        stmt_insert = "INSERT INTO {table} (col1,col2) VALUES (%s, %s)".format(
-            table=tbl
-        )
-        stmt_select = "SELECT col1,col2 FROM {table} ORDER BY col1".format(table=tbl)
+        stmt_insert = f"INSERT INTO {tbl} (col1, col2) VALUES (%s, %s)"
+        stmt_select = f"SELECT col1, col2 FROM {tbl} ORDER BY col1"
 
         cur.executemany(stmt_insert, [(1, 100), (2, 200), (3, 300)])
         self.assertEqual(3, cur.rowcount)
@@ -1346,9 +1367,21 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         )
 
         data = [(2,), (3,)]
-        stmt = "DELETE FROM {table} WHERE col1 = %s".format(table=tbl)
+        stmt = f"DELETE FROM {tbl} WHERE col1 = %s"
         cur.executemany(stmt, data)
         self.assertEqual(2, cur.rowcount)
+
+        # Use dict as placeholders
+        stmt_insert = f"INSERT INTO {tbl} (col1, col2) VALUES (%(col1)s, %(col2)s)"
+        cur.executemany(
+            stmt_insert,
+            [
+                {"col1": 3, "col2": 100},
+                {"col1": 4, "col2": 200},
+                {"col1": 5, "col2": 300},
+            ],
+        )
+        self.assertEqual(3, cur.rowcount)
 
         self._test_execute_cleanup(self.cnx, tbl)
         cur.close()

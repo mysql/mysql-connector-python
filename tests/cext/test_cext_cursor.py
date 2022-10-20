@@ -31,6 +31,7 @@
 """Testing the C Extension cursors
 """
 
+import copy
 import datetime
 import decimal
 import logging
@@ -845,6 +846,69 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         "POINT(21.2, 34.2), ?)"
     )
 
+    insert_dict_stmt = (
+        "INSERT INTO {0} ("
+        "my_null, "
+        "my_bit, "
+        "my_tinyint, "
+        "my_smallint, "
+        "my_mediumint, "
+        "my_int, "
+        "my_bigint, "
+        "my_decimal, "
+        "my_float, "
+        "my_double, "
+        "my_date, "
+        "my_time, "
+        "my_datetime, "
+        "my_year, "
+        "my_char, "
+        "my_varchar, "
+        "my_enum, "
+        "my_geometry, "
+        "my_blob) "
+        "VALUES ("
+        "%(my_null)s, "
+        "B'1111100', "
+        "%(my_tinyint)s, "
+        "%(my_smallint)s, "
+        "%(my_mediumint)s, "
+        "%(my_int)s, "
+        "%(my_bigint)s, "
+        "%(my_decimal)s, "
+        "%(my_float)s, "
+        "%(my_double)s, "
+        "%(my_date)s, "
+        "%(my_time)s, "
+        "%(my_datetime)s, "
+        "%(my_year)s, "
+        "%(my_char)s, "
+        "%(my_varchar)s, "
+        "%(my_enum)s, "
+        "POINT(21.2, 34.2), "
+        "%(my_blob)s)"
+    )
+
+    insert_columns = (
+        "my_null",
+        "my_tinyint",
+        "my_smallint",
+        "my_mediumint",
+        "my_int",
+        "my_bigint",
+        "my_decimal",
+        "my_float",
+        "my_double",
+        "my_date",
+        "my_time",
+        "my_datetime",
+        "my_year",
+        "my_char",
+        "my_varchar",
+        "my_enum",
+        "my_blob",
+    )
+
     data = (
         None,
         127,
@@ -939,11 +1003,32 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][1:], self.exp)
 
+    def test_execute(self):
+        # Use dict as placeholders
+        data_dict = dict(zip(self.insert_columns, self.data))
+
+        self.cur.execute(self.insert_dict_stmt.format(self.tbl), data_dict)
+        self.cur.execute(f"SELECT * FROM {self.tbl}")
+        rows = self.cur.fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1:], self.exp)
+
     def test_executemany(self):
         data = [self.data[:], self.data[:]]
         self.cur.executemany(self.insert_stmt.format(self.tbl), data)
-        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        self.cur.execute(f"SELECT * FROM {self.tbl}")
         rows = self.cur.fetchall()
         self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][1:], self.exp)
+        self.assertEqual(rows[1][1:], self.exp)
+
+        # Use dict as placeholders
+        data_dict = dict(zip(self.insert_columns, self.data))
+        data = [data_dict, copy.deepcopy(data_dict)]
+
+        self.cur.executemany(self.insert_dict_stmt.format(self.tbl), data)
+        self.cur.execute(f"SELECT * FROM {self.tbl}")
+        rows = self.cur.fetchall()
+        self.assertEqual(len(rows), 4)
         self.assertEqual(rows[0][1:], self.exp)
         self.assertEqual(rows[1][1:], self.exp)

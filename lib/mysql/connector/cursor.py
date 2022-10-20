@@ -101,6 +101,8 @@ RE_PY_MAPPING_PARAM = re.compile(
 )
 RE_SQL_SPLIT_STMTS = re.compile(b""";(?=(?:[^"'`]*["'`].*["'`])*[^"'`]*$)""")
 RE_SQL_FIND_PARAM = re.compile(b"""%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)""")
+RE_SQL_PYTHON_REPLACE_PARAM = re.compile(r"%\(.*?\)s")
+RE_SQL_PYTHON_CAPTURE_PARAM_NAME = re.compile(r"%\((.*?)\)s")
 
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
@@ -1303,7 +1305,7 @@ class MySQLCursorPrepared(MySQLCursor):
     def execute(
         self,
         operation: StrOrBytes,
-        params: Optional[ParamsSequenceType] = None,
+        params: Optional[ParamsSequenceOrDictType] = None,
         multi: bool = False,
     ) -> None:  # multi is unused
         """Prepare and execute a MySQL Prepared Statement
@@ -1316,22 +1318,40 @@ class MySQLCursorPrepared(MySQLCursor):
 
         Note: argument "multi" is unused.
         """
+        charset = self._connection.charset
+        if charset == "utf8mb4":
+            charset = "utf8"
+
+        if not isinstance(operation, str):
+            try:
+                operation = operation.decode(charset)
+            except UnicodeDecodeError as err:
+                raise ProgrammingError(str(err)) from err
+
+        if isinstance(params, dict):
+            replacement_keys = re.findall(RE_SQL_PYTHON_CAPTURE_PARAM_NAME, operation)
+            try:
+                # Replace params dict with params tuple in correct order.
+                params = tuple(params[key] for key in replacement_keys)
+            except KeyError as err:
+                raise ProgrammingError(
+                    "Not all placeholders were found in the parameters dict"
+                ) from err
+            # Convert %(name)s to ? before sending it to MySQL
+            operation = re.sub(RE_SQL_PYTHON_REPLACE_PARAM, "?", operation)
+
         if operation is not self._executed:
             if self._prepared:
                 self._connection.cmd_stmt_close(self._prepared["statement_id"])
-
             self._executed = operation
+
             try:
-                if not isinstance(operation, bytes):
-                    charset = self._connection.charset
-                    if charset == "utf8mb4":
-                        charset = "utf8"
-                    operation = operation.encode(charset)
-            except (UnicodeDecodeError, UnicodeEncodeError) as err:
+                operation = operation.encode(charset)
+            except UnicodeEncodeError as err:
                 raise ProgrammingError(str(err)) from err
 
-            # need to convert %s to ? before sending it to MySQL
             if b"%s" in operation:
+                # Convert %s to ? before sending it to MySQL
                 operation = re.sub(RE_SQL_FIND_PARAM, b"?", operation)
 
             try:

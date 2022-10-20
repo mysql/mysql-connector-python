@@ -28,6 +28,7 @@ v8.0.32
 - BUG#28020811: Fix multiple reference leaks in the C extension
 - BUG#27426532: Reduce callproc roundtrip time
 - BUG#24364556: Improve warning behavior
+- BUG#23342572: Allow dictionaries as parameters in prepared statements
 
 v8.0.31
 =======
