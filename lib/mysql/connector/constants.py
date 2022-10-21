@@ -679,8 +679,9 @@ class CharacterSet(_Constants):
     name of the used character set or collation.
     """
 
-    desc: List[Optional[Tuple[str, str, bool]]] = MYSQL_CHARACTER_SETS  # type: ignore[assignment]
-    mysql_version: Tuple[int, ...] = (8, 0)
+    # Use LTS character set as default
+    desc: List[Optional[Tuple[str, str, bool]]] = MYSQL_CHARACTER_SETS_57  # type: ignore[assignment]
+    mysql_version: Tuple[int, ...] = (5, 7)
 
     # Multi-byte character sets which use 5c (backslash) in characters
     slash_charsets: Tuple[int, ...] = (1, 13, 28, 84, 87, 88)
@@ -693,8 +694,8 @@ class CharacterSet(_Constants):
             version (tuple): MySQL version tuple.
         """
         cls.mysql_version = version[:2]
-        if cls.mysql_version == (5, 7):
-            cls.desc = MYSQL_CHARACTER_SETS_57
+        if cls.mysql_version == (8, 0):
+            cls.desc = MYSQL_CHARACTER_SETS
 
     @classmethod
     def get_info(cls, setid: int) -> Tuple[str, str]:
