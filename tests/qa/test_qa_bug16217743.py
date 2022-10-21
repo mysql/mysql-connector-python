@@ -39,22 +39,24 @@ class BUG1617743(tests.MySQLConnectorTests):
     def test_bug(self):
         with self.cnx.cursor() as cur:
             cur.execute("drop table if exists varTable")
-            cur.execute("create table varTable(f1 varchar(255))")
+            cur.execute(
+                "create table varTable(id int auto_increment primary key, f1 varchar(255))"
+            )
             # Create Procedure
             cur.execute("drop procedure if exists varProc")
             cur.execute(
                 "create procedure varProc(v1 varchar(255)) "
-                "begin insert into varTable values(v1); end"
+                "begin insert into varTable (f1) values(v1); end"
             )
             cur.execute("drop procedure if exists dateProc")
             cur.execute(
                 "create procedure dateProc(v1 DATE) "
-                "begin insert into varTable values(v1); end"
+                "begin insert into varTable (f1) values(v1); end"
             )
             cur.execute("drop procedure if exists timestampProc")
             cur.execute(
                 "create procedure timestampProc(v1 TIMESTAMP) "
-                "begin insert into varTable values(v1); end"
+                "begin insert into varTable (f1) values(v1); end"
             )
 
             # Create a table with VARCHAR column type
@@ -72,7 +74,9 @@ class BUG1617743(tests.MySQLConnectorTests):
 
             # Create a table with DATE column type
             cur.execute("drop table if exists varTable")
-            cur.execute("create table varTable(f1 DATE)")
+            cur.execute(
+                "create table varTable(id int auto_increment primary key, f1 DATE)"
+            )
             cur.callproc("dateProc", ("1978-10-18",))
             cur.execute("select f1 from varTable")
             res = cur.fetchone()
@@ -80,7 +84,9 @@ class BUG1617743(tests.MySQLConnectorTests):
 
             # Create a table with TIMESTAMP column type
             cur.execute("drop table if exists varTable")
-            cur.execute("create table varTable(f1 TIMESTAMP)")
+            cur.execute(
+                "create table varTable(id int auto_increment primary key, f1 TIMESTAMP)"
+            )
             cur.callproc("timestampProc", ("2013-01-01 00:00:01",))
             cur.execute("select f1 from varTable")
             res = cur.fetchone()

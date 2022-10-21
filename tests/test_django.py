@@ -558,8 +558,10 @@ class BugOra20106629(tests.MySQLConnectorTests):
         self.cnx = DatabaseWrapper(settings.DATABASES["default"])
         self.cur = self.cnx.cursor()
         self.tbl = "BugOra20106629"
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
-        self.cur.execute("CREATE TABLE {0}(col1 TEXT, col2 BLOB)".format(self.tbl), ())
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}", ())
+        self.cur.execute(
+            f"CREATE TABLE {self.tbl}(id INT PRIMARY KEY, col1 TEXT, col2 BLOB)", ()
+        )
 
     def tearDown(self):
         self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl), ())
@@ -568,8 +570,8 @@ class BugOra20106629(tests.MySQLConnectorTests):
         safe_text = SafeText("dummy & safe data <html> ")
         safe_bytes = SafeText("dummy & safe data <html> ")
         self.cur.execute(
-            "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl),
-            (safe_text, safe_bytes),
+            f"INSERT INTO {self.tbl} VALUES(%s, %s, %s)",
+            (1, safe_text, safe_bytes),
         )
-        self.cur.execute("SELECT * FROM {0}".format(self.tbl), ())
+        self.cur.execute("SELECT col1, col2 FROM {0}".format(self.tbl), ())
         self.assertEqual(self.cur.fetchall(), [(safe_text, safe_bytes.encode())])

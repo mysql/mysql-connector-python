@@ -40,7 +40,7 @@ class APIResultTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_get_affected_items_count(self):
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(a int, b int)").execute()
+        self.session.sql("create table t1(a int primary key, b int)").execute()
         table = self.schema.get_table("t1")
         result = table.insert().values(1, 1).execute()
         self.assertEqual(result.get_affected_items_count(), 1)
@@ -62,7 +62,7 @@ class APIResultTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_get_string(self):
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(a int , b int)").execute()
+        self.session.sql("create table t2(a int primary key, b int)").execute()
         table = self.schema.get_table("t2")
         table.insert("a", "b").values(1, 2).execute()
         result = table.select("a").where("b== 2").execute()
@@ -73,7 +73,7 @@ class APIResultTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_index_of(self):
         self.session.sql("drop table if exists t3").execute()
-        self.session.sql("create table t3(a int , b int)").execute()
+        self.session.sql("create table t3(a int primary key, b int)").execute()
         table = self.schema.get_table("t3")
         table.insert("a", "b").values(1, 2).execute()
         result = table.select("a", "b").where("b== 2").execute()
@@ -84,7 +84,7 @@ class APIResultTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_fetchone_test1(self):
         self.session.sql("drop table if exists t4").execute()
-        self.session.sql("create table t4(a int , b int)").execute()
+        self.session.sql("create table t4(a int primary key, b int)").execute()
         table = self.schema.get_table("t4")
         table.insert("a", "b").values(1, 2).values(3, 2).execute()
         result = table.select("a").where("b== 2").execute()
@@ -96,7 +96,7 @@ class APIResultTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_fetchone_test2(self):
         self.session.sql("drop table if exists t5").execute()
-        self.session.sql("create table t5(a int , b int)").execute()
+        self.session.sql("create table t5(a int primary key, b int)").execute()
         table = self.schema.get_table("t5")
         table.insert("a", "b").values(1, 2).execute()
         result = table.select("a").where("b== 3").execute()
@@ -107,7 +107,7 @@ class APIResultTests(tests.MySQLxTests):
     def test_fetchone_test3(self):
         """MCPY-370."""
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql("create table t6(a int , b int)").execute()
+        self.session.sql("create table t6(a int primary key, b int)").execute()
         table = self.schema.get_table("t6")
         table.insert("a", "b").values(1, 2).values(3, 2).values(4, 2).execute()
         result = table.select("a").where("b== 2").execute()
@@ -122,7 +122,9 @@ class APIResultTests(tests.MySQLxTests):
         """testing the MCPY-357 issue(multiple resultset)."""
         self.session.sql("drop table if exists t7").execute()
         self.session.sql("drop procedure if exists sproc").execute()
-        self.session.sql("create table t7(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t7(_id int primary key, name varchar(32))"
+        ).execute()
         self.session.sql(
             "insert into t7(_id,name) values (1,'abc'),(2,'def'),(3,'ghi'),(4,'jkl')"
         ).execute()

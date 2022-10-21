@@ -742,9 +742,13 @@ class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
         stmt = f"select %s,%s from {table_name} a,{table_name} b"
         cur.execute(f"DROP TABLE IF EXISTS {table_name}")
         cur.execute(
-            f"create table {table_name}(c1 char(32),c2 longblob)DEFAULT CHARSET utf8"
+            f"create table {table_name}"
+            "(id int auto_increment primary key, c1 char(32),c2 longblob)"
+            "DEFAULT CHARSET utf8"
         )
-        cur.execute(f"insert into {table_name} values('1','1'),('2','2'),('3','3')")
+        cur.execute(
+            f"insert into {table_name} (c1, c2) values('1','1'),('2','2'),('3','3')"
+        )
         for data in data_list:
             cur.executemany(stmt, data)
             self.assertEqual(9 * len(data), cur.rowcount)
@@ -777,6 +781,7 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
 
     create_table_stmt = (
         "CREATE TABLE {0} ("
+        "id INT AUTO_INCREMENT PRIMARY KEY, "
         "my_null INT, "
         "my_bit BIT(7), "
         "my_tinyint TINYINT, "
@@ -894,7 +899,7 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.cur.execute(self.insert_stmt.format(self.tbl), self.data)
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         row = self.cur.fetchone()
-        self.assertEqual(row, self.exp)
+        self.assertEqual(row[1:], self.exp)
         row = self.cur.fetchone()
         self.assertIsNone(row)
 
@@ -903,7 +908,7 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         rows = self.cur.fetchall()
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0], self.exp)
+        self.assertEqual(rows[0][1:], self.exp)
 
     def test_fetchmany(self):
         data = [self.data[:], self.data[:], self.data[:]]
@@ -911,11 +916,11 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         rows = self.cur.fetchmany(size=2)
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0], self.exp)
-        self.assertEqual(rows[1], self.exp)
+        self.assertEqual(rows[0][1:], self.exp)
+        self.assertEqual(rows[1][1:], self.exp)
         rows = self.cur.fetchmany(1)
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0], self.exp)
+        self.assertEqual(rows[0][1:], self.exp)
 
     def test_executemany(self):
         data = [self.data[:], self.data[:]]
@@ -923,5 +928,5 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.cur.execute("SELECT * FROM {0}".format(self.tbl))
         rows = self.cur.fetchall()
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0], self.exp)
-        self.assertEqual(rows[1], self.exp)
+        self.assertEqual(rows[0][1:], self.exp)
+        self.assertEqual(rows[1][1:], self.exp)

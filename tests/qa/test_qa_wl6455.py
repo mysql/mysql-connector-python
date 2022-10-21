@@ -42,7 +42,9 @@ class WL6936Tests(tests.MySQLConnectorTests):
     def test_insert_point(self):
         with self.cnx.cursor() as cur:
             # creating the table
-            cur.execute("create table gm1 (i int , g geometry )engine=innodb")
+            cur.execute(
+                "create table gm1 (i int primary key, g geometry )engine=innodb"
+            )
             stmt = "INSERT INTO gm1 VALUES(%s,ST_GeomFromText(%s))"
             cur.execute(stmt, (1, "POINT(1 2)"))
             cur.execute("SELECT ST_X(g) FROM gm1 WHERE i=1;")
@@ -56,9 +58,10 @@ class WL6936Tests(tests.MySQLConnectorTests):
             # creating the table
             cur.execute(
                 "create table gm2 "
-                "(g geometry not null, spatial index(g))engine=innodb"
+                "(id int auto_increment primary key, g geometry not null, spatial index(g)"
+                ")engine=innodb"
             )
-            stmt = "INSERT INTO gm2 VALUES(ST_GeomFromText(%s))"
+            stmt = "INSERT INTO gm2 (g) VALUES (ST_GeomFromText(%s))"
             cur.execute(stmt, ("POINT(3 0)",))
             cur.execute(stmt, ("POINT(1 1)",))
             cur.execute("SELECT ST_X(g) FROM gm2 WHERE g=POINT(3,0)")
@@ -70,11 +73,13 @@ class WL6936Tests(tests.MySQLConnectorTests):
     def test_polygon(self):
         with self.cnx.cursor() as cur:
             # creating the table
-            cur.execute("create table gm3 (g geometry )engine=innodb")
+            cur.execute(
+                "create table gm3 (id int primary key, g geometry )engine=innodb"
+            )
             cur.execute(
                 "set @g = 'POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7,5 5))'"
             )
-            cur.execute("INSERT INTO gm3 VALUES (ST_GeomFromText(@g))")
+            cur.execute("INSERT INTO gm3 VALUES (1, ST_GeomFromText(@g))")
             exp = "POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7,5 5))"
             cur.execute("SELECT ST_AsText(g) FROM gm3")
             out = cur.fetchone()[0]
@@ -85,9 +90,11 @@ class WL6936Tests(tests.MySQLConnectorTests):
     def test_linestring(self):
         with self.cnx.cursor() as cur:
             # creating the table
-            cur.execute("create table gm4 (g geometry )engine=innodb")
+            cur.execute(
+                "create table gm4 (id int primary key, g geometry )engine=innodb"
+            )
             cur.execute("set @g ='LINESTRING(0 0,1 1,2 2)'")
-            cur.execute("INSERT INTO gm4 VALUES (ST_GeomFromText(@g))")
+            cur.execute("INSERT INTO gm4 VALUES (1, ST_GeomFromText(@g))")
             exp = "LINESTRING(0 0,1 1,2 2)"
             cur.execute("SELECT ST_AsText(g) FROM gm4")
             out = cur.fetchone()[0]

@@ -44,7 +44,7 @@ class WL3253Tests(tests.MySQLConnectorTests):
         with mysql.connector.connect(**config) as cnx:
             with cnx.cursor() as cur:
                 # creating the table
-                cur.execute("create table account (ac_no int , amount int)")
+                cur.execute("create table account (ac_no int primary key, amount int)")
                 # cretaing the first trigger
                 cur.execute(
                     "create trigger ac_sum before insert "

@@ -525,7 +525,7 @@ class PEP249CursorTests(PEP249Base):
 
     def test_isolation1(self):
         """Cursor isolation between 2 cursor on same connection"""
-        self._isolation_test(self.cnx, self.cnx, "MyISAM")
+        self._isolation_test(self.cnx, self.cnx, "InnoDB")
 
     def test_isolation2(self):
         """Cursor isolation with 2 cursors, different connections, trans."""

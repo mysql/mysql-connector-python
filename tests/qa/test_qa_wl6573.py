@@ -43,7 +43,7 @@ class WL6936Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor() as cur:
             self.cnx.start_transaction()
             cur.execute("DROP TABLE IF EXISTS customer")
-            cur.execute("CREATE TABLE customer(i INT,name varchar(10))")
+            cur.execute("CREATE TABLE customer(i INT PRIMARY KEY,name varchar(10))")
             cur.execute(
                 "INSERT INTO customer(i,name) "
                 "values (10,'Joshi'),(20,'Kiran'),(30,'Raja')"
@@ -115,12 +115,15 @@ class WL6936Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor() as cur:
             self.cnx.start_transaction()
             cur.execute("DROP TABLE IF EXISTS customer")
-            cur.execute("CREATE TABLE customer(i INT,name varchar(10))")
+            cur.execute(
+                "CREATE TABLE customer "
+                "(id INT AUTO_INCREMENT PRIMARY KEY, i INT,name varchar(10))"
+            )
             cur.execute(
                 "INSERT INTO customer(i,name) "
                 "values (10,'Joshi'),(20,'Kiran'),(30,'Raja')"
             )
-            cur.execute("SELECT * FROM customer")
+            cur.execute("SELECT i, name FROM customer")
             _ = cur.fetchall()
             self.cnx.commit()
             self.assertEqual(cur.rowcount, 3)
@@ -132,7 +135,7 @@ class WL6936Tests(tests.MySQLConnectorTests):
                 "values (10,'Joshi'),(20,'Kiran'),(30,'Raja')"
             )
             self.cnx.commit()
-            cur.execute("SELECT * FROM customer")
+            cur.execute("SELECT i, name FROM customer")
             _ = cur.fetchall()
             self.assertEqual(cur.rowcount, 6)
 
@@ -148,7 +151,7 @@ class WL6936Tests(tests.MySQLConnectorTests):
         with self.cnx.cursor() as cur:
             self.cnx.start_transaction()
             cur.execute("DROP TABLE IF EXISTS customer")
-            cur.execute("CREATE TABLE customer(i INT,name varchar(10))")
+            cur.execute("CREATE TABLE customer(i INT PRIMARY KEY,name varchar(10))")
             cur.execute(
                 "INSERT INTO customer(i,name) "
                 "values (10,'Joshi'),(20,'Kiran'),(30,'Raja')"

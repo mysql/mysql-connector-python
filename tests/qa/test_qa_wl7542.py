@@ -75,7 +75,7 @@ class WL7542Tests(tests.MySQLConnectorTests):
         """Test to verify the deletion of cached transactions."""
         with self.cnx.cursor() as cur:
             cur.execute("drop table if exists test7542")
-            cur.execute("create table test7542 (t int)")
+            cur.execute("create table test7542 (t int primary key)")
             cur.execute("insert into test7542 values(10)")
             cur.execute("SELECT t from test7542")
             out = cur.fetchone()[0]

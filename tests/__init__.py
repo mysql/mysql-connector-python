@@ -650,7 +650,7 @@ class MySQLConnectorTests(unittest.TestCase):
 
 
 class TestsCursor(MySQLConnectorTests):
-    def _test_execute_setup(self, cnx, tbl="myconnpy_cursor", engine="MyISAM"):
+    def _test_execute_setup(self, cnx, tbl="myconnpy_cursor", engine="InnoDB"):
 
         self._test_execute_cleanup(cnx, tbl)
         stmt_create = (

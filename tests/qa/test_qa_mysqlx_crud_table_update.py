@@ -40,7 +40,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update1(self):
         """Test the table.update with where."""
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(a int , b int)").execute()
+        self.session.sql("create table t1(a int primary key, b int)").execute()
         table = self.schema.get_table("t1")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         result = table.update().set("b", 10).where("a > 1").execute()
@@ -51,7 +51,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update2(self):
         """Test the table.update with where and limit."""
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(a int , b int)").execute()
+        self.session.sql("create table t2(a int primary key, b int)").execute()
         table = self.schema.get_table("t2")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         table.update().set("b", 10).where("a > 1").limit(1).execute()
@@ -65,7 +65,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update3(self):
         """Test the table.update with bind."""
         self.session.sql("drop table if exists t3").execute()
-        self.session.sql("create table t3(a int , b int)").execute()
+        self.session.sql("create table t3(a int primary key, b int)").execute()
         table = self.schema.get_table("t3")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         table.update().set("b", 10).where("a == :a").bind("a", 1).execute()
@@ -78,7 +78,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update4(self):
         """Test the table.update with unknown column."""
         self.session.sql("drop table if exists t4").execute()
-        self.session.sql("create table t4(a int , b int)").execute()
+        self.session.sql("create table t4(a int primary key, b int)").execute()
         table = self.schema.get_table("t4")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         try:
@@ -92,7 +92,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update5(self):
         """Test the table.update with out of range value."""
         self.session.sql("drop table if exists t5").execute()
-        self.session.sql("create table t5(a int , b int)").execute()
+        self.session.sql("create table t5(a int primary key, b int)").execute()
         table = self.schema.get_table("t5")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         try:
@@ -109,10 +109,12 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update6(self):
         """Test the table.update with multiple set with different datatypes."""
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql("create table t6(a int , b varchar(32), c date)").execute()
+        self.session.sql(
+            "create table t6(id int primary key, a int, b varchar(32), c date)"
+        ).execute()
         table = self.schema.get_table("t6")
-        table.insert().values(1, "abc", "2000-10-20").values(
-            2, "def", "2000-10-20"
+        table.insert().values(1, 1, "abc", "2000-10-20").values(
+            2, 2, "def", "2000-10-20"
         ).execute()
         table.update().set("a", 10).set("b", "lmn").where("a == 1").execute()
         result2 = table.select("a,b").where("c == '2000-10-20'").execute()
@@ -125,7 +127,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update7(self):
         """Test the table.update with sort."""
         self.session.sql("drop table if exists t7").execute()
-        self.session.sql("create table t7(a int , b int)").execute()
+        self.session.sql("create table t7(a int primary key, b int)").execute()
         table = self.schema.get_table("t7")
         table.insert().values(1, 3).values(2, 2).values(3, 1).execute()
         table.update().set("b", 10).sort("b ASC").limit(1).where("false").execute()
@@ -141,7 +143,7 @@ class TableUpdateTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_update8(self):
         self.session.sql("drop table if exists t8").execute()
-        self.session.sql("create table t8(a int , b int)").execute()
+        self.session.sql("create table t8(a int primary key, b int)").execute()
         table = self.schema.get_table("t8")
         table.insert().values(1, 3).execute()
         table.update().set("a", 10).set("b", "a+10").set("a", 20).where(
@@ -155,9 +157,13 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update9(self):
         """Test the table.update with sort and param."""
         self.session.sql("drop table if exists t9").execute()
-        self.session.sql("create table t9(a int , b int)").execute()
+        self.session.sql(
+            "create table t9(id int auto_increment primary key, a int , b int)"
+        ).execute()
         table = self.schema.get_table("t9")
-        table.insert().values(1, 10).values(2, 11).values(1, 11).values(2, 10).execute()
+        table.insert().values(1, 1, 10).values(2, 2, 11).values(3, 1, 11).values(
+            4, 2, 10
+        ).execute()
         table.update().set("a", 10).sort("a ASC", "b DESC").limit(1).where(
             "true"
         ).execute()
@@ -171,7 +177,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update10(self):
         """Test table update with no condition - expected an exception."""
         self.session.sql("drop table if exists t10").execute()
-        self.session.sql("create table t10(a int , b int)").execute()
+        self.session.sql("create table t10(a int primary key, b int)").execute()
         table = self.schema.get_table("t10")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         try:
@@ -185,7 +191,7 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_table_update11(self):
         """Test table update with empty condition - expected an exception."""
         self.session.sql("drop table if exists t11").execute()
-        self.session.sql("create table t11(a int , b int)").execute()
+        self.session.sql("create table t11(a int primary key, b int)").execute()
         table = self.schema.get_table("t11")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         try:
@@ -199,10 +205,12 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_contains_operator_table_update1(self):
         """Test In operator in table.update."""
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t1(idx int primary key, id int, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t1")
-        table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
-            2, '{"name":"b"}', '{"age":24}'
+        table.insert().values(1, 1, '{"name":"a"}', '{"age":22}').values(
+            2, 2, '{"name":"b"}', '{"age":24}'
         ).execute()
         result = table.update().where("n->'$.name' IN 'a'").set("id", 4).execute()
         result1 = table.update().where("a->'$.age' IN [22,24]").set("id", 5).execute()
@@ -214,7 +222,9 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_contains_operator_table_update2(self):
         """Test Not In operator in table.update."""
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t2(id int primary key, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t2")
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
@@ -233,15 +243,17 @@ class TableUpdateTests(tests.MySQLxTests):
         RHS."""
         self.session.sql("drop table if exists t3").execute()
         self.session.sql(
-            "create table t3(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t3(idx INT PRIMARY KEY, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t3")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":{"company":"xyz","vehicle":"bike","hobbies":["reading","music","playing"]}}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
@@ -280,20 +292,23 @@ class TableUpdateTests(tests.MySQLxTests):
         """IN operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t4").execute()
         self.session.sql(
-            "create table t4(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t4(idx INT PRIMARY KEY, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t4")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":[{"company":"xyz","vehicle":"bike"},{"company":"abc","vehicle":"car"},{"company":"mno","vehicle":"zeep"}]}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
             '{"additionalinfo":[{"company":"abc","vehicle":"car"},{"company":"pqr","vehicle":"bicycle"}]}',
         ).values(
+            3,
             '{"_id":3}',
             '{"name":"nice"}',
             '{"age":25}',
@@ -335,10 +350,12 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_overlaps_table_update1(self):
         """Overlaps in table.update."""
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t1(idx int primary key, id int, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t1")
-        table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
-            2, '{"name":"b"}', '{"age":24}'
+        table.insert().values(1, 1, '{"name":"a"}', '{"age":22}').values(
+            2, 2, '{"name":"b"}', '{"age":24}'
         ).execute()
         result = table.update().where("n->'$.name' OVERLAPS 'a'").set("id", 4).execute()
         result1 = (
@@ -352,7 +369,9 @@ class TableUpdateTests(tests.MySQLxTests):
     def test_overlaps_table_update2(self):
         """Not Overlaps in table.update."""
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t2(id int primary key, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t2")
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
@@ -376,10 +395,12 @@ class TableUpdateTests(tests.MySQLxTests):
         on RHS."""
         self.session.sql("drop table if exists t3").execute()
         self.session.sql(
-            "create table t3(i json, n JSON, a JSON, addinfo JSON,zip int,street varchar(20))"
+            "create table t3"
+            "(id int primary key, i json, n JSON, a JSON, addinfo JSON,zip int,street varchar(20))"
         ).execute()
         table = self.schema.get_table("t3")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
@@ -387,6 +408,7 @@ class TableUpdateTests(tests.MySQLxTests):
             12345,
             "street1",
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
@@ -418,20 +440,23 @@ class TableUpdateTests(tests.MySQLxTests):
         """OVERLAPS operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t4").execute()
         self.session.sql(
-            "create table t4(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t4(idx INT PRIMARY KEY, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t4")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":[{"company":"xyz","vehicle":"bike"},{"company":"abc","vehicle":"car"},{"company":"mno","vehicle":"zeep"}]}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
             '{"additionalinfo":[{"company":"abc","vehicle":"car"},{"company":"pqr","vehicle":"bicycle"}]}',
         ).values(
+            3,
             '{"_id":3}',
             '{"name":"nice"}',
             '{"age":25}',

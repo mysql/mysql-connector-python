@@ -47,7 +47,7 @@ import tests
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 ARCH_64BIT = sys.maxsize > 2**32 and sys.platform != "win32"
 
-_CREATE_TEST_TABLE_QUERY = "CREATE TABLE `{0}`.`{1}` (id INT)"
+_CREATE_TEST_TABLE_QUERY = "CREATE TABLE `{0}`.`{1}` (id INT PRIMARY KEY)"
 _INSERT_TEST_TABLE_QUERY = "INSERT INTO `{0}`.`{1}` VALUES ({2})"
 _CREATE_TEST_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS SELECT * FROM `{2}`.`{3}`"
 _CREATE_VIEW_QUERY = "CREATE VIEW `{0}`.`{1}` AS {2}"
@@ -3168,20 +3168,12 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, table_name)
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50))".format(table_name)
+            f"CREATE TABLE {table_name}(age INT, name VARCHAR(50) PRIMARY KEY)"
         ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)
-        ).execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (21, 'Fred')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (28, 'Barney')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (42, 'Wilma')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (67, 'Betty')").execute()
 
         table = self.schema.get_table("test")
 
@@ -3269,24 +3261,24 @@ class MySQLxTableTests(tests.MySQLxTests):
         "Test not available for external MySQL servers",
     )
     def test_having(self):
-        table_name = "{0}.test".format(self.schema_name)
+        table_name = f"{self.schema_name}.test"
         drop_table(self.schema, "test")
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50), "
-            "gender CHAR(1))".format(table_name)
+            f"""
+            CREATE TABLE {table_name} "
+            (age, name VARCHAR(50) PRIMARY KEY, gender CHAR(1))
+            """
+        ).execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (21, 'Fred', 'M')").execute()
+        self.session.sql(
+            f"INSERT INTO {table_name} VALUES (28, 'Barney', 'M')"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', 'M')".format(table_name)
+            f"INSERT INTO {table_name} VALUES (42, 'Wilma', 'F')"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', 'M')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', 'F')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', 'F')".format(table_name)
+            f"INSERT INTO {table_name} VALUES (67, 'Betty', 'F')"
         ).execute()
 
         table = self.schema.get_table("test")
@@ -3325,9 +3317,10 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test1")
 
         self.session.sql(
-            "CREATE TABLE {0}.test1(age INT, name "
-            "VARCHAR(50), gender CHAR(1))"
-            "".format(self.schema_name)
+            f"""
+            CREATE TABLE {self.schema_name}.test1
+            (age INT, name VARCHAR(50) PRIMARY KEY, gender CHAR(1))
+            """
         ).execute()
         table = self.schema.get_table("test1")
 
@@ -3368,9 +3361,11 @@ class MySQLxTableTests(tests.MySQLxTests):
         drop_table(self.schema, "test")
 
         self.session.sql(
-            "CREATE TABLE {0}.test(age INT, name "
-            "VARCHAR(50), gender CHAR(1), `info` json DEFAULT NULL)"
-            "".format(self.schema_name)
+            f"""
+            CREATE TABLE {self.schema_name}.test
+            (age INT, name VARCHAR(50) PRIMARY KEY, gender CHAR(1),
+            `info` json DEFAULT NULL)
+            """
         ).execute()
         table = self.schema.get_table("test")
 
@@ -3450,33 +3445,25 @@ class MySQLxTableTests(tests.MySQLxTests):
         self.assertRaises(mysqlx.OperationalError, table.count)
 
     def test_results(self):
-        table_name = "{0}.test".format(self.schema_name)
+        table_name = f"{self.schema_name}.test"
         drop_table(self.schema, "test")
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50))".format(table_name)
+            f"CREATE TABLE {table_name}(id INT PRIMARY KEY, age INT, name VARCHAR(50))"
         ).execute()
 
         # Test if result has no data
-        result = self.session.sql(
-            "SELECT age, name FROM {0}".format(table_name)
-        ).execute()
+        result = self.session.sql(f"SELECT age, name FROM {table_name}").execute()
         self.assertFalse(result.has_data())
         rows = result.fetch_all()
         self.assertEqual(len(rows), 0)
 
         # Insert data
-        self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
-        ).execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (1, 21, 'Fred')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (2, 28, 'Barney')").execute()
 
         # Test if result has data
-        result = self.session.sql(
-            "SELECT age, name FROM {0}".format(table_name)
-        ).execute()
+        result = self.session.sql(f"SELECT age, name FROM {table_name}").execute()
         self.assertTrue(result.has_data())
         rows = result.fetch_all()
         self.assertEqual(len(rows), 2)
@@ -3487,7 +3474,7 @@ class MySQLxTableTests(tests.MySQLxTests):
         row = result.fetch_one()
         # Test access by column name and index
         self.assertEqual("Fred", row["name"])
-        self.assertEqual("Fred", row[1])
+        self.assertEqual("Fred", row[2])
         # Test if error is raised with negative indexes and out of bounds
         self.assertRaises(IndexError, row.__getitem__, -1)
         self.assertRaises(IndexError, row.__getitem__, -2)
@@ -3498,7 +3485,7 @@ class MySQLxTableTests(tests.MySQLxTests):
 
         row = result.fetch_one()
         self.assertEqual("Barney", row["name"])
-        self.assertEqual("Barney", row[1])
+        self.assertEqual("Barney", row[2])
         self.assertEqual(None, result.fetch_one())
 
         # Test result using column label
@@ -3563,33 +3550,39 @@ class MySQLxTableTests(tests.MySQLxTests):
         "Time zones in TIMETAMP are only available in MySQL servers +8.0.19",
     )
     def test_column_metadata(self):
-        table_name = "{0}.test".format(self.schema_name)
+        table_name = f"{self.schema_name}.test"
         drop_table(self.schema, "test")
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
-            "config JSON, created DATE, updated DATETIME(6), ts TIMESTAMP(2), "
-            "active BIT)".format(table_name)
+            f"""
+            CREATE TABLE {table_name}
+            (age INT, name VARCHAR(50) PRIMARY KEY, pic VARBINARY(100), config JSON,
+            created DATE, updated DATETIME(6), ts TIMESTAMP(2), active BIT)
+            """
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', "
-            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)"
-            "".format(table_name)
+            f"""
+            INSERT INTO {table_name} VALUES (21, 'Fred', NULL, NULL, '2008-07-26',
+            '2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)
+            """
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12', "
-            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)"
-            "".format(table_name)
+            f"""
+            INSERT INTO {table_name} VALUES (28, 'Barney', NULL, NULL, '2012-03-12',
+            '2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)
+            """
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', "
-            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 1)"
-            "".format(table_name)
+            f"""
+            INSERT INTO {table_name} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11',
+            '2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 1)
+            """
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', "
-            "'2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)"
-            "".format(table_name)
+            f"""
+            INSERT INTO {table_name} VALUES (67, 'Betty', NULL, NULL, '2015-06-21',
+            '2019-01-19 03:14:07.999999', '2020-01-01 10:10:10+05:30', 0)
+            """
         ).execute()
 
         table = self.schema.get_table("test")
@@ -3995,25 +3988,17 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertTrue(view.exists_in_database())
 
     def test_select(self):
-        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+        table_name = f"{self.schema_name}.{self.table_name}"
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50))".format(table_name)
+            f"CREATE TABLE {table_name} (age INT, name VARCHAR(50) PRIMARY KEY)"
         ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty')".format(table_name)
-        ).execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (21, 'Fred')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (28, 'Barney')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (42, 'Wilma')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (67, 'Betty')").execute()
 
-        defined_as = "SELECT age, name FROM {0}".format(table_name)
+        defined_as = f"SELECT age, name FROM {table_name}"
         view = create_view(self.schema, self.view_name, defined_as)
         result = view.select().order_by("age DESC").execute()
         rows = result.fetch_all()
@@ -4035,26 +4020,26 @@ class MySQLxViewTests(tests.MySQLxTests):
         "Test not available for external MySQL servers",
     )
     def test_having(self):
-        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+        table_name = f"{self.schema_name}.{self.table_name}"
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50), "
-            "gender CHAR(1))".format(table_name)
+            f"""
+            CREATE TABLE {table_name}
+            (age INT, name VARCHAR(50) PRIMARY KEY, gender CHAR(1))
+            """
+        ).execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (21, 'Fred', 'M')").execute()
+        self.session.sql(
+            f"INSERT INTO {table_name} VALUES (28, 'Barney', 'M')"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', 'M')".format(table_name)
+            f"INSERT INTO {table_name} VALUES (42, 'Wilma', 'F')"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', 'M')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', 'F')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', 'F')".format(table_name)
+            f"INSERT INTO {table_name} VALUES (67, 'Betty', 'F')"
         ).execute()
 
-        defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
+        defined_as = f"SELECT age, name, gender FROM {table_name}"
         view = create_view(self.schema, self.view_name, defined_as)
         result = view.select().group_by("gender").order_by("age ASC").execute()
         rows = result.fetch_all()
@@ -4089,7 +4074,7 @@ class MySQLxViewTests(tests.MySQLxTests):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50), "
+            "CREATE TABLE {0} (age INT, name VARCHAR(50) PRIMARY KEY, "
             "gender CHAR(1))".format(table_name)
         ).execute()
         defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
@@ -4122,10 +4107,12 @@ class MySQLxViewTests(tests.MySQLxTests):
         table_name = "{0}.{1}".format(self.schema_name, self.table_name)
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50), "
-            "gender CHAR(1))".format(table_name)
+            f"""
+            CREATE TABLE {table_name}
+            (age INT, name VARCHAR(50) PRIMARY KEY, gender CHAR(1))
+            """
         ).execute()
-        defined_as = "SELECT age, name, gender FROM {0}".format(table_name)
+        defined_as = f"SELECT age, name, gender FROM {table_name}"
         view = create_view(self.schema, self.view_name, defined_as)
 
         result = (
@@ -4169,19 +4156,15 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertRaises(mysqlx.OperationalError, view.count)
 
     def test_results(self):
-        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+        table_name = f"{self.schema_name}.{self.table_name}"
 
         self.session.sql(
-            "CREATE TABLE {0} (age INT, name VARCHAR(50))".format(table_name)
+            f"CREATE TABLE {table_name} (id INT PRIMARY KEY, age INT, name VARCHAR(50))"
         ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred')".format(table_name)
-        ).execute()
-        self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney')".format(table_name)
-        ).execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (1, 21, 'Fred')").execute()
+        self.session.sql(f"INSERT INTO {table_name} VALUES (2, 28, 'Barney')").execute()
 
-        defined_as = "SELECT age, name FROM {0}".format(table_name)
+        defined_as = f"SELECT age, name FROM {table_name}"
         view = create_view(self.schema, self.view_name, defined_as)
         result = view.select().execute()
 
@@ -4207,34 +4190,32 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertEqual(2, result2.get_autoincrement_value())
 
     def test_column_metadata(self):
-        table_name = "{0}.{1}".format(self.schema_name, self.table_name)
+        table_name = f"{self.schema_name}.{self.table_name}"
 
         self.session.sql(
-            "CREATE TABLE {0}(age INT, name VARCHAR(50), pic VARBINARY(100), "
-            "config JSON, created DATE, active BIT)"
-            "".format(table_name)
+            f"""
+            CREATE TABLE {table_name}
+            (age INT, name VARCHAR(50) PRIMARY KEY, pic VARBINARY(100), config JSON,
+            created DATE, active BIT)
+            """
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
-            "".format(table_name)
+            f"INSERT INTO {table_name} VALUES (21, 'Fred', NULL, NULL, '2008-07-26', 0)"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
-            ", 0)".format(table_name)
+            f"INSERT INTO {table_name} VALUES (28, 'Barney', NULL, NULL, '2012-03-12'"
+            ", 0)"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11', 1)"
-            "".format(table_name)
+            f"INSERT INTO {table_name} VALUES (42, 'Wilma', NULL, NULL, '1975-11-11'"
+            ", 1)"
         ).execute()
         self.session.sql(
-            "INSERT INTO {0} VALUES (67, 'Betty', NULL, NULL, '2015-06-21', 0)"
-            "".format(table_name)
+            f"INSERT INTO {table_name} VALUES (67, 'Betty', NULL, NULL, '2015-06-21'"
+            ", 0)"
         ).execute()
 
-        defined_as = (
-            "SELECT age, name, pic, config, created, active FROM {0}"
-            "".format(table_name)
-        )
+        defined_as = f"SELECT age, name, pic, config, created, active FROM {table_name}"
         view = create_view(self.schema, self.view_name, defined_as)
 
         result = view.select().execute()

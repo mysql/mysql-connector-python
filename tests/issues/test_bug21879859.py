@@ -31,9 +31,6 @@
 """ BUG21879859
 """
 
-import os.path
-import unittest
-
 import mysql.connector
 import tests
 
@@ -54,26 +51,33 @@ class Bug21879859(tests.MySQLConnectorTests):
 
         cnx = mysql.connector.connect(**tests.get_mysql_config())
         cur = cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
-        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc))
-        cur.execute("CREATE TABLE {0} (c1 VARCHAR(1024))".format(self.table))
+        cur.execute(f"DROP TABLE IF EXISTS {self.table}")
+        cur.execute(f"DROP PROCEDURE IF EXISTS {self.proc}")
         cur.execute(
-            "CREATE PROCEDURE {1}() BEGIN SELECT 1234; "
-            "SELECT t from {0}; SELECT '' from {0}; END".format(self.table, self.proc)
+            f"""
+            CREATE TABLE {self.table}
+            (id INT AUTO_INCREMENT PRIMARY KEY, c1 VARCHAR(1024))
+            """
+        )
+        cur.execute(
+            f"""
+            CREATE PROCEDURE {self.table}() BEGIN SELECT 1234;
+            SELECT t from {self.proc}; SELECT '' from {self.table}; END
+            """
         )
 
     def tearDown(self):
         cnx = mysql.connector.connect(**tests.get_mysql_config())
         cur = cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
-        cur.execute("DROP PROCEDURE IF EXISTS {0}".format(self.proc))
+        cur.execute(f"DROP TABLE IF EXISTS {self.table}")
+        cur.execute(f"DROP PROCEDURE IF EXISTS {self.proc}")
 
     @cnx_config(consume_results=True)
     @foreach_cnx()
     def test_consume_after_callproc(self):
         cur = self.cnx.cursor()
 
-        cur.execute("INSERT INTO {0} VALUES ('a'),('b'),('c')".format(self.table))
+        cur.execute(f"INSERT INTO {self.table} (c1) VALUES ('a'),('b'),('c')")
 
         # expected to fail
         self.assertRaises(Error, cur.callproc, self.proc)

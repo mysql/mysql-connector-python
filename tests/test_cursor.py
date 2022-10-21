@@ -1403,7 +1403,7 @@ class MySQLCursorDictTests(tests.TestsCursor):
         self.cur = self.connection.cursor(dictionary=True)
         self.cur.execute("DROP TABLE IF EXISTS MySQLCursorDictTests")
         self.cur.execute(
-            "CREATE TABLE MySQLCursorDictTests(id INT(10), name "
+            "CREATE TABLE MySQLCursorDictTests(id INT(10) PRIMARY KEY, name "
             "VARCHAR(20), city VARCHAR(20))"
         )
 
@@ -1434,7 +1434,7 @@ class MySQLCursorBufferedDictTests(tests.TestsCursor):
         self.cur = self.connection.cursor(dictionary=True, buffered=True)
         self.cur.execute("DROP TABLE IF EXISTS MySQLCursorBufferedDictTests")
         self.cur.execute(
-            "CREATE TABLE MySQLCursorBufferedDictTests(id INT(10),"
+            "CREATE TABLE MySQLCursorBufferedDictTests(id INT(10) PRIMARY KEY,"
             "name VARCHAR(20), city VARCHAR(20))"
         )
 
@@ -1478,7 +1478,7 @@ class MySQLCursorNamedTupleTests(tests.TestsCursor):
         self.cur = self.connection.cursor(named_tuple=True)
         self.cur.execute("DROP TABLE IF EXISTS MySQLCursorNamedTupleTests")
         self.cur.execute(
-            "CREATE TABLE MySQLCursorNamedTupleTests(id INT(10),"
+            "CREATE TABLE MySQLCursorNamedTupleTests(id INT(10) PRIMARY KEY,"
             "name VARCHAR(20), city VARCHAR(20))"
         )
 
@@ -1516,7 +1516,7 @@ class MySQLCursorBufferedNamedTupleTests(tests.TestsCursor):
         self.cur.execute("DROP TABLE IF EXISTS MySQLCursorBufferedNamedTupleTests")
         self.cur.execute(
             "CREATE TABLE MySQLCursorBufferedNamedTupleTests("
-            "id INT(10), name VARCHAR(20), city VARCHAR(20))"
+            "id INT(10) PRIMARY KEY, name VARCHAR(20), city VARCHAR(20))"
         )
 
     def tearDown(self):

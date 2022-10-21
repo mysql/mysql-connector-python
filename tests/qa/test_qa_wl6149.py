@@ -51,10 +51,10 @@ class WL6149Tests(tests.MySQLConnectorTests):
         """
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS ts")
-            cur.execute("CREATE TABLE ts (t1 timestamp(3))")
-            cur.execute("insert into ts values ('2012-06-05 10:20:49.110')")
+            cur.execute("CREATE TABLE ts (id int primary key, t1 timestamp(3))")
+            cur.execute("insert into ts values (1, '2012-06-05 10:20:49.110')")
             self.cnx.commit()
-            cur.execute("SELECT * from ts")
+            cur.execute("SELECT t1 from ts")
             exp = b"2012-06-05 10:20:49.110"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)
@@ -78,10 +78,10 @@ class WL6149Tests(tests.MySQLConnectorTests):
         """
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_time")
-            cur.execute("CREATE TABLE t_time (t1 time(3))")
-            cur.execute("insert into t_time values ('10:20:49.11')")
+            cur.execute("CREATE TABLE t_time (idx int primary key, t1 time(3))")
+            cur.execute("insert into t_time values (1, '10:20:49.11')")
             self.cnx.commit()
-            cur.execute("SELECT * from t_time")
+            cur.execute("SELECT t1 from t_time")
             exp = b"10:20:49.110"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)
@@ -93,10 +93,10 @@ class WL6149Tests(tests.MySQLConnectorTests):
         """
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_datetime")
-            cur.execute("CREATE TABLE t_datetime (t1 datetime(3))")
-            cur.execute("insert into t_datetime values ('2038-01-19 03:14:07.11')")
+            cur.execute("CREATE TABLE t_datetime (id int primary key, t1 datetime(3))")
+            cur.execute("insert into t_datetime values (1, '2038-01-19 03:14:07.11')")
             self.cnx.commit()
-            cur.execute("SELECT * from t_datetime")
+            cur.execute("SELECT t1 from t_datetime")
             exp = b"2038-01-19 03:14:07.110"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)
@@ -113,16 +113,20 @@ class WL6149Tests(tests.MySQLConnectorTests):
         """
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_alt_datetime")
-            cur.execute("CREATE TABLE t_alt_datetime (t1 datetime(3))")
-            cur.execute("insert into t_alt_datetime values ('2038-01-19 03:14:07.11')")
+            cur.execute(
+                "CREATE TABLE t_alt_datetime (id int primary key, t1 datetime(3))"
+            )
+            cur.execute(
+                "insert into t_alt_datetime values (1, '2038-01-19 03:14:07.11')"
+            )
             self.cnx.commit()
-            cur.execute("SELECT * from t_alt_datetime")
+            cur.execute("SELECT t1 from t_alt_datetime")
             exp = b"2038-01-19 03:14:07.110"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)
 
             cur.execute("ALTER TABLE t_alt_datetime MODIFY t1 datetime(5)")
-            cur.execute("SELECT * from t_alt_datetime")
+            cur.execute("SELECT t1 from t_alt_datetime")
             exp = b"2038-01-19 03:14:07.11000"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)
@@ -134,16 +138,20 @@ class WL6149Tests(tests.MySQLConnectorTests):
     def test_alt_timestamp(self):
         with self.cnx.cursor(raw=True) as cur:
             cur.execute("DROP TABLE IF EXISTS t_alt_timestamp")
-            cur.execute("CREATE TABLE t_alt_timestamp (t1 timestamp(4))")
-            cur.execute("insert into t_alt_timestamp values ('2011-01-19 03:14:07.11')")
+            cur.execute(
+                "CREATE TABLE t_alt_timestamp (id int primary key, t1 timestamp(4))"
+            )
+            cur.execute(
+                "insert into t_alt_timestamp values (1, '2011-01-19 03:14:07.11')"
+            )
             self.cnx.commit()
-            cur.execute("SELECT * from t_alt_timestamp")
+            cur.execute("SELECT t1 from t_alt_timestamp")
             exp = b"2011-01-19 03:14:07.1100"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)
 
             cur.execute("ALTER TABLE t_alt_timestamp MODIFY t1 timestamp(5)")
-            cur.execute("SELECT * from t_alt_timestamp")
+            cur.execute("SELECT t1 from t_alt_timestamp")
             exp = b"2011-01-19 03:14:07.11000"
             out = cur.fetchone()[0]
             self.assertEqual(exp, out)

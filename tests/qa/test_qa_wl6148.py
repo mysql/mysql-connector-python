@@ -37,7 +37,7 @@ class WL6148Tests(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         with mysql.connector.connect(**config) as cnx:
             cnx.cmd_query("DROP TABLE IF EXISTS customer")
-            cnx.cmd_query("CREATE TABLE customer(i INT,name varchar(10))")
+            cnx.cmd_query("CREATE TABLE customer(i INT PRIMARY KEY,name varchar(10))")
             cnx.cmd_query(
                 "INSERT INTO customer(i,name) VALUES "
                 "(10,'Joshi'),(20,'Kiran'),(30,'Raja')"
@@ -161,7 +161,9 @@ class WL6148Tests(tests.MySQLConnectorTests):
         """
         cursor = self.cnx.cursor(prepared=True)
         cursor.execute("DROP TABLE IF EXISTS customer")
-        cursor.execute("CREATE TABLE customer2 (i INT,name varchar(10),age int)")
+        cursor.execute(
+            "CREATE TABLE customer2 (i INT PRIMARY KEY,name varchar(10),age int)"
+        )
         cursor.execute(
             "INSERT INTO customer2 (i,name,age) VALUES"
             "(10,'Joshi',30),(20,'Kiran',30),(30,'Raja',30)"

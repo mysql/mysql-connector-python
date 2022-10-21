@@ -376,7 +376,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy.select_db("myconnpy")
         cmy.query("DROP TABLE IF EXISTS {0}".format(table))
-        cmy.query("CREATE TABLE {0} (c1 INT, c2 INT)".format(table))
+        cmy.query("CREATE TABLE {0} (c1 INT PRIMARY KEY, c2 INT)".format(table))
 
         cmy.query(
             "INSERT INTO {0} (c1, c2) VALUES (1, 10), (2, 20), (3, 30)".format(table)
@@ -399,7 +399,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
 
         cmy.select_db("myconnpy")
         cmy.query("DROP TABLE IF EXISTS {0}".format(table))
-        cmy.query("CREATE TABLE {0} (c1 INT, c2 INT, c3 INT)".format(table))
+        cmy.query("CREATE TABLE {0} (c1 INT PRIMARY KEY, c2 INT, c3 INT)".format(table))
 
         cmy.query("SELECT * FROM {0}".format(table))
         self.assertEqual(3, cmy.field_count())
@@ -434,7 +434,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
             cmy2.query("SET @@session.autocommit = 0")
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
-        cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
+        cmy1.query(f"CREATE TABLE {table} (id INT AUTO_INCREMENT PRIMARY KEY, c1 INT)")
 
         # Turn AUTOCOMMIT on
         cmy1.autocommit(True)
@@ -448,11 +448,11 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         cmy1.autocommit(False)
         cmy1.query("INSERT INTO {0} (c1) VALUES (4), (5), (6)".format(table))
 
-        cmy2.query("SELECT * FROM {0} WHERE c1 > 3".format(table))
+        cmy2.query("SELECT c1 FROM {0} WHERE c1 > 3".format(table))
         self.assertEqual([], fetch_rows(cmy2))
 
         cmy1.commit()
-        cmy2.query("SELECT * FROM {0} WHERE c1 > 3".format(table))
+        cmy2.query("SELECT c1 FROM {0} WHERE c1 > 3".format(table))
         self.assertEqual([(4,), (5,), (6,)], fetch_rows(cmy2))
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
@@ -468,7 +468,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         table = "commit_test"
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
-        cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
+        cmy1.query("CREATE TABLE {0} (c1 INT PRIMARY KEY)".format(table))
 
         cmy1.query("START TRANSACTION")
         cmy1.query("INSERT INTO {0} (c1) VALUES (1), (2), (3)".format(table))
@@ -725,7 +725,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         def create_table(charset):
             cmy.query("DROP TABLE IF EXISTS {0}".format(table))
             cmy.query(
-                "CREATE TABLE {0} (id INT, "
+                "CREATE TABLE {0} (id INT PRIMARY KEY, "
                 "c1 VARCHAR(400)) CHARACTER SET {1}".format(table, charset)
             )
 
@@ -863,7 +863,7 @@ class CExtMySQLTests(tests.MySQLConnectorTests):
         table = "commit_test"
 
         cmy1.query("DROP TABLE IF EXISTS {0}".format(table))
-        cmy1.query("CREATE TABLE {0} (c1 INT)".format(table))
+        cmy1.query("CREATE TABLE {0} (c1 INT PRIMARY KEY)".format(table))
 
         cmy1.query("START TRANSACTION")
         cmy1.query("INSERT INTO {0} (c1) VALUES (1), (2), (3)".format(table))

@@ -39,7 +39,7 @@ class ViewTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_is_view(self):
         """Test is_view()."""
-        self.session.sql("create table t1(a int)").execute()
+        self.session.sql("create table t1(a int primary key)").execute()
         self.session.sql("insert into t1 values(1)").execute()
         table = self.schema.get_table("t1")
         self.assertFalse(table.is_view())
@@ -51,7 +51,9 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_select1(self):
-        self.session.sql("create table t2(id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t2(id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t2")
         table.insert("id", "name").values(1, "amr").values(2, "abc").execute()
         self.session.sql("create view v2 as select * from t2").execute()
@@ -64,7 +66,9 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_insert1(self):
-        self.session.sql("create table t3(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t3(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t3")
         table.insert("_id", "name").values(1, "amr").execute()
         self.session.sql("create view v3 as select * from t3").execute()
@@ -83,7 +87,9 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_update1(self):
-        self.session.sql("create table t4(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t4(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t4")
         table.insert("_id", "name").values(1, "amr").execute()
         self.session.sql("create view v4 as select * from t4").execute()
@@ -100,7 +106,9 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_delete1(self):
-        self.session.sql("create table t5(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t5(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t5")
         table.insert("_id", "name").values(1, "amr").execute()
         self.session.sql("create view v5 as select * from t5").execute()
@@ -117,8 +125,8 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_insert2(self):
-        self.session.sql("create table t6(a int , b int)").execute()
-        self.session.sql("create table t7(c int,d int)").execute()
+        self.session.sql("create table t6(a int, b int primary key)").execute()
+        self.session.sql("create table t7(c int, d int primary key)").execute()
         t1 = self.schema.get_table("t6")
         t2 = self.schema.get_table("t7")
         t1.insert("a", "b").values(1, 2).execute()
@@ -138,8 +146,8 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_update2(self):
-        self.session.sql("create table t8(a int , b int)").execute()
-        self.session.sql("create table t9(c int,d int)").execute()
+        self.session.sql("create table t8(a int, b int primary key)").execute()
+        self.session.sql("create table t9(c int, d int primary key)").execute()
         t1 = self.schema.get_table("t8")
         t2 = self.schema.get_table("t9")
         t1.insert("a", "b").values(1, 2).execute()
@@ -159,8 +167,8 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_update3(self):
-        self.session.sql("create table t12(a int , b int)").execute()
-        self.session.sql("create table t13(c int,d int)").execute()
+        self.session.sql("create table t12(a int, b int primary key)").execute()
+        self.session.sql("create table t13(c int, d int primary key)").execute()
         t1 = self.schema.get_table("t12")
         t2 = self.schema.get_table("t13")
         t1.insert("a", "b").values(1, 2).execute()
@@ -180,8 +188,8 @@ class ViewTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_view_delete2(self):
-        self.session.sql("create table t10(a int , b int)").execute()
-        self.session.sql("create table t11(c int,d int)").execute()
+        self.session.sql("create table t10(a int, b int primary key)").execute()
+        self.session.sql("create table t11(c int, d int primary key)").execute()
         t1 = self.schema.get_table("t10")
         t2 = self.schema.get_table("t11")
         t1.insert("a", "b").values(1, 2).execute()
@@ -215,7 +223,9 @@ class ViewTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_view_drop1(self):
         """Test a valid view drop."""
-        self.session.sql("create table t14(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t14(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t14")
         table.insert("_id", "name").values(1, "amr").values(2, "dev").values(
             3, "efg"
@@ -230,7 +240,9 @@ class ViewTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_view_drop2(self):
         """Test invalid view drop."""
-        self.session.sql("create table t15(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t15(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t15")
         table.insert("_id", "name").values(1, "amr").values(2, "dev").values(
             3, "efg"

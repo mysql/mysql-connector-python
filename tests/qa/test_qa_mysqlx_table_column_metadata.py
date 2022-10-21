@@ -38,7 +38,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_get_column_name(self):
-        self.session.sql("create table t1(a int , b int)").execute()
+        self.session.sql("create table t1(a int primary key, b int)").execute()
         table = self.schema.get_table("t1")
         table.insert("a", "b").values(1, 1).execute()
         result = table.select("a", "b").execute()
@@ -48,7 +48,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_get_table_name(self):
-        self.session.sql("create table t2(a int , b int)").execute()
+        self.session.sql("create table t2(a int primary key, b int)").execute()
         table = self.schema.get_table("t2")
         table.insert("a", "b").values(1, 1).execute()
         result = table.select().execute()
@@ -60,7 +60,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
     def test_get_schema_name(self):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
-        self.session.sql("create table t3(a int , b int)").execute()
+        self.session.sql("create table t3(a int primary key, b int)").execute()
         table = self.schema.get_table("t3")
         table.insert("a", "b").values(1, 1).execute()
         result = table.select("a", "b").execute()
@@ -69,7 +69,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_get_column_label(self):
-        self.session.sql("create table t4(a int , b int)").execute()
+        self.session.sql("create table t4(a int primary key, b int)").execute()
         table = self.schema.get_table("t4")
         table.insert("a", "b").values(1, 1).execute()
         result = table.select("a as amr").execute()
@@ -79,7 +79,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_get_table_label(self):
-        self.session.sql("create table t5(a int , b int)").execute()
+        self.session.sql("create table t5(a int primary key, b int)").execute()
         table = self.schema.get_table("t5")
         table.insert("a", "b").values(1, 1).execute()
         result = table.select("a", "b").execute()
@@ -91,6 +91,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
     def test_get_type(self):
         self.session.sql(
             "create table t6 ("
+            "id int primary key,"
             "_id varchar(32), "
             "a char(20), "
             "b date, "
@@ -109,14 +110,16 @@ class TableColumnMetadataTests(tests.MySQLxTests):
         ).execute()
         table = self.schema.get_table("t6")
         result = table.select().execute()
-        self.assertEqual(result.columns[3].get_type(), 5)
+        self.assertEqual(result.columns[4].get_type(), 5)
         self.session.sql("drop table t6").execute()
 
     @tests.foreach_session()
     def test_get_bit_data(self):
         config = tests.get_mysqlx_config()
         schema_name = config["schema"]
-        self.session.sql("create table t7(a bit)").execute()
+        self.session.sql(
+            "create table t7(id int auto_increment primary key, a bit)"
+        ).execute()
         table = self.schema.get_table("t7")
         table.insert("a").values(0).execute()
         result = table.select().execute()
@@ -152,12 +155,14 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_get_fractional_digits(self):
-        self.session.sql("create table t9(m FLOAT(7,4), s DECIMAL(5,2))").execute()
+        self.session.sql(
+            "create table t9(id INT PRIMARY KEY, m FLOAT(7,4), s DECIMAL(5,2))"
+        ).execute()
         table = self.schema.get_table("t9")
-        table.insert("m", "s").values(0, 0).execute()
+        table.insert("id", "m", "s").values(1, 0, 0).execute()
         result = table.select().execute()
-        self.assertEqual(result.columns[0].get_fractional_digits(), 4)
-        self.assertEqual(result.columns[1].get_fractional_digits(), 2)
+        self.assertEqual(result.columns[1].get_fractional_digits(), 4)
+        self.assertEqual(result.columns[2].get_fractional_digits(), 2)
         self.session.sql("drop table t9").execute()
 
     @tests.foreach_session()
@@ -189,7 +194,7 @@ class TableColumnMetadataTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_is_padded(self):
-        self.session.sql("create table t11(a int , b char(10))").execute()
+        self.session.sql("create table t11(a int primary key, b char(10))").execute()
         table = self.schema.get_table("t11")
         table.insert("a", "b").values(1, "a").execute()
         result = table.select("a", "b").execute()

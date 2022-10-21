@@ -32,6 +32,10 @@ import mysql.connector
 import tests
 
 
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
 @unittest.skipIf(not tests.SSL_AVAILABLE, "Python has no SSL support")
 @unittest.skipIf(
     tests.MYSQL_VERSION < (8, 0, 3),

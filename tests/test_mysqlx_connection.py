@@ -1023,7 +1023,9 @@ class MySQLxSessionTests(tests.MySQLxTests):
         # Test SQL statements not fully qualified, which must not raise error:
         #     mysqlx.errors.OperationalError: No database selected
         self.session.sql("CREATE DATABASE my_test_schema").execute()
-        self.session.sql("CREATE TABLE my_test_schema.pets(name VARCHAR(20))").execute()
+        self.session.sql(
+            "CREATE TABLE my_test_schema.pets(id INT PRIMARY KEY, name VARCHAR(20))"
+        ).execute()
         settings = self.connect_kwargs.copy()
         settings["schema"] = "my_test_schema"
         session = mysqlx.get_session(settings)
@@ -1113,7 +1115,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         self.session.create_schema(self.schema_name)
 
-        stmt = "CREATE TABLE {0}.{1}(_id INT)"
+        stmt = "CREATE TABLE {0}.{1}(_id INT PRIMARY KEY)"
         self.session.sql(stmt.format(self.schema_name, table_name)).execute()
         table = schema.get_table(table_name)
 
@@ -1136,7 +1138,7 @@ class MySQLxSessionTests(tests.MySQLxTests):
 
         self.session.create_schema(self.schema_name)
 
-        stmt = "CREATE TABLE {0}.{1}(_id INT)"
+        stmt = "CREATE TABLE {0}.{1}(_id INT PRIMARY KEY)"
         self.session.sql(stmt.format(self.schema_name, table_name)).execute()
         table = schema.get_table(table_name)
 

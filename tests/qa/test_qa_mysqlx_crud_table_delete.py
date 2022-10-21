@@ -40,7 +40,7 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete1(self):
         """Test the table.delete with sort and limit."""
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(a int , b int)").execute()
+        self.session.sql("create table t1(a int primary key, b int)").execute()
         table = self.schema.get_table("t1")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         self.assertRaises(
@@ -53,7 +53,7 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete2(self):
         """Test the table.delete with where."""
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(a int , b int)").execute()
+        self.session.sql("create table t2(a int primary key, b int)").execute()
         table = self.schema.get_table("t2")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         table.delete().where("a==2").execute()
@@ -64,7 +64,7 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete3(self):
         """Test the table.delete with bind."""
         self.session.sql("drop table if exists t3").execute()
-        self.session.sql("create table t3(a int , b int)").execute()
+        self.session.sql("create table t3(a int primary key, b int)").execute()
         table = self.schema.get_table("t3")
         table.insert().values(1, 1).values(2, 1).values(3, 2).execute()
         table.delete().where("a==:a").bind("a", 2).execute()
@@ -75,9 +75,11 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete4(self):
         """Test the table.delete with sort and param."""
         self.session.sql("drop table if exists t4").execute()
-        self.session.sql("create table t4(a int , b int)").execute()
+        self.session.sql("create table t4(id int primary key, a int , b int)").execute()
         table = self.schema.get_table("t4")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.insert().values(1, 1, 10).values(2, 2, 10).values(3, 1, 11).values(
+            4, 2, 11
+        ).execute()
         table.delete().sort("a ASC", "b DESC").limit(3).where("true").execute()
         self.assertEqual(table.count(), 1)
         result = table.select().execute()
@@ -89,9 +91,11 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete5(self):
         """Test the table.delete with a false condition."""
         self.session.sql("drop table if exists t5").execute()
-        self.session.sql("create table t5(a int , b int)").execute()
+        self.session.sql("create table t5(id int primary key, a int , b int)").execute()
         table = self.schema.get_table("t5")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.insert().values(1, 1, 10).values(2, 2, 10).values(3, 1, 11).values(
+            4, 2, 11
+        ).execute()
         table.delete().sort("a ASC", "b DESC").limit(3).where("false").execute()
         self.assertEqual(table.count(), 4)
         result = table.select().execute()
@@ -103,9 +107,11 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_able_delete6(self):
         """Test the table.delete with a false condition."""
         self.session.sql("drop table if exists t6").execute()
-        self.session.sql("create table t6(a int , b int)").execute()
+        self.session.sql("create table t6(id int primary key, a int , b int)").execute()
         table = self.schema.get_table("t6")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.insert().values(1, 1, 10).values(2, 2, 10).values(3, 1, 11).values(
+            4, 2, 11
+        ).execute()
         table.delete().sort("a ASC", "b DESC").limit(3).where("1 == 0").execute()
         self.assertEqual(table.count(), 4)
         result = table.select().execute()
@@ -117,9 +123,11 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete7(self):
         """Test the table.delete with a true condition."""
         self.session.sql("drop table if exists t7").execute()
-        self.session.sql("create table t7(a int , b int)").execute()
+        self.session.sql("create table t7(id int primary key, a int , b int)").execute()
         table = self.schema.get_table("t7")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.insert().values(1, 1, 10).values(2, 2, 10).values(3, 1, 11).values(
+            4, 2, 11
+        ).execute()
         table.delete().sort("a ASC", "b DESC").limit(3).where("1 == 1").execute()
         self.assertEqual(table.count(), 1)
         result = table.select().execute()
@@ -131,9 +139,11 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_table_delete8(self):
         """Test the table.delete with an empty condition."""
         self.session.sql("drop table if exists t8").execute()
-        self.session.sql("create table t8(a int , b int)").execute()
+        self.session.sql("create table t8(id int primary key, a int , b int)").execute()
         table = self.schema.get_table("t8")
-        table.insert().values(1, 10).values(2, 10).values(1, 11).values(2, 11).execute()
+        table.insert().values(1, 1, 10).values(2, 2, 10).values(3, 1, 11).values(
+            4, 2, 11
+        ).execute()
         try:
             table.delete().sort("a ASC", "b DESC").limit(3).where("").execute()
         except mysqlx.ProgrammingError:
@@ -145,7 +155,9 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_contains_operator_table_delete1(self):
         """Test IN operator in table.delete."""
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t1(id int primary key, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t1")
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
@@ -162,7 +174,9 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_contains_operator_table_delete2(self):
         """Tets NOT IN operator in table.delete."""
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t2(id int primary key, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t2")
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
@@ -181,15 +195,17 @@ class TableDeleteTests(tests.MySQLxTests):
         RHS."""
         self.session.sql("drop table if exists t3").execute()
         self.session.sql(
-            "create table t3(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t3(idx int primary key, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t3")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":{"company":"xyz","vehicle":"bike","hobbies":["reading","music","playing"]}}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
@@ -218,20 +234,23 @@ class TableDeleteTests(tests.MySQLxTests):
         """Test IN operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t4").execute()
         self.session.sql(
-            "create table t4(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t4(idx int primary key, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t4")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":[{"company":"xyz","vehicle":"bike"},{"company":"abc","vehicle":"car"},{"company":"mno","vehicle":"zeep"}]}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
             '{"additionalinfo":[{"company":"abc","vehicle":"car"},{"company":"pqr","vehicle":"bicycle"}]}',
         ).values(
+            3,
             '{"_id":3}',
             '{"name":"nice"}',
             '{"age":25}',
@@ -267,7 +286,9 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_overlaps_table_delete1(self):
         """Overlaps in table.delete."""
         self.session.sql("drop table if exists t1").execute()
-        self.session.sql("create table t1(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t1(id int primary key, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t1")
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
@@ -284,7 +305,9 @@ class TableDeleteTests(tests.MySQLxTests):
     def test_verlaps_table_delete2(self):
         """Not Overlaps in table.delete."""
         self.session.sql("drop table if exists t2").execute()
-        self.session.sql("create table t2(id int, n JSON, a JSON)").execute()
+        self.session.sql(
+            "create table t2(id int primary key, n JSON, a JSON)"
+        ).execute()
         table = self.schema.get_table("t2")
         table.insert().values(1, '{"name":"a"}', '{"age":22}').values(
             2, '{"name":"b"}', '{"age":24}'
@@ -303,15 +326,17 @@ class TableDeleteTests(tests.MySQLxTests):
         on RHS."""
         self.session.sql("drop table if exists t3").execute()
         self.session.sql(
-            "create table t3(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t3(idx int primary key, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t3")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":{"company":"xyz","vehicle":"bike","hobbies":["reading","music","playing"]}}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
@@ -326,11 +351,13 @@ class TableDeleteTests(tests.MySQLxTests):
         )
         # adding data
         table.insert().values(
+            3,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":{"company":"xyz","vehicle":"bike","hobbies":["reading","music","playing"]}}',
         ).values(
+            4,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
@@ -339,11 +366,13 @@ class TableDeleteTests(tests.MySQLxTests):
         result1 = table.delete().where('["happy","joy"] OVERLAPS n->$.name').execute()
         # Adding data
         table.insert().values(
+            5,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":{"company":"xyz","vehicle":"bike","hobbies":["reading","music","playing"]}}',
         ).values(
+            6,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
@@ -364,20 +393,23 @@ class TableDeleteTests(tests.MySQLxTests):
         """OVERLAPS operator with dict on LHS and dict on RHS."""
         self.session.sql("drop table if exists t4").execute()
         self.session.sql(
-            "create table t4(id JSON, n JSON, a JSON, addinfo JSON)"
+            "create table t4(idx int primary key, id JSON, n JSON, a JSON, addinfo JSON)"
         ).execute()
         table = self.schema.get_table("t4")
         table.insert().values(
+            1,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":[{"company":"xyz","vehicle":"bike"},{"company":"abc","vehicle":"car"},{"company":"mno","vehicle":"zeep"}]}',
         ).values(
+            2,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
             '{"additionalinfo":[{"company":"abc","vehicle":"car"},{"company":"pqr","vehicle":"bicycle"}]}',
         ).values(
+            3,
             '{"_id":3}',
             '{"name":"nice"}',
             '{"age":25}',
@@ -397,16 +429,19 @@ class TableDeleteTests(tests.MySQLxTests):
         )
         # Adding data
         table.insert().values(
+            4,
             '{"_id":1}',
             '{"name":"joy"}',
             '{"age":21}',
             '{"additionalinfo":[{"company":"xyz","vehicle":"bike"},{"company":"abc","vehicle":"car"},{"company":"mno","vehicle":"zeep"}]}',
         ).values(
+            5,
             '{"_id":2}',
             '{"name":"happy"}',
             '{"age":24}',
             '{"additionalinfo":[{"company":"abc","vehicle":"car"},{"company":"pqr","vehicle":"bicycle"}]}',
         ).values(
+            6,
             '{"_id":3}',
             '{"name":"nice"}',
             '{"age":25}',

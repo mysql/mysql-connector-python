@@ -114,23 +114,17 @@ class Bug441430Tests(tests.MySQLConnectorTests):
 
         cur = self.cnx.cursor()
         tbl = "buglp44130"
-        cur.execute("DROP TABLE IF EXISTS %s" % tbl)
-        cur.execute("CREATE TABLE %s (id INT)" % tbl)
-        cur.execute(
-            "INSERT INTO %s VALUES (%%s),(%%s)" % tbl,
-            (
-                1,
-                2,
-            ),
-        )
+        cur.execute(f"DROP TABLE IF EXISTS {tbl}")
+        cur.execute(f"CREATE TABLE {tbl} (id INT AUTO_INCREMENT PRIMARY KEY)")
+        cur.execute(f"INSERT INTO {tbl} VALUES (%s),(%s)", (1, 2))
         self.assertEqual(2, cur.rowcount)
-        stmt = "INSERT INTO %s VALUES (%%s)" % tbl
-        res = cur.executemany(stmt, [(3,), (4,), (5,), (6,), (7,), (8,)])
+        stmt = f"INSERT INTO {tbl} VALUES (%s)"
+        cur.executemany(stmt, [(3,), (4,), (5,), (6,), (7,), (8,)])
         self.assertEqual(6, cur.rowcount)
-        res = cur.execute("UPDATE %s SET id = id + %%s" % tbl, (10,))
+        cur.execute(f"UPDATE {tbl} SET id = id + %s", (10,))
         self.assertEqual(8, cur.rowcount)
 
-        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {tbl}")
         cur.close()
         self.cnx.close()
 
@@ -475,15 +469,15 @@ class Bug571201(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_multistmts(self):
         cur = self.cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         cur.execute(
-            ("CREATE TABLE {0} (id INT AUTO_INCREMENT KEY, c1 INT)").format(self.tbl)
+            f"CREATE TABLE {self.tbl} (id INT AUTO_INCREMENT PRIMARY KEY, c1 INT)"
         )
 
         stmts = [
-            "SELECT * FROM %s" % (self.tbl),
-            "INSERT INTO %s (c1) VALUES (10),(20)" % (self.tbl),
-            "SELECT * FROM %s" % (self.tbl),
+            f"SELECT * FROM {self.tbl}",
+            f"INSERT INTO {self.tbl} (c1) VALUES (10),(20)",
+            f"SELECT * FROM {self.tbl}",
         ]
         result_iter = cur.execute(";".join(stmts), multi=True)
 
@@ -513,25 +507,24 @@ class Bug551533and586003(tests.MySQLConnectorTests):
     def test_select(self):
         cur = self.cnx.cursor()
 
-        cur.execute("DROP TABLE IF EXISTS {table}".format(table=self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         cur.execute(
-            (
-                "CREATE TABLE {table} (id INT AUTO_INCREMENT KEY, "
-                "c1 VARCHAR(100) DEFAULT 'abcabcabcabcabcabcabcabcabcabc') "
-                "ENGINE=INNODB"
-            ).format(table=self.tbl)
+            f"""
+            CREATE TABLE {self.tbl} (id INT AUTO_INCREMENT PRIMARY KEY,
+            c1 VARCHAR(100) DEFAULT 'abcabcabcabcabcabcabcabcabcabc') ENGINE=INNODB
+            """
         )
 
-        insert = "INSERT INTO {table} (id) VALUES (%s)".format(table=self.tbl)
+        insert = f"INSERT INTO {self.tbl} (id) VALUES (%s)"
         exp = 20000
         cur.executemany(insert, [(None,)] * exp)
         self.cnx.commit()
 
-        cur.execute("SELECT * FROM {table} LIMIT 20000".format(table=self.tbl))
+        cur.execute(f"SELECT * FROM {self.tbl} LIMIT 20000")
         try:
             rows = cur.fetchall()
         except errors.Error as err:
-            self.fail("Failed retrieving big result set: {0}".format(err))
+            self.fail(f"Failed retrieving big result set: {err}")
         else:
             self.assertEqual(exp, cur.rowcount)
             self.assertEqual(exp, len(rows))
@@ -554,11 +547,13 @@ class Bug675425(tests.MySQLConnectorTests):
     def test_executemany_escape(self):
         cur = self.cnx.cursor()
 
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         cur.execute(
-            "CREATE TABLE {0} (c1 VARCHAR(30), c2 VARCHAR(30))".format(self.tbl)
+            f"""
+            CREATE TABLE {self.tbl}
+            (id INT AUTO_INCREMENT PRIMARY KEY, c1 VARCHAR(30), c2 VARCHAR(30))
+            """
         )
-
         data = [
             (
                 "ham",
@@ -573,7 +568,7 @@ class Bug675425(tests.MySQLConnectorTests):
                 "spam ' ham",
             ),
         ]
-        sql = "INSERT INTO {0} VALUES (%s, %s)".format(self.tbl)
+        sql = f"INSERT INTO {self.tbl} (c1, c2) VALUES (%s, %s)"
         try:
             cur.executemany(sql, data)
         except Exception as exc:
@@ -680,9 +675,14 @@ class Bug865859(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_reassign_connection(self):
         cur = self.cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_name))
-        cur.execute("CREATE TABLE {0} (c1 INT)".format(self.table_name))
-        cur.execute("INSERT INTO {0} (c1) VALUES (1)".format(self.table_name))
+        cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+        cur.execute(
+            f"""
+            CREATE TABLE {self.table_name}
+            (id INT AUTO_INCREMENT PRIMARY KEY, c1 INT)
+            """
+        )
+        cur.execute(f"INSERT INTO {self.table_name} (c1) VALUES (1)")
 
         try:
             # We create a new cnx, replacing current
@@ -719,20 +719,22 @@ class BugOra13395083(tests.MySQLConnectorTests):
         now_utc = datetime.utcnow().replace(microsecond=0, tzinfo=utc)
 
         cur = self.cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.table_name))
-        cur.execute("CREATE TABLE {0} (c1 TIMESTAMP)".format(self.table_name))
+        cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
         cur.execute(
-            "INSERT INTO {0} (c1) VALUES (%s)".format(self.table_name),
-            (now_utc,),
+            f"""
+            CREATE TABLE {self.table_name}
+            (id INT AUTO_INCREMENT PRIMARY KEY, c1 TIMESTAMP)
+            """
         )
+        cur.execute(f"INSERT INTO {self.table_name} (c1) VALUES (%s)", (now_utc,))
         self.cnx.commit()
 
-        cur.execute("SELECT c1 FROM {0}".format(self.table_name))
+        cur.execute(f"SELECT c1 FROM {self.table_name}")
         row = cur.fetchone()
         self.assertEqual(now_utc, row[0].replace(tzinfo=utc))
 
         self.cnx.time_zone = "+02:00"
-        cur.execute("SELECT c1 FROM {0}".format(self.table_name))
+        cur.execute(f"SELECT c1 FROM {self.table_name}")
         row = cur.fetchone()
         self.assertEqual(now_utc.astimezone(testzone), row[0].replace(tzinfo=testzone))
 
@@ -907,14 +909,14 @@ class BugOra14208326(tests.MySQLConnectorTests):
         self.table = "BugOra14208326"
 
     def _setup(self):
-        self.cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.table)
-        self.cnx.cmd_query("CREATE TABLE %s (id INT)" % self.table)
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table}")
+        self.cnx.cmd_query(f"CREATE TABLE {self.table} (id INT PRIMARY KEY)")
 
     def tearDown(self):
         config = tests.get_mysql_config()
         self.cnx = connection.MySQLConnection(**config)
 
-        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.table))
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table}")
 
     @foreach_cnx(connection.MySQLConnection)
     def test_cmd_query(self):
@@ -952,13 +954,13 @@ class BugOra14201459(tests.MySQLConnectorTests):
         self._setup()
 
     def _setup(self):
-        self.cnx.cmd_query("DROP TABLE IF EXISTS %s" % (self.tbl))
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
 
     @foreach_cnx()
     def test_error1426(self):
         cur = self.cnx.cursor()
         self._setup()
-        create = "CREATE TABLE %s (c1 TIME(7))" % self.tbl
+        create = f"CREATE TABLE {self.tbl} (id INT PRIMARY KEY, c1 TIME(7))"
         try:
             cur.execute(create)
         except errors.ProgrammingError as exception:
@@ -1046,20 +1048,20 @@ class BugOra14754894(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         self.tbl = "BugOra14754894"
-        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
-        cnx.cmd_query("CREATE TABLE {0} (c1 INT)".format(self.tbl))
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
+        cnx.cmd_query(f"CREATE TABLE {self.tbl} (c1 INT AUTO_INCREMENT PRIMARY KEY)")
 
     def tearDown(self):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
-        cnx.cmd_query("DROP TABLE IF EXISTS %s" % (self.tbl))
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
 
     @foreach_cnx()
     def test_executemany(self):
-        self.cnx.cmd_query("TRUNCATE TABLE {0}".format(self.tbl))
+        self.cnx.cmd_query(f"TRUNCATE TABLE {self.tbl}")
         cur = self.cnx.cursor()
 
-        insert = "INSERT INTO {0} (c1) VALUES (%(c1)s)".format(self.tbl)
+        insert = f"INSERT INTO {self.tbl} (c1) VALUES (%(c1)s)"
         data = [{"c1": 1}]
 
         try:
@@ -1067,7 +1069,7 @@ class BugOra14754894(tests.MySQLConnectorTests):
         except ValueError as err:
             self.fail(err)
 
-        cur.execute("SELECT c1 FROM %s" % self.tbl)
+        cur.execute(f"SELECT c1 FROM {self.tbl}")
         self.assertEqual(data[0]["c1"], cur.fetchone()[0])
 
         cur.close()
@@ -1220,7 +1222,7 @@ class BugOra16217743(tests.MySQLConnectorTests):
 
         cnx.cmd_query("DROP TABLE IF EXISTS bug16217743")
         cnx.cmd_query("DROP PROCEDURE IF EXISTS sp_bug16217743")
-        cnx.cmd_query("CREATE TABLE bug16217743 (c1 VARCHAR(20), c2 INT)")
+        cnx.cmd_query("CREATE TABLE bug16217743 (c1 VARCHAR(20), c2 INT PRIMARY KEY)")
         cnx.cmd_query(
             "CREATE PROCEDURE sp_bug16217743 (p1 VARCHAR(20), p2 INT) "
             "BEGIN INSERT INTO bug16217743 (c1, c2) "
@@ -1498,7 +1500,7 @@ class BugOra17041412(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS %s" % self.table_name)
-        cur.execute("CREATE TABLE %s (c1 INT)" % self.table_name)
+        cur.execute("CREATE TABLE %s (c1 INT PRIMARY KEY)" % self.table_name)
         cur.executemany("INSERT INTO %s (c1) VALUES (%%s)" % self.table_name, self.data)
         cnx.commit()
 
@@ -1582,7 +1584,7 @@ class BugOra16819486(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS BugOra16819486")
-        cur.execute("CREATE TABLE BugOra16819486 (c1 INT, c2 INT)")
+        cur.execute("CREATE TABLE BugOra16819486 (c1 INT PRIMARY KEY, c2 INT)")
         cur.executemany(
             "INSERT INTO BugOra16819486 VALUES (%s, %s)",
             [(1, 10), (2, 20), (3, 30)],
@@ -1683,10 +1685,10 @@ class BugOra17041240(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {table}".format(table=self.table_name))
-        cur.execute("CREATE TABLE {table} (c1 INT)".format(table=self.table_name))
+        cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+        cur.execute(f"CREATE TABLE {self.table_name} (c1 INT PRIMARY KEY)")
         cur.executemany(
-            "INSERT INTO {table} (c1) VALUES (%s)".format(table=self.table_name),
+            f"INSERT INTO {self.table_name} (c1) VALUES (%s)",
             self.data,
         )
         cnx.commit()
@@ -1831,7 +1833,9 @@ class BugOra16369511(tests.MySQLConnectorTests):
     def _setup(self):
         cnx = connection.MySQLConnection(**tests.get_mysql_config())
         cnx.cmd_query("DROP TABLE IF EXISTS local_data")
-        cnx.cmd_query("CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))")
+        cnx.cmd_query(
+            "CREATE TABLE local_data (id INT PRIMARY KEY, c1 VARCHAR(6), c2 VARCHAR(6))"
+        )
         cnx.close()
 
     def tearDown(self):
@@ -1916,7 +1920,7 @@ class BugOra17002411(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS local_data")
         cur.execute(
             "CREATE TABLE local_data ("
-            "id INT AUTO_INCREMENT KEY, "
+            "id INT AUTO_INCREMENT PRIMARY KEY, "
             "c1 VARCHAR(255), c2 VARCHAR(255))"
         )
 
@@ -1999,7 +2003,7 @@ class BugOra17215197(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
         cur.execute("DROP TABLE IF EXISTS BugOra17215197")
-        cur.execute("CREATE TABLE BugOra17215197 (c1 INT, c2 INT)")
+        cur.execute("CREATE TABLE BugOra17215197 (c1 INT PRIMARY KEY, c2 INT)")
         cur.executemany(
             "INSERT INTO BugOra17215197 VALUES (%s, %s)",
             [(1, 10), (2, 20), (3, 30)],
@@ -2110,7 +2114,7 @@ class BugOra17079344(tests.MySQLConnectorTests):
             cur.execute("DROP TABLE IF EXISTS {0}".format(tablename))
             table = (
                 "CREATE TABLE {table} ("
-                "id INT AUTO_INCREMENT KEY, "
+                "id INT AUTO_INCREMENT PRIMARY KEY, "
                 "c1 VARCHAR(40)"
                 ") CHARACTER SET '{charset}'"
             ).format(table=tablename, charset=charset)
@@ -2192,7 +2196,7 @@ class BugOra17780576(tests.MySQLConnectorTests):
 
         table = (
             "CREATE TABLE {table} ("
-            "id INT AUTO_INCREMENT KEY, "
+            "id INT AUTO_INCREMENT PRIMARY KEY, "
             "c1 VARCHAR(40) CHARACTER SET 'utf8mb4'"
             ") CHARACTER SET 'utf8mb4'"
         ).format(table=tablename)
@@ -2223,7 +2227,7 @@ class BugOra17573172(tests.MySQLConnectorTests):
         self.cnx = connection.MySQLConnection(**config)
         self.cur = self.cnx.cursor()
         self.cur.execute("DROP TABLE IF EXISTS BugOra17573172")
-        self.cur.execute("CREATE TABLE BugOra17573172 (c1 INT, c2 INT)")
+        self.cur.execute("CREATE TABLE BugOra17573172 (c1 INT PRIMARY KEY, c2 INT)")
         self.cur.executemany(
             "INSERT INTO BugOra17573172 VALUES (%s, %s)",
             [(1, 10), (2, 20), (3, 30)],
@@ -2905,15 +2909,21 @@ class BugOra18694096(tests.MySQLConnectorTests):
         self.tbl = "times"
         self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
         if tests.MYSQL_VERSION >= (5, 6, 4):
-            create = "CREATE TABLE {0} (c1 TIME(6))".format(self.tbl)
+            create = f"""
+                CREATE TABLE {self.tbl}
+                (id INT AUTO_INCREMENT PRIMARY KEY, c1 TIME(6))
+                """
             self.cases += self.cases_564
         else:
-            create = "CREATE TABLE {0} (c1 TIME)".format(self.tbl)
+            create = f"""
+                CREATE TABLE {self.tbl}
+                (id INT AUTO_INCREMENT PRIMARY KEY, c1 TIME)"
+                """
         self.cnx.cmd_query(create)
 
     def tearDown(self):
         if self.cnx:
-            self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+            self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
 
     def test_timedelta(self):
         # Note that both _timedelta_to_mysql and _TIME_to_python are
@@ -2945,22 +2955,28 @@ class BugOra18220593(tests.MySQLConnectorTests):
         self.cnx = connection.MySQLConnection(**config)
         self.cur = self.cnx.cursor()
         self.table = "⽃⽄⽅⽆⽇⽈⽉⽊"
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.table}")
         self.cur.execute(
-            "CREATE TABLE {0} (c1 VARCHAR(100)) "
-            "CHARACTER SET 'utf8'".format(self.table)
+            f"""
+            CREATE TABLE {self.table} (id INT AUTO_INCREMENT PRIMARY KEY, c1 VARCHAR(100))
+            CHARACTER SET 'utf8'
+            """
         )
 
     def test_unicode_operation(self):
-        data = [("database",), ("データベース",), ("데이터베이스",)]
-        self.cur.executemany("INSERT INTO {0} VALUES (%s)".format(self.table), data)
+        data = [
+            ("database",),
+            ("データベース",),
+            ("데이터베이스",),
+        ]
+        self.cur.executemany(f"INSERT INTO {self.table} (c1) VALUES (%s)", data)
         self.cnx.commit()
-        self.cur.execute("SELECT c1 FROM {0}".format(self.table))
+        self.cur.execute(f"SELECT c1 FROM {self.table}")
 
         self.assertEqual(self.cur.fetchall(), data)
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.table}")
         self.cur.close()
         self.cnx.close()
 
@@ -3042,30 +3058,31 @@ class Bug499410(tests.MySQLConnectorTests):
         ]
         exp_nonunicode = [(data[0],)]
 
-        tbl = "{0}test".format(charset)
+        tbl = f"{charset}test"
         try:
             cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
             cur.execute(
-                "CREATE TABLE {0} (c1 VARCHAR(60)) charset={1}".format(tbl, charset)
+                f"CREATE TABLE {tbl} "
+                f"(id INT AUTO_INCREMENT PRIMARY KEY, c1 VARCHAR(60)) charset={charset}"
             )
         except:
             self.fail("Failed creating test table.")
 
-        stmt = "INSERT INTO {0} VALUES (%s)".format(tbl)
+        stmt = f"INSERT INTO {tbl} (c1) VALUES (%s)"
         try:
             for line in data:
                 cur.execute(stmt, (line,))
-        except Exception as exc:
-            self.fail("Failed populating test table: {0}".format(str(exc)))
+        except Exception as err:
+            self.fail(f"Failed populating test table: {err}")
 
-        cur.execute("SELECT * FROM {0}".format(tbl))
+        cur.execute(f"SELECT c1 FROM {tbl}")
         res_nonunicode = cur.fetchall()
         self.cnx.set_unicode(True)
-        cur.execute("SELECT * FROM {0}".format(tbl))
+        cur.execute(f"SELECT c1 FROM {tbl}")
         res_unicode = cur.fetchall()
 
         try:
-            cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
+            cur.execute(f"DROP TABLE IF EXISTS {tbl}")
         except:
             self.fail("Failed cleaning up test table.")
 
@@ -3081,9 +3098,9 @@ class BugOra18742429(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
 
         self.tbl = "Bug18742429"
-        cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.tbl)
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
 
-        create = "CREATE TABLE {0}({1})".format(
+        create = "CREATE TABLE {0}(id INT PRIMARY KEY, {1})".format(
             self.tbl,
             ",".join(["col" + str(i) + " INT(10)" for i in range(1000)]),
         )
@@ -3094,16 +3111,16 @@ class BugOra18742429(tests.MySQLConnectorTests):
     def tearDown(self):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
-        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
         cnx.close()
 
     @foreach_cnx(connection.MySQLConnection)
     def test_columns(self):
         cur = self.cnx.cursor()
 
-        cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+        cur.execute(f"TRUNCATE TABLE {self.tbl}")
 
-        stmt = "INSERT INTO {0} VALUES({1})".format(
+        stmt = "INSERT INTO {0} VALUES(1, {1})".format(
             self.tbl,
             ",".join([str(i) if i % 2 == 0 else "NULL" for i in range(1000)]),
         )
@@ -3111,9 +3128,9 @@ class BugOra18742429(tests.MySQLConnectorTests):
         cur.execute(stmt)
 
         cur = self.cnx.cursor(prepared=True)
-        stmt = "SELECT * FROM {0} WHERE col0=?".format(self.tbl)
+        stmt = f"SELECT * FROM {self.tbl} WHERE col0=?"
         cur.execute(stmt, (0,))
-        self.assertEqual(exp, cur.fetchone())
+        self.assertEqual((1,) + exp, cur.fetchone())
 
 
 class BugOra19164627(tests.MySQLConnectorTests):
@@ -3175,21 +3192,24 @@ class BugOra19225481(tests.MySQLConnectorTests):
         cnx = connection.MySQLConnection(**config)
 
         self.tbl = "Bug19225481"
-        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
 
-        create = "CREATE TABLE {0} (col1 DOUBLE)".format(self.tbl)
+        create = f"""
+            CREATE TABLE {self.tbl}
+            (id INT AUTO_INCREMENT PRIMARY KEY, col1 DOUBLE)
+        """
         cnx.cmd_query(create)
         cnx.close()
 
     def tearDown(self):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
-        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
         cnx.close()
 
     @foreach_cnx()
     def test_columns(self):
-        self.cnx.cmd_query("TRUNCATE {0}".format(self.tbl))
+        self.cnx.cmd_query(f"TRUNCATE {self.tbl}")
         cur = self.cnx.cursor()
         values = [
             (123.123456789987,),
@@ -3199,10 +3219,10 @@ class BugOra19225481(tests.MySQLConnectorTests):
             (0.0,),
             (-99.99999900099,),
         ]
-        stmt = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        stmt = f"INSERT INTO {self.tbl} (col1) VALUES(%s)"
         cur.executemany(stmt, values)
 
-        stmt = "SELECT * FROM {0}".format(self.tbl)
+        stmt = f"SELECT col1 FROM {self.tbl}"
         cur.execute(stmt)
         self.assertEqual(values, cur.fetchall())
 
@@ -3236,22 +3256,25 @@ class BugOra19184025(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
 
-        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
-        create = "CREATE TABLE {0} (c1 INT, c2 INT NOT NULL DEFAULT 2)".format(self.tbl)
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
+        create = f"""
+            CREATE TABLE {self.tbl}
+            (c1 INT, c2 INT NOT NULL DEFAULT 2, PRIMARY KEY(c2))
+        """
         cnx.cmd_query(create)
 
     def tearDown(self):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
-        cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
         cnx.close()
 
     @foreach_cnx()
     def test_row_to_python(self):
-        self.cnx.cmd_query("TRUNCATE {0}".format(self.tbl))
+        self.cnx.cmd_query(f"TRUNCATE {self.tbl}")
         cur = self.cnx.cursor()
-        cur.execute("INSERT INTO {0} (c1) VALUES (NULL)".format(self.tbl))
-        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        cur.execute(f"INSERT INTO {self.tbl} (c1) VALUES (NULL)")
+        cur.execute(f"SELECT * FROM {self.tbl}")
         self.assertEqual((None, 2), cur.fetchone())
         cur.close()
 
@@ -3522,13 +3545,16 @@ class BugOra19522948(tests.MySQLConnectorTests):
         self.cur = self.cnx.cursor()
 
         self.tbl = "Bug19522948"
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
 
-        create = "CREATE TABLE {0} (c1 LONGTEXT NOT NULL)".format(self.tbl)
+        create = f"""
+            CREATE TABLE {self.tbl}
+            (id INT AUTO_INCREMENT PRIMARY KEY, c1 LONGTEXT NOT NULL)
+            """
         self.cur.execute(create)
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cur.close()
         self.cnx.close()
 
@@ -3536,20 +3562,20 @@ class BugOra19522948(tests.MySQLConnectorTests):
         cur = self.cnx.cursor(prepared=True)
 
         data = "test_data" * 10
-        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
-        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        cur.execute(f"INSERT INTO {self.tbl} (c1) VALUES (?)", (data,))
+        self.cur.execute(f"SELECT c1 FROM {self.tbl}")
         self.assertEqual((data,), self.cur.fetchone())
-        self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+        self.cur.execute(f"TRUNCATE TABLE {self.tbl}")
 
         data = "test_data" * 1000
-        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
-        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        cur.execute(f"INSERT INTO {self.tbl} (c1) VALUES (?)", (data,))
+        self.cur.execute(f"SELECT c1 FROM {self.tbl}")
         self.assertEqual((data,), self.cur.fetchone())
-        self.cur.execute("TRUNCATE TABLE {0}".format(self.tbl))
+        self.cur.execute(f"TRUNCATE TABLE {self.tbl}")
 
         data = "test_data" * 10000
-        cur.execute("INSERT INTO {0} (c1) VALUES (?)".format(self.tbl), (data,))
-        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        cur.execute(f"INSERT INTO {self.tbl} (c1) VALUES (?)", (data,))
+        self.cur.execute(f"SELECT c1 FROM {self.tbl}")
         self.assertEqual((data,), self.cur.fetchone())
 
 
@@ -3562,12 +3588,13 @@ class BugOra19500097(tests.MySQLConnectorTests):
         cur = cnx.cursor()
 
         self.tbl = "Bug19500097"
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
 
-        create = (
-            "CREATE TABLE {0} (col1 VARCHAR(10), col2 INT) "
-            "DEFAULT CHARSET latin1".format(self.tbl)
-        )
+        create = f"""
+            CREATE TABLE {self.tbl}
+            (id INT AUTO_INCREMENT PRIMARY KEY, col1 VARCHAR(10), col2 INT)
+            DEFAULT CHARSET latin1
+            """
         cur.execute(create)
         cur.close()
         cnx.close()
@@ -3576,14 +3603,13 @@ class BugOra19500097(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         cur.close()
         cnx.close()
 
     @foreach_cnx()
     def test_binary_charset(self):
-
-        sql = "INSERT INTO {0} VALUES(%s, %s)".format(self.tbl)
+        sql = f"INSERT INTO {self.tbl} (col1, col2) VALUES(%s, %s)"
         cur = self.cnx.cursor()
         cur.execute(sql, ("foo", 1))
         cur.execute(sql, ("ëëë", 2))
@@ -3602,7 +3628,7 @@ class BugOra19500097(tests.MySQLConnectorTests):
             (bytearray(b"\xc3\xab\xc3\xab\xc3\xab"), 4),
             (bytearray(b"\xc3\xa1\xc3\xa1\xc3\xa1"), 6),
         ]
-        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        cur.execute(f"SELECT col1, col2 FROM {self.tbl}")
         self.assertEqual(exp, cur.fetchall())
 
 
@@ -3786,12 +3812,13 @@ class BugOra20301989(tests.MySQLConnectorTests):
         cur = cnx.cursor()
 
         self.tbl = "Bug20301989"
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
 
-        create = (
-            "CREATE TABLE {0} (col1 SET('val1', 'val2')) "
-            "DEFAULT CHARSET latin1".format(self.tbl)
-        )
+        create = f"""
+            CREATE TABLE {self.tbl}
+            (id INT AUTO_INCREMENT PRIMARY KEY, col1 SET('val1', 'val2'))
+            DEFAULT CHARSET latin1
+            """
         cur.execute(create)
         cur.close()
         cnx.close()
@@ -3800,14 +3827,14 @@ class BugOra20301989(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         cnx = connection.MySQLConnection(**config)
         cur = cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         cur.close()
         cnx.close()
 
     @foreach_cnx()
     def test_set(self):
         cur = self.cnx.cursor()
-        sql = "INSERT INTO {0} VALUES(%s)".format(self.tbl)
+        sql = f"INSERT INTO {self.tbl} (col1) VALUES(%s)"
         cur.execute(sql, ("val1,val2",))
         cur.execute(sql, ("val1",))
         cur.execute(sql, ("",))
@@ -3815,7 +3842,7 @@ class BugOra20301989(tests.MySQLConnectorTests):
 
         exp = [(set(["val1", "val2"]),), (set(["val1"]),), (set([]),), (None,)]
 
-        cur.execute("SELECT * FROM {0}".format(self.tbl))
+        cur.execute(f"SELECT col1 FROM {self.tbl}")
         self.assertEqual(exp, cur.fetchall())
 
 
@@ -3906,7 +3933,7 @@ class BugOra20811802(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = (
-            "CREATE TABLE {0} (id INT, name VARCHAR(5), dept VARCHAR(5)) "
+            "CREATE TABLE {0} (id INT PRIMARY KEY, name VARCHAR(5), dept VARCHAR(5)) "
             "DEFAULT CHARSET latin1".format(self.tbl)
         )
         cur.execute(create)
@@ -3978,7 +4005,7 @@ class BugOra20834643(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = (
-            "CREATE TABLE {0} (id INT, name VARCHAR(5), dept VARCHAR(5)) "
+            "CREATE TABLE {0} (id INT PRIMARY KEY, name VARCHAR(5), dept VARCHAR(5)) "
             "DEFAULT CHARSET latin1".format(self.tbl)
         )
         cur.execute(create)
@@ -4223,7 +4250,7 @@ class BugOra21420633(tests.MySQLConnectorTests):
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
 
         create = (
-            "CREATE TABLE {0} (id INT, dept VARCHAR(5)) "
+            "CREATE TABLE {0} (id INT PRIMARY KEY, dept VARCHAR(5)) "
             "DEFAULT CHARSET latin1".format(self.tbl)
         )
         cur.execute(create)
@@ -4353,7 +4380,9 @@ class BugOra21477493(tests.MySQLConnectorTests):
         self.cnx = connection.MySQLConnection(**config)
         cursor = self.cnx.cursor()
         cursor.execute("DROP TABLE IF EXISTS fun1")
-        cursor.execute("CREATE TABLE fun1(a CHAR(50), b INT)")
+        cursor.execute(
+            "CREATE TABLE fun1(id INT AUTO_INCREMENT PRIMARY KEY, a CHAR(50), b INT)"
+        )
         data = [("A", 1), ("B", 2)]
         cursor.executemany("INSERT INTO fun1 (a, b) VALUES (%s, %s)", data)
         cursor.close()
@@ -4367,20 +4396,21 @@ class BugOra21477493(tests.MySQLConnectorTests):
         data = [("A", 1), ("B", 2)]
         cursor = self.cnx.cursor()
         cursor.executemany(
-            "INSERT INTO fun1 SELECT CONCAT('VALUES', %s), b + %s FROM fun1",
+            "INSERT INTO fun1 (a, b) SELECT CONCAT('VALUES', %s), b + %s FROM fun1",
             data,
         )
         cursor.close()
 
         cursor = self.cnx.cursor()
-        cursor.execute("SELECT * FROM fun1")
+        cursor.execute("SELECT a, b FROM fun1")
         self.assertEqual(8, len(cursor.fetchall()))
 
     def test_insert_into_select_type2(self):
         data = [("A", 1), ("B", 2)]
         cursor = self.cnx.cursor()
         cursor.executemany(
-            "INSERT INTO fun1 SELECT CONCAT('VALUES(ab, cd)',%s), b + %s FROM fun1",
+            "INSERT INTO fun1 (a, b) "
+            "SELECT CONCAT('VALUES(ab, cd)',%s), b + %s FROM fun1",
             data,
         )
         cursor.close()
@@ -4394,7 +4424,7 @@ class BugOra21477493(tests.MySQLConnectorTests):
         data = [("A", 1), ("B", 2)]
         cursor = self.cnx.cursor()
         cursor.executemany(
-            "INSERT INTO `{0}`.`fun1` SELECT CONCAT('"
+            "INSERT INTO `{0}`.`fun1` (a, b) SELECT CONCAT('"
             "VALUES(ab, cd)', %s), b + %s FROM fun1"
             "".format(config["database"]),
             data,
@@ -4552,7 +4582,7 @@ class BugOra21530841(tests.MySQLConnectorTests):
     def test_big_column_count(self):
         cur = self.cnx.cursor(raw=False, buffered=False)
         # Create table with 512 Columns
-        table = "CREATE TABLE {0} ({1})".format(
+        table = "CREATE TABLE {0} (id INT AUTO_INCREMENT PRIMARY KEY, {1})".format(
             self.tbl, ", ".join(["c{0} INT".format(idx) for idx in range(512)])
         )
         cur.execute(table)
@@ -4948,13 +4978,13 @@ class BugOra22564149(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         self.tbl = "BugOra22564149"
         self.cnx = connection.MySQLConnection(**config)
-        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cnx.cmd_query(
-            "CREATE TABLE {0} (id INT, name VARCHAR(50))".format(self.tbl)
+            f"CREATE TABLE {self.tbl} (id INT PRIMARY KEY, name VARCHAR(50))"
         )
 
     def tearDown(self):
-        self.cnx.cmd_query("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cnx.close()
 
     def test_cmd_query_iter(self):
@@ -4976,18 +5006,18 @@ class BugOra24659561(tests.MySQLConnectorTests):
         self.tbl = "BugOra24659561"
         self.cnx = connection.MySQLConnection(**config)
         self.cur = self.cnx.cursor()
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cur.execute(
-            "CREATE TABLE {0} (id INT, name VARCHAR(100))".format(self.tbl)
+            f"CREATE TABLE {self.tbl} (id INT PRIMARY KEY, name VARCHAR(100))"
         )
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cur.close()
 
     def test_executemany_utf8mb4(self):
         self.cur.executemany(
-            "INSERT INTO {0} VALUES (%s, %s)".format(self.tbl),
+            f"INSERT INTO {self.tbl} VALUES (%s, %s)",
             [(1, "Nuno"), (2, "Amitabh"), (3, "Rafael")],
         )
 
@@ -5050,17 +5080,17 @@ class BugOra27277964(tests.MySQLConnectorTests):
         self.tbl = "BugOra27277964"
         self.cnx = connection.MySQLConnection(**config)
         self.cur = self.cnx.cursor()
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cur.execute(
-            "CREATE TABLE {0} (id INT, name VARCHAR(100))".format(self.tbl)
+            f"CREATE TABLE {self.tbl} (id INT PRIMARY KEY, name VARCHAR(100))"
         )
 
     def tearDown(self):
-        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.tbl}")
         self.cur.close()
 
     def test_execute_utf8mb4_collation(self):
-        self.cur.execute("INSERT INTO {0} VALUES (1, 'Nuno')".format(self.tbl))
+        self.cur.execute(f"INSERT INTO {self.tbl} VALUES (1, 'Nuno')")
 
 
 @unittest.skipIf(
@@ -5394,7 +5424,7 @@ class BugOra28239074(tests.MySQLConnectorTests):
 
         cur.execute("DROP TABLE IF EXISTS {0}".format(self.table))
         cur.execute(
-            "CREATE TABLE {0}(a char(50) ,b int) "
+            "CREATE TABLE {0}(a char(50) ,b int PRIMARY KEY) "
             "DEFAULT CHARSET utf8".format(self.table)
         )
         data = [
@@ -5734,16 +5764,18 @@ class BugOra28188883(tests.MySQLConnectorTests):
         data = [(1, "🐬"), (2, "🐍"), (3, "🐶")]
         tbl = "BugOra28188883"
         cur = self.cnx.cursor()
-        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {tbl}")
         cur.execute(
-            "CREATE TABLE {0} (id INT, name VARCHAR(100)) "
-            "DEFAULT CHARSET utf8mb4".format(tbl)
+            f"""
+            CREATE TABLE {tbl} (id INT PRIMARY KEY, name VARCHAR(100))
+            DEFAULT CHARSET utf8mb4
+            """
         )
-        stmt = "INSERT INTO {0} (id, name) VALUES (%s, %s)".format(tbl)
+        stmt = f"INSERT INTO {tbl} (id, name) VALUES (%s, %s)"
         cur.executemany(stmt, data)
-        cur.execute("SELECT id, name FROM {0}".format(tbl))
+        cur.execute(f"SELECT id, name FROM {tbl}")
         self.assertEqual(data, cur.fetchall())
-        cur.execute("DROP TABLE IF EXISTS {0}".format(tbl))
+        cur.execute(f"DROP TABLE IF EXISTS {tbl}")
         cur.close()
         self.cnx.close()
 
@@ -6209,7 +6241,9 @@ class BugOra29195610(tests.MySQLConnectorTests):
         with connection.MySQLConnection(**config) as cnx:
             cnx.cmd_query("DROP TABLE IF EXISTS bug29195610")
             cnx.cmd_query("DROP PROCEDURE IF EXISTS sp_bug29195610")
-            cnx.cmd_query("CREATE TABLE bug29195610 (id INT, name VARCHAR(5))")
+            cnx.cmd_query(
+                "CREATE TABLE bug29195610 (id INT PRIMARY KEY, name VARCHAR(5))"
+            )
             cnx.cmd_query("INSERT INTO bug29195610 (id, name) VALUES (2020, 'Foo')")
             cnx.cmd_query(
                 "CREATE PROCEDURE sp_bug29195610 (in_id INT) "
@@ -6275,10 +6309,11 @@ class BugOra24938411(tests.MySQLConnectorTests):
             cur.execute("DROP TABLE IF EXISTS bug24938411")
             cur.execute(
                 "CREATE TABLE bug24938411 "
-                "(mydate datetime(3) DEFAULT NULL) ENGINE=InnoDB"
+                "(id INT PRIMARY KEY, mydate datetime(3) DEFAULT NULL) ENGINE=InnoDB"
             )
             cur.execute(
-                "INSERT INTO bug24938411 (mydate) " 'VALUES ("2020-01-01 01:01:01.543")'
+                "INSERT INTO bug24938411 (id, mydate) "
+                'VALUES (1, "2020-01-01 01:01:01.543")'
             )
             cur.execute(
                 "SELECT mydate, CAST(mydate AS CHAR) AS mydate_char FROM bug24938411"
@@ -6300,7 +6335,7 @@ class BugOra32165864(tests.MySQLConnectorTests):
             cur.execute("DROP TABLE IF EXISTS bug32165864")
             cur.execute(
                 "CREATE TABLE bug32165864 "
-                "(id INT, name VARCHAR(10), address VARCHAR(20))"
+                "(id INT PRIMARY KEY, name VARCHAR(10), address VARCHAR(20))"
             )
             cur.execute(
                 "INSERT INTO bug32165864 (id, name, address) VALUES "
@@ -6350,6 +6385,7 @@ class BugOra30416704(tests.MySQLConnectorTests):
             cnx.cmd_query(
                 f"""
                 CREATE TABLE {cls.table_name} (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
                     my_blob BLOB,
                     my_json JSON,
                     my_text TEXT,
@@ -6358,7 +6394,12 @@ class BugOra30416704(tests.MySQLConnectorTests):
                 """
             )
             values = "', '".join(cls.test_values)
-            cnx.cmd_query(f"INSERT INTO {cls.table_name} VALUES ('{values}')")
+            cnx.cmd_query(
+                f"""
+                INSERT INTO {cls.table_name}
+                (my_blob, my_json, my_text, my_binary) VALUES ('{values}')
+                """
+            )
             cnx.commit()
 
     @classmethod
@@ -6430,8 +6471,8 @@ class Bug32496788(tests.MySQLConnectorTests):
     """BUG#32496788: PREPARED STATEMETS ACCEPTS ANY TYPE OF PARAMETERS."""
 
     table_name = "Bug32496788"
-    test_values = (("John", "", "Doe", 21, 77), ["Jane", "", "Doe", 19, 7])
-    exp_values = ([("John", "", "Doe", 21, 77)], [("Jane", "", "Doe", 19, 7)])
+    test_values = ((1, "John", "", "Doe", 21, 77), [2, "Jane", "", "Doe", 19, 7])
+    exp_values = ([(1, "John", "", "Doe", 21, 77)], [(2, "Jane", "", "Doe", 19, 7)])
 
     def setUp(self):
         config = tests.get_mysql_config()
@@ -6440,6 +6481,7 @@ class Bug32496788(tests.MySQLConnectorTests):
             cnx.cmd_query(
                 f"""
                 CREATE TABLE {self.table_name} (
+                    id INT UNSIGNED NOT NULL AUTO_INCREMENT KEY,
                     column_first_name VARCHAR(30) DEFAULT '' NOT NULL,
                     column_midle_name VARCHAR(30) DEFAULT '' NOT NULL,
                     column_last_name VARCHAR(30) DEFAULT '' NOT NULL,
@@ -6480,7 +6522,7 @@ class Bug32496788(tests.MySQLConnectorTests):
             self.assertEqual(cur.fetchall(), [("1", "2")])
 
         with self.cnx.cursor(prepared=True) as cur:
-            insert_stmt = f"INSERT INTO {self.table_name} VALUES (?, ?, ?, ?, ?)"
+            insert_stmt = f"INSERT INTO {self.table_name} VALUES (?, ?, ?, ?, ?, ?)"
             cur.execute(insert_stmt)
             with self.assertRaises(errors.ProgrammingError) as contex:
                 cur.execute(insert_stmt, "JD")
@@ -6666,7 +6708,12 @@ class BugOra32497631(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_prepared_statement_parameters(self):
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
-        self.cnx.cmd_query(f"CREATE TABLE {self.table_name} (name VARCHAR(255))")
+        self.cnx.cmd_query(
+            f"""
+            CREATE TABLE {self.table_name}
+            (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255))
+            """
+        )
         with self.cnx.cursor(prepared=True) as cur:
             query = f"INSERT INTO {self.table_name} (name) VALUES (?)"
             # If the query has placeholders and no parameters is given,
@@ -6777,13 +6824,15 @@ class BugOra21528553(tests.MySQLConnectorTests):
             cnx.cmd_query(
                 f"""
                 CREATE TABLE {self.table_name} (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
                     c1 CHAR(32),
                     c2 LONGBLOB
                 ) CHARACTER SET utf8 COLLATE utf8_general_ci
                 """
             )
             cnx.cmd_query(
-                f"INSERT INTO {self.table_name} VALUES ('1','1'),('2','2'),('3','3')"
+                f"INSERT INTO {self.table_name} (c1, c2) "
+                "VALUES ('1','1'),('2','2'),('3','3')"
             )
             cnx.commit()
 
@@ -6796,7 +6845,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_cmd_refresh_with_consume_results(self):
         with self.cnx.cursor() as cur:
-            cur.execute(f"SELECT * FROM {self.table_name}")
+            cur.execute(f"SELECT c1, c2 FROM {self.table_name}")
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
@@ -6808,7 +6857,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_reset_session_with_consume_results(self):
         with self.cnx.cursor() as cur:
-            cur.execute(f"SELECT * FROM {self.table_name}")
+            cur.execute(f"SELECT c1, c2 FROM {self.table_name}")
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
@@ -6819,7 +6868,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_commit_with_consume_results(self):
         with self.cnx.cursor() as cur:
-            cur.execute(f"SELECT * FROM {self.table_name}")
+            cur.execute(f"SELECT c1, c2 FROM {self.table_name}")
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
@@ -6830,7 +6879,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_ping_with_consume_results(self):
         with self.cnx.cursor() as cur:
-            cur.execute(f"SELECT * FROM {self.table_name}")
+            cur.execute(f"SELECT c1, c2 FROM {self.table_name}")
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
@@ -6841,7 +6890,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_is_connected_with_consume_results(self):
         with self.cnx.cursor() as cur:
-            cur.execute(f"SELECT * FROM {self.table_name}")
+            cur.execute(f"SELECT c1, c2 FROM {self.table_name}")
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
@@ -6961,9 +7010,11 @@ class BugOra28491115(tests.MySQLConnectorTests):
         table_name = "BugOra28491115"
         with self.cnx.cursor(prepared=True) as cur:
             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
-            cur.execute(f"CREATE TABLE {table_name} (a TIME)")
-            cur.execute(f"INSERT INTO {table_name} VALUES (0)")
-            cur.execute(f"SELECT * FROM {table_name}")
+            cur.execute(
+                f"CREATE TABLE {table_name} (id INT AUTO_INCREMENT PRIMARY KEY, a TIME)"
+            )
+            cur.execute(f"INSERT INTO {table_name} (a) VALUES (0)")
+            cur.execute(f"SELECT a FROM {table_name}")
             res = cur.fetchall()
             self.assertEqual(res[0][0], timedelta(0))
             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
@@ -7156,7 +7207,7 @@ class BugOra34689812(tests.MySQLConnectorTests):
                 cur.execute(
                     f"""
                     CREATE TABLE {self.table_name} (
-                        id INT UNSIGNED NOT NULL AUTO_INCREMENT KEY,
+                        id INT AUTO_INCREMENT PRIMARY KEY,
                         my_date DATE,
                         my_datetime DATETIME,
                         my_timestamp TIMESTAMP
@@ -7207,6 +7258,7 @@ class BugOra34499578(tests.MySQLConnectorTests):
                 cur.execute(
                     f"""
                     CREATE TABLE {self.table_name}(
+                        id INT AUTO_INCREMENT PRIMARY KEY,
                         {self.field1} char(32),
                         {self.field2} char(32)
                     )

@@ -40,7 +40,7 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table1(self):
         """Test the table.getname."""
-        self.session.sql("create table t1(a int)").execute()
+        self.session.sql("create table t1(a int primary key)").execute()
         table = self.schema.get_table("t1")
         self.assertEqual(table.get_name(), "t1")
         self.session.sql("drop table t1").execute()
@@ -48,7 +48,7 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table2(self):
         """Test the table.getschema."""
-        self.session.sql("create table t2(a int)").execute()
+        self.session.sql("create table t2(a int primary key)").execute()
         table = self.schema.get_table("t2")
         self.assertEqual(table.get_schema(), self.schema)
         self.session.sql("drop table t2").execute()
@@ -56,7 +56,7 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table3(self):
         """Test the table.exists_in_database."""
-        self.session.sql("create table t3(a int)").execute()
+        self.session.sql("create table t3(a int primary key)").execute()
         self.session.sql("show tables")
         table = self.schema.get_table("t3")
         self.assertEqual(table.exists_in_database(), True)
@@ -64,7 +64,7 @@ class TableInsertTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_table4(self):
-        self.session.sql("create table t11(a int)").execute()
+        self.session.sql("create table t11(a int primary key)").execute()
         self.session.sql("show tables")
         table = self.schema.get_table("t11")
         self.assertEqual(table.who_am_i(), "t11")
@@ -72,7 +72,7 @@ class TableInsertTests(tests.MySQLxTests):
 
     @tests.foreach_session()
     def test_table5(self):
-        self.session.sql("create table t12(a int)").execute()
+        self.session.sql("create table t12(a int primary key)").execute()
         self.session.sql("show tables")
         table = self.schema.get_table("t12")
         self.assertTrue(table.am_i_real())
@@ -81,7 +81,9 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_insert1(self):
         """Test the table.insert_ with different_datatype."""
-        self.session.sql("create table t4(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t4(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t4")
         table.insert("_id", "name").values(1, "amr").execute()
         result = table.select().where("_id ==1").execute()
@@ -93,7 +95,7 @@ class TableInsertTests(tests.MySQLxTests):
     def test_table_insert2(self):
         """Test the table.insert_ with different_datatype."""
         self.session.sql(
-            "create table t5(_id int, name blob, salary float, title varchar(32))"
+            "create table t5(_id int primary key, name blob, salary float, title varchar(32))"
         ).execute()
         table = self.schema.get_table("t5")
         large_str = "x" * 1024
@@ -106,7 +108,9 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_insert3(self):
         """Test the table.insert."""
-        self.session.sql("create table t6(_id int, name varchar(32))").execute()
+        self.session.sql(
+            "create table t6(_id int primary key, name varchar(32))"
+        ).execute()
         table = self.schema.get_table("t6")
         try:
             table.insert().values().execute()
@@ -119,9 +123,9 @@ class TableInsertTests(tests.MySQLxTests):
     def test_table_insert4(self):
         """Test the table.insert with json."""
         data = '{"_id":1,"a":1}'
-        self.session.sql("create table t7(a JSON)").execute()
+        self.session.sql("create table t7(id int primary key, a JSON)").execute()
         table = self.schema.get_table("t7")
-        table.insert().values(data).execute()
+        table.insert().values(1, data).execute()
         result = table.select().execute()
         row = result.fetch_all()
         self.assertIsNotNone(row)
@@ -130,7 +134,7 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_insert5(self):
         """Test table.insert with date."""
-        self.session.sql("create table t8(_id int ,a date)").execute()
+        self.session.sql("create table t8(_id int primary key, a date)").execute()
         table = self.schema.get_table("t8")
         table.insert().values(1, "2016-10-10").execute()
         result = table.select().where("_id ==1").execute()
@@ -141,9 +145,9 @@ class TableInsertTests(tests.MySQLxTests):
     @tests.foreach_session()
     def test_table_insert6(self):
         """Test table.insert with time."""
-        self.session.sql("create table t9(b time)").execute()
+        self.session.sql("create table t9(id int primary key, b time)").execute()
         table = self.schema.get_table("t9")
-        table.insert().values("20:20:20").execute()
+        table.insert().values(1, "20:20:20").execute()
         result1 = table.select().execute()
         row = result1.fetch_all()
         self.assertEqual(row[0]["b"], datetime.timedelta(seconds=73220))
