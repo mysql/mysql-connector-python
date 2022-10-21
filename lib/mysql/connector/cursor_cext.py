@@ -218,7 +218,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         if self._cnx.raise_on_warnings:
             raise err
 
-        warnings.warn(err, stacklevel=4)
+        warnings.warn(str(err), stacklevel=4)
 
     def _handle_result(self, result: Union[CextEofPacketType, CextResultType]) -> None:
         """Handles the result after statement execution"""

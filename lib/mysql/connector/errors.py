@@ -75,7 +75,7 @@ class Error(Exception):
         return self._full_msg
 
 
-class Warning(Warning, Exception):  # pylint: disable=redefined-builtin
+class Warning(Exception):  # pylint: disable=redefined-builtin
     """Exception for important warnings"""
 
 
@@ -138,6 +138,7 @@ ErrorTypes = Union[
     DataError,
     NotSupportedError,
     PoolError,
+    Warning,
 ]
 # _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is used by the
 # function custom_error_exception. _ERROR_EXCEPTIONS (at bottom of module)
