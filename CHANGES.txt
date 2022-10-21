@@ -22,6 +22,7 @@ v8.0.32
 - BUG#32625155: Tests fail against group replication cluster
 - BUG#30089671: Fix decoding VARBINARY columns when using a prepared cursor
 - BUG#28020811: Fix multiple reference leaks in the C extension
+- BUG#27426532: Reduce callproc roundtrip time
 - BUG#24364556: Improve warning behavior
 
 v8.0.31

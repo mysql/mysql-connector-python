@@ -519,15 +519,19 @@ class CMySQLCursor(MySQLCursorAbstract):
             # by '.' and grab the procedure name from procname.
             procname_abs = procname.split(".")[-1]
             if args:
+                argvalues = []
                 for idx, arg in enumerate(args):
                     argname = argfmt.format(name=procname_abs, index=idx + 1)
                     argnames.append(argname)
                     if isinstance(arg, tuple):
                         argtypes.append(f" CAST({argname} AS {arg[1]})")
-                        self.execute(f"SET {argname}=%s", (arg[0],))
+                        argvalues.append(arg[0])
                     else:
                         argtypes.append(argname)
-                        self.execute(f"SET {argname}=%s", (arg,))
+                        argvalues.append(arg)
+
+                placeholders = ",".join(f"{arg}=%s" for arg in argnames)
+                self.execute(f"SET {placeholders}", argvalues)
 
             call = f"CALL {procname}({','.join(argnames)})"
 
