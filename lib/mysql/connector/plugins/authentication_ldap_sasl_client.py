@@ -152,7 +152,6 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
 
         This method will contact the Kerberos KDC in order of obtain a TGT.
         """
-        _LOGGER.debug("# user name: %s", self._username)
         user_name = gssapi.raw.names.import_name(
             self._username.encode("utf8"), name_type=gssapi.NameType.user
         )

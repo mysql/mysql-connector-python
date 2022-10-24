@@ -280,7 +280,6 @@ class MySQLConnection(MySQLConnectionAbstract):
         if self._password1 and password != self._password1:
             password = self._password1
 
-        _LOGGER.debug("# _do_auth(): user: %s", username)
         _LOGGER.debug("# _do_auth(): self._auth_plugin: %s", self._auth_plugin)
         if (
             self._auth_plugin.startswith("authentication_oci")
@@ -295,9 +294,6 @@ class MySQLConnection(MySQLConnectionAbstract):
                 username,
                 self._auth_plugin,
             )
-
-        _LOGGER.debug("# _do_auth(): user: %s", username)
-        _LOGGER.debug("# _do_auth(): password: %s", password)
 
         packet = self._protocol.make_auth(
             handshake=self._handshake,

@@ -188,7 +188,6 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
 
         _LOGGER.debug("Service Principal: %s", spn)
         _LOGGER.debug("Realm: %s", realm)
-        _LOGGER.debug("Username: %s", self._username)
 
         try:
             # Attempt to retrieve credentials from cache file
@@ -378,7 +377,6 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
 
         _LOGGER.debug("Service Principal: %s", spn)
         _LOGGER.debug("Realm: %s", realm)
-        _LOGGER.debug("Username: %s", self._username)
 
         if sspicon is None or sspi is None:
             raise errors.ProgrammingError(
