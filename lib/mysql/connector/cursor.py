@@ -99,7 +99,7 @@ RE_PY_MAPPING_PARAM = re.compile(
     """,
     re.X,
 )
-RE_SQL_SPLIT_STMTS = re.compile(b""";(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)""")
+RE_SQL_SPLIT_STMTS = re.compile(b""";(?=(?:[^"'`]*["'`].*["'`])*[^"'`]*$)""")
 RE_SQL_FIND_PARAM = re.compile(b"""%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)""")
 
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"

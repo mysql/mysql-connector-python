@@ -628,6 +628,25 @@ class MySQLCursorTests(tests.TestsCursor):
         self.assertEqual(exp_result, results)
         self.cur.execute("DROP PROCEDURE multi_results")
 
+    def test_execute_multi(self):
+        # Tests when execute(..., multi=True)
+        operations = [
+            'select 1; SELECT "`";',
+            "SELECT '\"'; SELECT 2; select '```';",
+            "select 1; select '`'; select 3; select \"'''''\";",
+        ]
+        control = [
+            ["select 1", 'SELECT "`"'],
+            ["SELECT '\"'", "SELECT 2", "select '```'"],
+            ["select 1", "select '`'", "select 3", "select \"'''''\""],
+        ]
+        self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
+        with self.cnx.cursor() as cur:
+            for operation, exps in zip(operations, control):
+                for res_cur, exp in zip(cur.execute(operation, multi=True), exps):
+                    self.assertEqual(exp, res_cur.statement)
+                    _ = res_cur.fetchall()
+
     def test_executemany(self):
         """MySQLCursor object executemany()-method"""
         self.check_method(self.cur, "executemany")

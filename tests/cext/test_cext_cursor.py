@@ -578,7 +578,7 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         cur.close()
         self.cnx.rollback()
 
-    def tests_execute_multi(self):
+    def test_execute_multi(self):
         tbl = "myconnpy_execute_multi"
         stmt = (
             "SELECT 'result', 1; INSERT INTO {0} () VALUES (); "
@@ -622,6 +622,23 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         cur.execute("DROP PROCEDURE multi_results")
 
         cur.close()
+
+        # test statement property
+        operations = [
+            'select 1; SELECT "`";',
+            "SELECT '\"'; SELECT 2; select '```';",
+            "select 1; select '`'; select 3; select \"'''''\";",
+        ]
+        control = [
+            ["select 1", 'SELECT "`"'],
+            ["SELECT '\"'", "SELECT 2", "select '```'"],
+            ["select 1", "select '`'", "select 3", "select \"'''''\""],
+        ]
+        with self._get_cursor(self.cnx) as cur:
+            for operation, exps in zip(operations, control):
+                for res_cur, exp in zip(cur.execute(operation, multi=True), exps):
+                    self.assertEqual(exp, res_cur.statement)
+                    _ = res_cur.fetchall()
 
 
 class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):
