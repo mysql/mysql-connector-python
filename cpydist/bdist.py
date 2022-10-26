@@ -125,8 +125,8 @@ class DistBinary(Command):
                 set_threshold(1)
 
         def _get_fullname():
-            label = f"-{self.label if self.label else ''}"
-            python_version = f"-py{get_python_version() if self.byte_code_only else ''}"
+            label = f"-{self.label}" if self.label else ""
+            python_version = f"-py{get_python_version()}" if self.byte_code_only else ""
             name = self.distribution.get_name()
             version = self.distribution.get_version()
             edition = self.edition or ""
