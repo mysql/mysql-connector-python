@@ -16,6 +16,7 @@ v8.0.32
 - WL#14861: Remove distutils support
 - BUG#34710366: Django implementation does not pass unit tests
 - BUG#34695103: Remove debug messages that shows authentication data
+- BUG#34690501: Connector/Python depends on outdated protobuf
 - BUG#34689812: Fix datetime conversion when using prepared cursors
 - BUG#34675508: Character set 'utf8' unsupported in python mysql connector when using MariaDB
 - BUG#34655520: Wrong MySQLCursor.statement values in the results of cursor.execute(..., multi=True)
