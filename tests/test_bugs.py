@@ -7313,18 +7313,9 @@ class BugOra34467201(tests.MySQLConnectorTests):
 
     var_name = "test_var"
     var_value = "BugOra34467201"
+    init_command = f"SET @{var_name}='{var_value}'"
 
-    def setUp(self):
-        config = tests.get_mysql_config()
-        config["init_command"] = f"SET @{self.var_name}='{self.var_value}'"
-        self.cnx = mysql.connector.connect(**config)
-
-    def tearDown(self):
-        with self.cnx.cursor() as cur:
-            cur.execute(f"SET @{self.var_name} = NULL")
-        self.cnx.close()
-
-    @foreach_cnx
+    @foreach_cnx(init_command=init_command)
     def test_init_command(self):
         with self.cnx.cursor() as cur:
             cur.execute(f"SELECT @{self.var_name}")
