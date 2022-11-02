@@ -886,12 +886,10 @@ class CMySQLCursorDict(CMySQLCursor):
         """Return next row of a query result set.
 
         Returns:
-            tuple or None: A row from query result set.
+            dict or None: A dict from query result set.
         """
         row = super().fetchone()
-        if row:
-            return dict(zip(self.column_names, row))
-        return None
+        return dict(zip(self.column_names, row)) if row else None
 
     def fetchmany(self, size: int = 1) -> List[Dict[str, ToPythonOutputTypes]]:
         """Return the next set of rows of a query result set.
@@ -901,7 +899,8 @@ class CMySQLCursorDict(CMySQLCursor):
         which defaults to one.
 
         Returns:
-            list: The next set of rows of a query result set.
+            list: The next set of rows of a query result set represented
+                  as a list of dictionaries where column names are used as keys.
         """
         res = super().fetchmany(size=size)
         return [dict(zip(self.column_names, row)) for row in res]
@@ -910,7 +909,8 @@ class CMySQLCursorDict(CMySQLCursor):
         """Return all rows of a query result set.
 
         Returns:
-            list: A list of tuples with all rows of a query result set.
+            list: A list of dictionaries with all rows of a query
+                  result set where column names are used as keys.
         """
         res = super().fetchall()
         return [dict(zip(self.column_names, row)) for row in res]
@@ -1260,3 +1260,21 @@ class CMySQLCursorPrepared(CMySQLCursor):
         self._rowcount += len(rows[0])
         self._handle_eof()
         return rows[0]
+
+
+class CMySQLCursorPreparedDict(CMySQLCursorDict, CMySQLCursorPrepared):  # type: ignore[misc]
+    """This class is a blend of features from CMySQLCursorDict and CMySQLCursorPrepared
+
+    Multiple inheritance in python is allowed but care must be taken
+    when assuming methods resolution. In the case of multiple
+    inheritance, a given attribute is first searched in the current
+    class if it's not found then it's searched in the parent classes.
+    The parent classes are searched in a left-right fashion and each
+    class is searched once.
+    Based on python's attribute resolution, in this case, attributes
+    are searched as follows:
+    1. CMySQLCursorPreparedDict (current class)
+    2. CMySQLCursorDict (left parent class)
+    3. CMySQLCursorPrepared (right parent class)
+    4. CMySQLCursor (base class)
+    """

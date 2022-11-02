@@ -74,6 +74,7 @@ try:
         CMySQLCursorDict,
         CMySQLCursorNamedTuple,
         CMySQLCursorPrepared,
+        CMySQLCursorPreparedDict,
         CMySQLCursorRaw,
     )
 except ImportError as exc:
@@ -704,6 +705,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             8: CMySQLCursorNamedTuple,
             9: CMySQLCursorBufferedNamedTuple,
             16: CMySQLCursorPrepared,
+            20: CMySQLCursorPreparedDict,
         }
         try:
             return (types[cursor_type])(self)

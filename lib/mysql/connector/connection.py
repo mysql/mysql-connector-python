@@ -78,6 +78,7 @@ from .cursor import (
     MySQLCursorDict,
     MySQLCursorNamedTuple,
     MySQLCursorPrepared,
+    MySQLCursorPreparedDict,
     MySQLCursorRaw,
 )
 from .errors import (
@@ -1435,6 +1436,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             8: MySQLCursorNamedTuple,
             9: MySQLCursorBufferedNamedTuple,
             16: MySQLCursorPrepared,
+            20: MySQLCursorPreparedDict,
         }
         try:
             return (types[cursor_type])(self)

@@ -1489,47 +1489,28 @@ class MySQLCursorDict(MySQLCursor):
 
         Returns a dictionary.
         """
-        row = rowdata
-
-        if row:
-            return dict(zip(self.column_names, row))
-
-        return None
+        return dict(zip(self.column_names, rowdata)) if rowdata else None
 
     def fetchone(self) -> Optional[Dict[str, ToPythonOutputTypes]]:
         """Return next row of a query result set.
 
         Returns:
-            tuple or None: A row from query result set.
+            dict or None: A dict from query result set.
         """
-        self._check_executed()
-        row = self._fetch_row()
-        if row:
-            return self._row_to_python(row, self.description)
-        return None
+        return self._row_to_python(super().fetchone(), self.description)
 
     def fetchall(self) -> List[Optional[Dict[str, ToPythonOutputTypes]]]:
         """Return all rows of a query result set.
 
         Returns:
-            list: A list of tuples with all rows of a query result set.
+            list: A list of dictionaries with all rows of a query
+                  result set where column names are used as keys.
         """
-        self._check_executed()
-        if not self._have_unread_result():
-            return []
-
-        (rows, eof) = self._connection.get_rows()
-        if self._nextrow[0]:
-            rows.insert(0, self._nextrow[0])
-        res = []
-        for row in rows:
-            res.append(self._row_to_python(row, self.description))
-        self._handle_eof(eof)
-        rowcount = len(rows)
-        if rowcount >= 0 and self._rowcount == -1:
-            self._rowcount = 0
-        self._rowcount += rowcount
-        return res
+        return [
+            self._row_to_python(row, self.description)
+            for row in super().fetchall()
+            if row
+        ]
 
 
 class MySQLCursorNamedTuple(MySQLCursor):
@@ -1661,3 +1642,41 @@ class MySQLCursorBufferedNamedTuple(MySQLCursorNamedTuple, MySQLCursorBuffered):
             res.append(self._row_to_python(row, self.description))
         self._next_row = len(self._rows)
         return res
+
+
+class MySQLCursorPreparedDict(MySQLCursorDict, MySQLCursorPrepared):  # type: ignore[misc]
+    """
+    This class is a blend of features from MySQLCursorDict and MySQLCursorPrepared
+
+    Multiple inheritance in python is allowed but care must be taken
+    when assuming methods resolution. In the case of multiple
+    inheritance, a given attribute is first searched in the current
+    class if it's not found then it's searched in the parent classes.
+    The parent classes are searched in a left-right fashion and each
+    class is searched once.
+    Based on python's attribute resolution, in this case, attributes
+    are searched as follows:
+    1. MySQLCursorPreparedDict (current class)
+    2. MySQLCursorDict (left parent class)
+    3. MySQLCursorPrepared (right parent class)
+    4. MySQLCursor (base class)
+    """
+
+    def fetchmany(
+        self, size: Optional[int] = None
+    ) -> List[Dict[str, ToPythonOutputTypes]]:
+        """Return the next set of rows of a query result set.
+
+        When no more rows are available, it returns an empty list.
+        The number of rows returned can be specified using the size argument,
+        which defaults to one.
+
+        Returns:
+            list: The next set of rows of a query result set represented
+                  as a list of dictionaries where column names are used as keys.
+        """
+        return [
+            self._row_to_python(row, self.description)
+            for row in super().fetchmany(size=size)
+            if row
+        ]

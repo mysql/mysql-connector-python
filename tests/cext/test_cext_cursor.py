@@ -54,6 +54,7 @@ from mysql.connector.cursor_cext import (
     CMySQLCursor,
     CMySQLCursorBuffered,
     CMySQLCursorPrepared,
+    CMySQLCursorPreparedDict,
     CMySQLCursorRaw,
 )
 
@@ -1032,3 +1033,117 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.assertEqual(len(rows), 4)
         self.assertEqual(rows[0][1:], self.exp)
         self.assertEqual(rows[1][1:], self.exp)
+
+
+class CMySQLCursorPreparedDictTests(CMySQLCursorPreparedTests):
+
+    tbl = "prep_dict_stmt"
+
+    column_names = (
+        "my_null",
+        "my_bit",
+        "my_tinyint",
+        "my_smallint",
+        "my_mediumint",
+        "my_int",
+        "my_bigint",
+        "my_decimal",
+        "my_float",
+        "my_double",
+        "my_date",
+        "my_time",
+        "my_datetime",
+        "my_year",
+        "my_char",
+        "my_varchar",
+        "my_enum",
+        "my_geometry",
+        "my_blob",
+    )
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = CMySQLConnection(**config)
+        self.cur = self.cnx.cursor(prepared=True, dictionary=True)
+        self.cur.execute(self.create_table_stmt.format(self.tbl))
+
+    def tearDown(self):
+        self.cur.execute("DROP TABLE IF EXISTS {0}".format(self.tbl))
+        self.cur.close()
+        self.cnx.close()
+
+    def test___init__(self):
+        self.assertIsInstance(self.cur, CMySQLCursorPreparedDict)
+
+    def test_close(self):
+        cur = self.cnx.cursor(prepared=True, dictionary=True)
+        self.assertEqual(None, cur._stmt)
+        cur.close()
+
+    def test_fetchone(self):
+        self.cur.execute(self.insert_stmt.format(self.tbl), self.data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        row = self.cur.fetchone()
+        del row["id"]
+        self.assertEqual(row, dict(zip(self.column_names, self.exp)))
+        row = self.cur.fetchone()
+        self.assertIsNone(row)
+
+    def test_fetchall(self):
+        self.cur.execute(self.insert_stmt.format(self.tbl), self.data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        rows = self.cur.fetchall()
+        self.assertEqual(len(rows), 1)
+        del rows[0]["id"]
+        self.assertEqual(rows[0], dict(zip(self.column_names, self.exp)))
+
+    def test_fetchmany(self):
+        data = [self.data[:], self.data[:], self.data[:]]
+        self.cur.executemany(self.insert_stmt.format(self.tbl), data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        rows = self.cur.fetchmany(size=2)
+        del rows[0]["id"]
+        del rows[1]["id"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], dict(zip(self.column_names, self.exp)))
+        self.assertEqual(rows[1], dict(zip(self.column_names, self.exp)))
+
+        rows = self.cur.fetchmany(1)
+        del rows[0]["id"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0], dict(zip(self.column_names, self.exp)))
+
+    def test_execute(self):
+        # Use dict as placeholders
+        data_dict = dict(zip(self.insert_columns, self.data))
+
+        self.cur.execute(self.insert_dict_stmt.format(self.tbl), data_dict)
+        self.cur.execute(f"SELECT * FROM {self.tbl}")
+        rows = self.cur.fetchall()
+        del rows[0]["id"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0], dict(zip(self.column_names, self.exp)))
+
+    def test_executemany(self):
+        data = [self.data[:], self.data[:]]
+        self.cur.executemany(self.insert_stmt.format(self.tbl), data)
+        self.cur.execute("SELECT * FROM {0}".format(self.tbl))
+        rows = self.cur.fetchall()
+        del rows[0]["id"]
+        del rows[1]["id"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], dict(zip(self.column_names, self.exp)))
+        self.assertEqual(rows[1], dict(zip(self.column_names, self.exp)))
+
+        # Use dict as placeholders
+        data_dict = dict(zip(self.insert_columns, self.data))
+        data = [data_dict, copy.deepcopy(data_dict)]
+
+        self.cur.executemany(self.insert_dict_stmt.format(self.tbl), data)
+        self.cur.execute(f"SELECT * FROM {self.tbl}")
+        rows = self.cur.fetchall()
+        del rows[0]["id"]
+        del rows[1]["id"]
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows[0], dict(zip(self.column_names, self.exp)))
+        self.assertEqual(rows[1], dict(zip(self.column_names, self.exp)))
