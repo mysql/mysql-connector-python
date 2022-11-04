@@ -41,7 +41,6 @@ from .constants import CharacterSet, FieldFlag, FieldType
 from .custom_types import HexLiteral
 from .types import (
     DescriptionType,
-    EscapeSupportedTypes,
     RowType,
     StrOrBytes,
     ToMysqlInputTypes,
@@ -170,7 +169,7 @@ class MySQLConverter(MySQLConverterBase):
         ] = {}
 
     @staticmethod
-    def escape(value: EscapeSupportedTypes) -> EscapeSupportedTypes:
+    def escape(value: Any) -> Any:
         """
         Escapes special characters as they are expected to by when MySQL
         receives them.
@@ -178,10 +177,6 @@ class MySQLConverter(MySQLConverterBase):
 
         Returns the value if not a string, or the escaped string.
         """
-        if value is None:
-            return value
-        if isinstance(value, NUMERIC_TYPES):
-            return value
         if isinstance(value, (bytes, bytearray)):
             value = value.replace(b"\\", b"\\\\")
             value = value.replace(b"\n", b"\\n")
@@ -189,8 +184,8 @@ class MySQLConverter(MySQLConverterBase):
             value = value.replace(b"\047", b"\134\047")  # single quotes
             value = value.replace(b"\042", b"\134\042")  # double quotes
             value = value.replace(b"\032", b"\134\032")  # for Win32
-        else:
-            value = value.replace("\\", "\\\\")  # type: ignore[union-attr]
+        elif isinstance(value, str) and not isinstance(value, HexLiteral):
+            value = value.replace("\\", "\\\\")
             value = value.replace("\n", "\\n")
             value = value.replace("\r", "\\r")
             value = value.replace("\047", "\134\047")  # single quotes

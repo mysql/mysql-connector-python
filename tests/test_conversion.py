@@ -189,6 +189,10 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             int(1281288),  # should stay the same
             float(3.14),  # should stay the same
             Decimal("3.14"),  # should stay a Decimal
+            datetime.date(2022, 11, 7),
+            datetime.timedelta(hours=35, minutes=34, seconds=10),
+            datetime.datetime(2022, 11, 4, 9, 11, 0),
+            time.strptime("30 Nov 2022", "%d %b %Y"),
             r"back\slash",
             "newline\n",
             "return\r",
@@ -202,6 +206,10 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
             1281288,
             float(3.14),
             Decimal("3.14"),
+            datetime.date(2022, 11, 7),
+            datetime.timedelta(hours=35, minutes=34, seconds=10),
+            datetime.datetime(2022, 11, 4, 9, 11, 0),
+            time.strptime("30 Nov 2022", "%d %b %Y"),
             "back\\\\slash",
             "newline\\n",
             "return\\r",

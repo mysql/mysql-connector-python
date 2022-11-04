@@ -35,18 +35,13 @@ from django.db.backends.mysql.schema import (
     DatabaseSchemaEditor as MySQLDatabaseSchemaEditor,
 )
 
-from mysql.connector.types import EscapeSupportedTypes
-
 
 class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
     """This class is responsible for emitting schema-changing statements to the
     databases.
     """
 
-    def quote_value(
-        self,
-        value: EscapeSupportedTypes,
-    ) -> EscapeSupportedTypes:
+    def quote_value(self, value: Any) -> Any:
         """Quote value."""
         self.connection.ensure_connection()
         if isinstance(value, str):

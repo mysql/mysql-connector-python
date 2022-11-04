@@ -30,6 +30,7 @@ v8.0.32
 - BUG#24364556: Improve warning behavior
 - BUG#23342572: Allow dictionaries as parameters in prepared statements
 - BUG#23339387: Add MySQLCursorPreparedDict option
+- BUG#22906307: MySQLConverter.escape() does not work for dates
 
 v8.0.31
 =======

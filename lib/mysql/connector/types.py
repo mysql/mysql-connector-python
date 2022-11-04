@@ -55,7 +55,6 @@ ToMysqlInputTypes = Optional[
     ]
 ]
 ToMysqlOutputTypes = Optional[Union[int, float, bytes, "HexLiteral"]]
-EscapeSupportedTypes = Optional[Union[int, float, Decimal, "HexLiteral", StrOrBytes]]
 
 
 """ Network """
