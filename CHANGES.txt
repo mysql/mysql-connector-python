@@ -31,6 +31,7 @@ v8.0.32
 - BUG#23342572: Allow dictionaries as parameters in prepared statements
 - BUG#23339387: Add MySQLCursorPreparedDict option
 - BUG#22906307: MySQLConverter.escape() does not work for dates
+- BUG#20504804: cursor.executemany() fails with INSERT IGNORE
 
 v8.0.31
 =======

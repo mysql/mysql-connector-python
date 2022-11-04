@@ -7321,3 +7321,48 @@ class BugOra34467201(tests.MySQLConnectorTests):
             cur.execute(f"SELECT @{self.var_name}")
             res = cur.fetchall()
             self.assertEqual((self.var_value,), res[0])
+
+
+class BugOra20504804(tests.MySQLConnectorTests):
+    """BUG#20504804: cursor.executemany() fails with INSERT IGNORE
+
+    When using INSERT IGNORE with cursor.executemany(), not all parameters
+    are added to the INSERT statement.
+
+    This patch fixes this issue by adding IGNORE in the regular expression
+    used to build the INSERT statement.
+    """
+
+    table_name = "BugOra20504804"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.table_name} (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(128)
+                    )
+                    """
+                )
+            cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_executemany_insert_ignore(self):
+        with self.cnx.cursor() as cur:
+            cur.executemany(
+                f"INSERT IGNORE INTO {self.table_name} (name) VALUES (%s)",
+                [("Foo",), ("Bar",)],
+            )
+            self.assertEqual(
+                f"INSERT IGNORE INTO {self.table_name} (name) VALUES ('Foo'),('Bar')",
+                cur.statement,
+            )
