@@ -681,7 +681,9 @@ class CharacterSet(_Constants):
     """
 
     # Use LTS character set as default
-    desc: List[Optional[Tuple[str, str, bool]]] = MYSQL_CHARACTER_SETS_57  # type: ignore[assignment]
+    desc: List[
+        Optional[Tuple[str, str, bool]]
+    ] = MYSQL_CHARACTER_SETS_57  # type: ignore[assignment]
     mysql_version: Tuple[int, ...] = (5, 7)
 
     # Multi-byte character sets which use 5c (backslash) in characters
