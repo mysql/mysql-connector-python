@@ -611,20 +611,19 @@ class DjangoMySQLConverter(MySQLConverter):
         """Connector/Python always returns naive datetime.datetime
 
         Connector/Python always returns naive timestamps since MySQL has
-        no time zone support. Since Django needs non-naive, we need to add
-        the UTC time zone.
+        no time zone support.
+
+        - A naive datetime is a datetime that doesn't know its own timezone.
+
+        Django needs a non-naive datetime, but in this method we don't need
+        to make a datetime value time zone aware since Django itself at some
+        point will make it aware (at least in versions 3.2.16 and 4.1.2) when
+        USE_TZ=True. This may change in a future release, we need to keep an
+        eye on this behaviour.
 
         Returns datetime.datetime()
         """
-        if not value:
-            return None
-
-        dt: Optional[datetime] = MySQLConverter._datetime_to_python(value)
-        if dt is None:
-            return None
-        if settings.USE_TZ and timezone.is_naive(dt):
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        return MySQLConverter._datetime_to_python(value) if value else None
 
     # pylint: enable=unused-argument
 
