@@ -429,9 +429,12 @@ class Message:
             else:
                 getattr(self._msg, name).MergeFrom(value)
         else:
-            self._msg[name] = (
-                value.get_message() if isinstance(value, Message) else value
-            )
+            if isinstance(value, str):
+                self._msg[name] = encode_to_bytes(value)
+            else:
+                self._msg[name] = (
+                    value.get_message() if isinstance(value, Message) else value
+                )
 
     def __getattr__(self, name):
         try:

@@ -44,6 +44,8 @@ import unittest
 import mysqlx
 import tests
 
+from tests import foreach_session
+
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 ARCH_64BIT = sys.maxsize > 2**32 and sys.platform != "win32"
 
@@ -4254,3 +4256,38 @@ class MySQLxViewTests(tests.MySQLxTests):
         self.assertEqual("active", col.get_column_name())
         self.assertEqual(self.view_name, col.get_table_name())
         self.assertEqual(mysqlx.ColumnType.BIT, col.get_type())
+
+
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
+class BugOra33904362(tests.MySQLxTests):
+    """BUG#33904362: mysqlx (X DevAPI) does not work properly with Russian characters
+
+    Russian characters are not handled correctly in queries using the MySQL
+    Connector/Python DevAPI driver because the query message gets corrupted
+    when encoded before being sent over by protobuf. The issue appears
+    on the c-ext only.
+    """
+
+    @foreach_session()
+    def test_russian_characters(self):
+        table_name = "BugOra33904362"
+
+        # create table
+        self.session.sql(f"DROP TABLE IF EXISTS {table_name}").execute()
+        self.session.sql(f"CREATE TABLE {table_name}(name VARCHAR(255))").execute()
+
+        # populate table
+        self.session.sql(f"INSERT INTO {table_name} VALUES('света')").execute()
+
+        # run query and test it
+        sql = f"SELECT name n1, name FROM {table_name} WHERE name like'све%'"
+        result = self.session.sql(sql).execute()
+        res = result.fetch_one()
+        self.assertEqual(res[0], "света")
+
+        sql = f"SELECT name n1, name FROM {table_name} WHERE name like?"
+        result = self.session.sql(sql).bind("све%%сс").execute()
+        res = result.fetch_one()
+        self.assertEqual(res, None)
+
+        self.session.sql(f"DROP TABLE IF EXISTS {table_name}").execute()
