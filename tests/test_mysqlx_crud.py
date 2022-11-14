@@ -4271,16 +4271,19 @@ class BugOra33904362(tests.MySQLxTests):
     @foreach_session()
     def test_russian_characters(self):
         table_name = "BugOra33904362"
+        charset = "utf8mb4"
 
         # create table
         self.session.sql(f"DROP TABLE IF EXISTS {table_name}").execute()
-        self.session.sql(f"CREATE TABLE {table_name}(name VARCHAR(255))").execute()
+        self.session.sql(
+            f"CREATE TABLE {table_name}(name VARCHAR(255)) DEFAULT CHARSET={charset}"
+        ).execute()
 
         # populate table
         self.session.sql(f"INSERT INTO {table_name} VALUES('света')").execute()
 
         # run query and test it
-        sql = f"SELECT name n1, name FROM {table_name} WHERE name like'све%'"
+        sql = f"SELECT name n1, name FROM {table_name} WHERE name like 'све%'"
         result = self.session.sql(sql).execute()
         res = result.fetch_one()
         self.assertEqual(res[0], "света")
