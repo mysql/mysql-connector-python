@@ -56,7 +56,6 @@ except ImportError:
     TLS_VERSIONS = {}
 
 import json
-import logging
 import os
 import platform
 import queue
@@ -106,6 +105,7 @@ from .errors import (
     TimeoutError,
 )
 from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
+from .logger import logger
 from .protobuf import Protobuf
 from .protocol import HAVE_LZ4, HAVE_ZSTD, MessageReader, MessageWriter, Protocol
 from .result import BaseResult, DocResult, Result, RowResult, SqlResult
@@ -211,7 +211,6 @@ _SESS_OPTS = _SSL_OPTS + [
     "compression-algorithms",
     "dns-srv",
 ]
-_LOGGER = logging.getLogger("mysqlx")
 
 
 def generate_pool_name(**kwargs: Any) -> str:
@@ -874,7 +873,7 @@ class Connection:
 
         if self.stream.is_socket():
             if self.settings.get("ssl-mode"):
-                _LOGGER.warning("SSL not required when using Unix socket.")
+                logger.warning("SSL not required when using Unix socket.")
             return
 
         if "tls" not in caps:
@@ -944,7 +943,7 @@ class Connection:
             msg = "Compression requested but the server does not support it"
             if compression == Compression.REQUIRED:
                 raise NotSupportedError(msg)
-            _LOGGER.warning(msg)
+            logger.warning(msg)
             return None
 
         compression_dict = {}
@@ -1002,7 +1001,7 @@ class Connection:
             )
             if compression == Compression.REQUIRED:
                 raise InterfaceError(msg)
-            _LOGGER.warning(msg)
+            logger.warning(msg)
             return None
 
         self.protocol.set_capabilities(compression={"algorithm": algorithm})
@@ -1419,7 +1418,7 @@ class Connection:
             self.protocol.send_close()
             self.protocol.read_ok()
         except (InterfaceError, OperationalError, OSError) as err:
-            _LOGGER.warning(
+            logger.warning(
                 "Warning: An error occurred while attempting to close the "
                 "connection: %s",
                 err,
@@ -1438,7 +1437,7 @@ class Connection:
         try:
             self.keep_open = self.protocol.send_reset(self.keep_open)
         except (InterfaceError, OperationalError) as err:
-            _LOGGER.warning(
+            logger.warning(
                 "Warning: An error occurred while attempting to reset the "
                 "session: %s",
                 err,
@@ -1713,7 +1712,7 @@ class ConnectionPool(queue.Queue):
         .. versionadded:: 8.0.20
         """
         if self._available:
-            _LOGGER.warning(
+            logger.warning(
                 "ConnectionPool.set_unavailable pool: %s time_out: %s",
                 self,
                 time_out,

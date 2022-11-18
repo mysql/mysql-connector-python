@@ -32,7 +32,6 @@
 
 import datetime
 import getpass
-import logging
 import os
 import socket
 import struct
@@ -93,6 +92,7 @@ from .errors import (
     ProgrammingError,
     get_exception,
 )
+from .logger import logger
 from .network import MySQLTCPSocket, MySQLUnixSocket
 from .plugins import BaseAuthPlugin
 from .protocol import MySQLProtocol
@@ -110,10 +110,6 @@ from .types import (
     SupportedMysqlBinaryProtocolTypes,
 )
 from .utils import get_platform, int1store, int4store, lc_int
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class MySQLConnection(MySQLConnectionAbstract):
@@ -283,7 +279,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         if self._password1 and password != self._password1:
             password = self._password1
 
-        _LOGGER.debug("# _do_auth(): self._auth_plugin: %s", self._auth_plugin)
+        logger.debug("# _do_auth(): self._auth_plugin: %s", self._auth_plugin)
         if (
             self._auth_plugin.startswith("authentication_oci")
             or (
@@ -292,7 +288,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             )
         ) and not username:
             username = getpass.getuser()
-            _LOGGER.debug(
+            logger.debug(
                 "MySQL user is empty, OS user: %s will be used for %s",
                 username,
                 self._auth_plugin,
@@ -330,7 +326,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         new_auth_plugin: Optional[str] = (
             self._auth_plugin or self._handshake["auth_plugin"]
         )
-        _LOGGER.debug("new_auth_plugin: %s", new_auth_plugin)
+        logger.debug("new_auth_plugin: %s", new_auth_plugin)
         packet = self._socket.recv()
         if packet[4] == 254 and len(packet) == 5:
             raise NotSupportedError(
@@ -383,7 +379,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 "Failed Multi Factor Authentication (invalid N factor)"
             )
 
-        _LOGGER.debug("# MFA N Factor #%d", self._mfa_nfactor)
+        logger.debug("# MFA N Factor #%d", self._mfa_nfactor)
 
         packet, auth_plugin = self._protocol.parse_auth_next_factor(packet[4:])
         auth = get_auth_plugin(auth_plugin, self._auth_plugin_class)(
@@ -418,21 +414,21 @@ class MySQLConnection(MySQLConnectionAbstract):
     ) -> bytearray:
         """Continue with the authentication."""
         if auth_plugin == "authentication_ldap_sasl_client":
-            _LOGGER.debug("# auth_data: %s", auth_data)
+            logger.debug("# auth_data: %s", auth_data)
             response = auth.auth_response(self._krb_service_principal)
         elif auth_plugin == "authentication_kerberos_client":
-            _LOGGER.debug("# auth_data: %s", auth_data)
+            logger.debug("# auth_data: %s", auth_data)
             response = auth.auth_response(auth_data)
         elif auth_plugin == "authentication_oci_client":
-            _LOGGER.debug("# oci configuration file path: %s", self._oci_config_file)
+            logger.debug("# oci configuration file path: %s", self._oci_config_file)
             response = auth.auth_response(self._oci_config_file)
         else:
             response = auth.auth_response()
 
-        _LOGGER.debug("# request: %s size: %s", response, len(response))
+        logger.debug("# request: %s size: %s", response, len(response))
         self._socket.send(response)
         packet = self._socket.recv()
-        _LOGGER.debug("# server response packet: %s", packet)
+        logger.debug("# server response packet: %s", packet)
         if (
             auth_plugin == "authentication_ldap_sasl_client"
             and len(packet) >= 6
@@ -454,19 +450,19 @@ class MySQLConnection(MySQLConnectionAbstract):
             and packet[4] != 255
         ):
             rcode_size = 5  # header size for the response status code.
-            _LOGGER.debug("# Continue with sasl GSSAPI authentication")
-            _LOGGER.debug("# response header: %s", packet[: rcode_size + 1])
-            _LOGGER.debug("# response size: %s", len(packet))
+            logger.debug("# Continue with sasl GSSAPI authentication")
+            logger.debug("# response header: %s", packet[: rcode_size + 1])
+            logger.debug("# response size: %s", len(packet))
 
-            _LOGGER.debug("# Negotiate a service request")
+            logger.debug("# Negotiate a service request")
             complete = False
             tries = 0  # To avoid a infinite loop attempt no more than feedback messages
             while not complete and tries < 5:
-                _LOGGER.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
-                _LOGGER.debug("<< server response: %s", packet)
-                _LOGGER.debug("# response code: %s", packet[: rcode_size + 1])
+                logger.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
+                logger.debug("<< server response: %s", packet)
+                logger.debug("# response code: %s", packet[: rcode_size + 1])
                 step, complete = auth.auth_continue_krb(packet[rcode_size:])
-                _LOGGER.debug(" >> response to server: %s", step)
+                logger.debug(" >> response to server: %s", step)
                 self._socket.send(step or b"")
                 packet = self._socket.recv()
                 tries += 1
@@ -475,13 +471,13 @@ class MySQLConnection(MySQLConnectionAbstract):
                     f"Unable to fulfill server request after {tries} "
                     f"attempts. Last server response: {packet}"
                 )
-            _LOGGER.debug(
+            logger.debug(
                 " last GSSAPI response from server: %s length: %d",
                 packet,
                 len(packet),
             )
             last_step = auth.auth_accept_close_handshake(packet[rcode_size:])
-            _LOGGER.debug(
+            logger.debug(
                 " >> last response to server: %s length: %d",
                 last_step,
                 len(last_step),
@@ -489,24 +485,24 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._socket.send(last_step)
             # Receive final handshake from server
             packet = self._socket.recv()
-            _LOGGER.debug("<< final handshake from server: %s", packet)
+            logger.debug("<< final handshake from server: %s", packet)
 
             # receive OK packet from server.
             packet = self._socket.recv()
-            _LOGGER.debug("<< ok packet from server: %s", packet)
+            logger.debug("<< ok packet from server: %s", packet)
         elif auth_plugin == "authentication_kerberos_client" and packet[4] != 255:
             rcode_size = 5  # Reader size for the response status code
-            _LOGGER.debug("# Continue with GSSAPI authentication")
-            _LOGGER.debug("# Response header: %s", packet[: rcode_size + 1])
-            _LOGGER.debug("# Response size: %s", len(packet))
-            _LOGGER.debug("# Negotiate a service request")
+            logger.debug("# Continue with GSSAPI authentication")
+            logger.debug("# Response header: %s", packet[: rcode_size + 1])
+            logger.debug("# Response size: %s", len(packet))
+            logger.debug("# Negotiate a service request")
             complete = False
             tries = 0
 
             while not complete and tries < 5:
-                _LOGGER.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
-                _LOGGER.debug("<< Server response: %s", packet)
-                _LOGGER.debug("# Response code: %s", packet[: rcode_size + 1])
+                logger.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
+                logger.debug("<< Server response: %s", packet)
+                logger.debug("# Response code: %s", packet[: rcode_size + 1])
                 token, complete = auth.auth_continue(packet[rcode_size:])
                 if token:
                     self._socket.send(token)
@@ -514,7 +510,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                     break
                 packet = self._socket.recv()
 
-                _LOGGER.debug(">> Response to server: %s", token)
+                logger.debug(">> Response to server: %s", token)
                 tries += 1
 
             if not complete:
@@ -523,7 +519,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                     f"attempts. Last server response: {packet}"
                 )
 
-            _LOGGER.debug(
+            logger.debug(
                 "Last response from server: %s length: %d",
                 packet,
                 len(packet),
@@ -531,7 +527,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
             # Receive OK packet from server.
             packet = self._socket.recv()
-            _LOGGER.debug("<< Ok packet from server: %s", packet)
+            logger.debug("<< Ok packet from server: %s", packet)
 
         return packet
 

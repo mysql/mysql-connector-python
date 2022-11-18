@@ -30,13 +30,13 @@
 
 """OCI Authentication Plugin."""
 
-import logging
 import os
 
 from base64 import b64encode
 from typing import Any, Dict, Optional
 
 from .. import errors
+from ..logger import logger
 
 try:
     from cryptography.exceptions import UnsupportedAlgorithm
@@ -54,10 +54,6 @@ except ImportError:
     ) from None
 
 from . import BaseAuthPlugin
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-_LOGGER = logging.getLogger(__name__)
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLOCIAuthPlugin"
 
@@ -151,8 +147,8 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
     def auth_response(self, auth_data: Optional[str] = None) -> bytes:  # type: ignore[override]
         """Prepare authentication string for the server."""
         oci_path = auth_data
-        _LOGGER.debug("server nonce: %s, len %d", self._auth_data, len(self._auth_data))
-        _LOGGER.debug("OCI configuration file location: %s", oci_path)
+        logger.debug("server nonce: %s, len %d", self._auth_data, len(self._auth_data))
+        logger.debug("OCI configuration file location: %s", oci_path)
 
         oci_config = self._get_valid_oci_config(oci_path)
 
@@ -162,5 +158,5 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
         )
 
         auth_response = self._prepare_auth_response(signature, oci_config)
-        _LOGGER.debug("authentication response: %s", auth_response)
+        logger.debug("authentication response: %s", auth_response)
         return auth_response.encode()

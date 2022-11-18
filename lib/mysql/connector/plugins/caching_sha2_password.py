@@ -33,7 +33,7 @@ import struct
 from hashlib import sha256
 from typing import Optional
 
-from .. import errors
+from ..errors import InterfaceError
 from . import BaseAuthPlugin
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLCachingSHA2PasswordAuthPlugin"
@@ -59,7 +59,7 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
         XOR(SHA2(password), SHA2(SHA2(SHA2(password)), Nonce))
         """
         if not self._auth_data:
-            raise errors.InterfaceError("Missing authentication data (seed)")
+            raise InterfaceError("Missing authentication data (seed)")
 
         if not self._password:
             return b""
@@ -83,7 +83,7 @@ class MySQLCachingSHA2PasswordAuthPlugin(BaseAuthPlugin):
     def _full_authentication(self) -> bytes:
         """Returns password as as clear text"""
         if not self._ssl_enabled:
-            raise errors.InterfaceError(f"{self.plugin_name} requires SSL")
+            raise InterfaceError(f"{self.plugin_name} requires SSL")
         return super().prepare_password()
 
     def prepare_password(self) -> Optional[bytes]:

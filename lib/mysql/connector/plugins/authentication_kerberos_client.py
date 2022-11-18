@@ -31,21 +31,21 @@
 """Kerberos Authentication Plugin."""
 
 import getpass
-import logging
 import os
 import struct
 
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
-from .. import errors
+from ..errors import InterfaceError, ProgrammingError
+from ..logger import logger
 
 try:
     import gssapi
 except ImportError:
     gssapi = None
     if os.name != "nt":
-        raise errors.ProgrammingError(
+        raise ProgrammingError(
             "Module gssapi is required for GSSAPI authentication "
             "mechanism but was not found. Unable to authenticate "
             "with the server"
@@ -59,10 +59,6 @@ except ImportError:
     sspicon = None
 
 from . import BaseAuthPlugin
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-_LOGGER = logging.getLogger(__name__)
 
 AUTHENTICATION_PLUGIN_CLASS = (
     "MySQLSSPIKerberosAuthPlugin" if os.name == "nt" else "MySQLKerberosAuthPlugin"
@@ -97,7 +93,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             dict: Credentials store dictionary with the krb5 ccache name.
 
         Raises:
-            errors.InterfaceError: If 'KRB5CCNAME' environment variable is empty.
+            InterfaceError: If 'KRB5CCNAME' environment variable is empty.
         """
         krb5ccname = os.environ.get(
             "KRB5CCNAME",
@@ -106,10 +102,10 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             else Path("%TEMP%").joinpath("krb5cc"),
         )
         if not krb5ccname:
-            raise errors.InterfaceError(
+            raise InterfaceError(
                 "The 'KRB5CCNAME' environment variable is set to empty"
             )
-        _LOGGER.debug("Using krb5 ccache name: FILE:%s", krb5ccname)
+        logger.debug("Using krb5 ccache name: FILE:%s", krb5ccname)
         store = {b"ccache": f"FILE:{krb5ccname}".encode("utf-8")}
         return store
 
@@ -122,7 +118,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         Returns:
             gssapi.raw.creds.Creds: GSSAPI credentials.
         """
-        _LOGGER.debug("Attempt to acquire credentials through provided password")
+        logger.debug("Attempt to acquire credentials through provided password")
         user = gssapi.Name(upn, gssapi.NameType.user)
         password = self._password.encode("utf-8")
 
@@ -139,7 +135,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
                 set_default=True,
             )
         except gssapi.raw.misc.GSSError as err:
-            raise errors.ProgrammingError(
+            raise ProgrammingError(
                 f"Unable to acquire credentials with the given password: {err}"
             )
         return creds
@@ -186,16 +182,16 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
 
         upn = f"{self._username}@{realm}" if self._username else None
 
-        _LOGGER.debug("Service Principal: %s", spn)
-        _LOGGER.debug("Realm: %s", realm)
+        logger.debug("Service Principal: %s", spn)
+        logger.debug("Realm: %s", realm)
 
         try:
             # Attempt to retrieve credentials from cache file
             creds: Any = gssapi.Credentials(usage="initiate")
             creds_upn = str(creds.name)
 
-            _LOGGER.debug("Cached credentials found")
-            _LOGGER.debug("Cached credentials UPN: %s", creds_upn)
+            logger.debug("Cached credentials found")
+            logger.debug("Cached credentials UPN: %s", creds_upn)
 
             # Remove the realm from user
             if creds_upn.find("@") != -1:
@@ -208,7 +204,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
 
             # The user from cached credentials matches with the given user?
             if self._username and self._username != creds_user:
-                _LOGGER.debug(
+                logger.debug(
                     "The user from cached credentials doesn't match with the "
                     "given user"
                 )
@@ -220,12 +216,12 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             if upn and self._password is not None:
                 creds = self._acquire_cred_with_password(upn)
             else:
-                raise errors.InterfaceError(f"Credentials has expired: {err}")
+                raise InterfaceError(f"Credentials has expired: {err}")
         except gssapi.raw.misc.GSSError as err:
             if upn and self._password is not None:
                 creds = self._acquire_cred_with_password(upn)
             else:
-                raise errors.InterfaceError(
+                raise InterfaceError(
                     f"Unable to retrieve cached credentials error: {err}"
                 )
 
@@ -243,9 +239,9 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         try:
             initial_client_token: Optional[bytes] = self.context.step()
         except gssapi.raw.misc.GSSError as err:
-            raise errors.InterfaceError(f"Unable to initiate security context: {err}")
+            raise InterfaceError(f"Unable to initiate security context: {err}")
 
-        _LOGGER.debug("Initial client token: %s", initial_client_token)
+        logger.debug("Initial client token: %s", initial_client_token)
         return initial_client_token
 
     def auth_continue(
@@ -265,12 +261,12 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             tuple (bytearray TGS service request,
             bool True if context is completed otherwise False).
         """
-        _LOGGER.debug("tgt_auth challenge: %s", tgt_auth_challenge)
+        logger.debug("tgt_auth challenge: %s", tgt_auth_challenge)
 
         resp: Optional[bytes] = self.context.step(tgt_auth_challenge)
 
-        _LOGGER.debug("Context step response: %s", resp)
-        _LOGGER.debug("Context completed?: %s", self.context.complete)
+        logger.debug("Context step response: %s", resp)
+        logger.debug("Context completed?: %s", self.context.complete)
 
         return resp, self.context.complete
 
@@ -301,26 +297,26 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             bytearray (closing handshake message to be send to the server).
         """
         if not self.context.complete:
-            raise errors.ProgrammingError("Security context is not completed")
-        _LOGGER.debug("Server message: %s", message)
-        _LOGGER.debug("GSSAPI flags in use: %s", self.context.actual_flags)
+            raise ProgrammingError("Security context is not completed")
+        logger.debug("Server message: %s", message)
+        logger.debug("GSSAPI flags in use: %s", self.context.actual_flags)
         try:
             unwraped = self.context.unwrap(message)
-            _LOGGER.debug("Unwraped: %s", unwraped)
+            logger.debug("Unwraped: %s", unwraped)
         except gssapi.raw.exceptions.BadMICError as err:
-            _LOGGER.debug("Unable to unwrap server message: %s", err)
-            raise errors.InterfaceError(f"Unable to unwrap server message: {err}")
+            logger.debug("Unable to unwrap server message: %s", err)
+            raise InterfaceError(f"Unable to unwrap server message: {err}")
 
-        _LOGGER.debug("Unwrapped server message: %s", unwraped)
+        logger.debug("Unwrapped server message: %s", unwraped)
         # The message contents for the clients closing message:
         #   - security level 1 byte, must be always 1.
         #   - conciliated buffer size 3 bytes, without importance as no
         #     further GSSAPI messages will be sends.
         response = bytearray(b"\x01\x00\x00\00")
         # Closing handshake must not be encrypted.
-        _LOGGER.debug("Message response: %s", response)
+        logger.debug("Message response: %s", response)
         wraped = self.context.wrap(response, encrypt=False)
-        _LOGGER.debug(
+        logger.debug(
             "Wrapped message response: %s, length: %d",
             wraped[0],
             len(wraped[0]),
@@ -365,7 +361,7 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
 
     def auth_response(self, auth_data: Optional[bytes] = None) -> Optional[bytes]:
         """Prepare the first message to the server."""
-        _LOGGER.debug("auth_response for sspi")
+        logger.debug("auth_response for sspi")
         spn = None
         realm = None
 
@@ -375,11 +371,11 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
             except struct.error as err:
                 raise InterruptedError(f"Invalid authentication data: {err}") from err
 
-        _LOGGER.debug("Service Principal: %s", spn)
-        _LOGGER.debug("Realm: %s", realm)
+        logger.debug("Service Principal: %s", spn)
+        logger.debug("Realm: %s", realm)
 
         if sspicon is None or sspi is None:
-            raise errors.ProgrammingError(
+            raise ProgrammingError(
                 'Package "pywin32" (Python for Win32 (pywin32) extensions)'
                 " is not installed."
             )
@@ -392,8 +388,8 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
             _auth_info = None
 
         targetspn = spn
-        _LOGGER.debug("targetspn: %s", targetspn)
-        _LOGGER.debug("_auth_info is None: %s", _auth_info is None)
+        logger.debug("targetspn: %s", targetspn)
+        logger.debug("_auth_info is None: %s", _auth_info is None)
 
         # The Security Support Provider Interface (SSPI) is an interface
         # that allows us to choose from a set of SSPs available in the
@@ -425,17 +421,15 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
         try:
             data = None
             err, out_buf = self.clientauth.authorize(data)
-            _LOGGER.debug("Context step err: %s", err)
-            _LOGGER.debug("Context step out_buf: %s", out_buf)
-            _LOGGER.debug("Context completed?: %s", self.clientauth.authenticated)
+            logger.debug("Context step err: %s", err)
+            logger.debug("Context step out_buf: %s", out_buf)
+            logger.debug("Context completed?: %s", self.clientauth.authenticated)
             initial_client_token = out_buf[0].Buffer
-            _LOGGER.debug("pkg_info: %s", self.clientauth.pkg_info)
+            logger.debug("pkg_info: %s", self.clientauth.pkg_info)
         except Exception as err:
-            raise errors.InterfaceError(
-                f"Unable to initiate security context: {err}"
-            ) from err
+            raise InterfaceError(f"Unable to initiate security context: {err}") from err
 
-        _LOGGER.debug("Initial client token: %s", initial_client_token)
+        logger.debug("Initial client token: %s", initial_client_token)
         return initial_client_token
 
     def auth_continue(
@@ -455,14 +449,14 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
             tuple (bytearray TGS service request,
             bool True if context is completed otherwise False).
         """
-        _LOGGER.debug("tgt_auth challenge: %s", tgt_auth_challenge)
+        logger.debug("tgt_auth challenge: %s", tgt_auth_challenge)
 
         err, out_buf = self.clientauth.authorize(tgt_auth_challenge)
 
-        _LOGGER.debug("Context step err: %s", err)
-        _LOGGER.debug("Context step out_buf: %s", out_buf)
+        logger.debug("Context step err: %s", err)
+        logger.debug("Context step out_buf: %s", out_buf)
         resp = out_buf[0].Buffer
-        _LOGGER.debug("Context step resp: %s", resp)
-        _LOGGER.debug("Context completed?: %s", self.clientauth.authenticated)
+        logger.debug("Context step resp: %s", resp)
+        logger.debug("Context completed?: %s", self.clientauth.authenticated)
 
         return resp, self.clientauth.authenticated

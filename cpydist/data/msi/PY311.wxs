@@ -71,6 +71,8 @@
          Source="$(var.BDist311)\mysqlx\expr.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_helperspy311" Name="helpers.$(var.PyExt)"
          Source="$(var.BDist311)\mysqlx\helpers.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_loggerpy311" Name="logger.$(var.PyExt)"
+         Source="$(var.BDist311)\mysqlx\logger.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_protocolpy311" Name="protocol.$(var.PyExt)"
          Source="$(var.BDist311)\mysqlx\protocol.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_resultpy311" Name="result.$(var.PyExt)"
@@ -198,6 +200,8 @@
          Source="$(var.BDist311)\mysql\connector\errors.$(var.PyExt)" DiskId="1"/>
         <File Id="errorcodepy311" Name="errorcode.$(var.PyExt)"
          Source="$(var.BDist311)\mysql\connector\errorcode.$(var.PyExt)" DiskId="1"/>
+        <File Id="loggerpy311" Name="logger.$(var.PyExt)"
+         Source="$(var.BDist311)\mysql\connector\logger.$(var.PyExt)" DiskId="1"/>
         <File Id="networkpy311" Name="network.$(var.PyExt)"
          Source="$(var.BDist311)\mysql\connector\network.$(var.PyExt)" DiskId="1"/>
         <File Id="protocolpy311" Name="protocol.$(var.PyExt)"

@@ -28,7 +28,6 @@
 
 """Implementation of the X protocol for MySQL servers."""
 
-import logging
 import struct
 import zlib
 
@@ -64,6 +63,7 @@ from .expr import (
     build_unsigned_int_scalar,
 )
 from .helpers import encode_to_bytes, get_item_or_attr
+from .logger import logger
 from .protobuf import (
     CRUD_PREPARE_MAPPING,
     PROTOBUF_REPEATED_TYPES,
@@ -96,7 +96,6 @@ from .types import (
 )
 
 _COMPRESSION_THRESHOLD = 1000
-_LOGGER = logging.getLogger("mysqlx")
 
 
 class Compressor:
@@ -496,7 +495,7 @@ class Protocol:
         if msg["type"] == 1:
             warn_msg = Message.from_message("Mysqlx.Notice.Warning", msg["payload"])
             self._warnings.append(warn_msg.msg)
-            _LOGGER.warning(
+            logger.warning(
                 "Protocol.process_frame Received Warning Notice code %s: %s",
                 warn_msg.code,
                 warn_msg.msg,

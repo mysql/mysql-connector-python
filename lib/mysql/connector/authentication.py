@@ -29,17 +29,13 @@
 """Implementing support for MySQL Authentication Plugins"""
 
 import importlib
-import logging
 
 from functools import lru_cache
 from typing import Optional, Type
 
 from .errors import NotSupportedError, ProgrammingError
+from .logger import logger
 from .plugins import BaseAuthPlugin
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PLUGINS_PKG = "mysql.connector.plugins"
 
@@ -67,15 +63,15 @@ def get_auth_plugin(
     package = DEFAULT_PLUGINS_PKG
     if plugin_name:
         try:
-            _LOGGER.info("package: %s", package)
-            _LOGGER.info("plugin_name: %s", plugin_name)
+            logger.info("package: %s", package)
+            logger.info("plugin_name: %s", plugin_name)
             plugin_module = importlib.import_module(f".{plugin_name}", package)
             if not auth_plugin_class or not hasattr(plugin_module, auth_plugin_class):
                 auth_plugin_class = plugin_module.AUTHENTICATION_PLUGIN_CLASS
-            _LOGGER.info("AUTHENTICATION_PLUGIN_CLASS: %s", auth_plugin_class)
+            logger.info("AUTHENTICATION_PLUGIN_CLASS: %s", auth_plugin_class)
             return getattr(plugin_module, auth_plugin_class)
         except ModuleNotFoundError as err:
-            _LOGGER.warning("Requested Module was not found: %s", err)
+            logger.warning("Requested Module was not found: %s", err)
         except ValueError as err:
             raise ProgrammingError(f"Invalid module name: {err}") from err
     raise NotSupportedError(f"Authentication plugin '{plugin_name}' is not supported")

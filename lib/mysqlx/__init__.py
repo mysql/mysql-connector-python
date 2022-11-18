@@ -28,8 +28,6 @@
 
 """MySQL X DevAPI Python implementation."""
 
-import logging
-
 from .connection import Client, Session, get_client, get_session
 from .constants import Auth, Compression, LockContention, SSLMode
 from .crud import Collection, Schema, Table, View
@@ -75,8 +73,6 @@ from .statement import (
     UpdateStatement,
     WriteStatement,
 )
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     # mysqlx.connection
