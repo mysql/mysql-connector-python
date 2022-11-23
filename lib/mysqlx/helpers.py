@@ -34,14 +34,17 @@ import functools
 import inspect
 import warnings
 
+from typing import Any, Callable, List, Optional, Union
+
 from .constants import TLS_CIPHER_SUITES, TLS_VERSIONS
 from .errors import InterfaceError
+from .types import EscapeTypes, StrOrBytes
 
 BYTE_TYPES = (bytearray, bytes)
 NUMERIC_TYPES = (int, float, decimal.Decimal)
 
 
-def encode_to_bytes(value, encoding="utf-8"):
+def encode_to_bytes(value: StrOrBytes, encoding: str = "utf-8") -> bytes:
     """Returns an encoded version of the string as a bytes object.
 
     Args:
@@ -53,7 +56,7 @@ def encode_to_bytes(value, encoding="utf-8"):
     return value if isinstance(value, bytes) else value.encode(encoding)
 
 
-def decode_from_bytes(value, encoding="utf-8"):
+def decode_from_bytes(value: StrOrBytes, encoding: str = "utf-8") -> str:
     """Returns a string decoded from the given bytes.
 
     Args:
@@ -66,7 +69,7 @@ def decode_from_bytes(value, encoding="utf-8"):
     return value.decode(encoding) if isinstance(value, bytes) else value
 
 
-def get_item_or_attr(obj, key):
+def get_item_or_attr(obj: object, key: str) -> Any:
     """Get item from dictionary or attribute from object.
 
     Args:
@@ -79,7 +82,7 @@ def get_item_or_attr(obj, key):
     return obj[key] if isinstance(obj, dict) else getattr(obj, key)
 
 
-def escape(*args):
+def escape(*args: EscapeTypes) -> Union[EscapeTypes, List[EscapeTypes]]:
     """Escapes special characters as they are expected to be when MySQL
     receives them.
     As found in MySQL source mysys/charset.c
@@ -91,7 +94,7 @@ def escape(*args):
         str: The value if not a string, or the escaped string.
     """
 
-    def _escape(value):
+    def _escape(value: EscapeTypes) -> EscapeTypes:
         """Escapes special characters."""
         if value is None:
             return value
@@ -118,7 +121,7 @@ def escape(*args):
     return _escape(args[0])
 
 
-def quote_identifier(identifier, sql_mode=""):
+def quote_identifier(identifier: str, sql_mode: str = "") -> str:
     """Quote the given identifier with backticks, converting backticks (`)
     in the identifier name with the correct escape sequence (``) unless the
     identifier is quoted (") as in sql_mode set to ANSI_QUOTES.
@@ -136,12 +139,15 @@ def quote_identifier(identifier, sql_mode=""):
     return f"`{quoted}`"
 
 
-def deprecated(version=None, reason=None):
+def deprecated(version: Optional[str] = None, reason: Optional[str] = None) -> Callable:
     """This is a decorator used to mark functions as deprecated.
 
     Args:
         version (Optional[string]): Version when was deprecated.
         reason (Optional[string]): Reason or extra information to be shown.
+
+    Returns:
+        Callable: A decorator used to mark functions as deprecated.
 
     Usage:
 
@@ -154,11 +160,11 @@ def deprecated(version=None, reason=None):
            return x + y
     """
 
-    def decorate(func):
+    def decorate(func: Callable) -> Callable:
         """Decorate function."""
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Callable:
             """Wrapper function.
 
             Args:
@@ -184,12 +190,17 @@ def deprecated(version=None, reason=None):
     return decorate
 
 
-def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
+def iani_to_openssl_cs_name(
+    tls_version: str, cipher_suites_names: List[str]
+) -> List[str]:
     """Translates a cipher suites names list; from IANI names to OpenSSL names.
 
     Args:
         TLS_version (str): The TLS version to look at for a translation.
         cipher_suite_names (list): A list of cipher suites names.
+
+    Returns:
+        List[str]: List of translated names.
     """
     translated_names = []
 
@@ -211,13 +222,13 @@ def iani_to_openssl_cs_name(tls_version, cipher_suites_names):
     return translated_names
 
 
-def hexlify(data):
+def hexlify(data: bytes) -> str:
     """Return the hexadecimal representation of the binary data.
 
     Args:
-        data (str): The binary data.
+        data (bytes): The binary data.
 
     Returns:
-        bytes: The hexadecimal representation of data.
+        str: The decoded hexadecimal representation of data.
     """
     return binascii.hexlify(data).decode("utf-8")

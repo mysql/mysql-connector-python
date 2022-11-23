@@ -26,7 +26,13 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="index,attr-defined"
+
 """Implementation of communication for MySQL X servers."""
+
+from __future__ import annotations
+
+from types import TracebackType
 
 try:
     import ssl
@@ -61,6 +67,8 @@ import sys
 import threading
 import uuid
 import warnings
+
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, Union
 
 try:
     import dns.exception
@@ -101,7 +109,19 @@ from .helpers import escape, get_item_or_attr, iani_to_openssl_cs_name
 from .protobuf import Protobuf
 from .protocol import HAVE_LZ4, HAVE_ZSTD, MessageReader, MessageWriter, Protocol
 from .result import BaseResult, DocResult, Result, RowResult, SqlResult
-from .statement import AddStatement, SqlStatement, quote_identifier
+from .statement import (
+    AddStatement,
+    DeleteStatement,
+    FindStatement,
+    InsertStatement,
+    ModifyStatement,
+    RemoveStatement,
+    SelectStatement,
+    SqlStatement,
+    UpdateStatement,
+    quote_identifier,
+)
+from .types import ColumnType, MessageType, ResultBaseType, StatementType
 
 sys.path.append("..")
 
@@ -193,7 +213,7 @@ _SESS_OPTS = _SSL_OPTS + [
 _LOGGER = logging.getLogger("mysqlx")
 
 
-def generate_pool_name(**kwargs):
+def generate_pool_name(**kwargs: Any) -> str:
     """Generate a pool name.
 
     This function takes keyword arguments, usually the connection arguments and
@@ -221,7 +241,7 @@ def generate_pool_name(**kwargs):
     return "_".join(parts)
 
 
-def update_timeout_penalties_by_error(penalty_dict):
+def update_timeout_penalties_by_error(penalty_dict: Mapping[str, Any]) -> None:
     """Update the timeout penalties directory.
 
     Update the timeout penalties by error dictionary used to deactivate a pool.
@@ -235,13 +255,13 @@ def update_timeout_penalties_by_error(penalty_dict):
 class SocketStream:
     """Implements a socket stream."""
 
-    def __init__(self):
-        self._socket = None
-        self._is_ssl = False
-        self._is_socket = False
-        self._host = None
+    def __init__(self) -> None:
+        self._socket: Optional[socket.socket] = None
+        self._is_ssl: bool = False
+        self._is_socket: bool = False
+        self._host: Optional[str] = None
 
-    def connect(self, params, connect_timeout=_CONNECT_TIMEOUT):
+    def connect(self, params: Tuple, connect_timeout: float = _CONNECT_TIMEOUT) -> None:
         """Connects to a TCP service.
 
         Args:
@@ -253,7 +273,7 @@ class SocketStream:
         if connect_timeout is not None:
             connect_timeout = connect_timeout / 1000  # Convert to seconds
         try:
-            self._socket = socket.create_connection(params, connect_timeout)
+            self._socket = socket.create_connection(params, connect_timeout)  # type: ignore[arg-type]
             self._host = params[0]
         except ValueError:
             try:
@@ -265,7 +285,7 @@ class SocketStream:
                 raise InterfaceError("Unix socket unsupported") from None
         self._socket.settimeout(None)
 
-    def read(self, count):
+    def read(self, count: int) -> bytes:
         """Receive data from the socket.
 
         Args:
@@ -285,7 +305,7 @@ class SocketStream:
             count -= len(data)
         return b"".join(buf)
 
-    def sendall(self, data):
+    def sendall(self, data: bytes) -> None:
         """Send data to the socket.
 
         Args:
@@ -298,7 +318,7 @@ class SocketStream:
         except OSError as err:
             raise OperationalError(f"Unexpected socket error: {err}") from err
 
-    def close(self):
+    def close(self) -> None:
         """Close the socket."""
         if not self._socket:
             return
@@ -310,19 +330,19 @@ class SocketStream:
             pass
         self._socket = None
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.close()
 
     def set_ssl(
         self,
-        ssl_protos,
-        ssl_mode,
-        ssl_ca,
-        ssl_crl,
-        ssl_cert,
-        ssl_key,
-        ssl_ciphers,
-    ):
+        ssl_protos: List[str],
+        ssl_mode: str,
+        ssl_ca: str,
+        ssl_crl: str,
+        ssl_cert: str,
+        ssl_key: str,
+        ssl_ciphers: List[str],
+    ) -> None:
         """Set SSL parameters.
 
         Args:
@@ -441,7 +461,7 @@ class SocketStream:
             )
             warnings.warn(warn_msg, DeprecationWarning)
 
-    def is_ssl(self):
+    def is_ssl(self) -> bool:
         """Verifies if SSL is being used.
 
         Returns:
@@ -449,7 +469,7 @@ class SocketStream:
         """
         return self._is_ssl
 
-    def is_socket(self):
+    def is_socket(self) -> bool:
         """Verifies if socket connection is being used.
 
         Returns:
@@ -457,7 +477,7 @@ class SocketStream:
         """
         return self._is_socket
 
-    def is_secure(self):
+    def is_secure(self) -> bool:
         """Verifies if connection is secure.
 
         Returns:
@@ -465,7 +485,7 @@ class SocketStream:
         """
         return self._is_ssl or self._is_socket
 
-    def is_open(self):
+    def is_open(self) -> bool:
         """Verifies if connection is open.
 
         Returns:
@@ -474,7 +494,7 @@ class SocketStream:
         return self._socket is not None
 
 
-def catch_network_exception(func):
+def catch_network_exception(func: Callable) -> Callable:
     """Decorator used to catch OSError or RuntimeError.
 
     Raises:
@@ -483,7 +503,7 @@ def catch_network_exception(func):
     """
 
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         """Wrapper function."""
         try:
             if (
@@ -493,7 +513,7 @@ def catch_network_exception(func):
                 raise InterfaceError(*self.get_disconnected_reason())
             result = func(self, *args, **kwargs)
             if isinstance(result, BaseResult):
-                warns = result.get_warnings()
+                warns: Any = result.get_warnings()
                 for warn in warns:
                     if warn["code"] in CONNECTION_CLOSED_ERROR:
                         error_msg = CONNECTION_CLOSED_ERROR[warn["code"]]
@@ -544,12 +564,12 @@ class Router(dict):
     .. versionadded:: 8.0.20
     """
 
-    def __init__(self, connection_params):
+    def __init__(self, connection_params: Mapping[str, Any]) -> None:
         super().__init__()
         self.update(connection_params)
         self["available"] = self.get("available", True)
 
-    def available(self):
+    def available(self) -> bool:
         """Verifies if the Router is available to open connections.
 
         Returns:
@@ -557,11 +577,11 @@ class Router(dict):
         """
         return self["available"]
 
-    def set_unavailable(self):
+    def set_unavailable(self) -> None:
         """Sets this Router unavailable to open connections."""
         self["available"] = False
 
-    def get_connection_params(self):
+    def get_connection_params(self) -> Union[str, Tuple[str, Optional[int]]]:
         """Verifies if the Router is available to open connections.
 
         Returns:
@@ -581,17 +601,17 @@ class RouterManager:
     .. versionadded:: 8.0.20
     """
 
-    def __init__(self, routers, settings):
+    def __init__(self, routers: List[Router], settings: Dict[str, Any]) -> None:
         self._routers = routers
         self._settings = settings
-        self._cur_priority_idx = 0
-        self._can_failover = True
+        self._cur_priority_idx: int = 0
+        self._can_failover: bool = True
         # Reuters status
-        self._routers_directory = {}
-        self.routers_priority_list = []
+        self._routers_directory: Dict[int, List[Router]] = {}
+        self.routers_priority_list: List[int] = []
         self._ensure_priorities()
 
-    def _ensure_priorities(self):
+    def _ensure_priorities(self) -> None:
         """Ensure priorities.
 
         Raises:
@@ -626,7 +646,7 @@ class RouterManager:
             else:
                 self._routers_directory[priority].append(Router(router))
 
-    def _get_available_routers(self, priority):
+    def _get_available_routers(self, priority: int) -> List[Router]:
         """Get a list of the current available routers that shares the given priority.
 
         Returns:
@@ -636,7 +656,7 @@ class RouterManager:
         router_list = [router for router in router_list if router.available()]
         return router_list
 
-    def _get_random_connection_params(self, priority):
+    def _get_random_connection_params(self, priority: int) -> Router:
         """Get a random router from the group with the given priority.
 
         Returns:
@@ -652,7 +672,7 @@ class RouterManager:
         index = random.randint(0, last)
         return router_list[index]
 
-    def can_failover(self):
+    def can_failover(self) -> bool:
         """Returns the next connection parameters.
 
         Returns:
@@ -660,7 +680,7 @@ class RouterManager:
         """
         return self._can_failover
 
-    def get_next_router(self):
+    def get_next_router(self) -> Router:
         """Returns the next connection parameters.
 
         Returns:
@@ -695,7 +715,7 @@ class RouterManager:
 
         return router
 
-    def get_routers_directory(self):
+    def get_routers_directory(self) -> Dict[int, List[Router]]:
         """Returns the directory containing all the routers managed.
 
         Returns:
@@ -711,45 +731,47 @@ class Connection:
         settings (dict): Dictionary with connection settings.
     """
 
-    def __init__(self, settings):
-        self.settings = settings
-        self.stream = SocketStream()
-        self.protocol = None
-        self.keep_open = None
-        self._user = settings.get("user")
-        self._password = settings.get("password")
-        self._schema = settings.get("schema")
-        self._active_result = None
-        self._routers = settings.get("routers", [])
+    def __init__(self, settings: Dict[str, Any]) -> None:
+        self.settings: Dict[str, Any] = settings
+        self.stream: SocketStream = SocketStream()
+        self.protocol: Optional[Protocol] = None
+        self.keep_open: Optional[bool] = None
+        self._user: Optional[str] = settings.get("user")
+        self._password: Optional[str] = settings.get("password")
+        self._schema: Optional[str] = settings.get("schema")
+        self._active_result: Optional[ResultBaseType] = None
+        self._routers: List[Router] = settings.get("routers", [])
 
         if "host" in settings and settings["host"]:
             self._routers.append(
-                {
+                {  # type: ignore[arg-type]
                     "host": settings.get("host"),
                     "port": settings.get("port", None),
                 }
             )
 
-        self.router_manager = RouterManager(self._routers, settings)
-        self._connect_timeout = settings.get("connect-timeout", _CONNECT_TIMEOUT)
+        self.router_manager: RouterManager = RouterManager(self._routers, settings)
+        self._connect_timeout: Optional[int] = settings.get(
+            "connect-timeout", _CONNECT_TIMEOUT
+        )
         if self._connect_timeout == 0:
             # None is assigned if connect timeout is 0, which disables timeouts
             # on socket operations
             self._connect_timeout = None
 
-        self._stmt_counter = 0
-        self._prepared_stmt_ids = []
-        self._prepared_stmt_supported = True
-        self._server_disconnected = False
-        self._server_disconnected_reason = None
+        self._stmt_counter: int = 0
+        self._prepared_stmt_ids: List[int] = []
+        self._prepared_stmt_supported: bool = True
+        self._server_disconnected: bool = False
+        self._server_disconnected_reason: Optional[Union[str, Tuple[str, int]]] = None
 
-    def fetch_active_result(self):
+    def fetch_active_result(self) -> None:
         """Fetch active result."""
         if self._active_result is not None:
             self._active_result.fetch_all()
             self._active_result = None
 
-    def set_active_result(self, result):
+    def set_active_result(self, result: ResultBaseType) -> None:
         """Set active result.
 
         Args:
@@ -760,7 +782,7 @@ class Connection:
         """
         self._active_result = result
 
-    def connect(self):
+    def connect(self) -> None:
         """Attempt to connect to the MySQL server.
 
         Raises:
@@ -774,7 +796,7 @@ class Connection:
             try:
                 router = self.router_manager.get_next_router()
                 self.stream.connect(
-                    router.get_connection_params(), self._connect_timeout
+                    router.get_connection_params(), self._connect_timeout  # type: ignore[arg-type]
                 )
                 reader = MessageReader(self.stream)
                 writer = MessageWriter(self.stream)
@@ -830,7 +852,7 @@ class Connection:
             raise InterfaceError(f"Cannot connect to host: {error}")
         raise InterfaceError("Unable to connect to any of the target hosts", 4001)
 
-    def _set_tls_capabilities(self, caps):
+    def _set_tls_capabilities(self, caps: Dict[str, Any]) -> None:
         """Set the TLS capabilities.
 
         Args:
@@ -884,7 +906,12 @@ class Connection:
             conn_attrs = self.settings["attributes"]
             self.protocol.set_capabilities(session_connect_attrs=conn_attrs)
 
-    def _set_compression_capabilities(self, caps, compression, algorithms=None):
+    def _set_compression_capabilities(
+        self,
+        caps: Dict[str, Any],
+        compression: str,
+        algorithms: Optional[List[str]] = None,
+    ) -> Optional[str]:
         """Set the compression capabilities.
 
         If compression is available, negociates client and server algorithms.
@@ -978,7 +1005,7 @@ class Connection:
         self.protocol.set_capabilities(compression={"algorithm": algorithm})
         return algorithm
 
-    def _authenticate(self):
+    def _authenticate(self) -> None:
         """Authenticate with the MySQL server."""
         auth = self.settings.get("auth")
         if auth:
@@ -1009,7 +1036,7 @@ class Connection:
                     f"password or try a secure connection err:{err}"
                 ) from err
 
-    def _authenticate_mysql41(self):
+    def _authenticate_mysql41(self) -> None:
         """Authenticate with the MySQL server using `MySQL41AuthPlugin`."""
         plugin = MySQL41AuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name())
@@ -1017,7 +1044,7 @@ class Connection:
         self.protocol.send_auth_continue(plugin.auth_data(extra_data))
         self.protocol.read_auth_ok()
 
-    def _authenticate_plain(self):
+    def _authenticate_plain(self) -> None:
         """Authenticate with the MySQL server using `PlainAuthPlugin`."""
         if not self.stream.is_secure():
             raise InterfaceError(
@@ -1027,7 +1054,7 @@ class Connection:
         self.protocol.send_auth_start(plugin.auth_name(), auth_data=plugin.auth_data())
         self.protocol.read_auth_ok()
 
-    def _authenticate_sha256_memory(self):
+    def _authenticate_sha256_memory(self) -> None:
         """Authenticate with the MySQL server using `Sha256MemoryAuthPlugin`."""
         plugin = Sha256MemoryAuthPlugin(self._user, self._password)
         self.protocol.send_auth_start(plugin.auth_name())
@@ -1035,7 +1062,7 @@ class Connection:
         self.protocol.send_auth_continue(plugin.auth_data(extra_data))
         self.protocol.read_auth_ok()
 
-    def _deallocate_statement(self, statement):
+    def _deallocate_statement(self, statement: StatementType) -> None:
         """Deallocates statement.
 
         Args:
@@ -1046,7 +1073,9 @@ class Connection:
             self._prepared_stmt_ids.remove(statement.stmt_id)
             statement.prepared = False
 
-    def _prepare_statement(self, msg_type, msg, statement):
+    def _prepare_statement(
+        self, msg_type: str, msg: MessageType, statement: StatementType
+    ) -> None:
         """Prepares a statement.
 
         Args:
@@ -1063,7 +1092,9 @@ class Connection:
         self._prepared_stmt_ids.append(statement.stmt_id)
         statement.prepared = True
 
-    def _execute_prepared_pipeline(self, msg_type, msg, statement):
+    def _execute_prepared_pipeline(
+        self, msg_type: str, msg: MessageType, statement: StatementType
+    ) -> None:
         """Executes the prepared statement pipeline.
 
         Args:
@@ -1114,7 +1145,7 @@ class Connection:
         statement.increment_exec_counter()
 
     @catch_network_exception
-    def send_sql(self, statement):
+    def send_sql(self, statement: SqlStatement) -> SqlResult:
         """Execute a SQL statement.
 
         Args:
@@ -1134,7 +1165,7 @@ class Connection:
         return SqlResult(self)
 
     @catch_network_exception
-    def send_insert(self, statement):
+    def send_insert(self, statement: Union[AddStatement, InsertStatement]) -> Result:
         """Send an insert statement.
 
         Args:
@@ -1154,7 +1185,9 @@ class Connection:
         return Result(self, ids)
 
     @catch_network_exception
-    def send_find(self, statement):
+    def send_find(
+        self, statement: Union[FindStatement, SelectStatement]
+    ) -> Union[DocResult, RowResult]:
         """Send an find statement.
 
         Args:
@@ -1170,7 +1203,7 @@ class Connection:
         return DocResult(self) if statement.is_doc_based() else RowResult(self)
 
     @catch_network_exception
-    def send_delete(self, statement):
+    def send_delete(self, statement: Union[DeleteStatement, RemoveStatement]) -> Result:
         """Send an delete statement.
 
         Args:
@@ -1185,7 +1218,7 @@ class Connection:
         return Result(self)
 
     @catch_network_exception
-    def send_update(self, statement):
+    def send_update(self, statement: Union[ModifyStatement, UpdateStatement]) -> Result:
         """Send an delete statement.
 
         Args:
@@ -1200,7 +1233,13 @@ class Connection:
         return Result(self)
 
     @catch_network_exception
-    def execute_nonquery(self, namespace, cmd, raise_on_fail, fields=None):
+    def execute_nonquery(
+        self,
+        namespace: str,
+        cmd: str,
+        raise_on_fail: bool,
+        fields: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Result]:
         """Execute a non query command.
 
         Args:
@@ -1227,7 +1266,7 @@ class Connection:
         return None
 
     @catch_network_exception
-    def execute_sql_scalar(self, sql):
+    def execute_sql_scalar(self, sql: StatementType) -> int:
         """Execute a SQL scalar.
 
         Args:
@@ -1245,10 +1284,10 @@ class Connection:
         result.fetch_all()
         if result.count == 0:
             raise InterfaceError("No data found")
-        return result[0][0]
+        return result[0][0]  # type: ignore[index]
 
     @catch_network_exception
-    def get_row_result(self, cmd, fields):
+    def get_row_result(self, cmd: str, fields: Dict[str, Any]) -> RowResult:
         """Returns the row result.
 
         Args:
@@ -1263,7 +1302,7 @@ class Connection:
         return RowResult(self)
 
     @catch_network_exception
-    def read_row(self, result):
+    def read_row(self, result: RowResult) -> Optional[MessageType]:
         """Read row.
 
         Args:
@@ -1272,7 +1311,7 @@ class Connection:
         return self.protocol.read_row(result)
 
     @catch_network_exception
-    def close_result(self, result):
+    def close_result(self, result: Result) -> None:
         """Close result.
 
         Args:
@@ -1281,7 +1320,7 @@ class Connection:
         self.protocol.close_result(result)
 
     @catch_network_exception
-    def get_column_metadata(self, result):
+    def get_column_metadata(self, result: Result) -> List[ColumnType]:
         """Get column metadata.
 
         Args:
@@ -1289,7 +1328,7 @@ class Connection:
         """
         return self.protocol.get_column_metadata(result)
 
-    def get_next_statement_id(self):
+    def get_next_statement_id(self) -> int:
         """Returns the next statement ID.
 
         Returns:
@@ -1300,7 +1339,7 @@ class Connection:
         self._stmt_counter += 1
         return self._stmt_counter
 
-    def is_open(self):
+    def is_open(self) -> bool:
         """Check if connection is open.
 
         Returns:
@@ -1308,7 +1347,7 @@ class Connection:
         """
         return self.stream.is_open()
 
-    def set_server_disconnected(self, reason):
+    def set_server_disconnected(self, reason: Union[str, Tuple[str, int]]) -> None:
         """Set the disconnection message from the server.
 
         Args:
@@ -1317,7 +1356,7 @@ class Connection:
         self._server_disconnected = True
         self._server_disconnected_reason = reason
 
-    def is_server_disconnected(self):
+    def is_server_disconnected(self) -> bool:
         """Verify if the session has been disconnect from the server.
 
         Returns:
@@ -1326,7 +1365,7 @@ class Connection:
         """
         return self._server_disconnected
 
-    def get_disconnected_reason(self):
+    def get_disconnected_reason(self) -> Optional[Union[str, Tuple[str, int]]]:
         """Get the disconnection message sent by the server.
 
         Returns:
@@ -1334,13 +1373,13 @@ class Connection:
         """
         return self._server_disconnected_reason
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from server."""
         if not self.is_open():
             return
         self.stream.close()
 
-    def close_session(self):
+    def close_session(self) -> None:
         """Close a sucessfully authenticated session."""
         if not self.is_open():
             return
@@ -1367,7 +1406,7 @@ class Connection:
             # close the connection locally.
             self.stream.close()
 
-    def reset_session(self):
+    def reset_session(self) -> None:
         """Reset a sucessfully authenticated session."""
         if not self.is_open():
             return
@@ -1382,7 +1421,7 @@ class Connection:
                 err,
             )
 
-    def close_connection(self):
+    def close_connection(self) -> None:
         """Announce to the server that the client wants to close the
         connection. Discards any session state of the server.
         """
@@ -1414,22 +1453,22 @@ class PooledConnection(Connection):
     .. versionadded:: 8.0.13
     """
 
-    def __init__(self, pool):
+    def __init__(self, pool: ConnectionPool) -> None:
         if not isinstance(pool, ConnectionPool):
             raise AttributeError("pool should be a ConnectionPool object")
         super().__init__(pool.cnx_config)
-        self.pool = pool
-        self.host = pool.cnx_config["host"]
-        self.port = pool.cnx_config["port"]
+        self.pool: ConnectionPool = pool
+        self.host: str = pool.cnx_config["host"]
+        self.port: int = pool.cnx_config["port"]
 
-    def close_connection(self):
+    def close_connection(self) -> None:
         """Closes the connection.
 
         This method closes the socket.
         """
         super().close_session()
 
-    def close_session(self):
+    def close_session(self) -> None:
         """Do not close, but add connection back to pool.
 
         The close_session() method does not close the connection with the
@@ -1442,20 +1481,20 @@ class PooledConnection(Connection):
         """
         self.pool.add_connection(self)
 
-    def reconnect(self):
+    def reconnect(self) -> None:
         """Reconnect this connection."""
         if self._active_result is not None:
             self._active_result.fetch_all()
         self._authenticate()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the connection.
 
         Resets the connection by re-authenticate.
         """
         self.reconnect()
 
-    def sql(self, sql):
+    def sql(self, sql: str) -> SqlStatement:
         """Creates a :class:`mysqlx.SqlStatement` object to allow running the
         SQL statement on the target MySQL Server.
 
@@ -1497,26 +1536,26 @@ class ConnectionPool(queue.Queue):
     .. versionadded:: 8.0.13
     """
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name: str, **kwargs: Any) -> None:
         self._set_pool_name(name)
-        self._open_sessions = 0
-        self._connections_openned = []
-        self._available = True
-        self._timeout = 0
-        self._timeout_stamp = datetime.now()
-        self.pool_max_size = kwargs.get("max_size", 25)
+        self._open_sessions: int = 0
+        self._connections_openned: List[PooledConnection] = []
+        self._available: bool = True
+        self._timeout: int = 0
+        self._timeout_stamp: datetime = datetime.now()
+        self.pool_max_size: int = kwargs.get("max_size", 25)
         # Can't invoke super due to Queue not is a new-style class
         queue.Queue.__init__(self, self.pool_max_size)
-        self.reset_session = kwargs.get("reset_session", True)
-        self.max_idle_time = kwargs.get("max_idle_time", 25)
-        self.settings = kwargs
-        self.queue_timeout = kwargs.get("queue_timeout", 25)
-        self.priority = kwargs.get("priority", 0)
-        self.cnx_config = kwargs
-        self.host = kwargs["host"]
-        self.port = kwargs["port"]
+        self.reset_session: bool = kwargs.get("reset_session", True)
+        self.max_idle_time: int = kwargs.get("max_idle_time", 25)
+        self.settings: Dict[str, Any] = kwargs
+        self.queue_timeout: int = kwargs.get("queue_timeout", 25)
+        self.priority: int = kwargs.get("priority", 0)
+        self.cnx_config: Dict[str, Any] = kwargs
+        self.host: str = kwargs["host"]
+        self.port: int = kwargs["port"]
 
-    def _set_pool_name(self, pool_name):
+    def _set_pool_name(self, pool_name: str) -> None:
         r"""Set the name of the pool.
 
         This method checks the validity and sets the name of the pool.
@@ -1536,11 +1575,11 @@ class ConnectionPool(queue.Queue):
         self.name = pool_name
 
     @property
-    def open_connections(self):
+    def open_connections(self) -> int:
         """Returns the number of open connections that can return to this pool."""
         return len(self._connections_openned)
 
-    def remove_connection(self, cnx=None):
+    def remove_connection(self, cnx: Optional[PooledConnection] = None) -> None:
         """Removes a connection from this pool.
 
         Args:
@@ -1548,7 +1587,7 @@ class ConnectionPool(queue.Queue):
         """
         self._connections_openned.remove(cnx)
 
-    def remove_connections(self):
+    def remove_connections(self) -> None:
         """Removes all the connections from the pool."""
         while self.qsize() > 0:
             try:
@@ -1563,7 +1602,7 @@ class ConnectionPool(queue.Queue):
                 finally:
                     self.remove_connection(cnx)
 
-    def add_connection(self, cnx=None):
+    def add_connection(self, cnx: Optional[PooledConnection] = None) -> None:
         """Adds a connection to this pool.
 
         This method instantiates a Connection using the configuration passed
@@ -1601,11 +1640,11 @@ class ConnectionPool(queue.Queue):
                 raise PoolError("Connection instance not subclass of PooledSession")
             if cnx.is_server_disconnected():
                 self.remove_connections()
-                cnx.close()
+                cnx.close()  # type: ignore[attr-defined]
 
         self.queue_connection(cnx)
 
-    def queue_connection(self, cnx):
+    def queue_connection(self, cnx: PooledConnection) -> None:
         """Put connection back in the queue:
 
         This method is putting a connection back in the queue.
@@ -1629,14 +1668,14 @@ class ConnectionPool(queue.Queue):
         except queue.Full:
             PoolError("Failed adding connection; queue is full")
 
-    def track_connection(self, connection):
+    def track_connection(self, connection: PooledConnection) -> None:
         """Tracks connection in order of close it when client.close() is invoke."""
         self._connections_openned.append(connection)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def available(self):
+    def available(self) -> bool:
         """Returns if this pool is available for pool connections from it.
 
         Returns:
@@ -1645,7 +1684,7 @@ class ConnectionPool(queue.Queue):
         """
         return self._available
 
-    def set_unavailable(self, time_out=-1):
+    def set_unavailable(self, time_out: int = -1) -> None:
         """Sets this pool unavailable for a period of time (in seconds).
 
         .. versionadded:: 8.0.20
@@ -1660,7 +1699,7 @@ class ConnectionPool(queue.Queue):
             self._timeout_stamp = datetime.now()
             self._timeout = time_out
 
-    def set_available(self):
+    def set_available(self) -> None:
         """Sets this pool available for pool connections from it.
 
         .. versionadded:: 8.0.20
@@ -1668,7 +1707,7 @@ class ConnectionPool(queue.Queue):
         self._available = True
         self._timeout_stamp = datetime.now()
 
-    def get_timeout_stamp(self):
+    def get_timeout_stamp(self) -> Tuple[int, datetime]:
         """Returns the penalized time (timeout) and the time at the penalty.
 
         Returns:
@@ -1677,7 +1716,7 @@ class ConnectionPool(queue.Queue):
         """
         return (self._timeout, self._timeout_stamp)
 
-    def close(self):
+    def close(self) -> None:
         """Empty this ConnectionPool."""
         for cnx in self._connections_openned:
             cnx.close_connection()
@@ -1691,16 +1730,16 @@ class PoolsManager:
     .. versionadded:: 8.0.13
     """
 
-    __instance = None
-    __pools = {}
+    __instance: PoolsManager = None
+    __pools: Dict[str, Any] = {}
 
-    def __new__(cls):
+    def __new__(cls) -> PoolsManager:
         if PoolsManager.__instance is None:
             PoolsManager.__instance = object.__new__(cls)
             PoolsManager.__pools = {}
         return PoolsManager.__instance
 
-    def _pool_exists(self, client_id, pool_name):
+    def _pool_exists(self, client_id: str, pool_name: str) -> bool:
         """Verifies if a pool exists with the given name.
 
         Args:
@@ -1716,7 +1755,7 @@ class PoolsManager:
                 return True
         return False
 
-    def _get_pools(self, settings):
+    def _get_pools(self, settings: Dict[str, Any]) -> List:
         """Retrieves a list of pools that shares the given settings.
 
         Args:
@@ -1740,7 +1779,9 @@ class PoolsManager:
         return available_pools
 
     @staticmethod
-    def _get_connections_settings(settings):
+    def _get_connections_settings(
+        settings: Dict[str, Any]
+    ) -> List[Tuple[str, Dict[str, Any]]]:
         """Generates a list of separated connection settings for each host.
 
         Gets a list of connection settings for each host or router found in the
@@ -1782,7 +1823,7 @@ class PoolsManager:
             )
         return connections_settings
 
-    def create_pool(self, cnx_settings):
+    def create_pool(self, cnx_settings: Dict[str, Any]) -> None:
         """Creates a `ConnectionPool` instance to hold the connections.
 
         Creates a `ConnectionPool` instance to hold the connections only if
@@ -1805,7 +1846,7 @@ class PoolsManager:
             pool.append(ConnectionPool(router_name, **settings))
 
     @staticmethod
-    def _get_random_pool(pool_list):
+    def _get_random_pool(pool_list: List[ConnectionPool]) -> ConnectionPool:
         """Get a random router from the group with the given priority.
 
         Returns:
@@ -1823,7 +1864,9 @@ class PoolsManager:
         return pool_list[index]
 
     @staticmethod
-    def _get_sublist(pools, index, cur_priority):
+    def _get_sublist(
+        pools: List[ConnectionPool], index: int, cur_priority: int
+    ) -> List[ConnectionPool]:
         sublist = []
         next_priority = None
         while index < len(pools):
@@ -1835,20 +1878,24 @@ class PoolsManager:
             index += 1
         return sublist
 
-    def _get_next_pool(self, pools, cur_priority):
+    def _get_next_pool(
+        self, pools: List[ConnectionPool], cur_priority: int
+    ) -> ConnectionPool:
         index = 0
         for pool in pools:
             if pool.available() and cur_priority == pool.priority:
                 break
             index += 1
-        subpool = []
+        subpool: List = []
         while not subpool and index < len(pools):
             subpool = self._get_sublist(pools, index, cur_priority)
             index += 1
         return self._get_random_pool(subpool)
 
     @staticmethod
-    def _get_next_priority(pools, cur_priority=None):
+    def _get_next_priority(
+        pools: List[ConnectionPool], cur_priority: Optional[int] = None
+    ) -> int:
         if cur_priority is None and pools:
             return pools[0].priority
         # find the first pool that does not share the same priority
@@ -1858,7 +1905,9 @@ class PoolsManager:
                 return cur_priority
         return pools[0].priority
 
-    def _check_unavailable_pools(self, settings, revive=None):
+    def _check_unavailable_pools(
+        self, settings: Dict[str, Any], revive: Optional[bool] = None
+    ) -> None:
         pools = self._get_pools(settings)
         for pool in pools:
             if pool.available():
@@ -1869,7 +1918,7 @@ class PoolsManager:
             if datetime.now() > (timeout_stamp + timedelta(seconds=timeout)):
                 pool.set_available()
 
-    def get_connection(self, settings):
+    def get_connection(self, settings: Dict[str, Any]) -> PooledConnection:
         """Get a connection from the pool.
 
         This method returns an `PooledConnection` instance which has a reference
@@ -1884,7 +1933,7 @@ class PoolsManager:
             PooledConnection: A pooled connection object.
         """
 
-        def set_mysqlx_wait_timeout(cnx):
+        def set_mysqlx_wait_timeout(cnx: PooledConnection) -> None:
             ver = cnx.sql(_SELECT_VERSION_QUERY).execute().fetch_all()[0][0]
             # mysqlx_wait_timeout is only available on MySQL 8
             if tuple(int(n) for n in ver.split("-")[0].split(".")) > (
@@ -2017,7 +2066,7 @@ class PoolsManager:
 
         raise PoolError("Unable to connect to any of the target hosts")
 
-    def close_pool(self, cnx_settings):
+    def close_pool(self, cnx_settings: Dict[str, Any]) -> int:
         """Closes the connections in the pools
 
         Returns:
@@ -2034,7 +2083,9 @@ class PoolsManager:
         return len(pools)
 
     @staticmethod
-    def set_pool_unavailable(pool, err):
+    def set_pool_unavailable(
+        pool: ConnectionPool, err: Union[InterfaceError, TimeoutError]
+    ) -> None:
         """Sets a pool as unavailable.
 
         The time a pool is set unavailable depends on the given error message
@@ -2076,9 +2127,9 @@ class Session:
         settings (dict): Connection data used to connect to the database.
     """
 
-    def __init__(self, settings):
-        self.use_pure = settings.get("use-pure", Protobuf.use_pure)
-        self._settings = settings
+    def __init__(self, settings: Dict[str, Any]) -> None:
+        self.use_pure: bool = settings.get("use-pure", Protobuf.use_pure)
+        self._settings: Dict[str, Any] = settings
 
         # Check for DNS SRV
         if settings.get("host") and settings.get("dns-srv"):
@@ -2115,7 +2166,7 @@ class Session:
         if "pooling" in settings and settings["pooling"]:
             # Create pool and retrieve a Connection instance
             PoolsManager().create_pool(settings)
-            self._connection = PoolsManager().get_connection(settings)
+            self._connection: Connection = PoolsManager().get_connection(settings)
             if self._connection is None:
                 raise PoolError("Connection could not be retrieved from pool")
         else:
@@ -2135,17 +2186,22 @@ class Session:
                 )
                 raise InterfaceError(errmsg, err.errno) from err
 
-    def __enter__(self):
+    def __enter__(self) -> Session:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Type[BaseException],
+        exc_value: BaseException,
+        traceback: TracebackType,
+    ) -> None:
         self.close()
 
-    def _init_attributes(self):
+    def _init_attributes(self) -> None:
         """Setup default and user defined connection-attributes."""
         if os.name == "nt":
             if "64" in platform.architecture()[0]:
-                platform_arch = "x86_64"
+                platform_arch: Union[str, Tuple[str, str]] = "x86_64"
             elif "32" in platform.architecture()[0]:
                 platform_arch = "i386"
             else:
@@ -2219,17 +2275,17 @@ class Session:
                 self._settings["attributes"][attr_name] = attr_value
 
     @property
-    def use_pure(self):
+    def use_pure(self) -> bool:
         """bool: `True` to use pure Python Protobuf implementation."""
         return Protobuf.use_pure
 
     @use_pure.setter
-    def use_pure(self, value):
+    def use_pure(self, value: bool) -> None:
         if not isinstance(value, bool):
             raise ProgrammingError("'use_pure' option should be True or False")
         Protobuf.set_use_pure(value)
 
-    def is_open(self):
+    def is_open(self) -> bool:
         """Returns `True` if the session is open.
 
         Returns:
@@ -2237,7 +2293,7 @@ class Session:
         """
         return self._connection.stream.is_open()
 
-    def sql(self, sql):
+    def sql(self, sql: str) -> SqlStatement:
         """Creates a :class:`mysqlx.SqlStatement` object to allow running the
         SQL statement on the target MySQL Server.
 
@@ -2249,7 +2305,7 @@ class Session:
         """
         return SqlStatement(self._connection, sql)
 
-    def get_connection(self):
+    def get_connection(self) -> Connection:
         """Returns the underlying connection.
 
         Returns:
@@ -2257,7 +2313,7 @@ class Session:
         """
         return self._connection
 
-    def get_schemas(self):
+    def get_schemas(self) -> List[str]:
         """Returns the list of schemas in the current session.
 
         Returns:
@@ -2268,7 +2324,7 @@ class Session:
         result = self.sql("SHOW DATABASES").execute()
         return [row[0] for row in result.fetch_all()]
 
-    def get_schema(self, name):
+    def get_schema(self, name: str) -> Schema:
         """Retrieves a Schema object from the current session by it's name.
 
         Args:
@@ -2279,7 +2335,7 @@ class Session:
         """
         return Schema(self, name)
 
-    def get_default_schema(self):
+    def get_default_schema(self) -> Optional[Schema]:
         """Retrieves a Schema object from the current session by the schema
         name configured in the connection settings.
 
@@ -2301,7 +2357,7 @@ class Session:
                 .fetch_all()
             )
             try:
-                if res[0][0] == schema:
+                if res[0][0] == schema:  # type: ignore[index]
                     return Schema(self, schema)
             except IndexError:
                 raise ProgrammingError(
@@ -2309,7 +2365,7 @@ class Session:
                 ) from None
         return None
 
-    def drop_schema(self, name):
+    def drop_schema(self, name: str) -> None:
         """Drops the schema with the specified name.
 
         Args:
@@ -2319,7 +2375,7 @@ class Session:
             "sql", _DROP_DATABASE_QUERY.format(quote_identifier(name)), True
         )
 
-    def create_schema(self, name):
+    def create_schema(self, name: str) -> Schema:
         """Creates a schema on the database and returns the corresponding
         object.
 
@@ -2331,23 +2387,23 @@ class Session:
         )
         return Schema(self, name)
 
-    def start_transaction(self):
+    def start_transaction(self) -> None:
         """Starts a transaction context on the server."""
         self._connection.execute_nonquery("sql", "START TRANSACTION", True)
 
-    def commit(self):
+    def commit(self) -> None:
         """Commits all the operations executed after a call to
         startTransaction().
         """
         self._connection.execute_nonquery("sql", "COMMIT", True)
 
-    def rollback(self):
+    def rollback(self) -> None:
         """Discards all the operations executed after a call to
         startTransaction().
         """
         self._connection.execute_nonquery("sql", "ROLLBACK", True)
 
-    def set_savepoint(self, name=None):
+    def set_savepoint(self, name: Optional[str] = None) -> str:
         """Creates a transaction savepoint.
 
         If a name is not provided, one will be generated using the uuid.uuid1()
@@ -2368,7 +2424,7 @@ class Session:
         )
         return name
 
-    def rollback_to(self, name):
+    def rollback_to(self, name: str) -> None:
         """Rollback to a transaction savepoint with the given name.
 
         Args:
@@ -2382,7 +2438,7 @@ class Session:
             True,
         )
 
-    def release_savepoint(self, name):
+    def release_savepoint(self, name: str) -> None:
         """Release a transaction savepoint with the given name.
 
         Args:
@@ -2396,13 +2452,13 @@ class Session:
             True,
         )
 
-    def close(self):
+    def close(self) -> None:
         """Closes the session."""
         self._connection.close_session()
         # Set an unconnected connection
         self._connection = Connection(self._settings)
 
-    def close_connections(self):
+    def close_connections(self) -> None:
         """Closes all underliying connections as pooled connections"""
         self._connection.close_connection()
 
@@ -2418,13 +2474,17 @@ class Client:
     .. versionadded:: 8.0.13
     """
 
-    def __init__(self, connection_dict, options_dict=None):
-        self.settings = connection_dict
+    def __init__(
+        self,
+        connection_dict: Dict[str, Any],
+        options_dict: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.settings: Dict[str, Any] = connection_dict
         if options_dict is None:
             options_dict = {}
 
-        self.sessions = []
-        self.client_id = uuid.uuid4()
+        self.sessions: List[Session] = []
+        self.client_id: uuid.UUID = uuid.uuid4()
 
         self._set_pool_size(options_dict.get("max_size", 25))
         self._set_max_idle_time(options_dict.get("max_idle_time", 0))
@@ -2435,13 +2495,18 @@ class Client:
         self.settings["max_size"] = self.max_size
         self.settings["client_id"] = self.client_id
 
-    def __enter__(self):
+    def __enter__(self) -> Client:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Type[BaseException],
+        exc_value: BaseException,
+        traceback: TracebackType,
+    ) -> None:
         self.close()
 
-    def _set_pool_size(self, pool_size):
+    def _set_pool_size(self, pool_size: int) -> None:
         """Set the size of the pool.
 
         This method sets the size of the pool but it will not resize the pool.
@@ -2466,7 +2531,7 @@ class Client:
 
         self.max_size = _CNX_POOL_MAXSIZE if pool_size == 0 else pool_size
 
-    def _set_max_idle_time(self, max_idle_time):
+    def _set_max_idle_time(self, max_idle_time: int) -> None:
         """Set the max idle time.
 
         This method sets the max idle time.
@@ -2494,7 +2559,7 @@ class Client:
             _CNX_POOL_MAX_IDLE_TIME if max_idle_time == 0 else int(max_idle_time / 1000)
         )
 
-    def _set_pool_enabled(self, enabled):
+    def _set_pool_enabled(self, enabled: bool) -> None:
         """Set if the pool is enabled.
 
         This method sets if the pool is enabled.
@@ -2509,7 +2574,7 @@ class Client:
             raise AttributeError("The enabled value should be True or False.")
         self.pooling_enabled = enabled
 
-    def _set_queue_timeout(self, queue_timeout):
+    def _set_queue_timeout(self, queue_timeout: int) -> None:
         """Set the queue timeout.
 
         This method sets the queue timeout.
@@ -2541,7 +2606,7 @@ class Client:
         if "connect-timeout" not in self.settings:
             self.settings["connect-timeout"] = self.queue_timeout
 
-    def get_session(self):
+    def get_session(self) -> Session:
         """Creates a Session instance using the provided connection data.
 
         Returns:
@@ -2551,14 +2616,14 @@ class Client:
         self.sessions.append(session)
         return session
 
-    def close(self):
+    def close(self) -> None:
         """Closes the sessions opened by this client."""
         PoolsManager().close_pool(self.settings)
         for session in self.sessions:
             session.close_connections()
 
 
-def _parse_address_list(path):
+def _parse_address_list(path: str) -> Union[Dict[str, List[Dict]], Dict]:
     """Parses a list of host, port pairs.
 
     Args:
@@ -2579,7 +2644,7 @@ def _parse_address_list(path):
     address_list = _SPLIT_RE.split(path[1:-1] if array else path)
     priority_count = 0
     for address in address_list:
-        router = {}
+        router: Dict = {}
 
         match = _PRIORITY_RE.match(address)
         if match:
@@ -2613,7 +2678,7 @@ def _parse_address_list(path):
     return {"routers": routers} if array else routers[0]
 
 
-def _parse_connection_uri(uri):
+def _parse_connection_uri(uri: str) -> Dict[str, Any]:
     """Parses the connection string and returns a dictionary with the
     connection settings.
 
@@ -2627,7 +2692,7 @@ def _parse_connection_uri(uri):
     Raises:
         :class:`mysqlx.InterfaceError`: If contains a invalid option.
     """
-    settings = {"schema": ""}
+    settings: Dict[str, Any] = {"schema": ""}
 
     match = _URI_SCHEME_RE.match(uri)
     scheme, uri = match.groups() if match else ("mysqlx", uri)
@@ -2676,7 +2741,7 @@ def _parse_connection_uri(uri):
     return settings
 
 
-def _validate_settings(settings):
+def _validate_settings(settings: Dict[str, Any]) -> None:
     """Validates the settings to be passed to a Session object
     the port values are converted to int if specified or set to 33060
     otherwise. The priority values for each router is converted to int
@@ -2809,7 +2874,9 @@ def _validate_settings(settings):
         _validate_tls_ciphersuites(settings)
 
 
-def _validate_hosts(settings, default_port=None):
+def _validate_hosts(
+    settings: Dict[str, Any], default_port: Optional[int] = None
+) -> None:
     """Validate hosts.
 
     Args:
@@ -2843,7 +2910,7 @@ def _validate_hosts(settings, default_port=None):
         settings["port"] = default_port
 
 
-def _validate_connection_attributes(settings):
+def _validate_connection_attributes(settings: Dict[str, Any]) -> None:
     """Validate connection-attributes.
 
     Args:
@@ -2955,7 +3022,7 @@ def _validate_connection_attributes(settings):
     settings["connection-attributes"] = attributes
 
 
-def _validate_tls_versions(settings):
+def _validate_tls_versions(settings: Dict[str, Any]) -> None:
     """Validate tls-versions.
 
     Args:
@@ -3046,7 +3113,7 @@ def _validate_tls_versions(settings):
         raise InterfaceError(TLS_VERSION_ERROR.format(tls_ver, SUPPORTED_TLS_VERSIONS))
 
 
-def _validate_tls_ciphersuites(settings):
+def _validate_tls_ciphersuites(settings: Dict[str, Any]) -> None:
     """Validate tls-ciphersuites.
 
     Args:
@@ -3100,7 +3167,7 @@ def _validate_tls_ciphersuites(settings):
 
     translated_names = []
     iani_cipher_suites_names = {}
-    ossl_cipher_suites_names = []
+    ossl_cipher_suites_names: List[str] = []
 
     # Old ciphers can work with new TLS versions.
     # Find all the ciphers introduced on previous TLS versions
@@ -3135,7 +3202,7 @@ def _validate_tls_ciphersuites(settings):
     settings["tls-ciphersuites"] = translated_names
 
 
-def _get_connection_settings(*args, **kwargs):
+def _get_connection_settings(*args: Any, **kwargs: Any) -> Dict[str, Any]:
     """Parses the connection string and returns a dictionary with the
     connection settings.
 
@@ -3171,7 +3238,7 @@ def _get_connection_settings(*args, **kwargs):
     return settings
 
 
-def get_session(*args, **kwargs):
+def get_session(*args: Any, **kwargs: Any) -> Session:
     """Creates a Session instance using the provided connection data.
 
     Args:
@@ -3188,7 +3255,10 @@ def get_session(*args, **kwargs):
     return Session(settings)
 
 
-def get_client(connection_string, options_string):
+def get_client(
+    connection_string: Union[str, Dict[str, Any]],
+    options_string: Union[str, Dict[str, Any]],
+) -> Client:
     """Creates a Client instance with the provided connection data and settings.
 
     Args:

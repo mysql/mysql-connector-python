@@ -26,11 +26,17 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="return-value"
+
 """Implementation of Statements."""
+
+from __future__ import annotations
 
 import copy
 import json
 import warnings
+
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from .constants import LockContention
 from .dbdoc import DbDoc
@@ -38,7 +44,15 @@ from .errors import NotSupportedError, ProgrammingError
 from .expr import ExprParser
 from .helpers import deprecated
 from .protobuf import mysqlxpb_enum
-from .result import Result
+from .result import DocResult, Result, RowResult, SqlResult
+from .types import (
+    ConnectionType,
+    DatabaseTargetType,
+    MessageType,
+    ProtobufMessageCextType,
+    ProtobufMessageType,
+    SchemaType,
+)
 
 ERR_INVALID_INDEX_NAME = 'The given index name "{}" is not valid'
 
@@ -46,18 +60,18 @@ ERR_INVALID_INDEX_NAME = 'The given index name "{}" is not valid'
 class Expr:
     """Expression wrapper."""
 
-    def __init__(self, expr):
-        self.expr = expr
+    def __init__(self, expr: Any) -> None:
+        self.expr: Any = expr
 
 
-def flexible_params(*values):
+def flexible_params(*values: Any) -> Union[List, Tuple]:
     """Parse flexible parameters."""
     if len(values) == 1 and isinstance(values[0], (list, tuple)):
         return values[0]
     return values
 
 
-def is_quoted_identifier(identifier, sql_mode=""):
+def is_quoted_identifier(identifier: str, sql_mode: str = "") -> bool:
     """Check if the given identifier is quoted.
 
     Args:
@@ -74,7 +88,7 @@ def is_quoted_identifier(identifier, sql_mode=""):
     return identifier[0] == "`" and identifier[-1] == "`"
 
 
-def quote_identifier(identifier, sql_mode=""):
+def quote_identifier(identifier: str, sql_mode: str = "") -> str:
     """Quote the given identifier with backticks, converting backticks (`) in
     the identifier name with the correct escape sequence (``).
 
@@ -94,7 +108,7 @@ def quote_identifier(identifier, sql_mode=""):
     return f"`{quoted}`"
 
 
-def quote_multipart_identifier(identifiers, sql_mode=""):
+def quote_multipart_identifier(identifiers: Iterable[str], sql_mode: str = "") -> str:
     """Quote the given multi-part identifier with backticks.
 
     Args:
@@ -109,7 +123,9 @@ def quote_multipart_identifier(identifiers, sql_mode=""):
     )
 
 
-def parse_table_name(default_schema, table_name, sql_mode=""):
+def parse_table_name(
+    default_schema: str, table_name: str, sql_mode: str = ""
+) -> Tuple[str, str]:
     """Parse table name.
 
     Args:
@@ -138,28 +154,30 @@ class Statement:
         doc_based (bool): `True` if it is document based.
     """
 
-    def __init__(self, target, doc_based=True):
-        self._target = target
-        self._doc_based = doc_based
-        self._connection = target.get_connection() if target else None
-        self._stmt_id = None
-        self._exec_counter = 0
-        self._changed = True
-        self._prepared = False
-        self._deallocate_prepare_execute = False
+    def __init__(self, target: DatabaseTargetType, doc_based: bool = True) -> None:
+        self._target: DatabaseTargetType = target
+        self._doc_based: bool = doc_based
+        self._connection: Optional[ConnectionType] = (
+            target.get_connection() if target else None
+        )
+        self._stmt_id: Optional[int] = None
+        self._exec_counter: int = 0
+        self._changed: bool = True
+        self._prepared: bool = False
+        self._deallocate_prepare_execute: bool = False
 
     @property
-    def target(self):
+    def target(self) -> DatabaseTargetType:
         """object: The database object target."""
         return self._target
 
     @property
-    def schema(self):
+    def schema(self) -> SchemaType:
         """:class:`mysqlx.Schema`: The Schema object."""
         return self._target.schema
 
     @property
-    def stmt_id(self):
+    def stmt_id(self) -> int:
         """Returns this statement ID.
 
         Returns:
@@ -168,47 +186,47 @@ class Statement:
         return self._stmt_id
 
     @stmt_id.setter
-    def stmt_id(self, value):
+    def stmt_id(self, value: int) -> None:
         self._stmt_id = value
 
     @property
-    def exec_counter(self):
+    def exec_counter(self) -> int:
         """int: The number of times this statement was executed."""
         return self._exec_counter
 
     @property
-    def changed(self):
+    def changed(self) -> bool:
         """bool: `True` if this statement has changes."""
         return self._changed
 
     @changed.setter
-    def changed(self, value):
+    def changed(self, value: bool) -> None:
         self._changed = value
 
     @property
-    def prepared(self):
+    def prepared(self) -> bool:
         """bool: `True` if this statement has been prepared."""
         return self._prepared
 
     @prepared.setter
-    def prepared(self, value):
+    def prepared(self, value: bool) -> None:
         self._prepared = value
 
     @property
-    def repeated(self):
+    def repeated(self) -> bool:
         """bool: `True` if this statement was executed more than once."""
         return self._exec_counter > 1
 
     @property
-    def deallocate_prepare_execute(self):
+    def deallocate_prepare_execute(self) -> bool:
         """bool: `True` to deallocate + prepare + execute statement."""
         return self._deallocate_prepare_execute
 
     @deallocate_prepare_execute.setter
-    def deallocate_prepare_execute(self, value):
+    def deallocate_prepare_execute(self, value: bool) -> None:
         self._deallocate_prepare_execute = value
 
-    def is_doc_based(self):
+    def is_doc_based(self) -> bool:
         """Check if it is document based.
 
         Returns:
@@ -216,15 +234,15 @@ class Statement:
         """
         return self._doc_based
 
-    def increment_exec_counter(self):
+    def increment_exec_counter(self) -> None:
         """Increments the number of times this statement has been executed."""
         self._exec_counter += 1
 
-    def reset_exec_counter(self):
+    def reset_exec_counter(self) -> None:
         """Resets the number of times this statement has been executed."""
         self._exec_counter = 0
 
-    def execute(self):
+    def execute(self) -> Any:
         """Execute the statement.
 
         Raises:
@@ -245,32 +263,43 @@ class FilterableStatement(Statement):
                                    documents or records.
     """
 
-    def __init__(self, target, doc_based=True, condition=None):
+    def __init__(
+        self,
+        target: DatabaseTargetType,
+        doc_based: bool = True,
+        condition: Optional[str] = None,
+    ) -> None:
         super().__init__(target=target, doc_based=doc_based)
-        self._binding_map = {}
-        self._bindings = {}
-        self._having = None
-        self._grouping_str = ""
-        self._grouping = None
-        self._limit_offset = 0
-        self._limit_row_count = None
-        self._projection_str = ""
-        self._projection_expr = None
-        self._sort_str = ""
-        self._sort_expr = None
-        self._where_str = ""
-        self._where_expr = None
-        self.has_bindings = False
-        self.has_limit = False
-        self.has_group_by = False
-        self.has_having = False
-        self.has_projection = False
-        self.has_sort = False
-        self.has_where = False
+        self._binding_map: Dict[str, Any] = {}
+        self._bindings: Union[Dict[str, Any], List] = {}
+        self._having: Optional[MessageType] = None
+        self._grouping_str: str = ""
+        self._grouping: Optional[
+            List[Union[ProtobufMessageType, ProtobufMessageCextType]]
+        ] = None
+        self._limit_offset: int = 0
+        self._limit_row_count: int = None
+        self._projection_str: str = ""
+        self._projection_expr: Optional[
+            List[Union[ProtobufMessageType, ProtobufMessageCextType]]
+        ] = None
+        self._sort_str: str = ""
+        self._sort_expr: Optional[
+            List[Union[ProtobufMessageType, ProtobufMessageCextType]]
+        ] = None
+        self._where_str: str = ""
+        self._where_expr: MessageType = None
+        self.has_bindings: bool = False
+        self.has_limit: bool = False
+        self.has_group_by: bool = False
+        self.has_having: bool = False
+        self.has_projection: bool = False
+        self.has_sort: bool = False
+        self.has_where: bool = False
         if condition:
             self._set_where(condition)
 
-    def _bind_single(self, obj):
+    def _bind_single(self, obj: Union[DbDoc, Dict[str, Any], str]) -> None:
         """Bind single object.
 
         Args:
@@ -296,7 +325,7 @@ class FilterableStatement(Statement):
         else:
             raise ProgrammingError("Invalid JSON string or object to bind")
 
-    def _sort(self, *clauses):
+    def _sort(self, *clauses: str) -> FilterableStatement:
         """Sets the sorting criteria.
 
         Args:
@@ -313,7 +342,7 @@ class FilterableStatement(Statement):
         self._changed = True
         return self
 
-    def _set_where(self, condition):
+    def _set_where(self, condition: str) -> FilterableStatement:
         """Sets the search condition to filter.
 
         Args:
@@ -334,7 +363,7 @@ class FilterableStatement(Statement):
         self._changed = True
         return self
 
-    def _set_group_by(self, *fields):
+    def _set_group_by(self, *fields: str) -> None:
         """Set group by.
 
         Args:
@@ -348,7 +377,7 @@ class FilterableStatement(Statement):
         ).parse_expr_list()
         self._changed = True
 
-    def _set_having(self, condition):
+    def _set_having(self, condition: str) -> None:
         """Set having.
 
         Args:
@@ -358,7 +387,7 @@ class FilterableStatement(Statement):
         self._having = ExprParser(condition, not self._doc_based).expr()
         self._changed = True
 
-    def _set_projection(self, *fields):
+    def _set_projection(self, *fields: str) -> FilterableStatement:
         """Set the projection.
 
         Args:
@@ -376,7 +405,7 @@ class FilterableStatement(Statement):
         self._changed = True
         return self
 
-    def get_binding_map(self):
+    def get_binding_map(self) -> Dict[str, Any]:
         """Returns the binding map dictionary.
 
         Returns:
@@ -384,7 +413,7 @@ class FilterableStatement(Statement):
         """
         return self._binding_map
 
-    def get_bindings(self):
+    def get_bindings(self) -> Union[Dict[str, Any], List]:
         """Returns the bindings list.
 
         Returns:
@@ -392,7 +421,7 @@ class FilterableStatement(Statement):
         """
         return self._bindings
 
-    def get_grouping(self):
+    def get_grouping(self) -> List[Union[ProtobufMessageType, ProtobufMessageCextType]]:
         """Returns the grouping expression list.
 
         Returns:
@@ -400,7 +429,7 @@ class FilterableStatement(Statement):
         """
         return self._grouping
 
-    def get_having(self):
+    def get_having(self) -> MessageType:
         """Returns the having expression.
 
         Returns:
@@ -408,7 +437,7 @@ class FilterableStatement(Statement):
         """
         return self._having
 
-    def get_limit_row_count(self):
+    def get_limit_row_count(self) -> int:
         """Returns the limit row count.
 
         Returns:
@@ -416,7 +445,7 @@ class FilterableStatement(Statement):
         """
         return self._limit_row_count
 
-    def get_limit_offset(self):
+    def get_limit_offset(self) -> int:
         """Returns the limit offset.
 
         Returns:
@@ -424,7 +453,7 @@ class FilterableStatement(Statement):
         """
         return self._limit_offset
 
-    def get_where_expr(self):
+    def get_where_expr(self) -> MessageType:
         """Returns the where expression.
 
         Returns:
@@ -432,7 +461,9 @@ class FilterableStatement(Statement):
         """
         return self._where_expr
 
-    def get_projection_expr(self):
+    def get_projection_expr(
+        self,
+    ) -> List[Union[ProtobufMessageType, ProtobufMessageCextType]]:
         """Returns the projection expression.
 
         Returns:
@@ -440,7 +471,9 @@ class FilterableStatement(Statement):
         """
         return self._projection_expr
 
-    def get_sort_expr(self):
+    def get_sort_expr(
+        self,
+    ) -> List[Union[ProtobufMessageType, ProtobufMessageCextType]]:
         """Returns the sort expression.
 
         Returns:
@@ -449,7 +482,7 @@ class FilterableStatement(Statement):
         return self._sort_expr
 
     @deprecated("8.0.12")
-    def where(self, condition):
+    def where(self, condition: str) -> FilterableStatement:
         """Sets the search condition to filter.
 
         Args:
@@ -464,7 +497,7 @@ class FilterableStatement(Statement):
         return self._set_where(condition)
 
     @deprecated("8.0.12")
-    def sort(self, *clauses):
+    def sort(self, *clauses: str) -> FilterableStatement:
         """Sets the sorting criteria.
 
         Args:
@@ -477,7 +510,9 @@ class FilterableStatement(Statement):
         """
         return self._sort(*clauses)
 
-    def limit(self, row_count, offset=None):
+    def limit(
+        self, row_count: int, offset: Optional[int] = None
+    ) -> FilterableStatement:
         """Sets the maximum number of items to be returned.
 
         Args:
@@ -510,7 +545,7 @@ class FilterableStatement(Statement):
             )
         return self
 
-    def offset(self, offset):
+    def offset(self, offset: int) -> FilterableStatement:
         """Sets the number of items to skip.
 
         Args:
@@ -529,7 +564,7 @@ class FilterableStatement(Statement):
         self._limit_offset = offset
         return self
 
-    def bind(self, *args):
+    def bind(self, *args: Any) -> FilterableStatement:
         """Binds value(s) to a specific placeholder(s).
 
         Args:
@@ -553,7 +588,7 @@ class FilterableStatement(Statement):
             raise ProgrammingError("Invalid number of arguments to bind")
         return self
 
-    def execute(self):
+    def execute(self) -> Any:
         """Execute the statement.
 
         Raises:
@@ -570,21 +605,21 @@ class SqlStatement(Statement):
         sql (string): The sql statement to be executed.
     """
 
-    def __init__(self, connection, sql):
+    def __init__(self, connection: ConnectionType, sql: str) -> None:
         super().__init__(target=None, doc_based=False)
-        self._connection = connection
-        self._sql = sql
-        self._binding_map = None
-        self._bindings = []
-        self.has_bindings = False
-        self.has_limit = False
+        self._connection: ConnectionType = connection
+        self._sql: str = sql
+        self._binding_map: Optional[Dict[str, Any]] = None
+        self._bindings: Union[List, Tuple] = []
+        self.has_bindings: bool = False
+        self.has_limit: bool = False
 
     @property
-    def sql(self):
+    def sql(self) -> str:
         """string: The SQL text statement."""
         return self._sql
 
-    def get_binding_map(self):
+    def get_binding_map(self) -> Dict[str, Any]:
         """Returns the binding map dictionary.
 
         Returns:
@@ -592,7 +627,7 @@ class SqlStatement(Statement):
         """
         return self._binding_map
 
-    def get_bindings(self):
+    def get_bindings(self) -> Union[Tuple, List]:
         """Returns the bindings list.
 
         Returns:
@@ -600,7 +635,7 @@ class SqlStatement(Statement):
         """
         return self._bindings
 
-    def bind(self, *args):
+    def bind(self, *args: Any) -> SqlStatement:
         """Binds value(s) to a specific placeholder(s).
 
         Args:
@@ -619,7 +654,7 @@ class SqlStatement(Statement):
             self._bindings.append(bindings)
         return self
 
-    def execute(self):
+    def execute(self) -> SqlResult:
         """Execute the statement.
 
         Returns:
@@ -631,11 +666,29 @@ class SqlStatement(Statement):
 class WriteStatement(Statement):
     """Provide common write operation attributes."""
 
-    def __init__(self, target, doc_based):
+    def __init__(self, target: DatabaseTargetType, doc_based: bool) -> None:
         super().__init__(target, doc_based)
-        self._values = []
+        self._values: List[
+            Union[
+                int,
+                str,
+                DbDoc,
+                Dict[str, Any],
+                List[Optional[Union[str, int, float, ExprParser, Dict[str, Any]]]],
+            ]
+        ] = []
 
-    def get_values(self):
+    def get_values(
+        self,
+    ) -> List[
+        Union[
+            int,
+            str,
+            DbDoc,
+            Dict[str, Any],
+            List[Optional[Union[str, int, float, ExprParser, Dict[str, Any]]]],
+        ]
+    ]:
         """Returns the list of values.
 
         Returns:
@@ -643,7 +696,7 @@ class WriteStatement(Statement):
         """
         return self._values
 
-    def execute(self):
+    def execute(self) -> Any:
         """Execute the statement.
 
         Raises:
@@ -659,12 +712,12 @@ class AddStatement(WriteStatement):
         collection (mysqlx.Collection): The Collection object.
     """
 
-    def __init__(self, collection):
+    def __init__(self, collection: DatabaseTargetType) -> None:
         super().__init__(collection, True)
-        self._upsert = False
-        self.ids = []
+        self._upsert: bool = False
+        self.ids: List = []
 
-    def is_upsert(self):
+    def is_upsert(self) -> bool:
         """Returns `True` if it's an upsert.
 
         Returns:
@@ -672,7 +725,7 @@ class AddStatement(WriteStatement):
         """
         return self._upsert
 
-    def upsert(self, value=True):
+    def upsert(self, value: bool = True) -> AddStatement:
         """Sets the upset flag to the boolean of the value provided.
         Setting of this flag allows updating of the matched rows/documents
         with the provided value.
@@ -683,7 +736,7 @@ class AddStatement(WriteStatement):
         self._upsert = value
         return self
 
-    def add(self, *values):
+    def add(self, *values: DbDoc) -> AddStatement:
         """Adds a list of documents into a collection.
 
         Args:
@@ -699,7 +752,7 @@ class AddStatement(WriteStatement):
                 self._values.append(DbDoc(val))
         return self
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -723,18 +776,18 @@ class UpdateSpec:
         ProgrammingError: If `source` is invalid.
     """
 
-    def __init__(self, update_type, source, value=None):
+    def __init__(self, update_type: int, source: str, value: Any = None) -> None:
         if update_type == mysqlxpb_enum("Mysqlx.Crud.UpdateOperation.UpdateType.SET"):
             self._table_set(source, value)
         else:
-            self.update_type = update_type
+            self.update_type: int = update_type
             try:
-                self.source = ExprParser(source, False).document_field().identifier
+                self.source: Any = ExprParser(source, False).document_field().identifier
             except ValueError as err:
                 raise ProgrammingError(f"{err}") from err
-            self.value = value
+            self.value: Any = value
 
-    def _table_set(self, source, value):
+    def _table_set(self, source: str, value: Any) -> None:
         """Table set.
 
         Args:
@@ -758,11 +811,11 @@ class ModifyStatement(FilterableStatement):
        The ``condition`` parameter is now mandatory.
     """
 
-    def __init__(self, collection, condition):
+    def __init__(self, collection: DatabaseTargetType, condition: str) -> None:
         super().__init__(target=collection, condition=condition)
-        self._update_ops = {}
+        self._update_ops: Dict[str, Any] = {}
 
-    def sort(self, *clauses):
+    def sort(self, *clauses: str) -> ModifyStatement:
         """Sets the sorting criteria.
 
         Args:
@@ -773,7 +826,7 @@ class ModifyStatement(FilterableStatement):
         """
         return self._sort(*clauses)
 
-    def get_update_ops(self):
+    def get_update_ops(self) -> Dict[str, Any]:
         """Returns the list of update operations.
 
         Returns:
@@ -781,7 +834,7 @@ class ModifyStatement(FilterableStatement):
         """
         return self._update_ops
 
-    def set(self, doc_path, value):
+    def set(self, doc_path: str, value: Any) -> ModifyStatement:
         """Sets or updates attributes on documents in a collection.
 
         Args:
@@ -800,7 +853,7 @@ class ModifyStatement(FilterableStatement):
         return self
 
     @deprecated("8.0.12")
-    def change(self, doc_path, value):
+    def change(self, doc_path: str, value: Any) -> ModifyStatement:
         """Add an update to the statement setting the field, if it exists at
         the document path, to the given value.
 
@@ -821,7 +874,7 @@ class ModifyStatement(FilterableStatement):
         self._changed = True
         return self
 
-    def unset(self, *doc_paths):
+    def unset(self, *doc_paths: str) -> ModifyStatement:
         """Removes attributes from documents in a collection.
 
         Args:
@@ -839,7 +892,7 @@ class ModifyStatement(FilterableStatement):
         self._changed = True
         return self
 
-    def array_insert(self, field, value):
+    def array_insert(self, field: str, value: Any) -> ModifyStatement:
         """Insert a value into the specified array in documents of a
         collection.
 
@@ -859,7 +912,7 @@ class ModifyStatement(FilterableStatement):
         self._changed = True
         return self
 
-    def array_append(self, doc_path, value):
+    def array_append(self, doc_path: str, value: Any) -> ModifyStatement:
         """Inserts a value into a specific position in an array attribute in
         documents of a collection.
 
@@ -880,7 +933,7 @@ class ModifyStatement(FilterableStatement):
         self._changed = True
         return self
 
-    def patch(self, doc):
+    def patch(self, doc: Union[Dict, DbDoc, ExprParser, str]) -> ModifyStatement:
         """Takes a :class:`mysqlx.DbDoc`, string JSON format or a dict with the
         changes and applies it on all matching documents.
 
@@ -906,7 +959,7 @@ class ModifyStatement(FilterableStatement):
         self._changed = True
         return self
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -932,18 +985,23 @@ class ReadStatement(FilterableStatement):
                                    documents or records.
     """
 
-    def __init__(self, target, doc_based=True, condition=None):
+    def __init__(
+        self,
+        target: DatabaseTargetType,
+        doc_based: bool = True,
+        condition: Optional[str] = None,
+    ) -> None:
         super().__init__(target, doc_based, condition)
-        self._lock_exclusive = False
-        self._lock_shared = False
-        self._lock_contention = LockContention.DEFAULT
+        self._lock_exclusive: bool = False
+        self._lock_shared: bool = False
+        self._lock_contention: LockContention = LockContention.DEFAULT
 
     @property
-    def lock_contention(self):
+    def lock_contention(self) -> LockContention:
         """:class:`mysqlx.LockContention`: The lock contention value."""
         return self._lock_contention
 
-    def _set_lock_contention(self, lock_contention):
+    def _set_lock_contention(self, lock_contention: LockContention) -> None:
         """Set the lock contention.
 
         Args:
@@ -961,7 +1019,7 @@ class ReadStatement(FilterableStatement):
             ) from err
         self._lock_contention = lock_contention
 
-    def is_lock_exclusive(self):
+    def is_lock_exclusive(self) -> bool:
         """Returns `True` if is `EXCLUSIVE LOCK`.
 
         Returns:
@@ -969,7 +1027,7 @@ class ReadStatement(FilterableStatement):
         """
         return self._lock_exclusive
 
-    def is_lock_shared(self):
+    def is_lock_shared(self) -> bool:
         """Returns `True` if is `SHARED LOCK`.
 
         Returns:
@@ -977,7 +1035,9 @@ class ReadStatement(FilterableStatement):
         """
         return self._lock_shared
 
-    def lock_shared(self, lock_contention=LockContention.DEFAULT):
+    def lock_shared(
+        self, lock_contention: LockContention = LockContention.DEFAULT
+    ) -> ReadStatement:
         """Execute a read operation with `SHARED LOCK`. Only one lock can be
            active at a time.
 
@@ -989,7 +1049,9 @@ class ReadStatement(FilterableStatement):
         self._set_lock_contention(lock_contention)
         return self
 
-    def lock_exclusive(self, lock_contention=LockContention.DEFAULT):
+    def lock_exclusive(
+        self, lock_contention: LockContention = LockContention.DEFAULT
+    ) -> ReadStatement:
         """Execute a read operation with `EXCLUSIVE LOCK`. Only one lock can be
            active at a time.
 
@@ -1001,7 +1063,7 @@ class ReadStatement(FilterableStatement):
         self._set_lock_contention(lock_contention)
         return self
 
-    def group_by(self, *fields):
+    def group_by(self, *fields: str) -> ReadStatement:
         """Sets a grouping criteria for the resultset.
 
         Args:
@@ -1013,7 +1075,7 @@ class ReadStatement(FilterableStatement):
         self._set_group_by(*fields)
         return self
 
-    def having(self, condition):
+    def having(self, condition: str) -> ReadStatement:
         """Sets a condition for records to be considered in agregate function
         operations.
 
@@ -1027,7 +1089,7 @@ class ReadStatement(FilterableStatement):
         self._set_having(condition)
         return self
 
-    def execute(self):
+    def execute(self) -> Union[DocResult, RowResult]:
         """Execute the statement.
 
         Returns:
@@ -1047,10 +1109,12 @@ class FindStatement(ReadStatement):
                                    result unless a limit is set.
     """
 
-    def __init__(self, collection, condition=None):
+    def __init__(
+        self, collection: DatabaseTargetType, condition: Optional[str] = None
+    ) -> None:
         super().__init__(collection, True, condition)
 
-    def fields(self, *fields):
+    def fields(self, *fields: str) -> FindStatement:
         """Sets a document field filter.
 
         Args:
@@ -1062,7 +1126,7 @@ class FindStatement(ReadStatement):
         """
         return self._set_projection(*fields)
 
-    def sort(self, *clauses):
+    def sort(self, *clauses: str) -> FindStatement:
         """Sets the sorting criteria.
 
         Args:
@@ -1082,11 +1146,11 @@ class SelectStatement(ReadStatement):
         *fields: The fields to be retrieved.
     """
 
-    def __init__(self, table, *fields):
+    def __init__(self, table: DatabaseTargetType, *fields: str) -> None:
         super().__init__(table, False)
         self._set_projection(*fields)
 
-    def where(self, condition):
+    def where(self, condition: str) -> SelectStatement:
         """Sets the search condition to filter.
 
         Args:
@@ -1097,7 +1161,7 @@ class SelectStatement(ReadStatement):
         """
         return self._set_where(condition)
 
-    def order_by(self, *clauses):
+    def order_by(self, *clauses: str) -> SelectStatement:
         """Sets the order by criteria.
 
         Args:
@@ -1108,7 +1172,7 @@ class SelectStatement(ReadStatement):
         """
         return self._sort(*clauses)
 
-    def get_sql(self):
+    def get_sql(self) -> str:
         """Returns the generated SQL.
 
         Returns:
@@ -1139,11 +1203,11 @@ class InsertStatement(WriteStatement):
         *fields: The fields to be inserted.
     """
 
-    def __init__(self, table, *fields):
+    def __init__(self, table: DatabaseTargetType, *fields: Any) -> None:
         super().__init__(table, False)
-        self._fields = flexible_params(*fields)
+        self._fields: Union[List, Tuple] = flexible_params(*fields)
 
-    def values(self, *values):
+    def values(self, *values: Any) -> InsertStatement:
         """Set the values to be inserted.
 
         Args:
@@ -1155,7 +1219,7 @@ class InsertStatement(WriteStatement):
         self._values.append(list(flexible_params(*values)))
         return self
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -1174,11 +1238,11 @@ class UpdateStatement(FilterableStatement):
        The ``fields`` parameters were removed.
     """
 
-    def __init__(self, table):
+    def __init__(self, table: DatabaseTargetType) -> None:
         super().__init__(target=table, doc_based=False)
-        self._update_ops = {}
+        self._update_ops: Dict[str, Any] = {}
 
-    def where(self, condition):
+    def where(self, condition: str) -> UpdateStatement:
         """Sets the search condition to filter.
 
         Args:
@@ -1189,7 +1253,7 @@ class UpdateStatement(FilterableStatement):
         """
         return self._set_where(condition)
 
-    def order_by(self, *clauses):
+    def order_by(self, *clauses: str) -> UpdateStatement:
         """Sets the order by criteria.
 
         Args:
@@ -1200,7 +1264,7 @@ class UpdateStatement(FilterableStatement):
         """
         return self._sort(*clauses)
 
-    def get_update_ops(self):
+    def get_update_ops(self) -> Dict[str, Any]:
         """Returns the list of update operations.
 
         Returns:
@@ -1208,7 +1272,7 @@ class UpdateStatement(FilterableStatement):
         """
         return self._update_ops
 
-    def set(self, field, value):
+    def set(self, field: str, value: Any) -> UpdateStatement:
         """Updates the column value on records in a table.
 
         Args:
@@ -1226,7 +1290,7 @@ class UpdateStatement(FilterableStatement):
         self._changed = True
         return self
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -1252,10 +1316,10 @@ class RemoveStatement(FilterableStatement):
        The ``condition`` parameter was added.
     """
 
-    def __init__(self, collection, condition):
+    def __init__(self, collection: DatabaseTargetType, condition: str) -> None:
         super().__init__(target=collection, condition=condition)
 
-    def sort(self, *clauses):
+    def sort(self, *clauses: str) -> RemoveStatement:
         """Sets the sorting criteria.
 
         Args:
@@ -1266,7 +1330,7 @@ class RemoveStatement(FilterableStatement):
         """
         return self._sort(*clauses)
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -1290,10 +1354,10 @@ class DeleteStatement(FilterableStatement):
        The ``condition`` parameter was removed.
     """
 
-    def __init__(self, table):
+    def __init__(self, table: DatabaseTargetType) -> None:
         super().__init__(target=table, doc_based=False)
 
-    def where(self, condition):
+    def where(self, condition: str) -> DeleteStatement:
         """Sets the search condition to filter.
 
         Args:
@@ -1304,7 +1368,7 @@ class DeleteStatement(FilterableStatement):
         """
         return self._set_where(condition)
 
-    def order_by(self, *clauses):
+    def order_by(self, *clauses: str) -> DeleteStatement:
         """Sets the order by criteria.
 
         Args:
@@ -1315,7 +1379,7 @@ class DeleteStatement(FilterableStatement):
         """
         return self._sort(*clauses)
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -1352,13 +1416,18 @@ class CreateCollectionIndexStatement(Statement):
                                 "type": type}
     """
 
-    def __init__(self, collection, index_name, index_desc):
+    def __init__(
+        self,
+        collection: DatabaseTargetType,
+        index_name: str,
+        index_desc: Dict[str, Any],
+    ) -> None:
         super().__init__(target=collection)
-        self._index_desc = copy.deepcopy(index_desc)
-        self._index_name = index_name
-        self._fields_desc = self._index_desc.pop("fields", [])
+        self._index_desc: Dict[str, Any] = copy.deepcopy(index_desc)
+        self._index_name: str = index_name
+        self._fields_desc: List[Dict[str, Any]] = self._index_desc.pop("fields", [])
 
-    def execute(self):
+    def execute(self) -> Result:
         """Execute the statement.
 
         Returns:
@@ -1396,8 +1465,7 @@ class CreateCollectionIndexStatement(Statement):
 
         if not isinstance(self._fields_desc, list):
             raise ProgrammingError("Required member 'fields' must contain a list")
-
-        args = {}
+        args: Dict[str, Any] = {}
         args["name"] = self._index_name
         args["collection"] = self._target.name
         args["schema"] = self._target.schema.name

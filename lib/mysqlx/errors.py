@@ -29,14 +29,22 @@
 """Implementation of the Python Database API Specification v2.0 exceptions."""
 
 from struct import unpack as struct_unpack
+from typing import Dict, Optional, Tuple, Union
 
 from .locales import get_client_error
+from .types import ErrorClassTypes, ErrorTypes, StrOrBytes
 
 
 class Error(Exception):
     """Exception that is base class for all other error exceptions."""
 
-    def __init__(self, msg=None, errno=None, values=None, sqlstate=None):
+    def __init__(
+        self,
+        msg: Optional[str] = None,
+        errno: Optional[int] = None,
+        values: Optional[Tuple[Union[int, str], ...]] = None,
+        sqlstate: Optional[str] = None,
+    ) -> None:
         super().__init__()
         self.msg = msg
         self._full_msg = self.msg
@@ -64,7 +72,7 @@ class Error(Exception):
 
         self.args = (self.errno, self._full_msg, self.sqlstate)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self._full_msg
 
 
@@ -108,7 +116,7 @@ class TimeoutError(Error):  # pylint: disable=redefined-builtin
     """Exception for errors relating to connection timeout."""
 
 
-def intread(buf):
+def intread(buf: bytes) -> int:
     """Unpacks the given buffer to an integer."""
     if isinstance(buf, int):
         return buf
@@ -122,7 +130,7 @@ def intread(buf):
     return struct_unpack("<Q", tmp)[0]
 
 
-def read_int(buf, size):
+def read_int(buf: bytes, size: int) -> Tuple[bytes, int]:
     """Read an integer from buffer.
 
     Returns a tuple (truncated buffer, int).
@@ -131,7 +139,7 @@ def read_int(buf, size):
     return (buf[size:], res)
 
 
-def read_bytes(buf, size):
+def read_bytes(buf: bytes, size: int) -> Tuple[bytes, bytes]:
     """Reads bytes from a buffer.
 
     Returns a tuple with buffer less the read bytes, and the bytes.
@@ -140,7 +148,9 @@ def read_bytes(buf, size):
     return (buf[size:], res)
 
 
-def get_mysql_exception(errno, msg=None, sqlstate=None):
+def get_mysql_exception(
+    errno: int, msg: Optional[str] = None, sqlstate: Optional[str] = None
+) -> ErrorTypes:
     """Get the exception matching the MySQL error.
 
     This function will return an exception based on the SQLState. The given
@@ -166,7 +176,7 @@ def get_mysql_exception(errno, msg=None, sqlstate=None):
         return DatabaseError(msg=msg, errno=errno, sqlstate=sqlstate)
 
 
-def get_exception(packet):
+def get_exception(packet: bytes) -> ErrorTypes:
     """Returns an exception object based on the MySQL error.
 
     Returns an exception object based on the MySQL error in the given
@@ -182,7 +192,7 @@ def get_exception(packet):
     except IndexError as err:
         return InterfaceError(f"Failed getting Error information ({err})")
 
-    sqlstate = None
+    sqlstate: Optional[StrOrBytes] = None
     try:
         packet = packet[5:]
         packet, errno = read_int(packet, 2)
@@ -200,10 +210,10 @@ def get_exception(packet):
     except (IndexError, ValueError) as err:
         return InterfaceError(f"Failed getting Error information ({err})")
     else:
-        return get_mysql_exception(errno, errmsg, sqlstate)
+        return get_mysql_exception(errno, errmsg, sqlstate)  # type: ignore[arg-type]
 
 
-_SQLSTATE_CLASS_EXCEPTION = {
+_SQLSTATE_CLASS_EXCEPTION: Dict[str, ErrorClassTypes] = {
     "02": DataError,  # no data
     "07": DatabaseError,  # dynamic SQL error
     "08": OperationalError,  # connection exception
@@ -237,7 +247,7 @@ _SQLSTATE_CLASS_EXCEPTION = {
     "HY": DatabaseError,  # default when no SQLState provided by MySQL server
 }
 
-_ERROR_EXCEPTIONS = {
+_ERROR_EXCEPTIONS: Dict[int, ErrorClassTypes] = {
     1243: ProgrammingError,
     1210: ProgrammingError,
     2002: InterfaceError,

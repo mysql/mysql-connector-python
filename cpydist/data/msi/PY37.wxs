@@ -77,6 +77,10 @@
          Source="$(var.BDist37)\mysqlx\result.$(var.PyExt)" DiskId="1"/>
         <File Id="mysqlx_statementpy37" Name="statement.$(var.PyExt)"
          Source="$(var.BDist37)\mysqlx\statement.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_typespy37" Name="types.$(var.PyExt)"
+         Source="$(var.BDist37)\mysqlx\types.$(var.PyExt)" DiskId="1"/>
+        <File Id="mysqlx_pytyped37" Name="py.typed"
+         Source="$(var.BDist37)\mysqlx\py.typed" DiskId="1"/>
       </Component>
     </DirectoryRef>
 

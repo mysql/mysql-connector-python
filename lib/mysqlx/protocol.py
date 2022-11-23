@@ -33,6 +33,7 @@ import struct
 import zlib
 
 from io import BytesIO
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 try:
     import lz4.frame
@@ -71,6 +72,27 @@ from .protobuf import (
     mysqlxpb_enum,
 )
 from .result import Column
+from .statement import (
+    AddStatement,
+    DeleteStatement,
+    FindStatement,
+    InsertStatement,
+    ModifyStatement,
+    ReadStatement,
+    RemoveStatement,
+    SelectStatement,
+    UpdateStatement,
+)
+from .types import (
+    ColumnType,
+    MessageType,
+    ProtobufMessageCextType,
+    ProtobufMessageType,
+    ResultBaseType,
+    SocketType,
+    StatementType,
+    StrOrBytes,
+)
 
 _COMPRESSION_THRESHOLD = 1000
 _LOGGER = logging.getLogger("mysqlx")
@@ -87,19 +109,19 @@ class Compressor:
 
     """
 
-    def __init__(self, algorithm):
-        self._algorithm = algorithm
+    def __init__(self, algorithm: str) -> None:
+        self._algorithm: str = algorithm
+        self._compressobj: Any = None
+        self._decompressobj: Any = None
+
         if algorithm == "zstd_stream":
             self._compressobj = zstd.ZstdCompressor()
             self._decompressobj = zstd.ZstdDecompressor()
         elif algorithm == "deflate_stream":
             self._compressobj = zlib.compressobj()
             self._decompressobj = zlib.decompressobj()
-        else:
-            self._compressobj = None
-            self._decompressobj = None
 
-    def compress(self, data):
+    def compress(self, data: StrOrBytes) -> bytes:
         """Compresses data and returns it.
 
         Args:
@@ -122,7 +144,7 @@ class Compressor:
         compressed += self._compressobj.flush(zlib.Z_SYNC_FLUSH)
         return compressed
 
-    def decompress(self, data):
+    def decompress(self, data: StrOrBytes) -> bytes:
         """Decompresses a frame of data and returns it as a string of bytes.
 
         Args:
@@ -153,13 +175,13 @@ class MessageReader:
     .. versionadded:: 8.0.21
     """
 
-    def __init__(self, socket_stream):
-        self._stream = socket_stream
-        self._compressor = None
-        self._msg = None
-        self._msg_queue = []
+    def __init__(self, socket_stream: SocketType) -> None:
+        self._stream: SocketType = socket_stream
+        self._compressor: Optional[Compressor] = None
+        self._msg: MessageType = None
+        self._msg_queue: List[Message] = []
 
-    def _read_message(self):
+    def _read_message(self) -> MessageType:
         """Reads X Protocol messages from the stream and returns a
         :class:`mysqlx.protobuf.Message` object.
 
@@ -206,7 +228,7 @@ class MessageReader:
 
         return frame_msg
 
-    def read_message(self):
+    def read_message(self) -> MessageType:
         """Read message.
 
         Returns:
@@ -218,7 +240,7 @@ class MessageReader:
             return msg
         return self._read_message()
 
-    def push_message(self, msg):
+    def push_message(self, msg: MessageType) -> None:
         """Push message.
 
         Args:
@@ -231,7 +253,7 @@ class MessageReader:
             raise OperationalError("Message push slot is full")
         self._msg = msg
 
-    def set_compression(self, algorithm):
+    def set_compression(self, algorithm: str) -> None:
         """Creates a :class:`mysqlx.protocol.Compressor` object based on the
         compression algorithm.
 
@@ -254,11 +276,11 @@ class MessageWriter:
 
     """
 
-    def __init__(self, socket_stream):
-        self._stream = socket_stream
-        self._compressor = None
+    def __init__(self, socket_stream: SocketType) -> None:
+        self._stream: SocketType = socket_stream
+        self._compressor: Optional[Compressor] = None
 
-    def write_message(self, msg_type, msg):
+    def write_message(self, msg_type: int, msg: MessageType) -> None:
         """Write message.
 
         Args:
@@ -295,7 +317,7 @@ class MessageWriter:
             header = struct.pack("<LB", msg_size + 1, msg_type)
             self._stream.sendall(b"".join([header, msg_str]))
 
-    def set_compression(self, algorithm):
+    def set_compression(self, algorithm: str) -> None:
         """Creates a :class:`mysqlx.protocol.Compressor` object based on the
         compression algorithm.
 
@@ -315,19 +337,19 @@ class Protocol:
     .. versionchanged:: 8.0.21
     """
 
-    def __init__(self, reader, writer):
-        self._reader = reader
-        self._writer = writer
-        self._compression_algorithm = None
-        self._warnings = []
+    def __init__(self, reader: MessageReader, writer: MessageWriter) -> None:
+        self._reader: MessageReader = reader
+        self._writer: MessageWriter = writer
+        self._compression_algorithm: Optional[str] = None
+        self._warnings: List[str] = []
 
     @property
-    def compression_algorithm(self):
+    def compression_algorithm(self) -> Optional[str]:
         """str: The compresion algorithm."""
         return self._compression_algorithm
 
     @staticmethod
-    def _apply_filter(msg, stmt):
+    def _apply_filter(msg: MessageType, stmt: StatementType) -> None:
         """Apply filter.
 
         Args:
@@ -343,7 +365,7 @@ class Protocol:
         if stmt.has_having:
             msg["grouping_criteria"] = stmt.get_having()
 
-    def _create_any(self, arg):
+    def _create_any(self, arg: Any) -> Optional[MessageType]:
         """Create any.
 
         Args:
@@ -417,7 +439,9 @@ class Protocol:
 
         return None
 
-    def _get_binding_args(self, stmt, is_scalar=True):
+    def _get_binding_args(
+        self, stmt: StatementType, is_scalar: bool = True
+    ) -> Union[List[None], List[Union[ProtobufMessageType, ProtobufMessageCextType]]]:
         """Returns the binding any/scalar.
 
         Args:
@@ -432,7 +456,9 @@ class Protocol:
             list: A list of ``Any`` or ``Scalar`` objects.
         """
 
-        def build_value(value):
+        def build_value(
+            value: Any,
+        ) -> Union[ProtobufMessageType, ProtobufMessageCextType]:
             if is_scalar:
                 return build_scalar(value).get_message()
             return self._create_any(value).get_message()
@@ -445,7 +471,7 @@ class Protocol:
             return [build_value(value) for value in bindings]
 
         count = len(binding_map)
-        args = count * [None]
+        args: List[Any] = count * [None]
         if count != len(bindings):
             raise ProgrammingError(
                 "The number of bind parameters and placeholders do not match"
@@ -459,7 +485,7 @@ class Protocol:
             args[pos] = build_value(value)
         return args
 
-    def _process_frame(self, msg, result):
+    def _process_frame(self, msg: MessageType, result: ResultBaseType) -> None:
         """Process frame.
 
         Args:
@@ -513,7 +539,7 @@ class Protocol:
                         get_item_or_attr(sess_state_value, "v_unsigned_int")
                     )
 
-    def _read_message(self, result):
+    def _read_message(self, result: ResultBaseType) -> Optional[MessageType]:
         """Read message.
 
         Args:
@@ -546,7 +572,7 @@ class Protocol:
                 break
         return msg
 
-    def set_compression(self, algorithm):
+    def set_compression(self, algorithm: str) -> None:
         """Sets the compression algorithm to be used by the compression
         object, for uplink and downlink.
 
@@ -560,7 +586,7 @@ class Protocol:
         self._reader.set_compression(algorithm)
         self._writer.set_compression(algorithm)
 
-    def get_capabilites(self):
+    def get_capabilites(self) -> MessageType:
         """Get capabilities.
 
         Returns:
@@ -580,7 +606,7 @@ class Protocol:
 
         return msg
 
-    def set_capabilities(self, **kwargs):
+    def set_capabilities(self, **kwargs: Any) -> None:
         """Set capabilities.
 
         Args:
@@ -628,7 +654,12 @@ class Protocol:
                 raise
         return None
 
-    def send_auth_start(self, method, auth_data=None, initial_response=None):
+    def send_auth_start(
+        self,
+        method: str,
+        auth_data: Optional[str] = None,
+        initial_response: Optional[str] = None,
+    ) -> None:
         """Send authenticate start.
 
         Args:
@@ -647,7 +678,7 @@ class Protocol:
             msg,
         )
 
-    def read_auth_continue(self):
+    def read_auth_continue(self) -> bytes:
         """Read authenticate continue.
 
         Raises:
@@ -666,7 +697,7 @@ class Protocol:
             )
         return msg["auth_data"]
 
-    def send_auth_continue(self, auth_data):
+    def send_auth_continue(self, auth_data: str) -> None:
         """Send authenticate continue.
 
         Args:
@@ -678,7 +709,7 @@ class Protocol:
             msg,
         )
 
-    def read_auth_ok(self):
+    def read_auth_ok(self) -> None:
         """Read authenticate OK.
 
         Raises:
@@ -691,7 +722,9 @@ class Protocol:
             if msg.type == "Mysqlx.Error":
                 raise InterfaceError(msg.msg)
 
-    def send_prepare_prepare(self, msg_type, msg, stmt):
+    def send_prepare_prepare(
+        self, msg_type: str, msg: MessageType, stmt: StatementType
+    ) -> None:
         """
         Send prepare statement.
 
@@ -747,7 +780,9 @@ class Protocol:
         except InterfaceError as err:
             raise NotSupportedError from err
 
-    def send_prepare_execute(self, msg_type, msg, stmt):
+    def send_prepare_execute(
+        self, msg_type: str, msg: MessageType, stmt: StatementType
+    ) -> None:
         """
         Send execute statement.
 
@@ -782,7 +817,7 @@ class Protocol:
             msg_execute,
         )
 
-    def send_prepare_deallocate(self, stmt_id):
+    def send_prepare_deallocate(self, stmt_id: int) -> None:
         """
         Send prepare deallocate statement.
 
@@ -799,7 +834,9 @@ class Protocol:
         )
         self.read_ok()
 
-    def send_msg_without_ps(self, msg_type, msg, stmt):
+    def send_msg_without_ps(
+        self, msg_type: str, msg: MessageType, stmt: StatementType
+    ) -> None:
         """
         Send a message without prepared statements support.
 
@@ -822,7 +859,7 @@ class Protocol:
             msg["args"].extend(args)
         self.send_msg(msg_type, msg)
 
-    def send_msg(self, msg_type, msg):
+    def send_msg(self, msg_type: str, msg: MessageType) -> None:
         """
         Send a message.
 
@@ -834,7 +871,9 @@ class Protocol:
         """
         self._writer.write_message(mysqlxpb_enum(msg_type), msg)
 
-    def build_find(self, stmt):
+    def build_find(
+        self, stmt: Union[FindStatement, ReadStatement, SelectStatement]
+    ) -> Tuple[str, MessageType]:
         """Build find/read message.
 
         Args:
@@ -874,7 +913,9 @@ class Protocol:
 
         return "Mysqlx.ClientMessages.Type.CRUD_FIND", msg
 
-    def build_update(self, stmt):
+    def build_update(
+        self, stmt: Union[ModifyStatement, UpdateStatement]
+    ) -> Tuple[str, MessageType]:
         """Build update message.
 
         Args:
@@ -913,7 +954,9 @@ class Protocol:
 
         return "Mysqlx.ClientMessages.Type.CRUD_UPDATE", msg
 
-    def build_delete(self, stmt):
+    def build_delete(
+        self, stmt: Union[DeleteStatement, RemoveStatement]
+    ) -> Tuple[str, MessageType]:
         """Build delete message.
 
         Args:
@@ -944,7 +987,12 @@ class Protocol:
         self._apply_filter(msg, stmt)
         return "Mysqlx.ClientMessages.Type.CRUD_DELETE", msg
 
-    def build_execute_statement(self, namespace, stmt, fields=None):
+    def build_execute_statement(
+        self,
+        namespace: str,
+        stmt: StatementType,
+        fields: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, MessageType]:
         """Build execute statement.
 
         Args:
@@ -982,7 +1030,9 @@ class Protocol:
         return "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE", msg
 
     @staticmethod
-    def build_insert(stmt):
+    def build_insert(
+        stmt: Union[AddStatement, InsertStatement]
+    ) -> Tuple[str, MessageType]:
         """Build insert statement.
 
         Args:
@@ -1032,7 +1082,7 @@ class Protocol:
 
         return "Mysqlx.ClientMessages.Type.CRUD_INSERT", msg
 
-    def close_result(self, result):
+    def close_result(self, result: ResultBaseType) -> None:
         """Close the result.
 
         Args:
@@ -1045,7 +1095,7 @@ class Protocol:
         if msg is not None:
             raise OperationalError("Expected to close the result")
 
-    def read_row(self, result):
+    def read_row(self, result: ResultBaseType) -> Optional[MessageType]:
         """Read row.
 
         Args:
@@ -1059,7 +1109,7 @@ class Protocol:
         self._reader.push_message(msg)
         return None
 
-    def get_column_metadata(self, result):
+    def get_column_metadata(self, result: ResultBaseType) -> List[ColumnType]:
         """Returns column metadata.
 
         Args:
@@ -1095,7 +1145,7 @@ class Protocol:
             columns.append(col)
         return columns
 
-    def read_ok(self):
+    def read_ok(self) -> None:
         """Read OK.
 
         Raises:
@@ -1107,21 +1157,21 @@ class Protocol:
         if msg.type != "Mysqlx.Ok":
             raise InterfaceError("Unexpected message encountered")
 
-    def send_connection_close(self):
+    def send_connection_close(self) -> None:
         """Send connection close."""
         msg = Message("Mysqlx.Connection.Close")
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.CON_CLOSE"), msg
         )
 
-    def send_close(self):
+    def send_close(self) -> None:
         """Send close."""
         msg = Message("Mysqlx.Session.Close")
         self._writer.write_message(
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.SESS_CLOSE"), msg
         )
 
-    def send_expect_open(self):
+    def send_expect_open(self) -> None:
         """Send expectation."""
         cond_key = mysqlxpb_enum("Mysqlx.Expect.Open.Condition.Key.EXPECT_FIELD_EXIST")
         msg_oc = Message("Mysqlx.Expect.Open.Condition")
@@ -1135,7 +1185,7 @@ class Protocol:
             mysqlxpb_enum("Mysqlx.ClientMessages.Type.EXPECT_OPEN"), msg_eo
         )
 
-    def send_reset(self, keep_open=None):
+    def send_reset(self, keep_open: Optional[bool] = None) -> bool:
         """Send reset session message.
 
         Returns:

@@ -131,15 +131,36 @@ allow_redefinition = true
 no_strict_optional = true
 no_implicit_optional = true
 files = [
-    'lib/mysql',
+    "lib",
+]
+# exclude is not working for some unknown  reason!
+# as a workaround I added a `type: ignore` header
+# in the files listed below to force the exclusion
+exclude = [
+  "lib/mysqlx/protobuf/mysqlx_connection_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_crud_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_cursor_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_expect_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_expr_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_notice_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_prepare_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_resultset_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_session_pb2.py",
+  "lib/mysqlx/protobuf/mysqlx_sql_pb2.py",
 ]
 
 [[tool.mypy.overrides]]
 module = [
   "_mysql_connector",
+  "_mysqlxpb",
   "cryptography.*",
   "dns.*",
+  "google.*",
+  "lz4.*",
   "mysql.*",
+  "mysqlx.protobuf",
   "oci",
   "sqlparse",
   "sspi",

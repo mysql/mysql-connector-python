@@ -30,10 +30,12 @@
 
 __all__ = ["get_client_error"]
 
+from typing import Optional, Union
+
 from .. import errorcode
 
 
-def get_client_error(error, language="eng"):
+def get_client_error(error: Union[int, str], language: str = "eng") -> Optional[str]:
     """Lookup client error
 
     This function will lookup the client error message based on the given

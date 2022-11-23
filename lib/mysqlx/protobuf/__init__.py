@@ -26,10 +26,19 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+# mypy: disable-error-code="attr-defined,union-attr"
+
 """Implementation of a helper class for MySQL X Protobuf messages."""
 
 # pylint: disable=c-extension-no-member, no-member
-_SERVER_MESSAGES_TUPLES = (
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
+
+from ..types import MessageType, ProtobufMessageCextType, ProtobufMessageType
+
+_SERVER_MESSAGES_TUPLES: Tuple[Tuple[str, str], ...] = (
     ("Mysqlx.ServerMessages.Type.OK", "Mysqlx.Ok"),
     ("Mysqlx.ServerMessages.Type.ERROR", "Mysqlx.Error"),
     (
@@ -76,8 +85,14 @@ _SERVER_MESSAGES_TUPLES = (
     ),
 )
 
-PROTOBUF_VERSION = None
-PROTOBUF_REPEATED_TYPES = [list]
+PROTOBUF_VERSION: Optional[str] = None
+PROTOBUF_REPEATED_TYPES: List[
+    Union[
+        Type[List[Dict[str, Any]]],
+        Type[RepeatedCompositeContainer],
+        Type[RepeatedCompositeFieldContainer],
+    ]
+] = [list]
 
 try:
     import _mysqlxpb
@@ -129,7 +144,7 @@ try:
     )
 
     # Dictionary with all messages descriptors
-    _MESSAGES = {}
+    _MESSAGES: Dict[str, int] = {}
 
     # Mysqlx
     for key, val in mysqlx_pb2.ClientMessages.Type.items():
@@ -258,10 +273,10 @@ try:
         """This class implements the methods in pure Python used by the
         _mysqlxpb C++ extension."""
 
-        factory = message_factory.MessageFactory()
+        factory: message_factory.MessageFactory = message_factory.MessageFactory()
 
         @staticmethod
-        def new_message(name):
+        def new_message(name: str) -> ProtobufMessageType:
             """Create new Protobuf message.
 
             Args:
@@ -276,43 +291,43 @@ try:
             return cls()
 
         @staticmethod
-        def enum_value(enum_key):
+        def enum_value(enum_key: str) -> int:
             """Return enum value.
 
             Args:
                 enum_key (str): Enum key.
 
             Returns:
-                object: Protobuf message.
+                int: enum value.
             """
             return _MESSAGES[enum_key]
 
         @staticmethod
-        def serialize_message(msg):
+        def serialize_message(msg: ProtobufMessageType) -> bytes:
             """Serialize message.
 
             Args:
                 msg (object): Protobuf message.
 
             Returns:
-                str: Serialized message string.
+                bytes: Serialized message bytes string.
             """
             return msg.SerializeToString()
 
         @staticmethod
-        def serialize_partial_message(msg):
+        def serialize_partial_message(msg: ProtobufMessageType) -> bytes:
             """Serialize partial message.
 
             Args:
                 msg (object): Protobuf message.
 
             Returns:
-                str: Serialized partial message string.
+                bytes: Serialized partial message bytes string.
             """
             return msg.SerializePartialToString()
 
         @staticmethod
-        def parse_message(msg_type_name, payload):
+        def parse_message(msg_type_name: str, payload: bytes) -> ProtobufMessageType:
             """Serialize partial message.
 
             Args:
@@ -327,11 +342,11 @@ try:
             return msg
 
         @staticmethod
-        def parse_server_message(msg_type, payload):
+        def parse_server_message(msg_type: int, payload: bytes) -> ProtobufMessageType:
             """Parse server message message.
 
             Args:
-                msg_type (str): Message type name.
+                msg_type (int): Message type.
                 payload (bytes): Payload.
 
             Returns:
@@ -352,7 +367,7 @@ except (ImportError, SyntaxError, TypeError) as err:
     if not HAVE_MYSQLXPB_CEXT:
         raise ImportError(f"Protobuf is not available: {HAVE_PROTOBUF_ERROR}") from err
 
-CRUD_PREPARE_MAPPING = {
+CRUD_PREPARE_MAPPING: Dict[str, Tuple[str, str]] = {
     "Mysqlx.ClientMessages.Type.CRUD_FIND": (
         "Mysqlx.Prepare.Prepare.OneOfMessage.Type.FIND",
         "find",
@@ -384,10 +399,10 @@ class Protobuf:
     """
 
     mysqlxpb = _mysqlxpb if HAVE_MYSQLXPB_CEXT else _mysqlxpb_pure
-    use_pure = not HAVE_MYSQLXPB_CEXT
+    use_pure: bool = not HAVE_MYSQLXPB_CEXT
 
     @staticmethod
-    def set_use_pure(use_pure):
+    def set_use_pure(use_pure: bool) -> None:
         """Sets whether to use the C extension or pure Python implementation.
 
         Args:
@@ -409,14 +424,16 @@ class Message:
         **kwargs: Arbitrary keyword arguments with values for the message.
     """
 
-    def __init__(self, msg_type_name=None, **kwargs):
+    def __init__(self, msg_type_name: Optional[str] = None, **kwargs: Any) -> None:
+        # _msg is a protobuf message instance when use_pure=True,
+        # else is a dictionary instance.
         self.__dict__["_msg"] = (
             Protobuf.mysqlxpb.new_message(msg_type_name) if msg_type_name else None
         )
         for name, value in kwargs.items():
             self.__setattr__(name, value)
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if Protobuf.use_pure:
             if isinstance(value, str):
                 setattr(self._msg, name, encode_to_bytes(value))
@@ -436,7 +453,7 @@ class Message:
                     value.get_message() if isinstance(value, Message) else value
                 )
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         try:
             return (
                 self._msg[name] if not Protobuf.use_pure else getattr(self._msg, name)
@@ -444,13 +461,13 @@ class Message:
         except KeyError:
             raise AttributeError from None
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name: str, value: Any) -> None:
         self.__setattr__(name, value)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: str) -> Any:
         return self.__getattr__(name)
 
-    def get(self, name, default=None):
+    def get(self, name: str, default: Any = None) -> Any:
         """Returns the value of an element of the message dictionary.
 
         Args:
@@ -466,7 +483,9 @@ class Message:
             else getattr(self.__dict__["_msg"], name, default)
         )
 
-    def set_message(self, msg):
+    def set_message(
+        self, msg: Union[ProtobufMessageType, ProtobufMessageCextType]
+    ) -> None:
         """Sets the message.
 
         Args:
@@ -474,7 +493,7 @@ class Message:
         """
         self.__dict__["_msg"] = msg
 
-    def get_message(self):
+    def get_message(self) -> Union[ProtobufMessageType, ProtobufMessageCextType]:
         """Returns the dictionary representing a message containing parsed
         data.
 
@@ -483,7 +502,7 @@ class Message:
         """
         return self.__dict__["_msg"]
 
-    def serialize_to_string(self):
+    def serialize_to_string(self) -> bytes:
         """Serializes a message to a string.
 
         Returns:
@@ -491,7 +510,7 @@ class Message:
         """
         return Protobuf.mysqlxpb.serialize_message(self._msg)
 
-    def serialize_partial_to_string(self):
+    def serialize_partial_to_string(self) -> bytes:
         """Serializes the protocol message to a binary string.
 
         This method is similar to serialize_to_string but doesn't check if the
@@ -503,7 +522,7 @@ class Message:
         return Protobuf.mysqlxpb.serialize_partial_message(self._msg)
 
     @property
-    def type(self):
+    def type(self) -> str:
         """string: Message type name."""
         return (
             self._msg["_mysqlxpb_type_name"]
@@ -512,7 +531,9 @@ class Message:
         )
 
     @staticmethod
-    def parse(msg_type_name, payload):
+    def parse(
+        msg_type_name: str, payload: bytes
+    ) -> Union[ProtobufMessageType, ProtobufMessageCextType]:
         """Creates a new message, initialized with parsed data.
 
         Args:
@@ -527,7 +548,7 @@ class Message:
         return Protobuf.mysqlxpb.parse_message(msg_type_name, payload)
 
     @staticmethod
-    def byte_size(msg):
+    def byte_size(msg: Union[ProtobufMessageType, ProtobufMessageCextType]) -> int:
         """Returns the size of the message in bytes.
 
         Args:
@@ -545,7 +566,9 @@ class Message:
         )
 
     @staticmethod
-    def parse_from_server(msg_type, payload):
+    def parse_from_server(
+        msg_type: int, payload: bytes
+    ) -> Union[ProtobufMessageType, ProtobufMessageCextType]:
         """Creates a new server-side message, initialized with parsed data.
 
         Args:
@@ -558,7 +581,7 @@ class Message:
         return Protobuf.mysqlxpb.parse_server_message(msg_type, payload)
 
     @classmethod
-    def from_message(cls, msg_type_name, payload):
+    def from_message(cls, msg_type_name: str, payload: bytes) -> MessageType:
         """Creates a new message, initialized with parsed data and returns a
         :class:`mysqlx.protobuf.Message` object.
 
@@ -575,7 +598,7 @@ class Message:
         return msg
 
     @classmethod
-    def from_server_message(cls, msg_type, payload):
+    def from_server_message(cls, msg_type: int, payload: bytes) -> MessageType:
         """Creates a new server-side message, initialized with parsed data and
         returns a :class:`mysqlx.protobuf.Message` object.
 
@@ -592,7 +615,7 @@ class Message:
         return msg
 
 
-def mysqlxpb_enum(name):
+def mysqlxpb_enum(name: str) -> int:
     """Returns the value of a MySQL X Protobuf enumerator.
 
     Args:

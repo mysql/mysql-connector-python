@@ -220,7 +220,10 @@ class BaseCommand(Command):
         install.extra_link_args = self.extra_link_args
         install.skip_vendor = self.skip_vendor
 
-        self.distribution.package_data = {"mysql.connector": ["py.typed"]}
+        self.distribution.package_data = {
+            "mysql.connector": ["py.typed"],
+            "mysqlx": ["py.typed"],
+        }
         if not cmd_build_ext.skip_vendor:
             self._copy_vendor_libraries()
 
@@ -481,6 +484,7 @@ class BaseCommand(Command):
             "mysql.connector": [
                 "py.typed",
             ],
+            "mysqlx": ["py.typed"],
         }
 
 

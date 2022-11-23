@@ -31,10 +31,12 @@
 """This module contains the MySQL Server Character Sets."""
 
 # This file was auto-generated.
+from typing import List, Optional, Tuple
+
 _GENERATED_ON = "2022-05-09"
 _MYSQL_VERSION = (8, 0, 30)
 
-MYSQL_CHARACTER_SETS = [
+MYSQL_CHARACTER_SETS: List[Optional[Tuple[str, str, bool]]] = [
     # (character set name, collation, default)
     None,
     ("big5", "big5_chinese_ci", True),  # 1
@@ -362,7 +364,7 @@ MYSQL_CHARACTER_SETS = [
     ("utf8mb4", "utf8mb4_mn_cyrl_0900_as_cs", False),  # 323
 ]
 
-MYSQL_CHARACTER_SETS_57 = [
+MYSQL_CHARACTER_SETS_57: List[Optional[Tuple[str, str, bool]]] = [
     # (character set name, collation, default)
     None,
     ("big5", "big5_chinese_ci", True),  # 1

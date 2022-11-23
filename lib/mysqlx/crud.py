@@ -28,8 +28,12 @@
 
 """Implementation of the CRUD database objects."""
 
+from __future__ import annotations
+
 import json
 import warnings
+
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from .dbdoc import DbDoc
 from .errorcode import (
@@ -51,6 +55,10 @@ from .statement import (
     SelectStatement,
     UpdateStatement,
 )
+from .types import ConnectionType, SchemaType, SessionType, StrOrBytes
+
+if TYPE_CHECKING:
+    from .result import Result
 
 _COUNT_VIEWS_QUERY = (
     "SELECT COUNT(*) FROM information_schema.views "
@@ -75,28 +83,28 @@ class DatabaseObject:
         name (str): The database object name.
     """
 
-    def __init__(self, schema, name):
-        self._schema = schema
-        self._name = name.decode() if isinstance(name, bytes) else name
-        self._session = self._schema.get_session()
-        self._connection = self._session.get_connection()
+    def __init__(self, schema: SchemaType, name: StrOrBytes) -> None:
+        self._schema: SchemaType = schema
+        self._name: str = name.decode() if isinstance(name, bytes) else name
+        self._session: SessionType = self._schema.get_session()
+        self._connection: ConnectionType = self._session.get_connection()
 
     @property
-    def session(self):
+    def session(self) -> SessionType:
         """:class:`mysqlx.Session`: The Session object."""
         return self._session
 
     @property
-    def schema(self):
+    def schema(self) -> SchemaType:
         """:class:`mysqlx.Schema`: The Schema object."""
         return self._schema
 
     @property
-    def name(self):
+    def name(self) -> str:
         """str: The name of this database object."""
         return self._name
 
-    def get_connection(self):
+    def get_connection(self) -> ConnectionType:
         """Returns the underlying connection.
 
         Returns:
@@ -104,7 +112,7 @@ class DatabaseObject:
         """
         return self._connection
 
-    def get_session(self):
+    def get_session(self) -> SessionType:
         """Returns the session of this database object.
 
         Returns:
@@ -112,7 +120,7 @@ class DatabaseObject:
         """
         return self._session
 
-    def get_schema(self):
+    def get_schema(self) -> SchemaType:
         """Returns the Schema object of this database object.
 
         Returns:
@@ -120,7 +128,7 @@ class DatabaseObject:
         """
         return self._schema
 
-    def get_name(self):
+    def get_name(self) -> str:
         """Returns the name of this database object.
 
         Returns:
@@ -128,7 +136,7 @@ class DatabaseObject:
         """
         return self._name
 
-    def exists_in_database(self):
+    def exists_in_database(self) -> Any:
         """Verifies if this object exists in the database.
 
         Returns:
@@ -140,7 +148,7 @@ class DatabaseObject:
         raise NotImplementedError
 
     @deprecated("8.0.12", "Use 'exists_in_database()' method instead")
-    def am_i_real(self):
+    def am_i_real(self) -> Any:
         """Verifies if this object exists in the database.
 
         Returns:
@@ -155,7 +163,7 @@ class DatabaseObject:
         return self.exists_in_database()
 
     @deprecated("8.0.12", "Use 'get_name()' method instead")
-    def who_am_i(self):
+    def who_am_i(self) -> str:
         """Returns the name of this database object.
 
         Returns:
@@ -176,11 +184,11 @@ class Schema(DatabaseObject):
         name (str): The Schema name.
     """
 
-    def __init__(self, session, name):
-        self._session = session
+    def __init__(self, session: SessionType, name: str) -> None:
+        self._session: SessionType = session
         super().__init__(self, name)
 
-    def exists_in_database(self):
+    def exists_in_database(self) -> bool:
         """Verifies if this object exists in the database.
 
         Returns:
@@ -189,7 +197,7 @@ class Schema(DatabaseObject):
         sql = _COUNT_SCHEMAS_QUERY.format(escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
-    def get_collections(self):
+    def get_collections(self) -> List[Collection]:
         """Returns a list of collections for this schema.
 
         Returns:
@@ -208,7 +216,9 @@ class Schema(DatabaseObject):
             collections.append(collection)
         return collections
 
-    def get_collection_as_table(self, name, check_existence=False):
+    def get_collection_as_table(
+        self, name: str, check_existence: bool = False
+    ) -> Table:
         """Returns a a table object for the given collection
 
         Returns:
@@ -217,7 +227,7 @@ class Schema(DatabaseObject):
         """
         return self.get_table(name, check_existence)
 
-    def get_tables(self):
+    def get_tables(self) -> List[Table]:
         """Returns a list of tables for this schema.
 
         Returns:
@@ -239,7 +249,7 @@ class Schema(DatabaseObject):
                 tables.append(table)
         return tables
 
-    def get_table(self, name, check_existence=False):
+    def get_table(self, name: str, check_existence: bool = False) -> Table:
         """Returns the table of the given name for this schema.
 
         Returns:
@@ -251,7 +261,7 @@ class Schema(DatabaseObject):
                 raise ProgrammingError("Table does not exist")
         return table
 
-    def get_view(self, name, check_existence=False):
+    def get_view(self, name: str, check_existence: bool = False) -> View:
         """Returns the view of the given name for this schema.
 
         Returns:
@@ -263,7 +273,7 @@ class Schema(DatabaseObject):
                 raise ProgrammingError("View does not exist")
         return view
 
-    def get_collection(self, name, check_existence=False):
+    def get_collection(self, name: str, check_existence: bool = False) -> Collection:
         """Returns the collection of the given name for this schema.
 
         Returns:
@@ -275,7 +285,7 @@ class Schema(DatabaseObject):
                 raise ProgrammingError("Collection does not exist")
         return collection
 
-    def drop_collection(self, name):
+    def drop_collection(self, name: str) -> None:
         """Drops a collection.
 
         Args:
@@ -289,7 +299,13 @@ class Schema(DatabaseObject):
             False,
         )
 
-    def create_collection(self, name, reuse_existing=False, validation=None, **kwargs):
+    def create_collection(
+        self,
+        name: str,
+        reuse_existing: bool = False,
+        validation: Optional[Dict[str, Union[str, Dict]]] = None,
+        **kwargs: Any,
+    ) -> Collection:
         """Creates in the current schema a new collection with the specified
         name and retrieves an object representing the new collection created.
 
@@ -325,7 +341,7 @@ class Schema(DatabaseObject):
             reuse_existing = kwargs["reuse"]
 
         collection = Collection(self, name)
-        fields = {"schema": self._name, "name": name}
+        fields: Dict[str, Any] = {"schema": self._name, "name": name}
 
         if validation is not None:
             if not isinstance(validation, dict) or not validation:
@@ -378,7 +394,9 @@ class Schema(DatabaseObject):
 
         return collection
 
-    def modify_collection(self, name, validation=None):
+    def modify_collection(
+        self, name: str, validation: Optional[Dict[str, Union[str, Dict]]] = None
+    ) -> None:
         """Modifies a collection using a JSON schema validation.
 
         Args:
@@ -453,7 +471,7 @@ class Collection(DatabaseObject):
         name (str): The collection name.
     """
 
-    def exists_in_database(self):
+    def exists_in_database(self) -> bool:
         """Verifies if this object exists in the database.
 
         Returns:
@@ -462,7 +480,7 @@ class Collection(DatabaseObject):
         sql = _COUNT_TABLES_QUERY.format(escape(self._schema.name), escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
-    def find(self, condition=None):
+    def find(self, condition: Optional[str] = None) -> FindStatement:
         """Retrieves documents from a collection.
 
         Args:
@@ -473,7 +491,7 @@ class Collection(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def add(self, *values):
+    def add(self, *values: DbDoc) -> AddStatement:
         """Adds a list of documents to a collection.
 
         Args:
@@ -484,7 +502,7 @@ class Collection(DatabaseObject):
         """
         return AddStatement(self).add(*values)
 
-    def remove(self, condition):
+    def remove(self, condition: str) -> RemoveStatement:
         """Removes documents based on the ``condition``.
 
         Args:
@@ -501,7 +519,7 @@ class Collection(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def modify(self, condition):
+    def modify(self, condition: str) -> ModifyStatement:
         """Modifies documents based on the ``condition``.
 
         Args:
@@ -518,7 +536,7 @@ class Collection(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def count(self):
+    def count(self) -> int:
         """Counts the documents in the collection.
 
         Returns:
@@ -538,7 +556,9 @@ class Collection(DatabaseObject):
             raise
         return res
 
-    def create_index(self, index_name, fields_desc):
+    def create_index(
+        self, index_name: str, fields_desc: Dict[str, Any]
+    ) -> CreateCollectionIndexStatement:
         """Creates a collection index.
 
         Args:
@@ -562,7 +582,7 @@ class Collection(DatabaseObject):
         """
         return CreateCollectionIndexStatement(self, index_name, fields_desc)
 
-    def drop_index(self, index_name):
+    def drop_index(self, index_name: str) -> None:
         """Drops a collection index.
 
         Args:
@@ -579,7 +599,7 @@ class Collection(DatabaseObject):
             },
         )
 
-    def replace_one(self, doc_id, doc):
+    def replace_one(self, doc_id: str, doc: Union[Dict, DbDoc]) -> "Result":
         """Replaces the Document matching the document ID with a new document
         provided.
 
@@ -594,7 +614,7 @@ class Collection(DatabaseObject):
             )
         return self.modify("_id = :id").set("$", doc).bind("id", doc_id).execute()
 
-    def add_or_replace_one(self, doc_id, doc):
+    def add_or_replace_one(self, doc_id: str, doc: Union[Dict, DbDoc]) -> "Result":
         """Upserts the Document matching the document ID with a new document
         provided.
 
@@ -611,7 +631,7 @@ class Collection(DatabaseObject):
             doc = DbDoc(doc)
         return self.add(doc.copy(doc_id)).upsert(True).execute()
 
-    def get_one(self, doc_id):
+    def get_one(self, doc_id: str) -> DbDoc:
         """Returns a Document matching the Document ID.
 
         Args:
@@ -625,7 +645,7 @@ class Collection(DatabaseObject):
         self._connection.fetch_active_result()
         return doc
 
-    def remove_one(self, doc_id):
+    def remove_one(self, doc_id: str) -> "Result":
         """Removes a Document matching the Document ID.
 
         Args:
@@ -648,7 +668,7 @@ class Table(DatabaseObject):
         name (str): The table name.
     """
 
-    def exists_in_database(self):
+    def exists_in_database(self) -> bool:
         """Verifies if this object exists in the database.
 
         Returns:
@@ -657,7 +677,7 @@ class Table(DatabaseObject):
         sql = _COUNT_TABLES_QUERY.format(escape(self._schema.name), escape(self._name))
         return self._connection.execute_sql_scalar(sql) == 1
 
-    def select(self, *fields):
+    def select(self, *fields: str) -> SelectStatement:
         """Creates a new :class:`mysqlx.SelectStatement` object.
 
         Args:
@@ -670,7 +690,7 @@ class Table(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def insert(self, *fields):
+    def insert(self, *fields: Any) -> InsertStatement:
         """Creates a new :class:`mysqlx.InsertStatement` object.
 
         Args:
@@ -683,7 +703,7 @@ class Table(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def update(self):
+    def update(self) -> UpdateStatement:
         """Creates a new :class:`mysqlx.UpdateStatement` object.
 
         Returns:
@@ -693,7 +713,7 @@ class Table(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def delete(self):
+    def delete(self) -> DeleteStatement:
         """Creates a new :class:`mysqlx.DeleteStatement` object.
 
         Returns:
@@ -706,7 +726,7 @@ class Table(DatabaseObject):
         stmt.stmt_id = self._connection.get_next_statement_id()
         return stmt
 
-    def count(self):
+    def count(self) -> int:
         """Counts the rows in the table.
 
         Returns:
@@ -726,7 +746,7 @@ class Table(DatabaseObject):
             raise
         return res
 
-    def is_view(self):
+    def is_view(self) -> bool:
         """Determine if the underlying object is a view or not.
 
         Returns:
@@ -746,7 +766,7 @@ class View(Table):
         name (str): The table name.
     """
 
-    def exists_in_database(self):
+    def exists_in_database(self) -> bool:
         """Verifies if this object exists in the database.
 
         Returns:

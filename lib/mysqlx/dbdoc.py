@@ -28,7 +28,11 @@
 
 """Implementation of the DbDoc."""
 
+from __future__ import annotations
+
 import json
+
+from typing import Any, Dict, KeysView, Optional, Union
 
 from .errors import ProgrammingError
 
@@ -37,7 +41,7 @@ class ExprJSONEncoder(json.JSONEncoder):
     """A :class:`json.JSONEncoder` subclass, which enables encoding of
     :class:`mysqlx.ExprParser` objects."""
 
-    def default(self, o):
+    def default(self, o: object) -> str:
         if hasattr(o, "expr"):
             return f"{o}"
         # Let the base class default method raise the TypeError
@@ -54,7 +58,7 @@ class DbDoc:
         ValueError: If ``value`` type is not a basestring or dict.
     """
 
-    def __init__(self, value):
+    def __init__(self, value: Union[str, Dict[str, Any]]) -> None:
         if isinstance(value, dict):
             self.__dict__ = value
         elif isinstance(value, str):
@@ -62,24 +66,24 @@ class DbDoc:
         else:
             raise ValueError(f"Unable to handle type: {type(value)}")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.as_str()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.__dict__)
 
-    def __setitem__(self, index, value):
+    def __setitem__(self, index: str, value: Any) -> None:
         if index == "_id":
             raise ProgrammingError("Cannot modify _id")
         self.__dict__[index] = value
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: str) -> Any:
         return self.__dict__[index]
 
-    def __contains__(self, item):
+    def __contains__(self, item: str) -> bool:
         return item in self.__dict__
 
-    def copy(self, doc_id=None):
+    def copy(self, doc_id: Optional[str] = None) -> DbDoc:
         """Returns a new copy of a :class:`mysqlx.DbDoc` object containing the
         `doc_id` provided. If `doc_id` is not provided, it will be removed from
         new :class:`mysqlx.DbDoc` object.
@@ -97,7 +101,7 @@ class DbDoc:
             del new_dict["_id"]
         return DbDoc(new_dict)
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         """Returns the keys.
 
         Returns:
@@ -105,7 +109,7 @@ class DbDoc:
         """
         return self.__dict__.keys()
 
-    def as_str(self):
+    def as_str(self) -> str:
         """Serialize :class:`mysqlx.DbDoc` to a JSON formatted ``str``.
 
         Returns:

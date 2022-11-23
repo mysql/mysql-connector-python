@@ -31,10 +31,12 @@
 import hashlib
 import struct
 
+from typing import Optional
+
 from .helpers import hexlify
 
 
-def xor_string(hash1, hash2, hash_size):
+def xor_string(hash1: bytes, hash2: bytes, hash_size: int) -> bytes:
     """Encrypt/Decrypt function used for password encryption in
     authentication, using a simple XOR.
 
@@ -52,11 +54,11 @@ def xor_string(hash1, hash2, hash_size):
 class BaseAuthPlugin:
     """Base class for implementing the authentication plugins."""
 
-    def __init__(self, username=None, password=None):
-        self._username = username
-        self._password = password
+    def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
+        self._username: Optional[str] = username
+        self._password: Optional[str] = password
 
-    def name(self):
+    def name(self) -> str:
         """Returns the plugin name.
 
         Returns:
@@ -64,7 +66,7 @@ class BaseAuthPlugin:
         """
         raise NotImplementedError
 
-    def auth_name(self):
+    def auth_name(self) -> str:
         """Returns the authentication name.
 
         Returns:
@@ -76,7 +78,7 @@ class BaseAuthPlugin:
 class MySQL41AuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Native Password authentication plugin."""
 
-    def name(self):
+    def name(self) -> str:
         """Returns the plugin name.
 
         Returns:
@@ -84,7 +86,7 @@ class MySQL41AuthPlugin(BaseAuthPlugin):
         """
         return "MySQL 4.1 Authentication Plugin"
 
-    def auth_name(self):
+    def auth_name(self) -> str:
         """Returns the authentication name.
 
         Returns:
@@ -92,11 +94,11 @@ class MySQL41AuthPlugin(BaseAuthPlugin):
         """
         return "MYSQL41"
 
-    def auth_data(self, data):
+    def auth_data(self, data: bytes) -> str:
         """Hashing for MySQL 4.1 authentication.
 
         Args:
-            data (str): The authentication data.
+            data (bytes): The authentication data.
 
         Returns:
             str: The authentication response.
@@ -117,7 +119,7 @@ class MySQL41AuthPlugin(BaseAuthPlugin):
 class PlainAuthPlugin(BaseAuthPlugin):
     """Class implementing the MySQL Plain authentication plugin."""
 
-    def name(self):
+    def name(self) -> str:
         """Returns the plugin name.
 
         Returns:
@@ -125,7 +127,7 @@ class PlainAuthPlugin(BaseAuthPlugin):
         """
         return "Plain Authentication Plugin"
 
-    def auth_name(self):
+    def auth_name(self) -> str:
         """Returns the authentication name.
 
         Returns:
@@ -133,7 +135,7 @@ class PlainAuthPlugin(BaseAuthPlugin):
         """
         return "PLAIN"
 
-    def auth_data(self):
+    def auth_data(self) -> str:
         """Returns the authentication data.
 
         Returns:
@@ -145,7 +147,7 @@ class PlainAuthPlugin(BaseAuthPlugin):
 class Sha256MemoryAuthPlugin(BaseAuthPlugin):
     """Class implementing the SHA256_MEMORY authentication plugin."""
 
-    def name(self):
+    def name(self) -> str:
         """Returns the plugin name.
 
         Returns:
@@ -153,7 +155,7 @@ class Sha256MemoryAuthPlugin(BaseAuthPlugin):
         """
         return "SHA256_MEMORY Authentication Plugin"
 
-    def auth_name(self):
+    def auth_name(self) -> str:
         """Returns the authentication name.
 
         Returns:
@@ -161,14 +163,14 @@ class Sha256MemoryAuthPlugin(BaseAuthPlugin):
         """
         return "SHA256_MEMORY"
 
-    def auth_data(self, data):
+    def auth_data(self, data: bytes) -> str:
         """Hashing for SHA256_MEMORY authentication.
 
         The scramble is of the form:
             SHA256(SHA256(SHA256(PASSWORD)),NONCE) XOR SHA256(PASSWORD)
 
         Args:
-            data (str): The authentication data.
+            data (bytes): The authentication data.
 
         Returns:
             str: The authentication response.
