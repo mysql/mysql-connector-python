@@ -107,7 +107,7 @@ class DistSolaris(bdist, BaseCommand):
         BaseCommand.initialize_options(self)
         self.name = self.distribution.get_name()
         self.version = self.distribution.get_version()
-        self.version_extra = f"-{VERSION_EXTRA if VERSION_EXTRA else ''}"
+        self.version_extra = f"-{VERSION_EXTRA}" if VERSION_EXTRA else ""
         self.keep_temp = None
         self.create_dmg = False
         self.dist_dir = None

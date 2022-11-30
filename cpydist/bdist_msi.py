@@ -241,9 +241,9 @@ class DistMSI(BaseCommand):
     def _get_wixobj_name(self, myc_version=None):
         """Get the name for the wixobj-file."""
         if not myc_version:
-            myc_version = self.distribution.metadata.version
+            myc_version = self.distribution.get_version()
         label = f"-{self.label if self.label else ''}"
-        version_extra = f"-{VERSION_EXTRA if VERSION_EXTRA else ''}"
+        version_extra = f"-{VERSION_EXTRA}" if VERSION_EXTRA else ""
         arch = "windows-x86-64bit" if ARCH_64BIT else "windows-x86-32bit"
         return (
             f"mysql-connector-python{label}-{myc_version}{version_extra}"
