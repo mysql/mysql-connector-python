@@ -33,7 +33,7 @@ import struct
 import zlib
 
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 try:
     import lz4.frame
@@ -75,12 +75,13 @@ from .result import Column
 from .statement import (
     AddStatement,
     DeleteStatement,
+    FilterableStatement,
     FindStatement,
     InsertStatement,
     ModifyStatement,
     ReadStatement,
     RemoveStatement,
-    SelectStatement,
+    SqlStatement,
     UpdateStatement,
 )
 from .types import (
@@ -349,7 +350,7 @@ class Protocol:
         return self._compression_algorithm
 
     @staticmethod
-    def _apply_filter(msg: MessageType, stmt: StatementType) -> None:
+    def _apply_filter(msg: MessageType, stmt: FilterableStatement) -> None:
         """Apply filter.
 
         Args:
@@ -440,7 +441,7 @@ class Protocol:
         return None
 
     def _get_binding_args(
-        self, stmt: StatementType, is_scalar: bool = True
+        self, stmt: Union[FilterableStatement, SqlStatement], is_scalar: bool = True
     ) -> Union[List[None], List[Union[ProtobufMessageType, ProtobufMessageCextType]]]:
         """Returns the binding any/scalar.
 
@@ -476,7 +477,7 @@ class Protocol:
             raise ProgrammingError(
                 "The number of bind parameters and placeholders do not match"
             )
-        for name, value in bindings.items():
+        for name, value in bindings.items():  # type: ignore[union-attr]
             if name not in binding_map:
                 raise ProgrammingError(
                     f"Unable to find placeholder for parameter: {name}"
@@ -723,7 +724,17 @@ class Protocol:
                 raise InterfaceError(msg.msg)
 
     def send_prepare_prepare(
-        self, msg_type: str, msg: MessageType, stmt: StatementType
+        self,
+        msg_type: str,
+        msg: MessageType,
+        stmt: Union[
+            FindStatement,
+            DeleteStatement,
+            ModifyStatement,
+            ReadStatement,
+            RemoveStatement,
+            UpdateStatement,
+        ],
     ) -> None:
         """
         Send prepare statement.
@@ -742,11 +753,11 @@ class Protocol:
         if stmt.has_limit and msg.type != "Mysqlx.Crud.Insert":
             # Remove 'limit' from message by building a new one
             if msg.type == "Mysqlx.Crud.Find":
-                _, msg = self.build_find(stmt)
+                _, msg = self.build_find(stmt)  # type: ignore[arg-type]
             elif msg.type == "Mysqlx.Crud.Update":
-                _, msg = self.build_update(stmt)
+                _, msg = self.build_update(stmt)  # type: ignore[arg-type]
             elif msg.type == "Mysqlx.Crud.Delete":
-                _, msg = self.build_delete(stmt)
+                _, msg = self.build_delete(stmt)  # type: ignore[arg-type]
             else:
                 raise ValueError(f"Invalid message type: {msg_type}")
             # Build 'limit_expr' message
@@ -781,7 +792,7 @@ class Protocol:
             raise NotSupportedError from err
 
     def send_prepare_execute(
-        self, msg_type: str, msg: MessageType, stmt: StatementType
+        self, msg_type: str, msg: MessageType, stmt: FilterableStatement
     ) -> None:
         """
         Send execute statement.
@@ -835,7 +846,10 @@ class Protocol:
         self.read_ok()
 
     def send_msg_without_ps(
-        self, msg_type: str, msg: MessageType, stmt: StatementType
+        self,
+        msg_type: str,
+        msg: MessageType,
+        stmt: Union[FilterableStatement, SqlStatement],
     ) -> None:
         """
         Send a message without prepared statements support.
@@ -849,9 +863,9 @@ class Protocol:
         """
         if stmt.has_limit:
             msg_limit = Message("Mysqlx.Crud.Limit")
-            msg_limit["row_count"] = stmt.get_limit_row_count()
+            msg_limit["row_count"] = stmt.get_limit_row_count()  # type: ignore[union-attr]
             if msg.type == "Mysqlx.Crud.Find":
-                msg_limit["offset"] = stmt.get_limit_offset()
+                msg_limit["offset"] = stmt.get_limit_offset()  # type: ignore[union-attr]
             msg["limit"] = msg_limit
         is_scalar = msg_type != "Mysqlx.ClientMessages.Type.SQL_STMT_EXECUTE"
         args = self._get_binding_args(stmt, is_scalar=is_scalar)
@@ -872,7 +886,7 @@ class Protocol:
         self._writer.write_message(mysqlxpb_enum(msg_type), msg)
 
     def build_find(
-        self, stmt: Union[FindStatement, ReadStatement, SelectStatement]
+        self, stmt: Union[FindStatement, ReadStatement]
     ) -> Tuple[str, MessageType]:
         """Build find/read message.
 
@@ -990,7 +1004,7 @@ class Protocol:
     def build_execute_statement(
         self,
         namespace: str,
-        stmt: StatementType,
+        stmt: Union[str, StatementType],
         fields: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, MessageType]:
         """Build execute statement.

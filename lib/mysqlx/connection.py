@@ -115,6 +115,7 @@ from .statement import (
     FindStatement,
     InsertStatement,
     ModifyStatement,
+    ReadStatement,
     RemoveStatement,
     SelectStatement,
     SqlStatement,
@@ -273,7 +274,9 @@ class SocketStream:
         if connect_timeout is not None:
             connect_timeout = connect_timeout / 1000  # Convert to seconds
         try:
-            self._socket = socket.create_connection(params, connect_timeout)  # type: ignore[arg-type]
+            self._socket = socket.create_connection(
+                params, connect_timeout  # type: ignore[arg-type]
+            )
             self._host = params[0]
         except ValueError:
             try:
@@ -1074,7 +1077,17 @@ class Connection:
             statement.prepared = False
 
     def _prepare_statement(
-        self, msg_type: str, msg: MessageType, statement: StatementType
+        self,
+        msg_type: str,
+        msg: MessageType,
+        statement: Union[
+            FindStatement,
+            DeleteStatement,
+            ModifyStatement,
+            ReadStatement,
+            RemoveStatement,
+            UpdateStatement,
+        ],
     ) -> None:
         """Prepares a statement.
 
@@ -1093,7 +1106,17 @@ class Connection:
         statement.prepared = True
 
     def _execute_prepared_pipeline(
-        self, msg_type: str, msg: MessageType, statement: StatementType
+        self,
+        msg_type: str,
+        msg: MessageType,
+        statement: Union[
+            FindStatement,
+            DeleteStatement,
+            ModifyStatement,
+            ReadStatement,
+            RemoveStatement,
+            UpdateStatement,
+        ],
     ) -> None:
         """Executes the prepared statement pipeline.
 

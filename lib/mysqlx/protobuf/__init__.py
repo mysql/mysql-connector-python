@@ -548,7 +548,7 @@ class Message:
         return Protobuf.mysqlxpb.parse_message(msg_type_name, payload)
 
     @staticmethod
-    def byte_size(msg: Union[ProtobufMessageType, ProtobufMessageCextType]) -> int:
+    def byte_size(msg: MessageType) -> int:
         """Returns the size of the message in bytes.
 
         Args:

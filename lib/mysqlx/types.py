@@ -1,25 +1,27 @@
-# mypy: disable-error-code="attr-defined"
 """
 Type hint aliases hub
 """
 
+import typing
+
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypeAlias,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+
+if hasattr(typing, "TypeAlias"):
+    from typing import TypeAlias  # type: ignore[attr-defined]
+else:
+    try:
+        from typing_extensions import TypeAlias
+    except ModuleNotFoundError:
+        # pylint: disable=reimported
+        from typing import Any as TypeAlias
+
 
 if TYPE_CHECKING:
     from google.protobuf.message import Message as ProtoMessage
 
+    # pylint: disable=redefined-builtin
     from .connection import Connection, Session, SocketStream
     from .crud import DatabaseObject, Schema
     from .dbdoc import DbDoc
