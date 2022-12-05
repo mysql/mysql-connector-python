@@ -851,11 +851,12 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
 {
     char *user = NULL, *database = NULL;
     char *password = NULL, *password1 = NULL, *password2 = NULL, *password3 = NULL;
-    char *oci_config_file = NULL;
+    char *oci_config_file = NULL, *oci_config_profile = NULL;
     unsigned int mfa_factor1 = 1, mfa_factor2 = 2, mfa_factor3 = 3;
     int res;
     static char *kwlist[] = {"user", "password", "database", "password1",
-                             "password2", "password3", "oci_config_file", NULL};
+                             "password2", "password3", "oci_config_file",
+                             "oci_config_profile", NULL};
 #if MYSQL_VERSION_ID >= 80001
     bool abool;
 #else
@@ -864,9 +865,9 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
 
     IS_CONNECTED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzzzz", kwlist, &user, &password,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zzzzzzzz", kwlist, &user, &password,
                                      &database, &password1, &password2, &password3,
-                                     &oci_config_file)) {
+                                     &oci_config_file, &oci_config_profile)) {
         return NULL;
     }
 
@@ -890,7 +891,6 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
     if (password3 && strlen(password3) > 0) {
         mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor3, password3);
     }
-#endif
 
     if (oci_config_file != NULL) {
         /* load oci client authentication plugin if required */
@@ -908,6 +908,28 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
             return NULL;
         }
     }
+#endif
+
+#if MYSQL_VERSION_ID >= 80033
+    if (oci_config_profile != NULL) {
+        /* load oci client authentication plugin if required */
+        struct st_mysql_client_plugin *oci_iam_plugin = mysql_client_find_plugin(
+            &self->session, "authentication_oci_client", MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
+        if (!oci_iam_plugin) {
+            raise_with_string(
+                PyUnicode_FromString("The OCI authentication plugin could not be loaded."),
+                NULL);
+            return NULL;
+        }
+        /* set oci-config-profile in plugin */
+        if (mysql_plugin_options(oci_iam_plugin, "authentication-oci-client-config-profile",
+                                 oci_config_profile)) {
+            raise_with_string(
+                PyUnicode_FromFormat("Invalid oci-config-profile: %s", oci_config_profile), NULL);
+            return NULL;
+        }
+    }
+#endif
 
     Py_BEGIN_ALLOW_THREADS
     res = mysql_change_user(&self->session, user, password, database);
@@ -1089,7 +1111,7 @@ PyObject *
 MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 {
     char *host = NULL, *user = NULL, *database = NULL, *unix_socket = NULL;
-    char *oci_config_file = NULL;
+    char *oci_config_file = NULL, *oci_config_profile = NULL;
     char *load_data_local_dir = NULL;
     char *ssl_ca = NULL, *ssl_cert = NULL, *ssl_key = NULL, *ssl_cipher_suites = NULL,
          *tls_versions = NULL, *tls_cipher_suites = NULL;
@@ -1140,18 +1162,19 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                              "local_infile",
                              "load_data_local_dir",
                              "oci_config_file",
+                             "oci_config_profile",
                              "fido_callback",
                              "use_kerberos_gssapi",
                              NULL};
 
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzOO", kwlist, &host, &user, &password,
+            args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzzOO", kwlist, &host, &user, &password,
             &password1, &password2, &password3, &database, &port, &unix_socket, &client_flags,
             &ssl_ca, &ssl_cert, &ssl_key, &ssl_cipher_suites, &tls_versions,
             &tls_cipher_suites, &PyBool_Type, &ssl_verify_cert, &PyBool_Type,
             &ssl_verify_identity, &PyBool_Type, &ssl_disabled, &PyBool_Type, &compress,
             &PyDict_Type, &conn_attrs, &local_infile, &load_data_local_dir, &oci_config_file,
-            &fido_callback, &use_kerberos_gssapi)) {
+            &oci_config_profile, &fido_callback, &use_kerberos_gssapi)) {
         return NULL;
     }
 
@@ -1337,7 +1360,6 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     if (password3 && strlen(password3) > 0) {
         mysql_options4(&self->session, MYSQL_OPT_USER_PASSWORD, &mfa_factor3, password3);
     }
-#endif
 
     if (oci_config_file != NULL) {
         /* load oci client authentication plugin if required */
@@ -1356,6 +1378,28 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
             return NULL;
         }
     }
+#endif
+
+#if MYSQL_VERSION_ID >= 80033
+    if (oci_config_profile != NULL) {
+        /* load oci client authentication plugin if required */
+        struct st_mysql_client_plugin *oci_iam_plugin = mysql_client_find_plugin(
+            &self->session, "authentication_oci_client", MYSQL_CLIENT_AUTHENTICATION_PLUGIN);
+        if (!oci_iam_plugin) {
+            raise_with_string(
+                PyUnicode_FromString("The OCI authentication plugin could not be loaded."),
+                NULL);
+            return NULL;
+        }
+        /* set oci-config-profile in plugin */
+        if (mysql_plugin_options(oci_iam_plugin, "authentication-oci-client-config-profile",
+                                 oci_config_profile)) {
+            raise_with_string(
+                PyUnicode_FromFormat("Invalid oci-config-profile: %s", oci_config_profile), NULL);
+            return NULL;
+        }
+    }
+#endif
 
     if (fido_callback && fido_callback != Py_None) {
         /* load FIDO client authentication plugin if required */

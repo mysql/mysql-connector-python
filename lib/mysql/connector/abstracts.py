@@ -166,6 +166,7 @@ class MySQLConnectionAbstract(ABC):
         self._ssl_disabled: bool = DEFAULT_CONFIGURATION["ssl_disabled"]
         self._force_ipv6: bool = False
         self._oci_config_file: Optional[str] = None
+        self._oci_config_profile: Optional[str] = None
         self._fido_callback: Optional[Union[str, Callable]] = None
         self._krb_service_principal: Optional[str] = None
 

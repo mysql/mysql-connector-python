@@ -421,7 +421,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             response = auth.auth_response(auth_data)
         elif auth_plugin == "authentication_oci_client":
             logger.debug("# oci configuration file path: %s", self._oci_config_file)
-            response = auth.auth_response(self._oci_config_file)
+            auth.oci_config_file = self._oci_config_file
+            auth.oci_config_profile = self._oci_config_profile
+            response = auth.auth_response()
         else:
             response = auth.auth_response()
 
@@ -1209,6 +1211,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         password2: str = "",
         password3: str = "",
         oci_config_file: str = "",
+        oci_config_profile: str = "",
     ) -> Optional[OkPacketType]:
         """Change the current logged in user
 
@@ -1251,6 +1254,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if oci_config_file:
             self._oci_config_file = oci_config_file
+
+        self._oci_config_profile = oci_config_profile
 
         ok_packet = self._auth_switch_request(username, password)
 
@@ -1329,6 +1334,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                     self._password2,
                     self._password3,
                     self._oci_config_file,
+                    self._oci_config_profile,
                 )
             except ProgrammingError:
                 self.reconnect()

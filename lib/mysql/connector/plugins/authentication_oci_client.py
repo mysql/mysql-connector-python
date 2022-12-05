@@ -30,9 +30,11 @@
 
 """OCI Authentication Plugin."""
 
+import json
 import os
 
 from base64 import b64encode
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .. import errors
@@ -56,6 +58,14 @@ except ImportError:
 from . import BaseAuthPlugin
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLOCIAuthPlugin"
+OCI_SECURITY_TOKEN_MAX_SIZE = 10 * 1024  # In bytes
+OCI_SECURITY_TOKEN_TOO_LARGE = "Ephemeral security token is too large (10KB max)"
+OCI_SECURITY_TOKEN_FILE_NOT_AVAILABLE = (
+    "Ephemeral security token file ('security_token_file') could not be read"
+)
+OCI_PROFILE_MISSING_PROPERTIES = (
+    "OCI configuration file does not contain a 'fingerprint' or 'key_file' entry"
+)
 
 
 class MySQLOCIAuthPlugin(BaseAuthPlugin):
@@ -64,6 +74,8 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
     plugin_name: str = "authentication_oci_client"
     requires_ssl: bool = False
     context: Any = None
+    oci_config_profile: str = "DEFAULT"
+    oci_config_file: str = config.DEFAULT_LOCATION
 
     @staticmethod
     def _prepare_auth_response(signature: bytes, oci_config: Dict[str, Any]) -> str:
@@ -71,18 +83,39 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
 
         Prepares client's authentication response in JSON format
         Args:
-            signature:  server's nonce to be signed by client.
-            oci_config: OCI configuration object.
+            signature (bytes):  server's nonce to be signed by client.
+            oci_config (dict): OCI configuration object.
 
         Returns:
-            JSON_STRING {"fingerprint": string, "signature": string}
+            str: JSON string with the following format:
+                 {"fingerprint": str, "signature": str, "token": base64.base64.base64}
+
+        Raises:
+            ProgrammingError: If the ephemeral security token file can't be open or the
+                              token is too large.
         """
         signature_64 = b64encode(signature)
         auth_response = {
             "fingerprint": oci_config["fingerprint"],
             "signature": signature_64.decode(),
         }
-        return repr(auth_response).replace(" ", "").replace("'", '"')
+
+        # The security token, if it exists, should be a JWT (JSON Web Token), consisted
+        # of a base64-encoded header, body, and signature, separated by '.',
+        # e.g. "Base64.Base64.Base64", stored in a file at the path specified by the
+        # security_token_file configuration property
+        if oci_config.get("security_token_file"):
+            try:
+                security_token_file = Path(oci_config["security_token_file"])
+                # Check if token exceeds the maximum size
+                if security_token_file.stat().st_size > OCI_SECURITY_TOKEN_MAX_SIZE:
+                    raise errors.ProgrammingError(OCI_SECURITY_TOKEN_TOO_LARGE)
+                auth_response["token"] = security_token_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as err:
+                raise errors.ProgrammingError(
+                    OCI_SECURITY_TOKEN_FILE_NOT_AVAILABLE
+                ) from err
+        return json.dumps(auth_response, separators=(",", ":"))
 
     @staticmethod
     def _get_private_key(key_path: str) -> PRIVATE_KEY_TYPES:
@@ -101,14 +134,8 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
 
         return private_key
 
-    @staticmethod
-    def _get_valid_oci_config(
-        oci_path: Optional[str] = None, profile_name: str = "DEFAULT"
-    ) -> Dict[str, Any]:
+    def _get_valid_oci_config(self) -> Dict[str, Any]:
         """Get a valid OCI config from the given configuration file path"""
-        if not oci_path:
-            oci_path = config.DEFAULT_LOCATION
-
         error_list = []
         req_keys = {
             "fingerprint": (lambda x: len(x) > 32),
@@ -118,7 +145,10 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
         oci_config: Dict[str, Any] = {}
         try:
             # key_file is validated by oci.config if present
-            oci_config = config.from_file(oci_path, profile_name)
+            oci_config = config.from_file(
+                self.oci_config_file or config.DEFAULT_LOCATION,
+                self.oci_config_profile or "DEFAULT",
+            )
             for req_key, req_value in req_keys.items():
                 try:
                     # Verify parameter in req_key is present and valid
@@ -138,19 +168,17 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
         # Raise errors if any
         if error_list:
             raise errors.ProgrammingError(
-                f'Invalid profile {profile_name} in: "{oci_path}". '
-                f" Errors found: {error_list}"
+                f"Invalid oci-config-file: {self.oci_config_file}. "
+                f"Errors found: {error_list}"
             )
 
         return oci_config
 
-    def auth_response(self, auth_data: Optional[str] = None) -> bytes:  # type: ignore[override]
+    def auth_response(self, auth_data: Optional[bytes] = None) -> bytes:
         """Prepare authentication string for the server."""
-        oci_path = auth_data
         logger.debug("server nonce: %s, len %d", self._auth_data, len(self._auth_data))
-        logger.debug("OCI configuration file location: %s", oci_path)
 
-        oci_config = self._get_valid_oci_config(oci_path)
+        oci_config = self._get_valid_oci_config()
 
         private_key = self._get_private_key(oci_config["key_file"])
         signature = private_key.sign(

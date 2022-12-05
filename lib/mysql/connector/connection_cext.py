@@ -249,6 +249,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "local_infile": self._allow_local_infile,
             "load_data_local_dir": self._allow_local_infile_in_path,
             "oci_config_file": self._oci_config_file,
+            "oci_config_profile": self._oci_config_profile,
             "fido_callback": self._fido_callback,
         }
 
@@ -810,6 +811,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         password2: str = "",
         password3: str = "",
         oci_config_file: Optional[str] = None,
+        oci_config_profile: Optional[str] = None,
     ) -> None:
         """Change the current logged in user"""
         try:
@@ -821,6 +823,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 password2,
                 password3,
                 oci_config_file,
+                oci_config_profile,
             )
 
         except MySQLInterfaceError as err:
@@ -958,6 +961,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                     self._password2,
                     self._password3,
                     self._oci_config_file,
+                    self._oci_config_profile,
                 )
             except ProgrammingError:
                 self.reconnect()
