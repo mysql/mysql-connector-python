@@ -167,11 +167,11 @@ class MySQLProtocol:
             + len(conn_attrs.values())
         )
 
-        conn_attrs_packet = struct.pack("<B", conn_attrs_len)
+        conn_attrs_packet = utils.lc_int(conn_attrs_len)
         for attr_name in conn_attrs:
-            conn_attrs_packet += struct.pack("<B", len(attr_name))
+            conn_attrs_packet += utils.lc_int(len(attr_name))
             conn_attrs_packet += attr_name.encode("utf8")
-            conn_attrs_packet += struct.pack("<B", len(conn_attrs[attr_name]))
+            conn_attrs_packet += utils.lc_int(len(conn_attrs[attr_name]))
             conn_attrs_packet += conn_attrs[attr_name].encode("utf8")
         return conn_attrs_packet
 
