@@ -31,7 +31,7 @@
 import warnings
 
 from abc import ABC, ABCMeta
-from typing import Dict, List, Optional, Sequence, Tuple, Union, ValuesView
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, ValuesView
 
 from .charsets import MYSQL_CHARACTER_SETS, MYSQL_CHARACTER_SETS_57
 from .errors import ProgrammingError
@@ -112,8 +112,18 @@ def flag_is_set(flag: int, flags: int) -> bool:
 
 
 def _obsolete_option(name: str, new_name: str, value: int) -> int:
+    """Raise a deprecation warning and advise a new option name.
+
+    Args:
+        name (str): The name of the option.
+        new_name (str): The new option name.
+        value (int): The value of the option.
+
+    Returns:
+        int: The value of the option.
+    """
     warnings.warn(
-        f'The option "{name}" has been deprecated, use "{new_name}" instead.',
+        f"The option '{name}' has been deprecated, use '{new_name}' instead.",
         category=DeprecationWarning,
     )
     return value
@@ -339,7 +349,27 @@ class FieldFlag(_Flags):
     }
 
 
-class ServerCmd(_Constants):
+class ServerCmdMeta(ABCMeta):
+    """ClientFlag Metaclass."""
+
+    def __getattribute__(cls, name: str) -> Any:
+        deprecated_options = (
+            "FIELD_LIST",
+            "REFRESH",
+            "SHUTDOWN",
+            "PROCESS_INFO",
+            "PROCESS_KILL",
+        )
+        if name in deprecated_options:
+            warnings.warn(
+                f"The option 'ServerCmd.{name}' is deprecated and will be removed in "
+                "a future release.",
+                category=DeprecationWarning,
+            )
+        return super().__getattribute__(name)
+
+
+class ServerCmd(_Constants, metaclass=ServerCmdMeta):
     """MySQL Server Commands"""
 
     _prefix: str = "COM_"
