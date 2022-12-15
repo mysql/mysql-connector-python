@@ -638,6 +638,12 @@ class MySQLConverter(MySQLConverterBase):
                 return value.decode(self.charset)
             if dsc[7] & FieldFlag.SET:
                 return self._set_to_python(value, dsc)
+            if dsc[7] & FieldFlag.BINARY:
+                if self.charset != 'binary' and not isinstance(value, str):
+                    try:
+                        return value.decode(self.charset)
+                    except (LookupError, UnicodeDecodeError):
+                        return value
             if dsc[8] == 63:  # 'binary' charset
                 return value
         if isinstance(value, (bytes, bytearray)) and self.use_unicode:
