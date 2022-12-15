@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,22 +28,26 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+import unittest
+
 import mysql.connector
-from tests import foreach_cnx, cnx_config
 import tests
+
+from tests import cnx_config, foreach_cnx
 
 
 class Bug21449207(tests.MySQLConnectorTests):
     def setUp(self):
-        self.tbl = 'Bug21449207'
+        self.tbl = "Bug21449207"
         cnx = mysql.connector.connect(**tests.get_mysql_config())
         cnx.cmd_query("DROP TABLE IF EXISTS %s" % self.tbl)
 
         create_table = (
             "CREATE TABLE {0} ("
-            "id INT PRIMARY KEY, "
+            "id INT PRIMARY KEY AUTO_INCREMENT, "
             "a LONGTEXT "
-            ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl))
+            ") ENGINE=Innodb DEFAULT CHARSET utf8".format(self.tbl)
+        )
         cnx.cmd_query(create_table)
         cnx.close()
 
@@ -55,7 +59,7 @@ class Bug21449207(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_uncompressed(self):
         cur = self.cnx.cursor()
-        exp = 'a' * 15 + 'TheEnd'
+        exp = "a" * 15 + "TheEnd"
         insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, exp)
         cur.execute(insert)
         cur.execute("SELECT a FROM {0}".format(self.tbl))
@@ -66,7 +70,7 @@ class Bug21449207(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_50k_compressed(self):
         cur = self.cnx.cursor()
-        exp = 'a' * 50000 + 'TheEnd'
+        exp = "a" * 50000 + "TheEnd"
         insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, exp)
         cur.execute(insert)
         cur.execute("SELECT a FROM {0}".format(self.tbl))
@@ -74,10 +78,14 @@ class Bug21449207(tests.MySQLConnectorTests):
         self.assertEqual(exp, row[0])
         self.assertEqual(row[0][-20:], exp[-20:])
 
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
     @foreach_cnx()
     def test_16M_compressed(self):
         cur = self.cnx.cursor()
-        exp = 'a' * 16777210 + 'TheEnd'
+        exp = "a" * 16777210 + "TheEnd"
         insert = "INSERT INTO {0} (a) VALUES ('{1}')".format(self.tbl, exp)
         cur.execute(insert)
         cur.execute("SELECT a FROM {0}".format(self.tbl))

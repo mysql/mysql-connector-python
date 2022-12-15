@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -27,6 +27,8 @@
  * along with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
+
+#define PY_SSIZE_T_CLEAN
 
 #include "python_cast.h"
 #include "python.h"
@@ -131,11 +133,7 @@ static PyObject* ConvertPbToPyRequired(
 
     case google::protobuf::FieldDescriptor::TYPE_BYTES: {
       std::string str = message.GetReflection()->GetString(message, &field);
-#ifdef PY3
       return PyBytes_FromStringAndSize(str.c_str(), str.size());
-#else
-      return PyString_FromStringAndSize(str.c_str(), str.size());
-#endif
     }
 
     case google::protobuf::FieldDescriptor::TYPE_UINT32: {
@@ -167,9 +165,12 @@ static PyObject* ConvertPbToPyRequired(
       return PyLong_FromLong(static_cast<long>(message.GetReflection()->
           GetInt64(message, &field)));
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
-  assert(false);
   return NULL;
 }
 
@@ -232,11 +233,7 @@ static PyObject* ConvertPbToPyRepeated(int index,
     case google::protobuf::FieldDescriptor::TYPE_BYTES: {
       std::string str = message.GetReflection()->
           GetRepeatedString(message, &field, index);
-#ifdef PY3
       return PyBytes_FromStringAndSize(str.c_str(), str.size());
-#else
-      return PyString_FromStringAndSize(str.c_str(), str.size());
-#endif
     }
 
     case google::protobuf::FieldDescriptor::TYPE_UINT32: {
@@ -268,9 +265,12 @@ static PyObject* ConvertPbToPyRepeated(int index,
       return PyLong_FromLong(static_cast<long>(message.
           GetReflection()->GetRepeatedInt64(message, &field, index)));
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
-  assert(false);
   return NULL;
 };
 
@@ -385,9 +385,12 @@ static void ConvertPyToPbRequired(
           python_cast<google::protobuf::int64>(obj));
       return;
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
-  assert(false);
   throw std::runtime_error("Unknown Protobuf type.");
 }
 
@@ -397,14 +400,13 @@ static void AddPyListToMessageRepeatedField(
     google::protobuf::Message& message,
     const google::protobuf::FieldDescriptor& field,
     PyObject* list) {
-  google::protobuf::RepeatedField<T>* mutable_field =
-      message.GetReflection()->MutableRepeatedField<T>(&message, &field);
+  google::protobuf::MutableRepeatedFieldRef<T> mutable_field =
+      message.GetReflection()->GetMutableRepeatedFieldRef<T>(&message, &field);
   Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
-    mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      mutable_field->Add(python_cast<T>(PyList_GetItem(list, idx)));
+      mutable_field.Add(python_cast<T>(PyList_GetItem(list, idx)));
     }
   }
 }
@@ -415,20 +417,19 @@ static void AddPyListToMessageRepeatedMessage(
     const google::protobuf::FieldDescriptor& field,
     google::protobuf::DynamicMessageFactory& factory,
     PyObject* list) {
-  google::protobuf::RepeatedPtrField<google::protobuf::Message>* mutable_field =
+  google::protobuf::MutableRepeatedFieldRef<google::protobuf::Message> mutable_field =
       message.GetReflection()->
-      MutableRepeatedPtrField<google::protobuf::Message>(&message, &field);
+      GetMutableRepeatedFieldRef<google::protobuf::Message>(&message, &field);
   Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
-    mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
       google::protobuf::Message* msg = CreateMessage(PyList_GetItem(list, idx), factory);
       if (!msg) {
         // CreateMessage already reported an error, we can leave quietly
         return;
       }
-      mutable_field->AddAllocated(msg);
+      mutable_field.Add(*msg);
     }
   }
 }
@@ -438,15 +439,14 @@ static void AddPyListToMessageRepeatedString(
     google::protobuf::Message& message,
     const google::protobuf::FieldDescriptor& field,
     PyObject* list) {
-  google::protobuf::RepeatedPtrField<google::protobuf::string>* mutable_field =
+  google::protobuf::MutableRepeatedFieldRef<google::protobuf::string> mutable_field =
       message.GetReflection()->
-      MutableRepeatedPtrField<google::protobuf::string>(&message, &field);
+      GetMutableRepeatedFieldRef<google::protobuf::string>(&message, &field);
   Py_ssize_t list_size = PyList_Size(list);
 
   if (list_size > 0) {
-    mutable_field->Reserve(list_size);
     for (Py_ssize_t idx = 0; idx < list_size; ++idx) {
-      mutable_field->AddAllocated(new google::protobuf::string(
+      mutable_field.Add(google::protobuf::string(
           python_cast<std::string>(PyList_GetItem(list, idx))));
     }
   }
@@ -575,6 +575,10 @@ static void ConvertPyToPbRepeated(
           message, field, list);
       return;
     }
+
+    // Tag-delimited message. Deprecated.
+    case google::protobuf::FieldDescriptor::TYPE_GROUP:
+      break;
   }
 
   assert(false);
@@ -799,7 +803,7 @@ static PyObject* ParseMessage(PyObject* self, PyObject* args) {
   PyObject* result = NULL;
   const char* type_name;
   const char* data;
-  int data_size;
+  Py_ssize_t data_size;
 
   if (PyArg_ParseTuple(args, "ss#", &type_name, &data, &data_size))
     result = ParseMessageImpl(type_name, data, data_size);
@@ -831,8 +835,9 @@ static const char* GetMessageNameByTypeId(Mysqlx::ServerMessages::Type type) {
     case Mysqlx::ServerMessages::RESULTSET_FETCH_DONE: {
       return "Mysqlx.Resultset.FetchDone";
     }
-    // TODO: Unused, enable in the future.
-    // case Mysqlx::ServerMessages::RESULTSET_FETCH_SUSPENDED: { return ""; }
+    case Mysqlx::ServerMessages::RESULTSET_FETCH_SUSPENDED: {
+      return "Mysqlx.Resultset.FetchSuspended";
+    }
     case Mysqlx::ServerMessages::RESULTSET_FETCH_DONE_MORE_RESULTSETS: {
       return "Mysqlx.Resultset.FetchDoneMoreResultsets";
     }
@@ -841,6 +846,9 @@ static const char* GetMessageNameByTypeId(Mysqlx::ServerMessages::Type type) {
     }
     case Mysqlx::ServerMessages::RESULTSET_FETCH_DONE_MORE_OUT_PARAMS: {
       return "Mysqlx.Resultset.FetchDoneMoreOutParams";
+    }
+    case Mysqlx::ServerMessages::COMPRESSION: {
+      return "Mysqlx.Connection.Compression";
     }
   }
 
@@ -853,7 +861,7 @@ static PyObject* ParseServerMessage(PyObject* self, PyObject* args) {
   PyObject* result = NULL;
   int type;
   const char* message_data;
-  int message_data_size;
+  Py_ssize_t message_data_size;
 
   if (PyArg_ParseTuple(args, "is#", &type, &message_data, &message_data_size))
   {
@@ -881,12 +889,25 @@ static PyObject* SerializeMessage(PyObject* self, PyObject* args) {
 
     if (message) {
       std::string buffer = message->SerializeAsString();
-
-#ifdef PY3
       result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
-#else
-      result = PyString_FromStringAndSize(buffer.c_str(), buffer.size());
-#endif
+    }
+  }
+  return result;
+}
+
+
+static PyObject* SerializePartialMessage(PyObject* self, PyObject* args) {
+  PyObject* result = NULL;
+  PyObject* dict;
+  google::protobuf::DynamicMessageFactory factory;
+
+  if (PyArg_ParseTuple(args, "O", &dict)) {
+    MyScopedPtr<google::protobuf::Message> message(
+        CreateMessage(dict, factory));
+
+    if (message) {
+      std::string buffer = message->SerializePartialAsString();
+      result = PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
     }
   }
   return result;
@@ -930,18 +951,12 @@ static PyObject* EnumValue(PyObject* self, PyObject* args) {
   return result;
 }
 
-#ifdef PY3
 static void MyFree(void *) {
   google::protobuf::ShutdownProtobufLibrary();
 }
-#endif
 
 PyMODINIT_FUNC
-#ifdef PY3
 PyInit__mysqlxpb() {
-#else
-init_mysqlxpb() {
-#endif
   static const char* kModuleName = "_mysqlxpb";
 
   static PyMethodDef methods_definition[] = {
@@ -951,6 +966,8 @@ init_mysqlxpb() {
       "Parse a server-side message." },
     { "serialize_message", SerializeMessage, METH_VARARGS,
       "Serialize a message." },
+    { "serialize_partial_message", SerializePartialMessage, METH_VARARGS,
+      "Serialize a message, but allows missing required fields." },
     { "enum_value", EnumValue, METH_VARARGS, "Get enum value." },
     { NULL, NULL, 0, NULL }
   };
@@ -958,7 +975,6 @@ init_mysqlxpb() {
   protobuf_description_pool =
       google::protobuf::DescriptorPool::generated_pool();
 
-#ifdef PY3
   static PyModuleDef module_definition = {
     PyModuleDef_HEAD_INIT,
     kModuleName,
@@ -972,7 +988,4 @@ init_mysqlxpb() {
   };
 
   return PyModule_Create(&module_definition);
-#else
-  Py_InitModule(kModuleName, methods_definition);
-#endif
 }

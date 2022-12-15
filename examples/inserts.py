@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -53,7 +53,7 @@ def main(config):
         "CREATE TABLE names ("
         "    id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT, "
         "    name VARCHAR(30) DEFAULT '' NOT NULL, "
-        "    info TEXT DEFAULT '', "
+        "    info TEXT, "
         "    age TINYINT UNSIGNED DEFAULT '30', "
         "PRIMARY KEY (id))"
     )
@@ -62,7 +62,7 @@ def main(config):
     info = "abc" * 10000
 
     # Insert 3 records
-    names = (('Geert', info, 30), ('Jan', info, 31), ('Michel', info, 32))
+    names = (("Geert", info, 30), ("Jan", info, 31), ("Michel", info, 32))
     stmt_insert = "INSERT INTO names (name, info, age) VALUES (%s, %s, %s)"
     cur.executemany(stmt_insert, names)
     cnx.commit()
@@ -72,8 +72,9 @@ def main(config):
     cur.execute(stmt_select)
 
     for row in cur.fetchall():
-        output.append("%d | %s | %d\nInfo: %s..\n" % (
-            row[0], row[1], row[3], row[2][:20]))
+        output.append(
+            "%d | %s | %d\nInfo: %s..\n" % (row[0], row[1], row[3], row[2][:20])
+        )
 
     # Cleaning up, dropping the table again
     cur.execute(stmt_drop)
@@ -83,18 +84,18 @@ def main(config):
     return output
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     config = {
-        'host': 'localhost',
-        'port': 3306,
-        'database': 'test',
-        'user': 'root',
-        'password': '',
-        'charset': 'utf8',
-        'use_unicode': True,
-        'get_warnings': True,
+        "host": "localhost",
+        "port": 3306,
+        "database": "test",
+        "user": "root",
+        "password": "",
+        "charset": "utf8",
+        "use_unicode": True,
+        "get_warnings": True,
     }
 
     out = main(config)
-    print('\n'.join(out))
+    print("\n".join(out))

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,14 +36,26 @@ import tests
 from mysqlx import errors
 
 
-@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 12), "XPlugin not compatible")
+@unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 14), "XPlugin not compatible")
 class ErrorsTests(tests.MySQLxTests):
-
     def test_get_mysql_exception(self):
         tests = {
             errors.ProgrammingError: (
-                "24", "25", "26", "27", "28", "2A", "2C",
-                "34", "35", "37", "3C", "3D", "3F", "42"),
+                "24",
+                "25",
+                "26",
+                "27",
+                "28",
+                "2A",
+                "2C",
+                "34",
+                "35",
+                "37",
+                "3C",
+                "3D",
+                "3F",
+                "42",
+            ),
             errors.DataError: ("02", "21", "22"),
             errors.NotSupportedError: ("0A",),
             errors.IntegrityError: ("23", "XA"),
@@ -57,12 +69,14 @@ class ErrorsTests(tests.MySQLxTests):
             for sqlstate in errlist:
                 errno = 1000
                 res = errors.get_mysql_exception(errno, msg, sqlstate)
-                self.assertTrue(isinstance(res, exp),
-                                "SQLState {0} should be {1}".format(
-                                    sqlstate, exp.__name__))
+                self.assertTrue(
+                    isinstance(res, exp),
+                    "SQLState {0} should be {1}".format(sqlstate, exp.__name__),
+                )
                 self.assertEqual(sqlstate, res.sqlstate)
-                self.assertEqual("{0} ({1}): {2}".format(errno, sqlstate, msg),
-                                 str(res))
+                self.assertEqual(
+                    "{0} ({1}): {2}".format(errno, sqlstate, msg), str(res)
+                )
 
         errno = 1064
         sqlstate = "42000"
@@ -74,8 +88,11 @@ class ErrorsTests(tests.MySQLxTests):
         # Hardcoded exceptions
         self.assertTrue(isinstance(errors._ERROR_EXCEPTIONS, dict))
         self.assertTrue(
-            isinstance(errors.get_mysql_exception(1243, None, None),
-                       errors.ProgrammingError))
+            isinstance(
+                errors.get_mysql_exception(1243, None, None),
+                errors.ProgrammingError,
+            )
+        )
 
     def test_get_exception(self):
         ok_packet = bytearray(b"\x07\x00\x00\x01\x00\x01\x00\x00\x00\x01\x00")
@@ -85,9 +102,11 @@ class ErrorsTests(tests.MySQLxTests):
             b"\x20\x66\x6f\x72\x20\x75\x73\x65\x72\x20\x27\x68\x61"
             b"\x6d\x27\x40\x27\x6c\x6f\x63\x61\x6c\x68\x6f\x73\x74"
             b"\x27\x20\x28\x75\x73\x69\x6e\x67\x20\x70\x61\x73\x73"
-            b"\x77\x6f\x72\x64\x3a\x20\x59\x45\x53\x29")
-        self.assertTrue(isinstance(errors.get_exception(err_packet),
-                                   errors.ProgrammingError))
+            b"\x77\x6f\x72\x64\x3a\x20\x59\x45\x53\x29"
+        )
+        self.assertTrue(
+            isinstance(errors.get_exception(err_packet), errors.ProgrammingError)
+        )
 
         self.assertRaises(ValueError, errors.get_exception, ok_packet)
 
@@ -96,7 +115,6 @@ class ErrorsTests(tests.MySQLxTests):
 
 
 class ErrorTest(tests.MySQLxTests):
-
     def test___init__(self):
         self.assertTrue(issubclass(errors.Error, Exception))
 
@@ -120,13 +138,14 @@ class ErrorTest(tests.MySQLxTests):
         self.assertEqual("Unknown MySQL error", err.msg)
         self.assertEqual("2000: Unknown MySQL error", err._full_msg)
 
-        err = errors.Error(errno=2003, values=("/path/to/ham", 2))
+        err = errors.Error(errno=2003, values=("localhost", 3306, 2))
         self.assertEqual(
-            "2003: Can't connect to MySQL server on '/path/to/ham' (2)",
-            err._full_msg)
+            "2003: Can't connect to MySQL server on 'localhost:3306' (2)",
+            err._full_msg,
+        )
         self.assertEqual(
-            "Can't connect to MySQL server on '/path/to/ham' (2)",
-            err.msg)
+            "Can't connect to MySQL server on 'localhost:3306' (2)", err.msg
+        )
 
         err = errors.Error(errno=2001, values=("ham",))
         if "(Warning:" in str(err):
@@ -134,72 +153,58 @@ class ErrorTest(tests.MySQLxTests):
 
         err = errors.Error(errno=2003, values=("ham",))
         self.assertEqual(
-            "2003: Can't connect to MySQL server on '%-.100s' (%s) "
+            "2003: Can't connect to MySQL server on '%-.100s:%u' (%s) "
             "(Warning: not enough arguments for format string)",
-            err._full_msg)
+            err._full_msg,
+        )
 
     def test___str__(self):
         msg = "Spam"
         self.assertEqual("Spam", str(errors.Error(msg)))
         self.assertEqual("1: Spam", str(errors.Error(msg, 1)))
-        self.assertEqual("1 (XYZ): Spam",
-                         str(errors.Error(msg, 1, sqlstate="XYZ")))
+        self.assertEqual("1 (XYZ): Spam", str(errors.Error(msg, 1, sqlstate="XYZ")))
 
 
 class InterfaceErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
         self.assertTrue(issubclass(errors.InterfaceError, errors.Error))
 
 
 class DatabaseErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
         self.assertTrue(issubclass(errors.DatabaseError, errors.Error))
 
 
 class InternalErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
-        self.assertTrue(issubclass(errors.InternalError,
-                                   errors.DatabaseError))
+        self.assertTrue(issubclass(errors.InternalError, errors.DatabaseError))
 
 
 class OperationalErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
-        self.assertTrue(issubclass(errors.OperationalError,
-                                   errors.DatabaseError))
+        self.assertTrue(issubclass(errors.OperationalError, errors.DatabaseError))
 
 
 class ProgrammingErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
-        self.assertTrue(issubclass(errors.ProgrammingError,
-                                   errors.DatabaseError))
+        self.assertTrue(issubclass(errors.ProgrammingError, errors.DatabaseError))
 
 
 class IntegrityErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
-        self.assertTrue(issubclass(errors.IntegrityError,
-                                   errors.DatabaseError))
+        self.assertTrue(issubclass(errors.IntegrityError, errors.DatabaseError))
 
 
 class DataErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
         self.assertTrue(issubclass(errors.DataError, errors.DatabaseError))
 
 
 class NotSupportedErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
-        self.assertTrue(issubclass(errors.NotSupportedError,
-                                   errors.DatabaseError))
+        self.assertTrue(issubclass(errors.NotSupportedError, errors.DatabaseError))
 
 
 class PoolErrorTests(tests.MySQLxTests):
-
     def test___init__(self):
         self.assertTrue(issubclass(errors.PoolError, errors.Error))

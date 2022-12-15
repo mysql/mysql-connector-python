@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -30,12 +30,13 @@
 """
 
 from datetime import datetime
+
 import tests
+
 from mysql.connector import errorcode
 
 
 class ErrorCodeTests(tests.MySQLConnectorTests):
-
     def test__MYSQL_VERSION(self):
         minimum = (5, 6, 6)
         self.assertTrue(isinstance(errorcode._MYSQL_VERSION, tuple))
@@ -50,9 +51,9 @@ class ErrorCodeTests(tests.MySQLConnectorTests):
 
     def test_server_error_codes(self):
         cases = {
-            'OBSOLETE_ER_HASHCHK': 1000,
-            'ER_TRG_INVALID_CREATION_CTX': 1604,
-            'ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION': 1792,
+            "OBSOLETE_ER_HASHCHK": 1000,
+            "ER_TRG_INVALID_CREATION_CTX": 1604,
+            "ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION": 1792,
         }
 
         for code, num in cases.items():
@@ -60,9 +61,9 @@ class ErrorCodeTests(tests.MySQLConnectorTests):
 
     def test_client_error_codes(self):
         cases = {
-            'CR_UNKNOWN_ERROR': 2000,
-            'CR_PROBE_SLAVE_STATUS': 2022,
-            'CR_AUTH_PLUGIN_CANNOT_LOAD': 2059,
+            "CR_UNKNOWN_ERROR": 2000,
+            "CR_PROBE_SLAVE_STATUS": 2022,
+            "CR_AUTH_PLUGIN_CANNOT_LOAD": 2059,
         }
 
         for code, num in cases.items():

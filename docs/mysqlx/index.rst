@@ -6,9 +6,9 @@
 Welcome to MySQL Connector/Python X DevAPI Reference Documentation
 ==================================================================
 
-The Connector/Python provides a client library for the X DevAPI protocol that was introduced in MySQL 5.7.12.
+The Connector/Python provides a client library for the X DevAPI protocol that was introduced in MySQL 8.0.
 
-MySQL 5.7 is an open-source relational database that is secure, high performing, and easy to use. The X DevAPI supports relational tables and JSON documents making it possible to use both tables and collections at the same time.
+MySQL 8.0 is an open-source relational database that is secure, high performing, and easy to use. The X DevAPI supports relational tables and JSON documents making it possible to use both tables and collections at the same time.
 
 For general information about the X DevAPI, please refer to documentation on http://dev.mysql.com/doc/x-devapi-userguide/en/
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -42,8 +42,8 @@ See the MySQL manual for information on how to change the default storage
 engine:
  http://dev.mysql.com/doc/refman/5.6/en/storage-engine-setting.html
 
-Make sure the database 'cpydjango1' has been created on the Master and is
-also available on the slave.
+Make sure the database 'cpydjango1' has been created on the Source and is
+also available on the Replica.
  CREATE DATABASE cpydjango1 DEFAULT CHARACTER SET utf8;
 
 Test settings
@@ -59,107 +59,117 @@ number of failures/errors should be be minimal (under 30?).
 
 import os
 import sys
+
 try:
-    from urlparse import urlparse
     from urllib2 import (
-        urlopen, ProxyHandler, URLError, HTTPError, install_opener,
-        build_opener
+        HTTPError,
+        ProxyHandler,
+        URLError,
+        build_opener,
+        install_opener,
+        urlopen,
     )
+    from urlparse import urlparse
 except ImportError:
     # Python 3
     from urllib.parse import urlparse
     from urllib.request import (
-        urlopen, ProxyHandler, install_opener, build_opener
+        urlopen,
+        ProxyHandler,
+        install_opener,
+        build_opener,
     )
     from urllib.error import URLError, HTTPError
-import shutil
+
 import argparse
 import logging
-from zipfile import ZipFile
+import shutil
 import tarfile
 
+from zipfile import ZipFile
 
 PYMAJ = sys.version_info[0]
 DJANGO = {
-    '1.4': (
-        'django-1.4.zip',
-        'https://github.com/django/django/archive/stable/1.4.x.zip'
+    "1.4": (
+        "django-1.4.zip",
+        "https://github.com/django/django/archive/stable/1.4.x.zip",
     ),
-    '1.5': (
-        'django-1.5.zip',
-        'https://github.com/django/django/archive/stable/1.5.x.zip'
+    "1.5": (
+        "django-1.5.zip",
+        "https://github.com/django/django/archive/stable/1.5.x.zip",
     ),
-    '1.6': (
-        'django-1.6.tar.gz',
-        'https://www.djangoproject.com/m/releases/1.6/Django-1.6.tar.gz',
+    "1.6": (
+        "django-1.6.tar.gz",
+        "https://www.djangoproject.com/m/releases/1.6/Django-1.6.tar.gz",
     ),
-    '1.7': (
-        'django-1.7.tar.gz',
-        'https://www.djangoproject.com/m/releases/1.7/Django-1.7c1.tar.gz',
+    "1.7": (
+        "django-1.7.tar.gz",
+        "https://www.djangoproject.com/m/releases/1.7/Django-1.7c1.tar.gz",
     ),
-
 }
 
 PROXIES = {
-    'http': os.environ.setdefault('http_proxy', ''),
-    'https': os.environ.setdefault('https_proxy', ''),
+    "http": os.environ.setdefault("http_proxy", ""),
+    "https": os.environ.setdefault("https_proxy", ""),
 }
 
 TEST_GROUPS = {
-    'basic': ['basic'],
-    'db': ['inspectdb'],
-    'all': [],
+    "basic": ["basic"],
+    "db": ["inspectdb"],
+    "all": [],
 }
 
-logger = logging.getLogger(os.path.basename(__file__).replace('.py', ''))
+logger = logging.getLogger(os.path.basename(__file__).replace(".py", ""))
 
 
 def get_args():
-    """Parse and return command line arguments
-    """
+    """Parse and return command line arguments"""
     parser = argparse.ArgumentParser(
-        description='Run Django tests',
+        description="Run Django tests",
         epilog=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--tests", metavar="test", nargs="+", help="tests to run")
+    parser.add_argument(
+        "--debug", action="store_true", help="show debugging information"
     )
     parser.add_argument(
-        '--tests', metavar='test', nargs='+',
-        help="tests to run"
+        "--offline",
+        action="store_true",
+        help="don't check online or download any thing",
     )
     parser.add_argument(
-        '--debug', action='store_true',
-        help="show debugging information"
-    )
-    parser.add_argument(
-        '--offline', action='store_true',
-        help="don't check online or download any thing"
-    )
-    parser.add_argument(
-        '--django', required=False, choices=DJANGO.keys(),
+        "--django",
+        required=False,
+        choices=DJANGO.keys(),
         help="Django version to tests, possible values: {versions}".format(
-            versions=', '.join(DJANGO.keys()))
+            versions=", ".join(DJANGO.keys())
+        ),
+    )
+    parser.add_argument("--django-path", required=False, help="Path to Django source")
+    parser.add_argument(
+        "--settings",
+        required=False,
+        help="Module containing Django Settings (note: not file)",
     )
     parser.add_argument(
-        '--django-path', required=False,
-        help="Path to Django source"
+        "--failfast", action="store_true", help="fail at first error/failure"
     )
     parser.add_argument(
-        '--settings', required=False,
-        help="Module containing Django Settings (note: not file)"
-    )
-    parser.add_argument(
-        '--failfast', action='store_true',
-        help="fail at first error/failure"
-    )
-    parser.add_argument(
-        '--verbosity', action='store', default=1, type=int,
-        help="verbosity level"
+        "--verbosity",
+        action="store",
+        default=1,
+        type=int,
+        help="verbosity level",
     )
 
     parser.add_argument(
-        '--group', choices=TEST_GROUPS.keys(),
-        help=("specify which group of tests to run; other tests on command "
-              "line are discarted")
+        "--group",
+        choices=TEST_GROUPS.keys(),
+        help=(
+            "specify which group of tests to run; other tests on command "
+            "line are discarted"
+        ),
     )
     args, tests = parser.parse_known_args()
 
@@ -187,7 +197,7 @@ def download(url, local_file=None):
         local_file = os.path.basename(url)
     # Don't download the same file again, or remove when different
     if os.path.exists(local_file):
-        content_length = int(urlfp.info().get('Content-Length'))
+        content_length = int(urlfp.info().get("Content-Length"))
         if os.path.getsize(local_file) != content_length:
             try:
                 os.remove(local_file)
@@ -198,10 +208,11 @@ def download(url, local_file=None):
             return
 
     urlparts = urlparse(url)
-    logger.info("Downloading '{file}' from {loc}".format(
-        file=local_file, loc=urlparts.netloc))
+    logger.info(
+        "Downloading '{file}' from {loc}".format(file=local_file, loc=urlparts.netloc)
+    )
 
-    with open(local_file, 'wb') as localfp:
+    with open(local_file, "wb") as localfp:
         localfp.write(urlfp.read())
 
 
@@ -219,8 +230,10 @@ def _check_urls():
         scheme = urlparse(url).scheme
         try:
             if not PROXIES[scheme] and scheme not in checked:
-                logger.warning("Note: {scheme}_proxy environment "
-                               "variable not set".format(scheme=scheme))
+                logger.warning(
+                    "Note: {scheme}_proxy environment "
+                    "variable not set".format(scheme=scheme)
+                )
                 checked.append(scheme)
         except KeyError:
             pass
@@ -238,10 +251,10 @@ def _unpack(archive_file):
     Returns string.
     """
     logger.info("Unpacking archive '{0}'".format(archive_file))
-    if archive_file.endswith('.zip'):
+    if archive_file.endswith(".zip"):
         archive = ZipFile(archive_file)
         rootdir = archive.namelist()[0]
-    elif archive_file.endswith('.tar.gz'):
+    elif archive_file.endswith(".tar.gz"):
         archive = tarfile.open(archive_file)
         rootdir = archive.getnames()[0]
     else:
@@ -259,72 +272,78 @@ def _unpack(archive_file):
     return rootdir
 
 
-def django_tests(django_version, django_root, myconnpy, tests=None, group=None,
-                 settings=None, failfast=False, verbosity=1):
-    """Run Django unit tests
-    """
+def django_tests(
+    django_version,
+    django_root,
+    myconnpy,
+    tests=None,
+    group=None,
+    settings=None,
+    failfast=False,
+    verbosity=1,
+):
+    """Run Django unit tests"""
     if not (tests or group):
         logger.info("No specific tests or groups specified; running all tests")
 
     cwd = os.getcwd()
-    os.chdir(os.path.join(django_root, 'tests'))
+    os.chdir(os.path.join(django_root, "tests"))
     logger.debug("Running tests from folder {0}".format(os.getcwd()))
     env = {
-        'PATH': os.environ.get('PATH'),
-        'PYTHONPATH': '{myconnpy}:{django_root}:'
-                      '{cwd}:{cwd}/../:{cwd}/../..'.format(
-            myconnpy=myconnpy, cwd=cwd, django_root=django_root),
+        "PATH": os.environ.get("PATH"),
+        "PYTHONPATH": "{myconnpy}:{django_root}:"
+        "{cwd}:{cwd}/../:{cwd}/../..".format(
+            myconnpy=myconnpy, cwd=cwd, django_root=django_root
+        ),
     }
-    if os.environ.get('DYLD_LIBRARY_PATH') is not None:
-        env['DYLD_LIBRARY_PATH'] = os.environ.get('DYLD_LIBRARY_PATH')
-    elif os.environ.get('LD_LIBRARY_PATH') is not None:
-        env['LD_LIBRARY_PATH'] = os.environ.get('LD_LIBRARY_PATH')
+    if os.environ.get("DYLD_LIBRARY_PATH") is not None:
+        env["DYLD_LIBRARY_PATH"] = os.environ.get("DYLD_LIBRARY_PATH")
+    elif os.environ.get("LD_LIBRARY_PATH") is not None:
+        env["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH")
 
-    django_script = 'runtests.py'
+    django_script = "runtests.py"
 
     args = [
         sys.executable,
-        '-B',
-        '-W', 'ignore::DeprecationWarning',
+        "-B",
+        "-W",
+        "ignore::DeprecationWarning",
         django_script,
-        '--noinput',
-        '--verbosity', str(verbosity),
+        "--noinput",
+        "--verbosity",
+        str(verbosity),
     ]
 
     if failfast:
-        args.append('--failfast')
+        args.append("--failfast")
 
     if settings:
-        args.extend(['--settings', settings])
+        args.extend(["--settings", settings])
     else:
-        args.extend(['--settings', 'test_mysqlconnector_settings'])
+        args.extend(["--settings", "test_mysqlconnector_settings"])
 
     if group:
         args.extend(TEST_GROUPS[group])
     elif tests:
         args.extend(tests)
 
-    logger.info("Executing '{script}' script..".format(
-        script=django_script)
-    )
+    logger.info("Executing '{script}' script..".format(script=django_script))
     os.execve(sys.executable, args, env)
 
 
 def get_django_version(path):
 
-    VERSION = [999, 0, 0, 'a', 0]  # Set correct after version.py is loaded
-    py_module = os.path.join(path, 'django', '__init__.py')
-    with open(py_module, 'rb') as fp:
-        exec(compile(fp.read(), py_module, 'exec'))
+    VERSION = [999, 0, 0, "a", 0]  # Set correct after version.py is loaded
+    py_module = os.path.join(path, "django", "__init__.py")
+    with open(py_module, "rb") as fp:
+        exec(compile(fp.read(), py_module, "exec"))
 
     return VERSION
 
 
 def main():
-    """Start application
-    """
-    formatter = logging.Formatter(
-        "%(asctime)s [%(name)s:%(levelname)s] %(message)s")
+    """Start application"""
+    formatter = logging.Formatter("%(asctime)s [%(name)s:%(levelname)s] %(message)s")
     loghandle = logging.StreamHandler()
     loghandle.setFormatter(formatter)
     logger.addHandler(loghandle)
@@ -336,10 +355,11 @@ def main():
     else:
         logger.setLevel(logging.INFO)
 
-    if os.name != 'nt':
-        if 'http_proxy' not in os.environ or 'https_proxy' not in os.environ:
-            logger.warning("Note: http_proxy and/or https_proxy "
-                           "environment variables not set")
+    if os.name != "nt":
+        if "http_proxy" not in os.environ or "https_proxy" not in os.environ:
+            logger.warning(
+                "Note: http_proxy and/or https_proxy environment variables not set"
+            )
 
     logger.info("Python v{maj}: {exe}".format(maj=PYMAJ, exe=sys.executable))
 
@@ -354,8 +374,7 @@ def main():
 
     if args.django_path:
         if not os.path.isdir(args.django_path):
-            logger.error("Path to Django is not valid, was %s",
-                         args.django_path)
+            logger.error("Path to Django is not valid, was %s", args.django_path)
             sys.exit(1)
         django_path = os.path.abspath(args.django_path)
     else:
@@ -368,8 +387,10 @@ def main():
             try:
                 download(url, archive)
             except (URLError, HTTPError, TypeError) as err:
-                logger.error("Error downloading Django {name}: {error}".format(
-                    name=args.django, error=err.reason)
+                logger.error(
+                    "Error downloading Django {name}: {error}".format(
+                        name=args.django, error=err.reason
+                    )
                 )
                 sys.exit(1)
             try:
@@ -385,10 +406,18 @@ def main():
     django_version = get_django_version(django_path)
     logger.info("Using Django %d.%d.%d", *django_version[0:3])
 
-    myconnpy_install = os.path.join(os.getcwd(), '..', '..', 'lib')
-    django_tests(django_version, django_path, myconnpy=myconnpy_install,
-                 tests=args.tests, group=args.group, settings=args.settings,
-                 failfast=args.failfast, verbosity=args.verbosity)
+    myconnpy_install = os.path.join(os.getcwd(), "..", "..", "lib")
+    django_tests(
+        django_version,
+        django_path,
+        myconnpy=myconnpy_install,
+        tests=args.tests,
+        group=args.group,
+        settings=args.settings,
+        failfast=args.failfast,
+        verbosity=args.verbosity,
+    )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,16 +29,17 @@
 """Unittests for mysql.connector.abstracts
 """
 
+import unittest
+
 from decimal import Decimal
 from operator import attrgetter
 
-import unittest
 import tests
-from tests import PY2, foreach_cnx
 
-from mysql.connector.connection import MySQLConnection
-from mysql.connector.constants import RefreshOption
 from mysql.connector import errors
+from mysql.connector.connection import MySQLConnection
+from mysql.connector.constants import ClientFlag, RefreshOption
+from tests import foreach_cnx
 
 try:
     from mysql.connector.connection_cext import CMySQLConnection
@@ -49,8 +50,7 @@ except ImportError:
 
 class ConnectionSubclasses(tests.MySQLConnectorTests):
 
-    """Tests for any subclass of MySQLConnectionAbstract
-    """
+    """Tests for any subclass of MySQLConnectionAbstract"""
 
     def asEq(self, exp, *cases):
         for case in cases:
@@ -59,11 +59,11 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_properties_getter(self):
         properties = [
-            (self.config['user'], 'user'),
-            (self.config['host'], 'server_host'),
-            (self.config['port'], 'server_port'),
-            (self.config['unix_socket'], 'unix_socket'),
-            (self.config['database'], 'database')
+            (self.config["user"], "user"),
+            (self.config["host"], "server_host"),
+            (self.config["port"], "server_port"),
+            (self.config["unix_socket"], "unix_socket"),
+            (self.config["database"], "database"),
         ]
 
         for exp, property in properties:
@@ -83,7 +83,7 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.assertEqual(orig, self.cnx.sql_mode)
 
         try:
-            self.cnx.sql_mode = 'SPAM'
+            self.cnx.sql_mode = "SPAM"
         except errors.ProgrammingError:
             pass  # excepted
         else:
@@ -91,48 +91,55 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
 
         # Set SQL Mode to a list of modes
         if tests.MYSQL_VERSION[0:3] < (5, 7, 4):
-            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,'
-                   'NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,'
-                   'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
+            exp = (
+                "STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,"
+                "NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,"
+                "NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+            )
         elif tests.MYSQL_VERSION[0:3] < (8, 0, 5):
-            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,'
-                   'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION')
+            exp = (
+                "STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,"
+                "NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+            )
         else:
-            exp = ('STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,'
-                   'NO_ENGINE_SUBSTITUTION')
+            exp = (
+                "STRICT_TRANS_TABLES,STRICT_ALL_TABLES,TRADITIONAL,"
+                "NO_ENGINE_SUBSTITUTION"
+            )
 
         try:
             self.cnx.sql_mode = exp
         except errors.Error as err:
-            self.fail("Failed setting SQL Mode with multiple "
-                      "modes: {0}".format(str(err)))
+            self.fail(
+                "Failed setting SQL Mode with multiple modes: {0}".format(str(err))
+            )
         self.assertEqual(exp, self.cnx._sql_mode)
 
         # SQL Modes must be empty
-        self.cnx.sql_mode = ''
-        self.assertEqual('', self.cnx.sql_mode)
+        self.cnx.sql_mode = ""
+        self.assertEqual("", self.cnx.sql_mode)
 
         # Set SQL Mode and check
-        sql_mode = exp = 'STRICT_ALL_TABLES'
+        sql_mode = exp = "STRICT_ALL_TABLES"
         self.cnx.sql_mode = sql_mode
         self.assertEqual(exp, self.cnx.sql_mode)
 
         # Unset the SQL Mode again
-        self.cnx.sql_mode = ''
-        self.assertEqual('', self.cnx.sql_mode)
+        self.cnx.sql_mode = ""
+        self.assertEqual("", self.cnx.sql_mode)
 
     @foreach_cnx()
     def test_in_transaction(self):
-        self.cnx.cmd_query('START TRANSACTION')
+        self.cnx.cmd_query("START TRANSACTION")
         self.assertTrue(self.cnx.in_transaction)
-        self.cnx.cmd_query('ROLLBACK')
+        self.cnx.cmd_query("ROLLBACK")
         self.assertFalse(self.cnx.in_transaction)
 
         # AUTO_COMMIT turned ON
         self.cnx.autocommit = True
         self.assertFalse(self.cnx.in_transaction)
 
-        self.cnx.cmd_query('START TRANSACTION')
+        self.cnx.cmd_query("START TRANSACTION")
         self.assertTrue(self.cnx.in_transaction)
 
     @foreach_cnx()
@@ -150,42 +157,58 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_info_query(self):
         queries = [
-            ("SELECT 1",
-             (1,)),
-            ("SELECT 'ham', 'spam'",
-             ((u'ham', u'spam')))
+            ("SELECT 1", (1,)),
+            ("SELECT 'ham', 'spam'", (("ham", "spam"))),
         ]
         for query, exp in queries:
             self.assertEqual(exp, self.cnx.info_query(query))
 
-    @foreach_cnx()
-    def test_cmd_init_db(self):
-        self.assertRaises(errors.ProgrammingError,
-                          self.cnx.cmd_init_db, 'unknown_database')
-        self.cnx.cmd_init_db(u'INFORMATION_SCHEMA')
-        self.assertEqual('INFORMATION_SCHEMA', self.cnx.database.upper())
-        self.cnx.cmd_init_db('mysql')
-        self.assertEqual(u'mysql', self.cnx.database)
-        self.cnx.cmd_init_db('myconnpy')
-        self.assertEqual(u'myconnpy', self.cnx.database)
+        # Test invalid query raised error
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.info_query, "SELECT invalid query"
+        )
 
     @foreach_cnx()
+    def test_cmd_init_db(self):
+        self.assertRaises(
+            errors.ProgrammingError, self.cnx.cmd_init_db, "unknown_database"
+        )
+        self.cnx.cmd_init_db("INFORMATION_SCHEMA")
+        self.assertEqual("INFORMATION_SCHEMA", self.cnx.database.upper())
+        self.cnx.cmd_init_db("mysql")
+        self.assertEqual("mysql", self.cnx.database)
+        self.cnx.cmd_init_db("myconnpy")
+        self.assertEqual("myconnpy", self.cnx.database)
+
+    @unittest.skipIf(tests.MYSQL_VERSION < (5, 7, 2), "reset command not available")
+    @foreach_cnx()
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (8, 0),
+        "Not working with cross version MySQL lib< 8.0.",
+    )
     def test_reset_session(self):
-        exp = [True, u'STRICT_ALL_TABLES', u'-09:00', 33]
+        exp = [True, "STRICT_ALL_TABLES", "-09:00", 33]
         self.cnx.autocommit = exp[0]
         self.cnx.sql_mode = exp[1]
         self.cnx.time_zone = exp[2]
         self.cnx.set_charset_collation(exp[3])
 
-        user_variables = {'ham': '1', 'spam': '2'}
-        session_variables = {'wait_timeout': 100000}
+        user_variables = {"ham": "1", "spam": "2"}
+        session_variables = {"wait_timeout": 100000}
         self.cnx.reset_session(user_variables, session_variables)
 
-        self.assertEqual(exp, [self.cnx.autocommit, self.cnx.sql_mode,
-                               self.cnx.time_zone, self.cnx._charset_id])
+        self.assertEqual(
+            exp,
+            [
+                self.cnx.autocommit,
+                self.cnx.sql_mode,
+                self.cnx.time_zone,
+                self.cnx._charset_id,
+            ],
+        )
 
-        exp_user_variables = {'ham': 1, 'spam': 2}
-        exp_session_variables = {'wait_timeout': 100000}
+        exp_user_variables = {"ham": 1, "spam": 2}
+        exp_session_variables = {"wait_timeout": 100000}
 
         for key, value in exp_user_variables.items():
             row = self.cnx.info_query("SELECT @{0}".format(key))
@@ -194,14 +217,20 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
             row = self.cnx.info_query("SELECT @@session.{0}".format(key))
             self.assertEqual(value, row[0])
 
-    @unittest.skipIf(tests.MYSQL_VERSION > (5, 7, 10),
-                     "As of MySQL 5.7.11, mysql_refresh() is deprecated")
+    @unittest.skipIf(
+        tests.MYSQL_VERSION > (5, 7, 10),
+        "As of MySQL 5.7.11, mysql_refresh() is deprecated",
+    )
     @foreach_cnx()
     def test_cmd_refresh(self):
         refresh = RefreshOption.LOG | RefreshOption.THREADS
-        exp = {'insert_id': 0, 'affected_rows': 0,
-               'field_count': 0, 'warning_count': 0,
-               'status_flag': 0}
+        exp = {
+            "insert_id": 0,
+            "affected_rows": 0,
+            "field_count": 0,
+            "warning_count": 0,
+            "status_flag": 0,
+        }
         result = self.cnx.cmd_refresh(refresh)
         for key in set(result.keys()) ^ set(exp.keys()):
             try:
@@ -221,10 +250,18 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.cnx.cmd_quit()
         self.assertFalse(self.cnx.is_connected())
 
-    @unittest.skipIf(tests.MYSQL_VERSION >= (8, 0, 1),
-                     "As of MySQL 8.0.1, CMD_SHUTDOWN is not recognized.")
-    @unittest.skipIf(tests.MYSQL_VERSION <= (5, 7, 1),
-                     "BugOra17422299 not tested with MySQL version 5.6")
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
+    @unittest.skipIf(
+        tests.MYSQL_VERSION >= (8, 0, 1),
+        "As of MySQL 8.0.1, CMD_SHUTDOWN is not recognized.",
+    )
+    @unittest.skipIf(
+        tests.MYSQL_VERSION <= (5, 7, 1),
+        "BugOra17422299 not tested with MySQL version 5.6",
+    )
     @foreach_cnx()
     def test_cmd_shutdown(self):
         server = tests.MYSQL_SERVERS[0]
@@ -233,8 +270,10 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         self.cnx.cmd_shutdown()
 
         if not server.wait_down():
-            self.fail("[{0}] ".format(self.cnx.__class__.__name__) +
-                      "MySQL not shut down after cmd_shutdown()")
+            self.fail(
+                "[{0}] ".format(self.cnx.__class__.__name__)
+                + "MySQL not shut down after cmd_shutdown()"
+            )
 
         self.assertRaises(errors.Error, self.cnx.cmd_shutdown)
 
@@ -245,14 +284,14 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_cmd_statistics(self):
         exp = {
-            'Uptime': int,
-            'Open tables': int,
-            'Queries per second avg': Decimal,
-            'Slow queries': int,
-            'Threads': int,
-            'Questions': int,
-            'Flush tables': int,
-            'Opens': int
+            "Uptime": int,
+            "Open tables": int,
+            "Queries per second avg": Decimal,
+            "Slow queries": int,
+            "Threads": int,
+            "Questions": int,
+            "Flush tables": int,
+            "Opens": int,
         }
 
         stat = self.cnx.cmd_statistics()
@@ -263,8 +302,7 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
 
     @foreach_cnx()
     def test_cmd_process_info(self):
-        self.assertRaises(errors.NotSupportedError,
-                          self.cnx.cmd_process_info)
+        self.assertRaises(errors.NotSupportedError, self.cnx.cmd_process_info)
 
     @foreach_cnx()
     def test_cmd_process_kill(self):
@@ -282,21 +320,26 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
 
         self.cnx.start_transaction(consistent_snapshot=True)
         self.assertTrue(self.cnx.in_transaction)
-        self.assertRaises(errors.ProgrammingError,
-                          self.cnx.start_transaction)
+        self.assertRaises(errors.ProgrammingError, self.cnx.start_transaction)
         self.cnx.rollback()
 
-        levels = ['READ UNCOMMITTED', 'READ COMMITTED', 'REPEATABLE READ',
-                  'SERIALIZABLE',
-                  'READ-UNCOMMITTED', 'READ-COMMITTED', 'REPEATABLE-READ',
-                  'SERIALIZABLE']
+        levels = [
+            "READ UNCOMMITTED",
+            "READ COMMITTED",
+            "REPEATABLE READ",
+            "SERIALIZABLE",
+            "READ-UNCOMMITTED",
+            "READ-COMMITTED",
+            "REPEATABLE-READ",
+            "SERIALIZABLE",
+        ]
 
         for level in levels:
-            level = level.replace(' ', '-')
+            level = level.replace(" ", "-")
             self.cnx.start_transaction(isolation_level=level)
             self.assertTrue(self.cnx.in_transaction)
             self.cnx.rollback()
 
-        self.assertRaises(ValueError,
-                          self.cnx.start_transaction,
-                          isolation_level='spam')
+        self.assertRaises(
+            ValueError, self.cnx.start_transaction, isolation_level="spam"
+        )

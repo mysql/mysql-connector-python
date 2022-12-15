@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Change permissions for files in MySQL Package
+#
+
+CPY_PACKAGE="/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.8/lib/python3.8/site-packages"
+chown -R root:wheel "${CPY_PACKAGE}/mysql/connector"
+chown -R root:wheel "${CPY_PACKAGE}/mysqlx"
+
+exit 0

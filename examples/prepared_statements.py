@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,6 +36,7 @@ Example using MySQL Connector/Python showing:
 """
 
 import mysql.connector
+
 from mysql.connector.cursor import MySQLCursorPrepared
 
 
@@ -45,18 +46,18 @@ def main(config):
 
     curprep = cnx.cursor(cursor_class=MySQLCursorPrepared)
     cur = cnx.cursor()
-    
+
     # Drop table if exists, and create it new
     stmt_drop = "DROP TABLE IF EXISTS names"
     cur.execute(stmt_drop)
-    
+
     stmt_create = (
         "CREATE TABLE names ("
         "id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT, "
         "name VARCHAR(30) DEFAULT '' NOT NULL, "
         "cnt TINYINT UNSIGNED DEFAULT 0, "
         "PRIMARY KEY (id))"
-        )
+    )
     cur.execute(stmt_create)
 
     # Connector/Python also allows ? as placeholders for MySQL Prepared
@@ -68,7 +69,7 @@ def main(config):
     curprep.execute(prepstmt)
 
     # Insert 3 records
-    names = ('Geert', 'Jan', 'Michel')
+    names = ("Geert", "Jan", "Michel")
     for name in names:
         curprep.execute(prepstmt, (name,))
         cnx.commit()
@@ -86,18 +87,18 @@ def main(config):
     return output
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     config = {
-        'host': 'localhost',
-        'port': 3306,
-        'database': 'test',
-        'user': 'root',
-        'password': '',
-        'charset': 'utf8',
-        'use_unicode': True,
-        'get_warnings': True,
+        "host": "localhost",
+        "port": 3306,
+        "database": "test",
+        "user": "root",
+        "password": "",
+        "charset": "utf8",
+        "use_unicode": True,
+        "get_warnings": True,
     }
 
     out = main(config)
-    print('\n'.join(out))
+    print("\n".join(out))

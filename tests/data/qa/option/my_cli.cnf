@@ -1,0 +1,27 @@
+[client]
+
+user=root
+password=
+database=cli_data
+join_buffer_size = 128M
+sort_buffer_size = 2M
+read_rnd_buffer_size = 2M 
+use_unicode=True
+charset=latin7
+collation= latin7_general_ci
+autocommit=True
+sql_mode=ANSI
+get_warnings=True
+raise_on_warnings=True
+buffered=True
+raw=True
+force_ipv6=False
+
+
+
+
+
+
+
+
+

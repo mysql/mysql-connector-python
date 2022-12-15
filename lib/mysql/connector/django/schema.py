@@ -1,86 +1,56 @@
-# MySQL Connector/Python - MySQL driver written in Python.
+# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0, as
+# published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an
+# additional permission to link the program and your derivative works
+# with the separately licensed software that they have included with
+# MySQL.
+#
+# Without limiting anything contained in the foregoing, this file,
+# which is part of MySQL Connector/Python, is also subject to the
+# Universal FOSS Exception, version 1.0, a copy of which can be found at
+# http://oss.oracle.com/licenses/universal-foss-exception.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-# New file added for Django 1.7
+"""Database schema editor."""
 
-import django
-if django.VERSION >= (1, 8):
-    from django.db.backends.base.schema import BaseDatabaseSchemaEditor
-else:
-    from django.db.backends.schema import BaseDatabaseSchemaEditor
-from django.db.models import NOT_PROVIDED
+from django.db.backends.mysql.schema import (
+    DatabaseSchemaEditor as MySQLDatabaseSchemaEditor,
+)
 
 
-class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
-
-    sql_rename_table = "RENAME TABLE %(old_table)s TO %(new_table)s"
-
-    sql_alter_column_null = "MODIFY %(column)s %(type)s NULL"
-    sql_alter_column_not_null = "MODIFY %(column)s %(type)s NOT NULL"
-    sql_alter_column_type = "MODIFY %(column)s %(type)s"
-    sql_rename_column = "ALTER TABLE %(table)s CHANGE %(old_column)s " \
-                        "%(new_column)s %(type)s"
-
-    sql_delete_unique = "ALTER TABLE %(table)s DROP INDEX %(name)s"
-
-    sql_create_fk = "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s FOREIGN " \
-                    "KEY (%(column)s) REFERENCES %(to_table)s (%(to_column)s)"
-    sql_delete_fk = "ALTER TABLE %(table)s DROP FOREIGN KEY %(name)s"
-
-    sql_delete_index = "DROP INDEX %(name)s ON %(table)s"
-
-    alter_string_set_null = 'MODIFY %(column)s %(type)s NULL;'
-    alter_string_drop_null = 'MODIFY %(column)s %(type)s NOT NULL;'
-
-    sql_create_pk = "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s " \
-                    "PRIMARY KEY (%(columns)s)"
-    sql_delete_pk = "ALTER TABLE %(table)s DROP PRIMARY KEY"
+class DatabaseSchemaEditor(MySQLDatabaseSchemaEditor):
+    """This class is responsible for emitting schema-changing statements to the
+    databases.
+    """
 
     def quote_value(self, value):
-        # Inner import to allow module to fail to load gracefully
-        from mysql.connector.conversion import MySQLConverter
-        return MySQLConverter.quote(MySQLConverter.escape(value))
+        """Quote value."""
+        self.connection.ensure_connection()
+        if isinstance(value, str):
+            value = value.replace("%", "%%")
+        quoted = self.connection.connection.converter.escape(value)
+        if isinstance(value, str) and isinstance(quoted, bytes):
+            quoted = quoted.decode()
+        return quoted
 
-    def skip_default(self, field):
+    def prepare_default(self, value):
+        """Implement the required abstract method.
+
+        MySQL has requires_literal_defaults=False, therefore return the value.
         """
-        MySQL doesn't accept default values for longtext and longblob
-        and implicitly treats these columns as nullable.
-        """
-        return field.db_type(self.connection) in ('longtext', 'longblob')
-
-    def add_field(self, model, field):
-        super(DatabaseSchemaEditor, self).add_field(model, field)
-
-        # Simulate the effect of a one-off default.
-        if (self.skip_default(field)
-                and field.default not in (None, NOT_PROVIDED)):
-            effective_default = self.effective_default(field)
-            self.execute('UPDATE %(table)s SET %(column)s = %%s' % {
-                'table': self.quote_name(model._meta.db_table),
-                'column': self.quote_name(field.column),
-            }, [effective_default])
-
-    def _model_indexes_sql(self, model):
-        # New in Django 1.8
-        storage = self.connection.introspection.get_storage_engine(
-            self.connection.cursor(), model._meta.db_table
-        )
-        if storage == "InnoDB":
-            for field in model._meta.local_fields:
-                if (field.db_index and not field.unique
-                        and field.get_internal_type() == "ForeignKey"):
-                    # Temporary setting db_index to False (in memory) to
-                    # disable index creation for FKs (index automatically
-                    # created by MySQL)
-                    field.db_index = False
-        return super(DatabaseSchemaEditor, self)._model_indexes_sql(model)
-
-    def _alter_column_type_sql(self, table, old_field, new_field, new_type):
-        # New in Django 1.8
-        # Keep null property of old field, if it has changed, it will be
-        # handled separately
-        if old_field.null:
-            new_type += " NULL"
-        else:
-            new_type += " NOT NULL"
-        return super(DatabaseSchemaEditor, self)._alter_column_type_sql(
-            table, old_field, new_field, new_type)
+        return value

@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,13 +32,15 @@ The file version.py gets installed and is available after installation
 as mysql.connector.version.
 """
 
-VERSION = (8, 0, 14, '', 1)
+VERSION = (8, 0, 31, "", 1)
 
+# pylint: disable=consider-using-f-string
 if VERSION[3] and VERSION[4]:
-    VERSION_TEXT = '{0}.{1}.{2}{3}{4}'.format(*VERSION)
+    VERSION_TEXT = "{0}.{1}.{2}{3}{4}".format(*VERSION)
 else:
-    VERSION_TEXT = '{0}.{1}.{2}'.format(*VERSION[0:3])
+    VERSION_TEXT = "{0}.{1}.{2}".format(*VERSION[0:3])
+# pylint: enable=consider-using-f-string
 
-VERSION_EXTRA = ''
-LICENSE = 'GPLv2 with FOSS License Exception'
-EDITION = ''  # Added in package names, after the version
+VERSION_EXTRA = ""
+LICENSE = "GPLv2 with FOSS License Exception"
+EDITION = ""  # Added in package names, after the version

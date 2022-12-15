@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,18 +28,19 @@
 
 """Module for managing and running a MySQL server"""
 
-import sys
-import os
-import signal
-import re
-from shutil import rmtree
-import subprocess
-import logging
-import time
 import ctypes
-import socket
 import errno
+import logging
+import os
+import re
+import signal
+import socket
 import struct
+import subprocess
+import sys
+import time
+
+from shutil import rmtree
 
 try:
     from ctypes import wintypes
@@ -47,32 +48,20 @@ except (ImportError, ValueError):
     # We are not on Windows
     pass
 
-try:
-    from socketserver import (
-        ThreadingMixIn, TCPServer, BaseRequestHandler
-    )
-except ImportError:
-    from SocketServer import (
-        ThreadingMixIn, TCPServer, BaseRequestHandler
-    )
-TCPServer.allow_reuse_address = True
+from socketserver import BaseRequestHandler, TCPServer, ThreadingMixIn
 
 import tests
 
+TCPServer.allow_reuse_address = True
+
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 
-
 # MySQL Server executable name
-if os.name == 'nt':
-    EXEC_MYSQLD = 'mysqld.exe'
-else:
-    EXEC_MYSQLD = 'mysqld'
+EXEC_MYSQLD = "mysqld.exe" if os.name == "nt" else "mysqld"
 
 # MySQL client executable name
-if os.name == 'nt':
-    EXEC_MYSQL = 'mysql.exe'
-else:
-    EXEC_MYSQL = 'mysql'
+EXEC_MYSQL = "mysql.exe" if os.name == "nt" else "mysql"
+
 
 def _convert_forward_slash(path):
     """Convert forward slashes with backslashes
@@ -83,9 +72,9 @@ def _convert_forward_slash(path):
 
     Returns a string
     """
-    if os.name == 'nt':
+    if os.name == "nt":
         nmpath = os.path.normpath(path)
-        return nmpath.replace('\\', '\\\\')
+        return nmpath.replace("\\", "\\\\")
     return path
 
 
@@ -97,13 +86,13 @@ def process_running(pid):
 
     Return True or False
     """
-    if os.name == 'nt':
+    if os.name == "nt":
         # We are on Windows
-        process = subprocess.Popen(['tasklist'], stdout=subprocess.PIPE)
+        process = subprocess.Popen(["tasklist"], stdout=subprocess.PIPE)
         output, _ = process.communicate()
         lines = [line.split(None, 2) for line in output.splitlines() if line]
         for name, apid, _ in lines:
-            name = name.decode('utf-8')
+            name = name.decode("utf-8")
             if name == EXEC_MYSQLD and pid == int(apid):
                 LOGGER.debug("Process %d is running.", pid)
                 return True
@@ -127,7 +116,7 @@ def process_terminate(pid):
 
     Raises MySQLServerError on errors.
     """
-    if os.name == 'nt':
+    if os.name == "nt":
         winkernel = ctypes.windll.kernel32
         process = winkernel.OpenProcess(0x0001, 0, pid)  # PROCESS_TERMINATE
         winkernel.TerminateProcess(process, 1)
@@ -142,7 +131,9 @@ def get_pid(pid_file):
     Returns None or int.
     """
     try:
-        return int(open(pid_file, 'r').readline().strip())
+        with open(pid_file, "r") as fp:
+            pid = int(fp.readline().strip())
+        return pid
     except IOError as err:
         LOGGER.debug("Failed reading pid file: %s", err)
         return None
@@ -150,15 +141,17 @@ def get_pid(pid_file):
 
 class MySQLServerError(Exception):
     """Exception for raising errors when managing a MySQL server"""
+
     pass
 
 
 class MySQLBootstrapError(MySQLServerError):
     """Exception for raising errors around bootstrapping a MySQL server"""
+
     pass
 
 
-class MySQLServerBase(object):
+class MySQLServerBase:
     """Base for classes managing a MySQL server"""
 
     def __init__(self, basedir, option_file=None, sharedir=None):
@@ -169,11 +162,14 @@ class MySQLServerBase(object):
         self._process = None
         self._lc_messages_dir = None
         self._init_mysql_install()
-        self._version = self._get_version()
+        ver, lic = self._get_version()
+        self._version = ver
+        self._license = lic
 
         if option_file and os.access(option_file, 0):
-            MySQLBootstrapError("Option file not accessible: {name}".format(
-                name=option_file))
+            MySQLBootstrapError(
+                "Option file not accessible: {name}".format(name=option_file)
+            )
         self._option_file = option_file
 
     def _init_mysql_install(self):
@@ -192,41 +188,38 @@ class MySQLServerBase(object):
             if self._sbindir:
                 break
             for afile in files:
-                if (afile == EXEC_MYSQLD and
-                        os.access(os.path.join(root, afile), 0)):
+                if afile == EXEC_MYSQLD and os.access(os.path.join(root, afile), 0):
                     self._sbindir = root
-                    LOGGER.debug("Located {} in {}".format(
-                        EXEC_MYSQLD, self._sbindir))
+                    LOGGER.debug("Located {} in {}".format(EXEC_MYSQLD, self._sbindir))
                     try:
                         files_to_find.remove(EXEC_MYSQLD)
                     except ValueError:
-                            pass
-                elif (afile == EXEC_MYSQL and
-                        os.access(os.path.join(root, afile), 0)):
+                        pass
+                elif afile == EXEC_MYSQL and os.access(os.path.join(root, afile), 0):
                     self._bindir = root
-                    LOGGER.debug("Located {} in {}".format(
-                        EXEC_MYSQL, self._bindir))
+                    LOGGER.debug("Located {} in {}".format(EXEC_MYSQL, self._bindir))
                     try:
                         files_to_find.remove(EXEC_MYSQLD)
                     except ValueError:
-                            pass
+                        pass
 
                 if not files_to_find:
                     break
 
-
         if not self._sbindir:
             raise MySQLBootstrapError(
-                "MySQL binaries not found under {0}".format(self._basedir))
+                "MySQL binaries not found under {0}".format(self._basedir)
+            )
 
         # Try to locate errmsg.sys and mysql_system_tables.sql
         if not self._sharedir:
-            match = self._get_mysqld_help_info(r'^lc-messages-dir\s+(.*)\s*$')
+            match = self._get_mysqld_help_info(r"^lc-messages-dir\s+(.*)\s*$")
             if match:
                 self._sharedir = match[0]
             if not self._sharedir:
-                raise MySQLBootstrapError("Failed getting share folder. "
-                                          "Use --with-mysql-share.")
+                raise MySQLBootstrapError(
+                    "Failed getting share folder. Use --with-mysql-share."
+                )
         LOGGER.debug("Using share folder: %s", self._sharedir)
 
         found = False
@@ -234,20 +227,22 @@ class MySQLServerBase(object):
             if found:
                 break
             for afile in files:
-                if afile == 'errmsg.sys' and 'english' in root:
+                if afile == "errmsg.sys" and "english" in root:
                     self._lc_messages_dir = os.path.abspath(
                         os.path.join(root, os.pardir)
                     )
-                elif afile == 'mysql_system_tables.sql' or \
-                   afile == 'innodb_memcached_config.sql':
+                elif (
+                    afile == "mysql_system_tables.sql"
+                    or afile == "innodb_memcached_config.sql"
+                ):
                     self._scriptdir = root
 
-        version = self._get_version()
-        if not self._lc_messages_dir or (version < (8, 0, 13) and
-                                         not self._scriptdir):
+        version = self._get_version()[0]
+        if not self._lc_messages_dir or (version < (8, 0, 13) and not self._scriptdir):
             raise MySQLBootstrapError(
                 "errmsg.sys and mysql_system_tables.sql not found"
-                " under {0}".format(self._sharedir))
+                " under {0}".format(self._sharedir)
+            )
 
         LOGGER.debug("Location of MySQL Server binaries: %s", self._sbindir)
 
@@ -264,8 +259,8 @@ class MySQLServerBase(object):
             "--defaults-file={0}".format(self._option_file),
         ]
 
-        if os.name == 'nt':
-            cmd.append('--standalone')
+        if os.name == "nt":
+            cmd.append("--standalone")
 
         return cmd
 
@@ -276,16 +271,13 @@ class MySQLServerBase(object):
         will be looked for in each line of the mysqld --help --verbose
         output. We return the first match as a list.
         """
-        cmd = [
-            os.path.join(self._sbindir, EXEC_MYSQLD),
-            '--help', '--verbose'
-        ]
+        cmd = [os.path.join(self._sbindir, EXEC_MYSQLD), "--help", "--verbose"]
 
         prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         help_verbose = prc.communicate()[0]
         regex = re.compile(needle)
         for help_line in help_verbose.splitlines():
-            help_line = help_line.decode('utf-8').strip()
+            help_line = help_line.decode("utf-8").strip()
             match = regex.search(help_line)
             if match:
                 return match.groups()
@@ -296,24 +288,26 @@ class MySQLServerBase(object):
         """Get the MySQL server version
 
         This method executes mysqld with the --version argument. It parses
-        the output looking for the version number and returns it as a
-        tuple with integer values: (major,minor,patch)
+        the output looking for the version number and license, returns it as a
+        tuple with version number as fisrt element as a tuple with integer
+        values and a string as second element indicating the version in the
+        form:  ((major,minor,patch), "license as shown by mysqld")
 
         Returns a tuple.
         """
-        cmd = [
-            os.path.join(self._sbindir, EXEC_MYSQLD),
-            '--version'
-        ]
+        cmd = [os.path.join(self._sbindir, EXEC_MYSQLD), "--version"]
 
         prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         verstr = str(prc.communicate()[0])
-        matches = re.match(r'.*Ver (\d)\.(\d).(\d{1,2}).*', verstr)
+        matches = re.match(r".*Ver (\d)\.(\d).(\d{1,2})-*(\S*).*", verstr)
         if matches:
-            return tuple([int(v) for v in matches.groups()])
+            matches_groups = matches.groups()
+            ver = tuple([int(v) for v in matches_groups[0:-1]])
+            lic = matches_groups[-1]
+            LOGGER.debug("MySQL version: %s license: %s", ver, lic)
+            return (ver, lic)
         else:
-            raise MySQLServerError(
-                'Failed reading version from mysqld --version')
+            raise MySQLServerError("Failed reading version from mysqld --version")
 
     @property
     def version(self):
@@ -322,6 +316,14 @@ class MySQLServerBase(object):
         Returns a tuple.
         """
         return self._version
+
+    @property
+    def license(self):
+        """Returns the MySQL server license type
+
+        Returns a tuple.
+        """
+        return self._license
 
     def _start_server(self):
         """Start the MySQL server"""
@@ -360,13 +362,28 @@ class MySQLServerBase(object):
 class MySQLServer(MySQLServerBase):
     """Class for managing a MySQL server"""
 
-    def __init__(self, basedir, topdir, cnf, bind_address, port, mysqlx_port,
-                 name, datadir=None, tmpdir=None, extra_args={},
-                 unix_socket_folder=None, ssl_folder=None, ssl_ca=None,
-                 ssl_cert=None, ssl_key=None, sharedir=None):
+    def __init__(
+        self,
+        basedir,
+        topdir,
+        cnf,
+        bind_address,
+        port,
+        mysqlx_port,
+        name,
+        datadir=None,
+        tmpdir=None,
+        extra_args={},
+        unix_socket_folder=None,
+        ssl_folder=None,
+        ssl_ca=None,
+        ssl_cert=None,
+        ssl_key=None,
+        sharedir=None,
+    ):
         self._extra_args = extra_args
         self._cnf = cnf
-        self._option_file = os.path.join(topdir, 'my.cnf')
+        self._option_file = os.path.join(topdir, "my.cnf")
         self._bind_address = bind_address
         self._port = port
         self._mysqlx_port = mysqlx_port
@@ -376,16 +393,18 @@ class MySQLServer(MySQLServerBase):
         self._ssl_ca = os.path.join(self._ssldir, ssl_ca)
         self._ssl_cert = os.path.join(self._ssldir, ssl_cert)
         self._ssl_key = os.path.join(self._ssldir, ssl_key)
-        self._datadir = datadir or os.path.join(topdir, 'data')
-        self._tmpdir = tmpdir or os.path.join(topdir, 'tmp')
+        self._datadir = datadir or os.path.join(topdir, "data")
+        self._tmpdir = tmpdir or os.path.join(topdir, "tmp")
         self._name = name
-        self._unix_socket = os.path.join(unix_socket_folder or self._topdir,
-                                         'mysql_cpy_' + name + '.sock')
-        self._mysqlx_unix_socket = os.path.join(unix_socket_folder \
-                or self._topdir, 'mysql_cpy_mysqlx_' + name + '.sock')
+        self._unix_socket = os.path.join(
+            unix_socket_folder or self._topdir, "mysql_cpy_" + name + ".sock"
+        )
+        self._mysqlx_unix_socket = os.path.join(
+            unix_socket_folder or self._topdir,
+            "mysql_cpy_mysqlx_" + name + ".sock",
+        )
 
-        self._pid_file = os.path.join(topdir,
-                                      'mysql_cpy_' + name + '.pid')
+        self._pid_file = os.path.join(topdir, "mysql_cpy_" + name + ".pid")
         self._serverid = port + 100000
         self._install = None
         self._server = None
@@ -394,10 +413,10 @@ class MySQLServer(MySQLServerBase):
 
         self.client_config = {}
 
-        super(MySQLServer, self).__init__(self._basedir,
-                                          self._option_file,
-                                          sharedir=self._sharedir)
-        self._init_sql = os.path.join(self._topdir, 'init.sql')
+        super(MySQLServer, self).__init__(
+            self._basedir, self._option_file, sharedir=self._sharedir
+        )
+        self._init_sql = os.path.join(self._topdir, "init.sql")
 
     def _create_directories(self):
         """Create directory structure for bootstrapping
@@ -410,13 +429,13 @@ class MySQLServer(MySQLServerBase):
         """
         dirs = [
             self._topdir,
-            os.path.join(self._topdir, 'tmp'),
+            os.path.join(self._topdir, "tmp"),
         ]
 
         if self._version[0:3] < (8, 0, 1):
             dirs.append(self._datadir)
             if self._version[0:3] < (5, 7, 21):
-                dirs.append(os.path.join(self._datadir, 'mysql'))
+                dirs.append(os.path.join(self._datadir, "mysql"))
 
         for adir in dirs:
             LOGGER.debug("Creating directory %s", adir)
@@ -432,14 +451,14 @@ class MySQLServer(MySQLServerBase):
         """
         cmd = [
             os.path.join(self._sbindir, EXEC_MYSQLD),
-            '--no-defaults',
-            '--basedir=%s' % self._basedir,
-            '--datadir=%s' % self._datadir,
-            '--max_allowed_packet=8M',
-            '--default-storage-engine=myisam',
-            '--net_buffer_length=16K',
-            '--tmpdir=%s' % self._tmpdir,
-            '--innodb_log_file_size=1Gb',
+            "--no-defaults",
+            "--basedir=%s" % self._basedir,
+            "--datadir=%s" % self._datadir,
+            "--max_allowed_packet=8M",
+            "--default-storage-engine=myisam",
+            "--net_buffer_length=16K",
+            "--tmpdir=%s" % self._tmpdir,
+            "--innodb_log_file_size=1Gb",
         ]
 
         if self._version[0:2] >= (8, 0) or self._version >= (5, 7, 21):
@@ -449,17 +468,19 @@ class MySQLServer(MySQLServerBase):
             cmd.append("--bootstrap")
 
         if self._version < (8, 0, 3):
-            cmd.append('--log-warnings=0')
+            cmd.append("--log-warnings=0")
 
         if self._version[0:2] < (5, 5):
-            cmd.append('--language={0}/english'.format(self._lc_messages_dir))
+            cmd.append("--language={0}/english".format(self._lc_messages_dir))
         else:
-            cmd.extend([
-                '--lc-messages-dir={0}'.format(self._lc_messages_dir),
-                '--lc-messages=en_US'
-            ])
+            cmd.extend(
+                [
+                    "--lc-messages-dir={0}".format(self._lc_messages_dir),
+                    "--lc-messages=en_US",
+                ]
+            )
         if self._version[0:2] >= (5, 1) and self._version < (8, 0, 11):
-            cmd.append('--loose-skip-ndbcluster')
+            cmd.append("--loose-skip-ndbcluster")
 
         return cmd
 
@@ -478,30 +499,31 @@ class MySQLServer(MySQLServerBase):
 
         # Order is important
         script_files = (
-            'mysql_system_tables.sql',
-            'mysql_system_tables_data.sql',
-            'fill_help_tables.sql',
+            "mysql_system_tables.sql",
+            "mysql_system_tables_data.sql",
+            "fill_help_tables.sql",
         )
 
         # Extra SQL statements to execute after SQL scripts
-        extra_sql = [
-            "CREATE DATABASE myconnpy;"
-        ]
+        extra_sql = ["CREATE DATABASE myconnpy CHARACTER SET utf8mb4;"]
 
         if self._version > (5, 7, 5) and self._version < (5, 7, 21):
             # Note: server is running with --skip-grant-tables
             # (can not user 'CREATE USER' statements).
-            defaults = ("'root'{0}, "
-                        "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-                        "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
-                        "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
-                        "@@default_authentication_plugin,'','N',"
-                        "CURRENT_TIMESTAMP,NULL{1}")
+            defaults = (
+                "'root'{0}, "
+                "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                "'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y',"
+                "'Y','Y','Y','Y','Y','','','','',0,0,0,0,"
+                "@@default_authentication_plugin,'','N',"
+                "CURRENT_TIMESTAMP,NULL{1}"
+            )
 
             hosts = ["::1", "127.0.0.1", "localhost"]
 
             insert = "INSERT INTO mysql.user VALUES {0};".format(
-                ", ".join("('{0}', {{0}})".format(host) for host in hosts))
+                ", ".join("('{0}', {{0}})".format(host) for host in hosts)
+            )
 
             if self._version[0:3] >= (5, 7, 6):
                 # No password column, has account_locked column
@@ -512,36 +534,41 @@ class MySQLServer(MySQLServerBase):
 
             extra_sql.append(insert.format(defaults))
         elif self._version[0:3] >= (5, 7, 21) and self._version < (8, 0, 1):
-                LOGGER.info("Appending extra SQL for mysqlx")
-                extra_sql.extend([
+            LOGGER.info("Appending extra SQL for mysqlx")
+            extra_sql.extend(
+                [
                     "CREATE USER IF NOT EXISTS 'root'@'localhost';",
-                    "GRANT ALL ON *.* TO 'root'@'localhost' WITH GRANT "
-                    "OPTION;",
+                    "GRANT ALL ON *.* TO 'root'@'localhost' WITH GRANT OPTION;",
                     "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
-                    "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT "
-                    "OPTION;",
+                    "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;",
                     "CREATE USER IF NOT EXISTS 'root'@'::1';",
                     "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;",
                     "CREATE USER IF NOT EXISTS mysqlxsys@localhost IDENTIFIED "
-                    "WITH mysql_native_password AS 'password' ACCOUNT LOCK;",
+                    "WITH mysql_native_password BY 'password' ACCOUNT LOCK;",
                     "GRANT SELECT ON mysql.user TO mysqlxsys@localhost;",
-                    "GRANT SUPER ON *.* TO mysqlxsys@localhost;"
-                ])
-        elif self._version[0:3] >= (5, 6, 39) and \
-             self._version[0:3] < (5, 7, 5):
+                    "GRANT SUPER ON *.* TO mysqlxsys@localhost;",
+                ]
+            )
+        elif self._version[0:3] >= (5, 6, 39) and self._version[0:3] < (
+            5,
+            7,
+            5,
+        ):
             # Following required user accounts are created by the server itself:
             # 'root'@'127.0.0.1', 'root'@'localhost' and 'root'@'::1'
             # Note: server is running with --skip-grant-tables.
             pass
         else:
-            extra_sql.extend([
-                "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
-                "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;",
-                "CREATE USER IF NOT EXISTS 'root'@'::1';",
-                "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;"
-            ])
+            extra_sql.extend(
+                [
+                    "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1';",
+                    "GRANT ALL ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;",
+                    "CREATE USER IF NOT EXISTS 'root'@'::1';",
+                    "GRANT ALL ON *.* TO 'root'@'::1' WITH GRANT OPTION;",
+                ]
+            )
 
-        bootstrap_log = os.path.join(self._topdir, 'bootstrap.log')
+        bootstrap_log = os.path.join(self._topdir, "bootstrap.log")
         try:
             self._create_directories()
             cmd = self._get_bootstrap_cmd()
@@ -555,34 +582,43 @@ class MySQLServer(MySQLServerBase):
                 for filename in script_files:
                     full_path = os.path.join(self._scriptdir, filename)
                     LOGGER.debug("Reading SQL from '%s'", full_path)
-                    with open(full_path, 'r') as fp:
+                    with open(full_path, "r", encoding="utf-8") as fp:
                         sql.extend([line.strip() for line in fp.readlines()])
 
-            fp_log = open(bootstrap_log, 'w')
+            fp_log = open(bootstrap_log, "w")
             if self._version[0:2] < (8, 0) or self._version < (5, 7, 21):
                 sql.extend(extra_sql)
-                prc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT,
-                                       stdout=fp_log)
-                prc.communicate('\n'.join(sql) if sys.version_info[0] == 2
-                                else bytearray('\n'.join(sql), 'utf8'))
+                prc = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    stdout=fp_log,
+                )
+                prc.communicate(
+                    "\n".join(sql)
+                    if sys.version_info[0] == 2
+                    else bytearray("\n".join(sql), "utf8")
+                )
             else:
-                prc = subprocess.call(cmd, stderr=subprocess.STDOUT,
-                                      stdout=fp_log)
+                prc = subprocess.call(cmd, stderr=subprocess.STDOUT, stdout=fp_log)
             fp_log.close()
         except OSError as err:
             raise MySQLBootstrapError(
                 "Error bootstrapping MySQL '{name}': {error}".format(
-                    name=self._name, error=str(err)))
+                    name=self._name, error=str(err)
+                )
+            )
 
-        with open(bootstrap_log, 'r') as fp:
+        with open(bootstrap_log, "r") as fp:
             log_lines = fp.readlines()
             for log_line in log_lines:
-                if '[ERROR]' in log_line:
-                    err_msg = log_line.split('[ERROR]')[1].strip()
+                if "[ERROR]" in log_line:
+                    err_msg = log_line.split("[ERROR]")[1].strip()
                     raise MySQLBootstrapError(
                         "Error bootstrapping MySQL '{name}': {error}".format(
-                            name=self._name, error=err_msg))
+                            name=self._name, error=err_msg
+                        )
+                    )
 
     @property
     def name(self):
@@ -610,38 +646,37 @@ class MySQLServer(MySQLServerBase):
 
     def update_config(self, **kwargs):
         options = {
-            'name': self._name,
-            'basedir': _convert_forward_slash(self._basedir),
-            'datadir': _convert_forward_slash(self._datadir),
-            'tmpdir': _convert_forward_slash(self._tmpdir),
-            'bind_address': self._bind_address,
-            'port': self._port,
-            'mysqlx_port': self._mysqlx_port,
-            'mysqlx_plugin': 'mysqlx.so' if os.name == 'posix' else 'mysqlx',
-            'unix_socket': _convert_forward_slash(self._unix_socket),
-            'mysqlx_unix_socket': _convert_forward_slash(
-                self._mysqlx_unix_socket),
-            'ssl_dir': _convert_forward_slash(self._ssldir),
-            'ssl_ca': _convert_forward_slash(self._ssl_ca),
-            'ssl_cert': _convert_forward_slash(self._ssl_cert),
-            'ssl_key': _convert_forward_slash(self._ssl_key),
-            'pid_file': _convert_forward_slash(self._pid_file),
-            'serverid': self._serverid,
-            'lc_messages_dir': _convert_forward_slash(
-                self._lc_messages_dir),
-            'ssl': 1,
+            "name": self._name,
+            "basedir": _convert_forward_slash(self._basedir),
+            "datadir": _convert_forward_slash(self._datadir),
+            "tmpdir": _convert_forward_slash(self._tmpdir),
+            "bind_address": self._bind_address,
+            "port": self._port,
+            "mysqlx_port": self._mysqlx_port,
+            "mysqlx_plugin": "mysqlx.so" if os.name == "posix" else "mysqlx",
+            "unix_socket": _convert_forward_slash(self._unix_socket),
+            "mysqlx_unix_socket": _convert_forward_slash(self._mysqlx_unix_socket),
+            "ssl_dir": _convert_forward_slash(self._ssldir),
+            "ssl_ca": _convert_forward_slash(self._ssl_ca),
+            "ssl_cert": _convert_forward_slash(self._ssl_cert),
+            "ssl_key": _convert_forward_slash(self._ssl_key),
+            "pid_file": _convert_forward_slash(self._pid_file),
+            "serverid": self._serverid,
+            "lc_messages_dir": _convert_forward_slash(self._lc_messages_dir),
+            "ssl": 1,
         }
 
+        cnf = kwargs.pop("my_cnf", self._cnf)
         for arg in self._extra_args:
             if self._version < arg["version"]:
-                options.update(dict([(key, '') for key in
-                                     arg["options"].keys()]))
+                options.update(dict([(key, "") for key in arg["options"].keys()]))
             else:
                 options.update(arg["options"])
         options.update(**kwargs)
+
         try:
-            fp = open(self._option_file, 'w')
-            fp.write(self._cnf.format(**options))
+            fp = open(self._option_file, "w")
+            fp.write(cnf.format(**options))
             fp.close()
         except Exception as ex:
             LOGGER.error("Failed to write config file {0}".format(ex))
@@ -650,8 +685,7 @@ class MySQLServer(MySQLServerBase):
     def start(self, **kwargs):
         LOGGER.debug("Attempting to start MySQL server %s", self.name)
         if self.check_running():
-            LOGGER.error("MySQL server '{name}' already running".format(
-                name=self.name))
+            LOGGER.error("MySQL server '{name}' already running".format(name=self.name))
             return
 
         self.update_config(**kwargs)
@@ -664,19 +698,25 @@ class MySQLServer(MySQLServerBase):
         except MySQLServerError as err:
             if self._debug is True:
                 raise
-            LOGGER.error("Failed starting MySQL server "
-                         "'{name}': {error}".format(name=self.name,
-                                                    error=str(err)))
+            LOGGER.error(
+                "Failed starting MySQL server "
+                "'{name}': {error}".format(name=self.name, error=str(err))
+            )
             sys.exit(1)
         else:
             pid = get_pid(self._pid_file)
             if not pid:
-                LOGGER.error("Failed getting PID of MySQL server "
-                             "'{name}' (file {pid_file}".format(
-                    name=self._name, pid_file=self._pid_file))
+                LOGGER.error(
+                    "Failed getting PID of MySQL server "
+                    "'{name}' (file {pid_file}".format(
+                        name=self._name, pid_file=self._pid_file
+                    )
+                )
                 sys.exit(1)
-            LOGGER.debug("MySQL server started '{name}' "
-                        "(pid={pid})".format(pid=pid, name=self._name))
+            LOGGER.debug(
+                "MySQL server started '{name}' "
+                "(pid={pid})".format(pid=pid, name=self._name)
+            )
 
     def stop(self):
         """Stop the MySQL server
@@ -696,15 +736,16 @@ class MySQLServer(MySQLServerBase):
         if not pid:
             LOGGER.error("Process id not found, unable to stop MySQL server.")
             return
-        LOGGER.debug("Attempting to stop MySQL server %s (pid=%s).",
-                     self._name, pid)
+        LOGGER.debug("Attempting to stop MySQL server %s (pid=%s).", self._name, pid)
         tries = 5
         while tries > 0:
             try:
                 self._stop_server(pid)
             except (MySQLServerError, OSError) as err:
-                LOGGER.error("Failed stopping MySQL server '{name}': "
-                             "{error}".format(error=str(err), name=self._name))
+                LOGGER.error(
+                    "Failed stopping MySQL server '{name}': "
+                    "{error}".format(error=str(err), name=self._name)
+                )
                 if self._debug is True:
                     raise
                 sys.exit(1)
@@ -712,13 +753,17 @@ class MySQLServer(MySQLServerBase):
                 LOGGER.debug("Waiting for MySQL server to stop...")
                 time.sleep(1)
                 if not self.check_running(pid):
-                    LOGGER.debug("MySQL server stopped '{name}' "
-                                 "(pid={pid})".format(pid=pid, name=self._name))
+                    LOGGER.debug(
+                        "MySQL server stopped '{name}' "
+                        "(pid={pid})".format(pid=pid, name=self._name)
+                    )
                     return True
-            tries =- 1
+            tries = -1
 
-        LOGGER.error("Failed stopping MySQL server '{name}' (pid={pid})"
-                     "".format(name=self._name, pid=pid))
+        LOGGER.error(
+            "Failed stopping MySQL server '{name}' (pid={pid})"
+            "".format(name=self._name, pid=pid)
+        )
 
         return False
 
@@ -789,8 +834,7 @@ class MySQLServer(MySQLServerBase):
 
 class DummyMySQLRequestHandler(BaseRequestHandler):
     def __init__(self, request, client_address, server):
-        super(DummyMySQLRequestHandler, self).__init__(request, client_address,
-                                                       server)
+        super(DummyMySQLRequestHandler, self).__init__(request, client_address, server)
 
     def read_packet(self):
         """Read a MySQL packet from the socket.
@@ -801,25 +845,26 @@ class DummyMySQLRequestHandler(BaseRequestHandler):
         header = bytearray(self.request.recv(4))
         if not header:
             return
-        length = struct.unpack('<I', header[0:3] + '\x00')[0]
-        self._curr_pktnr = struct.unpack('B', header[-1])[0]
+        length = struct.unpack("<I", header[0:3] + "\x00")[0]
+        self._curr_pktnr = struct.unpack("B", header[-1])[0]
         data = self.request.recv(length)
         return header + data
 
     def handle(self):
         if self.server.sock_error:
-            raise socket.error(self.server.socket_error)
+            raise OSError(self.server.socket_error)
 
         res = self._server_replies[0:bufsize]
         self._server_replies = self._server_replies[bufsize:]
         return res
+
 
 class DummyMySQLServer(ThreadingMixIn, TCPServer):
     """Class accepting connections for testing MySQL connections"""
 
     def __init__(self, *args, **kwargs):
         TCPServer.__init__(self, *args, **kwargs)
-        self._server_replies = bytearray(b'')
+        self._server_replies = bytearray(b"")
         self._client_sends = []
 
     def finish_request(self, request, client_address):
@@ -838,8 +883,56 @@ class DummyMySQLServer(ThreadingMixIn, TCPServer):
 
     def reset(self):
         self._raise_socket_error = 0
-        self._server_replies = bytearray(b'')
+        self._server_replies = bytearray(b"")
         self._client_sends = []
 
     def get_address(self):
-        return 'dummy'
+        return "dummy"
+
+
+class MySQLExternalServer:
+    """Class for managing an external MySQL Server."""
+
+    def __init__(self, cnf, name):
+        self.cnf = cnf
+        self.name = name
+        self.version = None
+        self.license = None
+
+        self.bind_address = None
+        self.unix_socket = None
+        self.mysqlx_unix_socket = None
+        self.pid_file = None
+        self.client_config = {}
+        self.xplugin_config = {}
+
+    def _exit_with_unsupported_operation(self):
+        LOGGER.error("Operation not supported when using an external MySQL server")
+        sys.exit(1)
+
+    def bootstrap(self):
+        self._exit_with_unsupported_operation()
+
+    def check_running(self, pid=None):
+        self._exit_with_unsupported_operation()
+
+    def start(self, **kwargs):
+        self._exit_with_unsupported_operation()
+
+    def stop(self):
+        self._exit_with_unsupported_operation()
+
+    def remove(self):
+        self._exit_with_unsupported_operation()
+
+    def get_exec(self, exec_name):
+        self._exit_with_unsupported_operation()
+
+    def update_config(self, **kwargs):
+        self._exit_with_unsupported_operation()
+
+    def wait_up(self, tries=10, delay=1):
+        self._exit_with_unsupported_operation()
+
+    def wait_down(self, tries=10, delay=1):
+        self._exit_with_unsupported_operation()

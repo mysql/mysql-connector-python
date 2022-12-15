@@ -185,116 +185,57 @@ Parameter binding is also available as a chained method to each of the CRUD oper
    my_coll = db.get_collection('my_collection')
    my_coll.remove('name = :data').bind('data', 'Sakila').execute()
 
+Resolving DNS SRV records
+-------------------------
 
-Using Collection patch (:func:`mysqlx.ModifyStatement.patch()`)
----------------------------------------------------------------
+If you are using a DNS server with service discovery utility that supports mapping `SRV records <https://tools.ietf.org/html/rfc2782>`_, you can use the ``mysqlx+srv`` scheme or ``dns-srv`` connection option and Connector/Python will automatically resolve the available server addresses described by those SRV records.
 
-First we need to get a session and a schema.
-
-.. code-block:: python
-
-    import mysqlx
-
-    # Connect to server on localhost
-    session = mysqlx.get_session({
-        'host': 'localhost',
-        'port': 33060,
-        'user': 'mike',
-        'password': 's3cr3t!'
-    })
-
-    schema = session.get_schema('test')
-
-Next step is create a sample collection and add some sample data.
+.. note:: MySQL host configuration using DNS SRV requires `dnspython <http://www.dnspython.org/>`_ module.
 
 .. code-block:: python
 
-    # Create 'collection_GOT' in schema
-    schema.create_collection('collection_GOT')
+   session = mysqlx.get_session('mysqlx://root:@foo.abc.com')
+   # or
+   session = mysqlx.get_session({
+       'host': 'foo.abc.com',
+       'user': 'root',
+       'password': '',
+       'dns-srv': True
+   })
 
-    # Get 'collection_GOT' from schema
-    collection = schema.get_collection('collection_GOT')
+For instance, given the following SRV records by a DNS server at the ``foo.abc.com`` endpoint, the servers would be in the following priority: foo2.abc.com, foo1.abc.com, foo3.abc.com, foo4.abc.com. ::
 
-    collection.add(
-        {"name": "Bran", "family_name": "Stark", "age": 18,
-         "parents": ["Eddard Stark", "Catelyn Stark"]},
-        {"name": "Sansa", "family_name": "Stark", "age": 21,
-         "parents": ["Eddard Stark", "Catelyn Stark"]},
-        {"name": "Arya", "family_name": "Stark", "age": 20,
-         "parents": ["Eddard Stark", "Catelyn Stark"]},
-        {"name": "Jon", "family_name": "Snow", "age": 30},
-        {"name": "Daenerys", "family_name": "Targaryen", "age": 30},
-        {"name": "Margaery", "family_name": "Tyrell", "age": 35},
-        {"name": "Cersei", "family_name": "Lannister", "age": 44,
-         "parents": ["Tywin Lannister, Joanna Lannister"]},
-        {"name": "Tyrion", "family_name": "Lannister", "age": 48,
-         "parents": ["Tywin Lannister, Joanna Lannister"]},
-    ).execute()
+    Record                    TTL   Class    Priority Weight Port  Target
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   0        5      33060 foo1.abc.com
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   0        10     33060 foo2.abc.com
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   10       5      33060 foo3.abc.com
+    _mysqlx._tcp.foo.abc.com. 86400 IN SRV   20       5      33060 foo4.abc.com
 
-This example shows how to add a new field to a matching  documents in a
-collection, in this case the new field name will be ``_is`` with the value
-of ``young`` for those documents with ``age`` field equal or smaller than 21 and
-the value ``old`` for documents with ``age`` field value greater than 21.
+Specifying which TLS versions to use
+------------------------------------
+
+The desired TLS versions to use during the connection van be specified while getting the session with the use of ``tls-versions`` option and in addition the TLS ciphers can also be specified with the ``tls-ciphersuites`` option. 
 
 .. code-block:: python
 
-    collection.modify("age <= 21").patch(
-        '{"_is": "young"}').execute()
-    collection.modify("age > 21").patch(
-        '{"_is": "old"}').execute()
+   session = mysqlx.get_session('mysqlx://root:@127.0.0.1:33060?tls-versions=[TLSv1.1,TLSv1.2]&tls-ciphersuites=[DHE-RSA-AES256-SHA]&ssl-mode=required')
+   # or
+   session = mysqlx.get_session({
+       'host': '127.0.0.1',
+       'user': 'root',
+       'password': '',
+       'tls-versions"': ["TLSv1.1", "TLSv1.2"],
+       'tls-ciphersuites': ["DHE-RSA-AES256-SHA"],
+   })
+   res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'").execute().fetch_all()
+   print("Mysqlx_ssl_version: {}".format(res[0].get_string('Value')))
+   res = session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_cipher'").execute().fetch_all()
+   print("Mysqlx_ssl_cipher: {}".format(res[0].get_string('Value')))
+   session.close()
 
-    for doc in mys.collection.find().execute().fetch_all():
-        if doc.age <= 21:
-            assert(doc._is == "young")
-        else:
-            assert(doc._is == "old")
+From the given list of TLS versions, the highest supported version will be selected for the connection, given as result:
 
-This example shows how to add a new field with an array value.
-The code will add the field "parents" with the value of
-``["Mace Tyrell", "Alerie Tyrell"]``
-to documents whose ``family_name`` field has value ``Tyrell``.
+    Mysqlx_ssl_version: TLSv1.2
 
-.. code-block:: python
+    Mysqlx_ssl_cipher: DHE-RSA-AES256-SHA
 
-    collection.modify('family_name == "Tyrell"').patch(
-        {"parents": ["Mace Tyrell", "Alerie Tyrell"]}).execute()
-    doc = collection.find("name = 'Margaery'").execute().fetch_all()[0]
-
-    assert(doc.parents == ["Mace Tyrell", "Alerie Tyrell"])
-
-
-This example shows how to add a new field ``dragons`` with a JSON document as
-value.
-
-.. code-block:: python
-
-    collection.modify('name == "Daenerys"').patch('''
-    {"dragons":{"drogon": "black with red markings",
-                "Rhaegal": "green with bronze markings",
-                "Viserion": "creamy white, with gold markings",
-                "count": 3}}
-                ''').execute()
-    doc = collection.find("name = 'Daenerys'").execute().fetch_all()[0]
-    assert(doc.dragons == {"count": 3,
-                           "drogon": "black with red markings",
-                           "Rhaegal": "green with bronze markings",
-                           "Viserion": "creamy white, with gold markings"})
-
-
-This example uses the previews one to show how to remove of the nested field
-``Viserion`` on ``dragons`` field and at the same time how to update the value of
-the ``count`` field with a new value based in the current one.
-
-.. note:: In the :func:`mysqlx.ModifyStatement.patch()` all strings are considered literals,
-          for expressions the usage of the :func:`mysqlx.expr()` is required.
-
-.. code-block:: python
-
-    collection.modify('name == "Daenerys"').patch(mysqlx.expr('''
-        JSON_OBJECT("dragons", JSON_OBJECT("count", $.dragons.count -1,
-                                           "Viserion", Null))
-        ''')).execute()
-    doc = mys.collection.find("name = 'Daenerys'").execute().fetch_all()[0]
-    assert(doc.dragons == {'count': 2,
-                           'Rhaegal': 'green with bronze markings',
-                           'drogon': 'black with red markings'})

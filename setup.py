@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -29,45 +29,120 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-"""
+import os
+import sys
 
-To install MySQL Connector/Python:
+sys.path.insert(0, ".")
 
-    shell> python ./setup.py install
+from setuptools import Extension, find_packages, setup
 
-"""
+from cpydist import BuildExt, Install, InstallLib
+from cpydist.bdist import DistBinary
+from cpydist.bdist_msi import DistMSI
+from cpydist.bdist_solaris import DistSolaris
+from cpydist.sdist import DistSource
 
-from setuptools import setup
-from distutils.command.install import INSTALL_SCHEMES
-
-# Make sure that data files are actually installed in the package directory
-for install_scheme in INSTALL_SCHEMES.values():
-    install_scheme['data'] = install_scheme['purelib']
-
-import setupinfo
 try:
-    from cpyint import metasetupinfo
-    setupinfo.command_classes.update(metasetupinfo.command_classes)
-except (ImportError, AttributeError):
-    # python-internal not available
-    pass
+    from cpydist.bdist_wheel import DistWheel
+except ImportError:
+    DistWheel = None
 
+
+VERSION_TEXT = "999.0.0"
+version_py = os.path.join("lib", "mysql", "connector", "version.py")
+with open(version_py, "rb") as fp:
+    exec(compile(fp.read(), version_py, "exec"))
+
+COMMAND_CLASSES = {
+    "bdist": DistBinary,
+    "bdist_msi": DistMSI,
+    "bdist_solaris": DistSolaris,
+    "build_ext": BuildExt,
+    "install": Install,
+    "install_lib": InstallLib,
+    "sdist": DistSource,
+}
+
+if DistWheel is not None:
+    COMMAND_CLASSES["bdist_wheel"] = DistWheel
+
+# C extensions
+EXTENSIONS = [
+    Extension(
+        "_mysql_connector",
+        sources=[
+            "src/exceptions.c",
+            "src/mysql_capi.c",
+            "src/mysql_capi_conversion.c",
+            "src/mysql_connector.c",
+            "src/force_cpp_linkage.cc",
+        ],
+        include_dirs=["src/include"],
+    ),
+    Extension(
+        name="_mysqlxpb",
+        define_macros=[("PY3", 1)] if sys.version_info[0] == 3 else [],
+        sources=[
+            "src/mysqlxpb/mysqlx/mysqlx.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_connection.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_crud.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_cursor.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_datatypes.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_expect.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_expr.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_notice.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_prepare.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_resultset.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_session.pb.cc",
+            "src/mysqlxpb/mysqlx/mysqlx_sql.pb.cc",
+            "src/mysqlxpb/mysqlxpb.cc",
+        ],
+    ),
+]
+
+LONG_DESCRIPTION = """
+MySQL driver written in Python which does not depend on MySQL C client
+libraries and implements the DB API v2.0 specification (PEP-249).
+"""
 setup(
-    name=setupinfo.name,
-    version=setupinfo.version,
-    description=setupinfo.description,
-    long_description=setupinfo.long_description,
-    author=setupinfo.author,
-    author_email=setupinfo.author_email,
-    license=setupinfo.cpy_gpl_license,
-    keywords=setupinfo.keywords,
-    url=setupinfo.url,
-    download_url=setupinfo.download_url,
-    package_dir=setupinfo.package_dir,
-    packages=setupinfo.packages,
-    classifiers=setupinfo.classifiers,
-    cmdclass=setupinfo.command_classes,
-    ext_modules=setupinfo.extensions,
-    install_requires=setupinfo.install_requires,
+    name="mysql-connector-python",
+    version=VERSION_TEXT,
+    description="MySQL driver written in Python",
+    long_description=LONG_DESCRIPTION,
+    author="Oracle and/or its affiliates",
+    author_email="",
+    license="GNU GPLv2 (with FOSS License Exception)",
+    keywords="mysql db",
+    url="http://dev.mysql.com/doc/connector-python/en/index.html",
+    download_url="http://dev.mysql.com/downloads/connector/python/",
+    package_dir={"": "lib"},
+    packages=find_packages(where="lib"),
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: Other Environment",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Education",
+        "Intended Audience :: Information Technology",
+        "Intended Audience :: System Administrators",
+        "License :: OSI Approved :: GNU General Public License (GPL)",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Topic :: Database",
+        "Topic :: Software Development",
+        "Topic :: Software Development :: Libraries :: Application Frameworks",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+    ],
+    ext_modules=EXTENSIONS,
+    cmdclass=COMMAND_CLASSES,
+    install_requires=["protobuf>=3.11.0,<=3.20.1"],
+    extras_require={
+        "dns-srv": ["dnspython>=1.16.0,<=2.1.0"],
+        "compression": ["lz4>=2.1.6,<=3.1.3", "zstandard>=0.12.0,<=0.15.2"],
+        "gssapi": ["gssapi>=1.6.9,<=1.8.1"],
+    },
 )
-

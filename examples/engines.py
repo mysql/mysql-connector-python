@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -36,15 +36,17 @@ Example using MySQL Connector/Python showing:
 
 """
 
-import sys, os
+import os
+import sys
 
 import mysql.connector
+
 
 def main(config):
     output = []
     db = mysql.connector.Connect(**config)
     cursor = db.cursor()
-    
+
     # Select it again and show it
     stmt_select = "SHOW ENGINES"
     cursor.execute(stmt_select)
@@ -56,18 +58,19 @@ def main(config):
     db.close()
     return output
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     config = {
-        'host': 'localhost',
-        'port': 3306,
-        'database': 'test',
-        'user': 'root',
-        'password': '',
-        'charset': 'utf8',
-        'use_unicode': True,
-        'get_warnings': True,
+        "host": "localhost",
+        "port": 3306,
+        "database": "test",
+        "user": "root",
+        "password": "",
+        "charset": "utf8",
+        "use_unicode": True,
+        "get_warnings": True,
     }
 
     out = main(config)
-    print('\n'.join(out))
+    print("\n".join(out))

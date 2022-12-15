@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -39,7 +39,6 @@
 #endif
 #include <mysql.h>
 
-#include "catch23.h"
 #include "exceptions.h"
 
 #define MINYEAR 1
@@ -62,8 +61,7 @@
 static int
 leap_year(int year)
 {
-    if ((year % 4 == 0) && (year % 100 != 0 || year % 400 == 0))
-    {
+    if ((year % 4 == 0) && (year % 100 != 0 || year % 400 == 0)) {
         return 1;
     }
 
@@ -87,9 +85,8 @@ leap_year(int year)
 static int
 nr_days_month(int year, int month)
 {
-    int days[]= {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    if (month == 2 && leap_year(year))
-    {
+    int days[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (month == 2 && leap_year(year)) {
         return 29;
     }
     return days[month];
@@ -112,10 +109,8 @@ nr_days_month(int year, int month)
 static int
 is_valid_date(int year, int month, int day)
 {
-    if ((year < MINYEAR || year > MAXYEAR)
-        || (month < 1 || month > 12)
-        || (day < 1 || day > nr_days_month(year, month)))
-    {
+    if ((year < MINYEAR || year > MAXYEAR) || (month < 1 || month > 12) ||
+        (day < 1 || day > nr_days_month(year, month))) {
         return 0;
     }
 
@@ -140,11 +135,8 @@ is_valid_date(int year, int month, int day)
 static int
 is_valid_time(int hours, int mins, int secs, int usecs)
 {
-    if ((hours < 0 || hours > 23)
-        || (mins < 0 || mins > 59)
-        || (secs < 0 || secs > 59)
-        || (usecs < 0 || usecs > 999999))
-    {
+    if ((hours < 0 || hours > 23) || (mins < 0 || mins > 59) || (secs < 0 || secs > 59) ||
+        (usecs < 0 || usecs > 999999)) {
         return 0;
     }
 
@@ -163,77 +155,67 @@ is_valid_time(int hours, int mins, int secs, int usecs)
 
   @return   Converted timedelta object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 pytomy_timedelta(PyObject *obj)
 {
-    int days= 0, secs= 0 , micro_secs= 0, total_secs= 0;
-    int hours= 0, mins= 0, remainder= 0;
-    char fmt[32]= {0};
-    char result[17]= {0};
+    int days = 0, secs = 0, micro_secs = 0, total_secs = 0;
+    int hours = 0, mins = 0, remainder = 0;
+    char fmt[32] = {0};
+    char result[17] = {0};
 
     PyDateTime_IMPORT;
 
-    if (!obj || !PyDelta_Check(obj))
-    {
-        PyErr_SetString(PyExc_ValueError,
-                        "Object must be a datetime.timedelta");
+    if (!obj || !PyDelta_Check(obj)) {
+        PyErr_SetString(PyExc_ValueError, "Object must be a datetime.timedelta");
         return NULL;
     }
 
     // Cannot use PyDateTime_DELTA_* (new in Python v3.3)
-    days= ((PyDateTime_Delta*)obj)->days;
-    secs= ((PyDateTime_Delta*)obj)->seconds;
-    micro_secs= ((PyDateTime_Delta*)obj)->microseconds;
+    days = ((PyDateTime_Delta *)obj)->days;
+    secs = ((PyDateTime_Delta *)obj)->seconds;
+    micro_secs = ((PyDateTime_Delta *)obj)->microseconds;
 
-    total_secs= abs(days * 86400 + secs);
+    total_secs = abs(days * 86400 + secs);
 
 #pragma warning(push)
 // result of strncpy does not accept direct user input
-#pragma warning(disable: 4996)
+#pragma warning(disable : 4996)
 
-
-    if (micro_secs)
-    {
-        strncpy(fmt, "%02d:%02d:%02d.%06d", 19);
-        if (days < 0)
-        {
-            micro_secs= 1000000 - micro_secs;
-            total_secs-= 1;
+    if (micro_secs) {
+        strncpy(fmt, "%02d:%02d:%02d.%06d", 20);
+        if (days < 0) {
+            micro_secs = 1000000 - micro_secs;
+            total_secs -= 1;
         }
     }
-    else
-    {
-        strncpy(fmt, "%02d:%02d:%02d", 14);
+    else {
+        strncpy(fmt, "%02d:%02d:%02d", 15);
     }
 
-    if (days < 0)
-    {
+    if (days < 0) {
         int index;
-        for(index = 31; index > 0; index--){
+        for (index = 31; index > 0; index--) {
             fmt[index] = fmt[index - 1];
         }
         fmt[0] = '-';
     }
 #pragma warning(pop)
 
-    hours= total_secs / 3600;
-    remainder= total_secs % 3600;
-    mins= remainder / 60;
-    secs= remainder % 60;
+    hours = total_secs / 3600;
+    remainder = total_secs % 3600;
+    mins = remainder / 60;
+    secs = remainder % 60;
 
-    if (micro_secs)
-    {
+    if (micro_secs) {
         PyOS_snprintf(result, 17, fmt, hours, mins, secs, micro_secs);
     }
-    else
-    {
+    else {
         PyOS_snprintf(result, 17, fmt, hours, mins, secs);
     }
 
-    return PyBytesFromString(result);
+    return PyBytes_FromString(result);
 }
 
 /**
@@ -248,40 +230,31 @@ pytomy_timedelta(PyObject *obj)
 
   @return   Converted time object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 pytomy_time(PyObject *obj)
 {
-    char result[17]= {0};
+    char result[17] = {0};
 
     PyDateTime_IMPORT;
 
-    if (!obj || !PyTime_Check(obj))
-    {
-        PyErr_SetString(PyExc_ValueError,
-                        "Object must be a datetime.time");
+    if (!obj || !PyTime_Check(obj)) {
+        PyErr_SetString(PyExc_ValueError, "Object must be a datetime.time");
         return NULL;
     }
 
-    if (PyDateTime_TIME_GET_MICROSECOND(obj))
-    {
-        PyOS_snprintf(result, 17, "%02d:%02d:%02d.%06d",
-                 PyDateTime_TIME_GET_HOUR(obj),
-                 PyDateTime_TIME_GET_MINUTE(obj),
-                 PyDateTime_TIME_GET_SECOND(obj),
-                 PyDateTime_TIME_GET_MICROSECOND(obj));
+    if (PyDateTime_TIME_GET_MICROSECOND(obj)) {
+        PyOS_snprintf(result, 17, "%02d:%02d:%02d.%06d", PyDateTime_TIME_GET_HOUR(obj),
+                      PyDateTime_TIME_GET_MINUTE(obj), PyDateTime_TIME_GET_SECOND(obj),
+                      PyDateTime_TIME_GET_MICROSECOND(obj));
     }
-    else
-    {
-        PyOS_snprintf(result, 17, "%02d:%02d:%02d",
-                 PyDateTime_TIME_GET_HOUR(obj),
-                 PyDateTime_TIME_GET_MINUTE(obj),
-                 PyDateTime_TIME_GET_SECOND(obj));
+    else {
+        PyOS_snprintf(result, 17, "%02d:%02d:%02d", PyDateTime_TIME_GET_HOUR(obj),
+                      PyDateTime_TIME_GET_MINUTE(obj), PyDateTime_TIME_GET_SECOND(obj));
     }
 
-    return PyBytesFromString(result);
+    return PyBytes_FromString(result);
 }
 
 /**
@@ -296,44 +269,33 @@ pytomy_time(PyObject *obj)
 
   @return   Converted datetime object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 pytomy_datetime(PyObject *obj)
 {
-    char result[27]= {0};
+    char result[27] = {0};
     PyDateTime_IMPORT;
 
-    if (!obj || !PyDateTime_Check(obj))
-    {
-        PyErr_SetString(PyExc_ValueError,
-                        "Object must be a datetime.datetime");
+    if (!obj || !PyDateTime_Check(obj)) {
+        PyErr_SetString(PyExc_ValueError, "Object must be a datetime.datetime");
         return NULL;
     }
 
-    if (PyDateTime_DATE_GET_MICROSECOND(obj))
-    {
+    if (PyDateTime_DATE_GET_MICROSECOND(obj)) {
         PyOS_snprintf(result, 27, "%04d-%02d-%02d %02d:%02d:%02d.%06d",
-                 PyDateTime_GET_YEAR(obj),
-                 PyDateTime_GET_MONTH(obj),
-                 PyDateTime_GET_DAY(obj),
-                 PyDateTime_DATE_GET_HOUR(obj),
-                 PyDateTime_DATE_GET_MINUTE(obj),
-                 PyDateTime_DATE_GET_SECOND(obj),
-                 PyDateTime_DATE_GET_MICROSECOND(obj));
+                      PyDateTime_GET_YEAR(obj), PyDateTime_GET_MONTH(obj),
+                      PyDateTime_GET_DAY(obj), PyDateTime_DATE_GET_HOUR(obj),
+                      PyDateTime_DATE_GET_MINUTE(obj), PyDateTime_DATE_GET_SECOND(obj),
+                      PyDateTime_DATE_GET_MICROSECOND(obj));
     }
-    else
-    {
-        PyOS_snprintf(result, 27, "%04d-%02d-%02d %02d:%02d:%02d",
-                 PyDateTime_GET_YEAR(obj),
-                 PyDateTime_GET_MONTH(obj),
-                 PyDateTime_GET_DAY(obj),
-                 PyDateTime_DATE_GET_HOUR(obj),
-                 PyDateTime_DATE_GET_MINUTE(obj),
-                 PyDateTime_DATE_GET_SECOND(obj));
+    else {
+        PyOS_snprintf(result, 27, "%04d-%02d-%02d %02d:%02d:%02d", PyDateTime_GET_YEAR(obj),
+                      PyDateTime_GET_MONTH(obj), PyDateTime_GET_DAY(obj),
+                      PyDateTime_DATE_GET_HOUR(obj), PyDateTime_DATE_GET_MINUTE(obj),
+                      PyDateTime_DATE_GET_SECOND(obj));
     }
-    return PyBytesFromString(result);
+    return PyBytes_FromString(result);
 }
 
 /**
@@ -348,24 +310,20 @@ pytomy_datetime(PyObject *obj)
 
   @return   Converted date object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 pytomy_date(PyObject *obj)
 {
     PyDateTime_IMPORT;
 
-    if (!obj || !PyDate_Check(obj))
-    {
+    if (!obj || !PyDate_Check(obj)) {
         PyErr_SetString(PyExc_TypeError, "Object must be a datetime.date");
         return NULL;
     }
 
-    return PyBytesFromFormat("%04d-%02d-%02d",
-                             PyDateTime_GET_YEAR(obj),
-                             PyDateTime_GET_MONTH(obj),
-                             PyDateTime_GET_DAY(obj));
+    return PyBytes_FromFormat("%04d-%02d-%02d", PyDateTime_GET_YEAR(obj),
+                              PyDateTime_GET_MONTH(obj), PyDateTime_GET_DAY(obj));
 }
 
 /**
@@ -383,29 +341,27 @@ pytomy_date(PyObject *obj)
     @retval None    Invalid date
     @retval NULL    Exception
 */
-PyObject*
+PyObject *
 mytopy_date(const char *data)
 {
-    int year= 0, month= 0, day= 0;
+    int year = 0, month = 0, day = 0;
 
     PyDateTime_IMPORT;
 
 #pragma warning(push)
 // sscanf data comes from MySQL and is fixed
-#pragma warning(disable: 4996)
+#pragma warning(disable : 4996)
     if (3 == sscanf(data, "%d-%d-%d", &year, &month, &day))
 #pragma warning(pop)
     {
         // Invalid dates are returned as None instead of raising ValueError
-        if (!is_valid_date(year, month, day))
-        {
+        if (!is_valid_date(year, month, day)) {
             Py_RETURN_NONE;
         }
         return PyDate_FromDate(year, month, day);
     }
 
-    PyErr_SetString(PyExc_ValueError,
-                    "Received incorrect DATE value from MySQL server");
+    PyErr_SetString(PyExc_ValueError, "Received incorrect DATE value from MySQL server");
     return NULL;
 }
 
@@ -421,71 +377,66 @@ mytopy_date(const char *data)
   @return   datetime.datetime object.
     @retval PyDateTime OK
 */
-PyObject*
+PyObject *
 mytopy_datetime(const char *data, const unsigned long length)
 {
-	int year= 0, month= 0, day= 0;
-	int hours= 0, mins= 0, secs= 0, usecs= 0;
-    int value= 0;
-    int parts[7]= {0};
-    int part= 0;
-    const char *end= data + length;
+    int year = 0, month = 0, day = 0;
+    int hours = 0, mins = 0, secs = 0, usecs = 0;
+    int value = 0;
+    int parts[7] = {0};
+    int part = 0;
+    const char *end = data + length;
 
     PyDateTime_IMPORT;
 
     /* Parse year, month, days, hours, minutes and seconds */
-    for (;;)
-    {
-        for (value= 0; data != end && isdigit(*data) ; data++)
-        {
-            value= (value * 10) + (unsigned int)(*data - '0');
+    for (;;) {
+        for (value = 0; data != end && isdigit(*data); data++) {
+            value = (value * 10) + (unsigned int)(*data - '0');
         }
-        parts[part++]= (unsigned int)value;
-        if (part == 8 || (end-data) < 2
-            || (*data != '-' && *data != ':' && *data != ' ')
-            || !isdigit(data[1]))
-        {
+        parts[part++] = (unsigned int)value;
+        if (part == 8 || (end - data) < 2 || (*data != '-' && *data != ':' && *data != ' ') ||
+            !isdigit(data[1])) {
             break;
         }
         data++;  // skip separators '-' and ':'
     }
 
-    if (data != end && end - data >= 2 && *data == '.')
-    {
+    if (data != end && end - data >= 2 && *data == '.') {
         // Fractional part
-        int field_length= 6;   // max fractional - 1
+        int field_length = 5;
         data++;
-        value= (unsigned int)(*data - '0');
-        while (data++ != end && isdigit(*data))
-        {
-            if (field_length-- > 0)
-            {
-                value= (value * 10) + (unsigned int)(*data - '0');
+        value = (unsigned int)(*data - '0');
+        while (data++ != end && isdigit(*data)) {
+            if (field_length-- > 0) {
+                value = (value * 10) + (unsigned int)(*data - '0');
             }
         }
-        parts[6]= value;
+        if (field_length >= 0) {
+            while (field_length-- > 0) {
+                value *= 10;
+            }
+        }
+        parts[6] = value;
     }
 
-    year= parts[0];
-    month= parts[1];
-    day= parts[2];
-    hours= parts[3];
-    mins= parts[4];
-    secs= parts[5];
-    usecs= parts[6];
+    year = parts[0];
+    month = parts[1];
+    day = parts[2];
+    hours = parts[3];
+    mins = parts[4];
+    secs = parts[5];
+    usecs = parts[6];
 
-    if (!is_valid_date(year, month, day))
-    {
+    if (!is_valid_date(year, month, day)) {
         Py_RETURN_NONE;
     }
 
-    if (!is_valid_time(hours, mins, secs, usecs))
-    {
+    if (!is_valid_time(hours, mins, secs, usecs)) {
         Py_RETURN_NONE;
     }
 
-    return PyDateTime_FromDateAndTime(year, month, day,
-                                      hours, mins, secs, usecs);
+    return PyDateTime_FromDateAndTime(year, month, day, hours, mins, secs, usecs);
 }
 
 /**
@@ -500,81 +451,72 @@ mytopy_datetime(const char *data, const unsigned long length)
   @return   datetime.timedelta object.
     @retval PyDelta_FromDSU OK
 */
-PyObject*
+PyObject *
 mytopy_time(const char *data, const unsigned long length)
 {
-    int hr= 0, min= 0, sec= 0, usec= 0;
-    int days= 0, hours= 0, seconds= 0;
-    int negative= 0;
-    int value= 0;
-    int parts[4]= {0};
-    int part= 0;
-    const char *end= data + length;
+    int hr = 0, min = 0, sec = 0, usec = 0;
+    int days = 0, hours = 0, seconds = 0;
+    int negative = 0;
+    int value = 0;
+    int parts[4] = {0};
+    int part = 0;
+    const char *end = data + length;
 
     PyDateTime_IMPORT;
 
     // Negative times
-    if (*data == '-')
-    {
-        negative= 1;
+    if (*data == '-') {
+        negative = 1;
         data++;
     }
 
     /* Parse hours, minutes and seconds */
-    for (;;)
-    {
-        for (value= 0; data != end && isdigit(*data) ; data++)
-        {
-            value= (value * 10) + (unsigned int)(*data - '0');
+    for (;;) {
+        for (value = 0; data != end && isdigit(*data); data++) {
+            value = (value * 10) + (unsigned int)(*data - '0');
         }
-        parts[part++]= (unsigned int)value;
-        if (part == 4 || (end-data) < 2 || *data != ':' || !isdigit(data[1]))
-        {
+        parts[part++] = (unsigned int)value;
+        if (part == 4 || (end - data) < 2 || *data != ':' || !isdigit(data[1])) {
             break;
         }
         data++;  // skip time separator ':'
     }
 
-    if (data != end && end - data >= 2 && *data == '.')
-    {
+    if (data != end && end - data >= 2 && *data == '.') {
         // Fractional part
-        int field_length= 5;
+        int field_length = 5;
         data++;
-        value= (unsigned int)(*data - '0');
-        while (data++ != end && isdigit(*data))
-        {
-            if (field_length-- > 0)
-            {
-                value= (value * 10) + (unsigned int)(*data - '0');
+        value = (unsigned int)(*data - '0');
+        while (data++ != end && isdigit(*data)) {
+            if (field_length-- > 0) {
+                value = (value * 10) + (unsigned int)(*data - '0');
             }
         }
-        if (field_length >= 0)
-        {
-            while (field_length-- > 0)
-            {
-                value*= 10;
+        if (field_length >= 0) {
+            while (field_length-- > 0) {
+                value *= 10;
             }
         }
-        parts[3]= value;
+        parts[3] = value;
     }
 
-    hr= parts[0];
-    min= parts[1];
-    sec= parts[2];
-    usec= parts[3];
+    hr = parts[0];
+    min = parts[1];
+    sec = parts[2];
+    usec = parts[3];
 
     // negative time
     if (negative) {
-        hr= hr * -1;
-        min= min * -1;
-        sec= sec * -1;
-        usec= usec * -1;
+        hr = hr * -1;
+        min = min * -1;
+        sec = sec * -1;
+        usec = usec * -1;
     }
 
-    days= hr / 24;
-    hours= hr % 24;
+    days = hr / 24;
+    hours = hr % 24;
 
-    seconds= (hours * 3600) + (min * 60) + sec;
+    seconds = (hours * 3600) + (min * 60) + sec;
 
     return PyDelta_FromDSU(days, seconds, usec);
 }
@@ -595,10 +537,9 @@ mytopy_time(const char *data, const unsigned long length)
 
   @return   Converted datetime object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 datetime_to_mysql(PyObject *self, PyObject *datetime)
 {
     return pytomy_datetime(datetime);
@@ -620,10 +561,9 @@ datetime_to_mysql(PyObject *self, PyObject *datetime)
 
   @return   Converted time object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 time_to_mysql(PyObject *self, PyObject *time)
 {
     return pytomy_time(time);
@@ -645,10 +585,9 @@ time_to_mysql(PyObject *self, PyObject *time)
 
   @return   Converted date object.
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
     @retval NULL        Exception
 */
-PyObject*
+PyObject *
 date_to_mysql(PyObject *self, PyObject *date)
 {
     return pytomy_date(date);
@@ -663,25 +602,24 @@ date_to_mysql(PyObject *self, PyObject *date)
     @retval PyInt   Python v3
     @retval PyLong  Python v2
 */
-PyObject*
+PyObject *
 mytopy_bit(const char *data, const unsigned long length)
 {
 #ifdef HAVE_LONG_LONG
-    unsigned PY_LONG_LONG value= 0;
+    unsigned PY_LONG_LONG value = 0;
 #else
-    unsigned PY_LONG value= 0;
+    unsigned PY_LONG value = 0;
 #endif
-    const unsigned char *d= (const unsigned char*)data;
-    unsigned long size= length;
-    while (size > 0)
-    {
-        value= (value << 8) | *d++;
+    const unsigned char *d = (const unsigned char *)data;
+    unsigned long size = length;
+    while (size > 0) {
+        value = (value << 8) | *d++;
         size--;
     }
 #ifdef HAVE_LONG_LONG
-    return PyIntFromULongLong(value);
+    return PyLong_FromUnsignedLongLong(value);
 #else
-    return PyIntFromULong(value);
+    return PyLong_FromUnsignedLong(value);
 #endif
 }
 
@@ -695,34 +633,14 @@ mytopy_bit(const char *data, const unsigned long length)
 
   @return   Converted decimal as string
     @retval PyBytes     Python v3
-    @retval PyString    Python v2
 */
-PyObject*
+PyObject *
 pytomy_decimal(PyObject *obj)
 {
-#ifdef PY3
-    return PyBytes_FromString((const char *)PyUnicode_1BYTE_DATA(
-                              PyObject_Str(obj)));
-#else
-    PyObject *numeric, *new_num;
-    int tmp_size;
-    char *tmp;
-
-    numeric= PyObject_Str(obj);
-    tmp= PyString_AsString(numeric);
-    tmp_size= (int)PyString_Size(numeric);
-    if (tmp[tmp_size - 1] == 'L')
-    {
-        new_num= PyString_FromStringAndSize(tmp, tmp_size);
-        _PyString_Resize(&new_num, tmp_size - 1);
-        return new_num;
-    }
-    else
-    {
-        return numeric;
-    }
-
-#endif
+    PyObject *str = PyObject_Str(obj);
+    PyObject *bytes = PyUnicode_AsUTF8String(str);
+    Py_DECREF(str);
+    return bytes;
 }
 
 /**
@@ -731,45 +649,35 @@ pytomy_decimal(PyObject *obj)
   Convert, and decode if needed, a string MySQL value to
   Python str or bytes.
 
-  @param    data        string to be converted
-  @param    length      length of data
-  @param    flags       field flags
-  @param    charset     character used for decoding
-  @param    use_unicode return Unicode
+  @param    data             string to be converted
+  @param    field_type       field type
+  @param    field_charsetnr  charset number
+  @param    field_length     length of data
+  @param    charset          character used for decoding
+  @param    use_unicode      use unicode
 
   @return   Converted string
-    @retval PyUnicode   if not BINARY_FLAG
-    @retval PyBytes     Python v3 if not use_unicode
-    @retval PyString    Python v2 if not use_unicode
-    @retval NULL    Exception
+    @retval PyUnicode   if use unicode
+    @retval PyBytes     if not use_unicode or charset is 'binary'
+    @retval NULL        Exception
  */
-PyObject*
-mytopy_string(const char *data, const unsigned long length,
-              const unsigned long flags, const char *charset,
-              unsigned int use_unicode)
+PyObject *
+mytopy_string(const char *data, enum_field_types field_type,
+              const unsigned int field_charsetnr, const unsigned long field_length,
+              const char *charset, unsigned int use_unicode)
 {
     if (!charset || !data) {
-        printf("\n==> here ");
-        if (charset) {
-            printf(" charset:%s", charset);
-        }
-        if (data) {
-            printf(" data:'%s'", data);
-        }
-        printf("\n");
         return NULL;
     }
 
-    if (!((flags != NULL) & flags & BINARY_FLAG) && use_unicode && strcmp(charset, "binary") != 0)
-    {
-        return PyUnicode_Decode(data, length, charset, NULL);
+    if (strcmp(charset, "binary") == 0) {
+        return PyByteArray_FromStringAndSize(data, field_length);
     }
-    else
-    {
-#ifndef PY3
-        return PyStringFromStringAndSize(data, length);
-#else
-        return PyBytes_FromStringAndSize(data, length);
-#endif
+
+    /* 'binary' charset = 63 */
+    if (use_unicode && (field_type == MYSQL_TYPE_JSON || field_charsetnr != 63)) {
+        return PyUnicode_Decode(data, field_length, charset, NULL);
     }
+
+    return PyByteArray_FromStringAndSize(data, field_length);
 }

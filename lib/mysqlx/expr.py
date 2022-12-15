@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,14 +28,15 @@
 
 """Expression Parser."""
 
-from .compat import STRING_TYPES, BYTE_TYPES, UNICODE_TYPES
-from .helpers import get_item_or_attr
 from .dbdoc import DbDoc
+from .helpers import BYTE_TYPES, get_item_or_attr
 from .protobuf import Message, mysqlxpb_enum
 
 
-# pylint: disable=C0103,C0111
-class TokenType(object):
+# pylint: disable=missing-function-docstring
+class TokenType:
+    """Token types class."""
+
     NOT = 1
     AND = 2
     OR = 3
@@ -124,72 +125,77 @@ class TokenType(object):
     DAY_MINUTE = 86
     DAY_HOUR = 87
     YEAR_MONTH = 88
-# pylint: enable=C0103
+    OVERLAPS = 89
 
-_INTERVAL_UNITS = set([
-    TokenType.MICROSECOND,
-    TokenType.SECOND,
-    TokenType.MINUTE,
-    TokenType.HOUR,
-    TokenType.DAY,
-    TokenType.WEEK,
-    TokenType.MONTH,
-    TokenType.QUARTER,
-    TokenType.YEAR,
-    TokenType.SECOND_MICROSECOND,
-    TokenType.MINUTE_MICROSECOND,
-    TokenType.MINUTE_SECOND,
-    TokenType.HOUR_MICROSECOND,
-    TokenType.HOUR_SECOND,
-    TokenType.HOUR_MINUTE,
-    TokenType.DAY_MICROSECOND,
-    TokenType.DAY_SECOND,
-    TokenType.DAY_MINUTE,
-    TokenType.DAY_HOUR,
-    TokenType.YEAR_MONTH])
+
+_INTERVAL_UNITS = set(
+    [
+        TokenType.MICROSECOND,
+        TokenType.SECOND,
+        TokenType.MINUTE,
+        TokenType.HOUR,
+        TokenType.DAY,
+        TokenType.WEEK,
+        TokenType.MONTH,
+        TokenType.QUARTER,
+        TokenType.YEAR,
+        TokenType.SECOND_MICROSECOND,
+        TokenType.MINUTE_MICROSECOND,
+        TokenType.MINUTE_SECOND,
+        TokenType.HOUR_MICROSECOND,
+        TokenType.HOUR_SECOND,
+        TokenType.HOUR_MINUTE,
+        TokenType.DAY_MICROSECOND,
+        TokenType.DAY_SECOND,
+        TokenType.DAY_MINUTE,
+        TokenType.DAY_HOUR,
+        TokenType.YEAR_MONTH,
+    ]
+)
 
 # map of reserved word to token type
 _RESERVED_WORDS = {
-    "and":      TokenType.AND,
-    "or":       TokenType.OR,
-    "xor":      TokenType.XOR,
-    "is":       TokenType.IS,
-    "not":      TokenType.NOT,
-    "like":     TokenType.LIKE,
-    "in":       TokenType.IN,
-    "regexp":   TokenType.REGEXP,
-    "between":  TokenType.BETWEEN,
+    "and": TokenType.AND,
+    "or": TokenType.OR,
+    "xor": TokenType.XOR,
+    "is": TokenType.IS,
+    "not": TokenType.NOT,
+    "like": TokenType.LIKE,
+    "in": TokenType.IN,
+    "overlaps": TokenType.OVERLAPS,
+    "regexp": TokenType.REGEXP,
+    "between": TokenType.BETWEEN,
     "interval": TokenType.INTERVAL,
-    "escape":   TokenType.ESCAPE,
-    "cast":     TokenType.CAST,
-    "div":      TokenType.DIV,
-    "hex":      TokenType.HEX,
-    "bin":      TokenType.BIN,
-    "true":     TokenType.TRUE,
-    "false":    TokenType.FALSE,
-    "null":     TokenType.NULL,
-    "second":   TokenType.SECOND,
-    "minute":   TokenType.MINUTE,
-    "hour":     TokenType.HOUR,
-    "day":      TokenType.DAY,
-    "week":     TokenType.WEEK,
-    "month":    TokenType.MONTH,
-    "quarter":  TokenType.QUARTER,
-    "year":     TokenType.YEAR,
+    "escape": TokenType.ESCAPE,
+    "cast": TokenType.CAST,
+    "div": TokenType.DIV,
+    "hex": TokenType.HEX,
+    "bin": TokenType.BIN,
+    "true": TokenType.TRUE,
+    "false": TokenType.FALSE,
+    "null": TokenType.NULL,
+    "second": TokenType.SECOND,
+    "minute": TokenType.MINUTE,
+    "hour": TokenType.HOUR,
+    "day": TokenType.DAY,
+    "week": TokenType.WEEK,
+    "month": TokenType.MONTH,
+    "quarter": TokenType.QUARTER,
+    "year": TokenType.YEAR,
     "microsecond": TokenType.MICROSECOND,
-    "asc":      TokenType.ORDERBY_ASC,
-    "desc":     TokenType.ORDERBY_DESC,
-    "as":       TokenType.AS,
-    "binary":   TokenType.BINARY,
+    "asc": TokenType.ORDERBY_ASC,
+    "desc": TokenType.ORDERBY_DESC,
+    "as": TokenType.AS,
+    "binary": TokenType.BINARY,
     "datetime": TokenType.DATETIME,
-    "time":     TokenType.TIME,
-    "char":     TokenType.CHAR,
-    "date":     TokenType.DATE,
-    "decimal":  TokenType.DECIMAL,
-    "signed":   TokenType.SIGNED,
+    "time": TokenType.TIME,
+    "char": TokenType.CHAR,
+    "date": TokenType.DATE,
+    "decimal": TokenType.DECIMAL,
+    "signed": TokenType.SIGNED,
     "unsigned": TokenType.UNSIGNED,
-    "integer":  TokenType.INTEGER,
-    "json":     TokenType.JSON,
+    "integer": TokenType.INTEGER,
+    "json": TokenType.JSON,
     "second_microsecond": TokenType.SECOND_MICROSECOND,
     "minute_microsecond": TokenType.MINUTE_MICROSECOND,
     "minute_second": TokenType.MINUTE_SECOND,
@@ -200,7 +206,7 @@ _RESERVED_WORDS = {
     "day_second": TokenType.DAY_SECOND,
     "day_minute": TokenType.DAY_MINUTE,
     "day_hour": TokenType.DAY_HOUR,
-    "year_month": TokenType.YEAR_MONTH
+    "year_month": TokenType.YEAR_MONTH,
 }
 
 _SQL_FUNTION_RESERVED_WORDS_COLLISION = {
@@ -235,6 +241,7 @@ _OPERATORS = {
     "<": "<",
     "<=": "<=",
     "&": "&",
+    "&&": "&&",
     "|": "|",
     "<<": "<<",
     ">>": ">>",
@@ -245,7 +252,8 @@ _OPERATORS = {
     "~": "~",
     "%": "%",
     "cast": "cast",
-    "cont_in": "cont_in"
+    "cont_in": "cont_in",
+    "overlaps": "overlaps",
 }
 
 _UNARY_OPERATORS = {
@@ -253,7 +261,7 @@ _UNARY_OPERATORS = {
     "-": "sign_minus",
     "~": "~",
     "not": "not",
-    "!": "!"
+    "!": "!",
 }
 
 _NEGATION = {
@@ -262,11 +270,14 @@ _NEGATION = {
     "regexp": "not_regexp",
     "like": "not_like",
     "in": "not_in",
-    "cont_in": "not_cont_in"
+    "cont_in": "not_cont_in",
+    "overlaps": "not_overlaps",
 }
 
 
-class Token(object):
+class Token:
+    """Token representation class."""
+
     def __init__(self, token_type, value, length=1):
         self.token_type = token_type
         self.value = value
@@ -276,22 +287,25 @@ class Token(object):
         return self.__str__()
 
     def __str__(self):
-        if self.token_type == TokenType.IDENT or \
-           self.token_type == TokenType.LNUM or \
-           self.token_type == TokenType.LSTRING:
-            return "{0}({1})".format(self.token_type, self.value)
-        return "{0}".format(self.token_type)
+        if self.token_type in (
+            TokenType.IDENT,
+            TokenType.LNUM,
+            TokenType.LSTRING,
+        ):
+            return f"{self.token_type}({self.value})"
+        return f"{self.token_type}"
 
 
 # static protobuf helper functions
+
 
 def build_expr(value):
     msg = Message("Mysqlx.Expr.Expr")
     if isinstance(value, (Message)):
         return value
-    elif isinstance(value, (ExprParser)):
-        return value.expr()
-    elif isinstance(value, (dict, DbDoc)):
+    if isinstance(value, (ExprParser)):
+        return value.expr(reparse=True)
+    if isinstance(value, (dict, DbDoc)):
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OBJECT")
         msg["object"] = build_object(value).get_message()
     elif isinstance(value, (list, tuple)):
@@ -304,19 +318,19 @@ def build_expr(value):
 
 
 def build_scalar(value):
-    if isinstance(value, STRING_TYPES):
+    if isinstance(value, str):
         return build_string_scalar(value)
-    elif isinstance(value, BYTE_TYPES):
+    if isinstance(value, BYTE_TYPES):
         return build_bytes_scalar(value)
-    elif isinstance(value, bool):
+    if isinstance(value, bool):
         return build_bool_scalar(value)
-    elif isinstance(value, int):
+    if isinstance(value, int):
         return build_int_scalar(value)
-    elif isinstance(value, float):
+    if isinstance(value, float):
         return build_double_scalar(value)
-    elif value is None:
+    if value is None:
         return build_null_scalar()
-    raise ValueError("Unsupported data type: {0}.".format(type(value)))
+    raise ValueError(f"Unsupported data type: {type(value)}")
 
 
 def build_object(obj):
@@ -326,7 +340,7 @@ def build_object(obj):
     msg = Message("Mysqlx.Expr.Object")
     for key, value in obj.items():
         pair = Message("Mysqlx.Expr.Object.ObjectField")
-        pair["key"] = key.encode() if isinstance(key, UNICODE_TYPES) else key
+        pair["key"] = key.encode() if isinstance(key, str) else key
         pair["value"] = build_expr(value).get_message()
         msg["fld"].extend([pair.get_message()])
     return msg
@@ -357,14 +371,16 @@ def build_int_scalar(value):
     msg["v_signed_int"] = value
     return msg
 
+
 def build_unsigned_int_scalar(value):
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_UINT")
     msg["v_unsigned_int"] = value
     return msg
 
+
 def build_string_scalar(value):
-    if isinstance(value, STRING_TYPES):
+    if isinstance(value, str):
         value = bytes(bytearray(value, "utf-8"))
     msg = Message("Mysqlx.Datatypes.Scalar")
     msg["type"] = mysqlxpb_enum("Mysqlx.Datatypes.Scalar.Type.V_STRING")
@@ -407,10 +423,13 @@ def escape_literal(string):
     return string.replace('"', '""')
 
 
-class ExprParser(object):
-    def __init__(self, string, allow_relational=False):
+class ExprParser:
+    """Expression parser class."""
+
+    def __init__(self, string, allow_relational=True):
         self.string = string
         self.tokens = []
+        self.path_name_queue = []
         self.pos = 0
         self._allow_relational_columns = allow_relational
         self.placeholder_name_to_position = {}
@@ -419,7 +438,7 @@ class ExprParser(object):
         self.lex()
 
     def __str__(self):
-        return "<mysqlx.ExprParser '{}'>".format(self.string)
+        return f"<mysqlx.ExprParser '{self.string}'>"
 
     def clean_expression(self):
         """Removes the keywords that does not form part of the expression.
@@ -427,10 +446,10 @@ class ExprParser(object):
         Removes the keywords "SELECT" and "WHERE" that does not form part of
         the expression itself.
         """
-        if not isinstance(self.string, STRING_TYPES):
+        if not isinstance(self.string, str):
             self.string = repr(self.string)
         self.string = self.string.strip(" ")
-        if len(self.string) > 1 and self.string[-1] == ';':
+        if len(self.string) > 1 and self.string[-1] == ";":
             self.string = self.string[:-1]
         if "SELECT" in self.string[:6].upper():
             self.string = self.string[6:]
@@ -445,8 +464,9 @@ class ExprParser(object):
         # numeric literal
         start = pos
         found_dot = False
-        while pos < len(self.string) and (self.string[pos].isdigit() or
-                                          self.string[pos] == "."):
+        while pos < len(self.string) and (
+            self.string[pos].isdigit() or self.string[pos] == "."
+        ):
             if self.string[pos] == ".":
                 if found_dot is True:
                     raise ValueError("Invalid number. Found multiple '.'")
@@ -459,15 +479,20 @@ class ExprParser(object):
 
     def lex_alpha(self, i, allow_space=False):
         start = i
-        while i < len(self.string) and \
-              (self.string[i].isalnum() or self.string[i] == "_" or
-               (self.string[i].isspace() and allow_space)):
+        while i < len(self.string) and (
+            self.string[i].isalnum()
+            or self.string[i] == "_"
+            or (self.string[i].isspace() and allow_space)
+        ):
             i += 1
 
         val = self.string[start:i]
         try:
-            if i < len(self.string) and self.string[i] == '(' and \
-               val.lower() not in _SQL_FUNTION_RESERVED_WORDS_COLLISION:
+            if (
+                i < len(self.string)
+                and self.string[i] == "("
+                and val.lower() not in _SQL_FUNTION_RESERVED_WORDS_COLLISION
+            ):
                 token = Token(TokenType.IDENT, val, len(val))
             else:
                 token = Token(_RESERVED_WORDS[val.lower()], val.lower(), len(val))
@@ -482,11 +507,14 @@ class ExprParser(object):
         start = key
         while key < len(self.string):
             char = self.string[key]
-            if char == quote_char and key + 1 < len(self.string) and \
-               self.string[key + 1] != quote_char:
+            if (
+                char == quote_char
+                and key + 1 < len(self.string)
+                and self.string[key + 1] != quote_char
+            ):
                 # break if we have a quote char that's not double
                 break
-            elif char == quote_char or char == "\\":
+            if char in (quote_char, "\\"):
                 # this quote char has to be doubled
                 if key + 1 >= len(self.string):
                     break
@@ -496,8 +524,7 @@ class ExprParser(object):
                 val += char
             key += 1
         if key >= len(self.string) or self.string[key] != quote_char:
-            raise ValueError("Unterminated quoted string starting at {0}"
-                             "".format(start))
+            raise ValueError(f"Unterminated quoted string starting at {start}")
         if quote_char == "`":
             return Token(TokenType.IDENT, val, len(val) + 2)
         return Token(TokenType.LSTRING, val, len(val) + 2)
@@ -511,7 +538,7 @@ class ExprParser(object):
             if char.isspace():
                 i += 1
                 continue
-            elif char.isdigit():
+            if char.isdigit():
                 token = self.lex_number(i)
             elif char.isalpha() or char == "_":
                 token = self.lex_alpha(i, inside_arrow)
@@ -549,7 +576,7 @@ class ExprParser(object):
                     token = Token(TokenType.EQ, "==", 1)
             elif char == "&":
                 if self.next_char_is(i, "&"):
-                    token = Token(TokenType.ANDAND, char, 2)
+                    token = Token(TokenType.ANDAND, "&&", 2)
                 else:
                     token = Token(TokenType.BITAND, char)
             elif char == "^":
@@ -599,46 +626,49 @@ class ExprParser(object):
                     token = self.lex_number(i)
                 else:
                     token = Token(TokenType.DOT, char)
-            elif (char == "'" or char == '"') and arrow_last:
+            elif char in ("'", '"') and arrow_last:
                 token = Token(TokenType.QUOTE, char)
                 if not inside_arrow:
                     inside_arrow = True
                 else:
                     arrow_last = False
                     inside_arrow = False
-            elif char == '"' or char == "'" or char == "`":
+            elif char in ('"', "'", "`"):
                 token = self.lex_quoted_token(i)
             else:
-                raise ValueError("Unknown character at {0}".format(i))
+                raise ValueError(f"Unknown character at {i}")
             self.tokens.append(token)
             i += token.length
 
     def assert_cur_token(self, token_type):
         if self.pos >= len(self.tokens):
-            raise ValueError("Expected token type {0} at pos {1} but no "
-                             "tokens left".format(token_type, self.pos))
+            raise ValueError(
+                f"Expected token type {token_type} at pos {self.pos} but no "
+                "tokens left"
+            )
         if self.tokens[self.pos].token_type != token_type:
-            raise ValueError("Expected token type {0} at pos {1} but found "
-                             "type {2}".format(token_type, self.pos,
-                                               self.tokens[self.pos]))
+            raise ValueError(
+                f"Expected token type {token_type} at pos {self.pos} but found "
+                f"type {self.tokens[self.pos]}, on tokens {self.tokens}"
+            )
 
     def cur_token_type_is(self, token_type):
         return self.pos_token_type_is(self.pos, token_type)
 
     def cur_token_type_in(self, *types):
-        return self.pos < len(self.tokens) and \
-               self.tokens[self.pos].token_type in types
+        return self.pos < len(self.tokens) and self.tokens[self.pos].token_type in types
 
     def next_token_type_is(self, token_type):
         return self.pos_token_type_is(self.pos + 1, token_type)
 
     def next_token_type_in(self, *types):
-        return self.pos < len(self.tokens) and \
-               self.tokens[self.pos + 1].token_type in types
+        return (
+            self.pos < len(self.tokens)
+            and self.tokens[self.pos + 1].token_type in types
+        )
 
     def pos_token_type_is(self, pos, token_type):
-        return pos < len(self.tokens) and \
-            self.tokens[pos].token_type == token_type
+        return pos < len(self.tokens) and self.tokens[pos].token_type == token_type
 
     def consume_token(self, token_type):
         self.assert_cur_token(token_type)
@@ -651,13 +681,27 @@ class ExprParser(object):
         list and return a list of Expr objects.
         """
         exprs = []
+        path_name_added = False
         self.consume_token(TokenType.LPAREN)
         if not self.cur_token_type_is(TokenType.RPAREN):
-            exprs.append(self.expr().get_message())
+            msg_expr = self._expr().get_message()
+            if hasattr(msg_expr, "identifier") and msg_expr.identifier.name:
+                self.path_name_queue.insert(0, msg_expr.identifier.name)
+                path_name_added = True
+            elif (
+                not hasattr(msg_expr, "identifier")
+                and "identifier" in msg_expr
+                and "name" in msg_expr["identifier"]
+            ):
+                self.path_name_queue.insert(0, msg_expr["identifier"]["name"])
+                path_name_added = True
+            exprs.append(msg_expr)
             while self.cur_token_type_is(TokenType.COMMA):
                 self.pos += 1
-                exprs.append(self.expr().get_message())
+                exprs.append(self._expr().get_message())
         self.consume_token(TokenType.RPAREN)
+        if path_name_added:
+            self.path_name_queue.pop()
         return exprs
 
     def identifier(self):
@@ -684,20 +728,24 @@ class ExprParser(object):
         token = self.tokens[self.pos]
 
         if token.token_type == TokenType.IDENT:
-            if token.value.startswith('`') and token.value.endswith('`'):
-                raise ValueError("{0} is not a valid JSON/ECMAScript "
-                                 "identifier".format(token.value))
+            if token.value.startswith("`") and token.value.endswith("`"):
+                raise ValueError(
+                    f"{token.value} is not a valid JSON/ECMAScript identifier"
+                )
             self.consume_token(TokenType.IDENT)
             member_name = token.value
         elif token.token_type == TokenType.LSTRING:
             self.consume_token(TokenType.LSTRING)
             member_name = token.value
         else:
-            raise ValueError("Expected token type IDENT or LSTRING in JSON "
-                             "path at token pos {0}".format(self.pos))
+            raise ValueError(
+                "Expected token type IDENT or LSTRING in JSON path at token "
+                f"pos {self.pos}"
+            )
         doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
         doc_path_item["type"] = mysqlxpb_enum(
-            "Mysqlx.Expr.DocumentPathItem.Type.MEMBER")
+            "Mysqlx.Expr.DocumentPathItem.Type.MEMBER"
+        )
         doc_path_item["value"] = member_name
         return doc_path_item
 
@@ -708,33 +756,41 @@ class ExprParser(object):
             self.consume_token(TokenType.RSQBRACKET)
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
-                "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX_ASTERISK")
+                "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX_ASTERISK"
+            )
             return doc_path_item
-        elif self.cur_token_type_is(TokenType.LNUM):
+        if self.cur_token_type_is(TokenType.LNUM):
             value = int(self.consume_token(TokenType.LNUM))
             if value < 0:
-                raise IndexError("Array index cannot be negative at {0}"
-                                 "".format(self.pos))
+                raise IndexError(f"Array index cannot be negative at {self.pos}")
             self.consume_token(TokenType.RSQBRACKET)
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
-                "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX")
+                "Mysqlx.Expr.DocumentPathItem.Type.ARRAY_INDEX"
+            )
             doc_path_item["index"] = value
             return doc_path_item
-        else:
-            raise ValueError("Exception token type MUL or LNUM in JSON "
-                             "path array index at token pos {0}"
-                             "".format(self.pos))
+        raise ValueError(
+            "Exception token type MUL or LNUM in JSON path array index at "
+            f"token pos {self.pos}"
+        )
 
     def document_field(self):
+        if not self.tokens:
+            raise ValueError("Empty string cannot be used as document field")
+        if self.cur_token_type_is(TokenType.DOLLAR):
+            self.consume_token(TokenType.DOLLAR)
         col_id = Message("Mysqlx.Expr.ColumnIdentifier")
         if self.cur_token_type_is(TokenType.IDENT):
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
-                "Mysqlx.Expr.DocumentPathItem.Type.MEMBER")
+                "Mysqlx.Expr.DocumentPathItem.Type.MEMBER"
+            )
             doc_path_item["value"] = self.consume_token(TokenType.IDENT)
             col_id["document_path"].extend([doc_path_item.get_message()])
         col_id["document_path"].extend(self.document_path())
+        if self.path_name_queue:
+            col_id["name"] = self.path_name_queue[0]
         expr = Message("Mysqlx.Expr.Expr")
         expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.IDENT")
         expr["identifier"] = col_id
@@ -753,7 +809,8 @@ class ExprParser(object):
                 self.consume_token(TokenType.DOTSTAR)
                 doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
                 doc_path_item["type"] = mysqlxpb_enum(
-                    "Mysqlx.Expr.DocumentPathItem.Type.MEMBER_ASTERISK")
+                    "Mysqlx.Expr.DocumentPathItem.Type.MEMBER_ASTERISK"
+                )
                 doc_path.append(doc_path_item.get_message())
             elif self.cur_token_type_is(TokenType.LSQBRACKET):
                 doc_path.append(self.docpath_array_loc().get_message())
@@ -761,15 +818,16 @@ class ExprParser(object):
                 self.consume_token(TokenType.DOUBLESTAR)
                 doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
                 doc_path_item["type"] = mysqlxpb_enum(
-                    "Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK")
+                    "Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK"
+                )
                 doc_path.append(doc_path_item.get_message())
             else:
                 break
         items = len(doc_path)
-        if items > 0 and get_item_or_attr(doc_path[items - 1], "type") == \
-           mysqlxpb_enum("Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK"):
-            raise ValueError("JSON path may not end in '**' at {0}"
-                             "".format(self.pos))
+        if items > 0 and get_item_or_attr(doc_path[items - 1], "type") == mysqlxpb_enum(
+            "Mysqlx.Expr.DocumentPathItem.Type.DOUBLE_ASTERISK"
+        ):
+            raise ValueError(f"JSON path may not end in '**' at {self.pos}")
         return doc_path
 
     def column_identifier(self):
@@ -779,8 +837,7 @@ class ExprParser(object):
             self.consume_token(TokenType.DOT)
             parts.append(self.consume_token(TokenType.IDENT))
         if len(parts) > 3:
-            raise ValueError("Too many parts to identifier at {0}"
-                             "".format(self.pos))
+            raise ValueError(f"Too many parts to identifier at {self.pos}")
         parts.reverse()
         col_id = Message("Mysqlx.Expr.ColumnIdentifier")
         # clever way to apply them to the struct
@@ -812,7 +869,8 @@ class ExprParser(object):
         if is_doc and len(col_id["document_path"]) == 0:
             doc_path_item = Message("Mysqlx.Expr.DocumentPathItem")
             doc_path_item["type"] = mysqlxpb_enum(
-                "Mysqlx.Expr.DocumentPathItem.Type.MEMBER")
+                "Mysqlx.Expr.DocumentPathItem.Type.MEMBER"
+            )
             doc_path_item["value"] = ""
             col_id["document_path"].extend([doc_path_item.get_message()])
 
@@ -831,7 +889,7 @@ class ExprParser(object):
     def expect_token(self, token_type):
         token = self.next_token()
         if token.token_type != token_type:
-            raise ValueError("Expected token type {0}".format(token_type))
+            raise ValueError(f"Expected token type {token_type}")
 
     def peek_token(self):
         return self.tokens[self.pos]
@@ -846,9 +904,10 @@ class ExprParser(object):
         jsonArray            ::=  "[" [ expr ("," expr)* ] "]"
         """
         msg = Message("Mysqlx.Expr.Array")
-        while self.pos < len(self.tokens) and \
-            not self.cur_token_type_is(TokenType.RSQBRACKET):
-            msg["value"].extend([self.expr().get_message()])
+        while self.pos < len(self.tokens) and not self.cur_token_type_is(
+            TokenType.RSQBRACKET
+        ):
+            msg["value"].extend([self._expr().get_message()])
             if not self.cur_token_type_is(TokenType.COMMA):
                 break
             self.consume_token(TokenType.COMMA)
@@ -865,12 +924,13 @@ class ExprParser(object):
         jsonKeyValue         ::=  STRING_DQ ":" expr
         """
         msg = Message("Mysqlx.Expr.Object")
-        while self.pos < len(self.tokens) and \
-            not self.cur_token_type_is(TokenType.RCURLY):
+        while self.pos < len(self.tokens) and not self.cur_token_type_is(
+            TokenType.RCURLY
+        ):
             item = Message("Mysqlx.Expr.Object.ObjectField")
             item["key"] = self.consume_token(TokenType.LSTRING)
             self.consume_token(TokenType.COLON)
-            item["value"] = self.expr().get_message()
+            item["value"] = self._expr().get_message()
             msg["fld"].extend([item.get_message()])
             if not self.cur_token_type_is(TokenType.COMMA):
                 break
@@ -891,73 +951,75 @@ class ExprParser(object):
         elif token.token_type == TokenType.EROTEME:
             place_holder_name = str(self.positional_placeholder_count)
         else:
-            raise ValueError("Invalid placeholder name at token pos {0}"
-                             "".format(self.pos))
+            raise ValueError(f"Invalid placeholder name at token pos {self.pos}")
 
-        place_holder_name = place_holder_name.lower()
         msg_expr = Message("Mysqlx.Expr.Expr")
         msg_expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.PLACEHOLDER")
         if place_holder_name in self.placeholder_name_to_position:
-            msg_expr["position"] = \
-                self.placeholder_name_to_position[place_holder_name]
+            msg_expr["position"] = self.placeholder_name_to_position[place_holder_name]
         else:
             msg_expr["position"] = self.positional_placeholder_count
-            self.placeholder_name_to_position[place_holder_name] = \
-                self.positional_placeholder_count
+            self.placeholder_name_to_position[
+                place_holder_name
+            ] = self.positional_placeholder_count
             self.positional_placeholder_count += 1
         return msg_expr
 
     def cast(self):
-        """ cast ::= CAST LPAREN expr AS cast_data_type RPAREN
-        """
+        """cast ::= CAST LPAREN expr AS cast_data_type RPAREN"""
         operator = Message("Mysqlx.Expr.Operator", name="cast")
         self.consume_token(TokenType.LPAREN)
-        operator["param"].extend([self.expr().get_message()])
+        operator["param"].extend([self._expr().get_message()])
         self.consume_token(TokenType.AS)
 
         type_scalar = build_bytes_scalar(str.encode(self.cast_data_type()))
-        operator["param"].extend(
-            [build_literal_expr(type_scalar).get_message()])
+        operator["param"].extend([build_literal_expr(type_scalar).get_message()])
         self.consume_token(TokenType.RPAREN)
         msg = Message("Mysqlx.Expr.Expr", operator=operator.get_message())
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
         return msg
 
     def cast_data_type(self):
-        """ cast_data_type ::= ( BINARY dimension? ) |
-                               ( CHAR dimension? ) |
-                               ( DATE ) |
-                               ( DATETIME dimension? ) |
-                               ( TIME dimension? ) |
-                               ( DECIMAL dimension? ) |
-                               ( SIGNED INTEGER? ) |
-                               ( UNSIGNED INTEGER? ) |
-                               JSON
+        """cast_data_type ::= ( BINARY dimension? ) |
+        ( CHAR dimension? ) |
+        ( DATE ) |
+        ( DATETIME dimension? ) |
+        ( TIME dimension? ) |
+        ( DECIMAL dimension? ) |
+        ( SIGNED INTEGER? ) |
+        ( UNSIGNED INTEGER? ) |
+        JSON
         """
         token = self.next_token()
-        if token.token_type in (TokenType.BINARY, TokenType.CHAR,
-                                TokenType.DATETIME, TokenType.TIME,):
+        if token.token_type in (
+            TokenType.BINARY,
+            TokenType.CHAR,
+            TokenType.DATETIME,
+            TokenType.TIME,
+        ):
             dimension = self.cast_data_type_dimension()
-            return "{0}{1}".format(token.value, dimension) \
-                    if dimension else token.value
-        elif token.token_type is TokenType.DECIMAL:
+            return f"{token.value}{dimension}" if dimension else token.value
+        if token.token_type is TokenType.DECIMAL:
             dimension = self.cast_data_type_dimension(True)
-            return "{0}{1}".format(token.value, dimension) \
-                    if dimension else token.value
-        elif token.token_type in (TokenType.SIGNED, TokenType.UNSIGNED,):
+            return f"{token.value}{dimension}" if dimension else token.value
+        if token.token_type in (TokenType.SIGNED, TokenType.UNSIGNED):
             if self.cur_token_type_is(TokenType.INTEGER):
                 self.consume_token(TokenType.INTEGER)
             return token.value
-        elif token.token_type in (TokenType.INTEGER, TokenType.JSON,
-                                  TokenType.DATE,):
+        if token.token_type in (
+            TokenType.INTEGER,
+            TokenType.JSON,
+            TokenType.DATE,
+        ):
             return token.value
 
-        raise ValueError("Unknown token type {0} at position {1} ({2})"
-                         "".format(token.token_type, self.pos, token.value))
+        raise ValueError(
+            f"Unknown token type {token.token_type} at position {self.pos} "
+            f"({token.value})"
+        )
 
     def cast_data_type_dimension(self, decimal=False):
-        """ dimension ::= LPAREN LNUM (, LNUM)? RPAREN
-        """
+        """dimension ::= LPAREN LNUM (, LNUM)? RPAREN"""
         if not self.cur_token_type_is(TokenType.LPAREN):
             return None
 
@@ -969,10 +1031,14 @@ class ExprParser(object):
             dimension.append(self.consume_token(TokenType.LNUM))
         self.consume_token(TokenType.RPAREN)
 
-        return "({0})".format(dimension[0]) if len(dimension) is 1 else \
-               "({0},{1})".format(*dimension)
+        return (
+            f"({dimension[0]})"
+            if len(dimension) == 1
+            else f"({dimension[0]},{dimension[1]})"
+        )
 
-    def star_operator(self):
+    @staticmethod
+    def star_operator():
         msg = Message("Mysqlx.Expr.Expr")
         msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
         msg["operator"] = Message("Mysqlx.Expr.Operator", name="*")
@@ -984,62 +1050,65 @@ class ExprParser(object):
 
         if token.token_type in [TokenType.EROTEME, TokenType.COLON]:
             return self.parse_place_holder(token)
-        elif token.token_type == TokenType.LCURLY:
+        if token.token_type == TokenType.LCURLY:
             return self.parse_json_doc()
-        elif token.token_type == TokenType.LSQBRACKET:
+        if token.token_type == TokenType.LSQBRACKET:
             return self.parse_json_array()
-        elif token.token_type == TokenType.CAST:
+        if token.token_type == TokenType.CAST:
             return self.cast()
-        elif token.token_type == TokenType.LPAREN:
-            expr = self.expr()
+        if token.token_type == TokenType.LPAREN:
+            expr = self._expr()
             self.expect_token(TokenType.RPAREN)
             return expr
-        elif token.token_type in [TokenType.PLUS, TokenType.MINUS]:
+        if token.token_type in [TokenType.PLUS, TokenType.MINUS]:
             peek = self.peek_token()
             if peek.token_type == TokenType.LNUM:
                 self.tokens[self.pos].value = token.value + peek.value
                 return self.atomic_expr()
             return build_unary_op(token.value, self.atomic_expr())
-        elif token.token_type in [TokenType.NOT, TokenType.NEG, TokenType.BANG]:
+        if token.token_type in (TokenType.NOT, TokenType.NEG, TokenType.BANG):
             return build_unary_op(token.value, self.atomic_expr())
-        elif token.token_type == TokenType.LSTRING:
+        if token.token_type == TokenType.LSTRING:
             return build_literal_expr(build_string_scalar(token.value))
-        elif token.token_type == TokenType.NULL:
+        if token.token_type == TokenType.NULL:
             return build_literal_expr(build_null_scalar())
-        elif token.token_type == TokenType.LNUM:
+        if token.token_type == TokenType.LNUM:
             if "." in token.value:
-                return build_literal_expr(
-                    build_double_scalar(float(token.value)))
+                return build_literal_expr(build_double_scalar(float(token.value)))
             return build_literal_expr(build_int_scalar(int(token.value)))
-        elif token.token_type in [TokenType.TRUE, TokenType.FALSE]:
+        if token.token_type in [TokenType.TRUE, TokenType.FALSE]:
             return build_literal_expr(
-                build_bool_scalar(token.token_type == TokenType.TRUE))
-        elif token.token_type == TokenType.DOLLAR:
+                build_bool_scalar(token.token_type == TokenType.TRUE)
+            )
+        if token.token_type == TokenType.DOLLAR:
             return self.document_field()
-        elif token.token_type == TokenType.MUL:
+        if token.token_type == TokenType.MUL:
             return self.star_operator()
-        elif token.token_type == TokenType.IDENT:
+        if token.token_type == TokenType.IDENT:
             self.pos = self.pos - 1  # stay on the identifier
-            if self.next_token_type_is(TokenType.LPAREN) or \
-               (self.next_token_type_is(TokenType.DOT) and
-                self.pos_token_type_is(self.pos + 2, TokenType.IDENT) and
-                self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)):
+            if self.next_token_type_is(TokenType.LPAREN) or (
+                self.next_token_type_is(TokenType.DOT)
+                and self.pos_token_type_is(self.pos + 2, TokenType.IDENT)
+                and self.pos_token_type_is(self.pos + 3, TokenType.LPAREN)
+            ):
                 # Function call
                 return self.function_call()
-            return (self.document_field()
-                    if not self._allow_relational_columns
-                    else self.column_identifier())
+            return (
+                self.document_field()
+                if not self._allow_relational_columns
+                else self.column_identifier()
+            )
 
-        raise ValueError("Unknown token type = {0}  when expecting atomic "
-                         "expression at {1}"
-                         "".format(token.token_type, self.pos))
+        raise ValueError(
+            f"Unknown token type = {token.token_type}  when expecting atomic "
+            f"expression at {self.pos}"
+        )
 
     def parse_left_assoc_binary_op_expr(self, types, inner_parser):
         """Given a `set' of types and an Expr-returning inner parser function,
         parse a left associate binary operator expression"""
         lhs = inner_parser()
-        while (self.pos < len(self.tokens) and
-               self.tokens[self.pos].token_type in types):
+        while self.pos < len(self.tokens) and self.tokens[self.pos].token_type in types:
             msg = Message("Mysqlx.Expr.Expr")
             msg["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
             operator = Message("Mysqlx.Expr.Operator")
@@ -1054,25 +1123,27 @@ class ExprParser(object):
     # operator precedence is implemented here
     def add_sub_interval(self):
         lhs = self.atomic_expr()
-        if self.cur_token_type_in(TokenType.PLUS, TokenType.MINUS) and \
-           self.next_token_type_is(TokenType.INTERVAL):
+        if self.cur_token_type_in(
+            TokenType.PLUS, TokenType.MINUS
+        ) and self.next_token_type_is(TokenType.INTERVAL):
             token = self.next_token()
 
             operator = Message("Mysqlx.Expr.Operator")
             operator["param"].extend([lhs.get_message()])
-            operator["name"] = "date_add" if token.token_type is TokenType.PLUS \
-                               else "date_sub"
+            operator["name"] = (
+                "date_add" if token.token_type is TokenType.PLUS else "date_sub"
+            )
 
             self.consume_token(TokenType.INTERVAL)
             operator["param"].extend([self.bit_expr().get_message()])
 
             if not self.cur_token_type_in(*_INTERVAL_UNITS):
-                raise ValueError("Expected interval type at position {0}"
-                                 "".format(self.pos))
+                raise ValueError(f"Expected interval type at position {self.pos}")
 
             token = str.encode(self.consume_any_token().upper())
-            operator["param"].extend([build_literal_expr(
-                build_bytes_scalar(token)).get_message()])
+            operator["param"].extend(
+                [build_literal_expr(build_bytes_scalar(token)).get_message()]
+            )
 
             lhs = Message("Mysqlx.Expr.Expr", operator=operator)
             lhs["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
@@ -1082,25 +1153,39 @@ class ExprParser(object):
     def mul_div_expr(self):
         return self.parse_left_assoc_binary_op_expr(
             set([TokenType.MUL, TokenType.DIV, TokenType.MOD]),
-            self.add_sub_interval)
+            self.add_sub_interval,
+        )
 
     def add_sub_expr(self):
         return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.PLUS, TokenType.MINUS]), self.mul_div_expr)
+            set([TokenType.PLUS, TokenType.MINUS]), self.mul_div_expr
+        )
 
     def shift_expr(self):
         return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.LSHIFT, TokenType.RSHIFT]), self.add_sub_expr)
+            set([TokenType.LSHIFT, TokenType.RSHIFT]), self.add_sub_expr
+        )
 
     def bit_expr(self):
         return self.parse_left_assoc_binary_op_expr(
             set([TokenType.BITAND, TokenType.BITOR, TokenType.BITXOR]),
-            self.shift_expr)
+            self.shift_expr,
+        )
 
     def comp_expr(self):
         return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.GE, TokenType.GT, TokenType.LE, TokenType.LT,
-                 TokenType.EQ, TokenType.NE]), self.bit_expr)
+            set(
+                [
+                    TokenType.GE,
+                    TokenType.GT,
+                    TokenType.LE,
+                    TokenType.LT,
+                    TokenType.EQ,
+                    TokenType.NE,
+                ]
+            ),
+            self.bit_expr,
+        )
 
     def ilri_expr(self):
         params = []
@@ -1126,6 +1211,10 @@ class ExprParser(object):
                 else:
                     op_name = "cont_in"
                     params.append(self.comp_expr().get_message())
+            elif self.cur_token_type_is(TokenType.OVERLAPS):
+                self.consume_token(TokenType.OVERLAPS)
+                params.append(self.comp_expr().get_message())
+
             elif self.cur_token_type_is(TokenType.LIKE):
                 self.consume_token(TokenType.LIKE)
                 params.append(self.comp_expr().get_message())
@@ -1142,38 +1231,54 @@ class ExprParser(object):
                 params.append(self.comp_expr().get_message())
             else:
                 if is_not:
-                    raise ValueError("Unknown token after NOT as pos {0}"
-                                     "".format(self.pos))
+                    raise ValueError(f"Unknown token after NOT as pos {self.pos}")
                 op_name = None  # not an operator we're interested in
             if op_name:
                 operator = Message("Mysqlx.Expr.Operator")
                 operator["name"] = _NEGATION[op_name] if is_not else op_name
                 operator["param"] = params
                 msg_expr = Message("Mysqlx.Expr.Expr")
-                msg_expr["type"] = mysqlxpb_enum(
-                    "Mysqlx.Expr.Expr.Type.OPERATOR")
+                msg_expr["type"] = mysqlxpb_enum("Mysqlx.Expr.Expr.Type.OPERATOR")
                 msg_expr["operator"] = operator.get_message()
                 lhs = msg_expr
         return lhs
 
     def and_expr(self):
         return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.AND, TokenType.ANDAND]), self.ilri_expr)
+            set([TokenType.AND, TokenType.ANDAND]), self.ilri_expr
+        )
 
     def xor_expr(self):
-        return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.XOR]), self.and_expr)
+        return self.parse_left_assoc_binary_op_expr(set([TokenType.XOR]), self.and_expr)
 
     def or_expr(self):
         return self.parse_left_assoc_binary_op_expr(
-            set([TokenType.OR, TokenType.OROR]), self.xor_expr)
+            set([TokenType.OR, TokenType.OROR]), self.xor_expr
+        )
 
-    def expr(self):
+    def _expr(self, reparse=False):
+        if reparse:
+            self.tokens = []
+            self.pos = 0
+            self.placeholder_name_to_position = {}
+            self.positional_placeholder_count = 0
+            self.lex()
         return self.or_expr()
 
+    def expr(self, reparse=False):
+        expression = self._expr(reparse)
+        used_tokens = self.pos
+        if self.pos_token_type_is(len(self.tokens) - 2, TokenType.AS):
+            used_tokens += 2
+        if used_tokens < len(self.tokens):
+            raise ValueError(
+                f"Unused token types {self.tokens[self.pos :]} found in "
+                f"expression at position: {self.pos}"
+            )
+        return expression
+
     def parse_table_insert_field(self):
-        return Message("Mysqlx.Crud.Column",
-                       name=self.consume_token(TokenType.IDENT))
+        return Message("Mysqlx.Crud.Column", name=self.consume_token(TokenType.IDENT))
 
     def parse_table_update_field(self):
         return self.column_identifier().identifier
@@ -1184,10 +1289,12 @@ class ExprParser(object):
         temp.reverse()
         while temp:
             field = temp.pop()
-            while field.count("(") != field.count(")") or \
-                field.count("[") != field.count("]") or \
-                field.count("{") != field.count("}"):
-                field = "{1},{0}".format(temp.pop(), field)
+            while (
+                field.count("(") != field.count(")")
+                or field.count("[") != field.count("]")
+                or field.count("{") != field.count("}")
+            ):
+                field = f"{temp.pop()},{field}"
             fields.append(field.strip())
         return fields
 
@@ -1199,7 +1306,7 @@ class ExprParser(object):
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            projection = Message("Mysqlx.Crud.Projection", source=self.expr())
+            projection = Message("Mysqlx.Crud.Projection", source=self._expr())
             if self.cur_token_type_is(TokenType.AS):
                 self.consume_token(TokenType.AS)
                 projection["alias"] = self.consume_token(TokenType.IDENT)
@@ -1216,14 +1323,12 @@ class ExprParser(object):
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            order = Message("Mysqlx.Crud.Order", expr=self.expr())
+            order = Message("Mysqlx.Crud.Order", expr=self._expr())
             if self.cur_token_type_is(TokenType.ORDERBY_ASC):
-                order["direction"] = mysqlxpb_enum(
-                    "Mysqlx.Crud.Order.Direction.ASC")
+                order["direction"] = mysqlxpb_enum("Mysqlx.Crud.Order.Direction.ASC")
                 self.consume_token(TokenType.ORDERBY_ASC)
             elif self.cur_token_type_is(TokenType.ORDERBY_DESC):
-                order["direction"] = mysqlxpb_enum(
-                    "Mysqlx.Crud.Order.Direction.DESC")
+                order["direction"] = mysqlxpb_enum("Mysqlx.Crud.Order.Direction.DESC")
                 self.consume_token(TokenType.ORDERBY_DESC)
             order_specs.append(order.get_message())
         return order_specs
@@ -1235,5 +1340,5 @@ class ExprParser(object):
             if not first:
                 self.consume_token(TokenType.COMMA)
             first = False
-            expr_list.append(self.expr().get_message())
+            expr_list.append(self._expr().get_message())
         return expr_list
