@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1674,4 +1674,131 @@ class MySQLCursorPreparedDictTests(tests.TestsCursor):
 
         self.cur.execute(f"SELECT * FROM {self.table_name}")
         exp = [dict(zip(self.column_names, data)) for data in self.data]
+        self.assertEqual(exp, self.cur.fetchall())
+
+
+class MySQLCursorPreparedNamedTupleTests(tests.TestsCursor):
+
+    table_name = "MySQLCursorPreparedNamedTupleTests"
+    column_names = ("id", "name", "city")
+    data = [
+        (1, "Mr A", "mexico"),
+        (2, "Mr B", "portugal"),
+        (3, "Mr C", "poland"),
+        (4, "Mr D", "usa"),
+    ]
+    named_tuple = namedtuple("Row", column_names)
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor(prepared=True, named_tuple=True)
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cur.execute(
+            f"CREATE TABLE {self.table_name}(id INT(10) PRIMARY KEY, name "
+            "VARCHAR(20), city VARCHAR(20))"
+        )
+
+    def tearDown(self):
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cur.close()
+        self.cnx.close()
+
+    def test_fetchone(self):
+        self.cur.execute(
+            f"INSERT INTO {self.table_name} VALUES(%s, %s, %s)",
+            self.data[0],
+        )
+
+        self.cur.execute(f"SELECT * FROM {self.table_name}")
+        exp = self.named_tuple(*self.data[0])
+        self.assertEqual(exp, self.cur.fetchone())
+
+    def test_fetchmany(self):
+        for row in self.data:
+            self.cur.execute(
+                f"INSERT INTO {self.table_name} VALUES(%s, %s, %s)",
+                row,
+            )
+
+        self.cur.execute(f"SELECT * FROM {self.table_name}")
+
+        exp = [self.named_tuple(*data) for data in self.data[:2]]
+        self.assertEqual(exp, self.cur.fetchmany(size=2))
+
+        exp = [self.named_tuple(*data) for data in self.data[2:]]
+        self.assertEqual(exp, self.cur.fetchmany(size=2))
+
+    def test_fetchall(self):
+        for row in self.data:
+            self.cur.execute(
+                f"INSERT INTO {self.table_name} VALUES(%s, %s, %s)",
+                row,
+            )
+
+        self.cur.execute(f"SELECT * FROM {self.table_name}")
+        exp = [self.named_tuple(*data) for data in self.data]
+        self.assertEqual(exp, self.cur.fetchall())
+
+
+class MySQLCursorPreparedRawTests(tests.TestsCursor):
+
+    table_name = "MySQLCursorPreparedRawTests"
+    column_names = ("id", "name", "city")
+    data = [
+        (1, "Mr A", "mexico"),
+        (2, "Mr B", "portugal"),
+        (3, "Mr C", "poland"),
+        (4, "Mr D", "usa"),
+    ]
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        self.cnx = connection.MySQLConnection(**config)
+        self.cur = self.cnx.cursor(prepared=True, raw=True)
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cur.execute(
+            f"CREATE TABLE {self.table_name}(id INT(10) PRIMARY KEY, name "
+            "VARCHAR(20), city VARCHAR(20))"
+        )
+
+    def tearDown(self):
+        self.cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+        self.cur.close()
+        self.cnx.close()
+
+    def test_fetchone(self):
+        self.cur.execute(
+            f"INSERT INTO {self.table_name} VALUES(%s, %s, %s)",
+            self.data[0],
+        )
+
+        self.cur.execute(f"SELECT * FROM {self.table_name}")
+        exp = self.data[0]
+        self.assertEqual(exp, self.cur.fetchone())
+
+    def test_fetchmany(self):
+        for row in self.data:
+            self.cur.execute(
+                f"INSERT INTO {self.table_name} VALUES(%s, %s, %s)",
+                row,
+            )
+
+        self.cur.execute(f"SELECT * FROM {self.table_name}")
+
+        exp = self.data[:2]
+        self.assertEqual(exp, self.cur.fetchmany(size=2))
+
+        exp = self.data[2:]
+        self.assertEqual(exp, self.cur.fetchmany(size=2))
+
+    def test_fetchall(self):
+        for row in self.data:
+            self.cur.execute(
+                f"INSERT INTO {self.table_name} VALUES(%s, %s, %s)",
+                row,
+            )
+
+        self.cur.execute(f"SELECT * FROM {self.table_name}")
+        exp = self.data[:]
         self.assertEqual(exp, self.cur.fetchall())

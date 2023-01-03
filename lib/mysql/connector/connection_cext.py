@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -75,6 +75,8 @@ try:
         CMySQLCursorNamedTuple,
         CMySQLCursorPrepared,
         CMySQLCursorPreparedDict,
+        CMySQLCursorPreparedNamedTuple,
+        CMySQLCursorPreparedRaw,
         CMySQLCursorRaw,
     )
 except ImportError as exc:
@@ -705,7 +707,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             8: CMySQLCursorNamedTuple,
             9: CMySQLCursorBufferedNamedTuple,
             16: CMySQLCursorPrepared,
+            18: CMySQLCursorPreparedRaw,
             20: CMySQLCursorPreparedDict,
+            24: CMySQLCursorPreparedNamedTuple,
         }
         try:
             return (types[cursor_type])(self)

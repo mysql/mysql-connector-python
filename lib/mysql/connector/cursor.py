@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1549,13 +1549,14 @@ class MySQLCursorNamedTuple(MySQLCursor):
         Returns:
             tuple or None: A row from query result set.
         """
-        self._check_executed()
-        row = self._fetch_row()
-        if row:
-            if hasattr(self._connection, "converter"):
-                return self._row_to_python(row, self.description)
-            return row
-        return None
+        row = super().fetchone()
+        if not row:
+            return None
+        return (
+            self._row_to_python(row, self.description)
+            if hasattr(self._connection, "converter")
+            else row
+        )
 
     def fetchall(self) -> List[Optional[RowType]]:
         """Return all rows of a query result set.
@@ -1563,21 +1564,11 @@ class MySQLCursorNamedTuple(MySQLCursor):
         Returns:
             list: A list of tuples with all rows of a query result set.
         """
-        self._check_executed()
-        if not self._have_unread_result():
-            return []
-
-        (rows, eof) = self._connection.get_rows()
-        if self._nextrow[0]:
-            rows.insert(0, self._nextrow[0])
-        res = [self._row_to_python(row, self.description) for row in rows]
-
-        self._handle_eof(eof)
-        rowcount = len(rows)
-        if rowcount >= 0 and self._rowcount == -1:
-            self._rowcount = 0
-        self._rowcount += rowcount
-        return res
+        return [
+            self._row_to_python(row, self.description)
+            for row in super().fetchall()
+            if row
+        ]
 
 
 class MySQLCursorBufferedDict(MySQLCursorDict, MySQLCursorBuffered):
@@ -1680,3 +1671,88 @@ class MySQLCursorPreparedDict(MySQLCursorDict, MySQLCursorPrepared):  # type: ig
             for row in super().fetchmany(size=size)
             if row
         ]
+
+
+class MySQLCursorPreparedNamedTuple(MySQLCursorNamedTuple, MySQLCursorPrepared):
+    """
+    This class is a blend of features from MySQLCursorNamedTuple and MySQLCursorPrepared
+    """
+
+    def fetchmany(self, size: Optional[int] = None) -> List[RowType]:
+        """Return the next set of rows of a query result set.
+
+        When no more rows are available, it returns an empty list.
+        The number of rows returned can be specified using the size argument,
+        which defaults to one.
+
+        Returns:
+            list: The next set of rows of a query result set represented
+                  as a list of named tuples where column names are used as names.
+        """
+        return [
+            self._row_to_python(row, self.description)
+            for row in super().fetchmany(size=size)
+            if row
+        ]
+
+
+class MySQLCursorPreparedRaw(MySQLCursorPrepared):
+    """
+    This class is a blend of features from MySQLCursorRaw and MySQLCursorPrepared
+    """
+
+    _raw: bool = True
+
+    def fetchone(self) -> Optional[RowType]:
+        """Return next row of a query result set.
+
+        Returns:
+            tuple or None: A row from query result set.
+        """
+        self._check_executed()
+        if self._cursor_exists:
+            self._connection.cmd_stmt_fetch(self._prepared["statement_id"])
+        return self._fetch_row(raw=self._raw) or None
+
+    def fetchmany(self, size: Optional[int] = None) -> List[RowType]:
+        """Return the next set of rows of a query result set.
+
+        When no more rows are available, it returns an empty list.
+        The number of rows returned can be specified using the size argument,
+        which defaults to one.
+
+        Returns:
+            list: The next set of rows of a query result set.
+        """
+        self._check_executed()
+        res = []
+        cnt = size or self.arraysize
+        while cnt > 0 and self._have_unread_result():
+            cnt -= 1
+            row = self._fetch_row(raw=self._raw)
+            if row:
+                res.append(row)
+        return res
+
+    def fetchall(self) -> List[RowType]:
+        """Return all rows of a query result set.
+
+        Returns:
+            list: A list of tuples with all rows of a query result set.
+        """
+        self._check_executed()
+        rows = []
+        if self._nextrow[0]:
+            rows.append(self._nextrow[0])
+        while self._have_unread_result():
+            if self._cursor_exists:
+                self._connection.cmd_stmt_fetch(
+                    self._prepared["statement_id"], MAX_RESULTS
+                )
+            (tmp, eof) = self._connection.get_rows(
+                raw=self._raw, binary=self._binary, columns=self.description
+            )
+            rows.extend(tmp)
+            self._handle_eof(eof)
+        self._rowcount = len(rows)
+        return rows

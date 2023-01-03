@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -976,7 +976,7 @@ class CMySQLCursorNamedTuple(CMySQLCursor):
         res = super().fetchmany(size=size)
         if not res:
             return []
-        return [self.named_tuple(*res[0])]
+        return [self.named_tuple(*row) for row in res]
 
     def fetchall(self) -> List[RowType]:
         """Return all rows of a query result set.
@@ -1278,3 +1278,13 @@ class CMySQLCursorPreparedDict(CMySQLCursorDict, CMySQLCursorPrepared):  # type:
     3. CMySQLCursorPrepared (right parent class)
     4. CMySQLCursor (base class)
     """
+
+
+class CMySQLCursorPreparedNamedTuple(CMySQLCursorNamedTuple, CMySQLCursorPrepared):
+    """This class is a blend of features from CMySQLCursorNamedTuple and CMySQLCursorPrepared"""
+
+
+class CMySQLCursorPreparedRaw(CMySQLCursorPrepared):
+    """This class is a blend of features from CMySQLCursorRaw and CMySQLCursorPrepared"""
+
+    _raw: bool = True

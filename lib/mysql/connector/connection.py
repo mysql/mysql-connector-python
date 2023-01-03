@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -79,6 +79,8 @@ from .cursor import (
     MySQLCursorNamedTuple,
     MySQLCursorPrepared,
     MySQLCursorPreparedDict,
+    MySQLCursorPreparedNamedTuple,
+    MySQLCursorPreparedRaw,
     MySQLCursorRaw,
 )
 from .errors import (
@@ -1436,7 +1438,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             8: MySQLCursorNamedTuple,
             9: MySQLCursorBufferedNamedTuple,
             16: MySQLCursorPrepared,
+            18: MySQLCursorPreparedRaw,
             20: MySQLCursorPreparedDict,
+            24: MySQLCursorPreparedNamedTuple,
         }
         try:
             return (types[cursor_type])(self)

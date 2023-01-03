@@ -12,6 +12,7 @@ v8.0.33
 =======
 
 - WL#15401: Support for type hints in module mysqlx
+- BUG#27359063: Support for dictionary, named_tuple, and raw to prepared statements cursor
 
 v8.0.32
 =======
