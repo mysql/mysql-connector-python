@@ -215,6 +215,11 @@ _UNITTESTS_CMD_ARGS = {
         "metavar": "NAME",
         "help": "Tests to execute, see --help-tests for more information",
     },
+    ("-r", "--test-regex"): {
+        "dest": "test_regex_pattern",
+        "metavar": "NAME",
+        "help": "Run tests matching the regex pattern.",
+    },
     ("-l", "--log"): {
         "dest": "logfile",
         "metavar": "NAME",
@@ -1078,16 +1083,16 @@ def main():
     # Which tests cases to run
     testcases = []
 
-    if options.testcase:
-        for name, module, _ in tests.get_test_modules():
-            if name == options.testcase or module == options.testcase:
-                LOGGER.info("Executing tests in module %s", module)
-                testcases = [module]
-                break
+    if options.test_regex_pattern:
+        pattern = re.compile(options.test_regex_pattern)
+        testcases = [
+            module
+            for name, module, _ in tests.get_test_modules()
+            if pattern.match(name)
+        ]
         if not testcases:
-            LOGGER.error("Test case not valid; see --help-tests")
-            sys.exit(1)
-    elif options.onetest:
+            LOGGER.error("No test matches the provided regex pattern")
+    elif options.testcase:
         LOGGER.info("Executing test: %s", options.onetest)
         testcases = [options.onetest]
     else:
