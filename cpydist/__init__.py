@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -52,7 +52,6 @@ except ImportError:
 
 from .utils import (
     ARCH,
-    ARCH_64BIT,
     get_openssl_libs,
     mysql_c_api_info,
     parse_loose_version,
@@ -177,7 +176,10 @@ class BaseCommand(Command):
             self.log.setLevel(logging.DEBUG)
             if set_threshold:
                 # Set setuptools logging level to DEBUG
-                set_threshold(1)
+                try:
+                    set_threshold(1)
+                except AttributeError:
+                    pass
 
         if not self.with_mysql_capi:
             self.with_mysql_capi = os.environ.get("MYSQL_CAPI")
@@ -196,7 +198,10 @@ class BaseCommand(Command):
         if not self.extra_link_args:
             self.extra_link_args = os.environ.get("EXTRA_LINK_ARGS")
         if not self.skip_vendor:
-            self.skip_vendor = os.environ.get("SKIP_VENDOR")
+            self.skip_vendor = os.environ.get("SKIP_VENDOR", False)
+
+        if not self.with_mysql_capi:
+            self.skip_vendor = True
 
         cmd_build_ext = self.distribution.get_command_obj("build_ext")
         cmd_build_ext.with_mysql_capi = self.with_mysql_capi
@@ -268,6 +273,17 @@ class BaseCommand(Command):
             if self.with_openssl_lib_dir:
                 libssl, libcrypto = self._get_openssl_libs()
                 vendor_libs.append((self.with_openssl_lib_dir, [libssl, libcrypto]))
+                # Copy libssl and libcrypto libraries to 'mysql/vendor/plugin' on macOS
+                if platform.system() == "Darwin":
+                    vendor_libs.append(
+                        (
+                            self.with_openssl_lib_dir,
+                            [
+                                Path("plugin", libssl).as_posix(),
+                                Path("plugin", libcrypto).as_posix(),
+                            ],
+                        )
+                    )
 
         # Plugins
         bundle_plugin_libs = False
@@ -292,6 +308,7 @@ class BaseCommand(Command):
                     f"authentication_fido_client.{plugin_ext}",
                 ),
             ]
+
             for plugin_name, plugin_file in plugin_list:
                 plugin_full_path = os.path.join(plugin_path, plugin_file)
                 self.log.debug(
@@ -335,20 +352,18 @@ class BaseCommand(Command):
         self.log.debug("# vendor_libs: %s", vendor_libs)
 
         # mysql/vendor
-        if not os.path.exists(self.vendor_folder):
-            Path(os.path.join(os.getcwd(), self.vendor_folder)).mkdir(
-                parents=True, exist_ok=True
-            )
+        if not Path(self.vendor_folder).exists():
+            Path(os.getcwd(), self.vendor_folder).mkdir(parents=True, exist_ok=True)
 
         # mysql/vendor/plugin
-        if not os.path.exists(os.path.join(self.vendor_folder, "plugin")):
-            Path(os.path.join(os.getcwd(), self.vendor_folder, "plugin")).mkdir(
+        if not Path(self.vendor_folder, "plugin").exists():
+            Path(os.getcwd(), self.vendor_folder, "plugin").mkdir(
                 parents=True, exist_ok=True
             )
 
         # mysql/vendor/private
-        if not os.path.exists(os.path.join(self.vendor_folder, "private")):
-            Path(os.path.join(os.getcwd(), self.vendor_folder, "private")).mkdir(
+        if not Path(self.vendor_folder, "private").exists():
+            Path(os.getcwd(), self.vendor_folder, "private").mkdir(
                 parents=True, exist_ok=True
             )
 
@@ -358,13 +373,11 @@ class BaseCommand(Command):
             self.log.info("Copying folder: %s", src_folder)
             for filepath in files:
                 dst_folder, filename = os.path.split(filepath)
-                src = os.path.join(src_folder, filename)
-                dst = os.path.join(os.getcwd(), self.vendor_folder, dst_folder)
-                self.log.info("copying %s -> %s", src, dst)
-                try:
-                    self.log.info("shutil res: %s", shutil.copy(src, dst))
-                except shutil.SameFileError:
-                    pass
+                src = Path(src_folder, filename)
+                dst = Path(os.getcwd(), self.vendor_folder, dst_folder)
+                if not Path(dst, src.name).exists():
+                    self.log.debug("copying %s -> %s", src, dst)
+                    shutil.copy2(src, dst, follow_symlinks=False)
 
         if os.name == "nt":
             self.distribution.package_data = {"mysql": ["vendor/plugin/*"]}
@@ -380,7 +393,11 @@ class BaseCommand(Command):
             self.log.debug("# site_packages_files: %s", self.distribution.data_files)
         elif bundle_plugin_libs:
             # Bundle SASL libs
-            sasl_libs_path = os.path.join(self.with_mysql_capi, "lib", "private")
+            sasl_libs_path = (
+                Path(self.with_mysql_capi, "lib")
+                if platform.system() == "Darwin"
+                else Path(self.with_mysql_capi, "lib", "private")
+            )
             if not os.path.exists(sasl_libs_path):
                 self.log.info("sasl2 llibraries not found at %s", sasl_libs_path)
             sasl_libs = []
@@ -408,13 +425,18 @@ class BaseCommand(Command):
             for src_folder, files in sasl_libs:
                 self.log.info("Copying folder: %s", src_folder)
                 for filename in files:
-                    src = os.path.join(src_folder, filename)
-                    if not os.path.exists(src):
+                    src = Path(src_folder, filename)
+                    if not src.exists():
                         self.log.warn("Library not found: %s", src)
                         continue
-                    dst = os.path.join(os.getcwd(), self.vendor_folder, "private")
-                    self.log.info("copying %s -> %s", src, dst)
-                    shutil.copy2(src, dst)
+                    dst = (
+                        Path(os.getcwd(), self.vendor_folder)
+                        if platform.system() == "Darwin"
+                        else Path(os.getcwd(), self.vendor_folder, "private")
+                    )
+                    if not Path(dst, src.name).exists():
+                        self.log.debug("copying %s -> %s", src, dst)
+                        shutil.copy2(src, dst, follow_symlinks=False)
 
             # include sasl2 libs
             sasl2_libs = []
@@ -422,7 +444,7 @@ class BaseCommand(Command):
                 self.with_mysql_capi, "lib", "private", "sasl2"
             )
             if not os.path.exists(sasl2_libs_path):
-                self.log.info("sasl2 llibraries not found at %s", sasl2_libs_path)
+                self.log.info("sasl2 libraries not found at %s", sasl2_libs_path)
             sasl2_libs_w = [
                 "libanonymous.*",
                 "libcrammd5.*.*",
@@ -463,16 +485,32 @@ class BaseCommand(Command):
 
             # Copy vendor libraries to 'mysql/vendor/private/sasl2' folder
             self.log.info("Copying vendor libraries")
+            dst = Path(os.getcwd(), sasl2_libs_private_path)
             for src_folder, files in sasl2_libs:
                 self.log.info("Copying folder: %s", src_folder)
                 for filename in files:
-                    src = os.path.join(src_folder, filename)
-                    if not os.path.exists(src):
+                    src = Path(src_folder, filename)
+                    if not src.exists():
                         self.log.warning("Library not found: %s", src)
                         continue
-                    dst = os.path.join(os.getcwd(), sasl2_libs_private_path)
-                    self.log.info("copying %s -> %s", src, dst)
-                    shutil.copy2(src, dst)
+                    if not Path(dst, filename).exists():
+                        self.log.debug("copying %s -> %s", src, dst)
+                        shutil.copy2(src, dst, follow_symlinks=False)
+
+            # Copy libfido2 libraries to 'mysql/vendor/plugin' on macOS
+            if platform.system() == "Darwin":
+                dst = Path(os.getcwd(), self.vendor_folder, "plugin")
+                libfido2_files = [
+                    Path(filename).name
+                    for filename in glob(
+                        Path(self.vendor_folder, "libfido2.*.*").as_posix()
+                    )
+                ]
+                for filename in libfido2_files:
+                    src = Path(os.getcwd(), self.vendor_folder, filename)
+                    if not Path(dst, filename).exists():
+                        self.log.debug("copying %s -> %s", src, dst)
+                        shutil.copy2(src, dst, follow_symlinks=False)
 
         self.distribution.package_data = {
             "mysql": [
