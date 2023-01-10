@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -441,7 +441,8 @@ class ClientFlag(_Flags):
     CONNECT_ARGS: int = 1 << 20
     PLUGIN_AUTH_LENENC_CLIENT_DATA: int = 1 << 21
     CAN_HANDLE_EXPIRED_PASSWORDS: int = 1 << 22
-    SESION_TRACK: int = 1 << 23
+    SESION_TRACK: int = 1 << 23  # deprecated
+    SESSION_TRACK: int = 1 << 23
     DEPRECATE_EOF: int = 1 << 24
     CLIENT_QUERY_ATTRIBUTES: int = 1 << 27
     SSL_VERIFY_SERVER_CERT: int = 1 << 30
@@ -478,7 +479,11 @@ class ClientFlag(_Flags):
             1 << 22,
             "Don't close the connection for a connection with expired password",
         ),
-        "SESION_TRACK": (
+        "SESION_TRACK": (  # deprecated
+            1 << 23,
+            "Capable of handling server state change information",
+        ),
+        "SESSION_TRACK": (
             1 << 23,
             "Capable of handling server state change information",
         ),
