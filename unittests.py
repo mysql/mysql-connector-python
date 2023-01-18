@@ -1093,6 +1093,15 @@ def main():
         if not testcases:
             LOGGER.error("No test matches the provided regex pattern")
     elif options.testcase:
+        for name, module, _ in tests.get_test_modules():
+            if name == options.testcase or module == options.testcase:
+                LOGGER.info("Executing tests in module %s", module)
+                testcases = [module]
+                break
+        if not testcases:
+            LOGGER.error("Test case not valid; see --help-tests")
+            sys.exit(1)
+    elif options.onetest:
         LOGGER.info("Executing test: %s", options.onetest)
         testcases = [options.onetest]
     else:
