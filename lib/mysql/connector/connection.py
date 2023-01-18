@@ -684,11 +684,12 @@ class MySQLConnection(MySQLConnectionAbstract):
         if not hasattr(data_file, "read"):
             raise ValueError("expecting a file-like object")
 
+        chunk_size = 131072  # 128 KB
         try:
-            buf = data_file.read(NET_BUFFER_LENGTH - 16)
+            buf = data_file.read(chunk_size - 16)
             while buf:
                 self._socket.send(buf)
-                buf = data_file.read(NET_BUFFER_LENGTH - 16)
+                buf = data_file.read(chunk_size - 16)
         except AttributeError as err:
             raise OperationalError("MySQL Connection not available") from err
 
@@ -1665,7 +1666,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns int.
         """
-        chunk_size = 8192
+        chunk_size = 131072  # 128 KB
         total_sent = 0
         try:
             buf = data.read(chunk_size)

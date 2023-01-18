@@ -19,6 +19,7 @@ v8.0.33
 - BUG#30103652: Connector/Python ClientFlag SESION_TRACK is a misspelling
 - BUG#27489972: Several COM_% commands have been deprecated
 - BUG#27359063: Support for dictionary, named_tuple, and raw to prepared statements cursor
+- BUG#21476351: Too small chunks when sending huge parameters with COM_STMT_SEND_LONG_DATA
 
 v8.0.32
 =======
