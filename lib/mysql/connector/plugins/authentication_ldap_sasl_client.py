@@ -166,12 +166,12 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             except gssapi.raw.exceptions.ExpiredCredentialsError as err:
                 logger.warning(" Credentials has expired: %s", err)
                 cred.acquire(user_name)
-                raise InterfaceError(f"Credentials has expired: {err}")
+                raise InterfaceError(f"Credentials has expired: {err}") from err
         except gssapi.raw.misc.GSSError as err:
             if not self._password:
                 raise InterfaceError(
                     f"Unable to retrieve stored credentials error: {err}"
-                )
+                ) from err
             try:
                 logger.debug("# Attempt to retrieve credentials with given password")
                 acquire_cred_result = gssapi.raw.acquire_cred_with_password(
@@ -183,7 +183,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             except gssapi.raw.misc.GSSError as err2:
                 raise ProgrammingError(
                     f"Unable to retrieve credentials with the given password: {err2}"
-                )
+                ) from err
 
         flags_l = (
             gssapi.RequirementFlag.mutual_authentication,
@@ -211,7 +211,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             # suffix: python-gssapi/latest/gssapi.html#gssapi.sec_contexts.SecurityContext
             initial_client_token = self.ctx.step()
         except gssapi.raw.misc.GSSError as err:
-            raise InterfaceError(f"Unable to initiate security context: {err}")
+            raise InterfaceError(f"Unable to initiate security context: {err}") from err
 
         logger.debug("# initial client token: %s", initial_client_token)
         return initial_client_token
@@ -273,7 +273,7 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
             unwraped = self.ctx.unwrap(message)
             logger.debug("# unwraped: %s", unwraped)
         except gssapi.raw.exceptions.BadMICError as err:
-            raise InterfaceError(f"Unable to unwrap server message: {err}")
+            raise InterfaceError(f"Unable to unwrap server message: {err}") from err
 
         logger.debug("# unwrapped server message: %s", unwraped)
         # The message contents for the clients closing message:

@@ -137,7 +137,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         except gssapi.raw.misc.GSSError as err:
             raise ProgrammingError(
                 f"Unable to acquire credentials with the given password: {err}"
-            )
+            ) from err
         return creds
 
     @staticmethod
@@ -216,14 +216,14 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             if upn and self._password is not None:
                 creds = self._acquire_cred_with_password(upn)
             else:
-                raise InterfaceError(f"Credentials has expired: {err}")
+                raise InterfaceError(f"Credentials has expired: {err}") from err
         except gssapi.raw.misc.GSSError as err:
             if upn and self._password is not None:
                 creds = self._acquire_cred_with_password(upn)
             else:
                 raise InterfaceError(
                     f"Unable to retrieve cached credentials error: {err}"
-                )
+                ) from err
 
         flags = (
             gssapi.RequirementFlag.mutual_authentication,
@@ -239,7 +239,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         try:
             initial_client_token: Optional[bytes] = self.context.step()
         except gssapi.raw.misc.GSSError as err:
-            raise InterfaceError(f"Unable to initiate security context: {err}")
+            raise InterfaceError(f"Unable to initiate security context: {err}") from err
 
         logger.debug("Initial client token: %s", initial_client_token)
         return initial_client_token
@@ -305,7 +305,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
             logger.debug("Unwraped: %s", unwraped)
         except gssapi.raw.exceptions.BadMICError as err:
             logger.debug("Unable to unwrap server message: %s", err)
-            raise InterfaceError(f"Unable to unwrap server message: {err}")
+            raise InterfaceError(f"Unable to unwrap server message: {err}") from err
 
         logger.debug("Unwrapped server message: %s", unwraped)
         # The message contents for the clients closing message:
