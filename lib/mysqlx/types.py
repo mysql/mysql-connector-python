@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 if hasattr(typing, "TypeAlias"):
+    # pylint: disable=no-name-in-module
     from typing import TypeAlias  # type: ignore[attr-defined]
 else:
     try:
