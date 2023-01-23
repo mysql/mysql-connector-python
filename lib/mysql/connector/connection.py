@@ -57,7 +57,6 @@ from . import version
 from .abstracts import MySQLConnectionAbstract
 from .authentication import get_auth_plugin
 from .constants import (
-    NET_BUFFER_LENGTH,
     CharacterSet,
     ClientFlag,
     FieldType,
