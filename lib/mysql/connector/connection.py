@@ -585,7 +585,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._socket.set_connection_timeout(None)
         except Exception:
             # close socket
-            self.close()
+            self._socket.close_connection()
             raise
 
         if (

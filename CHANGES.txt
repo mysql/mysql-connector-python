@@ -15,6 +15,7 @@ v8.0.33
 - WL#15483: Support OCI ephemeral key-based authentication
 - WL#15435: Improve the logging system
 - WL#15401: Support for type hints in module mysqlx
+- BUG#35015758: COM_QUIT should not be called in the connection phase
 - BUG#31355895: Fix slow executemany() with insert statements
 - BUG#30103652: Connector/Python ClientFlag SESION_TRACK is a misspelling
 - BUG#27489972: Several COM_% commands have been deprecated
