@@ -594,6 +594,10 @@ class RefreshOptionTests(tests.MySQLConnectorTests):
         tests.MYSQL_VERSION > (8, 0, 31),
         "RefreshOption.SLAVE was removed in 8.0.32",
     )
+    @unittest.skipIf(
+        tests.MYSQL_VERSION[:2] == (5, 7) and tests.MYSQL_VERSION > (5, 7, 40),
+        "RefreshOption.SLAVE was removed in 5.7.41",
+    )
     def test_deprecated(self):
         """Test deprecated warning is raised"""
         with warnings.catch_warnings(record=True) as warn:
