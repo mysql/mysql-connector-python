@@ -841,7 +841,7 @@ def test_skip_if(condition, reason):
     return _id
 
 
-def setup_logger(logger, debug=False, logfile=None):
+def setup_logger(logger, debug=False, logfile=None, filter=None):
     """Setting up the logger"""
     formatter = logging.Formatter("%(asctime)s [%(name)s:%(levelname)s] %(message)s")
     handler = None
@@ -854,6 +854,8 @@ def setup_logger(logger, debug=False, logfile=None):
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.INFO)
+    if filter:
+        logger.addFilter(filter)
     LOGGER.handlers = []  # We only need one handler
     LOGGER.addHandler(handler)
 

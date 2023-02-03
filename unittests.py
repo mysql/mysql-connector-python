@@ -892,6 +892,11 @@ def init_mysql_server(port, options):
             sys.exit(1)
 
 
+def warnings_filter(record):
+    """Filter out warnings."""
+    return record.levelno != logging.WARNING
+
+
 def main():
     parser = _get_arg_parser()
     options = parser.parse_args()
@@ -907,7 +912,25 @@ def main():
             print("{0:22s} {1}".format(name, description))
         sys.exit()
 
+    # Setup tests logger
     tests.setup_logger(LOGGER, debug=options.debug, logfile=options.logfile)
+
+    # Setup mysql.connector and mysqlx loggers, and filter out warnings
+    mysql_connector_logger = logging.getLogger("mysql.connector")
+    tests.setup_logger(
+        mysql_connector_logger,
+        debug=options.debug,
+        logfile=options.logfile,
+        filter=warnings_filter,
+    )
+    mysqlx_logger = logging.getLogger("mysqlx")
+    tests.setup_logger(
+        mysqlx_logger,
+        debug=options.debug,
+        logfile=options.logfile,
+        filter=warnings_filter,
+    )
+
     LOGGER.info(
         "MySQL Connector/Python unittest using Python v{0}".format(
             ".".join([str(v) for v in sys.version_info[0:3]])
