@@ -170,6 +170,7 @@ module = [
   'opentelemetry',
   'opentelemetry.*',
   'fido2.*',
+  'lib.mysql.connector.aio.connection_cext',
 ]
 ignore_missing_imports = true
 

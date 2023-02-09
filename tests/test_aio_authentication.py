@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,6 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+
 """Test module for authentication."""
 
 import getpass
@@ -42,16 +41,19 @@ import time
 import unittest
 
 import mysql.connector
-import mysql.connector.plugins as plugins
+import mysql.connector.aio.plugins as plugins
 import tests
 
-from mysql.connector import authentication
+from mysql.connector.aio import authentication
+from mysql.connector.aio.plugins import get_auth_plugin
 from mysql.connector.errors import (
     DatabaseError,
     InterfaceError,
+    NotSupportedError,
     OperationalError,
     ProgrammingError,
 )
+from tests import MySQLConnectorAioTestCase, MySQLConnectorTests, foreach_cnx_aio
 
 try:
     import cryptography
@@ -61,7 +63,7 @@ except ImportError:
 try:
     import gssapi
 
-    from mysql.connector.plugins.authentication_kerberos_client import (
+    from mysql.connector.aio.plugins.authentication_kerberos_client import (
         MySQLKerberosAuthPlugin,
     )
 except ImportError:
@@ -79,7 +81,7 @@ except ImportError:
     fido2 = None
 
 try:
-    from mysql.connector.connection_cext import HAVE_CMYSQL, CMySQLConnection
+    from mysql.connector.aio.connection_cext import HAVE_CMYSQL, CMySQLConnection
 except ImportError:
     # Test without C Extension
     CMySQLConnection = None
@@ -95,22 +97,12 @@ _PLUGINS_DEPENDENCIES = {
 }
 
 
-class AuthenticationModuleTests(tests.MySQLConnectorTests):
-
-    """Tests globals and functions of the authentication module"""
+class AuthenticationModuleTests(MySQLConnectorTests):
+    """Tests globals and functions of the authentication module."""
 
     def test_get_auth_plugin(self):
-        self.assertRaises(
-            mysql.connector.NotSupportedError,
-            authentication.get_auth_plugin,
-            "spam",
-        )
-
-        self.assertRaises(
-            mysql.connector.NotSupportedError,
-            authentication.get_auth_plugin,
-            "",
-        )
+        self.assertRaises(NotSupportedError, get_auth_plugin, "spam")
+        self.assertRaises(NotSupportedError, get_auth_plugin, "")
 
         # Test using standard plugins
         plugin_list = []
@@ -126,7 +118,7 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
                 plugin_list.append(module.name)
 
             plugin_module = importlib.import_module(
-                f"mysql.connector.plugins.{module.name}"
+                f"mysql.connector.aio.plugins.{module.name}"
             )
             if hasattr(plugin_module, "AUTHENTICATION_PLUGIN_CLASS"):
                 plugin_classes[module.name] = getattr(
@@ -140,12 +132,11 @@ class AuthenticationModuleTests(tests.MySQLConnectorTests):
             )
 
 
-class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
-
-    """Tests authentication.MySQLNativePasswordAuthPlugin"""
+class MySQLNativePasswordAuthPluginTests(MySQLConnectorTests):
+    """Tests authentication.MySQLNativePasswordAuthPlugin."""
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin("mysql_native_password")
+        self.plugin_class = get_auth_plugin("mysql_native_password")
 
     def test_class(self):
         auth_plugin = self.plugin_class(username="dummy", password="s3cr3t")
@@ -154,17 +145,11 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
 
     def test_prepare_password(self):
         auth_plugin = self.plugin_class(username=None, password="spam")
-        self.assertRaises(
-            mysql.connector.InterfaceError,
-            auth_plugin._prepare_password,
-            auth_data=None,
-        )
+        self.assertRaises(InterfaceError, auth_plugin._prepare_password, auth_data=None)
 
         auth_plugin = self.plugin_class(username=None, password="spam")  # too long
         self.assertRaises(
-            mysql.connector.InterfaceError,
-            auth_plugin._prepare_password,
-            auth_data=123456,
+            InterfaceError, auth_plugin._prepare_password, auth_data=123456
         )
 
         empty = b""
@@ -185,35 +170,11 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(auth_response, auth_plugin.auth_response(auth_data))
 
 
-class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
-
-    """Tests authentication.MySQLClearPasswordAuthPlugin"""
-
-    def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin("mysql_clear_password")
-
-    def test_class(self):
-        auth_plugin = self.plugin_class(
-            username="dummy", password="s3cr3t", ssl_enabled=True
-        )
-        self.assertEqual("mysql_clear_password", auth_plugin.name)
-        self.assertEqual(True, auth_plugin.requires_ssl)
-
-    def test_prepare_password(self):
-        exp = b"spam\x00"
-        auth_plugin = self.plugin_class(
-            username=None, password="spam", ssl_enabled=True
-        )
-        self.assertEqual(exp, auth_plugin._prepare_password())
-        self.assertEqual(exp, auth_plugin.auth_response(auth_data=None))
-
-
-class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
-
+class MySQLSHA256PasswordAuthPluginTests(MySQLConnectorTests):
     """Tests authentication.MySQLSHA256PasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin("sha256_password")
+        self.plugin_class = get_auth_plugin("sha256_password")
 
     def test_class(self):
         auth_plugin = self.plugin_class(
@@ -232,13 +193,11 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
 
 
 @unittest.skipIf(gssapi is None, "Module gssapi is required")
-class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
+class MySQLLdapSaslPasswordAuthPluginTests(MySQLConnectorTests):
     """Tests authentication.MySQLLdapSaslPasswordAuthPlugin"""
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin(
-            "authentication_ldap_sasl_client"
-        )
+        self.plugin_class = get_auth_plugin("authentication_ldap_sasl_client")
 
     def test_class(self):
         auth_plugin = self.plugin_class(username="user", password="spam")
@@ -254,12 +213,12 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "sasl authentication method",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
         self.assertIn(
             "is not supported",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
         # Test SCRAM-SHA-1 mechanism is accepted
@@ -272,7 +231,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response(auth_data)),
+            f"got header: {auth_plugin.auth_response(auth_data)}",
         )
 
         auth_plugin = self.plugin_class(username="user", password="spam")
@@ -287,7 +246,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response(auth_data)),
+            f"got header: {auth_plugin.auth_response(auth_data)}",
         )
 
         # Verify the length of the client's nonce in r=
@@ -296,8 +255,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(
             32,
             r_len,
-            "Unexpected cnonce legth {}, response {}"
-            "".format(len(cnonce), client_first_nsg),
+            f"Unexpected cnonce legth {len(cnonce)}, response {client_first_nsg}",
         )
 
         # Verify that a user name that requires character mapping is mapped
@@ -306,13 +264,13 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response(auth_data)),
+            f"got header: {auth_plugin.auth_response(auth_data)}",
         )
 
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(exp)) :]
         r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+        self.assertEqual(32, r_len, f"Unexpected legth {len(cnonce)}")
 
         bad_responses = [None, "", "v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
         for bad_res in bad_responses:
@@ -322,7 +280,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             self.assertIn(
                 "Unexpected server message",
                 context.exception.msg,
-                "not the expected: {}".format(context.exception.msg),
+                f"not the expected: {context.exception.msg}",
             )
 
         # verify an error is shown if server response is not well formated.
@@ -333,7 +291,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "Incomplete reponse",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
         # verify an error is shown if server does not authenticate response.
@@ -344,7 +302,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "Unable to authenticate resp",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
         bad_proofs = [None, "", b"5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
@@ -355,7 +313,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             self.assertIn(
                 "proof is not well formated",
                 context.exception.msg,
-                "not the expected: {}".format(context.exception.msg),
+                f"not the expected: {context.exception.msg}",
             )
 
         # verify an error is shown it the server can not prove it self.
@@ -364,7 +322,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "Unable to proof server identity",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
     def test_auth_response256(self):
@@ -376,12 +334,12 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             'sasl authentication method "UNKOWN-METHOD"',
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
         self.assertIn(
             "is not supported",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
         # Test SCRAM-SHA-256 mechanism is accepted
@@ -394,7 +352,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response(auth_data)),
+            f"got header: {auth_plugin.auth_response(auth_data)}",
         )
 
         auth_plugin = self.plugin_class(username="user", password="spam")
@@ -402,14 +360,14 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
         r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+        self.assertEqual(32, r_len, f"Unexpected legth {len(cnonce)}")
 
         # Verify the format of the first message from client.
         exp = b"n,a=user,n=user,r="
         client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response(auth_data)),
+            f"got header: {auth_plugin.auth_response(auth_data)}",
         )
 
         # Verify the length of the client's nonce in r=
@@ -418,8 +376,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertEqual(
             32,
             r_len,
-            "Unexpected cnonce legth {}, response {}"
-            "".format(len(cnonce), client_first_nsg),
+            f"Unexpected cnonce legth {len(cnonce)}, response {client_first_nsg}",
         )
 
         # Verify that a user name that requires character mapping is mapped
@@ -428,13 +385,13 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response(auth_data)),
+            f"got header: {auth_plugin.auth_response(auth_data)}",
         )
 
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(exp)) :]
         r_len = len(cnonce)
-        self.assertEqual(32, r_len, "Unexpected legth {}".format(len(cnonce)))
+        self.assertEqual(32, r_len, f"Unexpected legth {len(cnonce)}")
 
         bad_responses = [None, "", "v=5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
         for bad_res in bad_responses:
@@ -444,7 +401,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             self.assertIn(
                 "Unexpected server message",
                 context.exception.msg,
-                "not the expected: {}".format(context.exception.msg),
+                f"not the expected: {context.exception.msg}",
             )
 
         # verify an error is shown if server response is not well formated.
@@ -453,7 +410,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "Incomplete reponse",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
         # verify an error is shown if server does not authenticate response.
@@ -462,7 +419,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "Unable to authenticate resp",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
         bad_proofs = [None, "", b"5H6b+IApa7ZwqQ/ZT33fXoR/BTM=", b"", 123]
@@ -473,7 +430,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
             self.assertIn(
                 "proof is not well formated",
                 context.exception.msg,
-                "not the expected: {}".format(context.exception.msg),
+                f"not the expected: {context.exception.msg}",
             )
 
         # verify an error is shown it the server can not prove it self.
@@ -482,7 +439,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.assertIn(
             "Unable to proof server identity",
             context.exception.msg,
-            "not the expected error {}".format(context.exception.msg),
+            f"not the expected error {context.exception.msg}",
         )
 
 
@@ -501,7 +458,7 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
     tests.MYSQL_VERSION < (8, 0, 32) and os.name == "nt",
     "Authentication with Kerberos on Windows is not supported for MySQL <8.0.32",
 )
-class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
+class MySQLKerberosAuthPluginTests(MySQLConnectorAioTestCase):
     """Test authentication.MySQLKerberosAuthPlugin.
 
     Implemented by WL#14440: Support for authentication kerberos.
@@ -556,9 +513,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             cnx.cmd_query("FLUSH PRIVILEGES")
 
     def setUp(self):
-        self.plugin_class = authentication.get_auth_plugin(
-            "authentication_kerberos_client"
-        )
+        self.plugin_class = get_auth_plugin("authentication_kerberos_client")
         if self.skip_reason is not None:
             self.skipTest(self.skip_reason)
 
@@ -607,7 +562,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         if expired:
             time.sleep(8)
 
-    def _test_connection(self, conn_class, config, fail=False):
+    async def _test_connection(self, conn_class, config, fail=False):
         """Test a MySQL connection.
 
         Try to connect to a MySQL server using a specified connection class
@@ -626,14 +581,14 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             )
             return
 
-        with conn_class(**config) as cnx:
+        async with conn_class(**config) as cnx:
             self.assertTrue(cnx.is_connected)
-            with cnx.cursor() as cur:
-                cur.execute("SELECT @@version")
-                res = cur.fetchone()
+            async with cnx.cursor() as cur:
+                await cur.execute("SELECT @@version")
+                res = await cur.fetchone()
                 self.assertIsNotNone(res[0])
 
-    def _test_with_tgt_cache(
+    async def _test_with_tgt_cache(
         self,
         conn_class,
         config,
@@ -653,12 +608,12 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         )
 
         # Test connection
-        self._test_connection(conn_class, config, fail=fail)
+        await self._test_connection(conn_class, config, fail=fail)
 
         # Destroy Kerberos tickets
         self._kdestroy()
 
-    def _test_with_st_cache(self, conn_class, config, fail=False):
+    async def _test_with_st_cache(self, conn_class, config, fail=False):
         """Test with cached valid ST."""
         # Destroy Kerberos tickets
         self._kdestroy()
@@ -668,10 +623,11 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
         # Obtain the service ticket
         cnx = conn_class(**self.default_config)
-        cnx.close()
+        await cnx.connect()
+        await cnx.close()
 
         # Test connection
-        self._test_connection(conn_class, config, fail=fail)
+        await self._test_connection(conn_class, config, fail=fail)
 
         # Destroy Kerberos tickets
         self._kdestroy()
@@ -683,117 +639,117 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     # Test with TGT in the cache
 
-    @tests.foreach_cnx()
-    def test_tgt_cache(self):
+    @foreach_cnx_aio()
+    async def test_tgt_cache(self):
         """Test with cached valid TGT."""
         config = self.default_config.copy()
-        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_tgt_cache_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_cache_wrongpassword(self):
         """Test with cached valid TGT with a wrong password."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
-        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_tgt_cache_nouser(self):
+    @foreach_cnx_aio()
+    async def test_tgt_cache_nouser(self):
         """Test with cached valid TGT with no user."""
         config = self.default_config.copy()
         del config["user"]
-        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_tgt_cache_nouser_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_cache_nouser_wrongpassword(self):
         """Test with cached valid TGT with no user and a wrong password."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
         del config["user"]
-        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_tgt_cache_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_cache_nopassword(self):
         """Test with cached valid TGT with no password."""
         config = self.default_config.copy()
         del config["password"]
-        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_tgt_cache_nouser_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_cache_nouser_nopassword(self):
         """Test with cached valid TGT with no user and no password."""
         config = self.default_config.copy()
         del config["user"]
         del config["password"]
-        self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_tgt_cache(self.cnx.__class__, config, fail=False)
 
     # Tests with ST in the cache
 
-    @tests.foreach_cnx()
-    def test_st_cache(self):
+    @foreach_cnx_aio()
+    async def test_st_cache(self):
         """Test with cached valid ST."""
         config = self.default_config.copy()
-        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_st_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_st_cache_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_st_cache_wrongpassword(self):
         """Test with cached valid ST with a wrong password."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
-        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_st_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_st_cache_nouser(self):
+    @foreach_cnx_aio()
+    async def test_st_cache_nouser(self):
         """Test with cached valid ST with no user."""
         config = self.default_config.copy()
         del config["user"]
-        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_st_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_st_cache_nouser_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_st_cache_nouser_wrongpassword(self):
         """Test with cached valid ST with no user and a wrong password."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
         del config["user"]
-        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_st_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_st_cache_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_st_cache_nopassword(self):
         """Test with cached valid ST with no password."""
         config = self.default_config.copy()
         del config["password"]
-        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_st_cache(self.cnx.__class__, config, fail=False)
 
-    @tests.foreach_cnx()
-    def test_st_cache_nouser_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_st_cache_nouser_nopassword(self):
         """Test with cached valid ST with no user and no password."""
         config = self.default_config.copy()
         del config["user"]
         del config["password"]
-        self._test_with_st_cache(self.cnx.__class__, config, fail=False)
+        await self._test_with_st_cache(self.cnx.__class__, config, fail=False)
 
     # Tests with cache is present but contains expired TGT
 
-    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
-    def test_tgt_expired(self):
+    @foreach_cnx_aio(CMySQLConnection if os.name == "nt" else None)
+    async def test_tgt_expired(self):
         """Test with cache expired.
 
         NOTE: This test is skipped for MySQLConnection on Windows due to
               https://github.com/pythongssapi/python-gssapi/issues/302
         """
         config = self.default_config.copy()
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             expired=True,
             fail=False,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_expired_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_expired_wrongpassword(self):
         """Test with cache expired with a wrong password."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             expired=True,
@@ -801,50 +757,50 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         )
 
     @unittest.skipIf(not HAVE_CMYSQL, "C Extension not available")
-    @tests.foreach_cnx(CMySQLConnection)
-    def test_tgt_expired_nouser(self):
+    @foreach_cnx_aio(CMySQLConnection)
+    async def test_tgt_expired_nouser(self):
         """Test with cache expired with no user."""
         config = self.default_config.copy()
         del config["user"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             expired=True,
             fail=False,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_expired_nouser_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_expired_nouser_wrongpassword(self):
         """Test with cache expired with no user and a wrong password."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
         del config["user"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             expired=True,
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_expired_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_expired_nopassword(self):
         """Test with cache expired with no password."""
         config = self.default_config.copy()
         del config["password"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             expired=True,
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_expired_nouser_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_expired_nouser_nopassword(self):
         """Test with cache expired with no user and no password."""
         config = self.default_config.copy()
         del config["user"]
         del config["password"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             expired=True,
@@ -853,78 +809,78 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     # Tests with TGT in the cache for a different UPN
 
-    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
-    def test_tgt_badupn(self):
+    @foreach_cnx_aio(CMySQLConnection if os.name == "nt" else None)
+    async def test_tgt_badupn(self):
         """Test with cached valid TGT with a bad UPN.
 
         NOTE: This test is skipped for MySQLConnection on Windows due to
               https://github.com/pythongssapi/python-gssapi/issues/302
         """
         config = self.default_config.copy()
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.other_user,
             fail=False,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badupn_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badupn_wrongpassword(self):
         """Test with cached valid TGT with a wrong password with a bad UPN."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.other_user,
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badupn_nouser(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badupn_nouser(self):
         """Test with cached valid TGT with no user with a bad UPN."""
         config = self.default_config.copy()
         del config["user"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.other_user,
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badupn_nouser_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badupn_nouser_wrongpassword(self):
         """Test with cached valid TGT with no user and a wrong password and
         bad UPN."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
         del config["user"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.other_user,
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badupn_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badupn_nopassword(self):
         """Test with cached valid TGT with no password and bad UPN."""
         config = self.default_config.copy()
         del config["password"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.other_user,
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badupn_nouser_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badupn_nouser_nopassword(self):
         """Test with cached valid TGT with no user and no password."""
         config = self.default_config.copy()
         del config["user"]
         del config["password"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.other_user,
@@ -933,15 +889,15 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     # Tests with TGT in the cache with for a different realm
 
-    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
-    def test_tgt_badrealm(self):
+    @foreach_cnx_aio(CMySQLConnection if os.name == "nt" else None)
+    async def test_tgt_badrealm(self):
         """Test with cached valid TGT with a bad realm.
 
         NOTE: This test is skipped for MySQLConnection on Windows due to
               https://github.com/pythongssapi/python-gssapi/issues/302
         """
         config = self.default_config.copy()
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.user,
@@ -950,12 +906,12 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             fail=False,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badrealm_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badrealm_wrongpassword(self):
         """Test with cached valid TGT with a wrong password with a bad realm."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.user,
@@ -964,8 +920,8 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             fail=True,
         )
 
-    @tests.foreach_cnx(CMySQLConnection if os.name == "nt" else None)
-    def test_tgt_badrealm_nouser(self):
+    @foreach_cnx_aio(CMySQLConnection if os.name == "nt" else None)
+    async def test_tgt_badrealm_nouser(self):
         """Test with cached valid TGT with no user with a bad realm.
 
         NOTE: This test is skipped for MySQLConnection on Windows due to
@@ -973,7 +929,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         """
         config = self.default_config.copy()
         del config["user"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.user,
@@ -982,14 +938,14 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             fail=False,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badrealm_nouser_wrongpassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badrealm_nouser_wrongpassword(self):
         """Test with cached valid TGT with no user and a wrong password and
         bad realm."""
         config = self.default_config.copy()
         config["password"] = "wrong_password"
         del config["user"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.user,
@@ -998,12 +954,12 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badrealm_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badrealm_nopassword(self):
         """Test with cached valid TGT with no password and bad realm."""
         config = self.default_config.copy()
         del config["password"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.user,
@@ -1012,13 +968,13 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
             fail=True,
         )
 
-    @tests.foreach_cnx()
-    def test_tgt_badrealm_nouser_nopassword(self):
+    @foreach_cnx_aio()
+    async def test_tgt_badrealm_nouser_nopassword(self):
         """Test with cached valid TGT with no user and no password."""
         config = self.default_config.copy()
         del config["user"]
         del config["password"]
-        self._test_with_tgt_cache(
+        await self._test_with_tgt_cache(
             self.cnx.__class__,
             config,
             user=self.user,
@@ -1031,8 +987,8 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         getpass.getuser() != "test1",
         "Test only available for system user 'test1'",
     )
-    @tests.foreach_cnx()
-    def test_nocache_nouser(self):
+    @foreach_cnx_aio()
+    async def test_nocache_nouser(self):
         """Test with no valid TGT cache, no user and with password."""
         config = self.default_config.copy()
         del config["user"]
@@ -1041,28 +997,32 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         self._kdestroy()
 
         # Test connection
-        self._test_connection(self.cnx.__class__, config, fail=False)
+        await self._test_connection(self.cnx.__class__, config, fail=False)
 
     # Tests 'kerberos_auth_mode' option
 
     @unittest.skipIf(os.name == "nt", "Tests not available for Windows")
-    @tests.foreach_cnx()
-    def test_kerberos_auth_mode_sspi(self):
+    @foreach_cnx_aio()
+    async def test_kerberos_auth_mode_sspi(self):
         """Test 'kerberos_auth_mode=SSPI' on platforms without support for SSPI."""
         config = self.default_config.copy()
         config["kerberos_auth_mode"] = "SSPI"
-        self.assertRaises(InterfaceError, self.cnx.__class__, **config)
+        with self.assertRaises(InterfaceError):
+            cnx = self.cnx.__class__(**config)
+            await cnx.connect()
 
-    @tests.foreach_cnx()
-    def test_kerberos_auth_mode_invalid(self):
+    @foreach_cnx_aio()
+    async def test_kerberos_auth_mode_invalid(self):
         """Test invalid options for 'kerberos_auth_mode'."""
         config = self.default_config.copy()
         for option in ("abc", ["GSSAPI"], 0):
             config["kerberos_auth_mode"] = option
-            self.assertRaises(InterfaceError, self.cnx.__class__, **config)
+            with self.assertRaises(InterfaceError):
+                cnx = self.cnx.__class__(**config)
+                await cnx.connect()
 
-    @tests.foreach_cnx()
-    def test_kerberos_auth_mode_valid(self):
+    @foreach_cnx_aio()
+    async def test_kerberos_auth_mode_valid(self):
         """Test valid options for 'kerberos_auth_mode'."""
         # Destroy Kerberos tickets
         self._kdestroy()
@@ -1074,15 +1034,15 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         for option in ("GSSAPI", "GssApi", "gssapi"):
             config["kerberos_auth_mode"] = option
             # Test connection
-            self._test_connection(self.cnx.__class__, config, fail=False)
+            await self._test_connection(self.cnx.__class__, config, fail=False)
 
         # Destroy Kerberos tickets
         self._kdestroy()
 
     # Tests 'MySQLKerberosAuthPlugin.get_store()' function
 
-    @tests.foreach_cnx()
-    def test_get_store(self):
+    @foreach_cnx_aio()
+    async def test_get_store(self):
         """Test when 'MySQLKerberosAuthPlugin.get_store()."""
         self.maxDiff = 33333
         default_krb5ccname = (
@@ -1124,7 +1084,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     tests.MYSQL_VERSION < (8, 0, 28),
     "Multi Factor Authentication not supported",
 )
-class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
+class MySQLMultiFactorAuthenticationTests(MySQLConnectorAioTestCase):
     """Test Multi Factor Authentication.
 
     Implemented by WL#14667: Support for MFA authentication.
@@ -1221,7 +1181,82 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
         if self.skip_reason is not None:
             self.skipTest(self.skip_reason)
 
-    def _test_connection(self, cls, permutations, user):
+    #     # @classmethod
+    #     # def setUpClass(cls):
+    #     async def asyncSetUp(self):
+    #         config = tests.get_mysql_config()
+    #         self.base_config = {
+    #             "host": config["host"],
+    #             "port": config["port"],
+    #             "auth_plugin": "mysql_clear_password",
+    #         }
+    #         plugin_ext = "dll" if os.name == "nt" else "so"
+    #         with mysql.connector.connection.MySQLConnection(**config) as cnx:
+    #             try:
+    #                 cnx.cmd_query("UNINSTALL PLUGIN cleartext_plugin_server")
+    #             except ProgrammingError:
+    #                 pass
+    #             try:
+    #                 cnx.cmd_query(
+    #                     f"""
+    #                     INSTALL PLUGIN cleartext_plugin_server
+    #                     SONAME 'auth_test_plugin.{plugin_ext}'
+    #                     """
+    #                 )
+    #             except DatabaseError:
+    #                 self.skip_reason = "Plugin cleartext_plugin_server not available"
+    #                 self.skipTest(self.skip_reason)
+    #             cnx.cmd_query(f"DROP USER IF EXISTS '{self.user_1f}'")
+    #             cnx.cmd_query(f"DROP USER IF EXISTS '{self.user_2f}'")
+    #             cnx.cmd_query(f"DROP USER IF EXISTS '{self.user_3f}'")
+    #             cnx.cmd_query(
+    #                 f"""
+    #                 CREATE USER '{self.user_1f}'
+    #                 IDENTIFIED WITH cleartext_plugin_server BY '{self.password1}'
+    #                 """
+    #             )
+    #             try:
+    #                 cnx.cmd_query(
+    #                     f"""
+    #                     CREATE USER '{self.user_2f}'
+    #                     IDENTIFIED WITH cleartext_plugin_server BY '{self.password1}'
+    #                     AND
+    #                     IDENTIFIED WITH cleartext_plugin_server BY '{self.password2}'
+    #                     """
+    #                 )
+    #                 cnx.cmd_query(
+    #                     f"""
+    #                     CREATE USER '{self.user_3f}'
+    #                     IDENTIFIED WITH cleartext_plugin_server BY '{self.password1}'
+    #                     AND
+    #                     IDENTIFIED WITH cleartext_plugin_server BY '{self.password2}'
+    #                     AND
+    #                     IDENTIFIED WITH cleartext_plugin_server BY '{self.password3}'
+    #                     """
+    #                 )
+    #             except ProgrammingError:
+    #                 self.skip_reason = "Multi Factor Authentication not supported"
+    #                 self.skipTest(self.skip_reason)
+    #                 return
+
+    #     # @classmethod
+    #     # def tearDownClass(cls):
+    #     async def asyncTearDown(self):
+    #         config = tests.get_mysql_config()
+    #         with mysql.connector.connection.MySQLConnection(**config) as cnx:
+    #             cnx.cmd_query(f"DROP USER IF EXISTS '{self.user_1f}'")
+    #             cnx.cmd_query(f"DROP USER IF EXISTS '{self.user_2f}'")
+    #             cnx.cmd_query(f"DROP USER IF EXISTS '{self.user_3f}'")
+    #             try:
+    #                 cnx.cmd_query("UNINSTALL PLUGIN cleartext_plugin_server")
+    #             except ProgrammingError:
+    #                 pass
+
+    # async def asyncSetUp(self):
+    #     if self.skip_reason is not None:
+    #         self.skipTest(self.skip_reason)
+
+    async def _test_connection(self, cls, permutations, user):
         """Helper method for testing connection with MFA."""
         LOGGER.debug("Running %d permutations...", len(permutations))
         for perm, valid in permutations:
@@ -1241,17 +1276,18 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                 perm,
                 "SUCCESS" if valid else "FAIL",
             )
-
             if valid:
-                with cls(**config) as cnx:
-                    self.assertTrue(cnx.is_connected())
-                    cnx.cmd_query("SELECT @@version")
-                    res = cnx.get_rows()
+                async with cls(**config) as cnx:
+                    self.assertTrue(await cnx.is_connected())
+                    await cnx.cmd_query("SELECT @@version")
+                    res = await cnx.get_rows()
                     self.assertIsNotNone(res[0][0][0])
             else:
-                self.assertRaises(ProgrammingError, cls, **config)
+                with self.assertRaises(ProgrammingError):
+                    cnx = cls(**config)
+                    await cnx.connect()
 
-    def _test_change_user(self, cls, permutations, user):
+    async def _test_change_user(self, cls, permutations, user):
         """Helper method for testing cnx.cmd_change_user() with MFA."""
         LOGGER.debug("Running %d permutations...", len(permutations))
         for perm, valid in permutations:
@@ -1259,9 +1295,9 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
             config = self.base_config.copy()
             config["user"] = self.user_1f
             config["password"] = self.password1
-            with cls(**config) as cnx:
-                cnx.cmd_query("SELECT @@version")
-                res = cnx.get_rows()
+            async with cls(**config) as cnx:
+                await cnx.cmd_query("SELECT @@version")
+                res = await cnx.get_rows()
                 self.assertIsNotNone(res[0][0][0])
                 # Create kwargs options for the provided user
                 kwargs = {"username": user}
@@ -1281,9 +1317,9 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                 )
                 # Change user to the provided user
                 if valid:
-                    cnx.cmd_change_user(**kwargs)
-                    cnx.cmd_query("SELECT @@version")
-                    res = cnx.get_rows()
+                    await cnx.cmd_change_user(**kwargs)
+                    await cnx.cmd_query("SELECT @@version")
+                    res = await cnx.get_rows()
                     self.assertIsNotNone(res[0][0][0])
                 else:
                     self.assertRaises(
@@ -1292,16 +1328,16 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                         **kwargs,
                     )
 
-    @tests.foreach_cnx()
-    def test_user_1f(self):
+    @foreach_cnx_aio()
+    async def test_user_1f(self):
         """Test connection 'user_1f' password permutations."""
         permutations = []
         for perm in itertools.product([True, False, None], repeat=4):
             permutations.append((perm, perm[1] or (perm[0] and perm[1] is None)))
-        self._test_connection(self.cnx.__class__, permutations, self.user_1f)
+        await self._test_connection(self.cnx.__class__, permutations, self.user_1f)
 
-    @tests.foreach_cnx()
-    def test_user_2f(self):
+    @foreach_cnx_aio()
+    async def test_user_2f(self):
         """Test connection and change user 'user_2f' password permutations."""
         permutations = []
         for perm in itertools.product([True, False, None], repeat=4):
@@ -1311,12 +1347,13 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                     perm[2] and ((perm[0] and perm[1] is not False) or perm[1]),
                 )
             )
-        self._test_connection(self.cnx.__class__, permutations, self.user_2f)
-        # The cmd_change_user() tests are temporarily disabled due to server BUG#33110621
+        await self._test_connection(self.cnx.__class__, permutations, self.user_2f)
+        # The cmd_change_user() tests are temporarily disabled due to server
+        # BUG#33110621
         # self._test_change_user(self.cnx.__class__, permutations, self.user_2f)
 
-    @tests.foreach_cnx()
-    def test_user_3f(self):
+    @foreach_cnx_aio()
+    async def test_user_3f(self):
         """Test connection and change user 'user_3f' password permutations."""
         permutations = []
         for perm in itertools.product([True, False, None], repeat=4):
@@ -1328,8 +1365,9 @@ class MySQLMultiFactorAuthenticationTests(tests.MySQLConnectorTests):
                     and ((perm[0] and perm[1] is not False) or perm[1]),
                 )
             )
-        self._test_connection(self.cnx.__class__, permutations, self.user_3f)
-        # The cmd_change_user() tests are temporarily disabled due to server BUG#33110621
+        await self._test_connection(self.cnx.__class__, permutations, self.user_3f)
+        # The cmd_change_user() tests are temporarily disabled due to server
+        # BUG#33110621
         # self._test_change_user(self.cnx.__class__, permutations, self.user_2f)
 
 
@@ -1343,8 +1381,8 @@ class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
     Implemented by WL#14860: Support FIDO authentication (c-ext)
     """
 
-    @tests.foreach_cnx(CMySQLConnection)
-    def test_invalid_fido_callback(self):
+    @foreach_cnx_aio(CMySQLConnection)
+    async def test_invalid_fido_callback(self):
         """Test invalid 'fido_callback' option."""
 
         def my_callback():
@@ -1359,7 +1397,9 @@ class MySQLFIDOAuthPluginTests(tests.MySQLConnectorTests):
         config["auth_plugin"] = "authentication_fido_client"
         for case in test_cases:
             config["fido_callback"] = case
-            self.assertRaises(ProgrammingError, self.cnx.__class__, **config)
+            with self.assertRaises(ProgrammingError):
+                cnx = self.cnx.__class__(**config)
+                await cnx.connect()
 
 
 @unittest.skipIf(
@@ -1371,8 +1411,8 @@ class MySQLWebAuthnAuthPluginTests(tests.MySQLConnectorTests):
     Implemented by WL#11521: Support WebAuthn authentication
     """
 
-    @tests.foreach_cnx()
-    def test_invalid_webauthn_callback(self):
+    @foreach_cnx_aio()
+    async def test_invalid_webauthn_callback(self):
         """Test invalid 'webauthn_callback' option."""
 
         def my_callback():
@@ -1386,4 +1426,6 @@ class MySQLWebAuthnAuthPluginTests(tests.MySQLConnectorTests):
         config = tests.get_mysql_config()
         for case in test_cases:
             config["webauthn_callback"] = case
-            self.assertRaises(ProgrammingError, self.cnx.__class__, **config)
+            with self.assertRaises(ProgrammingError):
+                cnx = self.cnx.__class__(**config)
+                await cnx.connect()

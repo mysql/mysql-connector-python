@@ -15,6 +15,7 @@ v8.3.0
 - WL#15983: Stop using mysql_ssl_set api
 - WL#15982: Remove use of mysql_shutdown
 - WL#15942: Improve type hints and standardize byte type handling
+- WL#15523: Support Python DB API asynchronous execution
 - BUG#35912790: Binary strings are converted when using prepared statements
 
 v8.2.0

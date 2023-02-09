@@ -29,6 +29,7 @@
 """Unittests
 """
 
+import asyncio
 import datetime
 import errno
 import importlib
@@ -118,6 +119,7 @@ MYSQL_CAPI = None
 DJANGO_VERSION = None
 
 __all__ = [
+    "MySQLConnectorAioTestCase",
     "MySQLConnectorTests",
     "MySQLxTests",
     "get_test_names",
@@ -191,6 +193,62 @@ class DummySocket:
     def sendall(self, string, flags=0):
         self._client_sends.append(bytearray(string))
         return None
+
+    def add_packet(self, packet):
+        self._server_replies += packet
+
+    def add_packets(self, packets):
+        for packet in packets:
+            self._server_replies += packet
+
+    def reset(self):
+        self._raise_socket_error = 0
+        self._server_replies = bytearray(b"")
+        self._client_sends = []
+
+    def get_address(self):
+        return "dummy"
+
+
+class AioDummySocket:
+    def __init__(self):
+        self._socket = None
+        self._server_replies = bytearray(b"")
+        self._client_sends = []
+        self._raise_socket_error = 0
+
+    async def _write_pkt(self, writer, address, pkt) -> None:
+        writer.write(pkt)
+        await writer.drain()
+
+    def write(self, data):
+        self._client_sends.append(bytearray(data))
+        return len(data)
+
+    async def read(self, size=0):
+        if self._raise_socket_error:
+            raise OSError(self._raise_socket_error)
+        res = self._server_replies[0:size]
+        self._server_replies = self._server_replies[size:]
+        return res
+
+    async def drain(self):
+        pass
+
+    async def set_connection_socket(self, connection):
+        """Replace connection socket reader and writer.
+
+        Asyncio SSL keep-alive connections raise errors after loop close.
+        See https://github.com/python/cpython/issues/80890
+        """
+        try:
+            connection._socket._writer.close()
+            connection._socket._writer.transport.abort()
+            await connection._socket._writer.wait_closed()
+        except AttributeError:
+            pass  # Socket is already closed
+        connection._socket._writer = self
+        connection._socket._reader = self
 
     def add_packet(self, packet):
         self._server_replies += packet
@@ -448,6 +506,22 @@ def cnx_config(**extra_config):
     return _cnx_config
 
 
+def cnx_aio_config(**extra_config):
+    def _cnx_config(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            if not hasattr(self, "config"):
+                self.config = get_mysql_config()
+            if extra_config:
+                for key, value in extra_config.items():
+                    self.config[key] = value
+            await func(self, *args, **kwargs)
+
+        return wrapper
+
+    return _cnx_config
+
+
 def foreach_cnx(*cnx_classes, **extra_config):
     def _use_cnx(func):
         @wraps(func)
@@ -482,6 +556,53 @@ def foreach_cnx(*cnx_classes, **extra_config):
                         self.cnx.rollback()
                         self.cnx.close()
                     except:
+                        # Might already be closed.
+                        pass
+
+        return wrapper
+
+    return _use_cnx
+
+
+def foreach_cnx_aio(*cnx_classes, **extra_config):
+    def _use_cnx(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            if not hasattr(self, "config"):
+                self.config = get_mysql_config()
+            if extra_config:
+                for key, value in extra_config.items():
+                    self.config[key] = value
+            for cnx_class in cnx_classes or self.all_cnx_classes:
+                if cnx_class is None:
+                    continue
+                try:
+                    self.cnx = cnx_class(**self.config)
+                    await self.cnx.connect()
+                    self._testMethodName = (
+                        f"{func.__name__} (using {cnx_class.__name__})"
+                    )
+                except Exception as exc:
+                    if hasattr(self, "cnx"):
+                        # We will rollback/close later
+                        pass
+                    else:
+                        traceback.print_exc(file=sys.stdout)
+                        raise exc
+                try:
+                    obj = func(self, *args, **kwargs)
+                    if asyncio.iscoroutine(obj):
+                        await obj
+                except unittest.case.SkipTest:
+                    pass
+                except Exception as exc:
+                    traceback.print_exc(file=sys.stdout)
+                    raise exc
+                finally:
+                    try:
+                        # self.cnx.rollback()
+                        await self.cnx.close()
+                    except Exception:
                         # Might already be closed.
                         pass
 
@@ -769,6 +890,52 @@ class CMySQLCursorTests(CMySQLConnectorTests):
     def cleanup_tables(self, cnx):
         for tbl in self._cleanup_tables:
             self.cleanup_table(cnx, tbl)
+
+
+class MySQLConnectorAioTestCase(unittest.IsolatedAsyncioTestCase):
+    def __init__(self, methodName="runTest"):
+        from mysql.connector.aio import connection
+
+        self.all_cnx_classes = [connection.MySQLConnection]
+        self.cnx = None
+        self.use_pure_options = [True]
+        self.maxDiff = 64
+
+        super(MySQLConnectorAioTestCase, self).__init__(methodName=methodName)
+
+    def __str__(self):
+        classname = strclass(self.__class__)
+        return "{classname}.{method}".format(
+            method=self._testMethodName,
+            classname=re.sub(r"tests\d*.test_", "", classname),
+        )
+
+    def get_clean_mysql_config(self):
+        config = get_mysql_config()
+        return {
+            opt: config[opt]
+            for opt in [
+                "host",
+                "port",
+                "user",
+                "password",
+                "database",
+            ]
+        }
+
+    async def _test_execute_setup(self, cnx, tbl="myconnpy_cursor", engine="InnoDB"):
+        async with await cnx.cursor() as cur:
+            await cur.execute(f"DROP TABLE IF EXISTS {tbl}")
+            await cur.execute(
+                f"""
+                CREATE TABLE {tbl}
+                (col1 INT, col2 VARCHAR(30), PRIMARY KEY (col1)) ENGINE={engine}
+                """
+            )
+
+    async def _test_execute_cleanup(self, cnx, tbl="myconnpy_cursor"):
+        async with await cnx.cursor() as cur:
+            await cur.execute(f"DROP TABLE IF EXISTS {tbl}")
 
 
 class MySQLxTests(MySQLConnectorTests):
