@@ -36,7 +36,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, ValuesView
 from .charsets import MYSQL_CHARACTER_SETS, MYSQL_CHARACTER_SETS_57
 from .errors import ProgrammingError
 
-MAX_PACKET_LENGTH: int = 16777215
 NET_BUFFER_LENGTH: int = 8192
 MAX_MYSQL_TABLE_COLUMNS: int = 4096
 # Flag used to send the Query Attributes with 0 (or more) parameters.

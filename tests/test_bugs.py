@@ -72,6 +72,7 @@ from mysql.connector import (
     conversion,
     cursor,
     errors,
+    network,
     pooling,
     protocol,
 )
@@ -7423,3 +7424,63 @@ class BugOra34984850(tests.MySQLConnectorTests):
     @foreach_cnx()
     def test_no_backslash_escapes_with_converter_class(self):
         self._run_test()
+
+
+class BugOra29115406(tests.MySQLConnectorTests):
+    """BUG#29115406: CONTRIBUTION: FIX RECV COMPRESS BUG
+
+    When switching to compressed mode while using the pure
+    python implementation, there is a bug where a compressed
+    packet may contain an incomplete MySQL packet at last.
+
+    The bug report does not say much about the issue and
+    does not even provide a test case that proves it,
+    however, we managed to find the bug the contributor
+    means while developing the work log WL#15591(improve
+    the network module).
+
+    Such a  work log provides a fix for the issue.
+    """
+
+    @cnx_config(compress=True)
+    @foreach_cnx()
+    def compressed_packet_incomplete_at_last(self):
+        """When receiving a compressed packet as the first
+        step we need to decompress the payload.
+
+        After step 1, the payload might contain a sequence
+        of plain packets:
+
+        # `h` and `pl` stand for header and payload respectively
+        ```
+        uncompressed payload = pkt1 + pkt2 + pkt3 + ... + pktN
+                             = (h1 + pl1) + (h2 + pl2) + (h3 + pl3) + ... + (hN + plN)
+        ```
+
+        , but sometimes it happens that the last payload is
+        incomplete, by incomplete we mean that the payload
+        length from the last header (`hN`) is bigger than the length
+        of the last payload itself (len(plN)).
+
+        ```
+        header, payload = pktN[0:4], pktN[4:]
+        payload_length, sequence_id = get_header(header)
+        if payload_length > len(payload):
+            raise BugError("Last packet is incomplete")
+        ```
+
+        This effect takes place when the input size is about the
+        network.MAX_PAYLOAD_LENGTH, or bigger.
+        """
+        input_sizes = [
+            network.MAX_PAYLOAD_LENGTH - 303,
+            (network.MAX_PAYLOAD_LENGTH * 2) + 2,
+            network.MAX_PAYLOAD_LENGTH * 10,
+        ]
+        with self.cnx.cursor() as cur:
+            for input_size in input_sizes:
+                data = "b" * input_size
+                cur.execute("SELECT %s", (data,))
+                res = cur.fetchone()
+                self.assertEqual(data[:-5000], res[0][:-5000])
+                self.assertEqual(len(data), len(res[0]))

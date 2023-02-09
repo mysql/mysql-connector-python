@@ -37,6 +37,7 @@ import struct
 import warnings
 import zlib
 
+from abc import ABC, abstractmethod
 from collections import deque
 
 try:
@@ -60,327 +61,424 @@ except ImportError:
 
 from typing import Any, Deque, List, Optional, Tuple, Union
 
-from .constants import MAX_PACKET_LENGTH
 from .errors import InterfaceError, NotSupportedError, OperationalError
 from .types import StrOrBytesPath
-from .utils import init_bytearray
+
+MIN_COMPRESS_LENGTH: int = 50
+MAX_PAYLOAD_LENGTH: int = 2**24 - 1
+PACKET_HEADER_LENGTH: int = 4
+COMPRESSED_PACKET_HEADER_LENGTH: int = 7
 
 
 def _strioerror(err: IOError) -> str:
-    """Reformat the IOError error message
+    """Reformat the IOError error message.
 
     This function reformats the IOError error message.
     """
-    if not err.errno:
-        return str(err)
-    return f"{err.errno} {err.strerror}"
+    return str(err) if not err.errno else f"{err.errno} {err.strerror}"
 
 
-def _prepare_packets(buf: bytes, pktnr: int) -> List[bytes]:
-    """Prepare a packet for sending to the MySQL server"""
-    pkts = []
-    pllen = len(buf)
-    maxpktlen = MAX_PACKET_LENGTH
-    while pllen > maxpktlen:
-        pkts.append(b"\xff\xff\xff" + struct.pack("<B", pktnr) + buf[:maxpktlen])
-        buf = buf[maxpktlen:]
-        pllen = len(buf)
-        pktnr = pktnr + 1
-    pkts.append(struct.pack("<I", pllen)[0:3] + struct.pack("<B", pktnr) + buf)
-    return pkts
+class NetworkBroker(ABC):
+    """Broker class interface.
+
+    The network object is a broker used as a delegate by a socket object. Whenever the
+    socket wants to deliver or get packets to or from the MySQL server it needs to rely
+    on its network broker (netbroker).
+
+    The netbroker sends `payloads` and receives `packets`.
+
+    A packet is a bytes sequence, it has a header and body (referred to as payload).
+    The first `PACKET_HEADER_LENGTH` or `COMPRESSED_PACKET_HEADER_LENGTH`
+    (as appropriate) bytes correspond to the `header`, the remaining ones represent the
+    `payload`.
+
+    The maximum payload length allowed to be sent per packet to the server is
+    `MAX_PAYLOAD_LENGTH`. When  `send` is called with a payload whose length is greater
+    than `MAX_PAYLOAD_LENGTH` the netbroker breaks it down into packets, so the caller
+    of `send` can provide payloads of arbitrary length.
+
+    Finally, data received by the netbroker comes directly from the server, expect to
+    get a packet for each call to `recv`. The received packet contains a header and
+    payload, the latter respecting `MAX_PAYLOAD_LENGTH`.
+    """
+
+    @abstractmethod
+    def send(
+        self,
+        sock: socket.socket,
+        address: str,
+        payload: bytes,
+        packet_number: Optional[int] = None,
+        compressed_packet_number: Optional[int] = None,
+    ) -> None:
+        """Send `payload` to the MySQL server.
+
+        If provided a payload whose length is greater than `MAX_PAYLOAD_LENGTH`, it is
+        broken down into packets.
+
+        Args:
+            sock: Object holding the socket connection.
+            address: Socket's location.
+            payload: Packet's body to send.
+            packet_number: Sequence id (packet ID) to attach to the header when sending
+                           plain packets.
+            compressed_packet_number: Same as `packet_number` but used when sending
+                                      compressed packets.
+
+        Raises:
+            :class:`OperationalError`: If something goes wrong while sending packets to
+                                       the MySQL server.
+        """
+
+    @abstractmethod
+    def recv(self, sock: socket.socket, address: str) -> bytearray:
+        """Get the next available packet from the MySQL server.
+
+        Args:
+            sock: Object holding the socket connection.
+            address: Socket's location.
+
+        Returns:
+            packet: A packet from the MySQL server.
+
+        Raises:
+            :class:`OperationalError`: If something goes wrong while receiving packets
+                                       from the MySQL server.
+            :class:`InterfaceError`: If something goes wrong while receiving packets
+                                     from the MySQL server.
+        """
 
 
-class BaseMySQLSocket:
-    """Base class for MySQL socket communication
+class NetworkBrokerPlain(NetworkBroker):
+    """Broker class for MySQL socket communication."""
 
-    This class should not be used directly but overloaded, changing the
-    at least the open_connection()-method. Examples of subclasses are
-      mysql.connector.network.MySQLTCPSocket
-      mysql.connector.network.MySQLUnixSocket
+    def __init__(self) -> None:
+        self._pktnr: int = -1  # packet number
+
+    def _set_next_pktnr(self) -> None:
+        """Increment packet id."""
+        self._pktnr = (self._pktnr + 1) % 256
+
+    def _send_pkt(self, sock: socket.socket, address: str, pkt: bytes) -> None:
+        """Write packet to the comm channel."""
+        try:
+            sock.sendall(pkt)
+        except IOError as err:
+            raise OperationalError(
+                errno=2055, values=(address, _strioerror(err))
+            ) from err
+        except AttributeError as err:
+            raise OperationalError(errno=2006) from err
+
+    def _recv_chunk(self, sock: socket.socket, size: int = 0) -> bytearray:
+        """Read `size` bytes from the comm channel."""
+        pkt = bytearray(size)
+        pkt_view = memoryview(pkt)
+        while size:
+            read = sock.recv_into(pkt_view, size)
+            if read == 0 and size > 0:
+                raise InterfaceError(errno=2013)
+            pkt_view = pkt_view[read:]
+            size -= read
+        return pkt
+
+    def send(
+        self,
+        sock: socket.socket,
+        address: str,
+        payload: bytes,
+        packet_number: Optional[int] = None,
+        compressed_packet_number: Optional[int] = None,
+    ) -> None:
+        """Send payload to the MySQL server.
+
+        If provided a payload whose length is greater than `MAX_PAYLOAD_LENGTH`, it is
+        broken down into packets.
+        """
+        if packet_number is None:
+            self._set_next_pktnr()
+        else:
+            self._pktnr = packet_number
+
+        # If the payload is larger than or equal to MAX_PAYLOAD_LENGTH
+        # the length is set to 2^24 - 1 (ff ff ff) and additional
+        # packets are sent with the rest of the payload until the
+        # payload of a packet is less than MAX_PAYLOAD_LENGTH.
+        if len(payload) >= MAX_PAYLOAD_LENGTH:
+            offset = 0
+            for _ in range(len(payload) // MAX_PAYLOAD_LENGTH):
+                # payload_len, sequence_id, payload
+                self._send_pkt(
+                    sock,
+                    address,
+                    b"\xff\xff\xff"
+                    + struct.pack("<B", self._pktnr)
+                    + payload[offset : offset + MAX_PAYLOAD_LENGTH],
+                )
+                self._set_next_pktnr()
+                offset += MAX_PAYLOAD_LENGTH
+            payload = payload[offset:]
+        self._send_pkt(
+            sock,
+            address,
+            struct.pack("<I", len(payload))[0:3]
+            + struct.pack("<B", self._pktnr)
+            + payload,
+        )
+
+    def recv(self, sock: socket.socket, address: str) -> bytearray:
+        """Receive `one` packet from the MySQL server."""
+        try:
+            # Read the header of the MySQL packet
+            header = self._recv_chunk(sock, size=PACKET_HEADER_LENGTH)
+
+            # Pull the payload length and sequence id
+            payload_len, self._pktnr = (
+                struct.unpack("<I", header[0:3] + b"\x00")[0],
+                header[3],
+            )
+
+            # Read the payload, and return packet
+            return header + self._recv_chunk(sock, size=payload_len)
+        except IOError as err:
+            raise OperationalError(
+                errno=2055, values=(address, _strioerror(err))
+            ) from err
+
+
+class NetworkBrokerCompressed(NetworkBrokerPlain):
+    """Broker class for MySQL socket communication."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._compressed_pktnr = -1
+        self._queue_read: Deque[bytearray] = deque()
+
+    @staticmethod
+    def _prepare_packets(payload: bytes, pktnr: int) -> List[bytes]:
+        """Prepare a payload for sending to the MySQL server."""
+        pkts = []
+
+        # If the payload is larger than or equal to MAX_PAYLOAD_LENGTH
+        # the length is set to 2^24 - 1 (ff ff ff) and additional
+        # packets are sent with the rest of the payload until the
+        # payload of a packet is less than MAX_PAYLOAD_LENGTH.
+        if len(payload) >= MAX_PAYLOAD_LENGTH:
+            offset = 0
+            for _ in range(len(payload) // MAX_PAYLOAD_LENGTH):
+                # payload length + sequence id + payload
+                pkts.append(
+                    b"\xff\xff\xff"
+                    + struct.pack("<B", pktnr)
+                    + payload[offset : offset + MAX_PAYLOAD_LENGTH]
+                )
+                pktnr = (pktnr + 1) % 256
+                offset += MAX_PAYLOAD_LENGTH
+            payload = payload[offset:]
+        pkts.append(
+            struct.pack("<I", len(payload))[0:3] + struct.pack("<B", pktnr) + payload
+        )
+        return pkts
+
+    def _set_next_compressed_pktnr(self) -> None:
+        """Increment packet id."""
+        self._compressed_pktnr = (self._compressed_pktnr + 1) % 256
+
+    def _send_pkt(self, sock: socket.socket, address: str, pkt: bytes) -> None:
+        """Compress packet and write it to the comm channel."""
+        compressed_pkt = zlib.compress(pkt)
+        pkt = (
+            struct.pack("<I", len(compressed_pkt))[0:3]
+            + struct.pack("<B", self._compressed_pktnr)
+            + struct.pack("<I", len(pkt))[0:3]
+            + compressed_pkt
+        )
+        return super()._send_pkt(sock, address, pkt)
+
+    def send(
+        self,
+        sock: socket.socket,
+        address: str,
+        payload: bytes,
+        packet_number: Optional[int] = None,
+        compressed_packet_number: Optional[int] = None,
+    ) -> None:
+        """Send `payload` as compressed packets to the MySQL server.
+
+        If provided a payload whose length is greater than `MAX_PAYLOAD_LENGTH`, it is
+        broken down into packets.
+        """
+        # get next packet numbers
+        if packet_number is None:
+            self._set_next_pktnr()
+        else:
+            self._pktnr = packet_number
+        if compressed_packet_number is None:
+            self._set_next_compressed_pktnr()
+        else:
+            self._compressed_pktnr = compressed_packet_number
+
+        payload_prep = bytearray(b"").join(self._prepare_packets(payload, self._pktnr))
+        if len(payload) >= MAX_PAYLOAD_LENGTH - PACKET_HEADER_LENGTH:
+            # sending a MySQL payload of the size greater or equal to 2^24 - 5
+            # via compression leads to at least one extra compressed packet
+            # WHY? let's say len(payload) is MAX_PAYLOAD_LENGTH - 3; when preparing
+            # the payload, a header of size PACKET_HEADER_LENGTH is pre-appended
+            # to the payload. This means that len(payload_prep) is
+            # MAX_PAYLOAD_LENGTH - 3 + PACKET_HEADER_LENGTH = MAX_PAYLOAD_LENGTH + 1
+            # surpassing the maximum allowed payload size per packet.
+            offset = 0
+
+            # send several MySQL packets
+            for _ in range(len(payload_prep) // MAX_PAYLOAD_LENGTH):
+                self._send_pkt(
+                    sock, address, payload_prep[offset : offset + MAX_PAYLOAD_LENGTH]
+                )
+                self._set_next_compressed_pktnr()
+                offset += MAX_PAYLOAD_LENGTH
+            self._send_pkt(sock, address, payload_prep[offset:])
+        else:
+            # send one MySQL packet
+            # For small packets it may be too costly to compress the packet.
+            # Usually payloads less than 50 bytes (MIN_COMPRESS_LENGTH)
+            # aren't compressed (see MySQL source code Documentation).
+            if len(payload) > MIN_COMPRESS_LENGTH:
+                # perform compression
+                self._send_pkt(sock, address, payload_prep)
+            else:
+                # skip compression
+                super()._send_pkt(
+                    sock,
+                    address,
+                    struct.pack("<I", len(payload_prep))[0:3]
+                    + struct.pack("<B", self._compressed_pktnr)
+                    + struct.pack("<I", 0)[0:3]
+                    + payload_prep,
+                )
+
+    def _recv_compressed_pkt(
+        self, sock: socket.socket, compressed_pll: int, uncompressed_pll: int
+    ) -> None:
+        """Handle reading of a compressed packet."""
+        # compressed_pll stands for compressed payload length.
+        # Recalling that if uncompressed payload length == 0, the packet
+        # comes in uncompressed, so no decompression is needed.
+        compressed_pkt = super()._recv_chunk(sock, size=compressed_pll)
+        pkt = (
+            compressed_pkt
+            if uncompressed_pll == 0
+            else bytearray(zlib.decompress(compressed_pkt))
+        )
+
+        offset = 0
+        while offset < len(pkt):
+            # pll stands for payload length
+            pll = struct.unpack(
+                "<I", pkt[offset : offset + PACKET_HEADER_LENGTH - 1] + b"\x00"
+            )[0]
+            if PACKET_HEADER_LENGTH + pll > len(pkt) - offset:
+                # More bytes need to be consumed
+                # Read the header of the next MySQL packet
+                header = super()._recv_chunk(sock, size=COMPRESSED_PACKET_HEADER_LENGTH)
+
+                # compressed payload length, sequence id, uncompressed payload length
+                (
+                    compressed_pll,
+                    self._compressed_pktnr,
+                    uncompressed_pll,
+                ) = (
+                    struct.unpack("<I", header[0:3] + b"\x00")[0],
+                    header[3],
+                    struct.unpack("<I", header[4:7] + b"\x00")[0],
+                )
+                compressed_pkt = super()._recv_chunk(sock, size=compressed_pll)
+
+                # recalling that if uncompressed payload length == 0, the packet
+                # comes in uncompressed, so no decompression is needed.
+                pkt += (
+                    compressed_pkt
+                    if uncompressed_pll == 0
+                    else zlib.decompress(compressed_pkt)
+                )
+
+            self._queue_read.append(pkt[offset : offset + PACKET_HEADER_LENGTH + pll])
+            offset += PACKET_HEADER_LENGTH + pll
+
+    def recv(self, sock: socket.socket, address: str) -> bytearray:
+        """Receive `one` or `several` packets from the MySQL server, enqueue them, and
+        return the packet at the head.
+        """
+        if not self._queue_read:
+            try:
+                # Read the header of the next MySQL packet
+                header = super()._recv_chunk(sock, size=COMPRESSED_PACKET_HEADER_LENGTH)
+
+                # compressed payload length, sequence id, uncompressed payload length
+                (
+                    compressed_pll,
+                    self._compressed_pktnr,
+                    uncompressed_pll,
+                ) = (
+                    struct.unpack("<I", header[0:3] + b"\x00")[0],
+                    header[3],
+                    struct.unpack("<I", header[4:7] + b"\x00")[0],
+                )
+                self._recv_compressed_pkt(sock, compressed_pll, uncompressed_pll)
+            except IOError as err:
+                raise OperationalError(
+                    errno=2055, values=(address, _strioerror(err))
+                ) from err
+
+        if not self._queue_read:
+            return None
+
+        pkt = self._queue_read.popleft()
+        self._pktnr = pkt[3]
+
+        return pkt
+
+
+class MySQLSocket(ABC):
+    """MySQL socket communication interface.
+
+    Examples:
+        Subclasses: network.MySQLTCPSocket and network.MySQLUnixSocket.
     """
 
     def __init__(self) -> None:
+        """Network layer where transactions are made with plain (uncompressed) packets
+        is enabled by default.
+        """
         # holds the socket connection
         self.sock: Optional[socket.socket] = None
         self._connection_timeout: Optional[int] = None
-        self._packet_number: int = -1
-        self._compressed_packet_number: int = -1
-        self._packet_queue: Deque[bytearray] = deque()
         self.server_host: Optional[str] = None
-        self.recvsize: int = 8192
+        self._netbroker: NetworkBroker = NetworkBrokerPlain()
 
-    def next_packet_number(self) -> int:
-        """Increments the packet number"""
-        self._packet_number = self._packet_number + 1
-        if self._packet_number > 255:
-            self._packet_number = 0
-        return self._packet_number
-
-    def next_compressed_packet_number(self) -> int:
-        """Increments the compressed packet number"""
-        self._compressed_packet_number = self._compressed_packet_number + 1
-        if self._compressed_packet_number > 255:
-            self._compressed_packet_number = 0
-        return self._compressed_packet_number
-
-    def open_connection(self) -> Any:
-        """Open the socket"""
-        raise NotImplementedError
-
-    def get_address(self) -> Any:
-        """Get the location of the socket"""
-        raise NotImplementedError
+    def switch_to_compressed_mode(self) -> None:
+        """Enable network layer where transactions are made with compressed packets."""
+        self._netbroker = NetworkBrokerCompressed()
 
     def shutdown(self) -> None:
-        """Shut down the socket before closing it"""
+        """Shut down the socket before closing it."""
         try:
             self.sock.shutdown(socket.SHUT_RDWR)
             self.sock.close()
-            del self._packet_queue
         except (AttributeError, OSError):
             pass
 
     def close_connection(self) -> None:
-        """Close the socket"""
+        """Close the socket."""
         try:
             self.sock.close()
-            del self._packet_queue
         except (AttributeError, OSError):
             pass
 
     def __del__(self) -> None:
         self.shutdown()
 
-    def send_plain(
-        self,
-        buf: bytes,
-        packet_number: Optional[int] = None,
-        compressed_packet_number: Optional[int] = None,
-    ) -> None:
-        """Send packets to the MySQL server"""
-        # Keep 'compressed_packet_number' for API backward compatibility
-        _ = compressed_packet_number
-        if packet_number is None:
-            self.next_packet_number()
-        else:
-            self._packet_number = packet_number
-        packets = _prepare_packets(buf, self._packet_number)
-        for packet in packets:
-            try:
-                self.sock.sendall(packet)
-            except IOError as err:
-                raise OperationalError(
-                    errno=2055, values=(self.get_address(), _strioerror(err))
-                ) from err
-            except AttributeError as err:
-                raise OperationalError(errno=2006) from err
-
-    send = send_plain
-
-    def send_compressed(
-        self,
-        buf: bytes,
-        packet_number: Optional[int] = None,
-        compressed_packet_number: Optional[int] = None,
-    ) -> None:
-        """Send compressed packets to the MySQL server"""
-        if packet_number is None:
-            self.next_packet_number()
-        else:
-            self._packet_number = packet_number
-        if compressed_packet_number is None:
-            self.next_compressed_packet_number()
-        else:
-            self._compressed_packet_number = compressed_packet_number
-
-        pktnr = self._packet_number
-        pllen = len(buf)
-        zpkts = []
-        maxpktlen = MAX_PACKET_LENGTH
-        if pllen > maxpktlen:
-            pkts = _prepare_packets(buf, pktnr)
-            tmpbuf = b"".join(pkts)
-            del pkts
-            zbuf = zlib.compress(tmpbuf[:16384])
-            header = (
-                struct.pack("<I", len(zbuf))[0:3]
-                + struct.pack("<B", self._compressed_packet_number)
-                + b"\x00\x40\x00"
-            )
-            zpkts.append(header + zbuf)
-            tmpbuf = tmpbuf[16384:]
-            pllen = len(tmpbuf)
-            self.next_compressed_packet_number()
-            while pllen > maxpktlen:
-                zbuf = zlib.compress(tmpbuf[:maxpktlen])
-                header = (
-                    struct.pack("<I", len(zbuf))[0:3]
-                    + struct.pack("<B", self._compressed_packet_number)
-                    + b"\xff\xff\xff"
-                )
-                zpkts.append(header + zbuf)
-                tmpbuf = tmpbuf[maxpktlen:]
-                pllen = len(tmpbuf)
-                self.next_compressed_packet_number()
-            if tmpbuf:
-                zbuf = zlib.compress(tmpbuf)
-                header = (
-                    struct.pack("<I", len(zbuf))[0:3]
-                    + struct.pack("<B", self._compressed_packet_number)
-                    + struct.pack("<I", pllen)[0:3]
-                )
-                zpkts.append(header + zbuf)
-            del tmpbuf
-        else:
-            pkt = struct.pack("<I", pllen)[0:3] + struct.pack("<B", pktnr) + buf
-            pllen = len(pkt)
-            if pllen > 50:
-                zbuf = zlib.compress(pkt)
-                zpkts.append(
-                    struct.pack("<I", len(zbuf))[0:3]
-                    + struct.pack("<B", self._compressed_packet_number)
-                    + struct.pack("<I", pllen)[0:3]
-                    + zbuf
-                )
-            else:
-                header = (
-                    struct.pack("<I", pllen)[0:3]
-                    + struct.pack("<B", self._compressed_packet_number)
-                    + struct.pack("<I", 0)[0:3]
-                )
-                zpkts.append(header + pkt)
-
-        for zip_packet in zpkts:
-            try:
-                self.sock.sendall(zip_packet)
-            except IOError as err:
-                raise OperationalError(
-                    errno=2055, values=(self.get_address(), _strioerror(err))
-                ) from err
-            except AttributeError as err:
-                raise OperationalError(errno=2006) from err
-
-    def recv_plain(self) -> bytearray:
-        """Receive packets from the MySQL server"""
-        try:
-            # Read the header of the MySQL packet, 4 bytes
-            packet = bytearray(b"")
-            packet_len = 0
-            while packet_len < 4:
-                chunk = self.sock.recv(4 - packet_len)
-                if not chunk:
-                    raise InterfaceError(errno=2013)
-                packet += chunk
-                packet_len = len(packet)
-
-            # Save the packet number and payload length
-            self._packet_number = packet[3]
-            payload_len = struct.unpack("<I", packet[0:3] + b"\x00")[0]
-
-            # Read the payload
-            rest = payload_len
-            packet.extend(bytearray(payload_len))
-            packet_view = memoryview(packet)
-            packet_view = packet_view[4:]
-            while rest:
-                read = self.sock.recv_into(packet_view, rest)
-                if read == 0 and rest > 0:
-                    raise InterfaceError(errno=2013)
-                packet_view = packet_view[read:]
-                rest -= read
-            return packet
-        except IOError as err:
-            raise OperationalError(
-                errno=2055, values=(self.get_address(), _strioerror(err))
-            ) from err
-
-    recv = recv_plain
-
-    def _split_zipped_payload(self, packet_bunch: bytearray) -> None:
-        """Split compressed payload"""
-        while packet_bunch:
-            payload_length = struct.unpack("<I", packet_bunch[0:3] + b"\x00")[0]
-            self._packet_queue.append(packet_bunch[0 : payload_length + 4])
-            packet_bunch = packet_bunch[payload_length + 4 :]
-
-    def recv_compressed(self) -> Optional[bytearray]:
-        """Receive compressed packets from the MySQL server"""
-        try:
-            pkt = self._packet_queue.popleft()
-            self._packet_number = pkt[3]
-            return pkt
-        except IndexError:
-            pass
-
-        header = bytearray(b"")
-        packets = []
-        try:
-            abyte = self.sock.recv(1)
-            while abyte and len(header) < 7:
-                header += abyte
-                abyte = self.sock.recv(1)
-            while header:
-                if len(header) < 7:
-                    raise InterfaceError(errno=2013)
-
-                # Get length of compressed packet
-                zip_payload_length = struct.unpack("<I", header[0:3] + b"\x00")[0]
-                self._compressed_packet_number = header[3]
-
-                # Get payload length before compression
-                payload_length = struct.unpack("<I", header[4:7] + b"\x00")[0]
-
-                zip_payload = init_bytearray(abyte)
-                while len(zip_payload) < zip_payload_length:
-                    chunk = self.sock.recv(zip_payload_length - len(zip_payload))
-                    if not chunk:
-                        raise InterfaceError(errno=2013)
-                    zip_payload = zip_payload + chunk
-
-                # Payload was not compressed
-                if payload_length == 0:
-                    self._split_zipped_payload(zip_payload)
-                    pkt = self._packet_queue.popleft()
-                    self._packet_number = pkt[3]
-                    return pkt
-
-                packets.append((payload_length, zip_payload))
-
-                if zip_payload_length <= 16384:
-                    # We received the full compressed packet
-                    break
-
-                # Get next compressed packet
-                header = init_bytearray(b"")
-                abyte = self.sock.recv(1)
-                while abyte and len(header) < 7:
-                    header += abyte
-                    abyte = self.sock.recv(1)
-
-        except IOError as err:
-            raise OperationalError(
-                errno=2055, values=(self.get_address(), _strioerror(err))
-            ) from err
-
-        # Compressed packet can contain more than 1 MySQL packets
-        # We decompress and make one so we can split it up
-        tmp = init_bytearray(b"")
-        for payload_length, payload in packets:
-            # payload_length can not be 0; this was previously handled
-            tmp += zlib.decompress(payload)
-        self._split_zipped_payload(tmp)
-        del tmp
-
-        try:
-            pkt = self._packet_queue.popleft()
-            self._packet_number = pkt[3]
-            return pkt
-        except IndexError:
-            pass
-        return None
-
     def set_connection_timeout(self, timeout: Optional[int]) -> None:
-        """Set the connection timeout"""
+        """Set the connection timeout."""
         self._connection_timeout = timeout
         if self.sock:
             self.sock.settimeout(timeout)
@@ -489,16 +587,44 @@ class BaseMySQLSocket:
             raise NotSupportedError("Python installation has no SSL support") from err
         except (ssl.SSLError, IOError) as err:
             raise InterfaceError(
-                errno=2055, values=(self.get_address(), _strioerror(err))
+                errno=2055, values=(self.address, _strioerror(err))
             ) from err
         except ssl.CertificateError as err:
             raise InterfaceError(str(err)) from err
         except NotImplementedError as err:
             raise InterfaceError(str(err)) from err
 
+    def send(
+        self,
+        payload: bytes,
+        packet_number: Optional[int] = None,
+        compressed_packet_number: Optional[int] = None,
+    ) -> None:
+        """Send `payload` to the MySQL server."""
+        return self._netbroker.send(
+            self.sock,
+            self.address,
+            payload,
+            packet_number=packet_number,
+            compressed_packet_number=compressed_packet_number,
+        )
 
-class MySQLUnixSocket(BaseMySQLSocket):
-    """MySQL socket class using UNIX sockets
+    def recv(self) -> bytearray:
+        """Get packet from the MySQL server comm channel."""
+        return self._netbroker.recv(self.sock, self.address)
+
+    @abstractmethod
+    def open_connection(self) -> None:
+        """Open the socket."""
+
+    @property
+    @abstractmethod
+    def address(self) -> str:
+        """Get the location of the socket."""
+
+
+class MySQLUnixSocket(MySQLSocket):
+    """MySQL socket class using UNIX sockets.
 
     Opens a connection through the UNIX socket of the MySQL Server.
     """
@@ -506,9 +632,11 @@ class MySQLUnixSocket(BaseMySQLSocket):
     def __init__(self, unix_socket: str = "/tmp/mysql.sock") -> None:
         super().__init__()
         self.unix_socket: str = unix_socket
+        self._address: str = unix_socket
 
-    def get_address(self) -> str:
-        return self.unix_socket
+    @property
+    def address(self) -> str:
+        return self._address
 
     def open_connection(self) -> None:
         try:
@@ -519,7 +647,7 @@ class MySQLUnixSocket(BaseMySQLSocket):
             self.sock.connect(self.unix_socket)
         except IOError as err:
             raise InterfaceError(
-                errno=2002, values=(self.get_address(), _strioerror(err))
+                errno=2002, values=(self.address, _strioerror(err))
             ) from err
         except Exception as err:
             raise InterfaceError(str(err)) from err
@@ -534,26 +662,31 @@ class MySQLUnixSocket(BaseMySQLSocket):
         )
 
 
-class MySQLTCPSocket(BaseMySQLSocket):
-    """MySQL socket class using TCP/IP
+class MySQLTCPSocket(MySQLSocket):
+    """MySQL socket class using TCP/IP.
 
     Opens a TCP/IP connection to the MySQL Server.
     """
 
     def __init__(
-        self, host: str = "127.0.0.1", port: int = 3306, force_ipv6: bool = False
+        self,
+        host: str = "127.0.0.1",
+        port: int = 3306,
+        force_ipv6: bool = False,
     ) -> None:
         super().__init__()
         self.server_host: str = host
         self.server_port: int = port
         self.force_ipv6: bool = force_ipv6
         self._family: int = 0
+        self._address: str = f"{host}:{port}"
 
-    def get_address(self) -> str:
-        return f"{self.server_host}:{self.server_port}"
+    @property
+    def address(self) -> str:
+        return self._address
 
     def open_connection(self) -> None:
-        """Open the TCP/IP connection to the MySQL server"""
+        """Open the TCP/IP connection to the MySQL server."""
         # pylint: disable=no-member
         # Get address information
         addrinfo: Union[
@@ -588,7 +721,7 @@ class MySQLTCPSocket(BaseMySQLSocket):
                 addrinfo = addrinfos[0]
         except IOError as err:
             raise InterfaceError(
-                errno=2003, values=(self.get_address(), _strioerror(err))
+                errno=2003, values=(self.address, _strioerror(err))
             ) from err
 
         (self._family, socktype, proto, _, sockaddr) = addrinfo

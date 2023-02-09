@@ -256,7 +256,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         if ssl_options is None:
             ssl_options = {}
         if not self._ssl_disabled and (client_flags & ClientFlag.SSL):
-            packet: bytes = self._protocol.make_auth_ssl(
+            packet = self._protocol.make_auth_ssl(
                 charset=charset, client_flags=client_flags
             )
             self._socket.send(packet)
@@ -410,7 +410,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
     def _auth_continue(
         self, auth: BaseAuthPlugin, auth_plugin: str, auth_data: bytes
-    ) -> bytearray:
+    ) -> bytes:
         """Continue with the authentication."""
         if auth_plugin == "authentication_ldap_sasl_client":
             logger.debug("# auth_data: %s", auth_data)
@@ -530,7 +530,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             packet = self._socket.recv()
             logger.debug("<< Ok packet from server: %s", packet)
 
-        return packet
+        return bytes(packet)
 
     def _get_connection(self) -> SocketType:
         """Get connection based on configuration
@@ -568,7 +568,11 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._socket = self._get_connection()
         try:
             self._socket.open_connection()
+
+            # do initial handshake
             self._do_handshake()
+
+            # start authentication negotiation
             self._do_auth(
                 self._user,
                 self._password,
@@ -579,9 +583,11 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self._conn_attrs,
             )
             self.set_converter_class(self._converter_class)
+
             if self._client_flags & ClientFlag.COMPRESS:
-                self._socket.recv = self._socket.recv_compressed
-                self._socket.send = self._socket.send_compressed
+                # update the network layer accordingly
+                self._socket.switch_to_compressed_mode()
+
             self._socket.set_connection_timeout(None)
         except Exception:
             # close socket
@@ -666,9 +672,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             return None
         return self._socket.recv()
 
-    def _send_data(
-        self, data_file: BinaryIO, send_empty_packet: bool = False
-    ) -> bytearray:
+    def _send_data(self, data_file: BinaryIO, send_empty_packet: bool = False) -> bytes:
         """Send data to the MySQL server
 
         This method accepts a file-like object and sends its data
@@ -698,7 +702,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             except AttributeError as err:
                 raise OperationalError("MySQL Connection not available") from err
 
-        return self._socket.recv()
+        return bytes(self._socket.recv())
 
     def _handle_server_status(self, flags: int) -> None:
         """Handle the server flags found in MySQL packets
@@ -1117,7 +1121,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         return self._handle_ok(self._send_cmd(ServerCmd.REFRESH, int4store(options)))
 
-    def cmd_quit(self) -> bytearray:
+    def cmd_quit(self) -> bytes:
         """Close the current connection with the server
 
         This method sends the QUIT command to the MySQL server, closing the
@@ -1130,7 +1134,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         packet = self._protocol.make_command(ServerCmd.QUIT)
         self._socket.send(packet, 0, 0)
-        return packet
+        return bytes(packet)
 
     def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> EofPacketType:
         """Shut down the MySQL Server

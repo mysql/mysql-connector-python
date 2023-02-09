@@ -58,10 +58,6 @@ class Helpers(tests.MySQLConnectorTests):
 
         self.assertFalse(constants.flag_is_set(1 << 4, flags))
 
-    def test_MAX_PACKET_LENGTH(self):
-        """Check MAX_PACKET_LENGTH"""
-        self.assertEqual(16777215, constants.MAX_PACKET_LENGTH)
-
     def test_NET_BUFFER_LENGTH(self):
         """Check NET_BUFFER_LENGTH"""
         self.assertEqual(8192, constants.NET_BUFFER_LENGTH)

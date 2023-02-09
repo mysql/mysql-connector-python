@@ -1270,8 +1270,9 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         self.cnx._client_flags |= constants.ClientFlag.COMPRESS
         self.cnx._open_connection()
-        self.assertEqual(self.cnx._socket.recv_compressed, self.cnx._socket.recv)
-        self.assertEqual(self.cnx._socket.send_compressed, self.cnx._socket.send)
+        self.assertIsInstance(
+            self.cnx._socket._netbroker, network.NetworkBrokerCompressed
+        )
 
     def test__post_connection(self):
         """Executes commands after connection has been established"""

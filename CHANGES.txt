@@ -8,6 +8,11 @@ Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.1.0
+======
+
+- WL#15591: Improve the network module
+
 v8.0.33
 =======
 

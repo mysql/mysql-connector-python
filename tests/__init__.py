@@ -166,13 +166,21 @@ class DummySocket:
         if nbytes == 0:
             nbytes = len(buffer_)
         try:
-            buffer_[0:nbytes] = self._server_replies[0:nbytes]
+            if isinstance(buffer_, memoryview):
+                # return the number of bytes received,
+                # not the length of the memoryview
+                len_ = 0
+                for x in self._server_replies[0:nbytes]:
+                    buffer_[len_] = x
+                    len_ += 1
+            else:
+                buffer_[0:nbytes] = self._server_replies[0:nbytes]
         except (IndexError, TypeError) as err:
             return 0
         except ValueError:
             pass
         self._server_replies = self._server_replies[nbytes:]
-        return len(buffer_)
+        return len(buffer_) if not isinstance(buffer_, memoryview) else len_
 
     def send(self, string, flags=0):
         if self._raise_socket_error:

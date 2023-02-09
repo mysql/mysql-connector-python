@@ -2,6 +2,7 @@
 Type hint aliases hub
 """
 import os
+import typing
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -18,13 +19,25 @@ from typing import (
     Union,
 )
 
+if hasattr(typing, "TypeAlias"):
+    # pylint: disable=no-name-in-module
+    from typing import TypeAlias  # type: ignore[attr-defined]
+else:
+    try:
+        from typing_extensions import TypeAlias
+    except ModuleNotFoundError:
+        # pylint: disable=reimported
+        from typing import Any as TypeAlias
+
+
 if TYPE_CHECKING:
     from .custom_types import HexLiteral
-    from .network import MySQLTCPSocket, MySQLUnixSocket
+    from .network import MySQLSocket
 
 
 StrOrBytes = Union[str, bytes]
 StrOrBytesPath = Union[StrOrBytes, os.PathLike]
+SocketType: TypeAlias = "MySQLSocket"
 
 
 """ Conversion """
@@ -55,10 +68,6 @@ ToMysqlInputTypes = Optional[
     ]
 ]
 ToMysqlOutputTypes = Optional[Union[int, float, bytes, "HexLiteral"]]
-
-
-""" Network """
-SocketType = Union["MySQLUnixSocket", "MySQLTCPSocket"]
 
 
 """ Protocol """
