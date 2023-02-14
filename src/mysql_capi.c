@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2023, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -1977,7 +1977,11 @@ MySQL_convert_to_mysql(MySQL *self, PyObject *args)
             PyTuple_SET_ITEM(prepared, i, new_value);
         }
         else if (PyBytes_Check(new_value)) {
-            PyObject *quoted = PyBytes_FromFormat("'%s'", PyBytes_AsString(new_value));
+            PyObject *quoted = PyBytes_FromString("'");
+            PyObject *quote = PyBytes_FromString("'");
+            PyBytes_Concat(&quoted, new_value);
+            PyBytes_Concat(&quoted, quote);
+            Py_DECREF(quote);
             PyTuple_SET_ITEM(prepared, i, quoted);
         }
         else if (PyUnicode_Check(new_value)) {

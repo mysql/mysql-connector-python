@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -7366,3 +7366,52 @@ class BugOra20504804(tests.MySQLConnectorTests):
                 f"INSERT IGNORE INTO {self.table_name} (name) VALUES ('Foo'),('Bar')",
                 cur.statement,
             )
+
+
+class BugOra34984850(tests.MySQLConnectorTests):
+    """BUG#34984850: Fix binary conversion with NO_BACKSLASH_ESCAPES mode
+
+    The Connector/Python C extension converter truncates bytes containing
+    the \x00 byte when using NO_BACKSLASH_ESCAPES mode in MySQL.
+    The PyBytes_AsString() Python function interprets the \x00 as the end
+    of the string, dropping the rest of the binary data.
+
+    This patch fixes this issue by using the PyBytes_Concat() function to
+    quote the resulting bytes.
+    """
+
+    table_name = "BugOra34984850"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.table_name} (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        data LONGBLOB
+                    )
+                    """
+                )
+            cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_no_backslash_escapes(self):
+        data = b"\x01\x02\x00\x01"
+        for use_backslash_escapes in (True, False):
+            if use_backslash_escapes:
+                self.cnx.sql_mode = [constants.SQLMode.NO_BACKSLASH_ESCAPES]
+            with self.cnx.cursor() as cur:
+                cur.execute(
+                    f"INSERT INTO {self.table_name} (data) VALUES (%s)", (data,)
+                )
+                cur.execute(f"SELECT data FROM {self.table_name} LIMIT 1")
+                res = cur.fetchone()
+                self.assertEqual(data, res[0])
