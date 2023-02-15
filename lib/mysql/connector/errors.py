@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -287,8 +287,7 @@ def get_exception(packet: bytes) -> ErrorTypes:
             errmsg = packet.decode("utf8")
     except (IndexError, UnicodeError) as err:
         return InterfaceError(f"Failed getting Error information ({err})")
-    else:
-        return get_mysql_exception(errno, errmsg, sqlstate)  # type: ignore[arg-type]
+    return get_mysql_exception(errno, errmsg, sqlstate)
 
 
 _SQLSTATE_CLASS_EXCEPTION: Dict[str, ErrorClassTypes] = {

@@ -776,8 +776,10 @@ class CharacterSet(_Constants):
             try:
                 info = cls.desc[charset]
                 return info[1], info[0], charset
-            except (IndexError, KeyError):
-                ProgrammingError(f"Character set ID '{charset}' unsupported")
+            except (IndexError, KeyError) as err:
+                raise ProgrammingError(
+                    f"Character set ID '{charset}' unsupported"
+                ) from err
 
         for cid, info in enumerate(cls.desc):
             if info is None:
@@ -811,8 +813,8 @@ class CharacterSet(_Constants):
             try:
                 info = cls.desc[charset]
                 return (charset, info[0], info[1])
-            except IndexError:
-                ProgrammingError(f"Character set ID {charset} unknown")
+            except IndexError as err:
+                raise ProgrammingError(f"Character set ID {charset} unknown") from err
 
         if charset in ("utf8", "utf-8") and cls.mysql_version == (8, 0):
             charset = "utf8mb4"

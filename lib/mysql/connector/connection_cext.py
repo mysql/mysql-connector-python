@@ -79,12 +79,12 @@ try:
         CMySQLCursorPreparedRaw,
         CMySQLCursorRaw,
     )
+
+    HAVE_CMYSQL = True
 except ImportError as exc:
     raise ImportError(
         f"MySQL Connector/Python C Extension not available ({exc})"
     ) from exc
-else:
-    HAVE_CMYSQL = True
 
 
 class CMySQLConnection(MySQLConnectionAbstract):

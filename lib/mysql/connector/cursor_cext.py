@@ -806,9 +806,7 @@ class CMySQLCursorBuffered(CMySQLCursor):
             row = self._rows[self._next_row]
         except IndexError:
             return None
-        else:
-            self._next_row += 1
-
+        self._next_row += 1
         return row
 
     def fetchall(self) -> List[RowType]:

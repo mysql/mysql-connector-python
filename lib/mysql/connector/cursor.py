@@ -434,11 +434,11 @@ class MySQLCursor(CursorBase):
         self, params: ParamsDictType
     ) -> Dict[bytes, Union[bytes, Decimal]]:
         """Process query parameters given as dictionary"""
+        res: Dict[bytes, Any] = {}
         try:
             to_mysql = self._connection.converter.to_mysql
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
-            res: Dict[bytes, Any] = {}
             for key, value in params.items():
                 conv = value
                 conv = to_mysql(conv)
@@ -450,20 +450,17 @@ class MySQLCursor(CursorBase):
             raise ProgrammingError(
                 f"Failed processing pyformat-parameters; {err}"
             ) from err
-        else:
-            return res
+        return res
 
     def _process_params(
         self, params: ParamsSequenceType
     ) -> Tuple[Union[bytes, Decimal], ...]:
         """Process query parameters."""
+        res = params[:]
         try:
-            res = params[:]
-
             to_mysql = self._connection.converter.to_mysql
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
-
             res = [to_mysql(value) for value in res]
             res = [escape(value) for value in res]
             res = [
@@ -474,8 +471,7 @@ class MySQLCursor(CursorBase):
             raise ProgrammingError(
                 f"Failed processing format-parameters; {err}"
             ) from err
-        else:
-            return tuple(res)
+        return tuple(res)
 
     def _handle_noresultset(self, res: ResultType) -> None:
         """Handles result of execute() when there is no result set"""
@@ -1094,10 +1090,8 @@ class MySQLCursorBuffered(MySQLCursor):
             row = self._rows[self._next_row]
         except (IndexError, TypeError):
             return None
-        else:
-            self._next_row += 1
-            return row
-        return None
+        self._next_row += 1
+        return row
 
     def fetchone(self) -> Optional[RowType]:
         """Return next row of a query result set.

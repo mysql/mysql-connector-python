@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -1687,8 +1687,8 @@ class ConnectionPool(queue.Queue):
             cnx.reset_session()
         try:
             self.put(cnx, block=False)
-        except queue.Full:
-            PoolError("Failed adding connection; queue is full")
+        except queue.Full as err:
+            raise PoolError("Failed adding connection; queue is full") from err
 
     def track_connection(self, connection: PooledConnection) -> None:
         """Tracks connection in order of close it when client.close() is invoke."""
