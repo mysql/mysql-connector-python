@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -68,7 +68,6 @@ class Helpers(tests.MySQLConnectorTests):
 
 
 class FieldTypeTests(tests.MySQLConnectorTests):
-
     desc = {
         "DECIMAL": (0x00, "DECIMAL"),
         "TINY": (0x01, "TINY"),
@@ -194,7 +193,6 @@ class FieldTypeTests(tests.MySQLConnectorTests):
 
 
 class FieldFlagTests(tests.MySQLConnectorTests):
-
     desc = {
         "NOT_NULL": (1 << 0, "Field can't be NULL"),
         "PRI_KEY": (1 << 1, "Field is part of a primary key"),
@@ -266,7 +264,6 @@ class FieldFlagTests(tests.MySQLConnectorTests):
 
 
 class ClientFlagTests(tests.MySQLConnectorTests):
-
     desc = {
         "LONG_PASSWD": (1 << 0, "New more secure passwords"),
         "FOUND_ROWS": (1 << 1, "Found instead of affected rows"),
@@ -459,7 +456,6 @@ class CharacterSetTests(tests.MySQLConnectorTests):
 
 
 class SQLModesTests(tests.MySQLConnectorTests):
-
     modes = (
         "REAL_AS_FLOAT",
         "PIPES_AS_CONCAT",

@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -469,7 +469,6 @@ class PEP249CursorTests(PEP249Base):
         cursor.close()
 
     def _isolation_test(self, cnx1, cnx2, engine="MyISAM"):
-
         cur1 = cnx1.cursor()
         cur2 = cnx2.cursor()
         data = (1, "myconnpy")

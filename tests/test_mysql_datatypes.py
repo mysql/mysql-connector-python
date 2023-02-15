@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -61,7 +61,6 @@ def _get_select_stmt(tbl, cols):
 
 
 class TestsDataTypes(tests.MySQLConnectorTests):
-
     tables = {
         "bit": "myconnpy_mysql_bit",
         "int": "myconnpy_mysql_int",

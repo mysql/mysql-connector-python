@@ -287,7 +287,7 @@ def get_exception(packet: bytes) -> ErrorTypes:
             errmsg = packet.decode("utf8")
     except (IndexError, UnicodeError) as err:
         return InterfaceError(f"Failed getting Error information ({err})")
-    return get_mysql_exception(errno, errmsg, sqlstate)
+    return get_mysql_exception(errno, errmsg, sqlstate)  # type: ignore[arg-type]
 
 
 _SQLSTATE_CLASS_EXCEPTION: Dict[str, ErrorClassTypes] = {

@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -651,7 +651,6 @@ class MySQLConnectorTests(unittest.TestCase):
 
 class TestsCursor(MySQLConnectorTests):
     def _test_execute_setup(self, cnx, tbl="myconnpy_cursor", engine="InnoDB"):
-
         self._test_execute_cleanup(cnx, tbl)
         stmt_create = (
             "CREATE TABLE {table} "
@@ -667,7 +666,6 @@ class TestsCursor(MySQLConnectorTests):
         cur.close()
 
     def _test_execute_cleanup(self, cnx, tbl="myconnpy_cursor"):
-
         stmt_drop = "DROP TABLE IF EXISTS {table}".format(table=tbl)
 
         try:
@@ -712,7 +710,6 @@ class CMySQLConnectorTests(MySQLConnectorTests):
 
 
 class CMySQLCursorTests(CMySQLConnectorTests):
-
     _cleanup_tables = []
 
     def setUp(self):
@@ -727,7 +724,6 @@ class CMySQLCursorTests(CMySQLConnectorTests):
         self.cnx.close()
 
     def setup_table(self, cnx, tbl="myconnpy_cursor", engine="InnoDB"):
-
         self.cleanup_table(cnx, tbl)
         stmt_create = (
             "CREATE TABLE {table} "
@@ -749,7 +745,6 @@ class CMySQLCursorTests(CMySQLConnectorTests):
         self._cleanup_tables.append(tbl)
 
     def cleanup_table(self, cnx, tbl="myconnpy_cursor"):
-
         stmt_drop = "DROP TABLE IF EXISTS {table}".format(table=tbl)
 
         # Explicit rollback: uncommited changes could otherwise block

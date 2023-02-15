@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -118,7 +118,6 @@ class MySQLConverterBaseTests(tests.MySQLConnectorTests):
 
 
 class MySQLConverterTests(tests.MySQLConnectorTests):
-
     _to_python_data = [
         (b"3.14", ("float", constants.FieldType.FLOAT)),
         (b"128", ("int", constants.FieldType.TINY)),
@@ -418,7 +417,6 @@ class MySQLConverterTests(tests.MySQLConnectorTests):
         self.assertEqual(res, tuple(self._to_python_exp))
 
     def test_row_to_python(self):
-
         data = [v[0] for v in self._to_python_data]
         description = [v[1] for v in self._to_python_data]
 
@@ -776,7 +774,6 @@ class MySQLConverterIntegrationTests(tests.MySQLConnectorTests):
 
 
 class MySQLConverterStrFallbackTests(tests.MySQLConnectorTests):
-
     table_name = "converter_table"
 
     @classmethod

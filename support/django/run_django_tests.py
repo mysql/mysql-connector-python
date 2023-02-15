@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -332,7 +332,6 @@ def django_tests(
 
 
 def get_django_version(path):
-
     VERSION = [999, 0, 0, "a", 0]  # Set correct after version.py is loaded
     py_module = os.path.join(path, "django", "__init__.py")
     with open(py_module, "rb") as fp:

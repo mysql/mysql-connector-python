@@ -2489,7 +2489,6 @@ class BugOra16217765(tests.MySQLConnectorTests):
     }
 
     def _create_user(self, cnx, user, password, host, database, plugin):
-
         self._drop_user(cnx, user, host)
         create_user = "CREATE USER '{user}'@'{host}' IDENTIFIED WITH {plugin}"
         cnx.cmd_query(create_user.format(user=user, host=host, plugin=plugin))

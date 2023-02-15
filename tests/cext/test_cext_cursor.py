@@ -277,7 +277,6 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         cur.close()
 
     def _test_callproc_setup(self, cnx):
-
         self._test_callproc_cleanup(cnx)
         stmt_create1 = (
             "CREATE PROCEDURE myconnpy_sp_1 "
@@ -327,7 +326,6 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         cur.close()
 
     def _test_callproc_cleanup(self, cnx):
-
         sp_names = (
             "myconnpy_sp_1",
             "myconnpy_sp_2",
@@ -799,7 +797,6 @@ class CMySQLCursorRawTests(tests.CMySQLCursorTests):
 
 
 class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
-
     tbl = "prep_stmt"
 
     create_table_stmt = (
@@ -1040,7 +1037,6 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
 
 
 class CMySQLCursorPreparedDictTests(CMySQLCursorPreparedTests):
-
     tbl = "prep_dict_stmt"
 
     column_names = (
@@ -1154,7 +1150,6 @@ class CMySQLCursorPreparedDictTests(CMySQLCursorPreparedTests):
 
 
 class CMySQLCursorPreparedNamedTupleTests(CMySQLCursorPreparedTests):
-
     tbl = "prep_named_tuple_stmt"
 
     column_names = (
@@ -1261,7 +1256,6 @@ class CMySQLCursorPreparedNamedTupleTests(CMySQLCursorPreparedTests):
 
 
 class CMySQLCursorPreparedRawTests(CMySQLCursorPreparedTests):
-
     tbl = "prep_raw_stmt"
 
     column_names = (

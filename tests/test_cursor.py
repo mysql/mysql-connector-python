@@ -418,7 +418,7 @@ class MySQLCursorTests(tests.TestsCursor):
             "_process_params() should return a tuple",
         )
         res = self.cur._process_params(data)
-        for (i, exped) in enumerate(exp):
+        for i, exped in enumerate(exp):
             self.assertEqual(exped, res[i])
         self.cur.close()
 
@@ -791,7 +791,6 @@ class MySQLCursorTests(tests.TestsCursor):
             self.fail("StopIteration not raised")
 
     def _test_callproc_setup(self, cnx):
-
         self._test_callproc_cleanup(cnx)
         stmt_create1 = (
             "CREATE PROCEDURE myconnpy_sp_1 "
@@ -841,7 +840,6 @@ class MySQLCursorTests(tests.TestsCursor):
         cur.close()
 
     def _test_callproc_cleanup(self, cnx):
-
         sp_names = (
             "myconnpy_sp_1",
             "myconnpy_sp_2",
@@ -1615,7 +1613,6 @@ class MySQLCursorBufferedNamedTupleTests(tests.TestsCursor):
 
 
 class MySQLCursorPreparedDictTests(tests.TestsCursor):
-
     table_name = "MySQLCursorPreparedDictTests"
     column_names = ("id", "name", "city")
     data = [
@@ -1678,7 +1675,6 @@ class MySQLCursorPreparedDictTests(tests.TestsCursor):
 
 
 class MySQLCursorPreparedNamedTupleTests(tests.TestsCursor):
-
     table_name = "MySQLCursorPreparedNamedTupleTests"
     column_names = ("id", "name", "city")
     data = [
@@ -1742,7 +1738,6 @@ class MySQLCursorPreparedNamedTupleTests(tests.TestsCursor):
 
 
 class MySQLCursorPreparedRawTests(tests.TestsCursor):
-
     table_name = "MySQLCursorPreparedRawTests"
     column_names = ("id", "name", "city")
     data = [

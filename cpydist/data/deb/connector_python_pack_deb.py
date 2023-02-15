@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -270,7 +270,6 @@ for change_line in get_changes():
 
 
 def rename_tar():
-
     # Here "orig" is not "original", but the TAR naming the Deb build needs
     # The TAR is assumed to be one level up, i.e. in PB2WORKDIR
     tarball = os.path.join(os.path.dirname(cwd), basename_tar + ".tar.gz")

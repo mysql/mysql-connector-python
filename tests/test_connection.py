@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -264,7 +264,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 False,
             ),
         ]
-        for (flag, attr, when_set, when_unset) in cases:
+        for flag, attr, when_set, when_unset in cases:
             setattr(self.cnx, attr, when_unset)
             self.cnx._handle_server_status(flag)
             self.assertEqual(when_set, getattr(self.cnx, attr))
@@ -2357,7 +2357,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             cnx.close()
             try:
                 os.remove(link)
-            except (FileNotFoundError):
+            except FileNotFoundError:
                 pass
 
         if os.name != "nt" and connector_class != CMySQLConnection:
@@ -2375,7 +2375,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             cnx.close()
             try:
                 os.remove(link)
-            except (FileNotFoundError):
+            except FileNotFoundError:
                 pass
 
         # Clean up
