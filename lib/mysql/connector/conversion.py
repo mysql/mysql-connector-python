@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -132,7 +132,10 @@ class MySQLConverterBase:
             return value
 
     @staticmethod
-    def escape(value: Any) -> Any:
+    def escape(
+        value: Any,
+        sql_mode: Optional[str] = None,  # pylint: disable=unused-argument
+    ) -> Any:
         """Escape buffer for sending to MySQL"""
         return value
 
@@ -169,7 +172,7 @@ class MySQLConverter(MySQLConverterBase):
         ] = {}
 
     @staticmethod
-    def escape(value: Any) -> Any:
+    def escape(value: Any, sql_mode: Optional[str] = None) -> Any:
         """
         Escapes special characters as they are expected to by when MySQL
         receives them.
@@ -178,6 +181,8 @@ class MySQLConverter(MySQLConverterBase):
         Returns the value if not a string, or the escaped string.
         """
         if isinstance(value, (bytes, bytearray)):
+            if sql_mode == "NO_BACKSLASH_ESCAPES":
+                return value.replace(b"'", b"''")
             value = value.replace(b"\\", b"\\\\")
             value = value.replace(b"\n", b"\\n")
             value = value.replace(b"\r", b"\\r")
@@ -185,6 +190,8 @@ class MySQLConverter(MySQLConverterBase):
             value = value.replace(b"\042", b"\134\042")  # double quotes
             value = value.replace(b"\032", b"\134\032")  # for Win32
         elif isinstance(value, str) and not isinstance(value, HexLiteral):
+            if sql_mode == "NO_BACKSLASH_ESCAPES":
+                return value.replace("'", "''")
             value = value.replace("\\", "\\\\")
             value = value.replace("\n", "\\n")
             value = value.replace("\r", "\\r")
@@ -270,8 +277,8 @@ class MySQLConverter(MySQLConverterBase):
     def _long_to_mysql(value: int) -> int:
         """Convert value to int
 
-        Note: there is not type "long" in Python 3 since integers (int) are of unlimited size.
-        Since Python 2 is no longer supported, this method should be deprecated.
+        Note: There is no type "long" in Python 3 since integers are of unlimited size.
+              Since Python 2 is no longer supported, this method should be deprecated.
         """
         return int(value)
 

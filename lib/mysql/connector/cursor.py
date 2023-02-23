@@ -442,7 +442,7 @@ class MySQLCursor(CursorBase):
             for key, value in params.items():
                 conv = value
                 conv = to_mysql(conv)
-                conv = escape(conv)
+                conv = escape(conv, self._connection.sql_mode)
                 if not isinstance(value, Decimal):
                     conv = quote(conv)
                 res[key.encode()] = conv
@@ -462,7 +462,7 @@ class MySQLCursor(CursorBase):
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
             res = [to_mysql(value) for value in res]
-            res = [escape(value) for value in res]
+            res = [escape(value, self._connection.sql_mode) for value in res]
             res = [
                 quote(value) if not isinstance(params[i], Decimal) else value
                 for i, value in enumerate(res)

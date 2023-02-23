@@ -7390,7 +7390,8 @@ class BugOra34984850(tests.MySQLConnectorTests):
                     f"""
                     CREATE TABLE {self.table_name} (
                         id INT AUTO_INCREMENT PRIMARY KEY,
-                        data LONGBLOB
+                        data LONGBLOB,
+                        text VARCHAR(50)
                     )
                     """
                 )
@@ -7401,16 +7402,24 @@ class BugOra34984850(tests.MySQLConnectorTests):
         with mysql.connector.connect(**config) as cnx:
             cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
 
-    @foreach_cnx()
-    def test_no_backslash_escapes(self):
-        data = b"\x01\x02\x00\x01"
+    def _run_test(self):
+        data = (b"\x01\x02\x00\x01", "abc'cba")
         for use_backslash_escapes in (True, False):
             if use_backslash_escapes:
                 self.cnx.sql_mode = [constants.SQLMode.NO_BACKSLASH_ESCAPES]
             with self.cnx.cursor() as cur:
                 cur.execute(
-                    f"INSERT INTO {self.table_name} (data) VALUES (%s)", (data,)
+                    f"INSERT INTO {self.table_name} (data, text) VALUES (%s, %s)", data
                 )
-                cur.execute(f"SELECT data FROM {self.table_name} LIMIT 1")
+                cur.execute(f"SELECT data, text FROM {self.table_name} LIMIT 1")
                 res = cur.fetchone()
-                self.assertEqual(data, res[0])
+                self.assertEqual(data, res)
+
+    @foreach_cnx()
+    def test_no_backslash_escapes(self):
+        self._run_test()
+
+    @cnx_config(converter_class=conversion.MySQLConverter)
+    @foreach_cnx()
+    def test_no_backslash_escapes_with_converter_class(self):
+        self._run_test()

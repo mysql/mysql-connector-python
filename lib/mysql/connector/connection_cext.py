@@ -770,7 +770,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             if self.converter:
                 result = [
                     self.converter.quote(
-                        self.converter.escape(self.converter.to_mysql(value))
+                        self.converter.escape(
+                            self.converter.to_mysql(value), self._sql_mode
+                        )
                     )
                     for value in params
                 ]
@@ -781,7 +783,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             if self.converter:
                 for key, value in params.items():
                     result[key] = self.converter.quote(
-                        self.converter.escape(self.converter.to_mysql(value))
+                        self.converter.escape(
+                            self.converter.to_mysql(value), self._sql_mode
+                        )
                     )
             else:
                 for key, value in params.items():
