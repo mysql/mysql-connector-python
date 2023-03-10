@@ -436,13 +436,14 @@ class MySQLCursor(CursorBase):
         """Process query parameters given as dictionary"""
         res: Dict[bytes, Any] = {}
         try:
+            sql_mode = self._connection.sql_mode
             to_mysql = self._connection.converter.to_mysql
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
             for key, value in params.items():
                 conv = value
                 conv = to_mysql(conv)
-                conv = escape(conv, self._connection.sql_mode)
+                conv = escape(conv, sql_mode)
                 if not isinstance(value, Decimal):
                     conv = quote(conv)
                 res[key.encode()] = conv
@@ -458,11 +459,12 @@ class MySQLCursor(CursorBase):
         """Process query parameters."""
         res = params[:]
         try:
+            sql_mode = self._connection.sql_mode
             to_mysql = self._connection.converter.to_mysql
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
             res = [to_mysql(value) for value in res]
-            res = [escape(value, self._connection.sql_mode) for value in res]
+            res = [escape(value, sql_mode) for value in res]
             res = [
                 quote(value) if not isinstance(params[i], Decimal) else value
                 for i, value in enumerate(res)

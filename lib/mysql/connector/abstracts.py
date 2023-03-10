@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -887,7 +887,9 @@ class MySQLConnectionAbstract(ABC):
     @property
     def sql_mode(self) -> str:
         """Get the SQL mode"""
-        return self.info_query("SELECT @@session.sql_mode")[0]
+        if self._sql_mode is None:
+            self._sql_mode = self.info_query("SELECT @@session.sql_mode")[0]
+        return self._sql_mode
 
     @sql_mode.setter
     def sql_mode(self, value: Union[str, Sequence[int]]) -> None:
