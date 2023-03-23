@@ -911,9 +911,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         self.cnx._handshake["auth_plugin"] = "caching_sha2_password"
         self.cnx._handshake["auth_data"] = b"h4i6oP!OLng9&PD@WrYH"
-        self.cnx._socket.switch_to_ssl = (
-            lambda ca, cert, key, verify_cert, verify_identity, cipher, ssl_version: None
-        )
+        self.cnx._socket.switch_to_ssl = lambda ssl_context, host: None
 
         # Test perform_full_authentication
         # Exchange:
@@ -939,11 +937,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         )
         # Check the SSL request packet
         self.assertEqual(packets[0][4:], ssl_pkt)
-        auth_pkt = self.cnx._protocol.make_auth(
+        auth_pkt, _ = self.cnx._protocol.make_auth(
             self.cnx._handshake,
             kwargs["username"],
             kwargs["password"],
-            kwargs["database"],
+            database=kwargs["database"],
             charset=kwargs["charset"],
             client_flags=kwargs["client_flags"],
             ssl_enabled=True,
@@ -979,11 +977,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         )
         # Check the SSL request packet
         self.assertEqual(packets[0][4:], ssl_pkt)
-        auth_pkt = self.cnx._protocol.make_auth(
+        auth_pkt, _ = self.cnx._protocol.make_auth(
             self.cnx._handshake,
             kwargs["username"],
             kwargs["password"],
-            kwargs["database"],
+            database=kwargs["database"],
             charset=kwargs["charset"],
             client_flags=kwargs["client_flags"],
             ssl_enabled=True,
@@ -1014,23 +1012,22 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
         # We check if do_auth send the autherization for SSL and the
         # normal authorization.
+        auth_pkt, _ = self.cnx._protocol.make_auth(
+            self.cnx._handshake,
+            kwargs["username"],
+            kwargs["password"],
+            database=kwargs["database"],
+            charset=kwargs["charset"],
+            client_flags=kwargs["client_flags"],
+            ssl_enabled=True,
+        )
         exp = [
             self.cnx._protocol.make_auth_ssl(
                 charset=kwargs["charset"], client_flags=kwargs["client_flags"]
             ),
-            self.cnx._protocol.make_auth(
-                self.cnx._handshake,
-                kwargs["username"],
-                kwargs["password"],
-                kwargs["database"],
-                charset=kwargs["charset"],
-                client_flags=kwargs["client_flags"],
-                ssl_enabled=True,
-            ),
+            auth_pkt,
         ]
-        self.cnx._socket.switch_to_ssl = (
-            lambda ca, cert, key, verify_cert, verify_identity, cipher, ssl_version: None
-        )
+        self.cnx._socket.switch_to_ssl = lambda ssl_context, host: None
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets(
             [

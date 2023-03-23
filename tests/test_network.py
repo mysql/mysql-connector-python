@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -477,11 +477,11 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
     def test_switch_to_ssl(self):
         """Switch the socket to use SSL"""
         args = {
-            "ca": os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"),
-            "cert": os.path.join(tests.SSL_DIR, "tests_client_cert.pem"),
-            "key": os.path.join(tests.SSL_DIR, "tests_client_key.pem"),
+            "ssl_ca": os.path.join(tests.SSL_DIR, "tests_CA_cert.pem"),
+            "ssl_cert": os.path.join(tests.SSL_DIR, "tests_client_cert.pem"),
+            "ssl_key": os.path.join(tests.SSL_DIR, "tests_client_key.pem"),
         }
-        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)
+        self.assertRaises(errors.InterfaceError, self.cnx.build_ssl_context, **args)
 
         # Handshake failure
         (family, socktype, proto, _, sockaddr) = socket.getaddrinfo(
@@ -491,4 +491,3 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
         sock.settimeout(4)
         sock.connect(sockaddr)
         self.cnx.sock = sock
-        self.assertRaises(errors.InterfaceError, self.cnx.switch_to_ssl, **args)

@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -37,7 +37,6 @@ from decimal import Decimal, DecimalException
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from . import utils
-from .authentication import get_auth_plugin
 from .constants import (
     PARAMETER_COUNT_AVAILABLE,
     ClientFlag,
@@ -46,6 +45,9 @@ from .constants import (
     ServerCmd,
 )
 from .errors import DatabaseError, InterfaceError, ProgrammingError, get_exception
+from .logger import logger
+from .plugins import MySQLAuthPlugin, get_auth_plugin
+from .plugins.caching_sha2_password import MySQLCachingSHA2PasswordAuthPlugin
 from .types import (
     ConnAttrsType,
     DescriptionType,
@@ -60,6 +62,13 @@ from .types import (
 )
 
 PROTOCOL_VERSION: int = 10
+AUTH_SWITCH_STATUS: int = 0xFE
+EXCHANGE_FURTHER_STATUS: int = 0x01
+OK_STATUS: int = 0x00
+MFA_STATUS: int = 0x02
+ERR_STATUS: int = 0xFF
+DEFAULT_CHARSET_ID = 45
+DEFAULT_MAX_ALLOWED_PACKET = 1073741824
 
 
 class MySQLProtocol:
@@ -69,117 +78,95 @@ class MySQLProtocol:
     """
 
     @staticmethod
-    def _connect_with_db(client_flags: int, database: Optional[str]) -> bytes:
-        """Prepare database string for handshake response"""
-        if client_flags & ClientFlag.CONNECT_WITH_DB and database:
-            return database.encode("utf8") + b"\x00"
-        return b"\x00"
+    def parse_auth_more_data(pkt: bytes) -> bytes:
+        """Parse a MySQL auth more data packet.
+
+        Args:
+            pkt: Packet representing an `auth more data` response.
+
+        Returns:
+            auth_data: Authentication method data (see [1]).
+
+        Raises:
+            InterfaceError: If packet's status tag doesn't
+                match `protocol.EXCHANGE_FURTHER_STATUS`.
+
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_connection_phase_packets_protocol_auth_more_data.html
+        """
+        if not pkt[4] == EXCHANGE_FURTHER_STATUS:
+            raise InterfaceError("Failed parsing AuthMoreData packet")
+        return pkt[5:]
 
     @staticmethod
-    def _auth_response(
-        client_flags: int,
-        username: Optional[StrOrBytes],
-        password: Optional[str],
-        database: Optional[str],
-        auth_plugin_class: str,
-        auth_plugin: str,
-        auth_data: Optional[bytes],
-        ssl_enabled: bool,
-    ) -> bytes:
-        """Prepare the authentication response"""
-        if not password:
-            return b"\x00"
+    def parse_auth_switch_request(pkt: bytes) -> Tuple[str, bytes]:
+        """Parse a MySQL auth switch request packet.
 
-        try:
-            auth = get_auth_plugin(auth_plugin, auth_plugin_class)(
-                auth_data,
-                username=username,
-                password=password,
-                database=database,
-                ssl_enabled=ssl_enabled,
-            )
-            plugin_auth_response = auth.auth_response()
-            # # We could receive a NULL response, an Interface error is called when so
-            # if plugin_auth_response is None:
-            #     raise InterfaceError
-        except (TypeError, InterfaceError) as err:
-            raise InterfaceError(f"Failed authentication: {err}") from err
+        Args:
+            pkt: Packet representing an `auth switch request` response.
 
-        if client_flags & ClientFlag.SECURE_CONNECTION:
-            resplen = len(plugin_auth_response)
-            auth_response = struct.pack("<B", resplen) + plugin_auth_response
-        else:
-            auth_response = plugin_auth_response + b"\x00"
-        return auth_response
+        Returns:
+            plugin_name: Name of the client authentication plugin to switch to.
+            plugin_provided_data: Plugin provided data (see [1]).
 
-    def make_auth(
-        self,
-        handshake: Optional[HandShakeType],
-        username: Optional[StrOrBytes] = None,
-        password: Optional[str] = None,
-        database: Optional[str] = None,
-        charset: int = 45,
-        client_flags: int = 0,
-        max_allowed_packet: int = 1073741824,
-        ssl_enabled: bool = False,
-        auth_plugin: Optional[str] = None,
-        conn_attrs: Optional[ConnAttrsType] = None,
-        auth_plugin_class: Optional[str] = None,
-    ) -> bytes:
-        """Make a MySQL Authentication packet"""
-        if handshake is None:
-            handshake = {}
-        try:
-            auth_data: Optional[bytes] = handshake["auth_data"]
-            auth_plugin = auth_plugin or handshake["auth_plugin"]
-        except (TypeError, KeyError) as err:
-            raise ProgrammingError(
-                f"Handshake misses authentication info ({err})"
-            ) from None
+        Raises:
+            InterfaceError: If packet's status tag doesn't
+                match `protocol.AUTH_SWITCH_STATUS`.
 
-        if not username:
-            username = b""
-        try:
-            username_bytes = username.encode("utf8")  # type: ignore[union-attr]
-        except AttributeError:
-            # Username is already bytes
-            username_bytes = username
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/
+                latest/page_protocol_connection_phase_packets_protocol_
+                auth_switch_request.html
+        """
+        if pkt[4] != AUTH_SWITCH_STATUS:
+            raise InterfaceError("Failed parsing AuthSwitchRequest packet")
+        pkt, plugin_name = utils.read_string(pkt[5:], end=b"\x00")
+        if pkt and pkt[-1] == 0:
+            pkt = pkt[:-1]
+        return plugin_name.decode(), pkt
 
-        filler = "x" * 22
-        username_len = len(username_bytes)
+    @staticmethod
+    def parse_auth_next_factor(pkt: bytes) -> Tuple[str, bytes]:
+        """Parse a MySQL auth next factor packet.
 
-        packet = struct.pack(
-            f"<IIH{filler}{username_len}sx",
-            client_flags,
-            max_allowed_packet,
-            charset,
-            username_bytes,
-        )
+        Args:
+            pkt: Packet representing an `auth next factor` response.
 
-        packet += self._auth_response(
-            client_flags,
-            username,
-            password,
-            database,
-            auth_plugin_class,
-            auth_plugin,
-            auth_data,
-            ssl_enabled,
-        )
+        Returns:
+            plugin_name: Name of the client authentication plugin.
+            plugin_provided_data: Initial authentication data for that
+                client plugin (see [1]).
 
-        packet += self._connect_with_db(client_flags, database)
+        Raises:
+            InterfaceError: If packet's packet type doesn't
+                match `protocol.MFA_STATUS`.
 
-        if client_flags & ClientFlag.PLUGIN_AUTH:
-            packet += auth_plugin.encode("utf8") + b"\x00"
-
-        if (client_flags & ClientFlag.CONNECT_ARGS) and conn_attrs is not None:
-            packet += self.make_conn_attrs(conn_attrs)
-
-        return packet
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_connection_phase_packets_protocol_auth_
+                next_factor_request.html
+        """
+        pkt, status = utils.read_int(pkt[4:], 1)
+        if status != MFA_STATUS:
+            raise InterfaceError("Failed parsing AuthNextFactor packet (invalid)")
+        pkt, plugin_name = utils.read_string(pkt, end=b"\x00")
+        return plugin_name.decode(), pkt
 
     @staticmethod
     def make_conn_attrs(conn_attrs: ConnAttrsType) -> bytes:
-        """Encode the connection attributes"""
+        """Encode the connection attributes.
+
+        Args:
+            conn_attrs: Connection attributes.
+
+        Returns:
+            serialized_conn_attrs: Serialized connection attributes as per [1].
+
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_connection_phase_packets_protocol_handshake_response.html
+        """
         for attr_name in conn_attrs:
             if conn_attrs[attr_name] is None:
                 conn_attrs[attr_name] = ""
@@ -192,17 +179,239 @@ class MySQLProtocol:
         conn_attrs_packet = struct.pack("<B", conn_attrs_len)
         for attr_name in conn_attrs:
             conn_attrs_packet += struct.pack("<B", len(attr_name))
-            conn_attrs_packet += attr_name.encode("utf8")
+            conn_attrs_packet += attr_name.encode()
             conn_attrs_packet += struct.pack("<B", len(conn_attrs[attr_name]))
-            conn_attrs_packet += conn_attrs[attr_name].encode("utf8")  # type: ignore[union-attr]
+            conn_attrs_packet += conn_attrs[attr_name].encode()  # type: ignore[union-attr]
         return conn_attrs_packet
 
     @staticmethod
-    def make_auth_ssl(
-        charset: int = 45, client_flags: int = 0, max_allowed_packet: int = 1073741824
-    ) -> bytearray:
-        """Make a SSL authentication packet"""
+    def connect_with_db(client_flags: int, database: Optional[str]) -> bytes:
+        """Prepare database string for handshake response.
+
+        Args:
+            client_flags: Integer representing client capabilities flags.
+            database: Initial database name for the connection.
+
+        Returns:
+            serialized_database: Serialized database name as per [1].
+
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_connection_phase_packets_protocol_handshake_response.html
+        """
         return (
+            database.encode() + b"\x00"
+            if client_flags & ClientFlag.CONNECT_WITH_DB and database
+            else b"\x00"
+        )
+
+    @staticmethod
+    def auth_plugin_first_response(
+        auth_data: bytes,
+        username: str,
+        password: str,
+        client_flags: int,
+        auth_plugin: str,
+        auth_plugin_class: Optional[str] = None,
+        ssl_enabled: bool = False,
+        plugin_config: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[bytes, MySQLAuthPlugin]:
+        """Prepare the first authentication response.
+
+        Args:
+            auth_data: Authorization data from initial handshake.
+            username: Account's username.
+            password: Account's password.
+            client_flags: Integer representing client capabilities flags.
+            auth_plugin: Authorization plugin name.
+            auth_plugin_class: Authorization plugin class (has higher precedence
+                than the authorization plugin name).
+            ssl_enabled: Whether SSL is enabled or not.
+            plugin_config: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            auth_response: Authorization plugin response.
+            auth_strategy: Authorization plugin instance created based
+                on the provided `auth_plugin` and `auth_plugin_class` parameters.
+
+        Raises:
+            InterfaceError: If authentication fails or when got a NULL auth response.
+        """
+        if not password:
+            # return auth response and an arbitrary auth strategy
+            return b"\x00", MySQLCachingSHA2PasswordAuthPlugin(
+                username, password, ssl_enabled=ssl_enabled
+            )
+
+        if plugin_config is None:
+            plugin_config = {}
+
+        try:
+            auth_strategy = get_auth_plugin(auth_plugin, auth_plugin_class)(
+                username, password, ssl_enabled=ssl_enabled
+            )
+            auth_response = auth_strategy.auth_response(auth_data, **plugin_config)
+        except (TypeError, InterfaceError) as err:
+            raise InterfaceError(f"Failed authentication: {err}") from err
+
+        if auth_response is None:
+            raise InterfaceError(
+                "Got NULL auth response while authenticating with "
+                f"plugin {auth_strategy.name}"
+            )
+
+        auth_response = bytes(
+            utils.int1store(len(auth_response)) + auth_response
+            if client_flags & ClientFlag.SECURE_CONNECTION
+            else auth_response + b"\x00"
+        )
+
+        return auth_response, auth_strategy
+
+    @staticmethod
+    def make_auth(
+        handshake: HandShakeType,
+        username: str,
+        password: str,
+        database: Optional[str] = None,
+        charset: int = DEFAULT_CHARSET_ID,
+        client_flags: int = 0,
+        max_allowed_packet: int = DEFAULT_MAX_ALLOWED_PACKET,
+        auth_plugin: Optional[str] = None,
+        auth_plugin_class: Optional[str] = None,
+        conn_attrs: Optional[ConnAttrsType] = None,
+        is_change_user_request: bool = False,
+        ssl_enabled: bool = False,
+        plugin_config: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[bytes, MySQLAuthPlugin]:
+        """Make a MySQL Authentication packet.
+
+        Args:
+            handshake: Initial handshake.
+            username: Account's username.
+            password: Account's password.
+            database: Initial database name for the connection
+            charset: Client charset (see [2]), only the lower 8-bits.
+            client_flags: Integer representing client capabilities flags.
+            max_allowed_packet: Maximum packet size.
+            auth_plugin: Authorization plugin name.
+            auth_plugin_class: Authorization plugin class (has higher precedence
+                than the authorization plugin name).
+            conn_attrs: Connection attributes.
+            is_change_user_request: Whether is a `change user request` operation or not.
+            ssl_enabled: Whether SSL is enabled or not.
+            plugin_config: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            handshake_response: Handshake response as per [1].
+            auth_strategy: Authorization plugin instance created based
+                on the provided `auth_plugin` and `auth_plugin_class`.
+
+        Raises:
+            ProgrammingError: Handshake misses authentication info.
+
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_connection_phase_packets_protocol_handshake_response.html
+            [2]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_basic_character_set.html#a_protocol_character_set
+        """
+        b_username = username.encode()
+        response_payload = bytearray(b"")
+
+        if is_change_user_request:
+            logger.debug("Got a `change user` request")
+
+        logger.debug("Starting authorization phase")
+        if handshake is None:
+            raise ProgrammingError("Got a NULL handshake") from None
+
+        if handshake.get("auth_data") is None:
+            raise ProgrammingError("Handshake misses authentication info") from None
+
+        try:
+            auth_plugin = auth_plugin or handshake["auth_plugin"]  # type: ignore[assignment]
+        except (TypeError, KeyError) as err:
+            raise ProgrammingError(
+                f"Handshake misses authentication plugin info ({err})"
+            ) from None
+
+        logger.debug("The provided initial strategy is %s", auth_plugin)
+
+        if is_change_user_request:
+            response_payload += struct.pack(
+                f"<B{len(b_username)}sx",
+                ServerCmd.CHANGE_USER,
+                b_username,
+            )
+        else:
+            filler = "x" * 22
+            response_payload += struct.pack(
+                f"<IIH{filler}{len(b_username)}sx",
+                client_flags,
+                max_allowed_packet,
+                charset,
+                b_username,
+            )
+
+        # auth plugin response
+        auth_response, auth_strategy = MySQLProtocol.auth_plugin_first_response(
+            auth_data=handshake["auth_data"],  # type: ignore[arg-type]
+            username=username,
+            password=password,
+            client_flags=client_flags,
+            auth_plugin=auth_plugin,
+            auth_plugin_class=auth_plugin_class,
+            ssl_enabled=ssl_enabled,
+            plugin_config=plugin_config,
+        )
+        response_payload += auth_response
+
+        # database name
+        response_payload += MySQLProtocol.connect_with_db(client_flags, database)
+
+        # charset
+        if is_change_user_request:
+            response_payload += struct.pack("<H", charset)
+
+        # plugin name
+        if client_flags & ClientFlag.PLUGIN_AUTH:
+            response_payload += auth_plugin.encode() + b"\x00"
+
+        # connection attributes
+        if (client_flags & ClientFlag.CONNECT_ARGS) and conn_attrs is not None:
+            response_payload += MySQLProtocol.make_conn_attrs(conn_attrs)
+
+        return bytes(response_payload), auth_strategy
+
+    @staticmethod
+    def make_auth_ssl(
+        charset: int = DEFAULT_CHARSET_ID,
+        client_flags: int = 0,
+        max_allowed_packet: int = DEFAULT_MAX_ALLOWED_PACKET,
+    ) -> bytes:
+        """Make a SSL authentication packet (see [1]).
+
+        Args:
+            charset: Client charset (see [2]), only the lower 8-bits.
+            client_flags: Integer representing client capabilities flags.
+            max_allowed_packet: Maximum packet size.
+
+        Returns:
+            ssl_request_pkt: SSL connection request packet.
+
+        References:
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_connection_phase_packets_protocol_ssl_request.html
+            [2]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+                page_protocol_basic_character_set.html#a_protocol_character_set
+        """
+        # SSL connection request packet
+        return bytes(
             utils.int4store(client_flags)
             + utils.int4store(max_allowed_packet)
             + utils.int2store(charset)
@@ -221,67 +430,6 @@ class MySQLProtocol:
     def make_stmt_fetch(statement_id: int, rows: int = 1) -> bytearray:
         """Make a MySQL packet with Fetch Statement command"""
         return utils.int4store(statement_id) + utils.int4store(rows)
-
-    def make_change_user(
-        self,
-        handshake: HandShakeType,
-        username: Optional[StrOrBytes] = None,
-        password: Optional[str] = None,
-        database: Optional[str] = None,
-        charset: int = 45,
-        client_flags: int = 0,
-        ssl_enabled: bool = False,
-        auth_plugin: Optional[str] = None,
-        conn_attrs: Optional[ConnAttrsType] = None,
-        auth_plugin_class: Optional[str] = None,
-    ) -> bytes:
-        """Make a MySQL packet with the Change User command"""
-
-        try:
-            auth_data: Optional[bytes] = handshake["auth_data"]
-            auth_plugin = auth_plugin or handshake["auth_plugin"]
-        except (TypeError, KeyError) as err:
-            raise ProgrammingError(
-                f"Handshake misses authentication info ({err})"
-            ) from None
-
-        if not username:
-            username = b""
-        try:
-            username_bytes = username.encode("utf8")  # type: ignore[union-attr]
-        except AttributeError:
-            # Username is already bytes
-            username_bytes = username
-
-        username_len = len(username_bytes)
-        packet = struct.pack(
-            f"<B{username_len}sx",
-            ServerCmd.CHANGE_USER,
-            username_bytes,
-        )
-
-        packet += self._auth_response(
-            client_flags,
-            username,
-            password,
-            database,
-            auth_plugin_class,
-            auth_plugin,
-            auth_data,
-            ssl_enabled,
-        )
-
-        packet += self._connect_with_db(client_flags, database)
-
-        packet += struct.pack("<H", charset)
-
-        if client_flags & ClientFlag.PLUGIN_AUTH:
-            packet += auth_plugin.encode("utf8") + b"\x00"
-
-        if (client_flags & ClientFlag.CONNECT_ARGS) and conn_attrs is not None:
-            packet += self.make_conn_attrs(conn_attrs)
-
-        return packet
 
     @staticmethod
     def parse_handshake(packet: bytes) -> HandShakeType:
@@ -334,15 +482,6 @@ class MySQLProtocol:
         res["auth_data"] = auth_data1 + auth_data2
         res["capabilities"] = capabilities
         return res
-
-    @staticmethod
-    def parse_auth_next_factor(packet: bytes) -> Tuple[bytes, str]:
-        """Parse a MySQL AuthNextFactor packet."""
-        packet, status = utils.read_int(packet, 1)
-        if status != 2:
-            raise InterfaceError("Failed parsing AuthNextFactor packet (invalid)")
-        packet, auth_plugin = utils.read_string(packet, end=b"\x00")
-        return packet, auth_plugin.decode("utf-8")
 
     @staticmethod
     def parse_ok(packet: bytes) -> OkPacketType:
@@ -972,23 +1111,3 @@ class MySQLProtocol:
                 packet += a_value
 
         return packet
-
-    @staticmethod
-    def parse_auth_switch_request(packet: bytes) -> Tuple[str, bytes]:
-        """Parse a MySQL AuthSwitchRequest-packet"""
-        if not packet[4] == 254:
-            raise InterfaceError("Failed parsing AuthSwitchRequest packet")
-
-        packet, plugin_name = utils.read_string(packet[5:], end=b"\x00")
-        if packet and packet[-1] == 0:
-            packet = packet[:-1]
-
-        return plugin_name.decode("utf8"), packet
-
-    @staticmethod
-    def parse_auth_more_data(packet: bytes) -> bytes:
-        """Parse a MySQL AuthMoreData-packet"""
-        if not packet[4] == 1:
-            raise InterfaceError("Failed parsing AuthMoreData packet")
-
-        return packet[5:]

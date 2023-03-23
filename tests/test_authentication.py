@@ -32,7 +32,6 @@
 
 import getpass
 import importlib
-import inspect
 import itertools
 import logging
 import os
@@ -143,15 +142,24 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.plugin_class = authentication.get_auth_plugin("mysql_native_password")
 
     def test_class(self):
-        self.assertEqual("mysql_native_password", self.plugin_class.plugin_name)
-        self.assertEqual(False, self.plugin_class.requires_ssl)
+        auth_plugin = self.plugin_class(username="dummy", password="s3cr3t")
+        self.assertEqual("mysql_native_password", auth_plugin.name)
+        self.assertEqual(False, auth_plugin.requires_ssl)
 
     def test_prepare_password(self):
-        auth_plugin = self.plugin_class(None, password="spam")
-        self.assertRaises(mysql.connector.InterfaceError, auth_plugin.prepare_password)
+        auth_plugin = self.plugin_class(username=None, password="spam")
+        self.assertRaises(
+            mysql.connector.InterfaceError,
+            auth_plugin._prepare_password,
+            auth_data=None,
+        )
 
-        auth_plugin = self.plugin_class(123456, password="spam")  # too long
-        self.assertRaises(mysql.connector.InterfaceError, auth_plugin.prepare_password)
+        auth_plugin = self.plugin_class(username=None, password="spam")  # too long
+        self.assertRaises(
+            mysql.connector.InterfaceError,
+            auth_plugin._prepare_password,
+            auth_data=123456,
+        )
 
         empty = b""
         auth_data = (
@@ -163,12 +171,12 @@ class MySQLNativePasswordAuthPluginTests(tests.MySQLConnectorTests):
             b"\x90\x50\xab\xc0\x3a\x0f\x8f\xad\x51\xa3"
         )
 
-        auth_plugin = self.plugin_class("\x3f" * 20, password=None)
-        self.assertEqual(empty, auth_plugin.prepare_password())
+        auth_plugin = self.plugin_class(username=None, password=None)
+        self.assertEqual(empty, auth_plugin._prepare_password("\x3f" * 20))
 
-        auth_plugin = self.plugin_class(auth_data, password="spam")
-        self.assertEqual(auth_response, auth_plugin.prepare_password())
-        self.assertEqual(auth_response, auth_plugin.auth_response())
+        auth_plugin = self.plugin_class(username=None, password="spam")
+        self.assertEqual(auth_response, auth_plugin._prepare_password(auth_data))
+        self.assertEqual(auth_response, auth_plugin.auth_response(auth_data))
 
 
 class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
@@ -179,14 +187,19 @@ class MySQLClearPasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.plugin_class = authentication.get_auth_plugin("mysql_clear_password")
 
     def test_class(self):
-        self.assertEqual("mysql_clear_password", self.plugin_class.plugin_name)
-        self.assertEqual(True, self.plugin_class.requires_ssl)
+        auth_plugin = self.plugin_class(
+            username="dummy", password="s3cr3t", ssl_enabled=True
+        )
+        self.assertEqual("mysql_clear_password", auth_plugin.name)
+        self.assertEqual(True, auth_plugin.requires_ssl)
 
     def test_prepare_password(self):
         exp = b"spam\x00"
-        auth_plugin = self.plugin_class(None, password="spam", ssl_enabled=True)
-        self.assertEqual(exp, auth_plugin.prepare_password())
-        self.assertEqual(exp, auth_plugin.auth_response())
+        auth_plugin = self.plugin_class(
+            username=None, password="spam", ssl_enabled=True
+        )
+        self.assertEqual(exp, auth_plugin._prepare_password())
+        self.assertEqual(exp, auth_plugin.auth_response(auth_data=None))
 
 
 class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
@@ -197,14 +210,19 @@ class MySQLSHA256PasswordAuthPluginTests(tests.MySQLConnectorTests):
         self.plugin_class = authentication.get_auth_plugin("sha256_password")
 
     def test_class(self):
-        self.assertEqual("sha256_password", self.plugin_class.plugin_name)
-        self.assertEqual(True, self.plugin_class.requires_ssl)
+        auth_plugin = self.plugin_class(
+            username=None, password="s3cr3t", ssl_enabled=True
+        )
+        self.assertEqual("sha256_password", auth_plugin.name)
+        self.assertEqual(True, auth_plugin.requires_ssl)
 
     def test_prepare_password(self):
         exp = b"spam\x00"
-        auth_plugin = self.plugin_class(None, password="spam", ssl_enabled=True)
-        self.assertEqual(exp, auth_plugin.prepare_password())
-        self.assertEqual(exp, auth_plugin.auth_response())
+        auth_plugin = self.plugin_class(
+            username=None, password="spam", ssl_enabled=True
+        )
+        self.assertEqual(exp, auth_plugin._prepare_password())
+        self.assertEqual(exp, auth_plugin.auth_response(auth_data=None))
 
 
 @unittest.skipIf(gssapi is None, "Module gssapi is required")
@@ -217,17 +235,16 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         )
 
     def test_class(self):
-        self.assertEqual(
-            "authentication_ldap_sasl_client", self.plugin_class.plugin_name
-        )
-        self.assertEqual(False, self.plugin_class.requires_ssl)
+        auth_plugin = self.plugin_class(username="user", password="spam")
+        self.assertEqual("authentication_ldap_sasl_client", auth_plugin.name)
+        self.assertEqual(False, auth_plugin.requires_ssl)
 
     def test_auth_response(self):
         # Test unsupported mechanism error message
         auth_data = b"UNKOWN-METHOD"
-        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
+        auth_plugin = self.plugin_class(username="user", password="spam")
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_response()
+            auth_plugin.auth_response(auth_data)
         self.assertIn(
             "sasl authentication method",
             context.exception.msg,
@@ -242,17 +259,17 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         # Test SCRAM-SHA-1 mechanism is accepted
         auth_data = b"SCRAM-SHA-1"
 
-        auth_plugin = self.plugin_class(auth_data, username="", password="")
+        auth_plugin = self.plugin_class(username="", password="")
 
         # Verify the format of the first message from client.
         exp = b"n,a=,n=,r="
-        client_first_nsg = auth_plugin.auth_response()
+        client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response()),
+            "got header: {}".format(auth_plugin.auth_response(auth_data)),
         )
 
-        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
+        auth_plugin = self.plugin_class(username="user", password="spam")
 
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
@@ -261,10 +278,10 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
         # Verify the format of the first message from client.
         exp = b"n,a=user,n=user,r="
-        client_first_nsg = auth_plugin.auth_response()
+        client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response()),
+            "got header: {}".format(auth_plugin.auth_response(auth_data)),
         )
 
         # Verify the length of the client's nonce in r=
@@ -278,14 +295,12 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         )
 
         # Verify that a user name that requires character mapping is mapped
-        auth_plugin = self.plugin_class(
-            auth_data, username="u\u1680ser", password="spam"
-        )
+        auth_plugin = self.plugin_class(username="u\u1680ser", password="spam")
         exp = b"n,a=u ser,n=u ser,r="
-        client_first_nsg = auth_plugin.auth_response()
+        client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response()),
+            "got header: {}".format(auth_plugin.auth_response(auth_data)),
         )
 
         # Verify the length of the client's nonce in r=
@@ -349,9 +364,9 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
     def test_auth_response256(self):
         # Test unsupported mechanism error message
         auth_data = b"UNKOWN-METHOD"
-        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
+        auth_plugin = self.plugin_class(username="user", password="spam")
         with self.assertRaises(InterfaceError) as context:
-            auth_plugin.auth_response()
+            auth_plugin.auth_response(auth_data)
         self.assertIn(
             'sasl authentication method "UNKOWN-METHOD"',
             context.exception.msg,
@@ -366,17 +381,17 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         # Test SCRAM-SHA-256 mechanism is accepted
         auth_data = b"SCRAM-SHA-256"
 
-        auth_plugin = self.plugin_class(auth_data, username="", password="")
+        auth_plugin = self.plugin_class(username="", password="")
 
         # Verify the format of the first message from client.
         exp = b"n,a=,n=,r="
-        client_first_nsg = auth_plugin.auth_response()
+        client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response()),
+            "got header: {}".format(auth_plugin.auth_response(auth_data)),
         )
 
-        auth_plugin = self.plugin_class(auth_data, username="user", password="spam")
+        auth_plugin = self.plugin_class(username="user", password="spam")
 
         # Verify the length of the client's nonce in r=
         cnonce = client_first_nsg[(len(b"n,a=,n=,r=")) :]
@@ -385,10 +400,10 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
 
         # Verify the format of the first message from client.
         exp = b"n,a=user,n=user,r="
-        client_first_nsg = auth_plugin.auth_response()
+        client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response()),
+            "got header: {}".format(auth_plugin.auth_response(auth_data)),
         )
 
         # Verify the length of the client's nonce in r=
@@ -402,14 +417,12 @@ class MySQLLdapSaslPasswordAuthPluginTests(tests.MySQLConnectorTests):
         )
 
         # Verify that a user name that requires character mapping is mapped
-        auth_plugin = self.plugin_class(
-            auth_data, username="u\u1680ser", password="spam"
-        )
+        auth_plugin = self.plugin_class(username="u\u1680ser", password="spam")
         exp = b"n,a=u ser,n=u ser,r="
-        client_first_nsg = auth_plugin.auth_response()
+        client_first_nsg = auth_plugin.auth_response(auth_data)
         self.assertTrue(
             client_first_nsg.startswith(exp),
-            "got header: {}".format(auth_plugin.auth_response()),
+            "got header: {}".format(auth_plugin.auth_response(auth_data)),
         )
 
         # Verify the length of the client's nonce in r=
@@ -658,10 +671,9 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
         self._kdestroy()
 
     def test_class(self):
-        self.assertEqual(
-            "authentication_kerberos_client", self.plugin_class.plugin_name
-        )
-        self.assertEqual(False, self.plugin_class.requires_ssl)
+        plugin_obj = self.plugin_class(username="", password="")
+        self.assertEqual("authentication_kerberos_client", plugin_obj.name)
+        self.assertEqual(False, plugin_obj.requires_ssl)
 
     # Test with TGT in the cache
 

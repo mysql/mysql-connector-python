@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -102,15 +102,19 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         }
         flags = ClientFlag.get_default()
         kwargs = {
-            "handshake": None,
             "username": "ham",
             "password": "spam",
+            "handshake": None,
             "database": "test",
             "charset": 33,
             "client_flags": flags,
         }
 
-        self.assertRaises(errors.ProgrammingError, self._protocol.make_auth, **kwargs)
+        self.assertRaises(
+            errors.ProgrammingError,
+            self._protocol.make_auth,
+            **kwargs,
+        )
 
         kwargs["handshake"] = {"auth_data": SEED}
         self.assertRaises(errors.ProgrammingError, self._protocol.make_auth, **kwargs)
@@ -119,21 +123,21 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             "auth_data": SEED,
             "auth_plugin": "mysql_native_password",
         }
-        res = self._protocol.make_auth(**kwargs)
+        res, _ = self._protocol.make_auth(**kwargs)
         self.assertEqual(exp["allset"], res)
 
-        kwargs["password"] = None
-        res = self._protocol.make_auth(**kwargs)
+        kwargs["password"] = ""
+        res, _ = self._protocol.make_auth(**kwargs)
         self.assertEqual(exp["nopass"], res)
 
         kwargs["password"] = "spam"
         kwargs["database"] = None
-        res = self._protocol.make_auth(**kwargs)
+        res, _ = self._protocol.make_auth(**kwargs)
         self.assertEqual(exp["nodb"], res)
 
-        kwargs["username"] = None
+        kwargs["username"] = ""
         kwargs["database"] = "test"
-        res = self._protocol.make_auth(**kwargs)
+        res, _ = self._protocol.make_auth(**kwargs)
         self.assertEqual(exp["nouser"], res)
 
     def test_make_auth_ssl(self):
@@ -198,31 +202,29 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
             ),
         }
         kwargs = {
-            "handshake": None,
             "username": "ham",
             "password": "spam",
+            "handshake": None,
             "database": "test",
             "charset": 8,
             "client_flags": ClientFlag.get_default(),
+            "is_change_user_request": True,
         }
-        self.assertRaises(
-            errors.ProgrammingError, self._protocol.make_change_user, **kwargs
-        )
+
+        self.assertRaises(errors.ProgrammingError, self._protocol.make_auth, **kwargs)
 
         kwargs["handshake"] = {"auth_data": SEED}
-        self.assertRaises(
-            errors.ProgrammingError, self._protocol.make_change_user, **kwargs
-        )
+        self.assertRaises(errors.ProgrammingError, self._protocol.make_auth, **kwargs)
 
         kwargs["handshake"] = {
             "auth_data": SEED,
             "auth_plugin": "mysql_native_password",
         }
-        res = self._protocol.make_change_user(**kwargs)
+        res, _ = self._protocol.make_auth(**kwargs)
         self.assertEqual(exp["allset"], res)
 
-        kwargs["password"] = None
-        res = self._protocol.make_change_user(**kwargs)
+        kwargs["password"] = ""
+        res, _ = self._protocol.make_auth(**kwargs)
         self.assertEqual(exp["nopass"], res)
 
     def test_parse_handshake(self):

@@ -1,4 +1,4 @@
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,13 +28,77 @@
 
 """Clear Password Authentication Plugin."""
 
-from . import BaseAuthPlugin
+from typing import TYPE_CHECKING, Any, Optional
+
+from .. import errors
+from ..logger import logger
+from . import MySQLAuthPlugin
+
+if TYPE_CHECKING:
+    from ..network import MySQLSocket
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLClearPasswordAuthPlugin"
 
 
-class MySQLClearPasswordAuthPlugin(BaseAuthPlugin):
+class MySQLClearPasswordAuthPlugin(MySQLAuthPlugin):
     """Class implementing the MySQL Clear Password authentication plugin"""
 
-    requires_ssl: bool = True
-    plugin_name: str = "mysql_clear_password"
+    def _prepare_password(self) -> bytes:
+        """Prepare and return password as as clear text.
+
+        Returns:
+            bytes: Prepared password.
+        """
+        return self._password.encode() + b"\x00"
+
+    @property
+    def name(self) -> str:
+        """Plugin official name."""
+        return "mysql_clear_password"
+
+    @property
+    def requires_ssl(self) -> bool:
+        """Signals whether or not SSL is required."""
+        return True
+
+    def auth_response(self, auth_data: bytes, **kwargs: Any) -> Optional[bytes]:
+        """Return the prepared password to send to MySQL.
+
+        Raises:
+            InterfaceError: When SSL is required by not enabled.
+
+        Returns:
+            str: The prepared password.
+        """
+        if self.requires_ssl and not self._ssl_enabled:
+            raise errors.InterfaceError(f"{self.name} requires SSL")
+        return self._prepare_password()
+
+    def auth_switch_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
+    ) -> bytes:
+        """Handles server's `auth switch request` response.
+
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Plugin provided data (extracted from a packet
+                representing an `auth switch request` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Last server's response after back-and-forth
+                communication.
+        """
+        response = self.auth_response(auth_data, **kwargs)
+        if response is None:
+            raise errors.InterfaceError("Got a NULL auth response")
+
+        logger.debug("# request: %s size: %s", response, len(response))
+        sock.send(response)
+
+        pkt = bytes(sock.recv())
+        logger.debug("# server response packet: %s", pkt)
+
+        return pkt

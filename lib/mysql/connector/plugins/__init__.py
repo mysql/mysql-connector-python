@@ -1,4 +1,4 @@
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -28,75 +28,135 @@
 
 """Base Authentication Plugin class."""
 
-from abc import ABC
-from typing import Optional, Union
+import importlib
 
-from .. import errors
-from ..types import StrOrBytes
+from abc import ABC, abstractmethod
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Optional, Type
+
+from ..errors import NotSupportedError, ProgrammingError
+from ..logger import logger
+
+if TYPE_CHECKING:
+    from ..network import MySQLSocket
+
+DEFAULT_PLUGINS_PKG = "mysql.connector.plugins"
 
 
-class BaseAuthPlugin(ABC):
-    """Base class for authentication pluginsF
-
-
-    Classes inheriting from BaseAuthPlugin should implement the method
-    prepare_password(). When instantiating, auth_data argument is
-    required. The username, password and database are optional. The
-    ssl_enabled argument can be used to tell the plugin whether SSL is
-    active or not.
-
-    The method auth_response() method is used to retrieve the password
-    which was prepared by prepare_password().
-    """
-
-    requires_ssl: int = False
-    plugin_name: str = ""
+class MySQLAuthPlugin(ABC):
+    """Authorization plugin interface."""
 
     def __init__(
         self,
-        auth_data: Optional[bytes],
-        username: Optional[StrOrBytes] = None,
-        password: Optional[str] = None,
-        database: Optional[str] = None,
+        username: str,
+        password: str,
         ssl_enabled: bool = False,
     ) -> None:
-        """Initialization"""
-        self._auth_data: bytes = auth_data
-        self._username: Optional[str] = (
-            username.decode("utf8")
-            if isinstance(username, (bytes, bytearray))
-            else username
-        )
-        self._password: Optional[str] = password
-        self._database: Optional[str] = database
+        """Constructor."""
+        self._username: str = "" if username is None else username
+        self._password: str = "" if password is None else password
         self._ssl_enabled: bool = ssl_enabled
 
-    def prepare_password(self) -> bytes:
-        """Prepare and return password as as clear text.
+    @property
+    def ssl_enabled(self) -> bool:
+        """Signals whether or not SSL is enabled."""
+        return self._ssl_enabled
+
+    @property
+    @abstractmethod
+    def requires_ssl(self) -> bool:
+        """Signals whether or not SSL is required."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Plugin official name."""
+
+    @abstractmethod
+    def auth_response(self, auth_data: bytes, **kwargs: Any) -> Optional[bytes]:
+        """Make the client's authorization response.
+
+        Args:
+            auth_data: Authorization data.
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
 
         Returns:
-            bytes: Prepared password.
+            packet: Client's authorization response.
         """
-        if not self._password:
-            return b"\x00"
-        password: StrOrBytes = self._password
 
-        if isinstance(password, str):
-            password = password.encode("utf8")
-
-        return password + b"\x00"
-
-    def auth_response(
-        self, auth_data: Optional[bytes] = None  # pylint: disable=unused-argument
+    def auth_more_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
     ) -> bytes:
-        """Return the prepared password to send to MySQL.
+        """Handles server's `auth more data` response.
 
-        Raises:
-            InterfaceError: When SSL is required by not enabled.
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Authentication method data (from a packet representing
+                an `auth more data` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
 
         Returns:
-            str: The prepared password.
+            packet: Last server's response after back-and-forth
+                communication.
         """
-        if self.requires_ssl and not self._ssl_enabled:
-            raise errors.InterfaceError(f"{self.plugin_name} requires SSL")
-        return self.prepare_password()
+        raise NotImplementedError
+
+    @abstractmethod
+    def auth_switch_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
+    ) -> bytes:
+        """Handles server's `auth switch request` response.
+
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Plugin provided data (extracted from a packet
+                representing an `auth switch request` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Last server's response after back-and-forth
+                communication.
+        """
+
+
+@lru_cache(maxsize=10, typed=False)
+def get_auth_plugin(
+    plugin_name: str,
+    auth_plugin_class: Optional[str] = None,
+) -> Type[MySQLAuthPlugin]:
+    """Return authentication class based on plugin name
+
+    This function returns the class for the authentication plugin plugin_name.
+    The returned class is a subclass of BaseAuthPlugin.
+
+    Args:
+        plugin_name (str): Authentication plugin name.
+        auth_plugin_class (str): Authentication plugin class name.
+
+    Raises:
+        NotSupportedError: When plugin_name is not supported.
+
+    Returns:
+        Subclass of `MySQLAuthPlugin`.
+    """
+    package = DEFAULT_PLUGINS_PKG
+    if plugin_name:
+        try:
+            logger.info("package: %s", package)
+            logger.info("plugin_name: %s", plugin_name)
+            plugin_module = importlib.import_module(f".{plugin_name}", package)
+            if not auth_plugin_class or not hasattr(plugin_module, auth_plugin_class):
+                auth_plugin_class = plugin_module.AUTHENTICATION_PLUGIN_CLASS
+            logger.info("AUTHENTICATION_PLUGIN_CLASS: %s", auth_plugin_class)
+            return getattr(plugin_module, auth_plugin_class)
+        except ModuleNotFoundError as err:
+            logger.warning("Requested Module was not found: %s", err)
+        except ValueError as err:
+            raise ProgrammingError(f"Invalid module name: {err}") from err
+    raise NotSupportedError(f"Authentication plugin '{plugin_name}' is not supported")

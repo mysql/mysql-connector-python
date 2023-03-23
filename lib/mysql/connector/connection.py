@@ -56,7 +56,7 @@ from typing import (
 
 from . import version
 from .abstracts import MySQLConnectionAbstract
-from .authentication import get_auth_plugin
+from .authentication import MySQLAuthenticator, get_auth_plugin
 from .constants import (
     CharacterSet,
     ClientFlag,
@@ -96,7 +96,6 @@ from .logger import logger
 from .network import MySQLSocket, MySQLTCPSocket, MySQLUnixSocket
 from .opentelemetry.constants import OTEL_ENABLED
 from .opentelemetry.context_propagation import with_context_propagation
-from .plugins import BaseAuthPlugin
 from .protocol import MySQLProtocol
 from .types import (
     ConnAttrsType,
@@ -163,6 +162,8 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         self._columns_desc: List[DescriptionType] = []
         self._mfa_nfactor: int = 1
+
+        self._authenticator: MySQLAuthenticator = MySQLAuthenticator()
 
         if kwargs:
             try:
@@ -257,33 +258,6 @@ class MySQLConnection(MySQLConnectionAbstract):
         Raises NotSupportedError when we get the old, insecure password
         reply back. Raises any error coming from MySQL.
         """
-        self._ssl_active = False
-        if ssl_options is None:
-            ssl_options = {}
-        if not self._ssl_disabled and (client_flags & ClientFlag.SSL):
-            packet = self._protocol.make_auth_ssl(
-                charset=charset, client_flags=client_flags
-            )
-            self._socket.send(packet)
-            if ssl_options.get("tls_ciphersuites") is not None:
-                tls_ciphersuites = ":".join(ssl_options.get("tls_ciphersuites"))
-            else:
-                tls_ciphersuites = ""
-            self._socket.switch_to_ssl(
-                ssl_options.get("ca"),
-                ssl_options.get("cert"),
-                ssl_options.get("key"),
-                ssl_options.get("verify_cert") or False,
-                ssl_options.get("verify_identity") or False,
-                tls_ciphersuites,
-                ssl_options.get("tls_versions"),
-            )
-            self._ssl_active = True
-
-        if self._password1 and password != self._password1:
-            password = self._password1
-
-        logger.debug("# _do_auth(): self._auth_plugin: %s", self._auth_plugin)
         if (
             self._auth_plugin.startswith("authentication_oci")
             or (
@@ -298,244 +272,43 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self._auth_plugin,
             )
 
-        packet = self._protocol.make_auth(
+        if self._password1 and password != self._password1:
+            password = self._password1
+
+        self._ssl_active = False
+        if not self._ssl_disabled and (client_flags & ClientFlag.SSL):
+            self._authenticator.setup_ssl(
+                self._socket,
+                self.server_host,
+                ssl_options,
+                charset=charset,
+                client_flags=client_flags,
+            )
+            self._ssl_active = True
+
+        ok_pkt = self._authenticator.authenticate(
+            sock=self._socket,
             handshake=self._handshake,
             username=username,
-            password=password,
+            password1=password,
+            password2=self._password2,
+            password3=self._password3,
             database=database,
             charset=charset,
             client_flags=client_flags,
-            ssl_enabled=self._ssl_active,
             auth_plugin=self._auth_plugin,
-            conn_attrs=conn_attrs,
             auth_plugin_class=self._auth_plugin_class,
+            conn_attrs=conn_attrs,
+            krb_service_principal=self._krb_service_principal,
+            oci_config_file=self._oci_config_file,
+            oci_config_profile=self._oci_config_profile,
         )
-        self._socket.send(packet)
-        self._auth_switch_request(username, password)
+        self._handle_ok(ok_pkt)
 
         if not (client_flags & ClientFlag.CONNECT_WITH_DB) and database:
             self.cmd_init_db(database)
 
         return True
-
-    def _auth_switch_request(
-        self, username: Optional[str] = None, password: Optional[str] = None
-    ) -> Optional[OkPacketType]:
-        """Handle second part of authentication
-
-        Raises NotSupportedError when we get the old, insecure password
-        reply back. Raises any error coming from MySQL.
-        """
-        auth = None
-        new_auth_plugin: Optional[str] = (
-            self._auth_plugin or self._handshake["auth_plugin"]
-        )
-        logger.debug("new_auth_plugin: %s", new_auth_plugin)
-        packet = self._socket.recv()
-        if packet[4] == 254 and len(packet) == 5:
-            raise NotSupportedError(
-                "Authentication with old (insecure) passwords "
-                "is not supported. For more information, lookup "
-                "Password Hashing in the latest MySQL manual"
-            )
-        if packet[4] == 254:
-            # AuthSwitchRequest
-            (
-                new_auth_plugin,
-                auth_data,
-            ) = self._protocol.parse_auth_switch_request(packet)
-            auth = get_auth_plugin(new_auth_plugin, self._auth_plugin_class)(
-                auth_data,
-                username=username or self._user,
-                password=password,
-                ssl_enabled=self.is_secure,
-            )
-            packet = self._auth_continue(auth, new_auth_plugin, auth_data)
-
-        if packet[4] == 1:
-            auth_data = self._protocol.parse_auth_more_data(packet)
-            auth = get_auth_plugin(new_auth_plugin, self._auth_plugin_class)(
-                auth_data, password=password, ssl_enabled=self.is_secure
-            )
-            if new_auth_plugin == "caching_sha2_password":
-                response = auth.auth_response()
-                if response:
-                    self._socket.send(response)
-                packet = self._socket.recv()
-
-        if packet[4] == 0:
-            return self._handle_ok(packet)
-        if packet[4] == 2:
-            return self._handle_mfa(packet)
-        if packet[4] == 255:
-            raise get_exception(packet)
-        return None
-
-    def _handle_mfa(self, packet: bytes) -> Optional[OkPacketType]:
-        """Handle Multi Factor Authentication."""
-        self._mfa_nfactor += 1
-        if self._mfa_nfactor == 2:
-            password = self._password2
-        elif self._mfa_nfactor == 3:
-            password = self._password3
-        else:
-            raise InterfaceError(
-                "Failed Multi Factor Authentication (invalid N factor)"
-            )
-
-        logger.debug("# MFA N Factor #%d", self._mfa_nfactor)
-
-        packet, auth_plugin = self._protocol.parse_auth_next_factor(packet[4:])
-        auth = get_auth_plugin(auth_plugin, self._auth_plugin_class)(
-            None,
-            username=self._user,
-            password=password,
-            ssl_enabled=self.is_secure,
-        )
-        packet = self._auth_continue(auth, auth_plugin, packet)
-
-        if packet[4] == 1:
-            auth_data = self._protocol.parse_auth_more_data(packet)
-            auth = get_auth_plugin(auth_plugin, self._auth_plugin_class)(
-                auth_data, password=password, ssl_enabled=self.is_secure
-            )
-            if auth_plugin == "caching_sha2_password":
-                response = auth.auth_response()
-                if response:
-                    self._socket.send(response)
-                packet = self._socket.recv()
-
-        if packet[4] == 0:
-            return self._handle_ok(packet)
-        if packet[4] == 2:
-            return self._handle_mfa(packet)
-        if packet[4] == 255:
-            raise get_exception(packet)
-        return None
-
-    def _auth_continue(
-        self, auth: BaseAuthPlugin, auth_plugin: str, auth_data: bytes
-    ) -> bytes:
-        """Continue with the authentication."""
-        if auth_plugin == "authentication_ldap_sasl_client":
-            logger.debug("# auth_data: %s", auth_data)
-            response = auth.auth_response(self._krb_service_principal)
-        elif auth_plugin == "authentication_kerberos_client":
-            logger.debug("# auth_data: %s", auth_data)
-            response = auth.auth_response(auth_data)
-        elif auth_plugin == "authentication_oci_client":
-            logger.debug("# oci configuration file path: %s", self._oci_config_file)
-            auth.oci_config_file = self._oci_config_file
-            auth.oci_config_profile = self._oci_config_profile
-            response = auth.auth_response()
-        else:
-            response = auth.auth_response()
-
-        logger.debug("# request: %s size: %s", response, len(response))
-        self._socket.send(response)
-        packet = self._socket.recv()
-        logger.debug("# server response packet: %s", packet)
-        if (
-            auth_plugin == "authentication_ldap_sasl_client"
-            and len(packet) >= 6
-            and packet[5] == 114
-            and packet[6] == 61
-        ):  # 'r' and '='
-            # Continue with sasl authentication
-            dec_response = packet[5:]
-            cresponse = auth.auth_continue(dec_response)
-            self._socket.send(cresponse)
-            packet = self._socket.recv()
-            if packet[5] == 118 and packet[6] == 61:  # 'v' and '='
-                if auth.auth_finalize(packet[5:]):
-                    # receive packed OK
-                    packet = self._socket.recv()
-        elif (
-            auth_plugin == "authentication_ldap_sasl_client"
-            and auth_data == b"GSSAPI"
-            and packet[4] != 255
-        ):
-            rcode_size = 5  # header size for the response status code.
-            logger.debug("# Continue with sasl GSSAPI authentication")
-            logger.debug("# response header: %s", packet[: rcode_size + 1])
-            logger.debug("# response size: %s", len(packet))
-
-            logger.debug("# Negotiate a service request")
-            complete = False
-            tries = 0  # To avoid a infinite loop attempt no more than feedback messages
-            while not complete and tries < 5:
-                logger.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
-                logger.debug("<< server response: %s", packet)
-                logger.debug("# response code: %s", packet[: rcode_size + 1])
-                step, complete = auth.auth_continue_krb(packet[rcode_size:])
-                logger.debug(" >> response to server: %s", step)
-                self._socket.send(step or b"")
-                packet = self._socket.recv()
-                tries += 1
-            if not complete:
-                raise InterfaceError(
-                    f"Unable to fulfill server request after {tries} "
-                    f"attempts. Last server response: {packet}"
-                )
-            logger.debug(
-                " last GSSAPI response from server: %s length: %d",
-                packet,
-                len(packet),
-            )
-            last_step = auth.auth_accept_close_handshake(packet[rcode_size:])
-            logger.debug(
-                " >> last response to server: %s length: %d",
-                last_step,
-                len(last_step),
-            )
-            self._socket.send(last_step)
-            # Receive final handshake from server
-            packet = self._socket.recv()
-            logger.debug("<< final handshake from server: %s", packet)
-
-            # receive OK packet from server.
-            packet = self._socket.recv()
-            logger.debug("<< ok packet from server: %s", packet)
-        elif auth_plugin == "authentication_kerberos_client" and packet[4] != 255:
-            rcode_size = 5  # Reader size for the response status code
-            logger.debug("# Continue with GSSAPI authentication")
-            logger.debug("# Response header: %s", packet[: rcode_size + 1])
-            logger.debug("# Response size: %s", len(packet))
-            logger.debug("# Negotiate a service request")
-            complete = False
-            tries = 0
-
-            while not complete and tries < 5:
-                logger.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
-                logger.debug("<< Server response: %s", packet)
-                logger.debug("# Response code: %s", packet[: rcode_size + 1])
-                token, complete = auth.auth_continue(packet[rcode_size:])
-                if token:
-                    self._socket.send(token)
-                if complete:
-                    break
-                packet = self._socket.recv()
-
-                logger.debug(">> Response to server: %s", token)
-                tries += 1
-
-            if not complete:
-                raise InterfaceError(
-                    f"Unable to fulfill server request after {tries} "
-                    f"attempts. Last server response: {packet}"
-                )
-
-            logger.debug(
-                "Last response from server: %s length: %d",
-                packet,
-                len(packet),
-            )
-
-            # Receive OK packet from server.
-            packet = self._socket.recv()
-            logger.debug("<< Ok packet from server: %s", packet)
-
-        return bytes(packet)
 
     def _get_connection(self) -> MySQLSocket:
         """Get connection based on configuration
@@ -1262,25 +1035,30 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if self._compress:
             raise NotSupportedError("Change user is not supported with compression")
-        packet = self._protocol.make_change_user(
-            handshake=self._handshake,
-            username=username,
-            password=password,
-            database=database,
-            charset=charset,
-            client_flags=self._client_flags,
-            ssl_enabled=self._ssl_active,
-            auth_plugin=self._auth_plugin,
-            conn_attrs=self._conn_attrs,
-        )
-        self._socket.send(packet, 0, 0)
 
         if oci_config_file:
             self._oci_config_file = oci_config_file
 
         self._oci_config_profile = oci_config_profile
 
-        ok_packet = self._auth_switch_request(username, password)
+        ok_pkt = self._authenticator.authenticate(
+            sock=self._socket,
+            handshake=self._handshake,
+            username=self._user,
+            password1=password,
+            password2=self._password2,
+            password3=self._password3,
+            database=database,
+            charset=charset,
+            client_flags=self._client_flags,
+            auth_plugin=self._auth_plugin,
+            auth_plugin_class=self._auth_plugin_class,
+            conn_attrs=self._conn_attrs,
+            is_change_user_request=True,
+            krb_service_principal=self._krb_service_principal,
+            oci_config_file=self._oci_config_file,
+            oci_config_profile=self._oci_config_profile,
+        )
 
         if not (self._client_flags & ClientFlag.CONNECT_WITH_DB) and database:
             self.cmd_init_db(database)
@@ -1288,7 +1066,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._charset_id = charset
         self._post_connection()
 
-        return ok_packet
+        # return ok_pkt
+        return self._handle_ok(ok_pkt)
 
     @property
     def database(self) -> str:

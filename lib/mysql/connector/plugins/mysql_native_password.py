@@ -1,4 +1,4 @@
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,39 +31,32 @@
 import struct
 
 from hashlib import sha1
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..errors import InterfaceError
-from ..types import StrOrBytes
-from . import BaseAuthPlugin
+from ..logger import logger
+from . import MySQLAuthPlugin
+
+if TYPE_CHECKING:
+    from ..network import MySQLSocket
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLNativePasswordAuthPlugin"
 
 
-class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
+class MySQLNativePasswordAuthPlugin(MySQLAuthPlugin):
     """Class implementing the MySQL Native Password authentication plugin"""
 
-    requires_ssl: bool = False
-    plugin_name: str = "mysql_native_password"
-
-    def prepare_password(self) -> bytes:
+    def _prepare_password(self, auth_data: bytes) -> bytes:
         """Prepares and returns password as native MySQL 4.1+ password"""
-        if not self._auth_data:
+        if not auth_data:
             raise InterfaceError("Missing authentication data (seed)")
 
         if not self._password:
             return b""
-        password: StrOrBytes = self._password
-
-        if isinstance(self._password, str):
-            password = self._password.encode("utf-8")
-        else:
-            password = self._password
-
-        auth_data = self._auth_data
 
         hash4 = None
         try:
-            hash1 = sha1(password).digest()
+            hash1 = sha1(self._password.encode()).digest()
             hash2 = sha1(hash1).digest()
             hash3 = sha1(auth_data + hash2).digest()
             xored = [h1 ^ h3 for (h1, h3) in zip(hash1, hash3)]
@@ -72,3 +65,56 @@ class MySQLNativePasswordAuthPlugin(BaseAuthPlugin):
             raise InterfaceError(f"Failed scrambling password; {err}") from err
 
         return hash4
+
+    @property
+    def name(self) -> str:
+        """Plugin official name."""
+        return "mysql_native_password"
+
+    @property
+    def requires_ssl(self) -> bool:
+        """Signals whether or not SSL is required."""
+        return False
+
+    def auth_response(self, auth_data: bytes, **kwargs: Any) -> Optional[bytes]:
+        """Make the client's authorization response.
+
+        Args:
+            auth_data: Authorization data.
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Client's authorization response.
+        """
+        return self._prepare_password(auth_data)
+
+    def auth_switch_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
+    ) -> bytes:
+        """Handles server's `auth switch request` response.
+
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Plugin provided data (extracted from a packet
+                representing an `auth switch request` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Last server's response after back-and-forth
+                communication.
+        """
+        response = self.auth_response(auth_data, **kwargs)
+        if response is None:
+            raise InterfaceError("Got a NULL auth response")
+
+        logger.debug("# request: %s size: %s", response, len(response))
+        sock.send(response)
+
+        pkt = bytes(sock.recv())
+        logger.debug("# server response packet: %s", pkt)
+
+        return pkt

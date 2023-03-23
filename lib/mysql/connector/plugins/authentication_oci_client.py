@@ -1,4 +1,4 @@
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -35,10 +35,13 @@ import os
 
 from base64 import b64encode
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from .. import errors
 from ..logger import logger
+
+if TYPE_CHECKING:
+    from ..network import MySQLSocket
 
 try:
     from cryptography.exceptions import UnsupportedAlgorithm
@@ -55,7 +58,7 @@ except ImportError:
         "Package 'oci' (Oracle Cloud Infrastructure Python SDK) is not installed"
     ) from None
 
-from . import BaseAuthPlugin
+from . import MySQLAuthPlugin
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLOCIAuthPlugin"
 OCI_SECURITY_TOKEN_MAX_SIZE = 10 * 1024  # In bytes
@@ -68,11 +71,9 @@ OCI_PROFILE_MISSING_PROPERTIES = (
 )
 
 
-class MySQLOCIAuthPlugin(BaseAuthPlugin):
+class MySQLOCIAuthPlugin(MySQLAuthPlugin):
     """Implement the MySQL OCI IAM authentication plugin."""
 
-    plugin_name: str = "authentication_oci_client"
-    requires_ssl: bool = False
     context: Any = None
     oci_config_profile: str = "DEFAULT"
     oci_config_file: str = config.DEFAULT_LOCATION
@@ -174,17 +175,60 @@ class MySQLOCIAuthPlugin(BaseAuthPlugin):
 
         return oci_config
 
-    def auth_response(self, auth_data: Optional[bytes] = None) -> bytes:
+    @property
+    def name(self) -> str:
+        """Plugin official name."""
+        return "authentication_oci_client"
+
+    @property
+    def requires_ssl(self) -> bool:
+        """Signals whether or not SSL is required."""
+        return False
+
+    def auth_response(self, auth_data: bytes, **kwargs: Any) -> Optional[bytes]:
         """Prepare authentication string for the server."""
-        logger.debug("server nonce: %s, len %d", self._auth_data, len(self._auth_data))
+        logger.debug("server nonce: %s, len %d", auth_data, len(auth_data))
 
         oci_config = self._get_valid_oci_config()
 
         private_key = self._get_private_key(oci_config["key_file"])
-        signature = private_key.sign(
-            self._auth_data, padding.PKCS1v15(), hashes.SHA256()
-        )
+        signature = private_key.sign(auth_data, padding.PKCS1v15(), hashes.SHA256())
 
         auth_response = self._prepare_auth_response(signature, oci_config)
         logger.debug("authentication response: %s", auth_response)
         return auth_response.encode()
+
+    def auth_switch_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
+    ) -> bytes:
+        """Handles server's `auth switch request` response.
+
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Plugin provided data (extracted from a packet
+                representing an `auth switch request` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Last server's response after back-and-forth
+                communication.
+        """
+        self.oci_config_file = kwargs.get("oci_config_file", "DEFAULT")
+        self.oci_config_profile = kwargs.get(
+            "oci_config_profile", config.DEFAULT_LOCATION
+        )
+        logger.debug("# oci configuration file path: %s", self.oci_config_file)
+
+        response = self.auth_response(auth_data, **kwargs)
+        if response is None:
+            raise errors.InterfaceError("Got a NULL auth response")
+
+        logger.debug("# request: %s size: %s", response, len(response))
+        sock.send(response)
+
+        packet = sock.recv()
+        logger.debug("# server response packet: %s", packet)
+
+        return bytes(packet)

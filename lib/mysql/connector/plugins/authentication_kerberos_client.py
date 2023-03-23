@@ -1,4 +1,4 @@
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,11 +34,16 @@ import getpass
 import os
 import struct
 
+from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
+from ..authentication import ERR_STATUS
 from ..errors import InterfaceError, ProgrammingError
 from ..logger import logger
+
+if TYPE_CHECKING:
+    from ..network import MySQLSocket
 
 try:
     import gssapi
@@ -58,19 +63,119 @@ except ImportError:
     sspi = None
     sspicon = None
 
-from . import BaseAuthPlugin
+from . import MySQLAuthPlugin
 
 AUTHENTICATION_PLUGIN_CLASS = (
     "MySQLSSPIKerberosAuthPlugin" if os.name == "nt" else "MySQLKerberosAuthPlugin"
 )
 
 
+class MySQLBaseKerberosAuthPlugin(MySQLAuthPlugin):
+    """Base class for the MySQL Kerberos authentication plugin."""
+
+    @property
+    def name(self) -> str:
+        """Plugin official name."""
+        return "authentication_kerberos_client"
+
+    @property
+    def requires_ssl(self) -> bool:
+        """Signals whether or not SSL is required."""
+        return False
+
+    @abstractmethod
+    def auth_continue(
+        self, tgt_auth_challenge: Optional[bytes]
+    ) -> Tuple[Optional[bytes], bool]:
+        """Continue with the Kerberos TGT service request.
+
+        With the TGT authentication service given response generate a TGT
+        service request. This method must be invoked sequentially (in a loop)
+        until the security context is completed and an empty response needs to
+        be send to acknowledge the server.
+
+        Args:
+            tgt_auth_challenge: the challenge for the negotiation.
+
+        Returns:
+            tuple (bytearray TGS service request,
+            bool True if context is completed otherwise False).
+        """
+
+    def auth_switch_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
+    ) -> bytes:
+        """Handles server's `auth switch request` response.
+
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Plugin provided data (extracted from a packet
+                representing an `auth switch request` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Last server's response after back-and-forth
+                communication.
+        """
+        logger.debug("# auth_data: %s", auth_data)
+        response = self.auth_response(auth_data, ignore_auth_data=False, **kwargs)
+        if response is None:
+            raise InterfaceError("Got a NULL auth response")
+
+        logger.debug("# request: %s size: %s", response, len(response))
+        sock.send(response)
+
+        packet = sock.recv()
+        logger.debug("# server response packet: %s", packet)
+
+        if packet != ERR_STATUS:
+            rcode_size = 5  # Reader size for the response status code
+            logger.debug("# Continue with GSSAPI authentication")
+            logger.debug("# Response header: %s", packet[: rcode_size + 1])
+            logger.debug("# Response size: %s", len(packet))
+            logger.debug("# Negotiate a service request")
+            complete = False
+            tries = 0
+
+            while not complete and tries < 5:
+                logger.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
+                logger.debug("<< Server response: %s", packet)
+                logger.debug("# Response code: %s", packet[: rcode_size + 1])
+                token, complete = self.auth_continue(packet[rcode_size:])
+                if token:
+                    sock.send(token)
+                if complete:
+                    break
+                packet = sock.recv()
+
+                logger.debug(">> Response to server: %s", token)
+                tries += 1
+
+            if not complete:
+                raise InterfaceError(
+                    f"Unable to fulfill server request after {tries} "
+                    f"attempts. Last server response: {packet}"
+                )
+
+            logger.debug(
+                "Last response from server: %s length: %d",
+                packet,
+                len(packet),
+            )
+
+            # Receive OK packet from server.
+            packet = sock.recv()
+            logger.debug("<< Ok packet from server: %s", packet)
+
+        return bytes(packet)
+
+
 # pylint: disable=c-extension-no-member,no-member
-class MySQLKerberosAuthPlugin(BaseAuthPlugin):
+class MySQLKerberosAuthPlugin(MySQLBaseKerberosAuthPlugin):
     """Implement the MySQL Kerberos authentication plugin."""
 
-    plugin_name: str = "authentication_kerberos_client"
-    requires_ssl: bool = False
     context: Optional[gssapi.SecurityContext] = None
 
     @staticmethod
@@ -97,7 +202,7 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         """
         krb5ccname = os.environ.get(
             "KRB5CCNAME",
-            f"/tmp/krb5cc_{os.getuid()}"
+            f"/tmp/krb5cc_{os.getuid()}"  # type: ignore[attr-defined]
             if os.name == "posix"
             else Path("%TEMP%").joinpath("krb5cc"),
         )
@@ -166,19 +271,21 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
 
         return spn.decode(), realm.decode()
 
-    def auth_response(self, auth_data: Optional[bytes] = None) -> Optional[bytes]:
+    def auth_response(
+        self, auth_data: Optional[bytes] = None, **kwargs: Any
+    ) -> Optional[bytes]:
         """Prepare the first message to the server."""
         spn = None
         realm = None
 
-        if auth_data:
+        if auth_data and not kwargs.get("ignore_auth_data", True):
             try:
                 spn, realm = self._parse_auth_data(auth_data)
             except struct.error as err:
                 raise InterruptedError(f"Invalid authentication data: {err}") from err
 
         if spn is None:
-            return self.prepare_password()
+            return self._password.encode() + b"\x00"
 
         upn = f"{self._username}@{realm}" if self._username else None
 
@@ -325,11 +432,9 @@ class MySQLKerberosAuthPlugin(BaseAuthPlugin):
         return wraped.message
 
 
-class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
+class MySQLSSPIKerberosAuthPlugin(MySQLBaseKerberosAuthPlugin):
     """Implement the MySQL Kerberos authentication plugin with Windows SSPI"""
 
-    plugin_name: str = "authentication_kerberos_client"
-    requires_ssl: bool = False
     context: Any = None
     clientauth: Any = None
 
@@ -359,13 +464,20 @@ class MySQLSSPIKerberosAuthPlugin(BaseAuthPlugin):
 
         return spn.decode(), realm.decode()
 
-    def auth_response(self, auth_data: Optional[bytes] = None) -> Optional[bytes]:
-        """Prepare the first message to the server."""
+    def auth_response(
+        self, auth_data: Optional[bytes] = None, **kwargs: Any
+    ) -> Optional[bytes]:
+        """Prepare the first message to the server.
+
+        Args:
+            kwargs:
+                ignore_auth_data (bool): if True, the provided auth data is ignored.
+        """
         logger.debug("auth_response for sspi")
         spn = None
         realm = None
 
-        if auth_data:
+        if auth_data and not kwargs.get("ignore_auth_data", True):
             try:
                 spn, realm = self._parse_auth_data(auth_data)
             except struct.error as err:

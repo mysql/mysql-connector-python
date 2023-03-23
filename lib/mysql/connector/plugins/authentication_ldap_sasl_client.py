@@ -1,4 +1,4 @@
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,12 +32,16 @@ import hmac
 
 from base64 import b64decode, b64encode
 from hashlib import sha1, sha256
-from typing import Any, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple
 from uuid import uuid4
 
+from ..authentication import ERR_STATUS
 from ..errors import InterfaceError, ProgrammingError
 from ..logger import logger
 from ..types import StrOrBytes
+
+if TYPE_CHECKING:
+    from ..network import MySQLSocket
 
 try:
     import gssapi
@@ -52,13 +56,13 @@ from ..utils import (
     normalize_unicode_string as norm_ustr,
     validate_normalized_unicode_string as valid_norm,
 )
-from . import BaseAuthPlugin
+from . import MySQLAuthPlugin
 
 AUTHENTICATION_PLUGIN_CLASS = "MySQLLdapSaslPasswordAuthPlugin"
 
 
 # pylint: disable=c-extension-no-member,no-member
-class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
+class MySQLLdapSaslPasswordAuthPlugin(MySQLAuthPlugin):
     """Class implementing the MySQL ldap sasl authentication plugin.
 
     The MySQL's ldap sasl authentication plugin support two authentication
@@ -78,13 +82,11 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
     """
 
     sasl_mechanisms: List[str] = ["SCRAM-SHA-1", "SCRAM-SHA-256", "GSSAPI"]
-    requires_ssl: bool = False
-    plugin_name: str = "authentication_ldap_sasl_client"
     def_digest_mode: Callable = sha1
     client_nonce: Optional[str] = None
     client_salt: Any = None
     server_salt: Optional[str] = None
-    krb_service_principal: Optional[StrOrBytes] = None
+    krb_service_principal: Optional[str] = None
     iterations: int = 0
     server_auth_var: Optional[str] = None
     target_name: Optional[gssapi.Name] = None
@@ -292,17 +294,19 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
 
         return wraped.message
 
-    def auth_response(  # type: ignore[override]
+    def auth_response(
         self,
-        auth_data: Optional[str] = None,
+        auth_data: bytes,
+        **kwargs: Any,
     ) -> Optional[bytes]:
         """This method will prepare the fist message to the server.
 
         Returns bytes to send to the server as the first message.
         """
-        krb_service_principal = auth_data
+        # pylint: disable=attribute-defined-outside-init
+        self._auth_data = auth_data
+
         auth_mechanism = self._auth_data.decode()
-        self.krb_service_principal = krb_service_principal
         logger.debug("read_method_name_from_server: %s", auth_mechanism)
         if auth_mechanism not in self.sasl_mechanisms:
             auth_mechanisms = '", "'.join(self.sasl_mechanisms[:-1])
@@ -491,6 +495,101 @@ class MySQLLdapSaslPasswordAuthPlugin(BaseAuthPlugin):
                 "Authentication failed: Unable to proof server identity"
             )
         return True
+
+    @property
+    def name(self) -> str:
+        """Plugin official name."""
+        return "authentication_ldap_sasl_client"
+
+    @property
+    def requires_ssl(self) -> bool:
+        """Signals whether or not SSL is required."""
+        return False
+
+    def auth_switch_response(
+        self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
+    ) -> bytes:
+        """Handles server's `auth switch request` response.
+
+        Args:
+            sock: Pointer to the socket connection.
+            auth_data: Plugin provided data (extracted from a packet
+                representing an `auth switch request` response).
+            kwargs: Custom configuration to be passed to the auth plugin
+                when invoked. The parameters defined here will override the ones
+                defined in the auth plugin itself.
+
+        Returns:
+            packet: Last server's response after back-and-forth
+                communication.
+        """
+        logger.debug("# auth_data: %s", auth_data)
+        self.krb_service_principal = kwargs.get("krb_service_principal")
+
+        response = self.auth_response(auth_data, **kwargs)
+        if response is None:
+            raise InterfaceError("Got a NULL auth response")
+
+        logger.debug("# request: %s size: %s", response, len(response))
+        sock.send(response)
+
+        packet = sock.recv()
+        logger.debug("# server response packet: %s", packet)
+
+        if len(packet) >= 6 and packet[5] == 114 and packet[6] == 61:  # 'r' and '='
+            # Continue with sasl authentication
+            dec_response = packet[5:]
+            cresponse = self.auth_continue(dec_response)
+            sock.send(cresponse)
+            packet = sock.recv()
+            if packet[5] == 118 and packet[6] == 61:  # 'v' and '='
+                if self.auth_finalize(packet[5:]):
+                    # receive packed OK
+                    packet = sock.recv()
+        elif auth_data == b"GSSAPI" and packet[4] != ERR_STATUS:
+            rcode_size = 5  # header size for the response status code.
+            logger.debug("# Continue with sasl GSSAPI authentication")
+            logger.debug("# response header: %s", packet[: rcode_size + 1])
+            logger.debug("# response size: %s", len(packet))
+
+            logger.debug("# Negotiate a service request")
+            complete = False
+            tries = 0  # To avoid a infinite loop attempt no more than feedback messages
+            while not complete and tries < 5:
+                logger.debug("%s Attempt %s %s", "-" * 20, tries + 1, "-" * 20)
+                logger.debug("<< server response: %s", packet)
+                logger.debug("# response code: %s", packet[: rcode_size + 1])
+                step, complete = self.auth_continue_krb(packet[rcode_size:])
+                logger.debug(" >> response to server: %s", step)
+                sock.send(step or b"")
+                packet = sock.recv()
+                tries += 1
+            if not complete:
+                raise InterfaceError(
+                    f"Unable to fulfill server request after {tries} "
+                    f"attempts. Last server response: {packet}"
+                )
+            logger.debug(
+                " last GSSAPI response from server: %s length: %d",
+                packet,
+                len(packet),
+            )
+            last_step = self.auth_accept_close_handshake(packet[rcode_size:])
+            logger.debug(
+                " >> last response to server: %s length: %d",
+                last_step,
+                len(last_step),
+            )
+            sock.send(last_step)
+            # Receive final handshake from server
+            packet = sock.recv()
+            logger.debug("<< final handshake from server: %s", packet)
+
+            # receive OK packet from server.
+            packet = sock.recv()
+            logger.debug("<< ok packet from server: %s", packet)
+
+        return bytes(packet)
 
 
 # pylint: enable=c-extension-no-member,no-member

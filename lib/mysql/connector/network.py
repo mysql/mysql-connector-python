@@ -39,6 +39,7 @@ import zlib
 
 from abc import ABC, abstractmethod
 from collections import deque
+from typing import Any, Deque, List, Optional, Tuple, Union
 
 try:
     import ssl
@@ -47,22 +48,20 @@ try:
         "TLSv1": ssl.PROTOCOL_TLSv1,
         "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
         "TLSv1.2": ssl.PROTOCOL_TLSv1_2,
+        "TLSv1.3": ssl.PROTOCOL_TLS,
     }
-    # TLSv1.3 included in PROTOCOL_TLS, but PROTOCOL_TLS is not included on 3.4
-    TLS_VERSIONS["TLSv1.3"] = (
-        ssl.PROTOCOL_TLS
-        if hasattr(ssl, "PROTOCOL_TLS")
-        else ssl.PROTOCOL_SSLv23  # Alias of PROTOCOL_TLS
-    )
     TLS_V1_3_SUPPORTED = hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3
 except ImportError:
     # If import fails, we don't have SSL support.
     TLS_V1_3_SUPPORTED = False
+    ssl = None
 
-from typing import Any, Deque, List, Optional, Tuple, Union
-
-from .errors import InterfaceError, NotSupportedError, OperationalError
-from .types import StrOrBytesPath
+from .errors import (
+    InterfaceError,
+    NotSupportedError,
+    OperationalError,
+    ProgrammingError,
+)
 
 MIN_COMPRESS_LENGTH: int = 50
 MAX_PAYLOAD_LENGTH: int = 2**24 - 1
@@ -483,85 +482,36 @@ class MySQLSocket(ABC):
         if self.sock:
             self.sock.settimeout(timeout)
 
-    def switch_to_ssl(
-        self,
-        ca: StrOrBytesPath,
-        cert: StrOrBytesPath,
-        key: StrOrBytesPath,
-        verify_cert: bool = False,
-        verify_identity: bool = False,
-        cipher_suites: Optional[str] = None,
-        tls_versions: Optional[List[str]] = None,
-    ) -> None:
-        """Switch the socket to use SSL"""
-        if not self.sock:
-            raise InterfaceError(errno=2048)
+    def switch_to_ssl(self, ssl_context: Any, host: str) -> None:
+        """Upgrade an existing connection to TLS.
+
+        Args:
+            ssl_context (ssl.SSLContext): The SSL Context to be used.
+            host (str): Server host name.
+
+        Returns:
+            None.
+
+        Raises:
+            ProgrammingError: If the transport does not expose the socket instance.
+            NotSupportedError: If Python installation has no SSL support.
+        """
+        # Ensure that self.sock is already created
+        assert self.sock is not None
+
+        if self.sock.family == 1:  # socket.AF_UNIX
+            raise ProgrammingError("SSL is not supported when using Unix sockets")
+
+        if ssl is None:
+            raise NotSupportedError("Python installation has no SSL support")
 
         try:
-            if verify_cert:
-                cert_reqs = ssl.CERT_REQUIRED
-            elif verify_identity:
-                cert_reqs = ssl.CERT_OPTIONAL
-            else:
-                cert_reqs = ssl.CERT_NONE
-
-            if tls_versions is None or not tls_versions:
-                context = ssl.create_default_context()
-                if not verify_identity:
-                    context.check_hostname = False
-            else:
-                tls_versions.sort(reverse=True)
-
-                tls_version = tls_versions[0]
-                if (
-                    not TLS_V1_3_SUPPORTED
-                    and tls_version == "TLSv1.3"
-                    and len(tls_versions) > 1
-                ):
-                    tls_version = tls_versions[1]
-                ssl_protocol = TLS_VERSIONS[tls_version]
-                context = ssl.SSLContext(ssl_protocol)
-
-                if tls_version == "TLSv1.3":
-                    if "TLSv1.2" not in tls_versions:
-                        context.options |= ssl.OP_NO_TLSv1_2
-                    if "TLSv1.1" not in tls_versions:
-                        context.options |= ssl.OP_NO_TLSv1_1
-                    if "TLSv1" not in tls_versions:
-                        context.options |= ssl.OP_NO_TLSv1
-
-            context.check_hostname = False
-            context.verify_mode = cert_reqs
-            context.load_default_certs()
-
-            if ca:
-                try:
-                    context.load_verify_locations(ca)
-                except (IOError, ssl.SSLError) as err:
-                    self.sock.close()
-                    raise InterfaceError(f"Invalid CA Certificate: {err}") from err
-            if cert:
-                try:
-                    context.load_cert_chain(cert, key)
-                except (IOError, ssl.SSLError) as err:
-                    self.sock.close()
-                    raise InterfaceError(f"Invalid Certificate/Key: {err}") from err
-            if cipher_suites:
-                context.set_ciphers(cipher_suites)
-
-            if hasattr(self, "server_host"):
-                self.sock = context.wrap_socket(
-                    self.sock, server_hostname=self.server_host
-                )
-            else:
-                self.sock = context.wrap_socket(self.sock)
-
-            if verify_identity:
-                context.check_hostname = True
-                hostnames: List[str] = [self.server_host] if self.server_host else []
-                if os.name == "nt" and self.server_host == "localhost":
+            self.sock = ssl_context.wrap_socket(self.sock, server_hostname=host)
+            if ssl_context.check_hostname:
+                hostnames = [host] if host else []
+                if os.name == "nt" and host == "localhost":
                     hostnames = ["localhost", "127.0.0.1"]
-                    aliases = socket.gethostbyaddr(self.server_host)
+                    aliases = socket.gethostbyaddr(host)
                     hostnames.extend([aliases[0]] + aliases[1])
                 match_found = False
                 errs = []
@@ -571,7 +521,10 @@ class MySQLSocket(ABC):
                         # should be removed in the future, since OpenSSL now
                         # performs hostname matching
                         # pylint: disable=deprecated-method
-                        ssl.match_hostname(self.sock.getpeercert(), hostname)
+                        ssl.match_hostname(
+                            self.sock.getpeercert(),  # type: ignore[union-attr]
+                            hostname,
+                        )
                         # pylint: enable=deprecated-method
                     except ssl.CertificateError as err:
                         errs.append(str(err))
@@ -592,6 +545,99 @@ class MySQLSocket(ABC):
         except ssl.CertificateError as err:
             raise InterfaceError(str(err)) from err
         except NotImplementedError as err:
+            raise InterfaceError(str(err)) from err
+
+    def build_ssl_context(
+        self,
+        ssl_ca: Optional[str] = None,
+        ssl_cert: Optional[str] = None,
+        ssl_key: Optional[str] = None,
+        ssl_verify_cert: Optional[bool] = False,
+        ssl_verify_identity: Optional[bool] = False,
+        tls_versions: Optional[List[str]] = None,
+        tls_cipher_suites: Optional[List[str]] = None,
+    ) -> Any:
+        """Build a SSLContext.
+
+        Args:
+            ssl_ca: Certificate authority, opptional.
+            ssl_cert: SSL certificate, optional.
+            ssl_key: Private key, optional.
+            ssl_verify_cert: Verify the SSL certificate if `True`.
+            ssl_verify_identity: Verify host identity if `True`.
+            tls_versions: TLS protocol versions, optional.
+            tls_cipher_suites: Set of steps that helps to establish a secure connection.
+
+        Returns:
+            ssl_context (ssl.SSLContext): An SSL Context ready be used.
+
+        Raises:
+            NotSupportedError: Python installation has no SSL support.
+            InterfaceError: Socket undefined or invalid ssl data.
+        """
+        if not self.sock:
+            raise InterfaceError(errno=2048)
+
+        if ssl is None:
+            raise NotSupportedError("Python installation has no SSL support")
+
+        if tls_versions is None:
+            tls_versions = []
+
+        if tls_cipher_suites is None:
+            tls_cipher_suites = []
+
+        try:
+            if tls_versions:
+                tls_versions.sort(reverse=True)
+                tls_version = tls_versions[0]
+                ssl_protocol = TLS_VERSIONS[tls_version]
+                context = ssl.SSLContext(ssl_protocol)
+
+                if tls_version == "TLSv1.3":
+                    if "TLSv1.2" not in tls_versions:
+                        context.options |= ssl.OP_NO_TLSv1_2
+                    if "TLSv1.1" not in tls_versions:
+                        context.options |= ssl.OP_NO_TLSv1_1
+                    if "TLSv1" not in tls_versions:
+                        context.options |= ssl.OP_NO_TLSv1
+            else:
+                context = ssl.create_default_context()
+
+            context.check_hostname = ssl_verify_identity
+
+            if ssl_verify_cert:
+                context.verify_mode = ssl.CERT_REQUIRED
+            elif ssl_verify_identity:
+                context.verify_mode = ssl.CERT_OPTIONAL
+            else:
+                context.verify_mode = ssl.CERT_NONE
+
+            context.load_default_certs()
+
+            if ssl_ca:
+                try:
+                    context.load_verify_locations(ssl_ca)
+                except (IOError, ssl.SSLError) as err:
+                    raise InterfaceError(f"Invalid CA Certificate: {err}") from err
+            if ssl_cert:
+                try:
+                    context.load_cert_chain(ssl_cert, ssl_key)
+                except (IOError, ssl.SSLError) as err:
+                    raise InterfaceError(f"Invalid Certificate/Key: {err}") from err
+
+            if tls_cipher_suites:
+                context.set_ciphers(":".join(tls_cipher_suites))
+
+            return context
+        except NameError as err:
+            raise NotSupportedError("Python installation has no SSL support") from err
+        except (
+            IOError,
+            NotImplementedError,
+            ssl.CertificateError,
+            ssl.SSLError,
+        ) as err:
             raise InterfaceError(str(err)) from err
 
     def send(

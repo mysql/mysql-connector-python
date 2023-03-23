@@ -11,6 +11,7 @@ Full release notes:
 v8.2.0
 ======
 
+- WL#15623: Improve the authentication module
 - BUG#35544123: Kerberos unit tests configuration is outdated
 
 v8.1.0
