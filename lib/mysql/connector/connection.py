@@ -1272,6 +1272,8 @@ class MySQLConnection(MySQLConnectionAbstract):
     @database.setter
     def database(self, value: str) -> None:
         """Set the current database"""
+        if not (value.startswith("`") and value.endswith("`")):
+            value = f"`{value}`"
         self.cmd_query(f"USE {value}")
 
     def is_connected(self) -> bool:
