@@ -361,7 +361,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->result = NULL;
     self->fields = NULL;
     self->use_unicode = 1;
-    self->auth_plugin = PyUnicode_FromString("mysql_native_password");
+    self->auth_plugin = Py_None;
     self->plugin_dir = PyUnicode_FromString(".");
     self->converter_str_fallback = Py_False;
 
@@ -871,7 +871,8 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    if (strcmp(PyUnicode_AsUTF8(self->auth_plugin), "mysql_clear_password") == 0) {
+    if (self->auth_plugin != Py_None &&
+        strcmp(PyUnicode_AsUTF8(self->auth_plugin), "mysql_clear_password") == 0) {
         abool = 1;
         mysql_options(&self->session, MYSQL_ENABLE_CLEARTEXT_PLUGIN, (char *)&abool);
     }
