@@ -1,4 +1,5 @@
-# Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+# -*- coding: utf-8 -*-
+# Copyright (c) 2017, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -31,13 +32,11 @@
 
 # type: ignore
 
-import sys
-_b=sys.version_info[0]<3 and (lambda x:x) or (lambda x:x.encode('latin1'))
+"""Generated protocol buffer code."""
+from google.protobuf.internal import builder as _builder
 from google.protobuf import descriptor as _descriptor
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
+from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -45,220 +44,22 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor.FileDescriptor(
-  name='mysqlx_session.proto',
-  package='Mysqlx.Session',
-  syntax='proto2',
-  serialized_pb=_b('\n\x14mysqlx_session.proto\x12\x0eMysqlx.Session\"S\n\x11\x41uthenticateStart\x12\x11\n\tmech_name\x18\x01 \x02(\t\x12\x11\n\tauth_data\x18\x02 \x01(\x0c\x12\x18\n\x10initial_response\x18\x03 \x01(\x0c\")\n\x14\x41uthenticateContinue\x12\x11\n\tauth_data\x18\x01 \x02(\x0c\"#\n\x0e\x41uthenticateOk\x12\x11\n\tauth_data\x18\x01 \x01(\x0c\"!\n\x05Reset\x12\x18\n\tkeep_open\x18\x01 \x01(\x08:\x05\x66\x61lse\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
-)
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14mysqlx_session.proto\x12\x0eMysqlx.Session\"S\n\x11\x41uthenticateStart\x12\x11\n\tmech_name\x18\x01 \x02(\t\x12\x11\n\tauth_data\x18\x02 \x01(\x0c\x12\x18\n\x10initial_response\x18\x03 \x01(\x0c\")\n\x14\x41uthenticateContinue\x12\x11\n\tauth_data\x18\x01 \x02(\x0c\"#\n\x0e\x41uthenticateOk\x12\x11\n\tauth_data\x18\x01 \x01(\x0c\"!\n\x05Reset\x12\x18\n\tkeep_open\x18\x01 \x01(\x08:\x05\x66\x61lse\"\x07\n\x05\x43loseB\x1b\n\x17\x63om.mysql.cj.x.protobufH\x03')
 
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'mysqlx_session_pb2', globals())
+if _descriptor._USE_C_DESCRIPTORS == False:
 
-
-
-_AUTHENTICATESTART = _descriptor.Descriptor(
-  name='AuthenticateStart',
-  full_name='Mysqlx.Session.AuthenticateStart',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='mech_name', full_name='Mysqlx.Session.AuthenticateStart.mech_name', index=0,
-      number=1, type=9, cpp_type=9, label=2,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='auth_data', full_name='Mysqlx.Session.AuthenticateStart.auth_data', index=1,
-      number=2, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='initial_response', full_name='Mysqlx.Session.AuthenticateStart.initial_response', index=2,
-      number=3, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=40,
-  serialized_end=123,
-)
-
-
-_AUTHENTICATECONTINUE = _descriptor.Descriptor(
-  name='AuthenticateContinue',
-  full_name='Mysqlx.Session.AuthenticateContinue',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='auth_data', full_name='Mysqlx.Session.AuthenticateContinue.auth_data', index=0,
-      number=1, type=12, cpp_type=9, label=2,
-      has_default_value=False, default_value=_b(""),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=125,
-  serialized_end=166,
-)
-
-
-_AUTHENTICATEOK = _descriptor.Descriptor(
-  name='AuthenticateOk',
-  full_name='Mysqlx.Session.AuthenticateOk',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='auth_data', full_name='Mysqlx.Session.AuthenticateOk.auth_data', index=0,
-      number=1, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=168,
-  serialized_end=203,
-)
-
-
-_RESET = _descriptor.Descriptor(
-  name='Reset',
-  full_name='Mysqlx.Session.Reset',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='keep_open', full_name='Mysqlx.Session.Reset.keep_open', index=0,
-      number=1, type=8, cpp_type=7, label=1,
-      has_default_value=True, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=205,
-  serialized_end=238,
-)
-
-
-_CLOSE = _descriptor.Descriptor(
-  name='Close',
-  full_name='Mysqlx.Session.Close',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=240,
-  serialized_end=247,
-)
-
-DESCRIPTOR.message_types_by_name['AuthenticateStart'] = _AUTHENTICATESTART
-DESCRIPTOR.message_types_by_name['AuthenticateContinue'] = _AUTHENTICATECONTINUE
-DESCRIPTOR.message_types_by_name['AuthenticateOk'] = _AUTHENTICATEOK
-DESCRIPTOR.message_types_by_name['Reset'] = _RESET
-DESCRIPTOR.message_types_by_name['Close'] = _CLOSE
-
-AuthenticateStart = _reflection.GeneratedProtocolMessageType('AuthenticateStart', (_message.Message,), dict(
-  DESCRIPTOR = _AUTHENTICATESTART,
-  __module__ = 'mysqlx_session_pb2'
-  # @@protoc_insertion_point(class_scope:Mysqlx.Session.AuthenticateStart)
-  ))
-_sym_db.RegisterMessage(AuthenticateStart)
-
-AuthenticateContinue = _reflection.GeneratedProtocolMessageType('AuthenticateContinue', (_message.Message,), dict(
-  DESCRIPTOR = _AUTHENTICATECONTINUE,
-  __module__ = 'mysqlx_session_pb2'
-  # @@protoc_insertion_point(class_scope:Mysqlx.Session.AuthenticateContinue)
-  ))
-_sym_db.RegisterMessage(AuthenticateContinue)
-
-AuthenticateOk = _reflection.GeneratedProtocolMessageType('AuthenticateOk', (_message.Message,), dict(
-  DESCRIPTOR = _AUTHENTICATEOK,
-  __module__ = 'mysqlx_session_pb2'
-  # @@protoc_insertion_point(class_scope:Mysqlx.Session.AuthenticateOk)
-  ))
-_sym_db.RegisterMessage(AuthenticateOk)
-
-Reset = _reflection.GeneratedProtocolMessageType('Reset', (_message.Message,), dict(
-  DESCRIPTOR = _RESET,
-  __module__ = 'mysqlx_session_pb2'
-  # @@protoc_insertion_point(class_scope:Mysqlx.Session.Reset)
-  ))
-_sym_db.RegisterMessage(Reset)
-
-Close = _reflection.GeneratedProtocolMessageType('Close', (_message.Message,), dict(
-  DESCRIPTOR = _CLOSE,
-  __module__ = 'mysqlx_session_pb2'
-  # @@protoc_insertion_point(class_scope:Mysqlx.Session.Close)
-  ))
-_sym_db.RegisterMessage(Close)
-
-
-DESCRIPTOR.has_options = True
-DESCRIPTOR._options = _descriptor._ParseOptions(descriptor_pb2.FileOptions(), _b('\n\027com.mysql.cj.x.protobufH\003'))
+  DESCRIPTOR._options = None
+  DESCRIPTOR._serialized_options = b'\n\027com.mysql.cj.x.protobufH\003'
+  _AUTHENTICATESTART._serialized_start=40
+  _AUTHENTICATESTART._serialized_end=123
+  _AUTHENTICATECONTINUE._serialized_start=125
+  _AUTHENTICATECONTINUE._serialized_end=166
+  _AUTHENTICATEOK._serialized_start=168
+  _AUTHENTICATEOK._serialized_end=203
+  _RESET._serialized_start=205
+  _RESET._serialized_end=238
+  _CLOSE._serialized_start=240
+  _CLOSE._serialized_end=247
 # @@protoc_insertion_point(module_scope)

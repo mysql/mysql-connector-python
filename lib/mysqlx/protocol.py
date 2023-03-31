@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -519,13 +519,7 @@ class Protocol:
                     ]
                 )
             else:  # Following results are unitary and not a list
-                sess_state_value = (
-                    sess_state_msg["value"][0]
-                    if isinstance(
-                        sess_state_msg["value"], tuple(PROTOBUF_REPEATED_TYPES)
-                    )
-                    else sess_state_msg["value"]
-                )
+                sess_state_value = sess_state_msg["value"].pop()
                 if sess_state_msg["param"] == mysqlxpb_enum(
                     "Mysqlx.Notice.SessionStateChanged.Parameter.ROWS_AFFECTED"
                 ):

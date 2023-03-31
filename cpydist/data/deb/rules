@@ -131,10 +131,5 @@ override_dh_installdocs:
 # anyway.
 SUBSTVARS = -Vpython3-distutils:Depends="python3-distutils"
 
-# Python PROTOBUF is required to communicate with the server using a pure
-# Note that at this time, using PROTOBUF 4 is not supported
-SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (>= 3.11.0)'
-SUBSTVARS += -Vpython3-protobuf:Depends='python3-protobuf (<< 4)'
-
 override_dh_gencontrol:
 	dh_gencontrol -- $(SUBSTVARS)
