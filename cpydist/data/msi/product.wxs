@@ -9,77 +9,11 @@
 
     <Package Compressed="yes" InstallerVersion="200"
      Description="$(var.ProductName) Installer"
-     Comments="Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved."
+     Comments="Copyright (c) 2013, 2023, Oracle and/or its affiliates. All rights reserved."
      InstallScope="perMachine"
      Platform="$(var.Platform)"/>
 
-    <Property Id="PREVIOUSVERSIONSINSTALLED36" Secure="yes" />
-    <Property Id="PREVIOUSVERSIONSINSTALLED37" Secure="yes" />
-    <Property Id="PREVIOUSVERSIONSINSTALLED38" Secure="yes" />
-    <Property Id="PREVIOUSVERSIONSINSTALLED39" Secure="yes" />
-    <Property Id="PREVIOUSVERSIONSINSTALLED310" Secure="yes" />
-    <Property Id="PREVIOUSVERSIONSINSTALLED311" Secure="yes" />
-
-    <Upgrade Id="c4142c28-7de9-11e7-b269-5ce0c50b9cbc">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED36"/>
-    </Upgrade>
-    <Upgrade Id="212eea22-7fa3-11e8-81b7-37e66f6c3ce1">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED37"/>
-    </Upgrade>
-    <Upgrade Id="29739579-22ec-4df7-905f-05ca0d778c41">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED38"/>
-    </Upgrade>
-    <Upgrade Id="180e8431-7c58-4b72-b206-c6d7bd5487d6">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED39"/>
-    </Upgrade>
-    <Upgrade Id="a0b2ca29-5516-4cb1-a076-178068896350">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED310"/>
-    </Upgrade>
-    <Upgrade Id="9b50203f-fa8d-4397-b8a4-391b1b89072a">
-      <UpgradeVersion OnlyDetect="no" IncludeMinimum="yes" IncludeMaximum="yes"
-       Minimum="1.0.0"
-       Maximum="$(var.Major_Version).$(var.Minor_Version).$(var.Patch_Version)"
-       Property="PREVIOUSVERSIONSINSTALLED311"/>
-    </Upgrade>
-
     <!-- Obtain location of the Python interpreters installed on the system-->
-
-    <!-- Python 3.7 -->
-    <Property Id="PYTHON37INSTALLPATH_ALL">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python37InstallPathAll64" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.7\InstallPath" Win64="yes"/>
-      <?else?>
-      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
-      <RegistrySearch Id="Python37InstallPathAll32" Root="HKLM" Type="raw"
-       Key="Software\Python\PythonCore\3.7-32\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
-    <Property Id="PYTHON37INSTALLPATH_CURRENT">
-      <?if "$(var.Platform)"="x64" ?>
-      <RegistrySearch Id="Python37InstallPathCurrent64" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.7\InstallPath" Win64="yes"/>
-      <?else?>
-      <!-- Starting from python 3.5, 32bit Python install has a '-32' in its InstallPath reg key path -->
-      <RegistrySearch Id="Python37InstallPathCurrent32" Root="HKCU" Type="raw"
-       Key="Software\Python\PythonCore\3.7-32\InstallPath" Win64="no"/>
-      <?endif?>
-    </Property>
 
     <!-- Python 3.8 -->
     <Property Id="PYTHON38INSTALLPATH_ALL">
@@ -170,39 +104,13 @@
     </Property>
 
     <Condition Message="We are unable to locate any supported Python version like Python v$(var.PythonVersion) $(var.Platform) edition. We only support Python installed using the Microsoft Windows Installer (MSI or EXE) downloaded from http://www.python.org/download/. Please check the Connector/Python manual on http://dev.mysql.com/doc/ for more information.">
-      Installed OR PYTHON37INSTALLPATH_ALL OR PYTHON37INSTALLPATH_CURRENT OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT OR PYTHON310INSTALLPATH_ALL OR PYTHON310INSTALLPATH_CURRENT OR PYTHON311INSTALLPATH_ALL OR PYTHON311INSTALLPATH_CURRENT
+      Installed OR PYTHON38INSTALLPATH_ALL OR PYTHON38INSTALLPATH_CURRENT OR PYTHON39INSTALLPATH_ALL OR PYTHON39INSTALLPATH_CURRENT OR PYTHON310INSTALLPATH_ALL OR PYTHON310INSTALLPATH_CURRENT OR PYTHON311INSTALLPATH_ALL OR PYTHON311INSTALLPATH_CURRENT
     </Condition>
 
     <Media Id="1" Cabinet="ConnectorPython_Python.cab" EmbedCab="yes"/>
 
     <!-- Definition of the folders used by the installed files-->
     <Directory Id="TARGETDIR" Name="SourceDir">
-
-      <Directory Id="INSTALLDIRP37" Name="Python37">
-        <Directory Id="PythonLibDir37" Name="Lib">
-          <Directory Id="SitePackagesDir37" Name="site-packages">
-            <Directory Id="EggInfoDir37" Name="mysql_connector_python-$(var.FullVersion)-py3.7.egg-info"/>
-            <Directory Id="MySQLXPackageDir37" Name="mysqlx">
-              <Directory Id="MySQLXPB2Dir37" Name="protobuf"/>
-              <Directory Id="MySQLXLocalesDir37" Name="locales">
-                <Directory Id="MySQLXLocalesEngDir37" Name="eng"/>
-              </Directory>
-            </Directory>
-            <Directory Id="MySQLPackageDir37" Name="mysql">
-              <Directory Id="VendorDir37" Name="vendor">
-                <Directory Id="VendorPluginDir37" Name="plugin"/>
-              </Directory>
-              <Directory Id="ConnectorPackageDir37" Name="connector">
-                <Directory Id="ConnectorPluginsDir37" Name="plugins"/>
-                <Directory Id="DjangoDir37" Name="django"/>
-                <Directory Id="ConnectorLocalesDir37" Name="locales">
-                  <Directory Id="LocalesEngDir37" Name="eng"/>
-                </Directory>
-              </Directory>
-            </Directory>
-          </Directory>
-        </Directory>
-      </Directory>
 
       <Directory Id="INSTALLDIRP38" Name="Python38">
         <Directory Id="PythonLibDir38" Name="Lib">
@@ -377,32 +285,6 @@
         <ComponentRef Id="MyConnPyExamples"/>
       </Feature>
 
-      <!-- Python 3.7 -->
-      <?if $(var.BDist37) != "" ?>
-      <Feature Id="Python37" Title="C/py for Python 3.7" Level="1"
-               ConfigurableDirectory ="INSTALLDIRP37" Absent="allow">
-        <Condition Level='0'>Not PYTHON37INSTALLPATH_ALL AND Not PYTHON37INSTALLPATH_CURRENT AND Not Installed</Condition>
-        <ComponentRef Id="EggInfo37"/>
-        <ComponentRef Id="MySQLPackage37"/>
-        <?if $(var.HaveCExt37) = 1 ?>
-        <ComponentRef Id="Vendor37"/>
-        <ComponentRef Id="VendorPlugin37"/>
-        <?endif?>
-        <ComponentRef Id="ConnectorPackage37"/>
-        <ComponentRef Id="ConnectorPlugins37"/>
-        <ComponentRef Id="ConnectorLocales37"/>
-        <ComponentRef Id="LocalesEng37"/>
-        <ComponentRef Id="DjangoBackend37"/>
-        <ComponentRef Id="MySQLXPackage37"/>
-        <ComponentRef Id="MySQLXPackagePB237"/>
-        <ComponentRef Id="MySQLXLocales37"/>
-        <ComponentRef Id="MySQLXLocalesEng37"/>
-        <?if $(var.HaveCExt37) = 1 ?>
-        <ComponentRef Id="CExtension37"/>
-        <?endif?>
-      </Feature>
-      <?endif?>
-
       <!-- Python 3.8 -->
       <?if $(var.BDist38) != "" ?>
       <Feature Id="Python38" Title="C/py for Python 3.8" Level="1"
@@ -508,11 +390,6 @@
       <?endif?>
     </Feature>
 
-    <!-- Python 3.7 -->
-    <CustomAction Id="SetInstallDirCurrentP37" Property="INSTALLDIRP37" Value="[PYTHON37INSTALLPATH_CURRENT]"/>
-    <CustomAction Id="SetInstallDirAllP37" Property="INSTALLDIRP37" Value="[PYTHON37INSTALLPATH_ALL]"/>
-    <CustomAction Id="ErrDebug37" Error="Installdir: [INSTALLDIRP37]"/>
-
     <!-- Python 3.8 -->
     <CustomAction Id="SetInstallDirCurrentP38" Property="INSTALLDIRP38" Value="[PYTHON38INSTALLPATH_CURRENT]"/>
     <CustomAction Id="SetInstallDirAllP38" Property="INSTALLDIRP38" Value="[PYTHON38INSTALLPATH_ALL]"/>
@@ -543,9 +420,6 @@
     <InstallExecuteSequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
       <RemoveExistingProducts After="InstallInitialize" />
-      <!-- Python 3.7 -->
-      <Custom Action="SetInstallDirCurrentP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_ALL</Custom>
       <!-- Python 3.8 -->
       <Custom Action="SetInstallDirCurrentP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_ALL</Custom>
@@ -562,9 +436,6 @@
 
     <InstallUISequence>
       <Custom Action="PreventDowngrading" After="FindRelatedProducts">NEWPRODUCTFOUND</Custom>
-      <!-- Python 3.7 -->
-      <Custom Action="SetInstallDirCurrentP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_CURRENT</Custom>
-      <Custom Action="SetInstallDirAllP37" After="AppSearch">NOT Installed AND PYTHON37INSTALLPATH_ALL</Custom>
       <!-- Python 3.8 -->
       <Custom Action="SetInstallDirCurrentP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_CURRENT</Custom>
       <Custom Action="SetInstallDirAllP38" After="AppSearch">NOT Installed AND PYTHON38INSTALLPATH_ALL</Custom>

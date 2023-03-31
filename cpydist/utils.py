@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -691,23 +691,3 @@ def create_tree(base_dir, files):
     # Create them
     for directory in sorted(directories):
         Path(directory).mkdir(parents=True, exist_ok=True)
-
-
-def copy_tree(src, dst, dirs_exist_ok=False):
-    """Recursively copy an entire directory tree rooted at src to a directory dst.
-
-    This is a helper function to add the missing `dir_exist_ok` parameter in
-    `shutil.copytree()` function on Python 3.7. Which basically removes the contents
-    of the destination directory.
-
-    Args:
-        src (str): Source directory.
-        dst (str): Destination directory.
-        dirs_exist_ok (bool): Overwrite destination folder.
-    """
-    if sys.version_info[:3] >= (3, 8, 0):
-        shutil.copytree(src, dst, dirs_exist_ok=dirs_exist_ok)
-    else:
-        if dirs_exist_ok and os.path.exists(dst):
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst)

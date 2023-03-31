@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -194,7 +194,6 @@ class WiX:
             r"-v",
             r"-ext WixUIExtension",
             wxs,
-            r"cpydist\data\msi\PY37.wxs",
             r"cpydist\data\msi\PY38.wxs",
             r"cpydist\data\msi\PY39.wxs",
             r"cpydist\data\msi\PY310.wxs",
@@ -236,7 +235,6 @@ class WiX:
             rf"-out {msi_out}",
             rf"{data_path}\cpy_product_desc.wixobj",
             rf"{data_path}\cpy_msi_gui.wixobj",
-            rf"{data_path}\PY37.wixobj",
             rf"{data_path}\PY38.wixobj",
             rf"{data_path}\PY39.wixobj",
             rf"{data_path}\PY310.wixobj",

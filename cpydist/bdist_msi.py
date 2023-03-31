@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -48,7 +48,6 @@ from . import EDITION, VERSION, VERSION_EXTRA, VERSION_TEXT, BaseCommand, wix
 from .utils import (
     ARCH_64BIT,
     add_arch_dep_elems,
-    copy_tree,
     get_magic_tag,
     get_openssl_libs,
     parse_loose_version,
@@ -107,7 +106,7 @@ class DistMSI(BaseCommand):
     _connc_lib = None
     _dist_path = {}
     _fix_txt_files = {}
-    _supported_versions = ["3.7", "3.8", "3.9", "3.10", "3.11"]
+    _supported_versions = ["3.8", "3.9", "3.10", "3.11"]
     _with_cext = False
     _wxs = None
 
@@ -188,8 +187,10 @@ class DistMSI(BaseCommand):
             self.log.error("MySQL C API should be a directory")
             sys.exit(1)
         self.log.info("# Locating OpeenSSL libraries")
-        copy_tree(os.path.join(connc_loc, "lib"), self._connc_lib, dirs_exist_ok=True)
-        copy_tree(
+        shutil.copytree(
+            os.path.join(connc_loc, "lib"), self._connc_lib, dirs_exist_ok=True
+        )
+        shutil.copytree(
             os.path.join(connc_loc, "include"), self._connc_include, dirs_exist_ok=True
         )
 

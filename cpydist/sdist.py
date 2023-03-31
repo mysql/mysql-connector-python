@@ -1,4 +1,4 @@
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -47,7 +47,7 @@ except ImportError:
     set_threshold = None
 
 from . import COMMON_USER_OPTIONS, EDITION, LOGGER, VERSION
-from .utils import copy_tree, create_tree, get_dist_name, write_info_bin, write_info_src
+from .utils import create_tree, get_dist_name, write_info_bin, write_info_src
 
 
 class DistSource(sdist):
@@ -267,11 +267,11 @@ class SourceGPL(sdist):
             ("docs/INFO_BIN", "INFO_BIN"),
         ]
 
-        copy_tree(self.bdist_dir, self.dist_target, dirs_exist_ok=True)
+        shutil.copytree(self.bdist_dir, self.dist_target, dirs_exist_ok=True)
         Path(self.dist_target).mkdir(parents=True, exist_ok=True)
 
         for src, dst in info_files:
             shutil.copyfile(src, os.path.join(self.dist_target, dst))
 
         if not self.keep_temp:
-            remove_tree(self.build_base, dry_run=self.dry_run)
+            shutil.rmtree(self.build_base, dry_run=self.dry_run)

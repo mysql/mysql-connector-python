@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 
-# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -72,11 +72,6 @@ endif
 # Check whether we have Python v3 support
 ifneq ($(shell which py3versions 2>/dev/null),)
     PYTHON3_SUPPORTED=$(shell py3versions -sv)
-endif
-
-# On Ubuntu 18 we want to use Python 3.7 instead of the default 3.6
-ifeq ($(shell lsb_release --short --codename),bionic)
-    PYTHON3_SUPPORTED=3.7
 endif
 
 ifneq ($(BYTE_CODE_ONLY),)

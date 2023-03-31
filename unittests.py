@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -722,8 +722,8 @@ def setup_stats_db(cnx):
     """Setup the database for storing statistics"""
     cur = cnx.cursor()
 
-    supported_python = ("2.6", "2.7", "3.1", "3.2", "3.3", "3.4")
-    supported_mysql = ("5.1", "5.5", "5.6", "5.7")
+    supported_python = ("3.8", "3.9", "3.10", "3.11")
+    supported_mysql = ("5.7", "8.0", "8.1")
 
     columns = []
     for pyver in supported_python:
