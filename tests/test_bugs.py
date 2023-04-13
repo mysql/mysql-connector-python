@@ -7484,3 +7484,42 @@ class BugOra29115406(tests.MySQLConnectorTests):
                 res = cur.fetchone()
                 self.assertEqual(data[:-5000], res[0][:-5000])
                 self.assertEqual(len(data), len(res[0]))
+
+
+class BugOra35212199(tests.MySQLConnectorTests):
+    """BUG#35212199: Check for identifier quotes in the database name
+
+    Connector/Python raises an error when setting the database name on a
+    connection that includes non-alphanumeric characters and using the pure
+    Python implementation.
+
+    This patch fixes the issue by using `connection.cmd_init_db()` to set
+    the database name.
+    """
+
+    database = "abc-abc|$%"
+
+    def setUp(self):
+        with mysql.connector.connect(**tests.get_mysql_config()) as cnx:
+            try:
+                cnx.cmd_query(f"DROP DATABASE `{self.database}`")
+            except errors.DatabaseError:  # Database already exists
+                pass
+            cnx.cmd_query(f"CREATE DATABASE `{self.database}`")
+
+    def tearDown(self):
+        with mysql.connector.connect(**tests.get_mysql_config()) as cnx:
+            cnx.cmd_query(f"DROP DATABASE `{self.database}`")
+
+    @foreach_cnx()
+    def test_set_database_name(self):
+        """Test setting the database on an established connection."""
+        self.cnx.database = self.database
+
+    @foreach_cnx()
+    def test_connect_database_name(self):
+        """Test setting the database when establishing a connection."""
+        config = tests.get_mysql_config()
+        config["database"] = self.database
+        with self.cnx.__class__(**config) as cnx:
+            self.assertTrue(cnx.is_connected())

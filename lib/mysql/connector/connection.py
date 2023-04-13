@@ -1279,7 +1279,7 @@ class MySQLConnection(MySQLConnectionAbstract):
     @database.setter
     def database(self, value: str) -> None:
         """Set the current database"""
-        self.cmd_query(f"USE {value}")
+        self.cmd_init_db(value)
 
     def is_connected(self) -> bool:
         """Reports whether the connection to MySQL Server is available

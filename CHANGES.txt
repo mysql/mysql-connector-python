@@ -12,6 +12,7 @@ v8.1.0
 ======
 
 - WL#15591: Improve the network module
+- BUG#35212199: Check for identifier quotes in the database name
 
 v8.0.33
 =======
