@@ -138,6 +138,7 @@ setup(
     ],
     ext_modules=EXTENSIONS,
     cmdclass=COMMAND_CLASSES,
+    python_requires=">=3.8",
     install_requires=["protobuf>=3.11.0,<=3.20.3"],
     extras_require={
         "dns-srv": ["dnspython>=1.16.0,<=2.3.0"],
