@@ -341,7 +341,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
 
     """Tests for constants.CharacterSet"""
 
-    utf8_charset = "utf8mb3" if tests.MYSQL_VERSION[:2] == (8, 0) else "utf8"
+    utf8_charset = "utf8mb3" if tests.MYSQL_VERSION[:2] >= (8, 0) else "utf8"
 
     def test_get_info(self):
         """Get info about charset using MySQL ID"""

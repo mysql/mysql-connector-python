@@ -1570,7 +1570,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             self.cnx.set_charset_collation(collation=collation)
             self.assertEqual(DEFAULT_CONFIGURATION["charset"], self.cnx.charset)
 
-        utf8_charset = "utf8mb3" if tests.MYSQL_VERSION[:2] == (8, 0) else "utf8"
+        utf8_charset = "utf8mb3" if tests.MYSQL_VERSION[:2] >= (8, 0) else "utf8"
         self.cnx.set_charset_collation(utf8_charset)
         self.assertEqual(33, self.cnx._charset_id)
 
