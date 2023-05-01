@@ -1202,6 +1202,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         mysql_options(&self->session, MYSQL_OPT_LOCAL_INFILE, &denied);
     }
 
+    if (compress != NULL && (PyBool_Check(compress) && compress == Py_True)) {
+        client_flags = client_flags ^ CLIENT_COMPRESS;
+    }
+
     if (client_flags & CLIENT_LOCAL_FILES && (local_infile != 1)) {
         client_flags = client_flags & ~CLIENT_LOCAL_FILES;
     }
