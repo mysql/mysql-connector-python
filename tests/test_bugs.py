@@ -83,11 +83,14 @@ from tests import cnx_config, foreach_cnx
 from . import check_tls_versions_support
 
 try:
+    from _mysql_connector import MySQL
+
     from mysql.connector.connection_cext import CMySQLConnection, MySQLInterfaceError
 except ImportError:
     # Test without C Extension
     CMySQLConnection = None
     MySQLInterfaceError = None
+    MySQL = None
 
 ERR_NO_CEXT = "C Extension not available"
 
@@ -7523,3 +7526,64 @@ class BugOra35212199(tests.MySQLConnectorTests):
         config["database"] = self.database
         with self.cnx.__class__(**config) as cnx:
             self.assertTrue(cnx.is_connected())
+
+
+class BugOra35349093(tests.MySQLConnectorTests):
+    """BUG#35349093: Compression doesn't work with C extension API
+
+    Compression is not enabled when using the C API implementation directly
+    with the connection option `compress=True`.
+
+    This patch fixes this issue by adding CLIENT_COMPRESS to client flags.
+
+    Thank you for your contribution.
+    """
+
+    def _get_compression_status(self):
+        with self.cnx.cursor() as cur:
+            cur.execute("SHOW SESSION STATUS LIKE 'Compression'")
+            return cur.fetchone()
+
+    @staticmethod
+    def _test_compression_status_cext(compress):
+        config = tests.get_mysql_config()
+        del config["connection_timeout"]
+        config["compress"] = compress
+        cnx = MySQL()
+        cnx.connect(**config)
+        cnx.query("SHOW SESSION STATUS LIKE 'Compression'")
+        res = cnx.fetch_row()
+        cnx.close()
+        return res
+
+    @foreach_cnx()
+    def test_set_compress_default(self):
+        """Test default `compress` option."""
+        res = self._get_compression_status()
+        self.assertEqual(res, ("Compression", "OFF"))
+
+    @cnx_config(compress=False)
+    @foreach_cnx()
+    def test_set_compress_false(self):
+        """Test setting `compress=False`."""
+        res = self._get_compression_status()
+        self.assertEqual(res, ("Compression", "OFF"))
+
+    @cnx_config(compress=True)
+    @foreach_cnx()
+    def test_set_compress_true(self):
+        """Test setting `compress=True`."""
+        res = self._get_compression_status()
+        self.assertEqual(res, ("Compression", "ON"))
+
+    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+    def test_set_compress_cext_true(self):
+        """Test setting `compress=True` in the C extension directly."""
+        res = self._test_compression_status_cext(True)
+        self.assertEqual(res, ("Compression", "ON"))
+
+    @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
+    def test_set_compress_cext_false(self):
+        """Test setting `compress=False` in the C extension directly."""
+        res = self._test_compression_status_cext(False)
+        self.assertEqual(res, ("Compression", "OFF"))

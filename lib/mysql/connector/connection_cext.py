@@ -243,7 +243,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             "port": self._port,
             "client_flags": self._client_flags,
             "unix_socket": self._unix_socket,
-            "compress": self.isset_client_flag(ClientFlag.COMPRESS),
+            "compress": self._compress,
             "ssl_disabled": True,
             "conn_attrs": self._conn_attrs,
             "local_infile": self._allow_local_infile,

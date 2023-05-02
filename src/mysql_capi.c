@@ -1206,6 +1206,10 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         client_flags = client_flags & ~CLIENT_LOCAL_FILES;
     }
 
+    if (compress != NULL && (PyBool_Check(compress) && compress == Py_True)) {
+        client_flags |= CLIENT_COMPRESS;
+    }
+
 #ifdef MS_WINDOWS
     if (NULL == host) {
         // if host is NULL, we try with named pipe

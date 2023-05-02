@@ -13,6 +13,7 @@ v8.1.0
 
 - WL#15630: Remove Python 3.7 support
 - WL#15591: Improve the network module
+- BUG#35349093: Compression doesn't work with C extension API
 - BUG#35338384: PIP installs incompatible Connector/Python packages
 - BUG#35318413: Fix charset mapping for MySQL 8.1.0
 - BUG#35212199: Check for identifier quotes in the database name
