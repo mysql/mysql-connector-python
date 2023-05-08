@@ -518,8 +518,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):  # pylint: disable=abstract-method
         return True
 
     @cached_property
-    @staticmethod
-    def display_name() -> str:
+    def display_name(self) -> str:
         """Display name."""
         return "MySQL"
 
