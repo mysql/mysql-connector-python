@@ -86,12 +86,26 @@ from .errors import (
     OperationalError,
     ProgrammingError,
 )
+from .opentelemetry.constants import (
+    CONNECTION_SPAN_NAME,
+    OPTION_CNX_SPAN,
+    OPTION_CNX_TRACER,
+    OTEL_ENABLED,
+)
+
+if OTEL_ENABLED:
+    from .opentelemetry.instrumentation import (
+        end_span,
+        record_exception_event,
+        set_connection_span_attrs,
+        trace,
+    )
+
 from .optionfiles import read_option_files
 from .types import (
     ConnAttrsType,
     DescriptionType,
     HandShakeType,
-    QueryAttrType,
     StrOrBytes,
     SupportedMysqlBinaryProtocolTypes,
     WarningType,
@@ -142,6 +156,11 @@ class MySQLConnectionAbstract(ABC):
 
     def __init__(self) -> None:
         """Initialize"""
+        # opentelemetry related
+        self._tracer: Any = None
+        self._span: Any = None
+        self.otel_context_propagation: bool = True
+
         self._client_flags: int = ClientFlag.get_default()
         self._charset_id: int = 45
         self._sql_mode: Optional[str] = None
@@ -187,7 +206,7 @@ class MySQLConnectionAbstract(ABC):
         ]
 
         self._prepared_statements: Any = None
-        self._query_attrs: QueryAttrType = []
+        self._query_attrs: Dict[str, Any] = {}
 
         self._ssl_active: bool = False
         self._auth_plugin: Optional[str] = None
@@ -233,19 +252,32 @@ class MySQLConnectionAbstract(ABC):
         return self._have_next_result
 
     @property
-    def query_attrs(self) -> QueryAttrType:
+    def query_attrs(self) -> List[Tuple[str, Any]]:
         """Return query attributes list."""
-        return self._query_attrs
+        return list(self._query_attrs.items())
 
     def query_attrs_append(
         self, value: Tuple[str, SupportedMysqlBinaryProtocolTypes]
     ) -> None:
-        """Add element to the query attributes list."""
-        self._query_attrs.append(value)
+        """Add element to the query attributes list.
+
+        If an element in the query attributes list already matches
+        the attribute name provided, the new element will NOT be added.
+        """
+        attr_name, attr_value = value
+        if attr_name not in self._query_attrs:
+            self._query_attrs[attr_name] = attr_value
+
+    def query_attrs_remove(self, name: str) -> Any:
+        """Remove element by name from the query attributes list.
+
+        If no match, `None` is returned; else the corresponding value is returned.
+        """
+        return self._query_attrs.pop(name, None)
 
     def query_attrs_clear(self) -> None:
         """Clear query attributes list."""
-        del self._query_attrs[:]
+        self._query_attrs = {}
 
     def _validate_tls_ciphersuites(self) -> None:
         """Validates the tls_ciphersuites option."""
@@ -470,6 +502,10 @@ class MySQLConnectionAbstract(ABC):
 
         Raises on errors.
         """
+        # opentelemetry related
+        self._span = kwargs.pop(OPTION_CNX_SPAN, None)
+        self._tracer = kwargs.pop(OPTION_CNX_TRACER, None)
+
         config = kwargs.copy()
         if "dsn" in config:
             raise NotSupportedError("Data source name is not supported")
@@ -1198,22 +1234,40 @@ class MySQLConnectionAbstract(ABC):
         Raises InterfaceError on errors.
         """
         counter = 0
-        while counter != attempts:
-            counter = counter + 1
-            try:
-                self.disconnect()
-                self.connect()
-                if self.is_connected():
-                    break
-            except (Error, IOError) as err:
-                if counter == attempts:
-                    msg = (
-                        f"Can not reconnect to MySQL after {attempts} "
-                        f"attempt(s): {err}"
-                    )
-                    raise InterfaceError(msg) from err
-            if delay > 0:
-                sleep(delay)
+        span = None
+
+        if self._tracer:
+            span = self._tracer.start_span(
+                name=CONNECTION_SPAN_NAME, kind=trace.SpanKind.CLIENT
+            )
+
+        try:
+            while counter != attempts:
+                counter = counter + 1
+                try:
+                    self.disconnect()
+                    self.connect()
+                    if self.is_connected():
+                        break
+                except (Error, IOError) as err:
+                    if counter == attempts:
+                        msg = (
+                            f"Can not reconnect to MySQL after {attempts} "
+                            f"attempt(s): {err}"
+                        )
+                        raise InterfaceError(msg) from err
+                if delay > 0:
+                    sleep(delay)
+        except InterfaceError as interface_err:
+            if OTEL_ENABLED:
+                set_connection_span_attrs(self, span)
+                record_exception_event(span, interface_err)
+                end_span(span)
+            raise
+
+        self._span = span
+        if OTEL_ENABLED:
+            set_connection_span_attrs(self, self._span)
 
     @abstractmethod
     def is_connected(self) -> Any:
@@ -1553,7 +1607,7 @@ class MySQLCursorAbstract(ABC):
     @abstractmethod
     def execute(
         self,
-        operation: Any,
+        operation: str,
         params: Union[Sequence[Any], Dict[str, Any]] = (),
         multi: bool = False,
     ) -> Any:
@@ -1577,7 +1631,7 @@ class MySQLCursorAbstract(ABC):
 
     @abstractmethod
     def executemany(
-        self, operation: Any, seq_params: Sequence[Union[Sequence[Any], Dict[str, Any]]]
+        self, operation: str, seq_params: Sequence[Union[Sequence[Any], Dict[str, Any]]]
     ) -> Any:
         """Execute the given operation multiple times
 
@@ -1710,7 +1764,7 @@ class MySQLCursorAbstract(ABC):
         """Returns Warnings."""
         return self._warnings
 
-    def get_attributes(self) -> Optional[List[Tuple[Any, Any]]]:
+    def get_attributes(self) -> Optional[List[Tuple[str, Any]]]:
         """Get the added query attributes so far."""
         if hasattr(self, "_cnx"):
             return self._cnx.query_attrs
@@ -1730,6 +1784,19 @@ class MySQLCursorAbstract(ABC):
             self._cnx.query_attrs_append((name, value))
         elif hasattr(self, "_connection"):
             self._connection.query_attrs_append((name, value))
+
+    def remove_attribute(self, name: str) -> Any:
+        """Remove a query attribute by name.
+
+        If no match, `None` is returned; else the corresponding value is returned.
+        """
+        if not isinstance(name, str):
+            raise ProgrammingError("Parameter `name` must be a string type")
+        if hasattr(self, "_cnx"):
+            return self._cnx.query_attrs_remove(name)
+        if hasattr(self, "_connection"):
+            return self._connection.query_attrs_remove(name)
+        return None
 
     def clear_attributes(self) -> None:
         """Remove all the query attributes."""

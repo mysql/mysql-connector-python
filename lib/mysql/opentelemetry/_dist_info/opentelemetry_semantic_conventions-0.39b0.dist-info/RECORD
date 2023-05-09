@@ -1,0 +1,15 @@
+opentelemetry/semconv/__init__.py,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+opentelemetry/semconv/__pycache__/__init__.cpython-310.pyc,,
+opentelemetry/semconv/__pycache__/version.cpython-310.pyc,,
+opentelemetry/semconv/metrics/__init__.py,sha256=Cuzgg6Ub2T9GgSd_nHXnYhHqP5aAS0vh51ddsk-sOZA,1117
+opentelemetry/semconv/metrics/__pycache__/__init__.cpython-310.pyc,,
+opentelemetry/semconv/resource/__init__.py,sha256=00ydHrPWGQIqp7lNqFTpRk2MNzpmef71MzjN1TmdCFg,21915
+opentelemetry/semconv/resource/__pycache__/__init__.cpython-310.pyc,,
+opentelemetry/semconv/trace/__init__.py,sha256=r6agWFOT4XpeNLGVqgOnA5Jnnerbg07YyuMKycvtO_A,38732
+opentelemetry/semconv/trace/__pycache__/__init__.cpython-310.pyc,,
+opentelemetry/semconv/version.py,sha256=QifjHc5eaNaAASTORH0to-wDBlOL5qn89Qf3mIN6CY8,608
+opentelemetry_semantic_conventions-0.39b0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+opentelemetry_semantic_conventions-0.39b0.dist-info/METADATA,sha256=g2cFHnm540znYhl13HKSyQ0czcdWMWzE6d-AeQQ6GWY,2306
+opentelemetry_semantic_conventions-0.39b0.dist-info/RECORD,,
+opentelemetry_semantic_conventions-0.39b0.dist-info/WHEEL,sha256=y1bSCq4r5i4nMmpXeUJMqs3ipKvkZObrIXSvJHm1qCI,87
+opentelemetry_semantic_conventions-0.39b0.dist-info/licenses/LICENSE,sha256=h8jwqxShIeVkc8vOo9ynxGYW16f4fVPxLhZKZs0H5U8,11350

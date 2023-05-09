@@ -1944,7 +1944,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         # prepare and execute
         self.cnx.cmd_stmt_prepare(stmt)
         if tests.MYSQL_VERSION < (8, 0, 22):
-            columns = [("c1", 253, None, None, None, None, 0, 1, 45)]
+            columns = [("c1", 254, None, None, None, None, 0, 1, 45)]
         else:
             columns = [("c1", 253, None, None, None, None, 1, 0, 45)]
         exp = (1, columns, {"status_flag": 0, "warning_count": 0})

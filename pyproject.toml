@@ -44,6 +44,7 @@ skip_glob = [
     'lib/mysqlx/locales/eng',
     'lib/mysqlx/protobuf',
     'venv/*',
+    'lib/mysql/opentelemetry',
 ]
 
 [tool.black]
@@ -58,6 +59,7 @@ exclude = '''
   | dist
   | docs
   | lib/mysql/connector/locales/eng
+  | lib/mysql/opentelemetry
   | lib/mysqlx/locales/eng
   | venv
   )/
@@ -86,6 +88,7 @@ omit = [
     'setupinfo.py',
     'tests/*',
     'unittests.py',
+    'lib/mysql/opentelemetry/*',
 ]
 
 [tool.coverage.html]
@@ -123,6 +126,7 @@ good-names = ["i", "f", "db", "dt", "ca", "hi", "pw"]
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/stable/command_line.html
+# https://mypy.readthedocs.io/en/stable/config_file.html#using-a-pyproject-toml-file
 python_version = 3.8
 disallow_untyped_defs = true
 show_error_codes = true
@@ -131,39 +135,46 @@ allow_redefinition = true
 no_strict_optional = true
 no_implicit_optional = true
 files = [
-    "lib",
+    'lib',
 ]
-# exclude is not working for some unknown  reason!
-# as a workaround I added a `type: ignore` header
-# in the files listed below to force the exclusion
 exclude = [
-  "lib/mysqlx/protobuf/mysqlx_connection_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_crud_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_cursor_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_expect_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_expr_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_notice_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_prepare_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_resultset_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_session_pb2.py",
-  "lib/mysqlx/protobuf/mysqlx_sql_pb2.py",
+  'lib/mysqlx/protobuf/mysqlx_connection_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_crud_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_cursor_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_expect_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_expr_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_notice_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_prepare_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_resultset_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_session_pb2.py',
+  'lib/mysqlx/protobuf/mysqlx_sql_pb2.py',
+  'lib/mysql/opentelemetry',
 ]
 
 [[tool.mypy.overrides]]
 module = [
-  "_mysql_connector",
-  "_mysqlxpb",
-  "cryptography.*",
-  "dns.*",
-  "google.*",
-  "lz4.*",
-  "mysql.*",
-  "mysqlx.protobuf",
-  "oci",
-  "sqlparse",
-  "sspi",
-  "sspicon",
+  '_mysql_connector',
+  '_mysqlxpb',
+  'cryptography.*',
+  'dns.*',
+  'google.*',
+  'lz4.*',
+  'mysql.*',
+  'mysqlx.protobuf',
+  'oci',
+  'sqlparse',
+  'sspi',
+  'sspicon',
+  'opentelemetry',
+  'opentelemetry.*',
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+  'lib.mysql.opentelemetry',
+  'lib.mysql.opentelemetry.*',
+]
+ignore_errors = true

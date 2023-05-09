@@ -35,6 +35,7 @@ import getpass
 import os
 import socket
 import struct
+import sys
 import warnings
 
 from decimal import Decimal
@@ -92,7 +93,9 @@ from .errors import (
     get_exception,
 )
 from .logger import logger
-from .network import MySQLTCPSocket, MySQLUnixSocket
+from .network import MySQLSocket, MySQLTCPSocket, MySQLUnixSocket
+from .opentelemetry.constants import OTEL_ENABLED
+from .opentelemetry.context_propagation import with_context_propagation
 from .plugins import BaseAuthPlugin
 from .protocol import MySQLProtocol
 from .types import (
@@ -103,12 +106,14 @@ from .types import (
     OkPacketType,
     ResultType,
     RowType,
-    SocketType,
     StatsPacketType,
     StrOrBytes,
     SupportedMysqlBinaryProtocolTypes,
 )
 from .utils import get_platform, int1store, int4store, lc_int
+
+if OTEL_ENABLED:
+    from .opentelemetry.instrumentation import end_span, record_exception_event
 
 
 class MySQLConnection(MySQLConnectionAbstract):
@@ -116,7 +121,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
     def __init__(self, **kwargs: Any) -> None:
         self._protocol: Optional[MySQLProtocol] = None
-        self._socket: Optional[SocketType] = None
+        self._socket: Optional[MySQLSocket] = None
         self._handshake: Optional[HandShakeType] = None
         super().__init__()
 
@@ -532,7 +537,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         return bytes(packet)
 
-    def _get_connection(self) -> SocketType:
+    def _get_connection(self) -> MySQLSocket:
         """Get connection based on configuration
 
         This method will return the appropriated connection object using
@@ -540,7 +545,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         Returns subclass of MySQLBaseSocket.
         """
-        conn: Optional[SocketType] = None
+        conn: Optional[MySQLSocket] = None
         if self._unix_socket and os.name == "posix":
             conn = MySQLUnixSocket(unix_socket=self.unix_socket)
         else:
@@ -621,6 +626,9 @@ class MySQLConnection(MySQLConnectionAbstract):
 
     def close(self) -> None:
         """Disconnect from the MySQL server"""
+        if self._span and self._span.is_recording():
+            record_exception_event(self._span, sys.exc_info()[1])
+
         if not self._socket:
             return
 
@@ -628,7 +636,17 @@ class MySQLConnection(MySQLConnectionAbstract):
             self.cmd_quit()
         except (AttributeError, Error):
             pass  # Getting an exception would mean we are disconnected.
-        self._socket.close_connection()
+
+        try:
+            self._socket.close_connection()
+        except Exception as err:
+            if OTEL_ENABLED:
+                record_exception_event(self._span, err)
+            raise
+        finally:
+            if OTEL_ENABLED:
+                end_span(self._span)
+
         self._handshake = None
 
     disconnect = close
@@ -941,6 +959,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             self._send_cmd(ServerCmd.INIT_DB, database.encode("utf-8"))
         )
 
+    @with_context_propagation
     def cmd_query(
         self,
         query: StrOrBytes,
@@ -979,7 +998,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             types = []
             values: List[bytes] = []
             null_bitmap = [0] * ((len(self._query_attrs) + 7) // 8)
-            for pos, attr_tuple in enumerate(self._query_attrs):
+            for pos, attr_tuple in enumerate(self._query_attrs.items()):
                 value = attr_tuple[1]
                 flags = 0
                 if value is None:
@@ -996,10 +1015,10 @@ class MySQLConnection(MySQLConnectionAbstract):
                 elif isinstance(value, str):
                     value = value.encode(charset)
                     values.append(lc_int(len(value)) + value)
-                    field_type = FieldType.VARCHAR
+                    field_type = FieldType.STRING
                 elif isinstance(value, bytes):
                     values.append(lc_int(len(value)) + value)
-                    field_type = FieldType.BLOB
+                    field_type = FieldType.STRING
                 elif isinstance(value, Decimal):
                     values.append(
                         lc_int(len(str(value).encode(charset)))
@@ -1586,6 +1605,7 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         return result
 
+    @with_context_propagation
     def cmd_stmt_execute(
         self,
         statement_id: int,
@@ -1620,7 +1640,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 flags,
                 long_data_used,
                 self.charset,
-                self._query_attrs,
+                self.query_attrs,
                 self._converter_str_fallback,
             )
         else:

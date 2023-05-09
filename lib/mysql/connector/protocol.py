@@ -53,7 +53,6 @@ from .types import (
     HandShakeType,
     OkPacketType,
     ParseValueFromBinaryResultPacketTypes,
-    QueryAttrType,
     SocketType,
     StatsPacketType,
     StrOrBytes,
@@ -851,7 +850,7 @@ class MySQLProtocol:
         flags: int = 0,
         long_data_used: Optional[Dict[int, Tuple[bool]]] = None,
         charset: str = "utf8",
-        query_attrs: Optional[QueryAttrType] = None,
+        query_attrs: Optional[List[Tuple[str, Any]]] = None,
         converter_str_fallback: bool = False,
     ) -> bytearray:
         """Make a MySQL packet with the Statement Execute command"""
@@ -903,10 +902,10 @@ class MySQLProtocol:
                 elif isinstance(value, str):
                     value = value.encode(charset)
                     values.append(utils.lc_int(len(value)) + value)
-                    field_type = FieldType.VARCHAR
+                    field_type = FieldType.STRING
                 elif isinstance(value, bytes):
                     values.append(utils.lc_int(len(value)) + value)
-                    field_type = FieldType.BLOB
+                    field_type = FieldType.STRING
                 elif isinstance(value, Decimal):
                     values.append(
                         utils.lc_int(len(str(value).encode(charset)))

@@ -1,0 +1,35 @@
+[opentelemetry_environment_variables]
+sdk = mysql.opentelemetry.sdk.environment_variables
+
+[opentelemetry_id_generator]
+random = mysql.opentelemetry.sdk.trace.id_generator:RandomIdGenerator
+
+[opentelemetry_logger_provider]
+sdk_logger_provider = mysql.opentelemetry.sdk._logs:LoggerProvider
+
+[opentelemetry_logs_exporter]
+console = mysql.opentelemetry.sdk._logs.export:ConsoleLogExporter
+
+[opentelemetry_meter_provider]
+sdk_meter_provider = mysql.opentelemetry.sdk.metrics:MeterProvider
+
+[opentelemetry_metrics_exporter]
+console = mysql.opentelemetry.sdk.metrics.export:ConsoleMetricExporter
+
+[opentelemetry_resource_detector]
+otel = mysql.opentelemetry.sdk.resources:OTELResourceDetector
+process = mysql.opentelemetry.sdk.resources:ProcessResourceDetector
+
+[opentelemetry_tracer_provider]
+sdk_tracer_provider = mysql.opentelemetry.sdk.trace:TracerProvider
+
+[opentelemetry_traces_exporter]
+console = mysql.opentelemetry.sdk.trace.export:ConsoleSpanExporter
+
+[opentelemetry_traces_sampler]
+always_off = mysql.opentelemetry.sdk.trace.sampling:_AlwaysOff
+always_on = mysql.opentelemetry.sdk.trace.sampling:_AlwaysOn
+parentbased_always_off = mysql.opentelemetry.sdk.trace.sampling:_ParentBasedAlwaysOff
+parentbased_always_on = mysql.opentelemetry.sdk.trace.sampling:_ParentBasedAlwaysOn
+parentbased_traceidratio = mysql.opentelemetry.sdk.trace.sampling:ParentBasedTraceIdRatio
+traceidratio = mysql.opentelemetry.sdk.trace.sampling:TraceIdRatioBased

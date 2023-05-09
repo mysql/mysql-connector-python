@@ -33,6 +33,7 @@
 import os
 import platform
 import socket
+import sys
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
@@ -86,6 +87,12 @@ except ImportError as exc:
         f"MySQL Connector/Python C Extension not available ({exc})"
     ) from exc
 
+from .opentelemetry.constants import OTEL_ENABLED
+from .opentelemetry.context_propagation import with_context_propagation
+
+if OTEL_ENABLED:
+    from .opentelemetry.instrumentation import end_span, record_exception_event
+
 
 class CMySQLConnection(MySQLConnectionAbstract):
     """Class initiating a MySQL Connection using Connector/C."""
@@ -117,7 +124,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
         super().__init__()
 
         if kwargs:
-            self.connect(**kwargs)
+            try:
+                self.connect(**kwargs)
+            except Exception:
+                self.close()
+                raise
 
     def _add_default_conn_attrs(self) -> None:
         """Add default connection attributes"""
@@ -301,14 +312,24 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def close(self) -> None:
         """Disconnect from the MySQL server"""
-        if self._cmysql:
-            try:
-                self.free_result()
-                self._cmysql.close()
-            except MySQLInterfaceError as err:
-                raise get_mysql_exception(
-                    msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
-                ) from err
+        if self._span and self._span.is_recording():
+            record_exception_event(self._span, sys.exc_info()[1])
+
+        if not self._cmysql:
+            return
+
+        try:
+            self.free_result()
+            self._cmysql.close()
+        except MySQLInterfaceError as err:
+            if OTEL_ENABLED:
+                record_exception_event(self._span, err)
+            raise get_mysql_exception(
+                msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
+            ) from err
+        finally:
+            if OTEL_ENABLED:
+                end_span(self._span)
 
     disconnect = close
 
@@ -594,6 +615,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise InternalError("Unread result found")
         statement_id.stmt_reset()
 
+    @with_context_propagation
     def cmd_query(
         self,
         query: StrOrBytes,
@@ -613,7 +635,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 raw=raw,
                 buffered=buffered,
                 raw_as_string=raw_as_string,
-                query_attrs=self._query_attrs,
+                query_attrs=self.query_attrs,
             )
         except MySQLInterfaceError as err:
             raise get_mysql_exception(
@@ -836,6 +858,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
 
         self._charset_id = charset
+        self._user = username  # updating user accordingly
         self._post_connection()
 
     def cmd_reset_connection(self) -> bool:

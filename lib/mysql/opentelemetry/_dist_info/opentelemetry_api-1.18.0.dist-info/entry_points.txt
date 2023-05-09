@@ -1,0 +1,15 @@
+[opentelemetry_context]
+contextvars_context = mysql.opentelemetry.context.contextvars_context:ContextVarsRuntimeContext
+
+[opentelemetry_environment_variables]
+api = mysql.opentelemetry.environment_variables
+
+[opentelemetry_meter_provider]
+default_meter_provider = mysql.opentelemetry.metrics:NoOpMeterProvider
+
+[opentelemetry_propagator]
+baggage = mysql.opentelemetry.baggage.propagation:W3CBaggagePropagator
+tracecontext = mysql.opentelemetry.trace.propagation.tracecontext:TraceContextTextMapPropagator
+
+[opentelemetry_tracer_provider]
+default_tracer_provider = mysql.opentelemetry.trace:NoOpTracerProvider

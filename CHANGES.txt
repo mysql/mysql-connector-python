@@ -14,6 +14,7 @@ v8.1.0
 - WL#15749: Remove DMG and MSI support
 - WL#15672: Upgrade Python Protobuf version to 4.21.12
 - WL#15630: Remove Python 3.7 support
+- WL#15629: Add OpenTelemetry tracing
 - WL#15591: Improve the network module
 - BUG#35425076: Fix deallocating None error
 - BUG#35349093: Compression doesn't work with C extension API

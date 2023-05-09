@@ -142,5 +142,10 @@ setup(
         "dns-srv": ["dnspython>=1.16.0,<=2.3.0"],
         "compression": ["lz4>=2.1.6,<=4.3.2", "zstandard>=0.12.0,<=0.19.0"],
         "gssapi": ["gssapi>=1.6.9,<=1.8.2"],
+        "opentelemetry": [
+            "Deprecated>=1.2.6",
+            "typing-extensions>=3.7.4",
+            "zipp>=0.5",
+        ],
     },
 )

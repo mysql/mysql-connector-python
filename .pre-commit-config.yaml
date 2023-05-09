@@ -43,8 +43,12 @@ repos:
           django-stubs,
           gssapi==1.8.1,
           dnspython==2.1.0,
+          Deprecated>=1.2.6,
+          typing-extensions>=3.7.4,
+          zipp>=0.5,
         ]
         files: lib
+        exclude: lib/mysql/opentelemetry
         args: [
           --disallow-untyped-defs,
           --show-error-codes,
