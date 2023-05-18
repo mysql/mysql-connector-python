@@ -38,7 +38,6 @@ from setuptools import Extension, find_packages, setup
 
 from cpydist import BuildExt, Install, InstallLib
 from cpydist.bdist import DistBinary
-from cpydist.bdist_msi import DistMSI
 from cpydist.bdist_solaris import DistSolaris
 from cpydist.sdist import DistSource
 
@@ -55,7 +54,6 @@ with open(version_py, "rb") as fp:
 
 COMMAND_CLASSES = {
     "bdist": DistBinary,
-    "bdist_msi": DistMSI,
     "bdist_solaris": DistSolaris,
     "build_ext": BuildExt,
     "install": Install,

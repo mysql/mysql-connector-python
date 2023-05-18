@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<WixLocalization Culture="en-us" xmlns="http://schemas.microsoft.com/wix/2006/localization">
-    <String Id="InstallDirDlgFolderLabel" Overridable="yes">Please select the folder destination for the examples, license and readme files of [ProductName]. Destination folder for the libraries can be customized in the next page.</String>
-</WixLocalization>

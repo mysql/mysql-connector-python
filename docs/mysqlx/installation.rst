@@ -14,11 +14,6 @@ Make sure you have a recent `pip <https://pip.pypa.io/>`_ version installed on y
 
     shell> pip install mysql-connector-python
 
-Installing Connector/Python on Microsoft Windows Using an MSI Package
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To use the MSI Installer, launch it and follow the prompts in the screens it presents to install Connector/Python in the location of your choosing.
-
 Installing Connector/Python on Linux Using the MySQL Yum Repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -51,11 +46,6 @@ To install a Connector/Python Debian package (denoted here as PACKAGE.deb), use 
 .. code-block:: bash
 
     shell> dpkg -i PACKAGE.deb
-
-Installing Connector/Python on OS X Using a Disk Image
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Download the .dmg file and install Connector/Python by opening it and double clicking the resulting .pkg file.
 
 Installing Connector/Python from source
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
