@@ -1,4 +1,4 @@
-# Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -32,7 +32,7 @@ The file version.py gets installed and is available after installation
 as mysql.connector.version.
 """
 
-VERSION = (8, 0, 33, "", 1)
+VERSION = (8, 1, 0, "", 1)
 
 # pylint: disable=consider-using-f-string
 if VERSION[3] and VERSION[4]:
