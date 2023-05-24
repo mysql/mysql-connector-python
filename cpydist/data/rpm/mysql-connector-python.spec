@@ -241,6 +241,8 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
     --with-mysql-capi=%{with_mysql_capi} %{?byte_code_only}
 %{?scl:EOF}
 
+sed -i -e '/protobuf/d' %{buildroot}%{python3_sitearch}/mysql_connector_python-*.egg-info/requires.txt
+
 %files -n mysql-connector-python3%{?product_suffix}
 %doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst docs/INFO_SRC docs/INFO_BIN
 %{python3_sitearch}/mysql
