@@ -66,7 +66,6 @@ from .helpers import encode_to_bytes, get_item_or_attr
 from .logger import logger
 from .protobuf import (
     CRUD_PREPARE_MAPPING,
-    PROTOBUF_REPEATED_TYPES,
     SERVER_MESSAGES,
     Message,
     mysqlxpb_enum,
