@@ -361,7 +361,7 @@ MySQL_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->result = NULL;
     self->fields = NULL;
     self->use_unicode = 1;
-    self->auth_plugin = Py_None;
+    self->auth_plugin = PyUnicode_FromString("");
     self->plugin_dir = PyUnicode_FromString(".");
     self->converter_str_fallback = Py_False;
 
@@ -396,7 +396,7 @@ int
 MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
 {
     PyObject *charset_name = NULL, *use_unicode = NULL, *auth_plugin = NULL,
-             *plugin_dir = NULL, *tmp, *con_timeout = NULL;
+             *plugin_dir = NULL, *con_timeout = NULL;
 
     static char *kwlist[] = {"buffered", "raw", "charset_name",
                              "connection_timeout", "use_unicode", "auth_plugin",
@@ -430,16 +430,10 @@ MySQL_init(MySQL *self, PyObject *args, PyObject *kwds)
         Py_INCREF(self->charset_name);
     }
 
-    if (auth_plugin) {
-        if (strcmp(PyUnicode_AsUTF8(auth_plugin), "") == 0) {
-            auth_plugin = Py_None;
-        }
-        if (auth_plugin != Py_None) {
-            tmp = self->auth_plugin;
-            Py_INCREF(auth_plugin);
-            self->auth_plugin = auth_plugin;
-            Py_XDECREF(tmp);
-        }
+    if (auth_plugin && strcmp(PyUnicode_AsUTF8(auth_plugin), "") != 0) {
+        Py_DECREF(self->auth_plugin);
+        self->auth_plugin = auth_plugin;
+        Py_INCREF(self->auth_plugin);
     }
 
     if (plugin_dir) {
@@ -527,12 +521,9 @@ MySQL_free_result(MySQL *self)
 PyObject *
 MySQL_consume_result(MySQL *self)
 {
-    int res = 0;
     if (self->result) {
         Py_BEGIN_ALLOW_THREADS
-        while (mysql_fetch_row(self->result)) {
-            res++;
-        }
+        while (mysql_fetch_row(self->result)) {}
         Py_END_ALLOW_THREADS
     }
 
@@ -871,8 +862,7 @@ MySQL_change_user(MySQL *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    if (self->auth_plugin != Py_None &&
-        strcmp(PyUnicode_AsUTF8(self->auth_plugin), "mysql_clear_password") == 0) {
+    if (strcmp(PyUnicode_AsUTF8(self->auth_plugin), "mysql_clear_password") == 0) {
         abool = 1;
         mysql_options(&self->session, MYSQL_ENABLE_CLEARTEXT_PLUGIN, (char *)&abool);
     }
@@ -1296,7 +1286,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
 #endif
     }
 
-    if (PyUnicode_Check(self->auth_plugin)) {
+    if (strcmp(PyUnicode_AsUTF8(self->auth_plugin), "") != 0) {
         auth_plugin = PyUnicode_AsUTF8(self->auth_plugin);
         mysql_options(&self->session, MYSQL_DEFAULT_AUTH, auth_plugin);
         if (strcmp(auth_plugin, "sha256_password") == 0 && !ssl_enabled) {
