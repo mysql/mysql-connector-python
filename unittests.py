@@ -114,36 +114,10 @@ else:
 # MySQL option file template. Platform specifics dynamically added later.
 MY_CNF = """
 # MySQL option file for MySQL Connector/Python tests
-[mysqld-8.0]
-plugin-load={mysqlx_plugin}
-loose_mysqlx_port={mysqlx_port}
-{mysqlx_bind_address}
-
-[mysqld-5.7]
-plugin-load={mysqlx_plugin}
-loose_mysqlx_port={mysqlx_port}
-{mysqlx_bind_address}
-
-[mysqld-5.6]
-innodb_compression_level = 0
-innodb_compression_failure_threshold_pct = 0
-lc_messages_dir = {lc_messages_dir}
-lc_messages = en_US
-general_log = ON
-
-[mysqld-5.5]
-lc_messages_dir = {lc_messages_dir}
-lc_messages = en_US
-general_log = ON
-
-[mysqld-5.1]
-language = {lc_messages_dir}/english
-general_log = ON
-
-[mysqld-5.0]
-language = {lc_messages_dir}/english
-
 [mysqld]
+plugin-load={mysqlx_plugin}
+loose_mysqlx_port={mysqlx_port}
+{mysqlx_bind_address}
 max_allowed_packet = 26777216
 net_read_timeout = 120
 net_write_timeout = 120
