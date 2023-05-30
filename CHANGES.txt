@@ -19,6 +19,7 @@ v8.1.0
 - BUG#35338384: PIP installs incompatible Connector/Python packages
 - BUG#35318413: Fix charset mapping for MySQL 8.1.0
 - BUG#35212199: Check for identifier quotes in the database name
+- BUG#35140271: Regex split hanging in cursor.execute(..., multi=True) for complex queries
 - BUG#29115406: CONTRIBUTION - FIX RECV COMPRESS BUG
 
 v8.0.33

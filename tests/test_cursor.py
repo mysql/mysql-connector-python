@@ -630,6 +630,9 @@ class MySQLCursorTests(tests.TestsCursor):
 
     def test_execute_multi(self):
         # Tests when execute(..., multi=True)
+
+        # Bug#34655520: Wrong MySQLCursor.statement values in the results of
+        # cursor.execute(..., multi=True)
         operations = [
             'select 1; SELECT "`";',
             "SELECT '\"'; SELECT 2; select '```';",
@@ -646,6 +649,31 @@ class MySQLCursorTests(tests.TestsCursor):
                 for res_cur, exp in zip(cur.execute(operation, multi=True), exps):
                     self.assertEqual(exp, res_cur.statement)
                     _ = res_cur.fetchall()
+
+        # Bug#35140271: Regex split hanging in cursor.execute(..., multi=True)
+        # for complex queries
+        operations.append("SELECT `';`; select 3; SELECT '`;`;`';")
+        control.append(["SELECT `';`", "select 3", "SELECT '`;`;`'"])
+        for operation, exps in zip(operations, control):
+            executed_list = cursor.RE_SQL_SPLIT_STMTS.split(operation.encode())
+            self.assertEqual(len(executed_list), len(exps) + 1)
+
+        # the bug reports that execution hangs with the following statement;
+        # let's run it and check it does not hang.
+        RE_SQL_SPLIT_STMTS_OLD = re.compile(
+            b""";(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)"""
+        )
+        operation = """
+        create database test;\n create table
+        test.test(pk INT PRIMARY KEY AUTO_INCREMENT, t CHAR(6));\n INSERT INTO
+        test.test(t) VALUES ('h'), ('e'), ('l'), ('l'), ('o'), (' '), ('w'), ('o'),
+        ('r'), ('l'), ('d'), ('!'), (' '), ('h'), ('e'), ('l'), ('l'), ('o'), (' '),
+        ('w'), ('o'), ('r'), ('l'), ('d'), ('!'); \n -- insert db's elements
+        """
+        self.assertListEqual(
+            cursor.RE_SQL_SPLIT_STMTS.split(operation.encode()),
+            RE_SQL_SPLIT_STMTS_OLD.split(operation.encode()),
+        )
 
     def test_executemany(self):
         """MySQLCursor object executemany()-method"""

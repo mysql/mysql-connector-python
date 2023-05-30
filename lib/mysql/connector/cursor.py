@@ -99,7 +99,9 @@ RE_PY_MAPPING_PARAM = re.compile(
     """,
     re.X,
 )
-RE_SQL_SPLIT_STMTS = re.compile(b""";(?=(?:[^"'`]*["'`].*["'`])*[^"'`]*$)""")
+RE_SQL_SPLIT_STMTS = re.compile(
+    b""";(?=(?:[^"'`]*(?:"[^"]*"|'[^']*'|`[^`]*`))*[^"'`]*$)"""
+)
 RE_SQL_FIND_PARAM = re.compile(b"""%s(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)""")
 RE_SQL_PYTHON_REPLACE_PARAM = re.compile(r"%\(.*?\)s")
 RE_SQL_PYTHON_CAPTURE_PARAM_NAME = re.compile(r"%\((.*?)\)s")

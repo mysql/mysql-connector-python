@@ -627,7 +627,8 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
 
         cur.close()
 
-        # test statement property
+        # Bug#34655520: Wrong MySQLCursor.statement values in the results of
+        # cursor.execute(..., multi=True)
         operations = [
             'select 1; SELECT "`";',
             "SELECT '\"'; SELECT 2; select '```';",
