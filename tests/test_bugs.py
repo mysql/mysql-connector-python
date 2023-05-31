@@ -7587,3 +7587,83 @@ class BugOra35349093(tests.MySQLConnectorTests):
         """Test setting `compress=False` in the C extension directly."""
         res = self._test_compression_status_cext(False)
         self.assertEqual(res, ("Compression", "OFF"))
+
+
+class BugOra35278365(tests.MySQLConnectorTests):
+    """BUG#35278365: Fix UnicodeDecodeError with a long field name alias (c-ext)
+
+    An UnicodeDecodeError is raised when using a complex query that produces
+    a long field name alias.
+    It fails to create an Unicode object using `PyUnicode_Decode()` from the
+    resulting `MYSQL_FIELD.name` returned by `mysql_fetch_fields()` MySQL
+    C API.
+
+    This patch uses "replace" in `PyUnicode_Decode()` to set how decoding
+    errors are handled, which uses a replace marker.
+    """
+
+    tbl_prefix = "BugOra35278365"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            with cnx.cursor() as cur:
+                cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl_prefix}_table1")
+                cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl_prefix}_table2")
+                cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl_prefix}_table3")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.tbl_prefix}_table1 (
+                    id int(11) NOT NULL,
+                    ort_id int(11) DEFAULT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+                    """
+                )
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.tbl_prefix}_table2 (
+                    id int(11) NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+                    """
+                )
+                cur.execute(
+                    f"""
+                    CREATE TABLE {self.tbl_prefix}_table3 (
+                    besuch_id int(11) NOT NULL,
+                    taxon varchar(30) NOT NULL,
+                    epitheton varchar(30) DEFAULT NULL,
+                    rang int(1) NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+                    """
+                )
+                cnx.commit()
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl_prefix}_table1")
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl_prefix}_table2")
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.tbl_prefix}_table3")
+            cnx.commit()
+
+    @foreach_cnx()
+    def test_long_field_names(self):
+        with mysql.connector.connect(**tests.get_mysql_config()) as cnx:
+            with cnx.cursor() as cur:
+                query = f"""
+                    SELECT (SELECT Group_concat(DISTINCT Concat_ws(' ', taxon,
+                                                Ifnull(t3.epitheton, 'sp.'))
+                        ORDER BY
+                            t3.taxon, Isnull(t3.epitheton), t3.epitheton SEPARATOR ', ')
+                            FROM   {self.tbl_prefix}_table3 t3
+                            WHERE  t3.besuch_id = {self.tbl_prefix}_table1.id
+                            AND t3.rang IN (1, 2)
+                            AND NOT EXISTS(
+                                SELECT 0 FROM {self.tbl_prefix}_table3 b3)), 1, 1
+                    FROM   {self.tbl_prefix}_table1,{self.tbl_prefix}_table2
+                    WHERE  {self.tbl_prefix}_table2.id = {self.tbl_prefix}_table1.ort_id
+                    ORDER  BY {self.tbl_prefix}_table1.id
+                """
+                cur.execute(query)  # No error is success
+                res = cur.fetchall()
+                self.assertEqual(res, [])

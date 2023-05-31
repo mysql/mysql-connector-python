@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+ * Copyright (c) 2014, 2023, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0, as
@@ -676,7 +676,7 @@ mytopy_string(const char *data, enum_field_types field_type,
 
     /* 'binary' charset = 63 */
     if (use_unicode && (field_type == MYSQL_TYPE_JSON || field_charsetnr != 63)) {
-        return PyUnicode_Decode(data, field_length, charset, NULL);
+        return PyUnicode_Decode(data, field_length, charset, "replace");
     }
 
     return PyByteArray_FromStringAndSize(data, field_length);
