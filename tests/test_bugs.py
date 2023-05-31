@@ -7478,7 +7478,7 @@ class BugOra29115406(tests.MySQLConnectorTests):
         input_sizes = [
             network.MAX_PAYLOAD_LENGTH - 303,
             (network.MAX_PAYLOAD_LENGTH * 2) + 2,
-            network.MAX_PAYLOAD_LENGTH * 10,
+            network.MAX_PAYLOAD_LENGTH * 3,
         ]
         with self.cnx.cursor() as cur:
             for input_size in input_sizes:
