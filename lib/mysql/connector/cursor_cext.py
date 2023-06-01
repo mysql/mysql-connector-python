@@ -320,7 +320,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                     stmt = stmt.replace(f"%({key})s".encode(), value)
             elif isinstance(prepared, (list, tuple)):
                 psub = _ParamSubstitutor(prepared)
-                stmt = RE_PY_PARAM.sub(psub, stmt)
+                stmt = RE_PY_PARAM.sub(psub, stmt)  # type: ignore[call-overload]
                 if psub.remaining != 0:
                     raise ProgrammingError(
                         "Not all parameters were used in the SQL statement"
@@ -388,7 +388,7 @@ class CMySQLCursor(MySQLCursorAbstract):
                         tmp = tmp.replace(f"%({key})s".encode(), value)
                 elif isinstance(prepared, (list, tuple)):
                     psub = _ParamSubstitutor(prepared)
-                    tmp = RE_PY_PARAM.sub(psub, tmp)
+                    tmp = RE_PY_PARAM.sub(psub, tmp)  # type: ignore[call-overload]
                     if psub.remaining != 0:
                         raise ProgrammingError(
                             "Not all parameters were used in the SQL statement"
