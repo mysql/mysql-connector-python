@@ -64,12 +64,7 @@ from .expr import (
 )
 from .helpers import encode_to_bytes, get_item_or_attr
 from .logger import logger
-from .protobuf import (
-    CRUD_PREPARE_MAPPING,
-    SERVER_MESSAGES,
-    Message,
-    mysqlxpb_enum,
-)
+from .protobuf import CRUD_PREPARE_MAPPING, SERVER_MESSAGES, Message, mysqlxpb_enum
 from .result import Column
 from .statement import (
     AddStatement,
