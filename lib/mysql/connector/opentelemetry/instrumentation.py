@@ -47,9 +47,7 @@ except ImportError:
     try:
         # falling back to the bundled installation
         from mysql.opentelemetry import trace
-        from mysql.opentelemetry.semconv.trace import (  # type: ignore[assignment]
-            SpanAttributes,
-        )
+        from mysql.opentelemetry.semconv.trace import SpanAttributes
 
         OTEL_SYSTEM_AVAILABLE = False
     except ImportError as missing_dependencies_err:

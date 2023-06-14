@@ -99,7 +99,7 @@ output = 'build/coverage.xml'
 
 [tool.pylint.master]
 load-plugins = ['pylint.extensions.overlapping_exceptions']
-ignore-paths = ['lib/mysqlx/protobuf/mysqlx_*']
+ignore-paths = ['lib/mysqlx/protobuf/mysqlx_*', 'lib/mysql/opentelemetry']
 init-hook = 'import sys; sys.path.append("lib")'
 
 [tool.pylint.messages_control]

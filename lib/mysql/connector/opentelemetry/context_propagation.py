@@ -10,6 +10,7 @@ if OTEL_ENABLED:
     from .instrumentation import OTEL_SYSTEM_AVAILABLE
 
     if OTEL_SYSTEM_AVAILABLE:
+        # pylint: disable=import-error
         # load otel from the system
         from opentelemetry import trace
         from opentelemetry.trace.span import format_span_id, format_trace_id
