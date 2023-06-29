@@ -479,7 +479,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):  # pylint: disable=abstract-method
                 )
                 if not primary_key_column_name:
                     continue
-                key_columns = self.introspection.get_key_columns(cursor, table_name)
+                key_columns = self.introspection.get_key_columns(  # type: ignore[attr-defined]
+                    cursor, table_name
+                )
                 for (
                     column_name,
                     referenced_table_name,
