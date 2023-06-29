@@ -625,12 +625,16 @@ static void PythonAddList(PyObject* list, int index,
 
 static PyObject* CreateMessage(const google::protobuf::Message& message) {
   PyObject* dict = PyDict_New();
+  PyObject* desc_full_name;
   const google::protobuf::Descriptor* descriptor = message.GetDescriptor();
   const google::protobuf::Reflection* reflection = message.GetReflection();
 
   try {
-    PyDict_SetItemString(dict, kMessageTypeKey,
-        PyString_FromString(descriptor->full_name().c_str()));
+    // PyString_FromString which relies on PyUnicode_FromString returns a new reference
+    desc_full_name = PyString_FromString(descriptor->full_name().c_str());
+
+    // PyDict_SetItemString does not steal a reference to val (last argument).
+    PyDict_SetItemString(dict, kMessageTypeKey, desc_full_name);
 
     for (int idx = 0; idx < descriptor->field_count(); ++idx) {
       const google::protobuf::FieldDescriptor* field = descriptor->field(idx);
@@ -658,10 +662,12 @@ static PyObject* CreateMessage(const google::protobuf::Message& message) {
       }
     }
   } catch(std::exception& e) {
+    Py_DECREF(desc_full_name);
     Py_CLEAR(dict);
     dict = NULL;
     PyErr_SetString(PyExc_RuntimeError, e.what());
   }
+  Py_DECREF(desc_full_name);
   return dict;
 }
 
