@@ -491,7 +491,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
     user = "test1"
     password = "Testpw1"
     other_user = "test3"
-    realm = "MYSQL.LOCAL"
+    realm = "MTR.LOCAL"
     badrealm = "MYSQL2.LOCAL"
     krb5ccname = os.environ.get("KRB5CCNAME")
     kinit = os.environ.get("KINIT", "kinit")
@@ -501,7 +501,7 @@ class MySQLKerberosAuthPluginTests(tests.MySQLConnectorTests):
 
     @classmethod
     def setUpClass(cls):
-        if not tests.is_host_reachable("100.103.18.98"):
+        if not tests.is_host_reachable("100.103.25.98"):
             cls.skip_reason = "Kerberos server is not reachable"
             return
 
