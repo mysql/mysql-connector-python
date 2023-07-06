@@ -33,7 +33,7 @@ build-backend = 'setuptools.build_meta'
 [tool.isort]
 profile = 'black'
 combine_as_imports = true
-known_first_party = ['mysql.connector', 'mysqlx']
+known_first_party = ['mysql.connector']
 line_length = 88
 lines_between_types = 1
 skip_glob = [
@@ -41,8 +41,6 @@ skip_glob = [
     'dist/*',
     'docs/*',
     'lib/mysql/connector/locales/eng',
-    'lib/mysqlx/locales/eng',
-    'lib/mysqlx/protobuf',
     'venv/*',
     'lib/mysql/opentelemetry',
 ]
@@ -60,21 +58,8 @@ exclude = '''
   | docs
   | lib/mysql/connector/locales/eng
   | lib/mysql/opentelemetry
-  | lib/mysqlx/locales/eng
   | venv
   )/
-  | lib/mysqlx/protobuf/mysqlx_connection_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_crud_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_cursor_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_expect_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_expr_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_notice_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_prepare_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_resultset_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_session_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_sql_pb2.py
 )
 '''
 
@@ -99,7 +84,7 @@ output = 'build/coverage.xml'
 
 [tool.pylint.master]
 load-plugins = ['pylint.extensions.overlapping_exceptions']
-ignore-paths = ['lib/mysqlx/protobuf/mysqlx_*', 'lib/mysql/opentelemetry']
+ignore-paths = ['lib/mysql/opentelemetry']
 init-hook = 'import sys; sys.path.append("lib")'
 
 [tool.pylint.messages_control]
@@ -138,31 +123,16 @@ files = [
     'lib',
 ]
 exclude = [
-  'lib/mysqlx/protobuf/mysqlx_connection_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_crud_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_cursor_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_expect_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_expr_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_notice_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_prepare_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_resultset_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_session_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_sql_pb2.py',
   'lib/mysql/opentelemetry',
 ]
 
 [[tool.mypy.overrides]]
 module = [
   '_mysql_connector',
-  '_mysqlxpb',
   'cryptography.*',
   'dns.*',
   'google.*',
-  'lz4.*',
   'mysql.*',
-  'mysqlx.protobuf',
   'oci',
   'sqlparse',
   'sspi',

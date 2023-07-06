@@ -19,7 +19,6 @@ dist/
 docs/INFO_BIN
 docs/INFO_SRC
 lib/mysql/vendor/
-src/mysqlxpb/mysqlx/mysqlx*
 pip-wheel-metadata/
 tests_*.log
 venv/

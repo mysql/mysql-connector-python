@@ -393,32 +393,14 @@ _UNITTESTS_CMD_ARGS = {
     ("", "--with-openssl-include-dir"): {
         "dest": "openssl_include_dir",
         "metavar": "NAME",
-        "default": os.environ.get("MYSQLXPB_OPENSSL_INCLUDE_DIR"),
+        "default": os.environ.get("OPENSSL_INCLUDE_DIR"),
         "help": ("Location of OpenSSL include directory"),
     },
     ("", "--with-openssl-lib-dir"): {
         "dest": "openssl_lib_dir",
         "metavar": "NAME",
-        "default": os.environ.get("MYSQLXPB_OPENSSL_LIB_DIR"),
+        "default": os.environ.get("OPENSSL_LIB_DIR"),
         "help": "Location of OpenSSL library directory",
-    },
-    ("", "--with-protobuf-include-dir"): {
-        "dest": "protobuf_include_dir",
-        "metavar": "NAME",
-        "default": os.environ.get("MYSQLXPB_PROTOBUF_INCLUDE_DIR"),
-        "help": "Location of Protobuf include directory",
-    },
-    ("", "--with-protobuf-lib-dir"): {
-        "dest": "protobuf_lib_dir",
-        "metavar": "NAME",
-        "default": os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR"),
-        "help": "Location of Protobuf library directory",
-    },
-    ("", "--with-protoc"): {
-        "dest": "protoc",
-        "metavar": "NAME",
-        "default": os.environ.get("MYSQLXPB_PROTOC"),
-        "help": "Location of Protobuf protoc binary",
     },
     ("", "--extra-compile-args"): {
         "dest": "extra_compile_args",
@@ -889,17 +871,10 @@ def main():
     # Setup tests logger
     tests.setup_logger(LOGGER, debug=options.debug, logfile=options.logfile)
 
-    # Setup mysql.connector and mysqlx loggers, and filter out warnings
+    # Setup mysql.connector logger, and filter out warnings
     mysql_connector_logger = logging.getLogger("mysql.connector")
     tests.setup_logger(
         mysql_connector_logger,
-        debug=options.debug,
-        logfile=options.logfile,
-        filter=warnings_filter,
-    )
-    mysqlx_logger = logging.getLogger("mysqlx")
-    tests.setup_logger(
-        mysqlx_logger,
         debug=options.debug,
         logfile=options.logfile,
         filter=warnings_filter,
@@ -1031,46 +1006,17 @@ def main():
 
     tests.MYSQL_CAPI = options.mysql_capi
     if not options.skip_install:
-        protobuf_include_dir = options.protobuf_include_dir or os.environ.get(
-            "MYSQLXPB_PROTOBUF_INCLUDE_DIR"
-        )
-        protobuf_lib_dir = options.protobuf_lib_dir or os.environ.get(
-            "MYSQLXPB_PROTOBUF_LIB_DIR"
-        )
-        protoc = options.protoc or os.environ.get("MYSQLXPB_PROTOC")
-        if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
-            if not protobuf_include_dir:
-                LOGGER.error("Unable to find Protobuf include directory.")
-                sys.exit(1)
-            if not protobuf_lib_dir:
-                LOGGER.error("Unable to find Protobuf library directory.")
-                sys.exit(1)
-            if not protoc:
-                LOGGER.error("Unable to find Protobuf protoc binary.")
-                sys.exit(1)
-
         openssl_include_dir = options.openssl_include_dir or os.environ.get(
-            "MYSQLXPB_OPENSSL_INCLUDE_DIR"
+            "OPENSSL_INCLUDE_DIR"
         )
         openssl_lib_dir = options.openssl_lib_dir or os.environ.get(
-            "MYSQLXPB_OPENSSL_LIB_DIR"
+            "OPENSSL_LIB_DIR"
         )
-        if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
-            if not openssl_include_dir:
-                LOGGER.error("Unable to find OpenSSL include directory.")
-                sys.exit(1)
-            if not openssl_lib_dir:
-                LOGGER.error("Unable to find OpenSSL library directory.")
-                sys.exit(1)
-
         tests.install_connector(
             _TOPDIR,
             tests.TEST_BUILD_DIR,
             openssl_include_dir,
             openssl_lib_dir,
-            protobuf_include_dir,
-            protobuf_lib_dir,
-            protoc,
             options.mysql_capi,
             options.extra_compile_args,
             options.extra_link_args,

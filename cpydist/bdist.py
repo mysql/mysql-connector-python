@@ -194,7 +194,6 @@ class DistBinary(Command):
             if get_python_version().startswith("3"):
                 self.log.info("Copying byte code from __pycache__")
                 self._copy_from_pycache(os.path.join(self.bdist_dir, "mysql"))
-                self._copy_from_pycache(os.path.join(self.bdist_dir, "mysqlx"))
 
         # create distribution
         info_files = [

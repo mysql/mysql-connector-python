@@ -77,26 +77,25 @@ Run the entire test suite:
 
    .. code-block:: bash
 
-       shell> python unittests.py --with-mysql=<mysql-dir> --with-mysql-capi=<mysql-capi-dir> --with-protobuf-include-dir=<protobuf-include-dir> --with-protobuf-lib-dir=<protobuf-lib-dir> --with-protoc=<protoc-binary>
+       shell> python unittests.py --with-mysql=<mysql-dir> --with-mysql-capi=<mysql-capi-dir>
 
 Example:
 
    .. code-block:: sh
 
-       shell> python unittests.py --with-mysql=/usr/local/mysql --with-mysql-capi=/usr/local/mysql --with-protobuf-include-dir=/usr/local/protobuf/include --with-protobuf-lib-dir=/usr/local/protobuf/lib --with-protoc=/usr/local/protobuf/bin/protoc
+       shell> python unittests.py --with-mysql=/usr/local/mysql --with-mysql-capi=/usr/local/mysql
 
 The tests can be configured to be launched using an external server or bootstrapping it. The former is preferred (we'll assume so moving forward).
 
-As you can see, there are several parameters that can be injected into the ``unittests`` module. The parameters shown above are optional, or a must if you want to run the tests with the *C extension* enabled for the ``mysql.connector`` and ``mysqlx`` modules.
+As you can see, there are several parameters that can be injected into the ``unittests`` module. The parameters shown above are optional, or a must if you want to run the tests with the *C extension* enabled for the ``mysql.connector`` module.
 
-The ``with-mysql-capi`` flag is needed to build the `C extension` of ``mysql.connector``, the remaining ones are needed to build it for ``mysqlx``.
+The ``with-mysql-capi`` flag is needed to build the `C extension` of ``mysql.connector``.
 
 Additionally, there are parameters or flags that can be provided to set values to be used when connecting to the server:
 
 * **user**: the value stored by the environment variable ``MYSQL_USER`` is used (if set), otherwise, ``root`` is used by default.
 * **password**: the value of ``MYSQL_PASSWORD`` is used (if set), otherwise, ``empty_string`` is used by default.
 * **port**: the value of ``MYSQL_PORT`` is used (if set), otherwise, ``3306`` is used by default.
-* **mysqlx-port**: the value of ``MYSQLX_PORT`` is used (if set), otherwise, ``33060`` is used by default.
 * **host**: the value of ``MYSQL_HOST`` is used (if set), otherwise, ``127.0.0.1`` (localhost) is used by default.
 
 The previous defaults conform to the standard or default configuration implemented by the MySQL server. Actually, there are many more flags available, you can explore them via ``python unittests.py --help``.
@@ -125,19 +124,12 @@ If you do not provide any flag regarding *control of the unit tests selection*, 
 - cursor
 - errors
 - mysql_datatypes
-- mysqlx_connection
-- mysqlx_crud
-- mysqlx_errorcode
-- mysqlx_pooling
 - network
 - optionfiles
 - pooling
 - protocol
 - qa_bug16217743
 - qa_caching_sha2_password
-- qa_mysqlx_crud_view
-- qa_mysqlx_session_reset
-- qa_mysqlx_table_column_metadata
 - utils
 
 The list is not complete, but you can deduce and find more module names by inspecting the **tests** folder and its subfolders.
@@ -155,7 +147,6 @@ The script uses the environment variables described previously and introduces a 
 * ``NO_PROXY`` (value of the environment variable in the host by default)
 * ``PYPI_REPOSITORY`` (https://pypi.org/pypi by default)
 * ``MYSQL_CEXT`` (used to control the building of the **connector.mysql** C-EXT. If set to ``true`` or ``yes``, the extension is built, otherwise it is not)
-* ``MYSQLX_CEXT`` (same usage as ``MYSQL_CEXT``, but for the **mysqlx** package)
 * ``MYSQL_SOCKET`` (described below)
 
 There is one additional environment variable called ``TEST_PATTERN`` which can be used to provide a string or a regular expression that is applied for filtering one or more matching unit tests to execute.
@@ -172,15 +163,7 @@ If you want to run **connector.mysql** tests related to the C-EXT functionality 
 
     $ MYSQL_CEXT='true' TEST_PATTERN='cext.*' MYSQL_PASSWORD='s3cr3t' ./tests/docker/runner.sh
 
-You can also enable the **mysqlx** C-EXT by injecting a similar parameter::
-
-    $ MYSQLX_CEXT='true' TEST_PATTERN='conversion' MYSQL_PASSWORD='s3cr3t' ./tests/docker/runner.sh
-
-Or you can enable the C-EXT for both packages by issuing::
-
-    $ MYSQL_CEXT='true' MYSQLX_CEXT='true' TEST_PATTERN='.*er.*' MYSQL_PASSWORD='s3cr3t' ./tests/docker/runner.sh
-
-In the examples above, a standard MySQL server configuration is assumed, that's the reason the values for ``MYSQL_HOST``, ``MYSQL_USER``, ``MYSQL_PORT`` or ``MYSQLX_PORT`` weren't specified.
+In the examples above, a standard MySQL server configuration is assumed, that's the reason the values for ``MYSQL_HOST``, ``MYSQL_USER`` or ``MYSQL_PORT``  weren't specified.
 
 For **Windows** users, you can set up a suitable environment to run bash scripts by installing `Git Bash <https://git-scm.com/>`_, and using the console it provides instead of the natives *PowerShell* or *CMD*.
 
@@ -192,13 +175,13 @@ On **macOS** and **Windows**, since containers run on a virtual machine, host lo
 
 Due to some `know limitations <https://github.com/docker/for-mac/issues/483>`_ on the macOS Docker architecture, Unix socket tests can only run on Linux. In that case, if the ``MYSQL_SOCKET`` variable is explicitly specified, a shared volume between the host and the container will be created as a mount point from the socket file path in the host and an internal container directory specified as a volume, where the socket file path becomes available.
 
-That being said, the following there are some examples of possible use cases:
+That being said, the following are some examples of possible use cases:
 
-* Running the test modules whose name follows the pattern ``c.*`` from a mac whose IP is ``232.188.98.520``, and the password for ``root`` is ``s3cr3t``. Classic and XDevAPI protocols listening on ports ``3306`` and ``33060`` respectively::
+* Running the test modules whose name follows the pattern ``c.*`` from a mac whose IP is ``232.188.98.520``, and the password for ``root`` is ``s3cr3t``. Classic protocol is listening on port ``3306``::
 
     $ TEST_PATTERN='c.*' MYSQL_HOST='192.168.68.111' MYSQL_PASSWORD='s3cr3t' ./tests/docker/runner.sh
 
-* Running the whole test suite from Linux with MySQL user account ``docker``, and password ``s3cr3t``. Classic and XDevAPI protocols listening on ports ``3308`` and ``33060`` respectively::
+* Running the whole test suite from Linux with MySQL user account ``docker``, and password ``s3cr3t``. Classic protocol is listening on port ``3308``::
 
     $ MYSQL_PORT='3308' MYSQL_USER='docker' MYSQL_PASSWORD='s3cr3t' ./tests/docker/runner.sh
 
@@ -206,9 +189,6 @@ That being said, the following there are some examples of possible use cases:
 
     $ MYSQL_CEXT='true' MYSQL_PORT='3308' MYSQL_USER='docker' MYSQL_PASSWORD='s3cr3t' ./tests/docker/runner.sh
 
-* Running the *bugs* test module from Linux with MySQL user account ``root``, and password ``empty_string``. Classic and XDevAPI protocols listening on ports ``3306`` and ``33070`` respectively::
-
-    $ MYSQLX_PORT='33070' TEST_PATTERN='bugs' ./tests/docker/runner.sh
 
 Test Coverage
 -------------

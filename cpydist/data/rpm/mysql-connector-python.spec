@@ -57,9 +57,6 @@
 %endif
 
 %{?mysql_capi: %global with_mysql_capi %{mysql_capi}}
-%{?protobuf_include_dir: %global with_protobuf_include_dir %{protobuf_include_dir}}
-%{?protobuf_lib_dir: %global with_protobuf_lib_dir %{protobuf_lib_dir}}
-%{?protoc: %global with_protoc %{protoc}}
 %{?extra_compile_args: %global extra_compile_args %{extra_compile_args}}
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
@@ -209,9 +206,6 @@ COMMON_INSTALL_ARGS="\
     --prefix=%{_prefix} \
     --root=%{buildroot} \
     %{with_openssl_opts} \
-    --with-protobuf-include-dir=%{with_protobuf_include_dir} \
-    --with-protobuf-lib-dir=%{with_protobuf_lib_dir} \
-    --with-protoc=%{with_protoc} \
     --skip-vendor \
 "
 
@@ -241,15 +235,11 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
     --with-mysql-capi=%{with_mysql_capi} %{?byte_code_only}
 %{?scl:EOF}
 
-sed -i -e '/protobuf/d' %{buildroot}%{python3_sitearch}/mysql_connector_python-*.egg-info/requires.txt
-
 %files -n mysql-connector-python3%{?product_suffix}
 %doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst docs/INFO_SRC docs/INFO_BIN
 %{python3_sitearch}/mysql
-%{python3_sitearch}/mysqlx
 %{python3_sitearch}/mysql_connector_python-*.egg-info
 %{python3_sitearch}/_mysql_connector.cpython*.so
-%{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
 * Mon May 22 2023  Nuno Mariz <nuno.mariz@oracle.com> - 8.1.0-1

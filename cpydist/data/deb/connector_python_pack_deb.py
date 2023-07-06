@@ -77,9 +77,6 @@ parser.add_argument("source_directory", nargs=1, help="Source directory")
 parser.add_argument("--with-mysql-capi", action="store", default="", help="")
 parser.add_argument("--with-openssl-include-dir", action="store", default="", help="")
 parser.add_argument("--with-openssl-lib-dir", action="store", default="", help="")
-parser.add_argument("--with-protobuf-include-dir", action="store", default="", help="")
-parser.add_argument("--with-protobuf-lib-dir", action="store", default="", help="")
-parser.add_argument("--with-protoc", action="store", default="", help="")
 parser.add_argument("--extra-compile-args", action="store", default="", help="")
 parser.add_argument("--extra-link-args", action="store", default="", help="")
 parser.add_argument("--label", action="store", default="", help="")
@@ -413,9 +410,6 @@ def make_dpkg():
     env["MYSQL_CAPI"] = options.with_mysql_capi
     env["OPENSSL_INCLUDE_DIR"] = options.with_openssl_include_dir
     env["OPENSSL_LIB_DIR"] = options.with_openssl_lib_dir
-    env["MYSQLXPB_PROTOBUF_INCLUDE_DIR"] = options.with_protobuf_include_dir
-    env["MYSQLXPB_PROTOBUF_LIB_DIR"] = options.with_protobuf_lib_dir
-    env["MYSQLXPB_PROTOC"] = options.with_protoc
     env["WITH_CEXT"] = "1"
     env["EXTRA_COMPILE_ARGS"] = options.extra_compile_args
     env["EXTRA_LINK_ARGS"] = options.extra_link_args

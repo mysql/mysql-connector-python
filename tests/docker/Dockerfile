@@ -32,7 +32,6 @@
 ARG BASE_IMAGE=container-registry.oracle.com/os/oraclelinux:9-slim
 
 
-# ------------------------------- STAGE -------------------------------
 FROM ${BASE_IMAGE} as pure_python
 # In order to be able to run the tests within a private network,
 # optional proxy configurations can be used.
@@ -61,8 +60,7 @@ RUN pip install -r tests/requirements.txt \
     && pip install .
 
 
-# ------------------------------- STAGE -------------------------------
-FROM pure_python AS mysql_cext
+FROM pure_python AS c_extension
 RUN dnf install -y yum wget
 # Install MySQL including dev files to compile the C Extension
 ENV MYSQL_ENDPOINT="mysql80-community-release-el9-1.noarch.rpm"
@@ -71,41 +69,3 @@ RUN wget https://dev.mysql.com/get/${MYSQL_ENDPOINT} \
     && dnf install -y mysql-community-server mysql-community-devel
 # Build mysql cext
 RUN python setup.py install --with-mysql-capi=/usr/bin/mysql_config
-
-
-# ------------------------------- STAGE -------------------------------
-FROM pure_python AS mysqlx_cext
-RUN dnf install -y wget gzip
-# Install Protobuf C++: https://github.com/protocolbuffers/protobuf
-ENV PROTO_VERSION="3.19.6"
-ENV PROTO_ENDPOINT="protobuf-cpp-${PROTO_VERSION}.tar.gz"
-ENV PROTO_URI="https://github.com/protocolbuffers/protobuf/releases/download"
-RUN wget ${PROTO_URI}/v${PROTO_VERSION}/${PROTO_ENDPOINT} \
-    && tar xvf ${PROTO_ENDPOINT} \
-    && cd protobuf-${PROTO_VERSION} \
-    && ./configure --disable-shared --with-pic \
-    && make \
-    && make install \
-    && cd .. \
-    && rm -f ${PROTO_ENDPOINT} \
-    && rm -rf protobuf-${PROTO_VERSION}
-# Build mysqlx cext
-RUN python setup.py install \
-    --with-protobuf-include-dir=/usr/local/include \
-    --with-protobuf-lib-dir=/usr/local/lib \
-    --with-protoc=/usr/local/bin/protoc
-
-
-FROM mysqlx_cext AS mysql_mysqlx_cext
-RUN dnf install -y yum
-# Install MySQL including dev files to compile the C Extension
-ENV MYSQL_ENDPOINT="mysql80-community-release-el9-1.noarch.rpm"
-RUN wget https://dev.mysql.com/get/${MYSQL_ENDPOINT} \
-    && yum install -y ${MYSQL_ENDPOINT} \
-    && dnf install -y mysql-community-server mysql-community-devel
-# Build mysqlx cext
-RUN python setup.py install \
-    --with-protobuf-include-dir=/usr/local/include \
-    --with-protobuf-lib-dir=/usr/local/lib \
-    --with-protoc=/usr/local/bin/protoc \
-    --with-mysql-capi=/usr/bin/mysql_config
