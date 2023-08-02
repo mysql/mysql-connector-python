@@ -2781,7 +2781,8 @@ MySQL_fetch_row(MySQL *self)
             PyTuple_SET_ITEM(result_row, i, mytopy_bit(row[i], field_lengths[i]));
         }
         else if (field_type == MYSQL_TYPE_BLOB) {
-            if ((field_flags & BLOB_FLAG) && (field_flags & BINARY_FLAG)) {
+            if ((field_flags & BLOB_FLAG) &&
+                (field_flags & BINARY_FLAG) && field_charsetnr == 63) {
                 value = PyBytes_FromStringAndSize(row[i], field_lengths[i]);
             }
             else {

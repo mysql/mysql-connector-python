@@ -42,11 +42,9 @@ to be created first.
 """
 
 import gc
-import io
 import os
 import pickle
 import platform
-import struct
 import sys
 import tempfile
 import time
@@ -7667,3 +7665,55 @@ class BugOra35278365(tests.MySQLConnectorTests):
                 cur.execute(query)  # No error is success
                 res = cur.fetchall()
                 self.assertEqual(res, [])
+
+
+class BugOra35503506(tests.MySQLConnectorTests):
+    """BUG#35503506: Query on information_schema.columns returns bytes
+
+    When querying information_schema.columns using the C extension, MySQL
+    Connector/Python returns bytes instead of str in the result values.
+
+    This patch fixes this issue by testing if the charset is binary.
+    """
+
+    table_name = "BugOra35503506"
+
+    def setUp(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+            cnx.cmd_query(
+                f"""
+                CREATE TABLE {self.table_name} (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    data LONGBLOB,
+                    text VARCHAR(50)
+                )
+                """
+            )
+
+    def tearDown(self):
+        config = tests.get_mysql_config()
+        with mysql.connector.connect(**config) as cnx:
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_information_schema_columns_result(self):
+        config = tests.get_mysql_config()
+        database = config["database"]
+        exp = [("id", "int", None, "int", 10, 0)]
+        with mysql.connector.connect(**config) as cnx:
+            with cnx.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH,
+                    COLUMN_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE
+                    FROM information_schema.columns
+                    WHERE TABLE_NAME = '{self.table_name}'
+                    AND TABLE_SCHEMA = '{database}'
+                    AND COLUMN_NAME = 'id'
+                    ORDER BY ORDINAL_POSITION
+                    """
+                )
+                res = cur.fetchall()
+                self.assertEqual(exp, res)
