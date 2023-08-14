@@ -8,6 +8,7 @@ from contextlib import nullcontext
 from typing import Any, Dict, List, Tuple
 
 import mysql.connector
+import mysqlx
 import tests
 
 from mysql.connector import HAVE_CEXT, errors
@@ -25,7 +26,6 @@ from mysql.connector.opentelemetry.constants import (
 )
 
 REQPKGS = [
-    "mysqlx-connector-python",
     "opentelemetry-api",
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp-proto-http",
@@ -38,13 +38,7 @@ COLLECTOR_URL = f"http://localhost:{COLLECTOR_PORT}"
 NO_DEPENDENCIES_ERR = f"Following packages are required {REQPKGS}"
 NO_CEXT_ERR = "Cext is required"
 
-
 try:
-    import mysqlx
-
-    if not hasattr(mysqlx, "DbDoc"):
-        raise ImportError
-
     import requests
 
     from opentelemetry import trace
@@ -75,9 +69,6 @@ try:
     OTEL_INSTRUMENTOR = True
 except ImportError:
     OTEL_INSTRUMENTOR = False
-
-
-DbDocType = Any  # mysqlx.DbDoc
 
 
 @unittest.skipIf(not DEPENDENCIES, NO_DEPENDENCIES_ERR)
@@ -113,14 +104,14 @@ def end_trace_tracking():
     return requests.get(COLLECTOR_URL + "/record")
 
 
-def dump_spans(spans: List[DbDocType], indent: int = 4) -> None:
+def dump_spans(spans: List[mysqlx.DbDoc], indent: int = 4) -> None:
     for span in spans:
         print(json.dumps(span.__dict__, indent=indent))
 
 
 def parse_end_of_session_payload(
     r,
-) -> Tuple[List[DbDocType], DbDocType, DbDocType]:
+) -> Tuple[List[mysqlx.DbDoc], mysqlx.DbDoc, mysqlx.DbDoc]:
     """Returns query spans, connection span and app span."""
     spans, cnx_span, app_span = [], None, None
 
@@ -406,7 +397,7 @@ class PythonWithGlobalInstSpanTests(tests.MySQLConnectorTests):
         )
         return cnx
 
-    def _check_query_span_attrs(self, span: DbDocType) -> None:
+    def _check_query_span_attrs(self, span: mysqlx.DbDoc) -> None:
         attrs = {a["key"]: a["value"] for a in span["attributes"]}
         self.assertIn(SpanAttributes.DB_USER, attrs)
         self.assertIn(SpanAttributes.DB_SYSTEM, attrs)
@@ -423,7 +414,7 @@ class PythonWithGlobalInstSpanTests(tests.MySQLConnectorTests):
             attrs[SpanAttributes.THREAD_ID]["int_value"], str(DEFAULT_THREAD_ID)
         )
 
-    def _check_query_span_events(self, span: DbDocType) -> None:
+    def _check_query_span_events(self, span: mysqlx.DbDoc) -> None:
         event_names = [e["name"] for e in span["events"]]
         if self.with_query_span_response_event:
             self.assertEqual(
@@ -431,15 +422,17 @@ class PythonWithGlobalInstSpanTests(tests.MySQLConnectorTests):
                 1,
             )
 
-    def _check_query_span_links(self, span: DbDocType, connection_span_id: str) -> None:
+    def _check_query_span_links(
+        self, span: mysqlx.DbDoc, connection_span_id: str
+    ) -> None:
         self.assertEqual(len(span["links"]), 1)
         self.assertEqual(span["links"][0]["span_id"], connection_span_id)
 
     def _check_query_spans(
         self,
-        query_spans: List[DbDocType],
-        cnx_span: DbDocType,
-        app_span: DbDocType,
+        query_spans: List[mysqlx.DbDoc],
+        cnx_span: mysqlx.DbDoc,
+        app_span: mysqlx.DbDoc,
         expected_num_query_spans: int,
     ) -> None:
         for query_span in query_spans:
@@ -451,7 +444,7 @@ class PythonWithGlobalInstSpanTests(tests.MySQLConnectorTests):
         self.assertEqual(expected_num_query_spans, len(query_spans))
 
     def _check_connection_span_attrs(
-        self, span: DbDocType, config: Dict[str, Any]
+        self, span: mysqlx.DbDoc, config: Dict[str, Any]
     ) -> None:
         is_tcp = "unix_socket" not in config
         attrs = {a["key"]: a["value"] for a in span["attributes"]}
@@ -490,7 +483,9 @@ class PythonWithGlobalInstSpanTests(tests.MySQLConnectorTests):
             if config.get("use_pure"):
                 self.assertIn(NET_SOCK_HOST_ADDR, attrs)
 
-    def _check_connection_span(self, cnx_span: DbDocType, app_span: DbDocType) -> None:
+    def _check_connection_span(
+        self, cnx_span: mysqlx.DbDoc, app_span: mysqlx.DbDoc
+    ) -> None:
         self.assertEqual(cnx_span["kind"], CLIENT_KIND)
         self.assertEqual(cnx_span["parent_span_id"], app_span["span_id"])
 
@@ -683,7 +678,7 @@ class PythonWithGlobalInstSpanTests(tests.MySQLConnectorTests):
     def test_prepared_cursor(self) -> None:
         self.test_plain_cursor(prepared=True)
 
-    def _check_error_event(self, span: DbDocType, ex: Exception) -> None:
+    def _check_error_event(self, span: mysqlx.DbDoc, ex: Exception) -> None:
         """Check an error event."""
         events = {
             e["name"]: {a["key"]: a["value"] for a in e["attributes"]}

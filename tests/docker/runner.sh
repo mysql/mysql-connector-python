@@ -49,11 +49,24 @@ image_name=mysql-connector-python
 basedir=$(dirname $0)
 list_of_true_values="true True yes Yes"
 
-if exists_in_list "$list_of_true_values" " " "$MYSQL_CEXT";
+if exists_in_list "$list_of_true_values" " " "$MYSQL_CEXT" \
+    && exists_in_list "$list_of_true_values" " " "$MYSQLX_CEXT";
 then
-    version_name=${version_name}-cext
-    MYSQL_BUILD_CEXT="c_extension"
-    echo "C-EXT enabled!"
+    version_name=${version_name}-mysql-mysqlx-cext
+    MYSQL_BUILD_CEXT="mysql_mysqlx_cext"
+    echo "C-EXT for classic and XdevAPI protocols enabled!"
+elif exists_in_list "$list_of_true_values" " " "$MYSQL_CEXT" \
+    && ! exists_in_list "$list_of_true_values" " " "$MYSQLX_CEXT";
+then
+    version_name=${version_name}-mysql-cext
+    MYSQL_BUILD_CEXT="mysql_cext"
+    echo "C-EXT for classic protocol enabled!"
+elif ! exists_in_list "$list_of_true_values" " " "$MYSQL_CEXT" \
+    && exists_in_list "$list_of_true_values" " " "$MYSQLX_CEXT";
+then
+    version_name=${version_name}-mysqlx-cext
+    MYSQL_BUILD_CEXT="mysqlx_cext"
+    echo "C-EXT for XdevAPI protocol enabled!"
 else
     echo "C-EXT disabled!"
 fi
@@ -108,12 +121,13 @@ docker run \
     --interactive \
     --tty \
     ${MYSQL_LOCALHOST:+ --network host} \
-    ${MYSQL_SOCKET:+ --volume $MYSQL_SOCKET:/shared/mysql.sock} \
-    ${MYSQL_SOCKET:+ --env MYSQL_SOCKET=/shared/mysql.sock} \
+    ${MYSQL_SOCKET:+ --volume $MYSQL_SOCKET:/shared/mysqlx.sock} \
+    ${MYSQL_SOCKET:+ --env MYSQL_SOCKET=/shared/mysqlx.sock} \
     --env MYSQL_USER \
     --env MYSQL_PASSWORD \
     --env MYSQL_HOST \
     --env MYSQL_PORT \
+    --env MYSQLX_PORT \
     $image_name:$version_name \
     python unittests.py \
         --use-external-server \

@@ -54,6 +54,21 @@ else
     OPENSSL_OPT = --with-openssl-include-dir=$(OPENSSL_INCLUDE_DIR)  --with-openssl-lib-dir=$(OPENSSL_LIB_DIR)
 endif
 
+ifeq ($(origin MYSQLXPB_PROTOBUF_INCLUDE_DIR), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOBUF_INCLUDE_DIR \
+    pointing to location of Protobuf include dir)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOBUF_LIB_DIR), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOBUF_LIB_DIR \
+    pointing to location of Protobuf library dir)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOC), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOC \
+    pointing to location of Protobuf protoc binary)
+endif
+
 # Check whether we have Python v3 support
 ifneq ($(shell which py3versions 2>/dev/null),)
     PYTHON3_SUPPORTED=$(shell py3versions -sv)
@@ -83,6 +98,9 @@ override_dh_auto_install:
 		python$$pyver setup.py \
 			install --install-layout=deb \
 			--with-mysql-capi=$(MYSQL_CAPI) \
+			--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
+			--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
+			--with-protoc=$(MYSQLXPB_PROTOC) \
 			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
 			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
 			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT) $(SKIP_VENDOR_OPT); \

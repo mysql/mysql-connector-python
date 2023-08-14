@@ -8,7 +8,7 @@ MySQL Connector/Python
 .. image:: https://img.shields.io/pypi/l/mysql-connector-python.svg
    :target: https://pypi.org/project/mysql-connector-python/
 
-MySQL Connector/Python enables Python programs to access MySQL databases, using an API that is compliant with the `Python Database API Specification v2.0 (PEP 249) <https://www.python.org/dev/peps/pep-0249/>`_.
+MySQL Connector/Python enables Python programs to access MySQL databases, using an API that is compliant with the `Python Database API Specification v2.0 (PEP 249) <https://www.python.org/dev/peps/pep-0249/>`_. It also contains an implementation of the `X DevAPI <https://dev.mysql.com/doc/x-devapi-userguide/en>`_, an Application Programming Interface for working with the `MySQL Document Store <https://dev.mysql.com/doc/refman/8.0/en/document-store.html>`_.
 
 Installation
 ------------
@@ -17,10 +17,9 @@ The recommended way to install Connector/Python is via `pip <https://pip.pypa.io
 
 Make sure you have a recent `pip <https://pip.pypa.io/>`_ version installed on your system. If your system already has ``pip`` installed, you might need to update it. Or you can use the `standalone pip installer <https://pip.pypa.io/en/latest/installing/#installing-with-get-pip-py>`_.
 
-Classic connector:
+.. code-block:: bash
 
-    $ pip install mysql-connector-python
-
+    shell> pip install mysql-connector-python
 
 Please refer to the `installation tutorial <https://dev.mysql.com/doc/dev/connector-python/8.0/installation.html>`_ for installation alternatives.
 
@@ -53,8 +52,38 @@ Using the MySQL classic protocol:
     # Close connection
     cnx.close()
 
+Using the MySQL X DevAPI:
 
-Please refer to the `MySQL Connector/Python Developer Guide <https://dev.mysql.com/doc/connector-python/en/>`_ for a complete usage guide.
+.. code:: python
+
+    import mysqlx
+
+    # Connect to server
+    session = mysqlx.get_session(
+       host="127.0.0.1",
+       port=33060,
+       user="mike",
+       password="s3cr3t!")
+    schema = session.get_schema("test")
+
+    # Use the collection "my_collection"
+    collection = schema.get_collection("my_collection")
+
+    # Specify which document to find with Collection.find()
+    result = collection.find("name like :param") \
+                       .bind("param", "S%") \
+                       .limit(1) \
+                       .execute()
+
+    # Print document
+    docs = result.fetch_all()
+    print(r"Name: {0}".format(docs[0]["name"]))
+
+    # Close session
+    session.close()
+
+
+Please refer to the `MySQL Connector/Python Developer Guide <https://dev.mysql.com/doc/connector-python/en/>`_ and the `MySQL Connector/Python X DevAPI Reference <https://dev.mysql.com/doc/dev/connector-python/>`_ for a complete usage guide.
 
 Additional Resources
 --------------------

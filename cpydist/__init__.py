@@ -100,6 +100,13 @@ CEXT_OPTIONS = [
         "location of OpenSSL include directory",
     ),
     ("with-openssl-lib-dir=", None, "location of OpenSSL library directory"),
+    (
+        "with-protobuf-include-dir=",
+        None,
+        "location of Protobuf include directory",
+    ),
+    ("with-protobuf-lib-dir=", None, "location of Protobuf library directory"),
+    ("with-protoc=", None, "location of Protobuf protoc binary"),
     ("extra-compile-args=", None, "extra compile args"),
     ("extra-link-args=", None, "extra link args"),
     ("skip-vendor", None, "Skip bundling vendor libraries"),
@@ -144,9 +151,14 @@ class BaseCommand(Command):
     boolean_options = ["debug", "byte_code_only", "keep_temp", "skip_vendor"]
 
     with_mysql_capi = None
+    with_mysqlxpb_cext = False
 
     with_openssl_include_dir = None
     with_openssl_lib_dir = None
+
+    with_protobuf_include_dir = None
+    with_protobuf_lib_dir = None
+    with_protoc = None
 
     extra_compile_args = None
     extra_link_args = None
@@ -163,12 +175,17 @@ class BaseCommand(Command):
 
     _mysql_info = {}
     _build_mysql_lib_dir = None
+    _build_protobuf_lib_dir = None
 
     def initialize_options(self):
         """Initialize the options."""
         self.with_mysql_capi = None
+        self.with_mysqlxpb_cext = False
         self.with_openssl_include_dir = None
         self.with_openssl_lib_dir = None
+        self.with_protobuf_include_dir = None
+        self.with_protobuf_lib_dir = None
+        self.with_protoc = None
         self.extra_compile_args = None
         self.extra_link_args = None
         self.byte_code_only = False
@@ -195,6 +212,12 @@ class BaseCommand(Command):
             self.with_openssl_include_dir = os.environ.get("OPENSSL_INCLUDE_DIR")
         if not self.with_openssl_lib_dir:
             self.with_openssl_lib_dir = os.environ.get("OPENSSL_LIB_DIR")
+        if not self.with_protobuf_include_dir:
+            self.with_protobuf_include_dir = os.environ.get("PROTOBUF_INCLUDE_DIR")
+        if not self.with_protobuf_lib_dir:
+            self.with_protobuf_lib_dir = os.environ.get("PROTOBUF_LIB_DIR")
+        if not self.with_protoc:
+            self.with_protoc = os.environ.get("PROTOC")
         if not self.extra_compile_args:
             self.extra_compile_args = os.environ.get("EXTRA_COMPILE_ARGS")
         if not self.extra_link_args:
@@ -209,6 +232,9 @@ class BaseCommand(Command):
         cmd_build_ext.with_mysql_capi = self.with_mysql_capi
         cmd_build_ext.with_openssl_include_dir = self.with_openssl_include_dir
         cmd_build_ext.with_openssl_lib_dir = self.with_openssl_lib_dir
+        cmd_build_ext.with_protobuf_include_dir = self.with_protobuf_include_dir
+        cmd_build_ext.with_protobuf_lib_dir = self.with_protobuf_lib_dir
+        cmd_build_ext.with_protoc = self.with_protoc
         cmd_build_ext.extra_compile_args = self.extra_compile_args
         cmd_build_ext.extra_link_args = self.extra_link_args
         cmd_build_ext.skip_vendor = self.skip_vendor
@@ -217,12 +243,16 @@ class BaseCommand(Command):
         install.with_mysql_capi = self.with_mysql_capi
         install.with_openssl_include_dir = self.with_openssl_include_dir
         install.with_openssl_lib_dir = self.with_openssl_lib_dir
+        install.with_protobuf_include_dir = self.with_protobuf_include_dir
+        install.with_protobuf_lib_dir = self.with_protobuf_lib_dir
+        install.with_protoc = self.with_protoc
         install.extra_compile_args = self.extra_compile_args
         install.extra_link_args = self.extra_link_args
         install.skip_vendor = self.skip_vendor
 
         self.distribution.package_data = {
             "mysql.connector": ["py.typed"],
+            "mysqlx": ["py.typed"],
             "mysql.opentelemetry": get_otel_src_package_data(),
         }
         if not cmd_build_ext.skip_vendor:
@@ -524,6 +554,7 @@ class BaseCommand(Command):
                 "vendor/private/sasl2/*",
             ],
             "mysql.connector": ["py.typed"],
+            "mysqlx": ["py.typed"],
             "mysql.opentelemetry": get_otel_src_package_data(),
         }
 
@@ -583,6 +614,79 @@ class BuildExt(build_ext, BaseCommand):
                 if os.path.isfile(lib_path) and not lib.endswith(".a"):
                     os.unlink(os.path.join(self._build_mysql_lib_dir, lib))
 
+    def _finalize_protobuf(self):
+        if not self.with_protobuf_include_dir:
+            self.with_protobuf_include_dir = os.environ.get(
+                "MYSQLXPB_PROTOBUF_INCLUDE_DIR"
+            )
+
+        if not self.with_protobuf_lib_dir:
+            self.with_protobuf_lib_dir = os.environ.get("MYSQLXPB_PROTOBUF_LIB_DIR")
+
+        if not self.with_protoc:
+            self.with_protoc = os.environ.get("MYSQLXPB_PROTOC")
+
+        if self.with_protobuf_include_dir:
+            self.log.info(
+                "Protobuf include directory: %s",
+                self.with_protobuf_include_dir,
+            )
+            if not os.path.isdir(self.with_protobuf_include_dir):
+                self.log.error("Protobuf include dir should be a directory")
+                sys.exit(1)
+        else:
+            self.log.error("Unable to find Protobuf include directory")
+            sys.exit(1)
+
+        if self.with_protobuf_lib_dir:
+            self.log.info("Protobuf library directory: %s", self.with_protobuf_lib_dir)
+            if not os.path.isdir(self.with_protobuf_lib_dir):
+                self.log.error("Protobuf library dir should be a directory")
+                sys.exit(1)
+        else:
+            self.log.error("Unable to find Protobuf library directory")
+            sys.exit(1)
+
+        if self.with_protoc:
+            self.log.info("Protobuf protoc binary: %s", self.with_protoc)
+            if not os.path.isfile(self.with_protoc):
+                self.log.error("Protobuf protoc binary is not valid")
+                sys.exit(1)
+        else:
+            self.log.error("Unable to find Protobuf protoc binary")
+            sys.exit(1)
+
+        if not os.path.exists(self._build_protobuf_lib_dir):
+            os.makedirs(self._build_protobuf_lib_dir)
+
+        self.log.info("Copying Protobuf libraries")
+
+        libs = glob(os.path.join(self.with_protobuf_lib_dir, "libprotobuf*"))
+        for lib in libs:
+            if os.path.isfile(lib):
+                self.log.info("copying %s -> %s", lib, self._build_protobuf_lib_dir)
+                shutil.copy2(lib, self._build_protobuf_lib_dir)
+
+        # Remove all but static libraries to force static linking
+        if os.name == "posix":
+            self.log.info(
+                "Removing non-static Protobuf libraries from %s",
+                self._build_protobuf_lib_dir,
+            )
+            for lib in os.listdir(self._build_protobuf_lib_dir):
+                lib_path = os.path.join(self._build_protobuf_lib_dir, lib)
+                if os.path.isfile(lib_path) and not lib.endswith((".a", ".dylib")):
+                    os.unlink(os.path.join(self._build_protobuf_lib_dir, lib))
+
+    def _run_protoc(self):
+        base_path = os.path.join(os.getcwd(), "src", "mysqlxpb", "mysqlx")
+        command = [self.with_protoc, "-I"]
+        command.append(os.path.join(base_path, "protocol"))
+        command.extend(glob(os.path.join(base_path, "protocol", "*.proto")))
+        command.append(f"--cpp_out={base_path}")
+        self.log.info("Running protoc command: %s", " ".join(command))
+        check_call(command)
+
     def initialize_options(self):
         """Initialize the options."""
         build_ext.initialize_options(self)
@@ -596,9 +700,20 @@ class BuildExt(build_ext, BaseCommand):
         self.log.info("Python architecture: %s", ARCH)
 
         self._build_mysql_lib_dir = os.path.join(self.build_temp, "capi", "lib")
+        self._build_protobuf_lib_dir = os.path.join(self.build_temp, "protobuf", "lib")
         if self.with_mysql_capi:
             self._mysql_info = mysql_c_api_info(self.with_mysql_capi)
             self._finalize_mysql_capi()
+
+        self.with_mysqlxpb_cext = any(
+            (
+                self.with_protobuf_include_dir,
+                self.with_protobuf_lib_dir,
+                self.with_protoc,
+            )
+        )
+        if self.with_mysqlxpb_cext:
+            self._finalize_protobuf()
 
     def run(self):
         """Run the command."""
@@ -607,6 +722,26 @@ class BuildExt(build_ext, BaseCommand):
 
         disabled = []  # Extensions to be disabled
         for ext in self.extensions:
+            # Add Protobuf include and library dirs
+            if ext.name == "_mysqlxpb":
+                if not self.with_mysqlxpb_cext:
+                    self.log.warning("The '_mysqlxpb' C extension will not be built")
+                    disabled.append(ext)
+                    continue
+                if platform.system() == "Darwin":
+                    symbol_file = tempfile.NamedTemporaryFile()
+                    ext.extra_link_args.extend(
+                        ["-exported_symbols_list", symbol_file.name]
+                    )
+                    with open(symbol_file.name, "w") as fp:
+                        fp.write("_PyInit__mysqlxpb")
+                        fp.write("\n")
+                ext.include_dirs.append(self.with_protobuf_include_dir)
+                ext.library_dirs.append(self._build_protobuf_lib_dir)
+                ext.libraries.append("libprotobuf" if os.name == "nt" else "protobuf")
+                # Add -std=c++11 needed for Protobuf 3.6.1
+                ext.extra_compile_args.append("-std=c++11")
+                self._run_protoc()
             if ext.name == "_mysql_connector":
                 if not self.with_mysql_capi:
                     self.log.warning(

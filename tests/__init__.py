@@ -119,6 +119,7 @@ DJANGO_VERSION = None
 
 __all__ = [
     "MySQLConnectorTests",
+    "MySQLxTests",
     "get_test_names",
     "printmsg",
     "LOGGER_NAME",
@@ -489,6 +490,35 @@ def foreach_cnx(*cnx_classes, **extra_config):
     return _use_cnx
 
 
+def foreach_session(**extra_config):
+    def _use_cnx(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            import mysqlx
+
+            if not hasattr(self, "config"):
+                self.config = get_mysqlx_config()
+            if extra_config:
+                for key, value in extra_config.items():
+                    self.config[key] = value
+            for use_pure in self.use_pure_options:
+                config = self.config.copy()
+                config["use_pure"] = use_pure
+                self.session = mysqlx.get_session(config)
+                self.schema = self.session.get_default_schema()
+                try:
+                    func(self, *args, **kwargs)
+                except Exception as exc:
+                    traceback.print_exc(file=sys.stdout)
+                    raise exc
+                finally:
+                    self.session.close()
+
+        return wrapper
+
+    return _use_cnx
+
+
 class MySQLConnectorTests(unittest.TestCase):
     def __init__(self, methodName="runTest"):
         from mysql.connector import connection
@@ -741,6 +771,31 @@ class CMySQLCursorTests(CMySQLConnectorTests):
             self.cleanup_table(cnx, tbl)
 
 
+class MySQLxTests(MySQLConnectorTests):
+    def __init__(self, methodName="runTest"):
+        super(MySQLxTests, self).__init__(methodName=methodName)
+        from mysqlx.protobuf import HAVE_MYSQLXPB_CEXT
+
+        self.use_pure_options = [True, False] if HAVE_MYSQLXPB_CEXT else [True]
+
+    def run(self, result=None):
+        if sys.version_info[0:2] == (2, 6):
+            test_method = getattr(self, self._testMethodName)
+            if getattr(self.__class__, "__unittest_skip__", False) or getattr(
+                test_method, "__unittest_skip__", False
+            ):
+                # We skipped a class
+                try:
+                    why = getattr(
+                        self.__class__, "__unittest_skip_why__", ""
+                    ) or getattr(test_method, "__unittest_skip_why__", "")
+                    self._addSkip(result, why)
+                finally:
+                    result.stopTest(self)
+                return
+        return super().run(result)
+
+
 def printmsg(msg=None):
     if msg is not None:
         print(msg)
@@ -813,6 +868,9 @@ def install_connector(
     install_dir,
     openssl_include_dir,
     openssl_lib_dir,
+    protobuf_include_dir,
+    protobuf_lib_dir,
+    protoc,
     connc_location=None,
     extra_compile_args=None,
     extra_link_args=None,
@@ -860,6 +918,18 @@ def install_connector(
                 openssl_include_dir,
                 "--with-openssl-lib-dir",
                 openssl_lib_dir,
+            ]
+        )
+
+    if any((protobuf_include_dir, protobuf_lib_dir, protoc)):
+        cmd.extend(
+            [
+                "--with-protobuf-include-dir",
+                protobuf_include_dir,
+                "--with-protobuf-lib-dir",
+                protobuf_lib_dir,
+                "--with-protoc",
+                protoc,
             ]
         )
 
