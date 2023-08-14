@@ -366,11 +366,12 @@ class SocketStream:
             raise RuntimeError("Python installation has no SSL support")
 
         if ssl_protos is None or not ssl_protos:
+            # `check_hostname` is True by default
             context = ssl.create_default_context()
             if ssl_mode != SSLMode.VERIFY_IDENTITY:
                 context.check_hostname = False
-            if ssl_mode == SSLMode.REQUIRED:
-                context.verify_mode = ssl.CERT_NONE
+                if ssl_mode == SSLMode.REQUIRED:
+                    context.verify_mode = ssl.CERT_NONE
         else:
             ssl_protos.sort(reverse=True)
             tls_version = ssl_protos[0]
@@ -390,6 +391,8 @@ class SocketStream:
                     context.options |= ssl.OP_NO_TLSv1_1
                 if "TLSv1" not in ssl_protos:
                     context.options |= ssl.OP_NO_TLSv1
+
+            context.check_hostname = ssl_mode == SSLMode.VERIFY_IDENTITY
 
         if ssl_ca:
             try:
@@ -422,34 +425,6 @@ class SocketStream:
             self._socket = context.wrap_socket(self._socket, server_hostname=self._host)
         except ssl.CertificateError as err:
             raise InterfaceError(f"{err}") from err
-        if ssl_mode == SSLMode.VERIFY_IDENTITY:
-            context.check_hostname = True
-            hostnames = []
-            # Windows does not return loopback aliases on gethostbyaddr
-            if os.name == "nt" and self._host in ("localhost", "127.0.0.1"):
-                hostnames = ["localhost", "127.0.0.1"]
-            aliases = socket.gethostbyaddr(self._host)
-            hostnames.extend([aliases[0]] + aliases[1])
-            match_found = False
-            errs = []
-            for hostname in hostnames:
-                try:
-                    # Deprecated in Python 3.7 without a replacement and
-                    # should be removed in the future, since OpenSSL now
-                    # performs hostname matching
-                    # pylint: disable=deprecated-method
-                    ssl.match_hostname(self._socket.getpeercert(), hostname)
-                    # pylint: enable=deprecated-method
-                except ssl.CertificateError as err:
-                    errs.append(str(err))
-                else:
-                    match_found = True
-                    break
-            if not match_found:
-                self.close()
-                raise InterfaceError(
-                    f"Unable to verify server identity: {', '.join(errs)}"
-                )
 
         self._is_ssl = True
 

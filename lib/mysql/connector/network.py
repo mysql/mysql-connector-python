@@ -31,7 +31,6 @@
 """Module implementing low-level socket communication with MySQL servers.
 """
 
-import os
 import socket
 import struct
 import warnings
@@ -507,35 +506,6 @@ class MySQLSocket(ABC):
 
         try:
             self.sock = ssl_context.wrap_socket(self.sock, server_hostname=host)
-            if ssl_context.check_hostname:
-                hostnames = [host] if host else []
-                if os.name == "nt" and host == "localhost":
-                    hostnames = ["localhost", "127.0.0.1"]
-                    aliases = socket.gethostbyaddr(host)
-                    hostnames.extend([aliases[0]] + aliases[1])
-                match_found = False
-                errs = []
-                for hostname in hostnames:
-                    try:
-                        # Deprecated in Python 3.7 without a replacement and
-                        # should be removed in the future, since OpenSSL now
-                        # performs hostname matching
-                        # pylint: disable=deprecated-method
-                        ssl.match_hostname(
-                            self.sock.getpeercert(),  # type: ignore[union-attr]
-                            hostname,
-                        )
-                        # pylint: enable=deprecated-method
-                    except ssl.CertificateError as err:
-                        errs.append(str(err))
-                    else:
-                        match_found = True
-                        break
-                if not match_found:
-                    self.sock.close()
-                    raise InterfaceError(
-                        f"Unable to verify server identity: {', '.join(errs)}"
-                    )
         except NameError as err:
             raise NotSupportedError("Python installation has no SSL support") from err
         except (ssl.SSLError, IOError) as err:
@@ -602,6 +572,7 @@ class MySQLSocket(ABC):
                     if "TLSv1" not in tls_versions:
                         context.options |= ssl.OP_NO_TLSv1
             else:
+                # `check_hostname` is True by default
                 context = ssl.create_default_context()
 
             context.check_hostname = ssl_verify_identity
