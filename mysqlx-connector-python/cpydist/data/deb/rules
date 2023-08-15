@@ -1,0 +1,117 @@
+#!/usr/bin/make -f
+
+
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0, as
+# published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an
+# additional permission to link the program and your derivative works
+# with the separately licensed software that they have included with
+# MySQL.
+#
+# Without limiting anything contained in the foregoing, this file,
+# which is part of MySQL Connector/Python, is also subject to the
+# Universal FOSS Exception, version 1.0, a copy of which can be found at
+# http://oss.oracle.com/licenses/universal-foss-exception.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+
+export DH_VERBOSE = 1
+export PYBUILD_DISABLE=test
+export PYBUILD_DISABLE_python2=1
+
+PY3_BUILD_LIB_OPT = --build-lib=build/python3
+
+DEB_PYTHON_INSTALL_ARGS_ALL = --install-layout=deb
+
+ifeq ($(LABEL), 0)
+    LIC_EXT =
+else
+    LIC_EXT = -$(LABEL)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOBUF_INCLUDE_DIR), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOBUF_INCLUDE_DIR \
+    pointing to location of Protobuf include dir)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOBUF_LIB_DIR), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOBUF_LIB_DIR \
+    pointing to location of Protobuf library dir)
+endif
+
+ifeq ($(origin MYSQLXPB_PROTOC), undefined)
+    $(error Please set environment variable MYSQLXPB_PROTOC \
+    pointing to location of Protobuf protoc binary)
+endif
+
+# Check whether we have Python v3 support
+ifneq ($(shell which py3versions 2>/dev/null),)
+    PYTHON3_SUPPORTED=$(shell py3versions -sv)
+endif
+
+ifneq ($(BYTE_CODE_ONLY),)
+    BYTE_CODE_ONLY_OPT = --byte-code-only
+else
+    BYTE_CODE_ONLY_OPT =
+endif
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+
+	set -xe; \
+	DESTDIR=$(CURDIR)/debian/mysqlx-connector-python$(LIC_EXT)-py3; \
+	for pyver in $(PYTHON3_SUPPORTED); \
+	do \
+		python$$pyver setup.py \
+			install --install-layout=deb \
+			--with-protobuf-include-dir=$(MYSQLXPB_PROTOBUF_INCLUDE_DIR) \
+			--with-protobuf-lib-dir=$(MYSQLXPB_PROTOBUF_LIB_DIR) \
+			--with-protoc=$(MYSQLXPB_PROTOC) \
+			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
+			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
+			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT) $(SKIP_VENDOR_OPT); \
+		find $$DESTDIR -name 'mysqlx_connector_*.egg-info' -prune -exec rm -rf {} \;; \
+	done
+
+override_dh_python3:
+ifeq ($(BYTE_CODE_ONLY),)
+	py3clean .
+endif
+
+ifneq ($(BYTE_CODE_ONLY),)
+override_dh_pysupport:
+	# Skipped. We need to keep the .pyc files.
+endif
+
+override_dh_installdocs:
+	dh_installdocs --all LICENSE.txt
+	dh_installdocs --all README.txt
+	dh_installdocs --all README.rst
+	dh_installdocs --all CONTRIBUTING.rst
+	dh_installdocs --all docs/INFO_SRC
+	dh_installdocs --all docs/INFO_BIN
+
+# Post install scripts uses "sysconfig", seems for some Deb platforms
+# the Python 3 default install this is provided by "python3-distutils".
+# Debian 9 and Ubuntu 16 lacks "python3-distutils" but has "sysconfig"
+# anyway.
+SUBSTVARS = -Vpython3-distutils:Depends="python3-distutils"
+
+override_dh_gencontrol:
+	dh_gencontrol -- $(SUBSTVARS)

@@ -1,0 +1,22 @@
+Source: mysqlx-connector-python
+Priority: extra
+Section: python
+Maintainer: MySQL Release Engineering <mysql-build@oss.oracle.com>
+Build-Depends:
+ debhelper (>= 9.0.0), dh-python, python (>= 3.8.0) | python3 (>= 3.8.0) | python3.8 (>= 3.8.0)
+Standards-Version: 3.9.8
+Homepage: http://dev.mysql.com/downloads/connector/python/
+X-Python3-Version: >= 3.8
+
+Package: mysqlx-connector-python-py3
+Architecture: any
+Depends:
+ ${python3:Depends},
+ ${python3-protobuf:Depends},
+ ${python3-distutils:Depends}
+Replaces: mysqlx-connector-python-cext-py3 (<< 8.0.22)
+Breaks: mysqlx-connector-python-cext-py3 (<< 8.0.22)
+Recommends: python3-dnspython (>= 1.16.0)
+Conflicts: mysqlx-connector-python-commercial-py3
+Description: MySQL database driver written in pure Python 3
+ @LICENSE@

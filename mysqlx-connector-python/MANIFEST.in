@@ -1,0 +1,16 @@
+include README.txt
+include README.rst
+include LICENSE.txt
+include CONTRIBUTING.rst
+include CHANGES.txt
+include setup.py
+include unittests.py
+include MANIFEST.in
+
+recursive-include lib *.py
+recursive-include tests *.py *.pem
+recursive-include src *.h *.cc *.proto
+recursive-include cpydist *.py
+
+include docs/INFO_SRC
+include docs/INFO_BIN

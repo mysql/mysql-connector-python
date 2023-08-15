@@ -37,14 +37,17 @@ known_first_party = ['mysql.connector', 'mysqlx']
 line_length = 88
 lines_between_types = 1
 skip_glob = [
-    'build/*',
-    'dist/*',
-    'docs/*',
-    'lib/mysql/connector/locales/eng',
-    'lib/mysqlx/locales/eng',
-    'lib/mysqlx/protobuf',
+    'mysql-connector-python/build/*',
+    'mysqlx-connector-python/build/*',
+    'mysql-connector-python/dist/*',
+    'mysqlx-connector-python/dist/*',
+    'mysql-connector-python/docs/*',
+    'mysqlx-connector-python/docs/*',
+    'mysql-connector-python/lib/mysql/connector/locales/eng',
+    'mysqlx-connector-python/lib/mysqlx/locales/eng',
+    'mysqlx-connector-python/lib/mysqlx/protobuf',
     'venv/*',
-    'lib/mysql/opentelemetry',
+    'mysql-connector-python/lib/mysql/opentelemetry',
 ]
 
 [tool.black]
@@ -58,23 +61,23 @@ exclude = '''
   | build
   | dist
   | docs
-  | lib/mysql/connector/locales/eng
-  | lib/mysql/opentelemetry
-  | lib/mysqlx/locales/eng
+  | mysql-connector-python/lib/mysql/connector/locales/eng
+  | mysql-connector-python/lib/mysql/opentelemetry
+  | mysqlx-connector-python/lib/mysqlx/locales/eng
   | venv
   )/
-  | lib/mysqlx/protobuf/mysqlx_connection_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_crud_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_cursor_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_expect_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_expr_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_notice_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_prepare_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_resultset_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_session_pb2.py
-  | lib/mysqlx/protobuf/mysqlx_sql_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_connection_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_crud_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_cursor_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_expect_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_expr_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_notice_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_prepare_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_resultset_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_session_pb2.py
+  | mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_sql_pb2.py
 )
 '''
 
@@ -83,12 +86,15 @@ branch = true
 omit = [
     '*/dist-packages/*',
     '*/site-packages/*',
-    'cpydist/*',
-    'examples/*',
+    'mysql-connector-python/cpydist/*',
+    'mysqlx-connector-python/cpydist/*',
+    'mysql-connector-python/examples/*',
     'setupinfo.py',
-    'tests/*',
-    'unittests.py',
-    'lib/mysql/opentelemetry/*',
+    'mysql-connector-python/tests/*',
+    'mysqlx-connector-python/tests/*',
+    'mysql-connector-python/unittests.py',
+    'mysqlx-connector-python/unittests.py',
+    'mysql-connector-python/lib/mysql/opentelemetry/*',
 ]
 
 [tool.coverage.html]
@@ -99,8 +105,8 @@ output = 'build/coverage.xml'
 
 [tool.pylint.master]
 load-plugins = ['pylint.extensions.overlapping_exceptions']
-ignore-paths = ['lib/mysqlx/protobuf/mysqlx_*', 'lib/mysql/opentelemetry']
-init-hook = 'import sys; sys.path.append("lib")'
+ignore-paths = ['mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_*', 'mysql-connector-python/lib/mysql/opentelemetry']
+init-hook = 'import sys; sys.path.append("mysql-connector-python/lib"); sys.path.append("mysqlx-connector-python/lib")'
 
 [tool.pylint.messages_control]
 disable = [
@@ -135,22 +141,23 @@ allow_redefinition = true
 no_strict_optional = true
 no_implicit_optional = true
 files = [
-    'lib',
+    'mysql-connector-python/lib/mysql',
+    'mysqlx-connector-python/lib/mysqlx',
 ]
 exclude = [
-  'lib/mysqlx/protobuf/mysqlx_connection_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_crud_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_cursor_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_expect_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_expr_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_notice_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_prepare_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_resultset_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_session_pb2.py',
-  'lib/mysqlx/protobuf/mysqlx_sql_pb2.py',
-  'lib/mysql/opentelemetry',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_connection_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_crud_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_cursor_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_datatypes_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_expect_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_expr_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_notice_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_prepare_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_resultset_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_session_pb2.py',
+  'mysqlx-connector-python/lib/mysqlx/protobuf/mysqlx_sql_pb2.py',
+  'mysql-connector-python/lib/mysql/opentelemetry',
 ]
 
 [[tool.mypy.overrides]]
