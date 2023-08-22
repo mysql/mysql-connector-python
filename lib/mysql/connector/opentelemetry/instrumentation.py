@@ -8,6 +8,7 @@ import functools
 import re
 
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Union
 
 # pylint: disable=cyclic-import
@@ -187,7 +188,22 @@ def set_connection_span_attrs(
     cnx_span.set_attributes(attrs)
 
 
-def instrument_execution(
+def with_connection_span_attached(method: Callable) -> Callable:
+    """Attach the connection span while executing a connection method."""
+
+    def wrapper(
+        cnx: Union["MySQLConnection", "CMySQLConnection"], *args: Any, **kwargs: Any
+    ) -> Any:
+        """Context propagation decorator."""
+        with trace.use_span(
+            cnx._span, end_on_exit=False
+        ) if cnx._span and cnx._span.is_recording() else nullcontext():
+            return method(cnx, *args, **kwargs)
+
+    return wrapper
+
+
+def _instrument_execution(
     query_method: Callable,
     tracer: trace.Tracer,
     connection_span_link: trace.Link,
@@ -288,7 +304,7 @@ class TracedMySQLCursor(BaseMySQLTracer):
 
     def execute(self, *args: Any, **kwargs: Any) -> Any:
         """Instruments execute method."""
-        return instrument_execution(
+        return _instrument_execution(
             self._wrapped.execute,
             self._tracer,
             self._connection_span_link,
@@ -299,7 +315,7 @@ class TracedMySQLCursor(BaseMySQLTracer):
 
     def executemany(self, *args: Any, **kwargs: Any) -> Any:
         """Instruments executemany method."""
-        return instrument_execution(
+        return _instrument_execution(
             self._wrapped.executemany,
             self._tracer,
             self._connection_span_link,
@@ -310,7 +326,7 @@ class TracedMySQLCursor(BaseMySQLTracer):
 
     def callproc(self, *args: Any, **kwargs: Any) -> Any:
         """Instruments callproc method."""
-        return instrument_execution(
+        return _instrument_execution(
             self._wrapped.callproc,
             self._tracer,
             self._connection_span_link,
@@ -332,15 +348,20 @@ class TracedMySQLConnection(BaseMySQLTracer):
         _ = self._wrapped.sql_mode
 
     def cursor(self, *args: Any, **kwargs: Any) -> TracedMySQLCursor:
-        """Wraps the cursor object."""
+        """Wraps the object method."""
         return TracedMySQLCursor(
             wrapped=self._wrapped.cursor(*args, **kwargs),
             tracer=self._tracer,
             connection_span=self._span,
         )
 
+    @with_connection_span_attached
+    def cmd_change_user(self, *args: Any, **kwargs: Any) -> Any:
+        """Wraps the object method."""
+        return self._wrapped.cmd_change_user(*args, **kwargs)
 
-def instrument_connect(
+
+def _instrument_connect(
     connect: Callable[
         ..., Union["MySQLConnection", "CMySQLConnection", "PooledMySQLConnection"]
     ],
@@ -376,19 +397,21 @@ def instrument_connect(
         )
         kwargs[OPTION_CNX_TRACER] = tracer
 
-        # Add basic net information.
-        set_connection_span_attrs(None, kwargs[OPTION_CNX_SPAN], kwargs)
+        # attach connection span
+        with trace.use_span(kwargs[OPTION_CNX_SPAN], end_on_exit=False) as cnx_span:
+            # Add basic net information.
+            set_connection_span_attrs(None, cnx_span, kwargs)
 
-        # Connection may fail at this point, in case it does, basic net info is already
-        # included so the user can check the net configuration she/he provided.
-        cnx = connect(*args, **kwargs)
+            # Connection may fail at this point, in case it does, basic net info is already
+            # included so the user can check the net configuration she/he provided.
+            cnx = connect(*args, **kwargs)
 
-        # connection went ok, let's refine the net information.
-        set_connection_span_attrs(cnx, cnx._span, kwargs)  # type: ignore[arg-type]
+            # connection went ok, let's refine the net information.
+            set_connection_span_attrs(cnx, cnx_span, kwargs)  # type: ignore[arg-type]
 
-        return TracedMySQLConnection(
-            wrapped=cnx,  # type: ignore[return-value, arg-type]
-        )
+            return TracedMySQLConnection(
+                wrapped=cnx,  # type: ignore[return-value, arg-type]
+            )
 
     return wrapper
 
@@ -427,7 +450,7 @@ class MySQLInstrumentor:
         if connector.connect != getattr(self, "_original_connect"):
             logger.warning("MySQL Connector/Python module already instrumented.")
             return
-        connector.connect = instrument_connect(
+        connector.connect = _instrument_connect(
             connect=getattr(self, "_original_connect"),
             tracer_provider=kwargs.get("tracer_provider"),
         )
