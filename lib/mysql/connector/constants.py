@@ -705,7 +705,7 @@ class ShutdownType(_Constants):
     }
 
 
-class CharacterSet(_Constants):
+class CharacterSet:
     """MySQL supported character sets and collations
 
     List of character sets with their collations supported by MySQL. This
@@ -716,28 +716,27 @@ class CharacterSet(_Constants):
     name of the used character set or collation.
     """
 
-    # Use LTS character set as default
-    desc: List[
-        Optional[Tuple[str, str, bool]]
-    ] = MYSQL_CHARACTER_SETS_57  # type: ignore[assignment]
-    mysql_version: Tuple[int, ...] = (5, 7)
-
     # Multi-byte character sets which use 5c (backslash) in characters
     slash_charsets: Tuple[int, ...] = (1, 13, 28, 84, 87, 88)
 
-    @classmethod
-    def set_mysql_version(cls, version: Tuple[int, ...]) -> None:
+    def __init__(self) -> None:
+        # Use LTS character set as default
+        self._desc: List[
+            Optional[Tuple[str, str, bool]]
+        ] = MYSQL_CHARACTER_SETS_57  # type: ignore[assignment]
+        self._mysql_version: Tuple[int, ...] = (5, 7)
+
+    def set_mysql_version(self, version: Tuple[int, ...]) -> None:
         """Set the MySQL major version and change the charset mapping if is 5.7.
 
         Args:
             version (tuple): MySQL version tuple.
         """
-        cls.mysql_version = version[:2]
-        if cls.mysql_version >= (8, 0):
-            cls.desc = MYSQL_CHARACTER_SETS
+        self._mysql_version = version[:2]
+        if self._mysql_version >= (8, 0):
+            self._desc = MYSQL_CHARACTER_SETS
 
-    @classmethod
-    def get_info(cls, setid: int) -> Tuple[str, str]:
+    def get_info(self, setid: int) -> Tuple[str, str]:  # type: ignore[override]
         """Retrieves character set information as tuple using an ID
 
         Retrieves character set and collation information based on the
@@ -748,12 +747,11 @@ class CharacterSet(_Constants):
         Returns a tuple.
         """
         try:
-            return cls.desc[setid][0:2]
+            return self._desc[setid][0:2]
         except IndexError:
             raise ProgrammingError(f"Character set '{setid}' unsupported") from None
 
-    @classmethod
-    def get_desc(cls, name: int) -> str:  # type: ignore[override]
+    def get_desc(self, name: int) -> str:  # type: ignore[override]
         """Retrieves character set information as string using an ID
 
         Retrieves character set and collation information based on the
@@ -761,11 +759,10 @@ class CharacterSet(_Constants):
 
         Returns a tuple.
         """
-        charset, collation = cls.get_info(name)
+        charset, collation = self.get_info(name)
         return f"{charset}/{collation}"
 
-    @classmethod
-    def get_default_collation(cls, charset: Union[int, str]) -> Tuple[str, str, int]:
+    def get_default_collation(self, charset: Union[int, str]) -> Tuple[str, str, int]:
         """Retrieves the default collation for given character set
 
         Raises ProgrammingError when character set is not supported.
@@ -774,14 +771,14 @@ class CharacterSet(_Constants):
         """
         if isinstance(charset, int):
             try:
-                info = cls.desc[charset]
+                info = self._desc[charset]
                 return info[1], info[0], charset
             except (IndexError, KeyError) as err:
                 raise ProgrammingError(
                     f"Character set ID '{charset}' unsupported"
                 ) from err
 
-        for cid, info in enumerate(cls.desc):
+        for cid, info in enumerate(self._desc):
             if info is None:
                 continue
             if info[0] == charset and info[2] is True:
@@ -789,9 +786,8 @@ class CharacterSet(_Constants):
 
         raise ProgrammingError(f"Character set '{charset}' unsupported")
 
-    @classmethod
     def get_charset_info(
-        cls, charset: Optional[Union[int, str]] = None, collation: Optional[str] = None
+        self, charset: Optional[Union[int, str]] = None, collation: Optional[str] = None
     ) -> Tuple[int, str, str]:
         """Get character set information using charset name and/or collation
 
@@ -811,39 +807,38 @@ class CharacterSet(_Constants):
         info: Optional[Union[Tuple[str, str, bool], Tuple[str, str, int]]] = None
         if isinstance(charset, int):
             try:
-                info = cls.desc[charset]
+                info = self._desc[charset]
                 return (charset, info[0], info[1])
             except IndexError as err:
                 raise ProgrammingError(f"Character set ID {charset} unknown") from err
 
-        if charset in ("utf8", "utf-8") and cls.mysql_version >= (8, 0):
+        if charset in ("utf8", "utf-8") and self._mysql_version >= (8, 0):
             charset = "utf8mb4"
         if charset is not None and collation is None:
-            info = cls.get_default_collation(charset)
+            info = self.get_default_collation(charset)
             return (info[2], info[1], info[0])
         if charset is None and collation is not None:
-            for cid, info in enumerate(cls.desc):
+            for cid, info in enumerate(self._desc):
                 if info is None:
                     continue
                 if collation == info[1]:
                     return (cid, info[0], info[1])
             raise ProgrammingError(f"Collation '{collation}' unknown")
-        for cid, info in enumerate(cls.desc):
+        for cid, info in enumerate(self._desc):
             if info is None:
                 continue
             if info[0] == charset and info[1] == collation:
                 return (cid, info[0], info[1])
-        _ = cls.get_default_collation(charset)
+        _ = self.get_default_collation(charset)
         raise ProgrammingError(f"Collation '{collation}' unknown")
 
-    @classmethod
-    def get_supported(cls) -> Tuple[str, ...]:
+    def get_supported(self) -> Tuple[str, ...]:
         """Retrieves a list with names of all supproted character sets
 
         Returns a tuple.
         """
         res = []
-        for info in cls.desc:
+        for info in self._desc:
             if info and info[0] not in res:
                 res.append(info[0])
         return tuple(res)

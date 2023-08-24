@@ -80,6 +80,7 @@ from .constants import (
 )
 from .conversion import MySQLConverter, MySQLConverterBase
 from .errors import (
+    DatabaseError,
     Error,
     InterfaceError,
     NotSupportedError,
@@ -221,6 +222,7 @@ class MySQLConnectionAbstract(ABC):
 
         self._consume_results: bool = False
         self._init_command: Optional[str] = None
+        self._character_set: CharacterSet = CharacterSet()
 
     def __enter__(self) -> MySQLConnectionAbstract:
         return self
@@ -585,20 +587,6 @@ class MySQLConnectionAbstract(ABC):
                 f"'{self._auth_plugin}' cannot be used as the default authentication "
                 "plugin"
             )
-
-        # Configure character set and collation
-        if "charset" in config or "collation" in config:
-            try:
-                charset = config["charset"]
-                del config["charset"]
-            except KeyError:
-                charset = None
-            try:
-                collation = config["collation"]
-                del config["collation"]
-            except KeyError:
-                collation = None
-            self._charset_id = CharacterSet.get_charset_info(charset, collation)[0]
 
         # Set converter class
         try:
@@ -1108,7 +1096,7 @@ class MySQLConnectionAbstract(ABC):
 
         Returns a string.
         """
-        return CharacterSet.get_info(self._charset_id)[0]
+        return self._character_set.get_info(self._charset_id)[0]
 
     @property
     def python_charset(self) -> str:
@@ -1121,7 +1109,7 @@ class MySQLConnectionAbstract(ABC):
 
         Returns a string.
         """
-        encoding = CharacterSet.get_info(self._charset_id)[0]
+        encoding = self._character_set.get_info(self._charset_id)[0]
         if encoding in ("utf8mb4", "utf8mb3", "binary"):
             return "utf8"
         return encoding
@@ -1157,13 +1145,13 @@ class MySQLConnectionAbstract(ABC):
                     self._charset_id,
                     charset_name,
                     collation_name,
-                ) = CharacterSet.get_charset_info(charset)
+                ) = self._character_set.get_charset_info(charset)
             elif isinstance(charset, str):
                 (
                     self._charset_id,
                     charset_name,
                     collation_name,
-                ) = CharacterSet.get_charset_info(charset, collation)
+                ) = self._character_set.get_charset_info(charset, collation)
             else:
                 raise ValueError(err_msg.format("charset"))
         elif collation:
@@ -1171,14 +1159,14 @@ class MySQLConnectionAbstract(ABC):
                 self._charset_id,
                 charset_name,
                 collation_name,
-            ) = CharacterSet.get_charset_info(collation=collation)
+            ) = self._character_set.get_charset_info(collation=collation)
         else:
             charset = DEFAULT_CONFIGURATION["charset"]
             (
                 self._charset_id,
                 charset_name,
                 collation_name,
-            ) = CharacterSet.get_charset_info(charset, collation=None)
+            ) = self._character_set.get_charset_info(charset, collation=None)
 
         self._execute_query(f"SET NAMES '{charset_name}' COLLATE '{collation_name}'")
 
@@ -1190,7 +1178,7 @@ class MySQLConnectionAbstract(ABC):
             pass
 
         if self.converter:
-            self.converter.set_charset(charset_name)
+            self.converter.set_charset(charset_name, character_set=self._character_set)
 
     @property
     def collation(self) -> str:
@@ -1202,7 +1190,7 @@ class MySQLConnectionAbstract(ABC):
 
         Returns a string.
         """
-        return CharacterSet.get_charset_info(self._charset_id)[2]
+        return self._character_set.get_charset_info(self._charset_id)[2]
 
     @abstractmethod
     def _do_handshake(self) -> Any:
@@ -1241,15 +1229,41 @@ class MySQLConnectionAbstract(ABC):
         arguments are given, it will use the already configured or default
         values.
         """
+        # open connection using the default charset id
         if kwargs:
             self.config(**kwargs)
 
         self.disconnect()
         self._open_connection()
-        # Server does not allow to run any other statement different from ALTER
-        # when user's password has been expired.
+
+        charset, collation = (
+            kwargs.pop("charset", None),
+            kwargs.pop("collation", None),
+        )
+        if charset or collation:
+            self._charset_id = self._character_set.get_charset_info(charset, collation)[
+                0
+            ]
+
         if not self._client_flags & ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS:
             self._post_connection()
+        else:
+            # the server does not allow to run any other statement different from
+            # ALTER when user's password has been expired - the server either
+            # disconnects the client or restricts the client to "sandbox mode" [1].
+            # [1]: https://dev.mysql.com/doc/refman/5.7/en/expired-password-handling.html
+            try:
+                self.set_charset_collation(charset=self._charset_id)
+            except DatabaseError:
+                # get out of sandbox mode - with no FOR user clause, the statement sets
+                # the password for the current user.
+                self.cmd_query(f"SET PASSWORD = '{self._password1 or self._password}'")
+
+                # Set charset and collation.
+                self.set_charset_collation(charset=self._charset_id)
+
+                # go back to sandbox mode.
+                self.cmd_query(f"ALTER USER CURRENT_USER() PASSWORD EXPIRE")
 
     def reconnect(self, attempts: int = 1, delay: int = 0) -> None:
         """Attempt to reconnect to the MySQL server
@@ -1444,7 +1458,7 @@ class MySQLConnectionAbstract(ABC):
         methods and members of conversion.MySQLConverter.
         """
         if convclass and issubclass(convclass, MySQLConverterBase):
-            charset_name = CharacterSet.get_info(self._charset_id)[0]
+            charset_name = self._character_set.get_info(self._charset_id)[0]
             self._converter_class = convclass
             self.converter = convclass(charset_name, self._use_unicode)
             self.converter.str_fallback = self._converter_str_fallback

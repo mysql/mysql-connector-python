@@ -19,6 +19,7 @@ v8.2.0
 - BUG#35547876: C/Python 8.1.0 type check build fails in the pb2 branch
 - BUG#35544123: Kerberos unit tests configuration is outdated
 - BUG#35503506: Query on information_schema.columns returns bytes
+- BUG#35503377: First connected to server v8, then any v5 connections fail with utf8mb4 charset
 - BUG#35141645: Memory leak in the mysqlx C extension
 
 v8.1.0

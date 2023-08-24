@@ -37,7 +37,8 @@ import tests
 from mysql.connector import constants, errors
 
 # Set the character mapping for the server version being used
-constants.CharacterSet.set_mysql_version(tests.MYSQL_VERSION)
+character_set = constants.CharacterSet()
+character_set.set_mysql_version(tests.MYSQL_VERSION)
 
 
 class Helpers(tests.MySQLConnectorTests):
@@ -347,25 +348,25 @@ class CharacterSetTests(tests.MySQLConnectorTests):
         """Get info about charset using MySQL ID"""
         exp = (self.utf8_charset, f"{self.utf8_charset}_general_ci")
         data = 33
-        self.assertEqual(exp, constants.CharacterSet.get_info(data))
+        self.assertEqual(exp, character_set.get_info(data))
 
         exception = errors.ProgrammingError
         data = 50000
-        self.assertRaises(exception, constants.CharacterSet.get_info, data)
+        self.assertRaises(exception, character_set.get_info, data)
 
     def test_get_desc(self):
         """Get info about charset using MySQL ID as string"""
         exp = f"{self.utf8_charset}/{self.utf8_charset}_general_ci"
         data = 33
-        self.assertEqual(exp, constants.CharacterSet.get_desc(data))
+        self.assertEqual(exp, character_set.get_desc(data))
 
         exception = errors.ProgrammingError
         data = 50000
-        self.assertRaises(exception, constants.CharacterSet.get_desc, data)
+        self.assertRaises(exception, character_set.get_desc, data)
 
     def test_get_default_collation(self):
         """Get default collation for a given Character Set"""
-        func = constants.CharacterSet.get_default_collation
+        func = character_set.get_default_collation
         data = "sjis"
         exp = ("sjis_japanese_ci", data, 13)
         self.assertEqual(exp, func(data))
@@ -377,7 +378,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
 
     def test_get_charset_info(self):
         """Get info about charset by name and collation"""
-        func = constants.CharacterSet.get_charset_info
+        func = character_set.get_charset_info
         exp = (209, self.utf8_charset, f"{self.utf8_charset}_esperanto_ci")
         data = exp[1:]
 
@@ -387,18 +388,18 @@ class CharacterSetTests(tests.MySQLConnectorTests):
 
         self.assertRaises(
             errors.ProgrammingError,
-            constants.CharacterSet.get_charset_info,
+            character_set.get_charset_info,
             666,
         )
         self.assertRaises(
             errors.ProgrammingError,
-            constants.CharacterSet.get_charset_info,
+            character_set.get_charset_info,
             charset="utf8",
             collation="utf8_spam_ci",
         )
         self.assertRaises(
             errors.ProgrammingError,
-            constants.CharacterSet.get_charset_info,
+            character_set.get_charset_info,
             collation="utf8_spam_ci",
         )
 
@@ -448,7 +449,7 @@ class CharacterSetTests(tests.MySQLConnectorTests):
             "gb18030",
         )
 
-        self.assertEqual(exp, constants.CharacterSet.get_supported())
+        self.assertEqual(exp, character_set.get_supported())
 
 
 class SQLModesTests(tests.MySQLConnectorTests):

@@ -229,3 +229,106 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
             # expecting default charset
             self.cnx.set_charset_collation(collation=collation)
             self.assertEqual(DEFAULT_CONFIGURATION["charset"], self.cnx.charset)
+
+    def test_character_set(self):
+        # Test character set
+        config = tests.get_mysql_config()
+
+        config["charset"] = "latin1"
+        with CMySQLConnection(**config) as cnx:
+            self.assertEqual(8, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@character_set_client")
+                res = cur.fetchone()
+                self.assertTupleEqual((config["charset"],), res)
+
+            cnx.set_charset_collation(charset="ascii", collation="ascii_general_ci")
+            self.assertEqual(11, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@character_set_client, @@collation_connection")
+                res = cur.fetchone()
+                self.assertTupleEqual(("ascii", "ascii_general_ci"), res)
+
+        for charset_id, charset, collation in [
+            (26, "cp1250", "cp1250_general_ci"),
+            (8, "latin1", "latin1_swedish_ci"),
+        ]:
+            config["charset"] = charset
+            config["collation"] = collation
+            with CMySQLConnection(**config) as cnx:
+                self.assertEqual(charset_id, cnx._charset_id)
+                with cnx.cursor() as cur:
+                    cur.execute("SELECT @@character_set_client, @@collation_connection")
+                    res = cur.fetchone()
+                    self.assertTupleEqual((config["charset"], config["collation"]), res)
+
+        config["client_flags"] = (
+            ClientFlag.get_default() | ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS
+        )
+        _ = config.pop("charset")
+        config["collation"] = "ascii_general_ci"
+        with CMySQLConnection(**config) as cnx:
+            self.assertEqual(11, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@collation_connection")
+                res = cur.fetchone()
+                self.assertTupleEqual((config["collation"],), res)
+
+        _ = config.pop("collation")
+        config["charset"] = "latin1"
+        with CMySQLConnection(**config) as cnx:
+            self.assertEqual(8, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@character_set_client")
+                res = cur.fetchone()
+                self.assertTupleEqual((config["charset"],), res)
+
+
+@unittest.skipIf(
+    tests.MYSQL_EXTERNAL_SERVER,
+    "Test not available for external MySQL servers",
+)
+class WL13335(tests.MySQLConnectorTests):
+    """WL#13335: Avoid set config values with flag CAN_HANDLE_EXPIRED_PASSWORDS"""
+
+    def setUp(self):
+        self.config = tests.get_mysql_config()
+        cnx = CMySQLConnection(**self.config)
+        self.user = "expired_pw_user"
+        self.passw = "i+QEqGkFr8h5"
+        self.hosts = ["localhost", "127.0.0.1"]
+        for host in self.hosts:
+            cnx.cmd_query(
+                "CREATE USER '{}'@'{}' IDENTIFIED BY "
+                "'{}'".format(self.user, host, self.passw)
+            )
+            cnx.cmd_query("GRANT ALL ON *.* TO '{}'@'{}'".format(self.user, host))
+            cnx.cmd_query(
+                "ALTER USER '{}'@'{}' PASSWORD EXPIRE".format(self.user, host)
+            )
+        cnx.close()
+
+    def tearDown(self):
+        cnx = CMySQLConnection(**self.config)
+        for host in self.hosts:
+            cnx.cmd_query("DROP USER '{}'@'{}'".format(self.user, host))
+        cnx.close()
+
+    @tests.foreach_cnx()
+    def test_connect_with_can_handle_expired_pw_flag(self):
+        cnx_config = self.config.copy()
+        cnx_config["user"] = self.user
+        cnx_config["password"] = self.passw
+        flags = ClientFlag.get_default()
+        flags |= ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS
+        cnx_config["client_flags"] = flags
+
+        # no error expected
+        cnx = self.cnx.__class__(**cnx_config)
+
+        # connection should be in sandbox mode, trying an operation should produce
+        # `DatabaseError: 1862 (HY000): Your password has expired. To log in you
+        # must change it using a client that supports expired passwords`
+        self.assertRaises(errors.DatabaseError, cnx.cmd_query, "SELECT 1")
+
+        cnx.close()

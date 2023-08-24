@@ -65,6 +65,7 @@ class MySQLConverterBase:
         use_unicode: bool = True,
         str_fallback: bool = False,
     ) -> None:
+        self._character_set: CharacterSet = CharacterSet()
         self.python_types: Optional[Tuple[Any, ...]] = None
         self.mysql_types: Optional[Tuple[Any, ...]] = None
         self.charset: Optional[str] = None
@@ -77,7 +78,9 @@ class MySQLConverterBase:
             Callable[[bytes, DescriptionType], ToPythonOutputTypes],
         ] = {}
 
-    def set_charset(self, charset: Optional[str]) -> None:
+    def set_charset(
+        self, charset: Optional[str], character_set: Optional[CharacterSet] = None
+    ) -> None:
         """Set character set"""
         if charset in ("utf8mb4", "utf8mb3"):
             charset = "utf8"
@@ -86,7 +89,11 @@ class MySQLConverterBase:
         else:
             # default to utf8
             self.charset = "utf8"
-        self.charset_id = CharacterSet.get_charset_info(self.charset)[0]
+
+        if character_set:
+            self._character_set = character_set
+
+        self.charset_id = self._character_set.get_charset_info(self.charset)[0]
 
     def set_unicode(self, value: bool = True) -> None:
         """Set whether to use Unicode"""
@@ -165,7 +172,7 @@ class MySQLConverter(MySQLConverterBase):
         use_unicode: bool = True,
         str_fallback: bool = False,
     ) -> None:
-        MySQLConverterBase.__init__(self, charset, use_unicode, str_fallback)
+        super().__init__(charset, use_unicode, str_fallback)
         self._cache_field_types: Dict[
             int,
             Callable[[bytes, DescriptionType], ToPythonOutputTypes],
@@ -299,9 +306,9 @@ class MySQLConverter(MySQLConverterBase):
         charset_id = self.charset_id
         if charset == "binary":
             charset = "utf8"
-            charset_id = CharacterSet.get_charset_info(charset)[0]
+            charset_id = self._character_set.get_charset_info(charset)[0]
         encoded = value.encode(charset)
-        if charset_id in CharacterSet.slash_charsets:
+        if charset_id in self._character_set.slash_charsets:
             if b"\x5c" in encoded:
                 return HexLiteral(value, charset)
         return encoded

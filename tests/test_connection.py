@@ -1146,16 +1146,6 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         exp = constants.ClientFlag.COMPRESS
         self.assertEqual(exp, cnx._client_flags & constants.ClientFlag.COMPRESS)
 
-        # Test character set
-        # utf8mb4 is default, which is mapped to 45
-        self.assertEqual(45, cnx._charset_id)
-        cnx.config(charset="latin1")
-        self.assertEqual(8, cnx._charset_id)
-        cnx.config(charset="latin1", collation="latin1_general_ci")
-        self.assertEqual(48, cnx._charset_id)
-        cnx.config(collation="latin1_general_ci")
-        self.assertEqual(48, cnx._charset_id)
-
         # Test converter class
         class TestConverter(MySQLConverterBase):
             ...
@@ -1240,6 +1230,60 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         self.assertEqual(cnx._ssl["ca"], "dummyCA")
         self.assertEqual(cnx._ssl["cert"], "dummyCert")
         self.assertEqual(cnx._ssl["key"], "dummyKey")
+
+    def test_character_set(self):
+        # Test character set
+        config = tests.get_mysql_config()
+
+        config["charset"] = "latin1"
+        with connection.MySQLConnection(**config) as cnx:
+            self.assertEqual(8, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@character_set_client")
+                res = cur.fetchone()
+                self.assertTupleEqual((config["charset"],), res)
+
+            cnx.set_charset_collation(charset="ascii", collation="ascii_general_ci")
+            self.assertEqual(11, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@character_set_client, @@collation_connection")
+                res = cur.fetchone()
+                self.assertTupleEqual(("ascii", "ascii_general_ci"), res)
+
+        for charset_id, charset, collation in [
+            (45, "utf8mb4", "utf8mb4_general_ci"),
+            (48, "latin1", "latin1_general_ci"),
+        ]:
+            config["charset"] = charset
+            config["collation"] = collation
+            with connection.MySQLConnection(**config) as cnx:
+                self.assertEqual(charset_id, cnx._charset_id)
+                with cnx.cursor() as cur:
+                    cur.execute("SELECT @@character_set_client, @@collation_connection")
+                    res = cur.fetchone()
+                    self.assertTupleEqual((config["charset"], config["collation"]), res)
+
+        config["client_flags"] = (
+            constants.ClientFlag.get_default()
+            | constants.ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS
+        )
+        _ = config.pop("charset")
+        config["collation"] = "ascii_general_ci"
+        with connection.MySQLConnection(**config) as cnx:
+            self.assertEqual(11, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@collation_connection")
+                res = cur.fetchone()
+                self.assertTupleEqual((config["collation"],), res)
+
+        _ = config.pop("collation")
+        config["charset"] = "latin1"
+        with connection.MySQLConnection(**config) as cnx:
+            self.assertEqual(8, cnx._charset_id)
+            with cnx.cursor() as cur:
+                cur.execute("SELECT @@character_set_client")
+                res = cur.fetchone()
+                self.assertTupleEqual((config["charset"],), res)
 
     @unittest.skipIf(
         tests.MYSQL_EXTERNAL_SERVER,
@@ -2968,8 +3012,16 @@ class WL13335(tests.MySQLConnectorTests):
         flags = constants.ClientFlag.get_default()
         flags |= constants.ClientFlag.CAN_HANDLE_EXPIRED_PASSWORDS
         cnx_config["client_flags"] = flags
-        # connection must be successful
-        _ = self.cnx.__class__(**cnx_config)
+
+        # no error expected
+        cnx = self.cnx.__class__(**cnx_config)
+
+        # connection should be in sandbox mode, trying an operation should produce
+        # `DatabaseError: 1862 (HY000): Your password has expired. To log in you
+        # must change it using a client that supports expired passwords`
+        self.assertRaises(errors.DatabaseError, cnx.cmd_query, "SELECT 1")
+
+        cnx.close()
 
 
 @unittest.skipIf(

@@ -39,7 +39,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 from . import version
 from .abstracts import MySQLConnectionAbstract
-from .constants import CharacterSet, ClientFlag, FieldFlag, ServerFlag, ShutdownType
+from .constants import ClientFlag, FieldFlag, ServerFlag, ShutdownType
 from .conversion import MySQLConverter
 from .errors import (
     InterfaceError,
@@ -164,7 +164,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._server_version = self._check_server_version(
             self._handshake["server_version_original"]
         )
-        CharacterSet.set_mysql_version(self._server_version)
+        self._character_set.set_mysql_version(self._server_version)
 
     @property
     def _server_status(self) -> int:
@@ -230,7 +230,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         return self._server_status & ServerFlag.STATUS_IN_TRANS
 
     def _open_connection(self) -> None:
-        charset_name = CharacterSet.get_info(self._charset_id)[0]
+        charset_name = self._character_set.get_info(self._charset_id)[0]
         # pylint: disable=c-extension-no-member
         self._cmysql = _mysql_connector.MySQL(
             buffered=self._buffered,
