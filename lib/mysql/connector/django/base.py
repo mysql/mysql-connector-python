@@ -373,7 +373,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):  # pylint: disable=abstract-method
 
         try:
             options = settings_dict["OPTIONS"].copy()
-            isolation_level = options.pop("isolation_level")
+            isolation_level = options.pop("isolation_level", None)
             if isolation_level:
                 isolation_level = isolation_level.lower()
                 if isolation_level not in self.isolation_levels:

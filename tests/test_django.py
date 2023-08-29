@@ -608,3 +608,22 @@ class BugOra34467201(tests.MySQLConnectorTests):
             cur.execute(f"SELECT @{self.var_name}")
             res = cur.fetchall()
             self.assertEqual((self.var_value,), res[0])
+
+
+class BugOra35755852(tests.MySQLConnectorTests):
+    """BUG#35755852: Django config raise_on_warnings is ignored without isolation_level
+
+    When the Django config option `isolation_level` is not provided, the
+    value of the option `raise_on_warnings` is ignored.
+
+    This issue was fixed by adding the missing default value in the pop()
+    function used for the `isolation_level`, which raises a `KeyError` and
+    breaks the assignment of the options.
+    """
+
+    def test_missing_config(self):
+        settings.DATABASES["default"]["OPTIONS"] = {"raise_on_warnings": True}
+        cnx = DatabaseWrapper(settings.DATABASES["default"])
+        cnx_params = cnx.get_connection_params()
+        self.assertTrue(cnx_params["raise_on_warnings"])
+        del settings.DATABASES["default"]["OPTIONS"]

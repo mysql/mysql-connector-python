@@ -14,6 +14,7 @@ v8.2.0
 - WL#15664: Add support for Python 3.12
 - WL#15623: Improve the authentication module
 - WL#15218: Support WebAuthn authentication
+- BUG#35755852: Django config raise_on_warnings is ignored without isolation_level
 - BUG#35547876: C/Python 8.1.0 type check build fails in the pb2 branch
 - BUG#35544123: Kerberos unit tests configuration is outdated
 - BUG#35503506: Query on information_schema.columns returns bytes
