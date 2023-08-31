@@ -7701,7 +7701,16 @@ class BugOra35503506(tests.MySQLConnectorTests):
     def test_information_schema_columns_result(self):
         config = tests.get_mysql_config()
         database = config["database"]
-        exp = [("id", "int", None, "int", 10, 0)]
+        exp = [
+            (
+                "id",
+                "int",
+                None,
+                "int" if tests.MYSQL_VERSION > (8, 0) else "int(11)",
+                10,
+                0,
+            )
+        ]
         with mysql.connector.connect(**config) as cnx:
             with cnx.cursor() as cur:
                 cur.execute(
