@@ -97,7 +97,7 @@ class MySQLWebAuthnAuthPlugin(MySQLAuthPlugin):
 
     def get_assertion_response(
         self, credential_id: Optional[bytearray] = None
-    ) -> bytearray:
+    ) -> bytes:
         """Get assertion from authenticator and return the response.
 
         Args:
@@ -165,7 +165,7 @@ class MySQLWebAuthnAuthPlugin(MySQLAuthPlugin):
         logger.debug("WebAuthn - payload response packet: %s", packet)
         return packet
 
-    def auth_response(self, auth_data: bytes, **kwargs: Any) -> int:
+    def auth_response(self, auth_data: bytes, **kwargs: Any) -> Optional[bytes]:
         """Find authenticator device and check if supports resident keys.
 
         It also creates a Fido2Client using the relying party ID from the server.
@@ -194,7 +194,7 @@ class MySQLWebAuthnAuthPlugin(MySQLAuthPlugin):
         if device is not None:
             logger.debug("WebAuthn - Use USB HID channel")
         elif CTAP_PCSC_DEVICE_AVAILABLE:
-            device = next(CtapPcscDevice.list_devices(), None)  # type: ignore[arg-type]
+            device = next(CtapPcscDevice.list_devices(), None)
 
         if device is None:
             raise errors.InterfaceError("No FIDO device found")
@@ -208,10 +208,10 @@ class MySQLWebAuthnAuthPlugin(MySQLAuthPlugin):
 
         if not self.client.info.options.get("rk"):
             logger.debug("WebAuthn - Authenticator doesn't support resident keys")
-            return 1
+            return b"1"
 
         logger.debug("WebAuthn - Authenticator with support for resident key found")
-        return 2
+        return b"2"
 
     def auth_more_response(
         self, sock: "MySQLSocket", auth_data: bytes, **kwargs: Any
@@ -271,10 +271,10 @@ class MySQLWebAuthnAuthPlugin(MySQLAuthPlugin):
         response = self.auth_response(auth_data)
         credential_id = None
 
-        if response == 1:
+        if response == b"1":
             # Authenticator doesn't support resident keys, request credential_id
             logger.debug("WebAuthn - request credential_id")
-            sock.send(utils.lc_int(response))
+            sock.send(utils.lc_int(int(response)))
 
             # return a packet representing an `auth more data` response
             return bytes(sock.recv())
