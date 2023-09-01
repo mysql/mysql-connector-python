@@ -64,7 +64,7 @@
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
 # set version if not defined through 'rpmbuild'
-%{!?version: %global version 8.1.0}
+%{!?version: %global version 8.2.0}
 
 %global with_openssl_opts ""
 
@@ -252,6 +252,9 @@ sed -i -e '/protobuf/d' %{buildroot}%{python3_sitearch}/mysql_connector_python-*
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Fri Sep 1 2023  Nuno Mariz <nuno.mariz@oracle.com> - 8.2.0-1
+- Updated for 8.2.0
+
 * Mon May 22 2023  Nuno Mariz <nuno.mariz@oracle.com> - 8.1.0-1
 - Updated for 8.1.0
 
