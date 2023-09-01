@@ -1263,7 +1263,7 @@ class MySQLConnectionAbstract(ABC):
                 self.set_charset_collation(charset=self._charset_id)
 
                 # go back to sandbox mode.
-                self.cmd_query(f"ALTER USER CURRENT_USER() PASSWORD EXPIRE")
+                self.cmd_query("ALTER USER CURRENT_USER() PASSWORD EXPIRE")
 
     def reconnect(self, attempts: int = 1, delay: int = 0) -> None:
         """Attempt to reconnect to the MySQL server

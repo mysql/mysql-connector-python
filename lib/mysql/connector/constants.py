@@ -721,9 +721,7 @@ class CharacterSet:
 
     def __init__(self) -> None:
         # Use LTS character set as default
-        self._desc: List[
-            Optional[Tuple[str, str, bool]]
-        ] = MYSQL_CHARACTER_SETS_57  # type: ignore[assignment]
+        self._desc: List[Optional[Tuple[str, str, bool]]] = MYSQL_CHARACTER_SETS_57
         self._mysql_version: Tuple[int, ...] = (5, 7)
 
     def set_mysql_version(self, version: Tuple[int, ...]) -> None:
@@ -736,7 +734,7 @@ class CharacterSet:
         if self._mysql_version >= (8, 0):
             self._desc = MYSQL_CHARACTER_SETS
 
-    def get_info(self, setid: int) -> Tuple[str, str]:  # type: ignore[override]
+    def get_info(self, setid: int) -> Tuple[str, str]:
         """Retrieves character set information as tuple using an ID
 
         Retrieves character set and collation information based on the
@@ -751,7 +749,7 @@ class CharacterSet:
         except IndexError:
             raise ProgrammingError(f"Character set '{setid}' unsupported") from None
 
-    def get_desc(self, name: int) -> str:  # type: ignore[override]
+    def get_desc(self, name: int) -> str:
         """Retrieves character set information as string using an ID
 
         Retrieves character set and collation information based on the
