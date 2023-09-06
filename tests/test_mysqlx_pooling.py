@@ -637,13 +637,13 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Verify given TLS cipher suite is used
         exp_res = [
-            "DHE-RSA-AES256-SHA256",
-            "DHE-RSA-AES256-SHA256",
+            "ECDHE-RSA-AES256-GCM-SHA384",
+            "DHE-RSA-AES256-GCM-SHA384",
             "DHE-RSA-AES128-GCM-SHA256",
         ]
         test_ciphers = [
-            ["TLS_DHE_RSA_WITH_AES_256_CBC_SHA256"],
-            ["DHE-RSA-AES256-SHA256"],
+            ["TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"],
+            ["TLS_DHE_RSA_WITH_AES_256_GCM_SHA384"],
             ["TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"],
         ]
         settings["tls-versions"] = "TLSv1.2"
