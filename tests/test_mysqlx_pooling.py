@@ -575,7 +575,7 @@ class MySQLxClientTests(tests.MySQLxTests):
 
         # Verify unsupported TLSv1.3 version is ignored (connection success)
         # when is not supported, TLSv1.2 is used
-        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-SHA256"]
+        settings["tls-ciphersuites"] = ["DHE-RSA-AES256-GCM-SHA384"]
         settings["tls-versions"] = ["TLSv1.3", "TLSv1.2"]
         uri_settings = build_uri(**settings)
         client = mysqlx.get_client(uri_settings, cnx_options)
