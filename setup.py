@@ -148,6 +148,5 @@ setup(
             "typing-extensions>=3.7.4",
             "zipp>=0.5",
         ],
-        "webauthn": ["fido2==1.1.2"],
     },
 )
