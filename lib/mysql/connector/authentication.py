@@ -46,25 +46,14 @@ from .protocol import (
     OK_STATUS,
     MySQLProtocol,
 )
-from .types import ConnAttrsType, HandShakeType
+from .types import HandShakeType
 
 if TYPE_CHECKING:
     from .network import MySQLSocket
 
 
 class MySQLAuthenticator:
-    """Implements the authentication phase.
-
-    The caller has access to the following API:
-        - ssl_enabled (property, read-only): signals whether or not SSL is enabled.
-
-        - plugin_config (property, read-only): custom arguments that will be provided
-        to the authentication plugin when called.
-
-        - setup_ssl (method): Set up an SSL communication channel.
-
-        - authenticate (method): Performs the authentication phase.
-    """
+    """Implements the authentication phase."""
 
     def __init__(self) -> None:
         """Constructor."""
@@ -82,11 +71,18 @@ class MySQLAuthenticator:
 
     @property
     def plugin_config(self) -> Dict[str, Any]:
-        """Custom arguments that will be provided to the authentication
-        plugin when called.
+        """Custom arguments that are being provided to the authentication plugin when called.
 
-        The parameters defined here will override the ones defined in
-        the auth plugin itself.
+        The parameters defined here will override the ones defined in the
+        auth plugin itself.
+
+        The plugin config is a read-only property - the plugin configuration
+        provided when invoking `authenticate()` is recorded and can be queried
+        by accessing this property.
+
+        Returns:
+            dict: The latest plugin configuration provided when invoking
+                  `authenticate()`.
         """
         return self._plugin_config
 
@@ -99,13 +95,13 @@ class MySQLAuthenticator:
         client_flags: int = 0,
         max_allowed_packet: int = DEFAULT_MAX_ALLOWED_PACKET,
     ) -> bytes:
-        """Set up an SSL communication channel.
+        """Sets up an SSL communication channel.
 
         Args:
             sock: Pointer to the socket connection.
             host: Server host name.
             ssl_options: SSL and TLS connection options (see
-                `network.MySQLSocket.build_ssl_context`).
+                         `network.MySQLSocket.build_ssl_context`).
             charset: Client charset (see [1]), only the lower 8-bits.
             client_flags: Integer representing client capabilities flags.
             max_allowed_packet: Maximum packet size.
@@ -114,7 +110,7 @@ class MySQLAuthenticator:
             ssl_request_payload: Payload used to carry out SSL authentication.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_basic_character_set.html#a_protocol_character_set
         """
         if ssl_options is None:
@@ -154,20 +150,17 @@ class MySQLAuthenticator:
         username: Optional[str] = None,
         password_factor: int = 1,
     ) -> None:
-        """Switch the authorization plugin.
+        """Switches the authorization plugin.
 
         Args:
             new_strategy_name: New authorization plugin name to switch to.
             strategy_class: New authorization plugin class to switch to
-                (has higher precedence than the authorization plugin name).
-            username: Username to be used, if not defined the username
-                provided when `authentication` was called is used.
+                            (has higher precedence than the authorization plugin name).
+            username: Username to be used - if not defined, the username
+                      provided when `authentication()` was invoked is used.
             password_factor: Up to three levels of authentication (MFA) are allowed,
-                hence you can choose the password corresponding to the 1st,
-                2nd, or 3rd factor. 1st is the default.
-
-        Returns:
-            None.
+                             hence you can choose the password corresponding to the 1st,
+                             2nd, or 3rd factor - 1st is the default.
         """
         if username is None:
             username = self._username
@@ -189,7 +182,7 @@ class MySQLAuthenticator:
         sock: MySQLSocket,
         pkt: bytes,
     ) -> Optional[bytes]:
-        """Handle MFA (Multi-Factor Authentication) response.
+        """Handles MFA (Multi-Factor Authentication) response.
 
         Up to three levels of authentication (MFA) are allowed.
 
@@ -307,13 +300,13 @@ class MySQLAuthenticator:
         max_allowed_packet: int = DEFAULT_MAX_ALLOWED_PACKET,
         auth_plugin: Optional[str] = None,
         auth_plugin_class: Optional[str] = None,
-        conn_attrs: Optional[ConnAttrsType] = None,
+        conn_attrs: Optional[Dict[str, str]] = None,
         is_change_user_request: bool = False,
         **plugin_config: Any,
     ) -> bytes:
         """Performs the authentication phase.
 
-        During re-authentication you should set `is_change_user_request` to True.
+        During re-authentication you must set `is_change_user_request` to True.
 
         Args:
             sock: Pointer to the socket connection.
@@ -322,18 +315,18 @@ class MySQLAuthenticator:
             password1: Account's password factor 1.
             password2: Account's password factor 2.
             password3: Account's password factor 3.
-            database: Initial database name for the connection
+            database: Initial database name for the connection.
             charset: Client charset (see [1]), only the lower 8-bits.
             client_flags: Integer representing client capabilities flags.
             max_allowed_packet: Maximum packet size.
             auth_plugin: Authorization plugin name.
             auth_plugin_class: Authorization plugin class (has higher precedence
-                than the authorization plugin name).
+                               than the authorization plugin name).
             conn_attrs: Connection attributes.
             is_change_user_request: Whether is a `change user request` operation or not.
             plugin_config: Custom configuration to be passed to the auth plugin
-                when invoked. The parameters defined here will override the ones
-                defined in the auth plugin itself.
+                           when invoked. The parameters defined here will override the
+                           ones defined in the auth plugin itself.
 
         Returns:
             ok_packet: OK packet.
@@ -342,7 +335,7 @@ class MySQLAuthenticator:
             InterfaceError: If OK packet is NULL.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_basic_character_set.html#a_protocol_character_set
         """
         # update credentials, plugin config and plugin class

@@ -75,7 +75,11 @@ from .pooling import connect
 Connect = connect
 
 __version_info__ = version.VERSION
+"""This attribute indicates the Connector/Python version as an array
+of version components."""
+
 __version__ = version.VERSION_TEXT
+"""This attribute indicates the Connector/Python version as a string."""
 
 __all__ = [
     "MySQLConnection",

@@ -41,11 +41,10 @@ from .constants import CharacterSet, FieldFlag, FieldType
 from .custom_types import HexLiteral
 from .types import (
     DescriptionType,
-    RowType,
+    MySQLConvertibleType,
+    MySQLProducedType,
+    PythonProducedType,
     StrOrBytes,
-    ToMysqlInputTypes,
-    ToMysqlOutputTypes,
-    ToPythonOutputTypes,
 )
 from .utils import NUMERIC_TYPES
 
@@ -66,8 +65,8 @@ class MySQLConverterBase:
         str_fallback: bool = False,
     ) -> None:
         self._character_set: CharacterSet = CharacterSet()
-        self.python_types: Optional[Tuple[Any, ...]] = None
-        self.mysql_types: Optional[Tuple[Any, ...]] = None
+        self.python_types: Optional[Tuple] = None
+        self.mysql_types: Optional[Tuple] = None
         self.charset: Optional[str] = None
         self.charset_id: int = 0
         self.set_charset(charset)
@@ -75,7 +74,7 @@ class MySQLConverterBase:
         self.str_fallback: bool = str_fallback
         self._cache_field_types: Dict[
             int,
-            Callable[[bytes, DescriptionType], ToPythonOutputTypes],
+            Callable[[bytes, DescriptionType], PythonProducedType],
         ] = {}
 
     def set_charset(
@@ -100,12 +99,12 @@ class MySQLConverterBase:
         self.use_unicode = value
 
     def to_mysql(
-        self, value: ToMysqlInputTypes
-    ) -> Union[ToMysqlInputTypes, HexLiteral]:
+        self, value: MySQLConvertibleType
+    ) -> Union[MySQLConvertibleType, HexLiteral]:
         """Convert Python data type to MySQL"""
         type_name = value.__class__.__name__.lower()
         try:
-            converted: ToMysqlOutputTypes = getattr(self, f"_{type_name}_to_mysql")(
+            converted: MySQLConvertibleType = getattr(self, f"_{type_name}_to_mysql")(
                 value
             )
             return converted
@@ -114,7 +113,7 @@ class MySQLConverterBase:
 
     def to_python(
         self, vtype: DescriptionType, value: Optional[bytes]
-    ) -> ToPythonOutputTypes:
+    ) -> PythonProducedType:
         """Convert MySQL data type to Python"""
 
         if (value == b"\x00" or value is None) and vtype[1] != FieldType.BIT:
@@ -175,7 +174,7 @@ class MySQLConverter(MySQLConverterBase):
         super().__init__(charset, use_unicode, str_fallback)
         self._cache_field_types: Dict[
             int,
-            Callable[[bytes, DescriptionType], ToPythonOutputTypes],
+            Callable[[bytes, DescriptionType], PythonProducedType],
         ] = {}
 
     @staticmethod
@@ -223,11 +222,11 @@ class MySQLConverter(MySQLConverterBase):
             return bytearray(b"NULL")
         return bytearray(b"'" + buf + b"'")  # type: ignore[operator]
 
-    def to_mysql(self, value: ToMysqlInputTypes) -> ToMysqlOutputTypes:
+    def to_mysql(self, value: MySQLConvertibleType) -> MySQLProducedType:
         """Convert Python data type to MySQL"""
         type_name = value.__class__.__name__.lower()
         try:
-            converted: ToMysqlOutputTypes = getattr(self, f"_{type_name}_to_mysql")(
+            converted: MySQLProducedType = getattr(self, f"_{type_name}_to_mysql")(
                 value
             )
             return converted
@@ -242,7 +241,7 @@ class MySQLConverter(MySQLConverterBase):
         self,
         vtype: DescriptionType,
         value: Optional[bytes],
-    ) -> ToPythonOutputTypes:
+    ) -> PythonProducedType:
         """Convert MySQL data type to Python"""
         # \x00
         if value == 0 and vtype[1] != FieldType.BIT:
@@ -456,7 +455,7 @@ class MySQLConverter(MySQLConverterBase):
 
     def row_to_python(
         self, row: Tuple[bytes, ...], fields: List[DescriptionType]
-    ) -> RowType:
+    ) -> Tuple[PythonProducedType, ...]:
         """Convert a MySQL text result row to Python types
 
         The row argument is a sequence containing text result returned
@@ -466,7 +465,7 @@ class MySQLConverter(MySQLConverterBase):
         Returns a tuple.
         """
         i = 0
-        result: List[ToPythonOutputTypes] = [None] * len(fields)
+        result: List[PythonProducedType] = [None] * len(fields)
 
         if not self._cache_field_types:
             self._cache_field_types = {}

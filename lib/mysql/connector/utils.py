@@ -73,17 +73,17 @@ def intread(buf: Union[int, bytes]) -> int:
     """Unpacks the given buffer to an integer"""
     if isinstance(buf, int):
         return buf
-    length = len(buf)
+    length, tmp = len(buf), bytearray()
     if length == 1:
         return buf[0]
     if length <= 4:
-        tmp = buf + b"\x00" * (4 - length)
+        tmp += buf + b"\x00" * (4 - length)
         return int(struct.unpack("<I", tmp)[0])
-    tmp = buf + b"\x00" * (8 - length)
+    tmp += buf + b"\x00" * (8 - length)
     return int(struct.unpack("<Q", tmp)[0])
 
 
-def int1store(i: int) -> bytearray:
+def int1store(i: int) -> bytes:
     """
     Takes an unsigned byte (1 byte) and packs it as a bytes-object.
 
@@ -91,10 +91,10 @@ def int1store(i: int) -> bytearray:
     """
     if i < 0 or i > 255:
         raise ValueError("int1store requires 0 <= i <= 255")
-    return bytearray(struct.pack("<B", i))
+    return struct.pack("<B", i)
 
 
-def int2store(i: int) -> bytearray:
+def int2store(i: int) -> bytes:
     """
     Takes an unsigned short (2 bytes) and packs it as a bytes-object.
 
@@ -102,10 +102,10 @@ def int2store(i: int) -> bytearray:
     """
     if i < 0 or i > 65535:
         raise ValueError("int2store requires 0 <= i <= 65535")
-    return bytearray(struct.pack("<H", i))
+    return struct.pack("<H", i)
 
 
-def int3store(i: int) -> bytearray:
+def int3store(i: int) -> bytes:
     """
     Takes an unsigned integer (3 bytes) and packs it as a bytes-object.
 
@@ -113,10 +113,10 @@ def int3store(i: int) -> bytearray:
     """
     if i < 0 or i > 16777215:
         raise ValueError("int3store requires 0 <= i <= 16777215")
-    return bytearray(struct.pack("<I", i)[0:3])
+    return struct.pack("<I", i)[0:3]
 
 
-def int4store(i: int) -> bytearray:
+def int4store(i: int) -> bytes:
     """
     Takes an unsigned integer (4 bytes) and packs it as a bytes-object.
 
@@ -124,10 +124,10 @@ def int4store(i: int) -> bytearray:
     """
     if i < 0 or i > 4294967295:
         raise ValueError("int4store requires 0 <= i <= 4294967295")
-    return bytearray(struct.pack("<I", i))
+    return struct.pack("<I", i)
 
 
-def int8store(i: int) -> bytearray:
+def int8store(i: int) -> bytes:
     """
     Takes an unsigned integer (8 bytes) and packs it as string.
 
@@ -135,10 +135,10 @@ def int8store(i: int) -> bytearray:
     """
     if i < 0 or i > 18446744073709551616:
         raise ValueError("int8store requires 0 <= i <= 2^64")
-    return bytearray(struct.pack("<Q", i))
+    return struct.pack("<Q", i)
 
 
-def intstore(i: int) -> bytearray:
+def intstore(i: int) -> bytes:
     """
     Takes an unsigned integers and packs it as a bytes-object.
 
@@ -173,13 +173,13 @@ def lc_int(i: int) -> bytes:
         raise ValueError("Requires 0 <= i <= 2^64")
 
     if i < 251:
-        return bytearray(struct.pack("<B", i))
+        return struct.pack("<B", i)
     if i <= 65535:
-        return b"\xfc" + bytearray(struct.pack("<H", i))
+        return b"\xfc" + struct.pack("<H", i)
     if i <= 16777215:
-        return b"\xfd" + bytearray(struct.pack("<I", i)[0:3])
+        return b"\xfd" + struct.pack("<I", i)[0:3]
 
-    return b"\xfe" + bytearray(struct.pack("<Q", i))
+    return b"\xfe" + struct.pack("<Q", i)
 
 
 def read_bytes(buf: bytes, size: int) -> Tuple[bytes, bytes]:
@@ -666,3 +666,41 @@ def import_object(fullpath: str) -> Any:
         raise ValueError(f"{err}") from err
 
     return obj
+
+
+class GenericWrapper:
+    """Base class that provides basic object wrapper functionality."""
+
+    def __init__(self, wrapped: Any) -> None:
+        """Constructor."""
+        self._wrapped: Any = wrapped
+
+    def __getattr__(self, attr: str) -> Any:
+        """Gets an attribute.
+
+        Attributes defined in the wrapper object have higher precedence
+        than those wrapped object equivalent. Attributes not found in
+        the wrapper are then searched in the wrapped object.
+        """
+        if attr in self.__dict__:
+            # this object has it
+            return getattr(self, attr)
+        # proxy to the wrapped object
+        return getattr(self._wrapped, attr)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Sets an attribute."""
+        if "_wrapped" not in self.__dict__:
+            self.__dict__["_wrapped"] = value
+            return
+
+        if name in self.__dict__:
+            # this object has it
+            super().__setattr__(name, value)
+            return
+        # proxy to the wrapped object
+        self._wrapped.__setattr__(name, value)
+
+    def get_wrapped_class(self) -> str:
+        """Gets the wrapped class name."""
+        return self._wrapped.__class__.__name__

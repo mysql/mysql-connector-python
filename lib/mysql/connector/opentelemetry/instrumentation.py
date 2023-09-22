@@ -19,14 +19,12 @@ if TYPE_CHECKING:
     # is True when analyzing the code which makes pylint believe there
     # is a circular import issue when there isn't.
 
-    from ..abstracts import MySQLConnectionAbstract
+    from ..abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
     from ..connection import MySQLConnection
-    from ..cursor import MySQLCursor
     from ..pooling import PooledMySQLConnection
 
     try:
         from ..connection_cext import CMySQLConnection
-        from ..cursor_cext import CMySQLCursor
     except ImportError:
         # The cext is not available.
         pass
@@ -127,8 +125,8 @@ def set_connection_span_attrs(
     connections, on the other hand, do include socket-level attributes.
 
     References:
-    [1]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/
-    specification/trace/semantic_conventions/span-general.md
+        [1]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/\
+            specification/trace/semantic_conventions/span-general.md
     """
     # pylint: disable=broad-exception-caught
     if not cnx_span or not cnx_span.is_recording():
@@ -194,7 +192,7 @@ def with_connection_span_attached(method: Callable) -> Callable:
     def wrapper(
         cnx: Union["MySQLConnection", "CMySQLConnection"], *args: Any, **kwargs: Any
     ) -> Any:
-        """Context propagation decorator."""
+        """Connection span attacher decorator."""
         with trace.use_span(
             cnx._span, end_on_exit=False
         ) if cnx._span and cnx._span.is_recording() else nullcontext():
@@ -207,7 +205,7 @@ def _instrument_execution(
     query_method: Callable,
     tracer: trace.Tracer,
     connection_span_link: trace.Link,
-    wrapped: Union["MySQLCursor", "CMySQLCursor"],
+    wrapped: "MySQLCursorAbstract",
     *args: Any,
     **kwargs: Any,
 ) -> Callable:
@@ -291,12 +289,12 @@ class TracedMySQLCursor(BaseMySQLTracer):
 
     def __init__(
         self,
-        wrapped: Union["MySQLCursor", "CMySQLCursor"],
+        wrapped: "MySQLCursorAbstract",
         tracer: trace.Tracer,
         connection_span: trace.Span,
     ):
         """Constructor."""
-        self._wrapped: Union["MySQLCursor", "CMySQLCursor"] = wrapped
+        self._wrapped: "MySQLCursorAbstract" = wrapped
         self._tracer: trace.Tracer = tracer
         self._connection_span_link: trace.Link = trace.Link(
             connection_span.get_span_context()
@@ -339,9 +337,9 @@ class TracedMySQLCursor(BaseMySQLTracer):
 class TracedMySQLConnection(BaseMySQLTracer):
     """Wrapper class for a `MySQLConnection` or `CMySQLConnection` object."""
 
-    def __init__(self, wrapped: Union["MySQLConnection", "CMySQLConnection"]) -> None:
+    def __init__(self, wrapped: "MySQLConnectionAbstract") -> None:
         """Constructor."""
-        self._wrapped: Union["MySQLConnection", "CMySQLConnection"] = wrapped
+        self._wrapped: "MySQLConnectionAbstract" = wrapped
 
         # call `sql_mode` so its value is cached internally and querying it does not
         # interfere when recording query span events later.
@@ -362,20 +360,16 @@ class TracedMySQLConnection(BaseMySQLTracer):
 
 
 def _instrument_connect(
-    connect: Callable[
-        ..., Union["MySQLConnection", "CMySQLConnection", "PooledMySQLConnection"]
-    ],
+    connect: Callable[..., Union["MySQLConnectionAbstract", "PooledMySQLConnection"]],
     tracer_provider: Optional[trace.TracerProvider] = None,
-) -> Callable[
-    ..., Union["MySQLConnection", "CMySQLConnection", "PooledMySQLConnection"]
-]:
+) -> Callable[..., Union["MySQLConnectionAbstract", "PooledMySQLConnection"]]:
     """Retrurn the instrumented version of `connect`."""
 
     # let's preserve `connect` identity.
     @functools.wraps(connect)
     def wrapper(
         *args: Any, **kwargs: Any
-    ) -> Union["MySQLConnection", "CMySQLConnection", "PooledMySQLConnection"]:
+    ) -> Union["MySQLConnectionAbstract", "PooledMySQLConnection"]:
         """Wraps the connection object returned by the method `connect`.
 
         Instrumentation for PooledConnections is not supported.
@@ -457,9 +451,9 @@ class MySQLInstrumentor:
 
     def instrument_connection(
         self,
-        connection: Union["MySQLConnection", "CMySQLConnection"],
+        connection: "MySQLConnectionAbstract",
         tracer_provider: Optional[trace.TracerProvider] = None,
-    ) -> Union["MySQLConnection", "CMySQLConnection"]:
+    ) -> "MySQLConnectionAbstract":
         """Enable instrumentation in a MySQL connection.
 
         Args:
@@ -506,8 +500,8 @@ class MySQLInstrumentor:
         connector.connect = getattr(self, "_original_connect")
 
     def uninstrument_connection(
-        self, connection: Union["MySQLConnection", "CMySQLConnection"]
-    ) -> Union["MySQLConnection", "CMySQLConnection"]:
+        self, connection: "MySQLConnectionAbstract"
+    ) -> "MySQLConnectionAbstract":
         """Disable instrumentation in a MySQL connection.
 
         Args:

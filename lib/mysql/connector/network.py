@@ -26,8 +26,6 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-# mypy: disable-error-code="attr-defined"
-
 """Module implementing low-level socket communication with MySQL servers.
 """
 
@@ -62,10 +60,10 @@ from .errors import (
     ProgrammingError,
 )
 
-MIN_COMPRESS_LENGTH: int = 50
-MAX_PAYLOAD_LENGTH: int = 2**24 - 1
-PACKET_HEADER_LENGTH: int = 4
-COMPRESSED_PACKET_HEADER_LENGTH: int = 7
+MIN_COMPRESS_LENGTH = 50
+MAX_PAYLOAD_LENGTH = 2**24 - 1
+PACKET_HEADER_LENGTH = 4
+COMPRESSED_PACKET_HEADER_LENGTH = 7
 
 
 def _strioerror(err: IOError) -> str:
@@ -617,7 +615,15 @@ class MySQLSocket(ABC):
         packet_number: Optional[int] = None,
         compressed_packet_number: Optional[int] = None,
     ) -> None:
-        """Send `payload` to the MySQL server."""
+        """Send `payload` to the MySQL server.
+
+        NOTE: if `payload` is an instance of `bytearray`, then `payload` might be
+        changed by this method - `bytearray` is similar to passing a variable by
+        reference.
+
+        If you're sure you won't read `payload` after invoking `send()`,
+        then you can use `bytearray.` Otherwise, you must use `bytes`.
+        """
         return self._netbroker.send(
             self.sock,
             self.address,
@@ -658,7 +664,9 @@ class MySQLUnixSocket(MySQLSocket):
     def open_connection(self) -> None:
         try:
             self.sock = socket.socket(
-                socket.AF_UNIX, socket.SOCK_STREAM  # pylint: disable=no-member
+                # pylint: disable=no-member
+                socket.AF_UNIX,
+                socket.SOCK_STREAM,
             )
             self.sock.settimeout(self._connection_timeout)
             self.sock.connect(self.unix_socket)

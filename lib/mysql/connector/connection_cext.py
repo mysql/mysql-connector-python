@@ -26,7 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-# mypy: disable-error-code="arg-type,index"
+# mypy: disable-error-code="arg-type"
 
 """Connection class using the C Extension."""
 
@@ -35,10 +35,21 @@ import platform
 import socket
 import sys
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    BinaryIO,
+    Dict,
+    List,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 from . import version
-from .abstracts import MySQLConnectionAbstract
+from .abstracts import CMySQLPrepStmt, MySQLConnectionAbstract
 from .constants import ClientFlag, FieldFlag, ServerFlag, ShutdownType
 from .conversion import MySQLConverter
 from .errors import (
@@ -65,7 +76,7 @@ HAVE_CMYSQL = False
 try:
     import _mysql_connector
 
-    from _mysql_connector import MySQLInterfaceError, MySQLPrepStmt
+    from _mysql_connector import MySQLInterfaceError
 
     from .cursor_cext import (
         CMySQLCursor,
@@ -225,9 +236,9 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
 
     @property
-    def in_transaction(self) -> int:
+    def in_transaction(self) -> bool:
         """MySQL session has started a transaction"""
-        return self._server_status & ServerFlag.STATUS_IN_TRANS
+        return bool(self._server_status & ServerFlag.STATUS_IN_TRANS)
 
     def _open_connection(self) -> None:
         charset_name = self._character_set.get_info(self._charset_id)[0]
@@ -275,8 +286,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
             tls_versions.sort(reverse=True)  # type: ignore[union-attr]
             tls_versions = ",".join(tls_versions)
         if self._ssl.get("tls_ciphersuites") is not None:
-            ssl_ciphersuites = self._ssl.get("tls_ciphersuites")[0]
-            tls_ciphersuites = self._ssl.get("tls_ciphersuites")[1]
+            ssl_ciphersuites = self._ssl.get("tls_ciphersuites")[  # type: ignore[index]
+                0
+            ]
+            tls_ciphersuites = self._ssl.get("tls_ciphersuites")[  # type: ignore[index]
+                1
+            ]
         else:
             ssl_ciphersuites = None
             tls_ciphersuites = None
@@ -418,7 +433,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         binary: bool = False,
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
-        prep_stmt: Optional[MySQLPrepStmt] = None,
+        prep_stmt: Optional[CMySQLPrepStmt] = None,
     ) -> Tuple[List[RowType], Optional[CextEofPacketType]]:
         """Get all or a subset of rows returned by the MySQL server"""
         unread_result = prep_stmt.have_result_set if prep_stmt else self.unread_result
@@ -428,7 +443,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         if raw is None:
             raw = self._raw
 
-        rows: List[Tuple[Any, ...]] = []
+        rows: List[Tuple] = []
         if count is not None and count <= 0:
             raise AttributeError("count should be 1 or higher, or None")
 
@@ -480,8 +495,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
         binary: bool = False,
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
-        prep_stmt: Optional[MySQLPrepStmt] = None,
-    ) -> Tuple[Optional[RowType], CextEofPacketType]:
+        prep_stmt: Optional[CMySQLPrepStmt] = None,
+    ) -> Tuple[Optional[RowType], Optional[CextEofPacketType]]:
         """Get the next rows returned by the MySQL server"""
         try:
             rows, eof = self.get_rows(
@@ -532,7 +547,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
 
     def fetch_eof_columns(
-        self, prep_stmt: Optional[MySQLPrepStmt] = None
+        self, prep_stmt: Optional[CMySQLPrepStmt] = None
     ) -> CextResultType:
         """Fetch EOF and column information"""
         have_result_set = (
@@ -579,7 +594,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return None
 
-    def cmd_stmt_prepare(self, statement: bytes) -> MySQLPrepStmt:
+    def cmd_stmt_prepare(self, statement: bytes) -> CMySQLPrepStmt:
         """Prepares the SQL statement"""
         if not self._cmysql:
             raise OperationalError("MySQL Connection not available")
@@ -587,12 +602,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
         try:
             stmt = self._cmysql.stmt_prepare(statement)
             stmt.converter_str_fallback = self._converter_str_fallback
-            return stmt
+            return CMySQLPrepStmt(stmt)
         except MySQLInterfaceError as err:
             raise InterfaceError(str(err)) from err
 
-    def cmd_stmt_execute(
-        self, statement_id: MySQLPrepStmt, *args: Any
+    def cmd_stmt_execute(  # type: ignore[override]
+        self, statement_id: CMySQLPrepStmt, *args: Any
     ) -> Optional[Union[CextEofPacketType, CextResultType]]:
         """Executes the prepared statement"""
         try:
@@ -609,13 +624,19 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self._unread_result = True
         return self.fetch_eof_columns(statement_id)
 
-    def cmd_stmt_close(self, statement_id: MySQLPrepStmt) -> None:
+    def cmd_stmt_close(
+        self,
+        statement_id: CMySQLPrepStmt,  # type: ignore[override]
+    ) -> None:
         """Closes the prepared statement"""
         if self._unread_result:
             raise InternalError("Unread result found")
         statement_id.stmt_close()
 
-    def cmd_stmt_reset(self, statement_id: MySQLPrepStmt) -> None:
+    def cmd_stmt_reset(
+        self,
+        statement_id: CMySQLPrepStmt,  # type: ignore[override]
+    ) -> None:
         """Resets the prepared statement"""
         if self._unread_result:
             raise InternalError("Unread result found")
@@ -669,7 +690,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         buffered: Optional[bool] = None,
         raw: Optional[bool] = None,
         prepared: Optional[bool] = None,
-        cursor_class: Optional[Type[CMySQLCursor]] = None,
+        cursor_class: Optional[Type[CMySQLCursor]] = None,  # type: ignore[override]
         dictionary: Optional[bool] = None,
         named_tuple: Optional[bool] = None,
     ) -> CMySQLCursor:
@@ -785,7 +806,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     def prepare_for_mysql(
         self, params: ParamsSequenceOrDictType
-    ) -> Union[Sequence[bytes], Dict[str, bytes],]:
+    ) -> Union[Sequence[bytes], Dict[str, bytes]]:
         """Prepare parameters for statements
 
         This method is use by cursors to prepared parameters found in the
@@ -938,21 +959,24 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise ValueError("MySQL PID must be int")
         self.cmd_query(f"KILL {mysql_pid}")
 
-    def cmd_debug(self) -> Any:
+    def cmd_debug(self) -> NoReturn:
         """Send the DEBUG command"""
         raise NotImplementedError
 
-    def cmd_ping(self) -> Any:
+    def cmd_ping(self) -> NoReturn:
         """Send the PING command"""
         raise NotImplementedError
 
-    def cmd_query_iter(self, statements: Any) -> Any:
+    def cmd_query_iter(self, statements: str) -> NoReturn:
         """Send one or more statements to the MySQL server"""
         raise NotImplementedError
 
     def cmd_stmt_send_long_data(
-        self, statement_id: Any, param_id: Any, data: Any
-    ) -> Any:
+        self,
+        statement_id: CMySQLPrepStmt,  # type: ignore[override]
+        param_id: int,
+        data: BinaryIO,
+    ) -> NoReturn:
         """Send data for a column"""
         raise NotImplementedError
 

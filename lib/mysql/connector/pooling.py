@@ -35,7 +35,7 @@ import re
 import threading
 
 from types import TracebackType
-from typing import Any, Dict, NoReturn, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, NoReturn, Optional, Tuple, Type, Union
 from uuid import uuid4
 
 try:
@@ -61,6 +61,9 @@ from .errors import (
     ProgrammingError,
 )
 from .optionfiles import read_option_files
+
+if TYPE_CHECKING:
+    from .abstracts import MySQLConnectionAbstract
 
 CONNECTION_POOL_LOCK = threading.RLock()
 CNX_POOL_MAXSIZE = 32
@@ -105,7 +108,7 @@ def _get_pooled_connection(**kwargs: Any) -> PooledMySQLConnection:
 
 def _get_failover_connection(
     **kwargs: Any,
-) -> Union[PooledMySQLConnection, MySQLConnection, CMySQLConnection]:
+) -> Union[PooledMySQLConnection, MySQLConnectionAbstract]:
     """Return a MySQL connection and try to failover if needed.
 
     An InterfaceError is raise when no MySQL is available. ValueError is
@@ -198,17 +201,43 @@ def _get_failover_connection(
 
 def connect(
     *args: Any, **kwargs: Any
-) -> Union[PooledMySQLConnection, MySQLConnection, CMySQLConnection]:
-    """Create or get a MySQL connection object.
+) -> Union[PooledMySQLConnection, MySQLConnectionAbstract]:
+    """Creates or gets a MySQL connection object.
 
-    In its simpliest form, connect() will open a connection to a
-    MySQL server and return a MySQLConnection object.
+    In its simpliest form, `connect()` will open a connection to a
+    MySQL server and return a `MySQLConnectionAbstract` subclass
+    object such as `MySQLConnection` or `CMySQLConnection`.
 
-    When any connection pooling arguments are given, for example pool_name
-    or pool_size, a pool is created or a previously one is used to return
-    a PooledMySQLConnection.
+    When any connection pooling arguments are given, for example `pool_name`
+    or `pool_size`, a pool is created or a previously one is used to return
+    a `PooledMySQLConnection`.
 
-    Returns MySQLConnection or PooledMySQLConnection.
+    Args:
+        *args: N/A.
+        **kwargs: For a complete list of possible arguments, see [1]. If no arguments
+                  are given, it uses the already configured or default values.
+
+    Returns:
+        A `MySQLConnectionAbstract` subclass instance (such as `MySQLConnection` or
+        `CMySQLConnection`) or a `PooledMySQLConnection` instance.
+
+    Examples:
+        A connection with the MySQL server can be established using either the
+        `mysql.connector.connect()` method or a `MySQLConnectionAbstract` subclass:
+        ```
+        >>> from mysql.connector import MySQLConnection, HAVE_CEXT
+        >>>
+        >>> cnx1 = mysql.connector.connect(user='joe', database='test')
+        >>> cnx2 = MySQLConnection(user='joe', database='test')
+        >>>
+        >>> cnx3 = None
+        >>> if HAVE_CEXT:
+        >>>     from mysql.connector import CMySQLConnection
+        >>>     cnx3 = CMySQLConnection(user='joe', database='test')
+        ```
+
+    References:
+        [1]: https://dev.mysql.com/doc/connector-python/en/connector-python-connectargs.html
     """
     # DNS SRV
     dns_srv = kwargs.pop("dns_srv") if "dns_srv" in kwargs else False
@@ -331,22 +360,25 @@ class PooledMySQLConnection:
     Configuring the connection have to be done through the MySQLConnectionPool
     method set_config(). Using config() on pooled connection will raise a
     PoolError.
+
+    Attributes:
+        pool_name (str): Returns the name of the connection pool to which the
+                         connection belongs.
     """
 
-    def __init__(
-        self, pool: MySQLConnectionPool, cnx: Union[MySQLConnection, CMySQLConnection]
-    ) -> None:
-        """Initialize
+    def __init__(self, pool: MySQLConnectionPool, cnx: MySQLConnectionAbstract) -> None:
+        """Constructor.
 
-        The pool argument must be an instance of MySQLConnectionPoll. cnx
-        if an instance of MySQLConnection.
+        Args:
+            pool: A `MySQLConnectionPool` instance.
+            cnx: A `MySQLConnectionAbstract` subclass instance.
         """
         if not isinstance(pool, MySQLConnectionPool):
             raise AttributeError("pool should be a MySQLConnectionPool")
         if not isinstance(cnx, MYSQL_CNX_CLASS):
             raise AttributeError("cnx should be a MySQLConnection")
         self._cnx_pool: MySQLConnectionPool = pool
-        self._cnx: Union[MySQLConnection, CMySQLConnection] = cnx
+        self._cnx: MySQLConnectionAbstract = cnx
 
     def __enter__(self) -> PooledMySQLConnection:
         return self
@@ -364,14 +396,13 @@ class PooledMySQLConnection:
         return getattr(self._cnx, attr)
 
     def close(self) -> None:
-        """Do not close, but add connection back to pool
+        """Do not close, but adds connection back to pool.
 
-        The close() method does not close the connection with the
-        MySQL server. The connection is added back to the pool so it
-        can be reused.
-
-        When the pool is configured to reset the session, the session
-        state will be cleared by re-authenticating the user.
+        For a pooled connection, close() does not actually close it but returns it
+        to the pool and makes it available for subsequent connection requests. If the
+        pool configuration parameters are changed, a returned connection is closed
+        and reopened with the new configuration before being returned from the pool
+        again in response to a connection request.
         """
         try:
             cnx = self._cnx
@@ -383,7 +414,12 @@ class PooledMySQLConnection:
 
     @staticmethod
     def config(**kwargs: Any) -> NoReturn:
-        """Configuration is done through the pool"""
+        """Configuration is done through the pool.
+
+        For pooled connections, the `config()` method raises a `PoolError`
+        exception. Configuration for pooled connections should be done
+        using the pool object.
+        """
         raise PoolError(
             "Configuration for pooled connections should be done through the "
             "pool itself"
@@ -391,7 +427,7 @@ class PooledMySQLConnection:
 
     @property
     def pool_name(self) -> str:
-        """Return the name of the connection pool"""
+        """Returns the name of the connection pool to which the connection belongs."""
         return self._cnx_pool.pool_name
 
 
@@ -405,12 +441,36 @@ class MySQLConnectionPool:
         pool_reset_session: bool = True,
         **kwargs: Any,
     ) -> None:
-        """Initialize
+        """Constructor.
 
         Initialize a MySQL connection pool with a maximum number of
-        connections set to pool_size. The rest of the keywords
+        connections set to `pool_size`. The rest of the keywords
         arguments, kwargs, are configuration arguments for MySQLConnection
         instances.
+
+        Args:
+            pool_name: The pool name. If this argument is not given, Connector/Python
+                       automatically generates the name, composed from whichever of
+                       the host, port, user, and database connection arguments are
+                       given in kwargs, in that order.
+            pool_size:  The pool size. If this argument is not given, the default is 5.
+            pool_reset_session: Whether to reset session variables when the connection
+                                is returned to the pool.
+            **kwargs: Optional additional connection arguments, as described in [1].
+
+        Examples:
+            ```
+            >>> dbconfig = {
+            >>>     "database": "test",
+            >>>     "user":     "joe",
+            >>> }
+            >>> cnxpool = mysql.connector.pooling.MySQLConnectionPool(pool_name = "mypool",
+            >>>                                                       pool_size = 3,
+            >>>                                                       **dbconfig)
+            ```
+
+        References:
+            [1]: https://dev.mysql.com/doc/connector-python/en/connector-python-connectargs.html
         """
         self._pool_size: Optional[int] = None
         self._pool_name: Optional[str] = None
@@ -418,9 +478,9 @@ class MySQLConnectionPool:
         self._set_pool_size(pool_size)
         self._set_pool_name(pool_name or generate_pool_name(**kwargs))
         self._cnx_config: Dict[str, Any] = {}
-        self._cnx_queue: queue.Queue[
-            Union[MySQLConnection, CMySQLConnection]
-        ] = queue.Queue(self._pool_size)
+        self._cnx_queue: queue.Queue[MySQLConnectionAbstract] = queue.Queue(
+            self._pool_size
+        )
         self._config_version = uuid4()
 
         if kwargs:
@@ -432,27 +492,36 @@ class MySQLConnectionPool:
 
     @property
     def pool_name(self) -> str:
-        """Return the name of the connection pool"""
+        """Returns the name of the connection pool."""
         return self._pool_name
 
     @property
     def pool_size(self) -> int:
-        """Return number of connections managed by the pool"""
+        """Returns number of connections managed by the pool."""
         return self._pool_size
 
     @property
     def reset_session(self) -> bool:
-        """Return whether to reset session"""
+        """Returns whether to reset session."""
         return self._reset_session
 
     def set_config(self, **kwargs: Any) -> None:
-        """Set the connection configuration for MySQLConnection instances
+        """Set the connection configuration for `MySQLConnectionAbstract` subclass instances.
 
-        This method sets the configuration used for creating MySQLConnection
-        instances. See MySQLConnection for valid connection arguments.
+        This method sets the configuration used for creating `MySQLConnectionAbstract`
+        subclass instances such as `MySQLConnection`. See [1] for valid
+        connection arguments.
 
-        Raises PoolError when a connection argument is not valid, missing
-        or not supported by MySQLConnection.
+        Args:
+            **kwargs: Connection arguments - for a complete list of possible
+                      arguments, see [1].
+
+        Raises:
+            PoolError: When a connection argument is not valid, missing
+                       or not supported by `MySQLConnectionAbstract`.
+
+        References:
+            [1]: https://dev.mysql.com/doc/connector-python/en/connector-python-connectargs.html
         """
         if not kwargs:
             return
@@ -495,37 +564,43 @@ class MySQLConnectionPool:
             raise AttributeError(f"Pool name '{pool_name}' is too long")
         self._pool_name = pool_name
 
-    def _queue_connection(self, cnx: Union[MySQLConnection, CMySQLConnection]) -> None:
+    def _queue_connection(self, cnx: MySQLConnectionAbstract) -> None:
         """Put connection back in the queue
 
         This method is putting a connection back in the queue. It will not
         acquire a lock as the methods using _queue_connection() will have it
         set.
 
-        Raises PoolError on errors.
+        Raises `PoolError` on errors.
         """
         if not isinstance(cnx, MYSQL_CNX_CLASS):
-            raise PoolError("Connection instance not subclass of MySQLConnection")
+            raise PoolError(
+                "Connection instance not subclass of MySQLConnectionAbstract"
+            )
 
         try:
             self._cnx_queue.put(cnx, block=False)
         except queue.Full as err:
             raise PoolError("Failed adding connection; queue is full") from err
 
-    def add_connection(
-        self, cnx: Optional[Union[MySQLConnection, CMySQLConnection]] = None
-    ) -> None:
-        """Add a connection to the pool
+    def add_connection(self, cnx: Optional[MySQLConnectionAbstract] = None) -> None:
+        """Adds a connection to the pool.
 
-        This method instantiates a MySQLConnection using the configuration
-        passed when initializing the MySQLConnectionPool instance or using
-        the set_config() method.
-        If cnx is a MySQLConnection instance, it will be added to the
+        This method instantiates a `MySQLConnection` using the configuration
+        passed when initializing the `MySQLConnectionPool` instance or using
+        the `set_config()` method.
+        If cnx is a `MySQLConnection` instance, it will be added to the
         queue.
 
-        Raises PoolError when no configuration is set, when no more
-        connection can be added (maximum reached) or when the connection
-        can not be instantiated.
+        Args:
+            cnx: The `MySQLConnectionAbstract` subclass object to be added to
+                 the pool. If this argument is missing (aka `None`), the pool
+                 creates a new connection and adds it.
+
+        Raises:
+            PoolError: When no configuration is set, when no more
+                       connection can be added (maximum reached) or when the connection
+                       can not be instantiated.
         """
         with CONNECTION_POOL_LOCK:
             if not self._cnx_config:
@@ -554,13 +629,13 @@ class MySQLConnectionPool:
             else:
                 if not isinstance(cnx, MYSQL_CNX_CLASS):
                     raise PoolError(
-                        "Connection instance not subclass of MySQLConnection"
+                        "Connection instance not subclass of MySQLConnectionAbstract"
                     )
 
             self._queue_connection(cnx)
 
     def get_connection(self) -> PooledMySQLConnection:
-        """Get a connection from the pool
+        """Gets a connection from the pool.
 
         This method returns an PooledMySQLConnection instance which
         has a reference to the pool that created it, and the next available
@@ -568,9 +643,11 @@ class MySQLConnectionPool:
 
         When the MySQL connection is not connect, a reconnect is attempted.
 
-        Raises PoolError on errors.
+        Returns:
+            A `PooledMySQLConnection` instance.
 
-        Returns a PooledMySQLConnection instance.
+        Raises:
+            PoolError: On errors.
         """
         with CONNECTION_POOL_LOCK:
             try:

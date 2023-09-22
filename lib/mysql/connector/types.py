@@ -1,8 +1,7 @@
 """
-Type hint aliases hub
+Type hint aliases hub.
 """
 import os
-import typing
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -19,85 +18,79 @@ from typing import (
     Union,
 )
 
-if hasattr(typing, "TypeAlias"):
-    # pylint: disable=no-name-in-module
-    from typing import TypeAlias  # type: ignore[attr-defined]
-else:
-    try:
-        from typing_extensions import TypeAlias
-    except ModuleNotFoundError:
-        # pylint: disable=reimported
-        from typing import Any as TypeAlias
-
-
 if TYPE_CHECKING:
     from .custom_types import HexLiteral
-    from .network import MySQLSocket
 
 
 StrOrBytes = Union[str, bytes]
+"""Shortcut to for `String or Bytes`."""
+
 StrOrBytesPath = Union[StrOrBytes, os.PathLike]
-SocketType: TypeAlias = "MySQLSocket"
+"""Shortcut to for `String or Bytes or os.PathLike` - this shortcut
+may come in handy as a hint for path-like variables."""
 
-
-""" Conversion """
-ToPythonOutputTypes = Optional[
-    Union[
-        float,
-        int,
-        Decimal,
-        StrOrBytes,
-        date,
-        timedelta,
-        datetime,
-        Set[str],
-    ]
+PythonProducedType = Union[
+    Decimal,
+    bytes,
+    date,
+    datetime,
+    float,
+    int,
+    Set[str],
+    str,
+    timedelta,
+    None,
 ]
-ToMysqlInputTypes = Optional[
-    Union[
-        int,
-        float,
-        Decimal,
-        StrOrBytes,
-        bool,
-        datetime,
-        date,
-        time,
-        struct_time,
-        timedelta,
-    ]
+"""
+Python producible types in converter - Types produced after processing a MySQL text
+result using the built-in converter.
+"""
+
+BinaryProtocolType = Union[
+    Decimal,
+    bytes,
+    date,
+    datetime,
+    float,
+    int,
+    str,
+    time,
+    timedelta,
+    None,
 ]
-ToMysqlOutputTypes = Optional[Union[int, float, bytes, "HexLiteral"]]
+"""
+Supported MySQL Binary Protocol Types - Python type that can be
+converted to a MySQL type. It's a subset of `MySQLConvertibleType`.
+"""
 
+# pylint: disable=invalid-name
+MySQLConvertibleType = Union[BinaryProtocolType, bool, struct_time]
+"""
+MySQL convertible Python types - Python types consumed by the built-in converter that
+can be converted to MySQL. It's a superset of `BinaryProtocolType`.
+"""
 
-""" Protocol """
-HandShakeType = Dict[str, Optional[Union[int, StrOrBytes]]]
+MySQLProducedType = Optional[Union[int, float, bytes, "HexLiteral"]]
+"""
+Types produced after processing MySQL convertible Python types.
+"""
+
+HandShakeType = Dict[str, Optional[Union[int, str, bytes]]]
+"""Dictionary representing the parsed `handshake response`
+sent at `connection` time by the server."""
+
 OkPacketType = Dict[str, Optional[Union[int, str]]]
+"""Dictionary representing the parsed `OK response`
+produced by the server to signal successful completion of a command."""
+
 EofPacketType = OkPacketType
-StatsPacketType = Dict[str, Union[int, Decimal]]
-SupportedMysqlBinaryProtocolTypes = Optional[
-    Union[int, StrOrBytes, Decimal, float, datetime, date, timedelta, time]
-]
-QueryAttrType = List[
-    # 2-Tuple: (str, attr_types)
-    Tuple[str, SupportedMysqlBinaryProtocolTypes]
-]
-ParseValueFromBinaryResultPacketTypes = Optional[
-    Union[
-        int,
-        float,
-        Decimal,
-        date,
-        datetime,
-        timedelta,
-        str,
-    ]
-]
+"""Dictionary representing the parsed `EOF response`
+produced by the server to signal successful completion of a command.
+In the MySQL client/server protocol, the EOF and OK responses serve
+the same purpose, to mark the end of a query execution resul.
+"""
+
 DescriptionType = Tuple[
-    # Sometimes it can be represented as a 2-Tuple of the form:
-    # Tuple[str, int],  # field name, field type,
-    # but we will stick with the 9-Tuple format produced by
-    # the protocol module.
     str,  # field name
     int,  # field type
     None,  # you can ignore it or take a look at protocol.parse_column()
@@ -108,23 +101,72 @@ DescriptionType = Tuple[
     int,  # field flags
     int,  # MySQL charset ID
 ]
+"""
+Tuple representing column information.
 
+Sometimes it can be represented as a 2-Tuple of the form:
+`Tuple[str, int]` <-> field name, field type.
 
-""" Connection """
-ConnAttrsType = Dict[str, Optional[Union[str, Tuple[str, str]]]]
+However, let's stick with the 9-Tuple format produced by the protocol module.
+```
+DescriptionType = Tuple[
+    str,  # field name
+    int,  # field type
+    None,  # you can ignore it or take a look at protocol.parse_column()
+    None,
+    None,
+    None,
+    Union[bool, int],  # null ok
+    int,  # field flags
+    int,  # MySQL charset ID
+]
+```
+"""
+
+StatsPacketType = Dict[str, Union[int, Decimal]]
+"""Dictionary representing the parsed `Stats response`
+produced by the server after completing a `COM_STATISTICS` command."""
+
 ResultType = Mapping[
     str, Optional[Union[int, str, EofPacketType, List[DescriptionType]]]
 ]
+"""
+Represents the returned type by `MySQLConnection._handle_result()`.
 
+This method can return a dictionary of the form:
+- columns -> column information
+- EOF_response -> end-of-file response
 
-""" Connection C-EXT """
+Or, it can return an `OkPacketType`/`EofPacketType`.
+"""
+
+RowItemType = Union[PythonProducedType, BinaryProtocolType]
+"""Item type found in `RowType`."""
+
+RowType = Tuple[RowItemType, ...]
+"""Row returned by the MySQL server after sending a query command."""
+
 CextEofPacketType = Dict[str, int]
+"""Similar to `EofPacketType` but for the C-EXT."""
+
 CextResultType = Dict[str, Union[CextEofPacketType, List[DescriptionType]]]
+"""Similar to `ResultType` but for the C-EXT.
 
+Represents the returned type by `CMySQLConnection.fetch_eof_columns()`.
 
-""" Cursor """
-ParamsSequenceType = Sequence[ToMysqlInputTypes]
-ParamsDictType = Dict[str, ToMysqlInputTypes]
+This method returns a dictionary of the form:
+- columns -> column information
+- EOF_response -> end-of-file response
+"""
+
+ParamsSequenceType = Sequence[MySQLConvertibleType]
+"""Sequence type expected by `cursor.execute()`."""
+
+ParamsDictType = Dict[str, MySQLConvertibleType]
+"""Dictionary type expected by `cursor.execute()`."""
+
 ParamsSequenceOrDictType = Union[ParamsDictType, ParamsSequenceType]
-RowType = Tuple[ToPythonOutputTypes, ...]
+"""Shortcut for `ParamsSequenceType or ParamsDictType`."""
+
 WarningType = Tuple[str, int, str]
+"""Warning generated by the previously executed operation."""

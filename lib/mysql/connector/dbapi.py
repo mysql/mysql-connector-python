@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2023, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -34,8 +34,15 @@ DB API v2.0 (PEP-249).
 # Python Db API v2
 # pylint: disable=invalid-name
 apilevel: str = "2.0"
+"""This attribute is a string that indicates the supported DB API level."""
+
 threadsafety: int = 1
+"""This attribute is an integer that indicates the supported level of thread safety
+provided by Connector/Python."""
+
 paramstyle: str = "pyformat"
+"""This attribute is a string that indicates the Connector/Python default
+parameter style."""
 
 import datetime
 import time

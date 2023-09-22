@@ -26,15 +26,25 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-# mypy: disable-error-code="assignment"
-
 """Implements the MySQL Client/Server protocol."""
+from __future__ import annotations
 
 import datetime
 import struct
 
+from collections import deque
 from decimal import Decimal, DecimalException
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Deque,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from . import utils
 from .constants import (
@@ -49,24 +59,25 @@ from .logger import logger
 from .plugins import MySQLAuthPlugin, get_auth_plugin
 from .plugins.caching_sha2_password import MySQLCachingSHA2PasswordAuthPlugin
 from .types import (
-    ConnAttrsType,
+    BinaryProtocolType,
     DescriptionType,
     EofPacketType,
     HandShakeType,
     OkPacketType,
-    ParseValueFromBinaryResultPacketTypes,
-    SocketType,
     StatsPacketType,
     StrOrBytes,
-    SupportedMysqlBinaryProtocolTypes,
 )
 
-PROTOCOL_VERSION: int = 10
-AUTH_SWITCH_STATUS: int = 0xFE
-EXCHANGE_FURTHER_STATUS: int = 0x01
-OK_STATUS: int = 0x00
-MFA_STATUS: int = 0x02
-ERR_STATUS: int = 0xFF
+if TYPE_CHECKING:
+    from .network import MySQLSocket
+
+
+PROTOCOL_VERSION = 10
+AUTH_SWITCH_STATUS = 0xFE
+EXCHANGE_FURTHER_STATUS = 0x01
+OK_STATUS = 0x00
+MFA_STATUS = 0x02
+ERR_STATUS = 0xFF
 DEFAULT_CHARSET_ID = 45
 DEFAULT_MAX_ALLOWED_PACKET = 1073741824
 
@@ -89,10 +100,10 @@ class MySQLProtocol:
 
         Raises:
             InterfaceError: If packet's status tag doesn't
-                match `protocol.EXCHANGE_FURTHER_STATUS`.
+                            match `protocol.EXCHANGE_FURTHER_STATUS`.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_connection_phase_packets_protocol_auth_more_data.html
         """
         if not pkt[4] == EXCHANGE_FURTHER_STATUS:
@@ -112,10 +123,10 @@ class MySQLProtocol:
 
         Raises:
             InterfaceError: If packet's status tag doesn't
-                match `protocol.AUTH_SWITCH_STATUS`.
+                            match `protocol.AUTH_SWITCH_STATUS`.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/\
                 latest/page_protocol_connection_phase_packets_protocol_
                 auth_switch_request.html
         """
@@ -136,15 +147,15 @@ class MySQLProtocol:
         Returns:
             plugin_name: Name of the client authentication plugin.
             plugin_provided_data: Initial authentication data for that
-                client plugin (see [1]).
+                                  client plugin (see [1]).
 
         Raises:
             InterfaceError: If packet's packet type doesn't
-                match `protocol.MFA_STATUS`.
+                            match `protocol.MFA_STATUS`.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
-                page_protocol_connection_phase_packets_protocol_auth_
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
+                page_protocol_connection_phase_packets_protocol_auth_\
                 next_factor_request.html
         """
         pkt, status = utils.read_int(pkt[4:], 1)
@@ -154,7 +165,7 @@ class MySQLProtocol:
         return plugin_name.decode(), pkt
 
     @staticmethod
-    def make_conn_attrs(conn_attrs: ConnAttrsType) -> bytes:
+    def make_conn_attrs(conn_attrs: Dict[str, str]) -> bytes:
         """Encode the connection attributes.
 
         Args:
@@ -164,7 +175,7 @@ class MySQLProtocol:
             serialized_conn_attrs: Serialized connection attributes as per [1].
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_connection_phase_packets_protocol_handshake_response.html
         """
         for attr_name in conn_attrs:
@@ -176,13 +187,13 @@ class MySQLProtocol:
             + len(conn_attrs.values())
         )
 
-        conn_attrs_packet = struct.pack("<B", conn_attrs_len)
+        conn_attrs_packet = [struct.pack("<B", conn_attrs_len)]
         for attr_name in conn_attrs:
-            conn_attrs_packet += struct.pack("<B", len(attr_name))
-            conn_attrs_packet += attr_name.encode()
-            conn_attrs_packet += struct.pack("<B", len(conn_attrs[attr_name]))
-            conn_attrs_packet += conn_attrs[attr_name].encode()  # type: ignore[union-attr]
-        return conn_attrs_packet
+            conn_attrs_packet.append(struct.pack("<B", len(attr_name)))
+            conn_attrs_packet.append(attr_name.encode())
+            conn_attrs_packet.append(struct.pack("<B", len(conn_attrs[attr_name])))
+            conn_attrs_packet.append(conn_attrs[attr_name].encode())
+        return b"".join(conn_attrs_packet)
 
     @staticmethod
     def connect_with_db(client_flags: int, database: Optional[str]) -> bytes:
@@ -196,7 +207,7 @@ class MySQLProtocol:
             serialized_database: Serialized database name as per [1].
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_connection_phase_packets_protocol_handshake_response.html
         """
         return (
@@ -225,16 +236,17 @@ class MySQLProtocol:
             client_flags: Integer representing client capabilities flags.
             auth_plugin: Authorization plugin name.
             auth_plugin_class: Authorization plugin class (has higher precedence
-                than the authorization plugin name).
+                               than the authorization plugin name).
             ssl_enabled: Whether SSL is enabled or not.
             plugin_config: Custom configuration to be passed to the auth plugin
-                when invoked. The parameters defined here will override the ones
-                defined in the auth plugin itself.
+                           when invoked. The parameters defined here will override
+                           the ones defined in the auth plugin itself.
 
         Returns:
             auth_response: Authorization plugin response.
             auth_strategy: Authorization plugin instance created based
-                on the provided `auth_plugin` and `auth_plugin_class` parameters.
+                           on the provided `auth_plugin` and `auth_plugin_class`
+                           parameters.
 
         Raises:
             InterfaceError: If authentication fails or when got a NULL auth response.
@@ -262,7 +274,7 @@ class MySQLProtocol:
                 f"plugin {auth_strategy.name}"
             )
 
-        auth_response = bytes(
+        auth_response = (
             utils.int1store(len(auth_response)) + auth_response
             if client_flags & ClientFlag.SECURE_CONNECTION
             else auth_response + b"\x00"
@@ -281,7 +293,7 @@ class MySQLProtocol:
         max_allowed_packet: int = DEFAULT_MAX_ALLOWED_PACKET,
         auth_plugin: Optional[str] = None,
         auth_plugin_class: Optional[str] = None,
-        conn_attrs: Optional[ConnAttrsType] = None,
+        conn_attrs: Optional[Dict[str, str]] = None,
         is_change_user_request: bool = False,
         ssl_enabled: bool = False,
         plugin_config: Optional[Dict[str, Any]] = None,
@@ -298,30 +310,31 @@ class MySQLProtocol:
             max_allowed_packet: Maximum packet size.
             auth_plugin: Authorization plugin name.
             auth_plugin_class: Authorization plugin class (has higher precedence
-                than the authorization plugin name).
+                               than the authorization plugin name).
             conn_attrs: Connection attributes.
             is_change_user_request: Whether is a `change user request` operation or not.
             ssl_enabled: Whether SSL is enabled or not.
             plugin_config: Custom configuration to be passed to the auth plugin
-                when invoked. The parameters defined here will override the ones
-                defined in the auth plugin itself.
+                           when invoked. The parameters defined here will override
+                           the one defined in the auth plugin itself.
 
         Returns:
             handshake_response: Handshake response as per [1].
             auth_strategy: Authorization plugin instance created based
-                on the provided `auth_plugin` and `auth_plugin_class`.
+                           on the provided `auth_plugin` and `auth_plugin_class`.
 
         Raises:
             ProgrammingError: Handshake misses authentication info.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_connection_phase_packets_protocol_handshake_response.html
-            [2]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+
+            [2]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_basic_character_set.html#a_protocol_character_set
         """
         b_username = username.encode()
-        response_payload = bytearray(b"")
+        response_payload = []
 
         if is_change_user_request:
             logger.debug("Got a `change user` request")
@@ -343,19 +356,23 @@ class MySQLProtocol:
         logger.debug("The provided initial strategy is %s", auth_plugin)
 
         if is_change_user_request:
-            response_payload += struct.pack(
-                f"<B{len(b_username)}sx",
-                ServerCmd.CHANGE_USER,
-                b_username,
+            response_payload.append(
+                struct.pack(
+                    f"<B{len(b_username)}sx",
+                    ServerCmd.CHANGE_USER,
+                    b_username,
+                )
             )
         else:
             filler = "x" * 22
-            response_payload += struct.pack(
-                f"<IIH{filler}{len(b_username)}sx",
-                client_flags,
-                max_allowed_packet,
-                charset,
-                b_username,
+            response_payload.append(
+                struct.pack(
+                    f"<IIH{filler}{len(b_username)}sx",
+                    client_flags,
+                    max_allowed_packet,
+                    charset,
+                    b_username,
+                )
             )
 
         # auth plugin response
@@ -369,24 +386,24 @@ class MySQLProtocol:
             ssl_enabled=ssl_enabled,
             plugin_config=plugin_config,
         )
-        response_payload += auth_response
+        response_payload.append(auth_response)
 
         # database name
-        response_payload += MySQLProtocol.connect_with_db(client_flags, database)
+        response_payload.append(MySQLProtocol.connect_with_db(client_flags, database))
 
         # charset
         if is_change_user_request:
-            response_payload += struct.pack("<H", charset)
+            response_payload.append(struct.pack("<H", charset))
 
         # plugin name
         if client_flags & ClientFlag.PLUGIN_AUTH:
-            response_payload += auth_plugin.encode() + b"\x00"
+            response_payload.append(auth_plugin.encode() + b"\x00")
 
         # connection attributes
         if (client_flags & ClientFlag.CONNECT_ARGS) and conn_attrs is not None:
-            response_payload += MySQLProtocol.make_conn_attrs(conn_attrs)
+            response_payload.append(MySQLProtocol.make_conn_attrs(conn_attrs))
 
-        return bytes(response_payload), auth_strategy
+        return b"".join(response_payload), auth_strategy
 
     @staticmethod
     def make_auth_ssl(
@@ -405,35 +422,36 @@ class MySQLProtocol:
             ssl_request_pkt: SSL connection request packet.
 
         References:
-            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+            [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_connection_phase_packets_protocol_ssl_request.html
-            [2]: https://dev.mysql.com/doc/dev/mysql-server/latest/
+
+            [2]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
                 page_protocol_basic_character_set.html#a_protocol_character_set
         """
         # SSL connection request packet
-        return bytes(
-            utils.int4store(client_flags)
-            + utils.int4store(max_allowed_packet)
-            + utils.int2store(charset)
-            + b"\x00" * 22
+        return b"".join(
+            [
+                utils.int4store(client_flags),
+                utils.int4store(max_allowed_packet),
+                utils.int2store(charset),
+                b"\x00" * 22,
+            ]
         )
 
     @staticmethod
-    def make_command(command: int, argument: Optional[bytes] = None) -> bytearray:
+    def make_command(command: int, argument: Optional[bytes] = None) -> bytes:
         """Make a MySQL packet containing a command"""
         data = utils.int1store(command)
-        if argument is not None:
-            data += argument
-        return data
+        return data if argument is None else data + argument
 
     @staticmethod
-    def make_stmt_fetch(statement_id: int, rows: int = 1) -> bytearray:
+    def make_stmt_fetch(statement_id: int, rows: int = 1) -> bytes:
         """Make a MySQL packet with Fetch Statement command"""
         return utils.int4store(statement_id) + utils.int4store(rows)
 
     @staticmethod
     def parse_handshake(packet: bytes) -> HandShakeType:
-        """Parse a MySQL Handshake-packet"""
+        """Parse a MySQL Handshake-packet."""
         res = {}
         res["protocol"] = struct.unpack("<xxxxB", packet[0:5])[0]
         if res["protocol"] != PROTOCOL_VERSION:
@@ -517,7 +535,7 @@ class MySQLProtocol:
 
     @staticmethod
     def parse_column(packet: bytes, encoding: str = "utf-8") -> DescriptionType:
-        """Parse a MySQL column-packet"""
+        """Parse a MySQL column-packet."""
         packet, _ = utils.read_lc_string(packet[4:])  # catalog
         packet, _ = utils.read_lc_string(packet)  # db
         packet, _ = utils.read_lc_string(packet)  # table
@@ -574,7 +592,7 @@ class MySQLProtocol:
         errmsg = "Failed getting COM_STATISTICS information"
         res: Dict[str, Union[int, Decimal]] = {}
         # Information is separated by 2 spaces
-        pairs: List[bytes] = [b""]
+        pairs = [b""]
         lbl: StrOrBytes = b""
         if with_header:
             pairs = packet[4:].split(b"\x20\x20")
@@ -598,7 +616,7 @@ class MySQLProtocol:
         return res
 
     def read_text_result(
-        self, sock: SocketType, version: Tuple[int, ...], count: int = 1
+        self, sock: MySQLSocket, version: Tuple[int, ...], count: int = 1
     ) -> Tuple[List[Tuple[Optional[bytes], ...]], Optional[EofPacketType],]:
         """Read MySQL text result
 
@@ -624,13 +642,13 @@ class MySQLProtocol:
                     datas.append(packet[4:])
                     packet = sock.recv()
                 datas.append(packet[4:])
-                rowdata = utils.read_lc_string_list(bytearray(b"").join(datas))
+                rowdata = utils.read_lc_string_list(b"".join(datas))
             elif packet[4] == 254 and packet[0] < 7:
                 eof = self.parse_eof(packet)
                 rowdata = None
             else:
                 eof = None
-                rowdata = utils.read_lc_string_list(packet[4:])
+                rowdata = utils.read_lc_string_list(bytes(packet[4:]))
             if eof is None and rowdata is not None:
                 rows.append(rowdata)
             elif eof is None and rowdata is None:
@@ -690,7 +708,7 @@ class MySQLProtocol:
     ) -> Tuple[bytes, Optional[Union[datetime.date, datetime.datetime]]]:
         """Parse a timestamp from a binary packet"""
         length = packet[0]
-        value = None
+        value: Optional[Union[datetime.datetime, datetime.date]] = None
         if length == 4:
             year = struct.unpack("<H", packet[1:3])[0]
             month = packet[3]
@@ -743,14 +761,14 @@ class MySQLProtocol:
         fields: List[DescriptionType],
         packet: bytes,
         charset: str = "utf-8",
-    ) -> Tuple[ParseValueFromBinaryResultPacketTypes, ...]:
+    ) -> Tuple[BinaryProtocolType, ...]:
         """Parse values from a binary result packet"""
         null_bitmap_length = (len(fields) + 7 + 2) // 8
         null_bitmap = [int(i) for i in packet[0:null_bitmap_length]]
         packet = packet[null_bitmap_length:]
 
         values: List[Any] = []
-        value: Any = None
+        value: BinaryProtocolType = None
         for pos, field in enumerate(fields):
             if null_bitmap[int((pos + 2) / 8)] & (1 << (pos + 2) % 8):
                 values.append(None)
@@ -791,14 +809,11 @@ class MySQLProtocol:
 
     def read_binary_result(
         self,
-        sock: SocketType,
+        sock: MySQLSocket,
         columns: List[DescriptionType],
         count: int = 1,
         charset: str = "utf-8",
-    ) -> Tuple[
-        List[Tuple[ParseValueFromBinaryResultPacketTypes, ...]],
-        Optional[EofPacketType],
-    ]:
+    ) -> Tuple[List[Tuple[BinaryProtocolType, ...]], Optional[EofPacketType],]:
         """Read MySQL binary protocol result
 
         Reads all or given number of binary resultset rows from the socket.
@@ -812,7 +827,7 @@ class MySQLProtocol:
                 break
             if i == count:
                 break
-            packet = sock.recv()
+            packet = bytes(sock.recv())
             if packet[4] == 254:
                 eof = self.parse_eof(packet)
                 values = None
@@ -828,7 +843,7 @@ class MySQLProtocol:
 
     @staticmethod
     def parse_binary_prepare_ok(packet: bytes) -> Dict[str, int]:
-        """Parse a MySQL Binary Protocol OK packet"""
+        """Parse a MySQL Binary Protocol OK packet."""
         if not packet[4] == 0:
             raise InterfaceError("Failed parsing Binary OK packet")
 
@@ -881,7 +896,7 @@ class MySQLProtocol:
     @staticmethod
     def prepare_binary_timestamp(
         value: Union[datetime.date, datetime.datetime]
-    ) -> Tuple[bytearray, int]:
+    ) -> Tuple[bytes, int]:
         """Prepare a timestamp object for the MySQL binary protocol
 
         This method prepares a timestamp of type datetime.datetime or
@@ -900,29 +915,31 @@ class MySQLProtocol:
         else:
             raise ValueError("Argument must a datetime.datetime or datetime.date")
 
-        packed = (
-            utils.int2store(value.year)
-            + utils.int1store(value.month)
-            + utils.int1store(value.day)
-        )
+        chunks = [
+            utils.int2store(value.year),
+            utils.int1store(value.month),
+            utils.int1store(value.day),
+        ]
 
         if isinstance(value, datetime.datetime):
-            packed = (
-                packed
-                + utils.int1store(value.hour)
-                + utils.int1store(value.minute)
-                + utils.int1store(value.second)
+            chunks.extend(
+                [
+                    utils.int1store(value.hour),
+                    utils.int1store(value.minute),
+                    utils.int1store(value.second),
+                ]
             )
             if value.microsecond > 0:
-                packed += utils.int4store(value.microsecond)
+                chunks.append(utils.int4store(value.microsecond))
 
-        packed = utils.int1store(len(packed)) + packed
-        return (packed, field_type)
+        packed = b"".join(chunks)
+
+        return utils.int1store(len(packed)) + packed, field_type
 
     @staticmethod
     def prepare_binary_time(
         value: Union[datetime.timedelta, datetime.time]
-    ) -> Tuple[bytearray, int]:
+    ) -> Tuple[bytes, int]:
         """Prepare a time object for the MySQL binary protocol
 
         This method prepares a time object of type datetime.timedelta or
@@ -940,76 +957,82 @@ class MySQLProtocol:
         field_type = FieldType.TIME
         negative = 0
         mcs = None
-        packed = b""
+        chunks: Deque[bytes] = deque([])
 
         if isinstance(value, datetime.timedelta):
             if value.days < 0:
                 negative = 1
             (hours, remainder) = divmod(value.seconds, 3600)
             (mins, secs) = divmod(remainder, 60)
-            packed += (
-                utils.int4store(abs(value.days))
-                + utils.int1store(hours)
-                + utils.int1store(mins)
-                + utils.int1store(secs)
+            chunks.extend(
+                [
+                    utils.int4store(abs(value.days)),
+                    utils.int1store(hours),
+                    utils.int1store(mins),
+                    utils.int1store(secs),
+                ]
             )
             mcs = value.microseconds
         else:
-            packed += (
-                utils.int4store(0)
-                + utils.int1store(value.hour)
-                + utils.int1store(value.minute)
-                + utils.int1store(value.second)
+            chunks.extend(
+                [
+                    utils.int4store(0),
+                    utils.int1store(value.hour),
+                    utils.int1store(value.minute),
+                    utils.int1store(value.second),
+                ]
             )
             mcs = value.microsecond
         if mcs:
-            packed += utils.int4store(mcs)
+            chunks.append(utils.int4store(mcs))
 
-        packed = utils.int1store(negative) + packed
-        packed = utils.int1store(len(packed)) + packed
+        chunks.appendleft(utils.int1store(negative))
 
-        return (packed, field_type)
+        packed = b"".join(chunks)
+
+        return utils.int1store(len(packed)) + packed, field_type
 
     @staticmethod
-    def prepare_stmt_send_long_data(
-        statement: int, param: int, data: bytes
-    ) -> bytearray:
+    def prepare_stmt_send_long_data(statement: int, param: int, data: bytes) -> bytes:
         """Prepare long data for prepared statements
 
         Returns a string.
         """
-        packet: bytearray = utils.int4store(statement) + utils.int2store(param) + data
-        return packet
+        return b"".join([utils.int4store(statement), utils.int2store(param), data])
 
     def make_stmt_execute(
         self,
         statement_id: int,
-        data: Sequence[SupportedMysqlBinaryProtocolTypes] = (),
-        parameters: Sequence[Any] = (),
+        data: Sequence[BinaryProtocolType] = (),
+        parameters: Sequence = (),
         flags: int = 0,
         long_data_used: Optional[Dict[int, Tuple[bool]]] = None,
         charset: str = "utf8",
-        query_attrs: Optional[List[Tuple[str, Any]]] = None,
+        query_attrs: Optional[List[Tuple[str, BinaryProtocolType]]] = None,
         converter_str_fallback: bool = False,
-    ) -> bytearray:
+    ) -> bytes:
         """Make a MySQL packet with the Statement Execute command"""
         iteration_count = 1
         null_bitmap = [0] * ((len(data) + 7) // 8)
-        values = []
-        types = []
+        values: List[bytes] = []
+        types: List[bytes] = []
         packed = b""
         data_len = len(data)
-        query_attr_names = []
+        query_attr_names: List[bytes] = []
         flags = flags if not query_attrs else flags + PARAMETER_COUNT_AVAILABLE
+
         if charset == "utf8mb4":
             charset = "utf8"
+
         if long_data_used is None:
             long_data_used = {}
+
         if query_attrs:
             data = list(data)
             for _, attr_val in query_attrs:
                 data.append(attr_val)
             null_bitmap = [0] * ((len(data) + 7) // 8)
+
         if parameters or data:
             if data_len != len(parameters):
                 raise InterfaceError(
@@ -1073,11 +1096,11 @@ class MySQLProtocol:
                 if query_attrs and pos + 1 > data_len:
                     name = query_attrs[pos - data_len][0].encode(charset)
                     query_attr_names.append(utils.lc_int(len(name)) + name)
-        packet = (
-            utils.int4store(statement_id)
-            + utils.int1store(flags)
-            + utils.int4store(iteration_count)
-        )
+        packet = [
+            utils.int4store(statement_id),
+            utils.int1store(flags),
+            utils.int4store(iteration_count),
+        ]
 
         # if (num_params > 0 || (CLIENT_QUERY_ATTRIBUTES \
         #                        && (flags & PARAMETER_COUNT_AVAILABLE)) {
@@ -1088,26 +1111,26 @@ class MySQLProtocol:
         if parameter_count:
             # if CLIENT_QUERY_ATTRIBUTES is on
             if query_attrs is not None:
-                packet += utils.lc_int(parameter_count)
+                packet.append(utils.lc_int(parameter_count))
 
-            packet += b"".join(
-                [struct.pack("B", bit) for bit in null_bitmap]
-            ) + utils.int1store(1)
+            packet.extend([struct.pack("B", bit) for bit in null_bitmap])
+            packet.append(utils.int1store(1))
+
             count = 0
             for a_type in types:
-                packet += a_type
+                packet.append(a_type)
                 # if CLIENT_QUERY_ATTRIBUTES is on {
                 #    string<lenenc>    parameter_name    Name of the parameter
                 # or empty if not present
                 # } if CLIENT_QUERY_ATTRIBUTES is on
                 if query_attrs is not None:
                     if count + 1 > data_len:
-                        packet += query_attr_names[count - data_len]
+                        packet.append(query_attr_names[count - data_len])
                     else:
-                        packet += b"\x00"
+                        packet.append(b"\x00")
                 count += 1
 
             for a_value in values:
-                packet += a_value
+                packet.append(a_value)
 
-        return packet
+        return b"".join(packet)

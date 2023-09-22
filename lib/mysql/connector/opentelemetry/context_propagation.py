@@ -2,7 +2,7 @@
 # mypy: disable-error-code="no-redef"
 # pylint: disable=invalid-name
 
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable
 
 from .constants import OTEL_ENABLED, TRACEPARENT_HEADER_NAME
 
@@ -21,8 +21,7 @@ if OTEL_ENABLED:
 
 
 if TYPE_CHECKING:
-    from ..connection import MySQLConnection
-    from ..connection_cext import CMySQLConnection
+    from ..abstracts import MySQLConnectionAbstract
 
 
 def build_traceparent_header(span: Any) -> str:
@@ -69,9 +68,7 @@ def with_context_propagation(method: Callable) -> Callable:
         [1]: https://www.w3.org/TR/trace-context/#traceparent-header
     """
 
-    def wrapper(
-        cnx: Union["MySQLConnection", "CMySQLConnection"], *args: Any, **kwargs: Any
-    ) -> Any:
+    def wrapper(cnx: "MySQLConnectionAbstract", *args: Any, **kwargs: Any) -> Any:
         """Context propagation decorator."""
         if not OTEL_ENABLED or not cnx.otel_context_propagation:
             return method(cnx, *args, **kwargs)

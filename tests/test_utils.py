@@ -44,7 +44,7 @@ class UtilsTests(tests.MySQLConnectorTests):
     """
 
     def _check_int_result(self, result, exp, data):
-        if not isinstance(result, bytearray):
+        if not isinstance(result, (bytearray, bytes)):
             self.fail(
                 "Wrong result. Expected {0}, we got {1}".format(
                     (type(exp), type(result))

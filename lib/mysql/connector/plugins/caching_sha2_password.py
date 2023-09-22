@@ -90,8 +90,8 @@ class MySQLCachingSHA2PasswordAuthPlugin(MySQLAuthPlugin):
         Args:
             auth_data: Authorization data.
             kwargs: Custom configuration to be passed to the auth plugin
-                when invoked. The parameters defined here will override the ones
-                defined in the auth plugin itself.
+                    when invoked. The parameters defined here will override the ones
+                    defined in the auth plugin itself.
 
         Returns:
             packet: Client's authorization response.
@@ -114,14 +114,14 @@ class MySQLCachingSHA2PasswordAuthPlugin(MySQLAuthPlugin):
         Args:
             sock: Pointer to the socket connection.
             auth_data: Authentication method data (from a packet representing
-                an `auth more data` response).
+                       an `auth more data` response).
             kwargs: Custom configuration to be passed to the auth plugin
-                when invoked. The parameters defined here will override the ones
-                defined in the auth plugin itself.
+                    when invoked. The parameters defined here will override the ones
+                    defined in the auth plugin itself.
 
         Returns:
             packet: Last server's response after back-and-forth
-                communication.
+                    communication.
         """
         response = self.auth_response(auth_data, **kwargs)
         if response:
@@ -137,14 +137,14 @@ class MySQLCachingSHA2PasswordAuthPlugin(MySQLAuthPlugin):
         Args:
             sock: Pointer to the socket connection.
             auth_data: Plugin provided data (extracted from a packet
-                representing an `auth switch request` response).
+                       representing an `auth switch request` response).
             kwargs: Custom configuration to be passed to the auth plugin
-                when invoked. The parameters defined here will override the ones
-                defined in the auth plugin itself.
+                    when invoked. The parameters defined here will override the ones
+                    defined in the auth plugin itself.
 
         Returns:
             packet: Last server's response after back-and-forth
-                communication.
+                    communication.
         """
         response = self.auth_response(auth_data, **kwargs)
         if response is None:

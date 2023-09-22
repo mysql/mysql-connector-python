@@ -44,7 +44,19 @@ Requires and comes with MySQL Connector/Python v8.0.22 and later:
 import warnings
 
 from datetime import datetime, time
-from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generator,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -53,23 +65,15 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import dateparse, timezone
 from django.utils.functional import cached_property
 
+from mysql.connector.types import MySQLConvertibleType
+
 try:
     import mysql.connector
 
-    from mysql.connector.connection import MySQLConnection
-    from mysql.connector.connection_cext import CMySQLConnection
     from mysql.connector.conversion import MySQLConverter
-    from mysql.connector.cursor import MySQLCursor
-    from mysql.connector.cursor_cext import CMySQLCursor
     from mysql.connector.custom_types import HexLiteral
     from mysql.connector.pooling import PooledMySQLConnection
-    from mysql.connector.types import (
-        ParamsDictType,
-        ParamsSequenceOrDictType,
-        ParamsSequenceType,
-        RowType,
-        StrOrBytes,
-    )
+    from mysql.connector.types import ParamsSequenceOrDictType, RowType, StrOrBytes
 except ImportError as err:
     raise ImproperlyConfigured(f"Error loading mysql.connector module: {err}") from err
 
@@ -93,6 +97,9 @@ DatabaseError = mysql.connector.DatabaseError
 NotSupportedError = mysql.connector.NotSupportedError
 OperationalError = mysql.connector.OperationalError
 ProgrammingError = mysql.connector.ProgrammingError
+
+if TYPE_CHECKING:
+    from mysql.connector.abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
 
 
 def adapt_datetime_with_timezone_support(value: datetime) -> StrOrBytes:
@@ -128,11 +135,13 @@ class CursorWrapper:
         4025,  # CHECK constraint failed
     )
 
-    def __init__(self, cursor: Union[MySQLCursor, CMySQLCursor]) -> None:
-        self.cursor: Union[MySQLCursor, CMySQLCursor] = cursor
+    def __init__(self, cursor: "MySQLCursorAbstract") -> None:
+        self.cursor: "MySQLCursorAbstract" = cursor
 
     @staticmethod
-    def _adapt_execute_args_dict(args: ParamsDictType) -> ParamsDictType:
+    def _adapt_execute_args_dict(
+        args: Dict[str, MySQLConvertibleType]
+    ) -> Dict[str, MySQLConvertibleType]:
         if not args:
             return args
         new_args = dict(args)
@@ -144,8 +153,8 @@ class CursorWrapper:
 
     @staticmethod
     def _adapt_execute_args(
-        args: Optional[ParamsSequenceType],
-    ) -> Optional[ParamsSequenceType]:
+        args: Optional[Sequence[MySQLConvertibleType]],
+    ) -> Optional[Sequence[MySQLConvertibleType]]:
         if not args:
             return args
         new_args = list(args)
@@ -156,8 +165,12 @@ class CursorWrapper:
         return tuple(new_args)
 
     def execute(
-        self, query: str, args: Optional[ParamsSequenceOrDictType] = None
-    ) -> Optional[Generator[Union[MySQLCursor, CMySQLCursor], None, None]]:
+        self,
+        query: str,
+        args: Optional[
+            Union[Sequence[MySQLConvertibleType], Dict[str, MySQLConvertibleType]]
+        ] = None,
+    ) -> Optional[Generator["MySQLCursorAbstract", None, None]]:
         """Executes the given operation
 
         This wrapper method around the execute()-method of the cursor is
@@ -178,11 +191,10 @@ class CursorWrapper:
     def executemany(
         self,
         query: str,
-        args: Union[
-            Tuple[ParamsSequenceOrDictType, ...],
-            List[ParamsSequenceOrDictType],
+        args: Sequence[
+            Union[Sequence[MySQLConvertibleType], Dict[str, MySQLConvertibleType]]
         ],
-    ) -> Optional[Generator[Union[MySQLCursor, CMySQLCursor], None, None]]:
+    ) -> Optional[Generator["MySQLCursorAbstract", None, None]]:
         """Executes the given operation
 
         This wrapper method around the executemany()-method of the cursor is
@@ -393,7 +405,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):  # pylint: disable=abstract-method
 
     def get_new_connection(
         self, conn_params: Dict[str, Any]
-    ) -> Union[PooledMySQLConnection, MySQLConnection, CMySQLConnection]:
+    ) -> Union[PooledMySQLConnection, "MySQLConnectionAbstract"]:
         if "converter_class" not in conn_params:
             conn_params["converter_class"] = DjangoMySQLConverter
         cnx = mysql.connector.connect(**conn_params)

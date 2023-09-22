@@ -180,7 +180,41 @@ class _Flags(_Constants):
 
 
 class FieldType(_Constants):
-    """MySQL Field Types"""
+    """MySQL Field Types.
+
+    This class provides all supported MySQL field or data types. They can be useful
+    when dealing with raw data or defining your own converters. The field type is
+    stored with every cursor in the description for each column.
+
+    The `FieldType` class shouldn't be instantiated.
+
+    Examples:
+        The following example shows how to print the name of the data type for
+        each column in a result set.
+
+        ```
+        from __future__ import print_function
+        import mysql.connector
+        from mysql.connector import FieldType
+
+        cnx = mysql.connector.connect(user='scott', database='test')
+        cursor = cnx.cursor()
+
+        cursor.execute(
+        "SELECT DATE(NOW()) AS `c1`, TIME(NOW()) AS `c2`, "
+        "NOW() AS `c3`, 'a string' AS `c4`, 42 AS `c5`")
+        rows = cursor.fetchall()
+
+        for desc in cursor.description:
+            colname = desc[0]
+            coltype = desc[1]
+            print("Column {} has type {}".format(
+                colname, FieldType.get_info(coltype)))
+
+        cursor.close()
+        cnx.close()
+        ```
+    """
 
     prefix: str = "FIELD_TYPE_"
     DECIMAL: int = 0x00
@@ -444,9 +478,22 @@ class ServerCmd(_Constants, metaclass=ServerCmdMeta):
 
 
 class ClientFlag(_Flags):
-    """MySQL Client Flags
+    """MySQL Client Flags.
 
-    Client options as found in the MySQL sources mysql-src/include/mysql_com.h
+    Client options as found in the MySQL sources mysql-src/include/mysql_com.h.
+
+    This class provides constants defining MySQL client flags that can be used
+    when the connection is established to configure the session. The `ClientFlag`
+    class is available when importing mysql.connector.
+
+    The `ClientFlag` class shouldn't be instantiated.
+
+    Examples:
+        ```
+        >>> import mysql.connector
+        >>> mysql.connector.ClientFlag.FOUND_ROWS
+        2
+        ```
     """
 
     LONG_PASSWD: int = 1 << 0
@@ -846,6 +893,8 @@ class SQLMode(_Constants):
     The numeric values of SQL Modes are not interesting, only the names
     are used when setting the SQL_MODE system variable using the MySQL
     SET command.
+
+    The `SQLMode` class shouldn't be instantiated.
 
     See http://dev.mysql.com/doc/refman/5.6/en/server-sql-mode.html
     """

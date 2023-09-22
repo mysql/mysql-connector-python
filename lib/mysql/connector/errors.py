@@ -35,7 +35,13 @@ from .utils import read_bytes, read_int
 
 
 class Error(Exception):
-    """Exception that is base class for all other error exceptions"""
+    """Exception that is base class for all other error exceptions.
+
+    See [1] for more details.
+
+    References:
+        [1]: https://dev.mysql.com/doc/connector-python/en/connector-python-api-errors-error.html
+    """
 
     def __init__(
         self,
@@ -150,23 +156,24 @@ def custom_error_exception(
     error: Optional[Union[int, Dict[int, Optional[ErrorClassTypes]]]] = None,
     exception: Optional[ErrorClassTypes] = None,
 ) -> Mapping[int, Optional[ErrorClassTypes]]:
-    """Define custom exceptions for MySQL server errors
+    """Defines custom exceptions for MySQL server errors.
 
     This function defines custom exceptions for MySQL server errors and
     returns the current set customizations.
 
-    If error is a MySQL Server error number, then you have to pass also the
-    exception class.
-
-    The error argument can also be a dictionary in which case the key is
-    the server error number, and value the exception to be raised.
-
-    If none of the arguments are given, then custom_error_exception() will
-    simply return the current set customizations.
-
     To reset the customizations, simply supply an empty dictionary.
 
+    Args:
+        error: Can be a MySQL Server error number or a dictionary in which case the
+               key is the server error number and the value is the exception to be raised.
+        exception: If `error` is a MySQL Server error number then you have to pass
+                   also the exception class, otherwise you don't.
+
+    Returns:
+        dictionary: Current set customizations.
+
     Examples:
+        ```
         import mysql.connector
         from mysql.connector import errorcode
 
@@ -182,8 +189,7 @@ def custom_error_exception(
 
         # Reset
         mysql.connector.custom_error_exception({})
-
-    Returns a dictionary.
+        ```
     """
     global _CUSTOM_ERROR_EXCEPTIONS  # pylint: disable=global-statement
 
