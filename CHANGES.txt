@@ -8,6 +8,11 @@ Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v8.3.0
+======
+
+- WL#15982: Remove use of mysql_shutdown
+
 v8.2.0
 ======
 

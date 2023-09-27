@@ -1947,12 +1947,8 @@ class BugOra17002411(tests.MySQLConnectorTests):
     "Test not available for external MySQL servers",
 )
 @unittest.skipIf(
-    tests.MYSQL_VERSION >= (8, 0, 1),
-    "BugOra17422299 not tested with MySQL version >= 8.0.1",
-)
-@unittest.skipIf(
-    tests.MYSQL_VERSION <= (5, 7, 1),
-    "BugOra17422299 not tested with MySQL version 5.6",
+    tests.MYSQL_VERSION < (8, 0, 1),
+    "The SQL command SHUTDOWN is only available as of MySQL 8.0.1",
 )
 class BugOra17422299(tests.MySQLConnectorTests):
     """BUG#17422299: cmd_shutdown fails with malformed connection packet"""

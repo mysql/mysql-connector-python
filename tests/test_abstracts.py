@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -255,12 +255,8 @@ class ConnectionSubclasses(tests.MySQLConnectorTests):
         "Test not available for external MySQL servers",
     )
     @unittest.skipIf(
-        tests.MYSQL_VERSION >= (8, 0, 1),
-        "As of MySQL 8.0.1, CMD_SHUTDOWN is not recognized.",
-    )
-    @unittest.skipIf(
-        tests.MYSQL_VERSION <= (5, 7, 1),
-        "BugOra17422299 not tested with MySQL version 5.6",
+        tests.MYSQL_VERSION < (8, 0, 1),
+        "The SQL command SHUTDOWN is only available as of MySQL 8.0.1",
     )
     @foreach_cnx()
     def test_cmd_shutdown(self):

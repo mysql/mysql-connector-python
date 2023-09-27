@@ -57,14 +57,7 @@ from typing import (
 from . import version
 from .abstracts import MySQLConnectionAbstract
 from .authentication import MySQLAuthenticator, get_auth_plugin
-from .constants import (
-    ClientFlag,
-    FieldType,
-    ServerCmd,
-    ServerFlag,
-    ShutdownType,
-    flag_is_set,
-)
+from .constants import ClientFlag, FieldType, ServerCmd, ServerFlag, flag_is_set
 from .conversion import MySQLConverter
 from .cursor import (
     CursorBase,
@@ -929,24 +922,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         self._socket.send(packet, 0, 0)
         return bytes(packet)
 
-    def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> EofPacketType:
+    def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> None:
         """Shut down the MySQL Server
 
-        This method sends the SHUTDOWN command to the MySQL server and is only
-        possible if the current user has SUPER privileges. The result is a
-        dictionary containing the OK packet information.
-
-        Note: Most applications and scripts do not the SUPER privilege.
-
-        Returns a dict()
+        This method sends the SHUTDOWN command to the MySQL server.
+        The `shutdown_type` is not used, and it's kept for backward compatibility.
         """
-        if shutdown_type:
-            if not ShutdownType.get_info(shutdown_type):
-                raise InterfaceError("Invalid shutdown type")
-            atype = shutdown_type
-        else:
-            atype = ShutdownType.SHUTDOWN_DEFAULT
-        return self._handle_eof(self._send_cmd(ServerCmd.SHUTDOWN, int4store(atype)))
+        self.cmd_query("SHUTDOWN")
 
     def cmd_statistics(self) -> StatsPacketType:
         """Send the statistics command to the MySQL Server

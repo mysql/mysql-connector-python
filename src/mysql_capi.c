@@ -2954,6 +2954,8 @@ MySQL_shutdown(MySQL *self, PyObject *args)
 {
     unsigned int level = 0;
     int res;
+    char *stmt = "SHUTDOWN";
+    Py_ssize_t stmt_length;
 
     CHECK_SESSION(self);
 
@@ -2962,7 +2964,8 @@ MySQL_shutdown(MySQL *self, PyObject *args)
     }
 
     Py_BEGIN_ALLOW_THREADS
-    res = mysql_shutdown(&self->session, level);
+    stmt_length = strlen(stmt);
+    res = mysql_real_query(&self->session, stmt, stmt_length);
     Py_END_ALLOW_THREADS
 
     if (res) {

@@ -897,7 +897,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self.close()
 
     def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> None:
-        """Shut down the MySQL Server"""
+        """Shut down the MySQL Server
+
+        This method sends the SHUTDOWN command to the MySQL server.
+        The `shutdown_type` is not used, and it's kept for backward compatibility.
+        """
         if not self._cmysql:
             raise OperationalError("MySQL Connection not available")
 

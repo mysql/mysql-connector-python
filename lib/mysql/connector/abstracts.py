@@ -1506,10 +1506,12 @@ class MySQLConnectionAbstract(ABC):
         """Close the current connection with the server"""
         raise NotImplementedError
 
-    def cmd_shutdown(
-        self, shutdown_type: Optional[int] = None
-    ) -> Optional[Mapping[str, Any]]:
-        """Shut down the MySQL Server"""
+    def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> None:
+        """Shut down the MySQL Server
+
+        This method sends the SHUTDOWN command to the MySQL server.
+        The `shutdown_type` is not used, and it's kept for backward compatibility.
+        """
         raise NotImplementedError
 
     def cmd_statistics(self) -> Optional[Mapping[str, Any]]:
