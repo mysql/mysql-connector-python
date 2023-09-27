@@ -11,6 +11,7 @@ Full release notes:
 v8.3.0
 ======
 
+- WL#15983: Stop using mysql_ssl_set api
 - WL#15982: Remove use of mysql_shutdown
 
 v8.2.0

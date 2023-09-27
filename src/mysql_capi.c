@@ -1259,7 +1259,9 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
         else {
             ssl_ca = NULL;
         }
-        mysql_ssl_set(&self->session, ssl_key, ssl_cert, ssl_ca, NULL, NULL);
+        mysql_options(&self->session, MYSQL_OPT_SSL_KEY, ssl_key);
+        mysql_options(&self->session, MYSQL_OPT_SSL_CERT, ssl_cert);
+        mysql_options(&self->session, MYSQL_OPT_SSL_CA, ssl_ca);
         if (tls_versions != NULL) {
             mysql_options(&self->session, MYSQL_OPT_TLS_VERSION, tls_versions);
         }
