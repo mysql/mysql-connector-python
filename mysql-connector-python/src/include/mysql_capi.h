@@ -294,7 +294,7 @@ PyObject *
 MySQL_stmt_prepare(MySQL *self, PyObject *stmt);
 
 PyObject *
-MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args);
+MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args, PyObject *kwds);
 
 PyObject *
 MySQLPrepStmt_handle_result(MySQLPrepStmt *self);

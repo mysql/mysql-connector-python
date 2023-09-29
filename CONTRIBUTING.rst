@@ -21,7 +21,7 @@ Contributing Code
 
 Contributing to this project is easy. You just need to follow these steps.
 
-- Make sure you have a user account at `bugs.mysql.com <https://bugs.mysql.com>`_. You will need to reference this user account when you submit your Oracle Contributor Agreement (OCA).
+- Make sure you have a user account at `bugs.mysql.com <https://bugs.mysql.com>`_. You will need to reference this user account when you submit your Oracle Contributor Agreement (a.k.a. OCA).
 - Sign the Oracle Contributor Agreement. You can find instructions for doing that at the `OCA Page <https://oca.opensource.oracle.com/>`_.
 - Develop your pull request. Make sure you are aware of the `requirements <https://dev.mysql.com/doc/dev/connector-python/8.0/requirements.html>`_ for the project.
 - Validate your pull request by including tests that sufficiently cover the functionality you are adding.

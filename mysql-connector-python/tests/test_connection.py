@@ -4309,3 +4309,137 @@ class WL14237(tests.MySQLConnectorTests):
     ):
         "Check behavior add_attribute() and get_attributes() when the name is ''"
         self._check_expected_behavior_for_unnamed_query_attrs(prepared=True)
+
+    def _test_named_parameters_are_transmitted(self, prepared=False):
+        """Check the query attributes (named parameters) are transmitted."""
+        attr_names = ["src", "workflow"]
+        attr_values = ["get_city", "update_population"]
+        with self.cnx.__class__(**self.config) as cnx:
+            with cnx.cursor(prepared=prepared) as cur:
+                for attr_name, attr_value in zip(attr_names, attr_values):
+                    cur.add_attribute(attr_name, attr_value)
+
+                cur.execute("SELECT @@version")
+                _ = cur.fetchall()
+
+                for i, attr_name in enumerate(attr_names):
+                    cur.execute(
+                        f"SELECT mysql_query_attribute_string('{attr_name}') AS {attr_name}"
+                    )
+                    res = cur.fetchone()
+                    self.assertEqual(attr_values[i], res[0])
+
+    def _test_unnamed_parameters_are_transmitted(self):
+        """Check the unnamed parameters are transmitted."""
+        stmt = "SELECT  %s, %s, %s"
+        data = [(5, "a", 8), (10, 0, 1)]
+        with self.cnx.__class__(**self.config) as cnx:
+            with cnx.cursor(prepared=True) as cur:
+                for unnamed_params in data:
+                    cur.execute(stmt, unnamed_params)
+                    res = cur.fetchone()
+                    self.assertTupleEqual(unnamed_params, res)
+
+                cur.execute("SELECT %s", ("Hello QA",))
+                res = cur.fetchone()
+                self.assertTupleEqual(("Hello QA",), res)
+
+    def _test_unnamed_and_named_parameters_are_transmitted(self):
+        """Check the unnamed and named parameters are transmitted."""
+        stmt = "SELECT  %s, %s, %s"
+        data = [(5, "a", 8), (10, "mr. test", 1)]
+        attr_names = ["src", "workflow"]
+        attr_values = ["get_city", "update_population"]
+        with self.cnx.__class__(**self.config) as cnx:
+            with cnx.cursor(prepared=True) as cur:
+                for attr_name, attr_value in zip(attr_names, attr_values):
+                    cur.add_attribute(attr_name, attr_value)
+
+                for unnamed_params in data:
+                    cur.execute(stmt, unnamed_params)
+                    res = cur.fetchone()
+                    self.assertTupleEqual(unnamed_params, res)
+
+                cur.execute("SELECT %s", ("Hello QA",))
+                res = cur.fetchone()
+                self.assertTupleEqual(("Hello QA",), res)
+
+                for i, attr_name in enumerate(attr_names):
+                    cur.execute(
+                        f"SELECT mysql_query_attribute_string('{attr_name}') AS {attr_name}"
+                    )
+                    res = cur.fetchone()
+                    self.assertEqual(attr_values[i], res[0])
+
+    @tests.foreach_cnx()
+    def test_17_check_server_receives_query_attrs_simple_stmts(self):
+        """Check the query attributes actually reach the server when executing simple stmts."""
+        self._test_named_parameters_are_transmitted(prepared=False)
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_18_check_server_receives_query_attrs_prepared_stmts_python(self):
+        """Check the query attributes (named parameters) are transmitted.
+
+        During this test at least one named parameter is defined, however,
+        no unnamed parameters are. This way we can test the case when
+        `num_named_params > 0 and num_unnamed_params == 0`.
+        """
+        self._test_named_parameters_are_transmitted(prepared=True)
+
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (8, 3, 0),
+        "Named parameters are supported for prepared statements when mysql_server_version >= 8.3.0",
+    )
+    @unittest.skipIf(
+        not os.environ.get("PB2WORKDIR") is None,
+        "C-ext must be built using libmysqlclient >= 8.3.0 - PB2 currently not meeting this condition",
+    )
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_18_check_server_receives_query_attrs_prepared_stmts_cext(self):
+        """Check the query attributes (named parameters) are transmitted.
+
+        During this test at least one named parameter is defined, however,
+        no unnamed parameters are. This way we can test the case when
+        `num_named_params > 0 and num_unnamed_params == 0`.
+        """
+        self._test_named_parameters_are_transmitted(prepared=True)
+
+    @tests.foreach_cnx()
+    def test_19_check_server_receives_unnamed_params_prepared_stmts(self):
+        """Check unnamed parameters are transmitted.
+
+        During this test at least one unnamed parameter is defined, however,
+        no named parameters are. This way we can test the case when
+        `num_named_params == 0 and num_unnamed_params > 0`.
+        """
+        self._test_unnamed_parameters_are_transmitted()
+
+    @tests.foreach_cnx(MySQLConnection)
+    def test_20_check_server_receives_named_and_unnamed_params_prepared_stmts_python(
+        self,
+    ):
+        """Check the named and unnamed parameters are transmitted.
+
+        During this test at least one named and unnamed parameters are defined. This
+        way we can test the case when `num_named_params > 0 and num_unnamed_params > 0`.
+        """
+        self._test_unnamed_and_named_parameters_are_transmitted()
+
+    @unittest.skipIf(
+        tests.MYSQL_VERSION < (8, 3, 0),
+        "Named parameters are supported for prepared statements when mysql_server_version >= 8.3.0",
+    )
+    @unittest.skipIf(
+        not os.environ.get("PB2WORKDIR") is None,
+        "C-ext must be built using libmysqlclient >= 8.3.0 - PB2 currently not meeting this condition",
+    )
+    @tests.foreach_cnx(CMySQLConnection)
+    def test_20_check_server_receives_named_and_unnamed_params_prepared_stmts_cext(
+        self,
+    ):
+        """Check the named and unnamed parameters are transmitted.
+
+        During this test at least one named and unnamed parameters are defined. This
+        way we can test the case when `num_named_params > 0 and num_unnamed_params > 0`.
+        """
+        self._test_unnamed_and_named_parameters_are_transmitted()

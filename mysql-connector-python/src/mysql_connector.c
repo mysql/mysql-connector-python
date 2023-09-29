@@ -244,7 +244,7 @@ static PyMemberDef MySQLPrepStmt_members[] = {
 };
 
 static PyMethodDef MySQLPrepStmt_methods[] = {
-    {"stmt_execute", (PyCFunction)MySQLPrepStmt_execute, METH_VARARGS,
+    {"stmt_execute", (PyCFunction)MySQLPrepStmt_execute, METH_VARARGS | METH_KEYWORDS,
      "Executes the prepared statement"},
     {"fetch_fields", (PyCFunction)MySQLPrepStmt_fetch_fields, METH_VARARGS,
      "Fetch information about fields in result set"},

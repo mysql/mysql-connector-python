@@ -606,12 +606,13 @@ class CMySQLConnection(MySQLConnectionAbstract):
         except MySQLInterfaceError as err:
             raise InterfaceError(str(err)) from err
 
+    @with_context_propagation
     def cmd_stmt_execute(  # type: ignore[override]
         self, statement_id: CMySQLPrepStmt, *args: Any
     ) -> Optional[Union[CextEofPacketType, CextResultType]]:
         """Executes the prepared statement"""
         try:
-            statement_id.stmt_execute(*args)
+            statement_id.stmt_execute(*args, query_attrs=self.query_attrs)
         except MySQLInterfaceError as err:
             raise InterfaceError(str(err)) from err
 

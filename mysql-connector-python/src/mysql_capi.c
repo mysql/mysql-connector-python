@@ -3216,19 +3216,42 @@ MySQLPrepStmt_dealloc(MySQLPrepStmt *self)
     @retval PyBool_type OK
 */
 PyObject *
-MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
+MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args, PyObject *kwds)
 {
-    Py_ssize_t size = PyTuple_Size(args);
+
+    static const char* key_query_attrs = "query_attrs";
+    PyObject *query_attrs = PyDict_GetItemString(kwds, key_query_attrs);  // returns borrowed reference
+
+    Py_ssize_t size_unnamed_params = PyTuple_Size(args);
+    Py_ssize_t size = size_unnamed_params + (query_attrs != NULL? PyList_Size(query_attrs): 0);
+
     MYSQL_BIND *mbinds = calloc(size, sizeof(MYSQL_BIND));
     struct MySQL_binding *bindings = calloc(size, sizeof(struct MySQL_binding));
+    const char **names = calloc(size, sizeof(char *));
+
     PyObject *value;
     PyObject *retval = NULL;
     int i = 0, res = 0;
+    bool params_bind_ans;
 
     for (i = 0; i < size; i++) {
         struct MySQL_binding *pbind = &bindings[i];
         MYSQL_BIND *mbind = &mbinds[i];
-        value = PyTuple_GetItem(args, i);
+
+        if (i < size_unnamed_params)
+        {
+            // handle unnamed parameter
+            names[i] = NULL;  // Name being NULL indicates that the parameter is unnamed
+            value = PyTuple_GetItem(args, i);
+        }
+        else
+        {
+            // handle query attribute
+            PyObject *attr_tuple = PyList_GetItem(query_attrs, i - size_unnamed_params);  // returns borrowed reference
+            PyObject *attr_name = PyTuple_GetItem(attr_tuple, 0);  // returns borrowed reference
+            names[i] = PyUnicode_AsUTF8(attr_name);
+            value = PyTuple_GetItem(attr_tuple, 1);
+        }
 
         if (value == NULL) {
             goto cleanup;
@@ -3392,7 +3415,14 @@ MySQLPrepStmt_execute(MySQLPrepStmt *self, PyObject *args)
         }
     }
 
-    if (mysql_stmt_bind_param(self->stmt, mbinds)) {
+    #if MYSQL_VERSION_ID >= 80300
+        params_bind_ans = mysql_stmt_bind_named_param(self->stmt, mbinds, (int)size, names);
+    #else
+        params_bind_ans = mysql_stmt_bind_param(self->stmt, mbinds);
+    #endif
+
+    if (params_bind_ans)
+    {
         retval = PyErr_Format(MySQLInterfaceError, (const char *)"Bind the parameters: %s",
                               mysql_stmt_error(self->stmt));
         goto cleanup;
