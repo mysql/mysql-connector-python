@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0, as
@@ -38,7 +38,20 @@ import tests
 from mysql.connector import cursor, cursor_cext, errors
 from mysql.connector.connection import MySQLConnection
 from mysql.connector.connection_cext import CMySQLConnection
-from mysql.connector.constants import DEFAULT_CONFIGURATION, ClientFlag, flag_is_set
+from mysql.connector.constants import (
+    DEFAULT_CONFIGURATION,
+    ClientFlag,
+    RefreshOption,
+    flag_is_set,
+)
+
+OK_PACKET_RESULT = {
+    "insert_id": 0,
+    "affected_rows": 0,
+    "field_count": 0,
+    "warning_count": 0,
+    "server_status": 0,
+}
 
 
 class CMySQLConnectionTests(tests.MySQLConnectorTests):
@@ -151,6 +164,28 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
 
         exp = (b"2",)
         self.assertNotEqual(exp, self.cnx.get_rows()[0][0])
+
+    def test_cmd_refresh(self):
+        """Send the Refresh-command to MySQL"""
+        self.maxDiff = 2000
+        refresh_options = (
+            RefreshOption.GRANT,
+            RefreshOption.LOG,
+            RefreshOption.TABLES,
+            RefreshOption.HOST,
+            RefreshOption.STATUS,
+            RefreshOption.REPLICA,
+        )
+        for option in refresh_options:
+            self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(option))
+
+        # Test combined options
+        options = RefreshOption.LOG | RefreshOption.STATUS
+        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(options))
+
+    def test_cmd_refresh_invalid_option(self):
+        """Test deprecated THREADS option"""
+        self.assertRaises(ValueError, self.cnx.cmd_refresh, 1 << 5)
 
     def test_connection_id(self):
         """MySQL connection ID"""

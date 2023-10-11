@@ -2884,8 +2884,35 @@ MySQL_num_fields(MySQL *self)
 PyObject *
 MySQL_refresh(MySQL *self, PyObject *args)
 {
+    int res = 0;
+    int refresh_options_len = 0;
     unsigned int options;
-    int res;
+    unsigned int supported_options = 1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 6;
+    unsigned long mysql_version;
+    char *reset_replica_stmt;
+
+    Py_BEGIN_ALLOW_THREADS
+    mysql_version = mysql_get_server_version(&self->session);
+    Py_END_ALLOW_THREADS
+
+    /* As of MySQL 8.0.22 REPLICA should be used instead of SLAVE */
+    reset_replica_stmt = mysql_version < 80022 ? "RESET SLAVE" : "RESET REPLICA";
+
+    /* A struct to represent the REFRESH options and their associated statements */
+    struct RefreshOption {
+        unsigned int option;
+        const char *statement;
+    };
+
+    /* Define an array of RefreshOption structs */
+    struct RefreshOption refresh_options[] = {
+        {1 << 0, "FLUSH PRIVILEGES"},                             /* REFRESH_GRANT */
+        {1 << 1, "FLUSH LOGS"},                                   /* REFRESH_LOGS  */
+        {1 << 2, "FLUSH TABLES"},                                 /* REFRESH_TABLES */
+        {1 << 3, "TRUNCATE TABLE performance_schema.host_cache"}, /* REFRESH_HOSTS */
+        {1 << 4, "FLUSH STATUS"},                                 /* REFRESH_STATUS */
+        {1 << 6, reset_replica_stmt}                              /* REFRESH_REPLICA */
+    };
 
     IS_CONNECTED(self);
 
@@ -2893,9 +2920,23 @@ MySQL_refresh(MySQL *self, PyObject *args)
         return NULL;
     }
 
-    Py_BEGIN_ALLOW_THREADS
-    res = mysql_refresh(&self->session, options);
-    Py_END_ALLOW_THREADS
+    if (!(options & supported_options)) {
+        PyErr_SetString(PyExc_ValueError, "Invalid command REFRESH option");
+        return NULL;
+    }
+
+    refresh_options_len = (int)(sizeof(refresh_options) / sizeof(refresh_options[0]));
+
+    for (int i = 0; i < refresh_options_len; i++) {
+        if (options & refresh_options[i].option) {
+            res = mysql_real_query(&self->session,
+                                   refresh_options[i].statement,
+                                   strlen(refresh_options[i].statement));
+            if (res) {
+                break;  /* stop processing if an error occurs */
+            }
+        }
+    }
 
     if (res) {
         raise_with_session(&self->session, NULL);

@@ -644,7 +644,6 @@ class RefreshOption(_Constants, metaclass=RefreshOptionMeta):
     TABLES: int = 1 << 2
     HOST: int = 1 << 3
     STATUS: int = 1 << 4
-    THREADS: int = 1 << 5
     REPLICA: int = 1 << 6
 
     desc: Dict[str, Tuple[int, str]] = {
@@ -653,7 +652,6 @@ class RefreshOption(_Constants, metaclass=RefreshOptionMeta):
         "TABLES": (1 << 2, "close all tables"),
         "HOST": (1 << 3, "Flush host cache"),
         "STATUS": (1 << 4, "Flush status variables"),
-        "THREADS": (1 << 5, "Flush thread cache"),
         "REPLICA": (1 << 6, "Reset source info and restart replica thread"),
         "SLAVE": (1 << 6, "Deprecated option; use REPLICA instead."),
     }

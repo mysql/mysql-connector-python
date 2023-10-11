@@ -936,7 +936,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         """Kill a MySQL process"""
         if not isinstance(mysql_pid, int):
             raise ValueError("MySQL PID must be int")
-        self.info_query(f"KILL {mysql_pid}")
+        self.cmd_query(f"KILL {mysql_pid}")
 
     def cmd_debug(self) -> Any:
         """Send the DEBUG command"""

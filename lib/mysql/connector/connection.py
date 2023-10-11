@@ -57,7 +57,14 @@ from typing import (
 from . import version
 from .abstracts import MySQLConnectionAbstract
 from .authentication import MySQLAuthenticator, get_auth_plugin
-from .constants import ClientFlag, FieldType, ServerCmd, ServerFlag, flag_is_set
+from .constants import (
+    ClientFlag,
+    FieldType,
+    RefreshOption,
+    ServerCmd,
+    ServerFlag,
+    flag_is_set,
+)
 from .conversion import MySQLConverter
 from .cursor import (
     CursorBase,
@@ -900,12 +907,33 @@ class MySQLConnection(MySQLConnectionAbstract):
          RefreshOption = mysql.connector.RefreshOption
          refresh = RefreshOption.LOG | RefreshOption.THREADS
          cnx.cmd_refresh(refresh)
-
-        The result is a dictionary with the OK packet information.
-
-        Returns a dict()
         """
-        return self._handle_ok(self._send_cmd(ServerCmd.REFRESH, int4store(options)))
+        if not options & (
+            RefreshOption.GRANT
+            | RefreshOption.LOG
+            | RefreshOption.TABLES
+            | RefreshOption.HOST
+            | RefreshOption.STATUS
+            | RefreshOption.REPLICA
+        ):
+            raise ValueError("Invalid command REFRESH option")
+
+        if options & RefreshOption.GRANT:
+            res = self.cmd_query("FLUSH PRIVILEGES")
+        if options & RefreshOption.LOG:
+            res = self.cmd_query("FLUSH LOGS")
+        if options & RefreshOption.TABLES:
+            res = self.cmd_query("FLUSH TABLES")
+        if options & RefreshOption.HOST:
+            res = self.cmd_query("TRUNCATE TABLE performance_schema.host_cache")
+        if options & RefreshOption.STATUS:
+            res = self.cmd_query("FLUSH STATUS")
+        if options & RefreshOption.REPLICA:
+            res = self.cmd_query(
+                "RESET SLAVE" if self._server_version < (8, 0, 22) else "RESET REPLICA"
+            )
+
+        return res
 
     def cmd_quit(self) -> bytes:
         """Close the current connection with the server
@@ -950,12 +978,10 @@ class MySQLConnection(MySQLConnectionAbstract):
         This method send the PROCESS_KILL command to the server along with
         the process ID. The result is a dictionary with the OK packet
         information.
-
-        Returns a dict()
         """
-        return self._handle_ok(
-            self._send_cmd(ServerCmd.PROCESS_KILL, int4store(mysql_pid))
-        )
+        if not isinstance(mysql_pid, int):
+            raise ValueError("MySQL PID must be int")
+        return self.cmd_query(f"KILL {mysql_pid}")
 
     def cmd_debug(self) -> EofPacketType:
         """Send the DEBUG command

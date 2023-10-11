@@ -572,11 +572,24 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
 
     def test_cmd_refresh(self):
         """Send the Refresh-command to MySQL"""
-        self.cnx._socket.sock = tests.DummySocket()
-        self.cnx._socket.sock.add_packet(OK_PACKET)
-        refresh = constants.RefreshOption.LOG | constants.RefreshOption.THREADS
+        refresh_options = (
+            constants.RefreshOption.GRANT,
+            constants.RefreshOption.LOG,
+            constants.RefreshOption.TABLES,
+            constants.RefreshOption.HOST,
+            constants.RefreshOption.STATUS,
+            constants.RefreshOption.REPLICA,
+        )
+        for option in refresh_options:
+            self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(option))
 
-        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(refresh))
+        # Test combined options
+        options = constants.RefreshOption.LOG | constants.RefreshOption.STATUS
+        self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(options))
+
+    def test_cmd_refresh_invalid_option(self):
+        """Test deprecated THREADS option"""
+        self.assertRaises(ValueError, self.cnx.cmd_refresh, 1 << 5)
 
     def test_cmd_quit(self):
         """Send the Quit-command to MySQL"""

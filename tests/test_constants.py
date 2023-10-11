@@ -558,7 +558,6 @@ class RefreshOptionTests(tests.MySQLConnectorTests):
         "REPLICA",
         "STATUS",
         "TABLES",
-        "THREADS",
         "SLAVE",
     ]
 

@@ -6846,7 +6846,7 @@ class BugOra21528553(tests.MySQLConnectorTests):
             res = cur.fetchone()
             self.assertEqual(len(res), 2)
             self.assertTrue(self.cnx.unread_result)
-            refresh = constants.RefreshOption.LOG | constants.RefreshOption.THREADS
+            refresh = constants.RefreshOption.LOG | constants.RefreshOption.STATUS
             self.cnx.cmd_refresh(refresh)
             self.assertFalse(self.cnx.unread_result)
 
