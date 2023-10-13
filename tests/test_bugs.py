@@ -76,7 +76,7 @@ from mysql.connector import (
 )
 from mysql.connector.optionfiles import read_option_files
 from mysql.connector.pooling import PooledMySQLConnection
-from tests import cnx_config, foreach_cnx
+from tests import cnx_config, foreach_cnx, foreach_cnx_aio
 
 from . import check_tls_versions_support
 
@@ -7722,3 +7722,129 @@ class BugOra35503506(tests.MySQLConnectorTests):
                 )
                 res = cur.fetchall()
                 self.assertEqual(exp, res)
+
+
+class BugOra35710145(tests.MySQLConnectorTests):
+    """BUG#35710145: Bad MySQLCursor.statement and result when query text contains \
+    code comments
+
+    Wrong query results provided by the connector, when the query contains code comments.
+    The regex expression that splits a multi-statement query produces as many statements
+    as semicolon-separated operations are found in the query.
+
+    End-of-line (EOL) comments are treated as if they were normal statements by the
+    connector but that leads to inconsistencies when reading results from the server
+    and trying to map each result to a statement since it's assumed every statement
+    will produce a result, but isn't always the case - eg for comments.
+
+    Comments should be treated specially to avoid issues.
+    """
+
+    table_name = "BugOra35710145"
+    ops = [
+        f"# dropping table; \n DROP TABLE IF EXISTS {table_name};",
+        f"CREATE TABLE {table_name} (id INT AUTO_INCREMENT PRIMARY KEY, city VARCHAR(20),country_id INT); -- create table",
+        "-- i am a comment;\nSELECT 1;",
+        "SELECT 2;-- A;",
+        "SELECT 2 /* this is an in-line comment */ + 1;\nSELECT 4;",
+        f"""INSERT INTO {table_name} (city, country_id) VALUES ('Guadalajara', '12'); \nSELECT 5;""",
+        "SELECT 6;\n# A;#B;",
+        "#hello;\n-- hello;\nSELECT 7; -- world",
+        "#hello;\n-- hello;\nSELECT 8; -- world; \n SELECT 9;",
+        "-- comment;#comment;  \n-- comment",
+        f"""# comment; \nINSERT INTO {table_name} (city, country_id) VALUES ('Monterrey', '32');-- insert; \nSELECT 'ham';""",
+        f"""
+            -- this is a test; \n
+            SELECT 'test'; -- a comment; \n
+            INSERT INTO {table_name} (city, country_id) VALUES ('Ciudad de Mexico', '38'); # added cdmx; \n
+            -- now let read the result; \n
+            SELECT * from {table_name} where city='Ciudad de Mexico'; \n
+            -- final comment;
+        """,
+        "SELECT 10;-- A; \nSELECT 11;",
+        "SELECT 12;\n-- ;",
+        "SELECT 13;-- ;",
+        f"# dropping table;\n -- lets drop table; \n DROP TABLE IF EXISTS {table_name}; # delete table",
+    ]
+
+    exps = [
+        [(f"DROP TABLE IF EXISTS {table_name}", [])],
+        [
+            (
+                f"CREATE TABLE {table_name} (id INT AUTO_INCREMENT PRIMARY KEY, city VARCHAR(20),country_id INT)",
+                [],
+            )
+        ],
+        [("SELECT 1", [(1,)])],
+        [("SELECT 2", [(2,)])],
+        [
+            ("SELECT 2 /* this is an in-line comment */ + 1", [(3,)]),
+            ("SELECT 4", [(4,)]),
+        ],
+        [
+            (
+                f"""INSERT INTO {table_name} (city, country_id) VALUES ('Guadalajara', '12')""",
+                [],
+            ),
+            ("SELECT 5", [(5,)]),
+        ],
+        [("SELECT 6", [(6,)])],
+        [("SELECT 7", [(7,)])],
+        [("SELECT 8", [(8,)]), ("SELECT 9", [(9,)])],
+        [],
+        [
+            (
+                f"INSERT INTO {table_name} (city, country_id) VALUES ('Monterrey', '32')",
+                [],
+            ),
+            ("SELECT 'ham'", [("ham",)]),
+        ],
+        [
+            ("SELECT 'test'", [("test",)]),
+            (
+                f"INSERT INTO {table_name} (city, country_id) VALUES ('Ciudad de Mexico', '38')",
+                [],
+            ),
+            (
+                f"SELECT * from {table_name} where city='Ciudad de Mexico'",
+                [(3, "Ciudad de Mexico", 38)],
+            ),
+        ],
+        [("SELECT 10", [(10,)]), ("SELECT 11", [(11,)])],
+        [("SELECT 12", [(12,)])],
+        [("SELECT 13", [(13,)])],
+        [(f"DROP TABLE IF EXISTS {table_name}", [])],
+    ]
+
+    @foreach_cnx()
+    def test_comments_with_execute_multi(self):
+        with self.cnx.cursor() as cur:
+            for op, exp in zip(self.ops, self.exps):
+                for result, (stmt_exp, fetch_exp) in zip(
+                    cur.execute(op, multi=True), exp
+                ):
+                    self.assertEqual(result.statement, stmt_exp)
+                    self.assertListEqual(result.fetchall(), fetch_exp)
+
+
+class BugOra35710145_async(tests.MySQLConnectorAioTestCase):
+    """BUG#35710145: Bad MySQLCursor.statement and result when query text contains \
+    code comments
+
+    For a description see `test_bugs.BugOra35710145`.
+    """
+
+    @foreach_cnx_aio()
+    async def test_comments_with_execute_multi(self):
+        async with await self.cnx.cursor() as cur:
+            for op, exp in zip(BugOra35710145.ops, BugOra35710145.exps):
+                i = 0
+                try:
+                    async for result in cur.executemulti(op):
+                        stmt_exp, fetch_exp = exp[i]
+                        res = await result.fetchall()
+                        self.assertEqual(result.statement, stmt_exp)
+                        self.assertListEqual(res, fetch_exp)
+                        i += 1
+                except IndexError:
+                    self.fail(f"Got more results than expected for query {op}")

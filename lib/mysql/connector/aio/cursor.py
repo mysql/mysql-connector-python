@@ -62,7 +62,8 @@ from ..cursor import (
     RE_SQL_ON_DUPLICATE,
     RE_SQL_PYTHON_CAPTURE_PARAM_NAME,
     RE_SQL_PYTHON_REPLACE_PARAM,
-    RE_SQL_SPLIT_STMTS,
+    is_eol_comment,
+    parse_multi_statement_query,
 )
 from ..errors import (
     Error,
@@ -217,25 +218,65 @@ class MySQLCursor(MySQLCursorAbstract):
     async def _execute_iter(
         self, query_iter: AsyncGenerator[ResultType, None]
     ) -> AsyncGenerator[MySQLCursorAbstract, None]:
-        """Return generator of MySQLCursor objects for multiple statements.
+        """Generator returns MySQLCursor objects for multiple statements
 
-        This method is only used when multiple statements are executed by the execute()
-        method. It uses zip() to make an iterator from the given query_iter
-        (result of MySQLConnection.cmd_query_iter()) and the list of statements that
-        were executed.
+        This method is only used when multiple statements are executed
+        by the `cursor.execute(multi_stmt_query, multi=True)` method.
+
+        It matches the given `query_iter` (result of `MySQLConnection.cmd_query_iter()`)
+        and the list of statements that were executed.
+
+        How does this method work? To properly map each statement (stmt) to a result,
+        the following facts must be considered:
+
+        1. Read operations such as `SELECT` produce a non-empty result
+            (calling `next(query_iter)` gets a result that includes at least one column).
+        2. Write operatios such as `INSERT` produce an empty result
+            (calling `next(query_iter)` gets a result with no columns - aka empty).
+        3. End-of-line (EOL) comments do not produce a result, unless is the last stmt
+            in which case produces an empty result.
+        4. Calling procedures such as `CALL my_proc` produce a sequence `(1)*0` which
+            means it may produce zero or more non-empty results followed by just one
+            empty result. In other words, a callproc stmt always terminates with an
+            empty result. E.g., `my_proc` includes an update + select + select + update,
+            then the result sequence will be `110` - note how the write ops results get
+            annulated, just the read ops results are produced. Other examples:
+                * insert + insert -> 0
+                * select + select + insert + select -> 1110
+                * select -> 10
+            Observe how 0 indicates the end of the result sequence. This property is
+            vital to know what result corresponds to what callproc stmt.
+
+        In this regard, the implementation is composed of:
+        1. Parsing: the multi-statement is broken down into single statements, and then
+            for each of these, leading white spaces are removed (including
+            jumping line, vertical line, tab, etc.). Also, EOL comments are removed from
+            the stream, except when the comment is the last statement of the
+            multi-statement string.
+        2. Mapping: the facts described above as used as "game rules" to properly match
+        statements and results. In case, if we run out of statements before running out
+        of results we use a sentinel named "stmt_overflow!" to indicate that the mapping
+        went wrong.
+
+        Acronyms
+            1: a non-empty result
+            2: an empty result
         """
-        executed_list = RE_SQL_SPLIT_STMTS.split(self._executed)
-
-        i = 0
+        executed_list = parse_multi_statement_query(multi_stmt=self._executed)
+        self._executed = None
+        stmt = executed_list.popleft() if executed_list else b"stmt_overflow!"
         async for result in query_iter:
             await self._reset_result()
             await self._handle_result(result)
-            try:
-                self._executed = executed_list[i].strip()
-                i += 1
-            except IndexError:
-                self._executed = executed_list[0]
+
+            if is_eol_comment(stmt):
+                continue
+
+            self._executed = stmt.rstrip()
             yield self
+
+            if not stmt.upper().startswith(b"CALL") or "columns" not in result:
+                stmt = executed_list.popleft() if executed_list else b"stmt_overflow!"
 
     async def _fetch_row(self, raw: bool = False) -> Optional[RowType]:
         """Return the next row in the result set."""

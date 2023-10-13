@@ -32,14 +32,16 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 import warnings
 import weakref
 
-from collections import namedtuple
+from collections import deque, namedtuple
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
+    Deque,
     Dict,
     Generator,
     Iterator,
@@ -113,6 +115,71 @@ RE_SQL_PYTHON_CAPTURE_PARAM_NAME = re.compile(r"%\((.*?)\)s")
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
 MAX_RESULTS = 4294967295
+
+
+def is_eol_comment(stmt: bytes) -> bool:
+    """Checks if statement is an end-of-line comment.
+
+    Double-dash comment style requires the second dash to be
+    followed by at least one whitespace (Z) or control character (C) such
+    as a space, tab, newline, and so on.
+
+    Hash comment simply requires start from `#` and nothing else.
+
+    Args:
+        stmt: MySQL statement.
+
+    Returns:
+        Whether or not the statement is an end-of-line comment.
+
+    References:
+        [1]: https://dev.mysql.com/doc/refman/8.0/en/comments.html
+    """
+    is_double_dash_comment = (
+        len(stmt) >= 3
+        and stmt.startswith(b"--")
+        and unicodedata.category(chr(stmt[2]))[0] in {"Z", "C"}
+    )
+    is_hash_comment = len(stmt) >= 2 and stmt.startswith(b"#")
+
+    return is_double_dash_comment or is_hash_comment
+
+
+def parse_multi_statement_query(multi_stmt: bytes) -> Deque[bytes]:
+    """Parses a multi-statement query/operation.
+
+    Parsing consists of removing empty (which includes just whitespaces and/or control
+    characters) statements and EOL (end-of-line) comments.
+
+    However, there's a caveat, by rule, the last EOL comment found in the stream isn't
+    removed if and only if it's the last statement.
+
+    Why? EOL comments do not generate results, however, when the last statement is an
+    EOL comment the server returns an empty result. So, in other to match statements
+    and results correctly we need to keep the last EOL comment statement.
+
+    Args:
+        multi_stmt: Query representing multi-statement operations separated by semicolons.
+
+    Returns:
+        A list of statements that aren't empty and don't contain leading
+        ASCII whitespaces. Also, they aren't EOL comments except
+        perhaps for the last one.
+    """
+    executed_list: Deque[bytes] = deque(RE_SQL_SPLIT_STMTS.split(multi_stmt))
+    stmt, num_stms = b"", len(executed_list)
+    while num_stms > 0:
+        num_stms -= 1
+        stmt_next = executed_list.popleft().lstrip()
+        if stmt_next:
+            stmt = stmt_next
+            if not is_eol_comment(stmt):
+                executed_list.append(stmt)
+
+    if is_eol_comment(stmt):
+        executed_list.append(stmt)
+
+    return executed_list
 
 
 class _ParamSubstitutor:
@@ -554,27 +621,62 @@ class MySQLCursor(CursorBase):
         """Generator returns MySQLCursor objects for multiple statements
 
         This method is only used when multiple statements are executed
-        by the execute() method. It uses zip() to make an iterator from the
-        given query_iter (result of MySQLConnection.cmd_query_iter()) and
-        the list of statements that were executed.
+        by the `cursor.execute(multi_stmt_query, multi=True)` method.
+
+        It matches the given `query_iter` (result of `MySQLConnection.cmd_query_iter()`)
+        and the list of statements that were executed.
+
+        How does this method work? To properly map each statement (stmt) to a result,
+        the following facts must be considered:
+
+        1. Read operations such as `SELECT` produce a non-empty result
+            (calling `next(query_iter)` gets a result that includes at least one column).
+        2. Write operatios such as `INSERT` produce an empty result
+            (calling `next(query_iter)` gets a result with no columns - aka empty).
+        3. End-of-line (EOL) comments do not produce a result, unless is the last stmt
+            in which case produces an empty result.
+        4. Calling procedures such as `CALL my_proc` produce a sequence `(1)*0` which
+            means it may produce zero or more non-empty results followed by just one
+            empty result. In other words, a callproc stmt always terminates with an
+            empty result. E.g., `my_proc` includes an update + select + select + update,
+            then the result sequence will be `110` - note how the write ops results get
+            annulated, just the read ops results are produced. Other examples:
+                * insert + insert -> 0
+                * select + select + insert + select -> 1110
+                * select -> 10
+            Observe how 0 indicates the end of the result sequence. This property is
+            vital to know what result corresponds to what callproc stmt.
+
+        In this regard, the implementation is composed of:
+        1. Parsing: the multi-statement is broken down into single statements, and then
+            for each of these, leading white spaces are removed (including
+            jumping line, vertical line, tab, etc.). Also, EOL comments are removed from
+            the stream, except when the comment is the last statement of the
+            multi-statement string.
+        2. Mapping: the facts described above as used as "game rules" to properly match
+        statements and results. In case, if we run out of statements before running out
+        of results we use a sentinel named "stmt_overflow!" to indicate that the mapping
+        went wrong.
+
+        Acronyms
+            1: a non-empty result
+            2: an empty result
         """
-        executed_list = RE_SQL_SPLIT_STMTS.split(self._executed)
+        executed_list = parse_multi_statement_query(multi_stmt=self._executed)
+        self._executed = None
+        stmt = executed_list.popleft() if executed_list else b"stmt_overflow!"
+        for result in query_iter:
+            self._reset_result()
+            self._handle_result(result)
 
-        i = 0
-        while True:
-            try:
-                result = next(query_iter)
-                self._reset_result()
-                self._handle_result(result)
-                try:
-                    self._executed = executed_list[i].strip()
-                    i += 1
-                except IndexError:
-                    self._executed = executed_list[0]
+            if is_eol_comment(stmt):
+                continue
 
-                yield self
-            except StopIteration:
-                return
+            self._executed = stmt.rstrip()
+            yield self
+
+            if not stmt.upper().startswith(b"CALL") or "columns" not in result:
+                stmt = executed_list.popleft() if executed_list else b"stmt_overflow!"
 
     def execute(
         self,
