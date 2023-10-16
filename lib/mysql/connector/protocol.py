@@ -798,6 +798,9 @@ class MySQLProtocol:
             elif field[1] == FieldType.TIME:
                 (packet, value) = self._parse_binary_time(packet)
                 values.append(value)
+            elif field[7] == FieldFlag.BINARY or field[8] == 63:  # "binary" charset
+                (packet, value) = utils.read_lc_string(packet)
+                values.append(value)
             else:
                 (packet, value) = utils.read_lc_string(packet)
                 try:

@@ -1358,6 +1358,11 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         stmt = "SELECT SQRT(POW(%(value1)s, 2) + POW(%(unknown)s, 2)) AS hypotenuse"
         self.assertRaises(errors.ProgrammingError, cur.execute, stmt, data)
 
+        # Test binary string
+        cur.execute("SELECT BINARY 'ham'")
+        exp = [(bytearray(b"ham"),)]
+        self.assertEqual(exp, cur.fetchall())
+
     def test_executemany(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
 

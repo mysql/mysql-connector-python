@@ -1016,6 +1016,11 @@ class CMySQLCursorPreparedTests(tests.CMySQLCursorTests):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][1:], self.exp)
 
+        # Test binary string
+        self.cur.execute("SELECT BINARY 'ham'")
+        exp = [(bytearray(b"ham"),)]
+        self.assertEqual(exp, self.cur.fetchall())
+
     def test_executemany(self):
         data = [self.data[:], self.data[:]]
         self.cur.executemany(self.insert_stmt.format(self.tbl), data)

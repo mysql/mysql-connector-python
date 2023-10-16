@@ -465,15 +465,15 @@ class MySQLProtocolTests(tests.MySQLConnectorTests):
         #
 
         fields = [
-            ("aStr", 253, None, None, None, None, 0, 1),
-            ("aFloat", 246, None, None, None, None, 0, 129),
-            ("aDouble", 246, None, None, None, None, 0, 129),
-            ("aDate", 10, None, None, None, None, 1, 128),
-            ("aDateTime", 12, None, None, None, None, 1, 128),
-            ("aTime", 11, None, None, None, None, 1, 128),
-            ("aNull", 6, None, None, None, None, 1, 128),
-            ("aBlob", 252, None, None, None, None, 1, 144),
-            ("aVarBinary", 253, None, None, None, None, 1, 128),
+            ("aStr", 253, None, None, None, None, 0, 1, 45),
+            ("aFloat", 246, None, None, None, None, 0, 129, 63),
+            ("aDouble", 246, None, None, None, None, 0, 129, 63),
+            ("aDate", 10, None, None, None, None, 1, 128, 63),
+            ("aDateTime", 12, None, None, None, None, 1, 128, 63),
+            ("aTime", 11, None, None, None, None, 1, 128, 63),
+            ("aNull", 6, None, None, None, None, 1, 128, 63),
+            ("aBlob", 252, None, None, None, None, 1, 144, 63),
+            ("aVarBinary", 253, None, None, None, None, 1, 128, 63),
         ]
 
         packet = bytearray(
