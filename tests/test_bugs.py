@@ -7848,3 +7848,301 @@ class BugOra35710145_async(tests.MySQLConnectorAioTestCase):
                         i += 1
                 except IndexError:
                     self.fail(f"Got more results than expected for query {op}")
+
+
+class BugOra21390859(tests.MySQLConnectorTests):
+    """BUG#21390859: STATEMENTS GET OUT OF SYNCH WITH RESULT SETS
+
+    When including callproc (calling stored procedures) statements as part of a
+    multi-query string while executing `cursor.execute(multi_stmt_query, multi=True)`
+    the statements get out of sync with the result, that's to say, the statement-result
+    mapping isn't correct, especially when a procedure produces multiple results.
+
+    This issue is fixed as part of BUG#35710145, however, no relevant tests for this
+    use case were added during the fix of BUG#35710145.
+
+    With this patch, we extend the unit tests to cover the scenario where multi-result
+    `callproc` statements are included in a multi-statement query.
+
+    Acronyms
+        rop: read operation
+        wop: write operation
+        1: it means the gotten result set isn't empty
+        0: it means the gotten result set is empty
+    """
+
+    table_name = "BugOra21390859"
+
+    use_case, use_case_exp = {}, {}
+
+    use_case[
+        1
+    ] = f"""
+    -- rop  wrop  proc_milti_read  proc_multi_insert;
+    --  1    0       1 1 1 0               0        ;
+    SELECT 76;
+    INSERT INTO {table_name} (city, country_id) VALUES ('Ciudad de Mexico', '38');
+    call {table_name}_multi_read(2);
+    call {table_name}_multi_insert();
+    """
+    use_case_exp[1] = [
+        ("SELECT 76", [(76,)]),
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Ciudad de Mexico', '38')",
+            [],
+        ),
+        (f"call {table_name}_multi_read(2)", [(2,)]),
+        (f"call {table_name}_multi_read(2)", [(3,)]),
+        (f"call {table_name}_multi_read(2)", [("bar",)]),
+        (f"call {table_name}_multi_read(2)", []),
+        (f"call {table_name}_multi_insert()", []),
+    ]
+
+    use_case[
+        2
+    ] = f"""
+    SELECT 'foo';
+    INSERT INTO {table_name} (city, country_id) VALUES ('Ciudad de Mexico', '38');
+    call {table_name}_multi_read(4);
+    #  rop  wrop  proc_milti_read;
+    --  1    0       1 1 1 0     ;
+    """
+    use_case_exp[2] = [
+        ("SELECT 'foo'", [("foo",)]),
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Ciudad de Mexico', '38')",
+            [],
+        ),
+        (f"call {table_name}_multi_read(4)", [(4,)]),
+        (f"call {table_name}_multi_read(4)", [(5,)]),
+        (f"call {table_name}_multi_read(4)", [("bar",)]),
+        (f"call {table_name}_multi_read(4)", []),
+    ]
+
+    use_case[3] = use_case[1] + use_case[2]
+    use_case_exp[3] = use_case_exp[1] + use_case_exp[2]
+
+    use_case[4] = use_case[2] + use_case[1]
+    use_case_exp[4] = use_case_exp[2] + use_case_exp[1]
+
+    use_case[
+        5
+    ] = f"""
+    -- one;
+    call {table_name}_single_read(1);
+    -- two;
+    call {table_name}_single_read(2);
+    -- three;
+    call {table_name}_single_read(3);
+    """
+    use_case_exp[5] = [
+        (f"call {table_name}_single_read(1)", [(1,)]),
+        (f"call {table_name}_single_read(1)", []),
+        (f"call {table_name}_single_read(2)", [(2,)]),
+        (f"call {table_name}_single_read(2)", []),
+        (f"call {table_name}_single_read(3)", [(3,)]),
+        (f"call {table_name}_single_read(3)", []),
+    ]
+
+    # same as 6, but ending the query with a EOL comment
+    use_case[6] = use_case[5] + "\n -- end;"
+    use_case_exp[6] = use_case_exp[5][:]
+
+    use_case[
+        7
+    ] = f"""
+    SELECT 'Hello MySQL';
+    INSERT INTO {table_name} (city, country_id) VALUES ('Colima', '84');
+    SELECT 10; -- ten;
+    # testing
+    -- comment;
+    INSERT INTO {table_name} (city, country_id) VALUES ('Tabasco', '0'); # added tabasco;
+    -- comment;
+    -- comment;
+    -- comment;
+    -- two;
+    call {table_name}_read_and_insert();
+    -- three;
+    call {table_name}_multi_insert();
+    -- two;
+    """
+    use_case_exp[7] = [
+        (f"SELECT 'Hello MySQL'", [("Hello MySQL",)]),
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Colima', '84')",
+            [],
+        ),
+        (f"SELECT 10", [(10,)]),
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Tabasco', '0')",
+            [],
+        ),
+        (f"call {table_name}_read_and_insert()", [("Oracle",)]),
+        (f"call {table_name}_read_and_insert()", [("MySQL",)]),
+        (f"call {table_name}_read_and_insert()", []),
+        (f"call {table_name}_multi_insert()", []),
+    ]
+
+    use_case[8] = use_case[6] + use_case[7]
+    use_case_exp[8] = use_case_exp[6] + use_case_exp[7]
+
+    use_case[9] = use_case[1] + use_case[5]
+    use_case_exp[9] = use_case_exp[1] + use_case_exp[5]
+
+    use_case[10] = use_case[3] + use_case[6]
+    use_case_exp[10] = use_case_exp[3] + use_case_exp[6]
+
+    use_case[
+        11
+    ] = f"""
+    INSERT INTO {table_name} (city, country_id) VALUES ('Sonora', '33');
+    -- callproc invokes procedures internally;
+    CALL {table_name}_callproc();
+    """
+    use_case_exp[11] = [
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Sonora', '33')",
+            [],
+        ),
+        (f"CALL {table_name}_callproc()", [(1,)]),
+        (f"CALL {table_name}_callproc()", [(2,)]),
+        (f"CALL {table_name}_callproc()", [("bar",)]),
+        (f"CALL {table_name}_callproc()", []),
+    ]
+
+    use_case[
+        12
+    ] = f"""
+    INSERT INTO {table_name} (city, country_id) VALUES ('Tamaulipas', '82');
+    INSERT INTO {table_name} (city, country_id) VALUES ('Chihuahua', '3');
+    -- write operations;
+    SELECT ':D';
+    """
+    use_case_exp[12] = [
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Tamaulipas', '82')",
+            [],
+        ),
+        (
+            f"INSERT INTO {table_name} (city, country_id) VALUES ('Chihuahua', '3')",
+            [],
+        ),
+        ("SELECT ':D'", [(":D",)]),
+    ]
+
+    use_case[13] = use_case[12] + use_case[11]
+    use_case_exp[13] = use_case_exp[12] + use_case_exp[11]
+
+    def setUp(self):
+        with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_multi_read")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_multi_insert")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_single_read")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_read_and_insert")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_callproc")
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+            cnx.cmd_query(
+                f"""
+                CREATE PROCEDURE {self.table_name}_single_read(val integer)
+                BEGIN
+                    SELECT val;
+                END;
+            """
+            )
+            cnx.cmd_query(
+                f"""
+                CREATE PROCEDURE {self.table_name}_multi_read(val integer)
+                BEGIN
+                    SELECT val;
+                    SELECT val + 1;
+                    SELECT 'bar';
+                END;
+            """
+            )
+            cnx.cmd_query(
+                f"""
+                CREATE PROCEDURE {self.table_name}_multi_insert()
+                BEGIN
+                    INSERT INTO {self.table_name} (city, country_id) VALUES ('Chiapas', '33');
+                    INSERT INTO {self.table_name} (city, country_id) VALUES ('Yucatan', '28');
+                    INSERT INTO {self.table_name} (city, country_id) VALUES ('Oaxaca', '13');
+                END;
+            """
+            )
+            cnx.cmd_query(
+                f"""
+                CREATE PROCEDURE {self.table_name}_read_and_insert()
+                BEGIN
+                    INSERT INTO {self.table_name} (city, country_id) VALUES ('CCC', '33');
+                    SELECT 'Oracle';
+                    INSERT INTO {self.table_name} (city, country_id) VALUES ('AAA', '44');
+                    INSERT INTO {self.table_name} (city, country_id) VALUES ('BBB', '99');
+                    SELECT 'MySQL';
+                END;
+            """
+            )
+            cnx.cmd_query(
+                f"""
+                CREATE PROCEDURE {self.table_name}_callproc()
+                BEGIN
+                    CALL {self.table_name}_multi_read(1);
+                    CALL {self.table_name}_multi_insert();
+                END;
+            """
+            )
+            cnx.cmd_query(
+                f"CREATE TABLE {self.table_name} (id INT AUTO_INCREMENT PRIMARY KEY, city VARCHAR(20),country_id INT)"
+            )
+
+    def tearDown(self) -> None:
+        with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_multi_read")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_multi_insert")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_single_read")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_read_and_insert")
+            cnx.cmd_query(f"DROP PROCEDURE IF EXISTS {self.table_name}_callproc")
+            cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table_name}")
+
+    @foreach_cnx()
+    def test_multi_stmts_with_callproc_out_of_sync(self):
+        with self.cnx.cursor() as cur:
+            for i in self.use_case:
+                for result, (stmt_exp, fetch_exp) in zip(
+                    cur.execute(self.use_case[i], multi=True), self.use_case_exp[i]
+                ):
+                    fetch = result.fetchall()
+                    self.assertEqual(result.statement, stmt_exp)
+                    self.assertListEqual(fetch, fetch_exp)
+
+
+class BugOra21390859_async(tests.MySQLConnectorAioTestCase):
+    """BUG#21390859: STATEMENTS GET OUT OF SYNCH WITH RESULT SETS
+
+    For a description see `test_bugs.BugOra21390859`.
+    """
+
+    def setUp(self) -> None:
+        self.bug_21390859 = BugOra21390859()
+        self.bug_21390859.setUp()
+
+    def tearDown(self) -> None:
+        self.bug_21390859.tearDown()
+
+    @foreach_cnx_aio()
+    async def test_multi_stmts_with_callproc_out_of_sync(self):
+        async with await self.cnx.cursor() as cur:
+            for i in self.bug_21390859.use_case:
+                exp_list = self.bug_21390859.use_case_exp[i]
+                j = 0
+                try:
+                    async for result in cur.executemulti(self.bug_21390859.use_case[i]):
+                        stmt_exp, fetch_exp = exp_list[j]
+                        res = await result.fetchall()
+                        self.assertEqual(result.statement, stmt_exp)
+                        self.assertListEqual(res, fetch_exp)
+                        j += 1
+                except IndexError:
+                    self.fail(
+                        "Got more results than expected "
+                        f"for query {self.bug_21390859.use_case[i]}"
+                    )
