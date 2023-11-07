@@ -12,6 +12,7 @@ v8.3.0
 ======
 
 - WL#16015: Remove use of removed COM_ commands
+- WL#15985: Support GSSAPI/Kerberos authentication on Windows using authentication_ldap_sasl_client plug-in for Pure Python
 - WL#15983: Stop using mysql_ssl_set api
 - WL#15982: Remove use of mysql_shutdown
 - WL#15950: Support query parameters for prepared statements
