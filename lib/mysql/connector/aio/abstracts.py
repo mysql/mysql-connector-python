@@ -43,6 +43,7 @@ import weakref
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from inspect import signature
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -102,7 +103,7 @@ from ..types import (
     StrOrBytes,
     WarningType,
 )
-from ..utils import GenericWrapper
+from ..utils import GenericWrapper, import_object
 from .authentication import MySQLAuthenticator
 from .charsets import Charset, charsets
 from .protocol import MySQLProtocol
@@ -181,6 +182,7 @@ class MySQLConnectionAbstract(ABC):
         raw: bool = False,
         kerberos_auth_mode: Optional[str] = None,
         krb_service_principal: Optional[str] = None,
+        fido_callback: Optional[Union[str, Callable[[str], None]]] = None,
         webauthn_callback: Optional[Union[str, Callable[[str], None]]] = None,
         allow_local_infile: bool = DEFAULT_CONFIGURATION["allow_local_infile"],
         allow_local_infile_in_path: Optional[str] = DEFAULT_CONFIGURATION[
@@ -259,8 +261,10 @@ class MySQLConnectionAbstract(ABC):
         self._in_transaction: bool = False
         self._oci_config_file: Optional[str] = None
         self._oci_config_profile: Optional[str] = None
-        self._fido_callback: Optional[Union[str, Callable[[str], None]]] = None
-        self._webauthn_callback: Optional[Union[str, Callable[[str], None]]] = None
+        self._fido_callback: Optional[Union[str, Callable[[str], None]]] = fido_callback
+        self._webauthn_callback: Optional[
+            Union[str, Callable[[str], None]]
+        ] = webauthn_callback
 
         self.converter: Optional[MySQLConverter] = None
 
@@ -587,6 +591,41 @@ class MySQLConnectionAbstract(ABC):
             )
         elif invalid_tls_versions:
             raise AttributeError(TLS_VERSION_ERROR.format(tls_ver, TLS_VERSIONS))
+
+    @staticmethod
+    def _validate_callable(
+        option_name: str, callback: Union[str, Callable], num_args: int = 0
+    ) -> None:
+        """Validates if it's a Python callable.
+
+         Args:
+             option_name (str): Connection option name.
+             callback (str or callable): The fully qualified path to the callable or
+                                         a callable.
+             num_args (int): Number of positional arguments allowed.
+
+        Raises:
+             ProgrammingError: If `callback` is not valid or wrong number of positional
+                               arguments.
+
+        .. versionadded:: 8.2.0
+        """
+        if isinstance(callback, str):
+            try:
+                callback = import_object(callback)
+            except ValueError as err:
+                raise ProgrammingError(f"{err}") from err
+
+        if not callable(callback):
+            raise ProgrammingError(f"Expected a callable for '{option_name}'")
+
+        # Check if the callable signature has <num_args> positional arguments
+        num_params = len(signature(callback).parameters)
+        if num_params != num_args:
+            raise ProgrammingError(
+                f"'{option_name}' requires {num_args} positional argument, but the "
+                f"callback provided has {num_params}"
+            )
 
     @property
     @abstractmethod

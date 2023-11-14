@@ -3968,7 +3968,10 @@ class WL14237(tests.MySQLConnectorTests):
         test_table = "wl14237"
         with connection.MySQLConnection(**tests.get_mysql_config()) as cnx:
             with cnx.cursor() as cur:
-                cur.execute('INSTALL COMPONENT "file://component_query_attributes"')
+                try:
+                    cur.execute('INSTALL COMPONENT "file://component_query_attributes"')
+                except errors.Error:
+                    pass  # The component is already installed
                 cur.execute(f"DROP TABLE IF EXISTS {test_table}")
                 cur.execute(
                     f"""
