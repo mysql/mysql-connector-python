@@ -17,6 +17,7 @@ v8.3.0
 - WL#15942: Improve type hints and standardize byte type handling
 - WL#15523: Support Python DB API asynchronous execution
 - BUG#35912790: Binary strings are converted when using prepared statements
+- BUG#35832148: Fix Django timezone.utc deprecation warning
 - BUG#35710145: Bad MySQLCursor.statement and result when query text contains code comments
 
 v8.2.0
