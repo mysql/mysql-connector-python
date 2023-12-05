@@ -229,6 +229,7 @@ rm -rf %{buildroot}
 # Remove the plugin to force the build not to bundle.
 rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 
+cd mysql-connector-python
 %{__python3} setup.py ${COMMON_INSTALL_ARGS} \
     --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
     --extra-link-args="${EXTRA_LINK_ARGS}" \
@@ -236,7 +237,7 @@ rm -f %{with_mysql_capi}/lib*/{,mysql/}plugin/authentication_ldap_sasl_client.*
 %{?scl:EOF}
 
 %files -n mysql-connector-python3%{?product_suffix}
-%doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst docs/INFO_SRC docs/INFO_BIN
+%doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst mysql-connector-python/docs/INFO_SRC mysql-connector-python/docs/INFO_BIN
 %{python3_sitearch}/mysql
 %{python3_sitearch}/mysql_connector_python-*.egg-info
 %{python3_sitearch}/_mysql_connector.cpython*.so

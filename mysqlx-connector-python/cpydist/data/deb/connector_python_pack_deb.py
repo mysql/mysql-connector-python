@@ -54,8 +54,9 @@ from subprocess import PIPE, STDOUT, Popen
 ##############################################################################
 
 product_name = "mysqlx-connector-python"
+src_product_name = "mysql-connector-python"
 
-debian_support_dir = "cpydist/data/deb"
+debian_support_dir = f"{product_name}/cpydist/data/deb"
 
 no_debug_filter = (
     r"^(byte-compiling|copying|creating /|dpkg-source: warning: ignoring deletion)"
@@ -189,7 +190,7 @@ if not os.path.isdir(debian_support_dir):
 
 # NOTE there is a similar "utils.py" in "cpydist" and "lib/mysql/connector"
 
-sys.path.insert(0, os.path.join(cwd, "lib"))
+sys.path.insert(0, os.path.join(cwd, product_name, "lib"))
 
 from mysqlx.utils import linux_distribution  # pylint: disable=C0413
 from mysqlx.version import EDITION, VERSION, VERSION_EXTRA  # pylint: disable=C0413
@@ -225,7 +226,7 @@ print("LABEL", "-%s" % options.label if options.label else "")
 print("VERSION", version_text_short)
 print("VERSION_EXTRA", version_extra)
 basename_tar = "%(name)s%(label)s-%(version)s%(version_extra)s-src" % {
-    "name": product_name,
+    "name": src_product_name,
     "label": "-%s" % options.label if options.label else "",
     "version": version_text_short,
     "version_extra": version_extra,

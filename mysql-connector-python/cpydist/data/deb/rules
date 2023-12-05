@@ -72,12 +72,14 @@ else
 endif
 
 %:
+	touch setup.py; \
 	dh $@ --with python3 --buildsystem=pybuild
 
 override_dh_auto_install:
 
 	set -xe; \
 	DESTDIR=$(CURDIR)/debian/mysql-connector-python$(LIC_EXT)-py3; \
+	cd mysql-connector-python; \
 	for pyver in $(PYTHON3_SUPPORTED); \
 	do \
 		python$$pyver setup.py \
@@ -86,6 +88,7 @@ override_dh_auto_install:
 			--extra-compile-args="$(EXTRA_COMPILE_ARGS)" \
 			--extra-link-args="$(EXTRA_LINK_ARGS)" $(OPENSSL_OPT) \
 			--root $$DESTDIR $(BYTE_CODE_ONLY_OPT) $(SKIP_VENDOR_OPT); \
+		rm ../setup.py; \
 		find $$DESTDIR -name 'mysql_connector_*.egg-info' -prune -exec rm -rf {} \;; \
 	done
 
@@ -104,8 +107,8 @@ override_dh_installdocs:
 	dh_installdocs --all README.txt
 	dh_installdocs --all README.rst
 	dh_installdocs --all CONTRIBUTING.rst
-	dh_installdocs --all docs/INFO_SRC
-	dh_installdocs --all docs/INFO_BIN
+	dh_installdocs --all mysql-connector-python/docs/INFO_SRC
+	dh_installdocs --all mysql-connector-python/docs/INFO_BIN
 
 # Post install scripts uses "sysconfig", seems for some Deb platforms
 # the Python 3 default install this is provided by "python3-distutils".

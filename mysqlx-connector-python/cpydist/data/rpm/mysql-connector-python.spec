@@ -89,7 +89,7 @@ Version:       %{version}
 Release:       1%{?version_extra:.%{version_extra}}%{?byte_code_only:.1}%{?dist}
 License:       Copyright (c) 2015, 2021, Oracle and/or its affiliates. Under %{?license_type} license as shown in the Description field.
 URL:           https://dev.mysql.com/downloads/connector/python/
-Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysqlx-connector-python%{?product_suffix}-%{version}-src.tar.gz
+Source0:       https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python%{?product_suffix}-%{version}-src.tar.gz
 
 %if 0%{?fedora}
 BuildRequires: python3-devel
@@ -191,7 +191,7 @@ and information about the MySQL software. Also please see the
 documentation and the manual for more information.
 
 %prep
-%setup -q -n mysqlx-connector-python%{?product_suffix}-%{version}-src
+%setup -q -n mysql-connector-python%{?product_suffix}-%{version}-src
 
 %install
 %{?scl:scl enable %{scl} - << \EOF}
@@ -219,6 +219,7 @@ EXTRA_LINK_ARGS=""
 
 rm -rf %{buildroot}
 
+cd mysqlx-connector-python
 %{__python3} setup.py ${COMMON_INSTALL_ARGS} \
     --extra-compile-args="${EXTRA_COMPILE_ARGS}" \
     --extra-link-args="${EXTRA_LINK_ARGS}"
@@ -227,7 +228,7 @@ rm -rf %{buildroot}
 sed -i -e '/protobuf/d' %{buildroot}%{python3_sitearch}/mysqlx_connector_python-*.egg-info/requires.txt
 
 %files -n mysqlx-connector-python3%{?product_suffix}
-%doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst docs/INFO_SRC docs/INFO_BIN
+%doc LICENSE.txt CHANGES.txt README.txt README.rst CONTRIBUTING.rst mysqlx-connector-python/docs/INFO_SRC mysqlx-connector-python/docs/INFO_BIN
 %{python3_sitearch}/mysqlx
 %{python3_sitearch}/mysqlx_connector_python-*.egg-info
 %{python3_sitearch}/_mysqlxpb.cpython*.so
