@@ -37,8 +37,8 @@
 
 %if 0%{?suse_version} == 1500
 %global dist            .sl15
-%global __python3 /usr/bin/python3.9
-%global python3_sitearch %{_libdir}/python3.9/site-packages
+%global __python3 /usr/bin/python3.11
+%global python3_sitearch %{_libdir}/python3.11/site-packages
 %endif
 
 # SCL is used on el7 https://www.softwarecollections.org/en/docs/guide/
@@ -102,8 +102,8 @@ BuildRequires: python3-setuptools
 %endif
 
 %if 0%{?suse_version} == 1500
-BuildRequires: python39-devel
-BuildRequires: python39-setuptools
+BuildRequires: python311-devel
+BuildRequires: python311-setuptools
 %endif
 
 %if 0%{?rhel} == 7
@@ -157,7 +157,7 @@ Requires:      python3
 %endif
 
 %if 0%{?suse_version} == 1500
-Requires:      python39
+Requires:      python311
 %endif
 
 %if 0%{?rhel} == 7
@@ -243,6 +243,9 @@ cd mysql-connector-python
 %{python3_sitearch}/_mysql_connector.cpython*.so
 
 %changelog
+* Wed Dec 6 2023  Oscar Pacheco <oscar.p.pacheco@oracle.com> - 8.3.0-1
+- Updated Python version for openSUSE 15 from 3.9 to 3.11
+
 * Fri Dec 1 2023  Oscar Pacheco <oscar.p.pacheco@oracle.com> - 8.3.0-1
 - Updated for 8.3.0
 
