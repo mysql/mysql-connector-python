@@ -113,7 +113,9 @@ def adapt_datetime_with_timezone_support(value: datetime) -> StrOrBytes:
             )
             default_timezone = timezone.get_default_timezone()
             value = timezone.make_aware(value, default_timezone)
-        value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        value = value.astimezone(timezone.utc).replace(  # pylint: disable=no-member
+            tzinfo=None
+        )
     if HAVE_CEXT:
         mysql_datetime: bytes = datetime_to_mysql(value)
         return mysql_datetime
@@ -531,7 +533,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):  # pylint: disable=abstract-method
             return False
         return True
 
-    @cached_property  # type: ignore[arg-type]
+    @cached_property  # type: ignore[misc]
     @staticmethod
     def display_name() -> str:
         """Display name."""

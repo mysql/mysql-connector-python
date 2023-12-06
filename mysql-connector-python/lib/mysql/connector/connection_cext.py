@@ -607,7 +607,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
             raise InterfaceError(str(err)) from err
 
     @with_context_propagation
-    def cmd_stmt_execute(  # type: ignore[override]
+    def cmd_stmt_execute(
         self, statement_id: CMySQLPrepStmt, *args: Any
     ) -> Optional[Union[CextEofPacketType, CextResultType]]:
         """Executes the prepared statement"""
