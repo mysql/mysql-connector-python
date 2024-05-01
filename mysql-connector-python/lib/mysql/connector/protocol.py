@@ -306,7 +306,7 @@ class MySQLProtocol:
             username: Account's username.
             password: Account's password.
             database: Initial database name for the connection
-            charset: Client charset (see [2]), only the lower 8-bits.
+            charset: Client collation (see [2]).
             client_flags: Integer representing client capabilities flags.
             max_allowed_packet: Maximum packet size.
             auth_plugin: Authorization plugin name.
@@ -415,7 +415,7 @@ class MySQLProtocol:
         """Make a SSL authentication packet (see [1]).
 
         Args:
-            charset: Client charset (see [2]), only the lower 8-bits.
+            charset: Client collation (see [2]).
             client_flags: Integer representing client capabilities flags.
             max_allowed_packet: Maximum packet size.
 

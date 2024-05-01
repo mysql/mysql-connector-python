@@ -102,7 +102,7 @@ class MySQLAuthenticator:
             host: Server host name.
             ssl_options: SSL and TLS connection options (see
                          `network.MySQLSocket.build_ssl_context`).
-            charset: Client charset (see [1]), only the lower 8-bits.
+            charset: Client collation (see [1]).
             client_flags: Integer representing client capabilities flags.
             max_allowed_packet: Maximum packet size.
 
@@ -316,7 +316,7 @@ class MySQLAuthenticator:
             password2: Account's password factor 2.
             password3: Account's password factor 3.
             database: Initial database name for the connection.
-            charset: Client charset (see [1]), only the lower 8-bits.
+            charset: Client collation (see [1]).
             client_flags: Integer representing client capabilities flags.
             max_allowed_packet: Maximum packet size.
             auth_plugin: Authorization plugin name.
