@@ -1501,7 +1501,7 @@ class MySQLConnectionAbstract(ABC):
         use `shutdown()`.
         """
 
-    close: Callable[["MySQLConnectionAbstract"], Any] = disconnect
+    close: Callable[["MySQLConnectionAbstract"], None] = disconnect
 
     def connect(self, **kwargs: Any) -> None:
         """Connects to the MySQL server.
