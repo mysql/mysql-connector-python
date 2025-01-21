@@ -26,6 +26,7 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+from mysql.connector.errors import ConnectionTimeoutError
 import tests
 
 import mysql.connector
@@ -44,6 +45,7 @@ class WL6351Tests(tests.MySQLConnectorTests):
         for cls in self.all_cnx_classes:
             self.assertRaises(
                 (
+                    mysql.connector.errors.ConnectionTimeoutError,
                     mysql.connector.errors.InterfaceError,
                     mysql.connector.errors.DatabaseError,
                 ),

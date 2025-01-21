@@ -61,6 +61,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 
 from ..abstracts import (
@@ -97,6 +98,7 @@ from ..types import (
     DescriptionType,
     EofPacketType,
     HandShakeType,
+    MySQLScriptPartition,
     OkPacketType,
     ParamsSequenceType,
     ResultType,
@@ -193,6 +195,8 @@ class MySQLConnectionAbstract(ABC):
         converter_class: Optional[MySQLConverter] = None,
         converter_str_fallback: bool = False,
         connection_timeout: int = DEFAULT_CONFIGURATION["connect_timeout"],
+        read_timeout: Optional[int] = DEFAULT_CONFIGURATION["read_timeout"],
+        write_timeout: Optional[int] = DEFAULT_CONFIGURATION["write_timeout"],
         unix_socket: Optional[str] = None,
         use_unicode: Optional[bool] = True,
         ssl_ca: Optional[str] = None,
@@ -223,6 +227,8 @@ class MySQLConnectionAbstract(ABC):
         self._password3: str = password3
         self._unix_socket: str = unix_socket
         self._connection_timeout: int = connection_timeout
+        self._read_timeout: Optional[int] = read_timeout
+        self._write_timeout: Optional[int] = write_timeout
         self._connection_attrs: Dict[str, str] = conn_attrs
         self._compress: bool = compress
         self._consume_results: bool = consume_results
@@ -452,6 +458,12 @@ class MySQLConnectionAbstract(ABC):
                     f"The path '{self._openid_token_file}' provided via 'openid_token_file' "
                     "does not exist"
                 )
+        if self._read_timeout is not None:
+            if not isinstance(self._read_timeout, int) or self._read_timeout < 0:
+                raise InterfaceError("Option read_timeout must be a positive integer")
+        if self._write_timeout is not None:
+            if not isinstance(self._write_timeout, int) or self._write_timeout < 0:
+                raise InterfaceError("Option write_timeout must be a positive integer")
 
     def _validate_tls_ciphersuites(self) -> None:
         """Validates the tls_ciphersuites option."""
@@ -702,6 +714,96 @@ class MySQLConnectionAbstract(ABC):
             "The use of async properties are not supported by Python. "
             "Use `await set_database(name)` to set the database instead"
         )
+
+    @property
+    def read_timeout(self) -> Optional[int]:
+        """
+        Gets the connection context's timeout in seconds for each attempt
+        to read any data from the server.
+
+        `read_timeout` is number of seconds upto which the connector should wait
+        for the server to reply back before raising an ReadTimeoutError. We can set
+        this option to None, which would signal the connector to wait indefinitely
+        till the read operation is completed or stopped abruptly.
+        """
+        return self._read_timeout
+
+    @read_timeout.setter
+    def read_timeout(self, timeout: Optional[int]) -> None:
+        """
+        Sets or updates the connection context's timeout in seconds for each attempt
+        to read any data from the server.
+
+        `read_timeout` is number of seconds upto which the connector should wait
+        for the server to reply back before raising an ReadTimeoutError. We can set
+        this option to None, which would signal the connector to wait indefinitely
+        till the read operation is completed or stopped abruptly.
+
+        Args:
+            timeout: Accepts a non-negative integer which is the timeout to be set
+                     in seconds or None.
+        Raises:
+            InterfaceError: If a positive integer or None is not passed via the
+                            timeout parameter.
+        Examples:
+            The following will set the read_timeout of the current session to
+            5 seconds:
+            ```
+            >>> cnx = await mysql.connector.aio.connect(user='scott')
+            >>> cnx.read_timeout = 5
+            ```
+        """
+        if timeout is not None:
+            if not isinstance(timeout, int) or timeout < 0:
+                raise InterfaceError(
+                    "Option read_timeout must be a positive integer or None"
+                )
+        self._read_timeout = timeout
+
+    @property
+    def write_timeout(self) -> Optional[int]:
+        """
+        Gets the connection context's timeout in seconds for each attempt
+        to send data to the server.
+
+        `write_timeout` is number of seconds upto which the connector should spend to
+        write to the server before raising an WriteTimeoutError. We can set this option
+        to None, which would signal the connector to wait indefinitely till the write
+        operation is completed or stopped abruptly.
+        """
+        return self._write_timeout
+
+    @write_timeout.setter
+    def write_timeout(self, timeout: Optional[int]) -> None:
+        """
+        Sets or updates the connection context's timeout in seconds for each attempt
+        to send data to the server.
+
+        `write_timeout` is number of seconds upto which the connector should spend to
+        write to the server before raising an WriteTimeoutError. We can set this option
+        to None, which would signal the connector to wait indefinitely till the write
+        operation is completed or stopped abruptly.
+
+        Args:
+            timeout: Accepts a non-negative integer which is the timeout to be set in
+                     seconds or None.
+        Raises:
+            InterfaceError: If a positive integer or None is not passed via the
+                            timeout parameter.
+        Examples:
+            The following will set the write_timeout of the current
+            session to 5 seconds:
+            ```
+            >>> cnx = await mysql.connector.connect(user='scott')
+            >>> cnx.write_timeout = 5
+            ```
+        """
+        if timeout is not None:
+            if not isinstance(timeout, int) or timeout < 0:
+                raise InterfaceError(
+                    "Option write_timeout must be a positive integer or None"
+                )
+        self._write_timeout = timeout
 
     async def get_database(self) -> str:
         """Get the current database."""
@@ -1119,7 +1221,7 @@ class MySQLConnectionAbstract(ABC):
             return `None`.
         """
         if self._server_info is not None:
-            return self._server_info.version  # type: ignore[return-value]
+            return self._server_info.version_tuple
         return None
 
     def get_server_info(self) -> Optional[str]:
@@ -1261,7 +1363,7 @@ class MySQLConnectionAbstract(ABC):
     async def info_query(self, query: StrOrBytes) -> Optional[RowType]:
         """Send a query which only returns 1 row."""
         async with await self.cursor(buffered=True) as cursor:
-            await cursor.execute(query)
+            await cursor.execute(cast(str, query))
             return await cursor.fetchone()
 
     def add_cursor(self, cursor: MySQLCursorAbstract) -> None:
@@ -1347,6 +1449,8 @@ class MySQLConnectionAbstract(ABC):
         cursor_class: Optional[Type[MySQLCursorAbstract]] = None,
         dictionary: Optional[bool] = None,
         named_tuple: Optional[bool] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> MySQLCursorAbstract:
         """Instantiate and return a cursor.
 
@@ -1371,6 +1475,7 @@ class MySQLConnectionAbstract(ABC):
         binary: bool = False,
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
+        **kwargs: Any,
     ) -> Tuple[Optional[RowType], Optional[EofPacketType]]:
         """Get the next rows returned by the MySQL server.
 
@@ -1387,6 +1492,7 @@ class MySQLConnectionAbstract(ABC):
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
         prep_stmt: Any = None,
+        **kwargs: Any,
     ) -> Tuple[List[RowType], Optional[EofPacketType]]:
         """Get all rows returned by the MySQL server.
 
@@ -1426,6 +1532,7 @@ class MySQLConnectionAbstract(ABC):
         raw: bool = False,
         buffered: bool = False,
         raw_as_string: bool = False,
+        **kwargs: Any,
     ) -> ResultType:
         """Send a query to the MySQL server.
 
@@ -1440,7 +1547,9 @@ class MySQLConnectionAbstract(ABC):
         """
 
     async def cmd_query_iter(
-        self, statements: StrOrBytes
+        self,
+        statements: StrOrBytes,
+        **kwargs: Any,
     ) -> Generator[ResultType, None, None]:
         """Send one or more statements to the MySQL server.
 
@@ -1458,7 +1567,9 @@ class MySQLConnectionAbstract(ABC):
         """
 
     @abstractmethod
-    async def cmd_stmt_fetch(self, statement_id: int, rows: int = 1) -> None:
+    async def cmd_stmt_fetch(
+        self, statement_id: int, rows: int = 1, **kwargs: Any
+    ) -> None:
         """Fetch a MySQL statement Result Set.
 
         This method will send the FETCH command to MySQL together with the given
@@ -1467,7 +1578,9 @@ class MySQLConnectionAbstract(ABC):
 
     @abstractmethod
     async def cmd_stmt_prepare(
-        self, statement: bytes
+        self,
+        statement: bytes,
+        **kwargs: Any,
     ) -> Mapping[str, Union[int, List[DescriptionType]]]:
         """Prepare a MySQL statement.
 
@@ -1482,18 +1595,23 @@ class MySQLConnectionAbstract(ABC):
         data: Sequence[BinaryProtocolType] = (),
         parameters: Sequence = (),
         flags: int = 0,
+        **kwargs: Any,
     ) -> Optional[Union[Dict[str, Any], Tuple]]:
         """Execute a prepared MySQL statement."""
 
     @abstractmethod
-    async def cmd_stmt_reset(self, statement_id: int) -> None:
+    async def cmd_stmt_reset(
+        self,
+        statement_id: int,
+        **kwargs: Any,
+    ) -> None:
         """Reset data for prepared statement sent as long data.
 
         The result is a dictionary with OK packet information.
         """
 
     @abstractmethod
-    async def cmd_stmt_close(self, statement_id: int) -> None:
+    async def cmd_stmt_close(self, statement_id: int, **kwargs: Any) -> None:
         """Deallocate a prepared MySQL statement.
 
         This method deallocates the prepared statement using the statement_id.
@@ -1507,14 +1625,33 @@ class MySQLConnectionAbstract(ABC):
         This method sends the Refresh command to the MySQL server. The options
         argument should be a bitwise value using constants.RefreshOption.
 
-        Usage example:
+        Typical usage example:
+            ```
            RefreshOption = mysql.connector.RefreshOption
            refresh = RefreshOption.LOG | RefreshOption.INFO
-           cnx.cmd_refresh(refresh)
+           await cnx.cmd_refresh(refresh)
+           ```
+
+        Args:
+            options: Bitmask value constructed using constants from
+                     the `constants.RefreshOption` class.
+
+        Returns:
+            A dictionary representing the OK packet got as response when executing
+            the command.
+
+        Raises:
+            ValueError: If an invalid command `refresh options` is provided.
+            DeprecationWarning: If one of the options is deprecated for the server you
+                                are connecting to.
         """
 
     async def cmd_stmt_send_long_data(
-        self, statement_id: int, param_id: int, data: BinaryIO
+        self,
+        statement_id: int,
+        param_id: int,
+        data: BinaryIO,
+        **kwargs: Any,
     ) -> int:
         """Send data for a column.
 
@@ -1631,15 +1768,20 @@ class MySQLConnectionAbstract(ABC):
 class MySQLCursorAbstract(ABC):
     """Defines the MySQL cursor interface."""
 
-    def __init__(self, connection: MySQLConnectionAbstract):
+    def __init__(
+        self,
+        connection: MySQLConnectionAbstract,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ):
         self._connection: MySQLConnectionAbstract = connection
         self._loop: asyncio.AbstractEventLoop = connection.loop
         self._description: Optional[List[DescriptionType]] = None
         self._last_insert_id: Optional[int] = None
         self._warnings: Optional[List[WarningType]] = None
         self._warning_count: int = 0
-        self._executed: Optional[StrOrBytes] = None
-        self._executed_list: List[StrOrBytes] = []
+        self._executed: Optional[bytes] = None
+        self._executed_list: List[bytes] = []
         self._stored_results: List[Any] = []
         self._binary: bool = False
         self._raw: bool = False
@@ -1649,6 +1791,16 @@ class MySQLCursorAbstract(ABC):
             None,
         )
         self.arraysize: int = 1
+
+        # multi statement execution
+        self._stmt_partitions: Optional[Generator[MySQLScriptPartition, None, None]] = (
+            None
+        )
+        self._stmt_partition: Optional[MySQLScriptPartition] = None
+        self._stmt_map_results: bool = False
+
+        self._read_timeout: Optional[int] = read_timeout
+        self._write_timeout: Optional[int] = write_timeout
         self._connection.add_cursor(self)
 
     async def __aenter__(self) -> MySQLCursorAbstract:
@@ -1682,6 +1834,98 @@ class MySQLCursorAbstract(ABC):
         if not row:
             raise StopAsyncIteration
         return row
+
+    @property
+    def read_timeout(self) -> Optional[int]:
+        """
+        Gets the cursor context's timeout in seconds for each attempt
+        to read any data from the server.
+
+        `read_timeout` is number of seconds upto which the connector should wait
+        for the server to reply back before raising an ReadTimeoutError. We can set
+        this option to None, which would signal the connector to wait indefinitely
+        till the read operation is completed or stopped abruptly.
+        """
+        return self._read_timeout
+
+    @read_timeout.setter
+    def read_timeout(self, timeout: Optional[int]) -> None:
+        """
+        Sets or updates the cursor context's timeout in seconds for each attempt
+        to read any data from the server.
+
+        `read_timeout` is number of seconds upto which the connector should wait
+        for the server to reply back before raising an ReadTimeoutError. We can set
+        this option to None, which would signal the connector to wait indefinitely
+        till the read operation is completed or stopped abruptly.
+
+        Args:
+            timeout: Accepts a non-negative integer which is the timeout to be set
+                     in seconds or None.
+        Raises:
+            InterfaceError: If a positive integer or None is not passed via the
+                            timeout parameter.
+        Examples:
+            The following will set the read_timeout of the current session's cursor
+            context to 5 seconds:
+            ```
+            >>> cnx = await mysql.connector.connect(user='scott')
+            >>> cur = await cnx.cursor()
+            >>> cur.read_timeout = 5
+            ```
+        """
+        if timeout is not None:
+            if not isinstance(timeout, int) or timeout < 0:
+                raise InterfaceError(
+                    "Option read_timeout must be a positive integer or None"
+                )
+        self._read_timeout = timeout
+
+    @property
+    def write_timeout(self) -> Optional[int]:
+        """
+        Gets the cursor context's timeout in seconds for each attempt
+        to send data to the server.
+
+        `write_timeout` is number of seconds upto which the connector should spend to
+        write to the server before raising an WriteTimeoutError. We can set this option
+        to None, which would signal the connector to wait indefinitely till the write
+        operation is completed or stopped abruptly.
+        """
+        return self._write_timeout
+
+    @write_timeout.setter
+    def write_timeout(self, timeout: Optional[int]) -> None:
+        """
+        Sets or updates the cursor context's timeout in seconds for each attempt
+        to send data to the server.
+
+        `write_timeout` is number of seconds upto which the connector should spend to
+        write to the server before raising an WriteTimeoutError. We can set this option
+        to None, which would signal the connector to wait indefinitely till the write
+        operation is completed or stopped abruptly.
+
+        Args:
+            timeout: Accepts a non-negative integer which is the timeout to be set in
+                     seconds or None.
+        Raises:
+            InterfaceError: If a positive integer or None is not passed via the
+                            timeout parameter.
+        Examples:
+            The following will set the write_timeout of the current session's cursor
+            context to 5 seconds:
+            ```
+            >>> cnx = await mysql.connector.connect(user='scott')
+            >>> cur = await cnx.cursor()
+            >>> cur.write_timeout = 5
+            ```
+        """
+        if timeout is not None:
+            if not isinstance(timeout, int) or timeout < 0:
+                raise InterfaceError(
+                    "Option write_timeout must be a positive integer or None"
+                )
+        self._write_timeout = timeout
 
     @property
     def description(self) -> Optional[List[DescriptionType]]:
@@ -1755,18 +1999,20 @@ class MySQLCursorAbstract(ABC):
 
     @property
     def statement(self) -> Optional[str]:
-        """Returns the executed statement
+        """Returns the latest executed statement.
 
-        This property returns the executed statement.
-        When multiple statements were executed, the current statement in the iterator
-        will be returned.
+        When a multiple statement is executed, the value of `statement`
+        corresponds to the one that caused the current result set, provided
+        the statement-result mapping was enabled. Otherwise, the value of
+        `statement` matches the statement just as provided when calling
+        `execute()` and it does not change as result sets are traversed.
         """
         if self._executed is None:
             return None
         try:
-            return self._executed.strip().decode()  # type: ignore[union-attr]
+            return self._executed.strip().decode("utf-8")
         except (AttributeError, UnicodeDecodeError):
-            return self._executed.strip()  # type: ignore[return-value]
+            return cast(str, self._executed.strip())
 
     @property
     def with_rows(self) -> bool:
@@ -1788,37 +2034,171 @@ class MySQLCursorAbstract(ABC):
     @abstractmethod
     async def execute(
         self,
-        operation: StrOrBytes,
+        operation: str,
         params: Union[Sequence[Any], Dict[str, Any]] = (),
-        multi: bool = False,
+        map_results: bool = False,
     ) -> None:
-        """Executes the given operation.
-
-        Executes the given operation substituting any markers with the given
-        parameters.
+        """Executes the given operation (a MySQL script) substituting any markers
+        with the given parameters.
 
         For example, getting all rows where id is 5:
-          await cursor.execute("SELECT * FROM t1 WHERE id = %s", (5,))
+        ```
+        cursor.execute("SELECT * FROM t1 WHERE id = %s", (5,))
+        ```
 
-        If the `multi`` parameter is used a `ProgrammingError` is raised. The method for
-        executing multiple statements is `executemulti()`.
+        If you want each single statement in the script to be related
+        to its corresponding result set, you should enable the `map_results`
+        switch - see workflow example below.
 
-        If warnings where generated, and connection.get_warnings is True, then
-        self._warnings will be a list containing these warnings.
+        If the given script uses `DELIMITER` statements (which are not recognized
+        by MySQL Server), the connector will parse such statements to remove them
+        from the script and substitute delimiters as needed. This pre-processing
+        may cause a performance hit when using long scripts. Note that when enabling
+        `map_results`, the script is expected to use `DELIMITER` statements in order
+        to split the script into multiple query strings.
 
-        Raises:
-            ProgramingError: If multi parameter is used.
+        The following characters are currently not supported by the connector in
+        `DELIMITER` statements: `"`, `'`, #`, `/*` and `*/`.
+
+        If warnings were generated, and `connection.get_warnings` is
+        `True`, then `self.warnings` will be a list containing these
+        warnings.
+
+        Args:
+            operation: Operation to be executed - it can be a single or a
+                       multi statement.
+            params: The parameters found in the tuple or dictionary params are bound
+                    to the variables in the operation. Specify variables using `%s` or
+                    `%(name)s` parameter style (that is, using format or pyformat style).
+            map_results: It is `False` by default. If `True`, it allows you to know what
+                        statement caused what result set - see workflow example below.
+                        Only relevant when working with multi statements.
+
+        Returns:
+            `None`.
+
+        Example (basic usage):
+            The following example runs many single statements in a
+            single go and loads the corresponding result sets
+            sequentially:
+
+            ```
+            sql_operation = '''
+            SET @a=1, @b='2024-02-01';
+            SELECT @a, LENGTH('hello'), @b;
+            SELECT @@version;
+            '''
+            async with await cnx.cursor() as cur:
+                await cur.execute(sql_operation)
+
+                result_set = await cur.fetchall()
+                # do something with result set
+                ...
+
+                while (await cur.nextset()):
+                    result_set = await cur.fetchall()
+                    # do something with result set
+                    ...
+            ```
+
+            In case the operation is a single statement, you may skip the
+            looping section as no more result sets are to be expected.
+
+        Example (statement-result mapping):
+            The following example runs many single statements in a
+            single go and loads the corresponding result sets
+            sequentially. Additionally, each result set gets related
+            to the statement that caused it:
+
+            ```
+            sql_operation = '''
+            SET @a=1, @b='2024-02-01';
+            SELECT @a, LENGTH('hello'), @b;
+            SELECT @@version;
+            '''
+            async with await cnx.cursor() as cur:
+                await cur.execute(sql_operation, map_results=True)
+
+                # statement 1 is `SET @a=1, @b='2024-02-01'`,
+                # result set from statement 1 is `[]` - aka, an empty set.
+                result_set, statement = await cur.fetchall(), cur.statement
+                # do something with result set
+                ...
+
+                # 1st call to `nextset()` will laod the result set from statement 2,
+                # statement 2 is `SELECT @a, LENGTH('hello'), @b`,
+                # result set from statement 2 is `[(1, 5, '2024-02-01')]`.
+                #
+                # 2nd call to `nextset()` will laod the result set from statement 3,
+                # statement 3 is `SELECT @@version`,
+                # result set from statement 3 is `[('9.0.0-labs-mrs-8',)]`.
+                #
+                # 3rd call to `nextset()` will return `None` as there are no more sets,
+                # leading to the end of the consumption process of result sets.
+                while (await cur.nextset()):
+                    result_set, statement = await cur.fetchall(), cur.statement
+                    # do something with result set
+                    ...
+            ```
+
+            In case the mapping is disabled (`map_results=False`), all result
+            sets get related to the same statement, which is the one provided
+            when calling `execute()`. In other words, the property `statement`
+            will not change as result sets are consumed, which contrasts with
+            the case in which the mapping is enabled. Note that we offer a
+            new fetch-related API command which can be leveraged as a shortcut
+            for consuming result sets - it is equivalent to the previous
+            workflow.
+
+            ```
+            sql_operation = '''
+            SET @a=1, @b='2024-02-01';
+            SELECT @a, LENGTH('hello'), @b;
+            SELECT @@version;
+            '''
+            async with await cnx.cursor() as cur:
+                await cur.execute(sql_operation, map_results=True)
+                async for statement, result_set in cur.fetchsets():
+                    # do something with result set
+            ```
         """
 
+    @abstractmethod
     async def executemulti(
         self,
-        operation: StrOrBytes,
+        operation: str,
         params: Union[Sequence[Any], Dict[str, Any]] = (),
-    ) -> AsyncGenerator[MySQLCursorAbstract, None]:
-        """Execute multiple statements.
+        map_results: bool = False,
+    ) -> None:
+        """Executes the given operation (it can be a multi statement
+        or a MySQL script) substituting any markers with the given parameters.
 
-        Executes the given operation substituting any markers with the given
-        parameters.
+        **NOTE: `executemulti()` is deprecated and will be removed in a
+        future release. Use `execute()` instead.**
+
+        If you want each single statement in the script to be related
+        to its corresponding result set, you should enable the `map_results`
+        switch - see workflow example below. This capability reduces performance.
+
+        **Unexpected behavior might happen if your script includes the following
+        symbols as delimiters `"`, `'`, `#`, `/*` and `*/`. The use of these should
+        be avoided for now**.
+
+        Refer to the documentation of `execute()` to see the multi statement execution
+        workflow.
+
+        Args:
+            operation: Operation to be executed - it can be a single or a
+                       multi statement.
+            params: The parameters found in the tuple or dictionary params are bound
+                    to the variables in the operation. Specify variables using `%s` or
+                    `%(name)s` parameter style (that is, using format or pyformat style).
+            map_results: It is `False` by default. If `True`, it allows you to know what
+                        statement caused what result set - see workflow example below.
+                        Only relevant when working with multi statements.
+
+        Returns:
+            `None`.
         """
 
     @abstractmethod
@@ -1869,6 +2249,119 @@ class MySQLCursorAbstract(ABC):
 
         Returns:
             list: The next set of rows of a query result set.
+        """
+
+    async def fetchsets(
+        self,
+    ) -> AsyncGenerator[tuple[Optional[str], list[RowType]], None]:
+        """Generates the result sets stream caused by the last `execute*()`.
+
+        Returns:
+            A 2-tuple; the first element is the statement that caused the
+            result set, and the second is the result set itself.
+
+        Example:
+            Consider the following example where multiple statements are executed in one
+            go:
+
+            ```
+                sql_operation = '''
+                SET @a=1, @b='2024-02-01';
+                SELECT @a, LENGTH('hello'), @b;
+                SELECT @@version;
+                '''
+                async with await cnx.cursor() as cur:
+                    await cur.execute(sql_operation, map_results=True)
+
+                    result_set, statement = await cur.fetchall(), cur.statement
+                    # do something with result set
+                    ...
+
+                    while (await cur.nextset()):
+                        result_set, statement = await cur.fetchall(), cur.statement
+                        # do something with result set
+                        ...
+            ```
+
+            In this case, as an alternative to loading the result sets with `nextset()`
+            in combination with a `while` loop, you can use `fetchsets()` which is
+            equivalent to the previous approach:
+
+            ```
+                sql_operation = '''
+                SET @a=1, @b='2024-02-01';
+                SELECT @a, LENGTH('hello'), @b;
+                SELECT @@version;
+                '''
+                async with await cnx.cursor() as cur:
+                    await cur.execute(sql_operation, map_results=True)
+                    async for statement, result_set in cur.fetchsets():
+                        # do something with result set
+            ```
+        """
+        # Some cursor flavor such as `buffered` raise an exception when they don't have
+        # result sets to fetch from.
+        # Some others, such as `dictionary` or `raw`, return an empty result set
+        # under the same circumstances.
+        statement_cached = None
+        if not self._stmt_map_results:
+            statement_cached = self.statement
+
+        try:
+            result_set = await self.fetchall()
+        except InterfaceError:
+            result_set = []
+        yield (
+            self.statement if self._stmt_map_results else statement_cached
+        ), result_set
+        while await self.nextset():
+            try:
+                result_set = await self.fetchall()
+            except InterfaceError:
+                result_set = []
+            yield (
+                self.statement if self._stmt_map_results else statement_cached
+            ), result_set
+
+    @abstractmethod
+    async def nextset(self) -> Optional[bool]:
+        """Makes the cursor skip to the next available set, discarding
+        any remaining rows from the current set.
+
+        This method should be used as part of the multi statement
+        execution workflow - see example below.
+
+        Returns:
+            It returns `None` if there are no more sets. Otherwise, it returns
+            `True` and subsequent calls to the `fetch*()` methods will return
+            rows from the next result set.
+
+        Example:
+            The following example runs many single statements in a
+            single go and loads the corresponding result sets
+            sequentially:
+
+            ```
+            sql_operation = '''
+            SET @a=1, @b='2024-02-01';
+            SELECT @a, LENGTH('hello'), @b;
+            SELECT @@version;
+            '''
+            async with await cnx.cursor() as cur:
+                await cur.execute(sql_operation)
+
+                result_set = await cur.fetchall()
+                # do something with result set
+                ...
+
+                while (await cur.nextset()):
+                    result_set = await cur.fetchall()
+                    # do something with result set
+                    ...
+            ```
+
+            In case the operation is a single statement, you may skip the
+            looping section as no more result sets are to be expected.
         """
 
     @abstractmethod

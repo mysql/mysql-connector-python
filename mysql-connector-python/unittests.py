@@ -97,6 +97,20 @@ _TOPDIR = os.path.dirname(os.path.realpath(__file__))
 LOGGER = logging.getLogger(tests.LOGGER_NAME)
 tests.setup_logger(LOGGER)
 
+
+class SuppressAsyncioTaskPendingLogs(logging.Filter):
+    """Log filter to suppress asyncio.wait_for() `Executing task ...` messages"""
+
+    def filter(self, record: logging.LogRecord):
+        return (
+            "Executing <Task pending" not in record.getMessage()
+            and "Executing <Task finished" not in record.getMessage()
+            and "Executing <Handle _SelectorSocketTransport" not in record.getMessage()
+        )
+
+
+logging.getLogger("asyncio").addFilter(SuppressAsyncioTaskPendingLogs())
+
 # Only run for supported Python Versions
 if not (((2, 6) <= sys.version_info < (3, 0)) or sys.version_info >= (3, 3)):
     LOGGER.error(
@@ -118,9 +132,7 @@ MY_CNF = """
 plugin-load={mysqlx_plugin}
 loose_mysqlx_port={mysqlx_port}
 {mysqlx_bind_address}
-max_allowed_packet = 26777216
-net_read_timeout = 120
-net_write_timeout = 120
+max_allowed_packet = 636870912
 connect_timeout = 60
 basedir = {basedir}
 datadir = {datadir}

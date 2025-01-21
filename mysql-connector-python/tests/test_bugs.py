@@ -41,6 +41,8 @@ in tests/py2/bugs.py or tests/py3/bugs.py. It might be that these files need
 to be created first.
 """
 
+import asyncio
+import collections
 import gc
 import os
 import pickle
@@ -57,6 +59,8 @@ from threading import Thread
 from time import sleep
 
 import tests
+
+import mysql.connector.aio
 
 if tests.SSL_AVAILABLE:
     import ssl
@@ -513,13 +517,21 @@ class Bug571201(tests.MySQLConnectorTests):
             f"INSERT INTO {self.tbl} (c1) VALUES (10),(20)",
             f"SELECT * FROM {self.tbl}",
         ]
-        result_iter = cur.execute(";".join(stmts), multi=True)
+        exp_result_sets = collections.deque(
+            [
+                # result set, row count
+                ([], 0),
+                ([], 2),
+                ([(1, 10), (2, 20)], 2),
+            ]
+        )
 
-        self.assertEqual(None, next(result_iter).fetchone())
-        self.assertEqual(2, next(result_iter).rowcount)
-        exp = [(1, 10), (2, 20)]
-        self.assertEqual(exp, next(result_iter).fetchall())
-        self.assertRaises(StopIteration, next, result_iter)
+        cur.execute(";".join(stmts))
+        for statement, result_set in cur.fetchsets():
+            exp_res, _ = exp_result_sets.popleft()
+            self.assertEqual(exp_res, result_set)
+            self.assertEqual(";".join(stmts), statement)
+        self.assertEqual(0, len(exp_result_sets))
 
         self.cnx.close()
 
@@ -937,7 +949,7 @@ class BugOra14184643(tests.MySQLConnectorTests):
 
 
 class BugOra14208326(tests.MySQLConnectorTests):
-    """BUG#14208326: cmd_query() does not handle multiple statements"""
+    """BUG#14208326: cmd_query() does not handle multiple statements."""
 
     def setUp(self):
         self.table = "BugOra14208326"
@@ -952,12 +964,44 @@ class BugOra14208326(tests.MySQLConnectorTests):
 
         self.cnx.cmd_query(f"DROP TABLE IF EXISTS {self.table}")
 
-    @foreach_cnx(connection.MySQLConnection)
-    def test_cmd_query(self):
-        self._setup()
-        self.assertRaises(
-            errors.InterfaceError, self.cnx.cmd_query, "SELECT 1; SELECT 2"
-        )
+    @foreach_cnx()
+    def test_get_rows_does_not_hang_when_cmd_query_runs_with_multi_stmts(self):
+        """
+        - Verify `cmd_query()` does not raise an error when passing a multi statement.
+        - Verify `get_rows()` does not hang if called after executing a multi statement.
+        """
+        scripts = [
+            (
+                "set @x = 'hola'; SELECT 12; SELECT 13;",
+                3,
+                errors.InternalError,
+            ),
+            (
+                "SELECT 1; SELECT 2",
+                2,
+                errors.InternalError,
+            ),
+            (
+                "SELECT 1; SELECT 2; set @x = 'hola'; select 'bar'",
+                4,
+                errors.InternalError,
+            ),
+        ]
+
+        config = {
+            **self.get_clean_mysql_config(),
+            **{"use_pure": isinstance(self.cnx, connection.MySQLConnection)},
+        }
+        for script, num_single_stmts, exp_err in scripts:
+            with mysql.connector.connect(**config) as cnx:
+                try:
+                    cnx.cmd_query(script)
+                except errors.InterfaceError as e:
+                    self.fail("An unexpected exception was raised: {}".format(e))
+
+                with self.assertRaises(exp_err):
+                    for _ in range(num_single_stmts):
+                        _ = cnx.get_rows()
 
     @unittest.skipIf(not CMySQLConnection, ERR_NO_CEXT)
     @foreach_cnx(CMySQLConnection)
@@ -974,6 +1018,53 @@ class BugOra14208326(tests.MySQLConnectorTests):
             # Some cnx are not implementing this
             if not isinstance(self.cnx, CMySQLConnection):
                 raise
+
+
+class BugOra14208326_async(tests.MySQLConnectorAioTestCase):
+    """BUG#14208326: cmd_query() does not handle multiple statements."""
+
+    @foreach_cnx_aio()
+    async def test_get_rows_does_not_hang_when_cmd_query_runs_with_multi_stmts(self):
+        """
+        - Verify `cmd_query()` does not raise an error when passing a multi statement.
+        - Verify `get_rows()` does not hang if called after executing a multi statement.
+        """
+        scripts = [
+            (
+                "set @x = 'hola'; SELECT 12; SELECT 13;",
+                3,
+                errors.InternalError,
+            ),
+            (
+                "SELECT 1; SELECT 2",
+                2,
+                errors.InternalError,
+            ),
+            (
+                "SELECT 1; SELECT 2; set @x = 'hola'; select 'bar'",
+                4,
+                errors.InternalError,
+            ),
+        ]
+
+        config = {
+            **self.get_clean_mysql_config(),
+            **{
+                "use_pure": isinstance(
+                    self.cnx, mysql.connector.aio.connection.MySQLConnection
+                )
+            },
+        }
+        for script, num_single_stmts, exp_err in scripts:
+            async with await mysql.connector.aio.connect(**config) as cnx:
+                try:
+                    await cnx.cmd_query(script)
+                except errors.InterfaceError as e:
+                    self.fail("An unexpected exception was raised: {}".format(e))
+
+                with self.assertRaises(exp_err):
+                    for _ in range(num_single_stmts):
+                        _ = await cnx.get_rows()
 
 
 class BugOra14201459(tests.MySQLConnectorTests):
@@ -3436,9 +3527,7 @@ class BugOra19168737(tests.MySQLConnectorTests):
             )
         }
         exp.update(config)
-
         self.assertEqual(exp, new_config)
-
 
 class BugOra21530100(tests.MySQLConnectorTests):
     """BUG#21530100: CONNECT FAILS WHEN USING MULTIPLE OPTION_GROUPS WITH
@@ -7793,7 +7882,7 @@ class BugOra35710145(tests.MySQLConnectorTests):
         "SELECT 6;\n# A;#B;",
         "#hello;\n-- hello;\nSELECT 7; -- world",
         "#hello;\n-- hello;\nSELECT 8; -- world; \n SELECT 9;",
-        "-- comment;#comment;  \n-- comment",
+        "-- comment;#comment;  \nseLect 'foo'; -- comment",
         f"""# comment; \nINSERT INTO {table_name} (city, country_id) VALUES ('Monterrey', '32');-- insert; \nSELECT 'ham';""",
         f"""
             -- this is a test; \n
@@ -7807,6 +7896,20 @@ class BugOra35710145(tests.MySQLConnectorTests):
         "SELECT 12;\n-- ;",
         "SELECT 13;-- ;",
         f"# dropping table;\n -- lets drop table; \n DROP TABLE IF EXISTS {table_name}; # delete table",
+        "SELECT 'Mr. Ham /* kkk */'",
+        """
+        -- Test1
+        SELECT "Test1";
+
+        /*
+        BUG#36126909 "Unread result found" exception/bad MySQLCursor.statement when query text contains code comments
+        */
+
+        /**/
+
+        -- Test2
+        SELECT "Test2"; # BUG#36126909 "Unread result found" exception/bad MySQLCursor.statement when query text contains code comments
+        """,  # BUG#36126909 "Unread result found" exception/bad MySQLCursor.statement when query text contains code comments
     ]
 
     exps = [
@@ -7820,7 +7923,7 @@ class BugOra35710145(tests.MySQLConnectorTests):
         [("SELECT 1", [(1,)])],
         [("SELECT 2", [(2,)])],
         [
-            ("SELECT 2 /* this is an in-line comment */ + 1", [(3,)]),
+            ("SELECT 2 + 1", [(3,)]),
             ("SELECT 4", [(4,)]),
         ],
         [
@@ -7833,7 +7936,7 @@ class BugOra35710145(tests.MySQLConnectorTests):
         [("SELECT 6", [(6,)])],
         [("SELECT 7", [(7,)])],
         [("SELECT 8", [(8,)]), ("SELECT 9", [(9,)])],
-        [],
+        [("seLect 'foo'", [("foo",)])],
         [
             (
                 f"INSERT INTO {table_name} (city, country_id) VALUES ('Monterrey', '32')",
@@ -7856,17 +7959,23 @@ class BugOra35710145(tests.MySQLConnectorTests):
         [("SELECT 12", [(12,)])],
         [("SELECT 13", [(13,)])],
         [(f"DROP TABLE IF EXISTS {table_name}", [])],
+        [("SELECT 'Mr. Ham /* kkk */'", [("Mr. Ham /* kkk */",)])],
+        [
+            ('SELECT "Test1"', [("Test1",)]),
+            ('SELECT "Test2"', [("Test2",)]),
+        ],
     ]
 
     @foreach_cnx()
     def test_comments_with_execute_multi(self):
         with self.cnx.cursor() as cur:
             for op, exp in zip(self.ops, self.exps):
-                for result, (stmt_exp, fetch_exp) in zip(
-                    cur.execute(op, multi=True), exp
+                cur.execute(op, map_results=True)
+                for (statement, result_set), (stmt_exp, fetch_exp) in zip(
+                    cur.fetchsets(), exp
                 ):
-                    self.assertEqual(result.statement, stmt_exp)
-                    self.assertListEqual(result.fetchall(), fetch_exp)
+                    self.assertEqual(statement, stmt_exp)
+                    self.assertListEqual(result_set, fetch_exp)
 
 
 class BugOra35710145_async(tests.MySQLConnectorAioTestCase):
@@ -7881,15 +7990,15 @@ class BugOra35710145_async(tests.MySQLConnectorAioTestCase):
         async with await self.cnx.cursor() as cur:
             for op, exp in zip(BugOra35710145.ops, BugOra35710145.exps):
                 i = 0
+                await cur.execute(op, map_results=True)
                 try:
-                    async for result in cur.executemulti(op):
+                    async for statement, result_set in cur.fetchsets():
                         stmt_exp, fetch_exp = exp[i]
-                        res = await result.fetchall()
-                        self.assertEqual(result.statement, stmt_exp)
-                        self.assertListEqual(res, fetch_exp)
+                        self.assertEqual(statement, stmt_exp)
+                        self.assertListEqual(result_set, fetch_exp)
                         i += 1
                 except IndexError:
-                    self.fail(f"Got more results than expected for query {op}")
+                    self.fail(f"Got more results than expected for query `{op}`")
 
 
 class BugOra21390859(tests.MySQLConnectorTests):
@@ -8149,12 +8258,12 @@ class BugOra21390859(tests.MySQLConnectorTests):
     def test_multi_stmts_with_callproc_out_of_sync(self):
         with self.cnx.cursor() as cur:
             for i in self.use_case:
-                for result, (stmt_exp, fetch_exp) in zip(
-                    cur.execute(self.use_case[i], multi=True), self.use_case_exp[i]
+                cur.execute(self.use_case[i], map_results=True)
+                for (statement, result_set), (stmt_exp, fetch_exp) in zip(
+                    cur.fetchsets(), self.use_case_exp[i]
                 ):
-                    fetch = result.fetchall()
-                    self.assertEqual(result.statement, stmt_exp)
-                    self.assertListEqual(fetch, fetch_exp)
+                    self.assertEqual(statement, stmt_exp)
+                    self.assertListEqual(result_set, fetch_exp)
 
 
 class BugOra21390859_async(tests.MySQLConnectorAioTestCase):
@@ -8177,11 +8286,11 @@ class BugOra21390859_async(tests.MySQLConnectorAioTestCase):
                 exp_list = self.bug_21390859.use_case_exp[i]
                 j = 0
                 try:
-                    async for result in cur.executemulti(self.bug_21390859.use_case[i]):
+                    await cur.execute(self.bug_21390859.use_case[i], map_results=True)
+                    async for statement, result_set in cur.fetchsets():
                         stmt_exp, fetch_exp = exp_list[j]
-                        res = await result.fetchall()
-                        self.assertEqual(result.statement, stmt_exp)
-                        self.assertListEqual(res, fetch_exp)
+                        self.assertEqual(statement, stmt_exp)
+                        self.assertListEqual(result_set, fetch_exp)
                         j += 1
                 except IndexError:
                     self.fail(
@@ -8253,14 +8362,9 @@ class BugOra36476195(tests.MySQLConnectorTests):
             )
             self.assertEqual(self.expected_result, cur.fetchall())
             # execute multi check
-            for idx, res in enumerate(
-                cur.execute(
-                    self.injected_param_multi,
-                    (self.injected_param, "A STRING"),
-                    multi=True,
-                )
-            ):
-                self.assertEqual(self.expected_result_multi[idx], res.fetchall())
+            cur.execute(self.injected_param_multi, (self.injected_param, "A STRING"))
+            for idx, (_, result_set) in enumerate(cur.fetchsets()):
+                self.assertEqual(self.expected_result_multi[idx], result_set)
             # batch insert check
             cur.executemany(
                 self.injected_param_batch_insert,
@@ -8285,14 +8389,9 @@ class BugOra36476195(tests.MySQLConnectorTests):
             )
             self.assertEqual(self.expected_result, cur.fetchall())
             # execute multi check
-            for idx, res in enumerate(
-                cur.execute(
-                    self.injected_param_multi,
-                    (self.injected_param, "A STRING"),
-                    multi=True,
-                )
-            ):
-                self.assertEqual(self.expected_result_multi[idx], res.fetchall())
+            cur.execute(self.injected_param_multi, (self.injected_param, "A STRING"))
+            for idx, (_, result_set) in enumerate(cur.fetchsets()):
+                self.assertEqual(self.expected_result_multi[idx], result_set)
             # batch insert check
             cur.executemany(
                 self.injected_param_batch_insert,
@@ -8317,14 +8416,9 @@ class BugOra36476195(tests.MySQLConnectorTests):
             )
             self.assertEqual(self.expected_result, cur.fetchall())
             # execute multi check
-            for idx, res in enumerate(
-                cur.execute(
-                    self.injected_param_multi,
-                    (self.injected_param, "A STRING"),
-                    multi=True,
-                )
-            ):
-                self.assertEqual(self.expected_result_multi[idx], res.fetchall())
+            cur.execute(self.injected_param_multi, (self.injected_param, "A STRING"))
+            for idx, (_, result_set) in enumerate(cur.fetchsets()):
+                self.assertEqual(self.expected_result_multi[idx], result_set)
             # batch insert check
             cur.executemany(
                 self.injected_param_batch_insert,
@@ -8384,13 +8478,12 @@ class BugOra36476195_async(tests.MySQLConnectorAioTestCase):
             )
             self.assertEqual(self.expected_result_bytes, await cur.fetchall())
             # execute multi check
-            idx = 0
-            async for res in cur.executemulti(
+            await cur.executemulti(
                 self.injected_param_multi, (self.injected_param, "A STRING")
-            ):
-                self.assertEqual(
-                    self.expected_result_multi_bytes[idx], await res.fetchall()
-                )
+            )
+            idx = 0
+            async for _, res in cur.fetchsets():
+                self.assertEqual(self.expected_result_multi_bytes[idx], res)
                 idx += 1
             # execute many check
             await cur.executemany(
@@ -8417,11 +8510,12 @@ class BugOra36476195_async(tests.MySQLConnectorAioTestCase):
             )
             self.assertEqual(self.expected_result, await cur.fetchall())
             # execute multi check
-            idx = 0
-            async for res in cur.executemulti(
+            await cur.executemulti(
                 self.injected_param_multi, (self.injected_param, "A STRING")
-            ):
-                self.assertEqual(self.expected_result_multi[idx], await res.fetchall())
+            )
+            idx = 0
+            async for _, res in cur.fetchsets():
+                self.assertEqual(self.expected_result_multi[idx], res)
                 idx += 1
             # execute many check
             await cur.executemany(
@@ -8447,11 +8541,12 @@ class BugOra36476195_async(tests.MySQLConnectorAioTestCase):
             )
             self.assertEqual(self.expected_result, await cur.fetchall())
             # execute multi check
-            idx = 0
-            async for res in cur.executemulti(
+            await cur.executemulti(
                 self.injected_param_multi, (self.injected_param, "A STRING")
-            ):
-                self.assertEqual(self.expected_result_multi[idx], await res.fetchall())
+            )
+            idx = 0
+            async for _, res in cur.fechsets():
+                self.assertEqual(self.expected_result_multi[idx], res)
                 idx += 1
             # execute many check
             await cur.executemany(
@@ -8477,11 +8572,12 @@ class BugOra36476195_async(tests.MySQLConnectorAioTestCase):
             )
             self.assertEqual(self.expected_result, await cur.fetchall())
             # execute multi check
-            idx = 0
-            async for res in cur.executemulti(
+            await cur.executemulti(
                 self.injected_param_multi, (self.injected_param, "A STRING")
-            ):
-                self.assertEqual(self.expected_result_multi[idx], await res.fetchall())
+            )
+            idx = 0
+            async for _, res in cur.fetchsets():
+                self.assertEqual(self.expected_result_multi[idx], res)
                 idx += 1
             # execute many check
             await cur.executemany(
@@ -8786,6 +8882,7 @@ class BugOra37013057_async(tests.MySQLConnectorAioTestCase):
         for cur_config in self.bug_37013057.cur_flavors:
             await self._run_execute(dict_based=False, cur_config=cur_config)
 
+
 class BugOra36765200(tests.MySQLConnectorTests):
     """BUG#367652000: python mysql connector 8.3.0 raise %-.100s:%u when input a wrong host
 
@@ -8810,5 +8907,76 @@ class BugOra36765200(tests.MySQLConnectorTests):
             self.assertNotIn(
                 "%-.100s:%u",
                 str(err),
-                "Error message cannot contain unstructured bind address"
+                "Error message cannot contain unstructured bind address",
             )
+
+class BugOra37145655(tests.MySQLConnectorTests):
+    """BUG#37145655: MySQL Connector/Python Configuration Files RCE"""
+
+    def test_read_optionfiles(self):
+        option_file_dir = os.path.join("tests", "data", "option_files")
+        opt_file = os.path.join(option_file_dir, "bug_37145655.cnf")
+        exp = {
+            "user": "root",
+            "password": "mypass",
+            "database": "cpydata",
+            "port": 10000,
+            "failover": [
+                {
+                    "host": "127.0.1.2",
+                    "port": 3306,
+                    "user": "root",
+                    "priority": 80,
+                },
+                {
+                    "host": "127.0.1.5",
+                    "port": 2450,
+                    "user": "root_123",
+                    "priority": 10,
+                },
+            ],
+        }
+        self.assertEqual(
+            exp, read_option_files(option_files=opt_file, option_groups=["correct_config"])
+        )
+        exp.pop("failover")
+        exp["unix_socket"] = "unix_socket_path_for_bug37145655"
+        self.assertEqual(
+            exp, read_option_files(option_files=opt_file, option_groups=["correct_config_with_unix_socket"])
+        )
+        self.assertEqual(
+            exp, read_option_files(option_files=opt_file, option_groups=["correct_config_with_socket"])
+        )
+        del exp["unix_socket"]
+        exp["port"] = "int(10000)"
+        exp["allow_local_infile"] = "__import__('os').system('whoami')"
+        self.assertEqual(
+            exp, read_option_files(option_files=opt_file, option_groups=["incorrect_config"])
+        )
+        with self.assertRaises((errors.InterfaceError, TypeError),) as _:
+            with mysql.connector.connect(
+                read_default_file=opt_file,
+                option_groups=["incorrect_config"],
+            ) as _:
+                pass
+class BugOra36922645(tests.MySQLConnectorTests):
+    """BUG#36922645: Option `connection_timeout` is overwritten and works as "query" timeout instead
+
+    The `connection_timeout` option is working as "the time taken to execute a query by Connector/Python
+    inside an established connection" instead of "the time taken to establish a connection".
+
+    This patch fixes this issue by seperating the use of connection_timeout and introducing read/write timeouts
+    as a part of WL#16381.
+    """
+
+    def test_connection_timeout(self):
+        config = tests.get_mysql_config()
+        config["unix_socket"] = None
+        config["use_pure"] = True
+        config["connection_timeout"] = 3
+        try:
+            with mysql.connector.connect(**config) as cnx:
+                # check that connection_timeout is not working as query timeout
+                cnx.cmd_query("SELECT SLEEP(5)")
+        except Exception as err:
+            self.fail(err)

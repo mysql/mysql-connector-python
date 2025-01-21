@@ -46,6 +46,8 @@ skip_glob = [
     'mysql-connector-python/lib/mysql/connector/locales/eng',
     'mysqlx-connector-python/lib/mysqlx/locales/eng',
     'mysqlx-connector-python/lib/mysqlx/protobuf',
+    'mysqlx-connector-python/lib/mysqlx/tls_ciphers.py',
+    'mysql-connector-python/lib/mysql/tls_ciphers.py',
     'venv/*',
 ]
 
@@ -125,6 +127,8 @@ disable = [
     'too-many-statements',
     'wrong-import-order',
     'wrong-import-position',
+    'too-many-positional-arguments',
+    'protected-access',
 ]
 
 [tool.pylint.format]

@@ -67,21 +67,24 @@ def main(config):
         "SELECT name FROM names",
     ]
 
-    # Note 'multi=True' when calling cursor.execute()
-    for result in cursor.execute(" ; ".join(stmts), multi=True):
-        if result.with_rows:
-            if result.statement == stmts[3]:
+    cursor.execute(";".join(stmts), map_results=True)
+    while True:
+        if cursor.with_rows:
+            if cursor.statement == stmts[3]:
                 output.append(
-                    "Names in table: " + " ".join([name[0] for name in result])
+                    "Names in table: " + " ".join([name[0] for name in cursor])
                 )
             else:
-                output.append("Number of rows: {0}".format(result.fetchone()[0]))
+                output.append("Number of rows: {0}".format(cursor.fetchone()[0]))
         else:
             output.append(
                 "Inserted {0} row{1}".format(
-                    result.rowcount, "s" if result.rowcount > 1 else ""
+                    cursor.rowcount, "s" if cursor.rowcount > 1 else ""
                 )
             )
+
+        if cursor.nextset() is None:
+            break
 
     cursor.execute(stmt_drop)
 

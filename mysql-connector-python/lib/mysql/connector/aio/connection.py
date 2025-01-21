@@ -69,6 +69,7 @@ from ..constants import (
     raise_warning_against_deprecated_cursor_class,
 )
 from ..errors import (
+    ConnectionTimeoutError,
     DatabaseError,
     Error,
     InterfaceError,
@@ -76,6 +77,8 @@ from ..errors import (
     NotSupportedError,
     OperationalError,
     ProgrammingError,
+    ReadTimeoutError,
+    WriteTimeoutError,
     get_exception,
 )
 from ..types import (
@@ -96,6 +99,7 @@ from ..utils import (
     warn_ciphersuites_deprecated,
     warn_tls_version_deprecated,
 )
+from ._decorating import cmd_refresh_verify_options
 from .abstracts import MySQLConnectionAbstract, MySQLCursorAbstract, ServerInfo
 from .charsets import charsets
 from .cursor import (
@@ -114,6 +118,7 @@ from .cursor import (
 )
 from .logger import logger
 from .network import MySQLTcpSocket, MySQLUnixSocket
+from .utils import handle_read_write_timeout
 
 
 class MySQLConnection(MySQLConnectionAbstract):
@@ -139,10 +144,13 @@ class MySQLConnection(MySQLConnectionAbstract):
             )
             await self._do_handshake()
             await self._do_auth()
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            raise
-        except Exception:
+        except Exception as err:
             await self._socket.close_connection()
+            if isinstance(err, (asyncio.CancelledError, asyncio.TimeoutError)):
+                raise ConnectionTimeoutError(
+                    errno=2003,
+                    msg=f"Can't connect to MySQL server on {self._host}:{self._port} (timed out)",
+                ) from err
             raise
 
         if self._client_flags & ClientFlag.COMPRESS:
@@ -393,7 +401,13 @@ class MySQLConnection(MySQLConnectionAbstract):
             raise get_exception(packet)
         raise InterfaceError("Expected EOF packet")
 
-    async def _handle_load_data_infile(self, filename: str) -> OkPacketType:
+    @handle_read_write_timeout()
+    async def _handle_load_data_infile(
+        self,
+        filename: str,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> OkPacketType:
         """Handle a LOAD DATA INFILE LOCAL request."""
         file_name = os.path.abspath(filename)
         if os.path.islink(file_name):
@@ -428,12 +442,14 @@ class MySQLConnection(MySQLConnectionAbstract):
         try:
             data_file = open(file_name, "rb")  # pylint: disable=consider-using-with
             return self._handle_ok(
-                await self._send_data(data_file, send_empty_packet=True)
+                await self._send_data(data_file, True, read_timeout, write_timeout)
             )
         except IOError:
             # Send a empty packet to cancel the operation
             try:
-                await self._socket.write(b"")
+                await self._socket.write(
+                    b"", write_timeout=write_timeout or self._write_timeout
+                )
             except AttributeError as err:
                 raise OperationalError("MySQL Connection not available") from err
             raise InterfaceError(f"File '{file_name}' could not be read") from None
@@ -443,7 +459,13 @@ class MySQLConnection(MySQLConnectionAbstract):
             except (IOError, NameError):
                 pass
 
-    async def _handle_result(self, packet: bytes) -> ResultType:
+    @handle_read_write_timeout()
+    async def _handle_result(
+        self,
+        packet: bytes,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> ResultType:
         """Handle a MySQL Result.
 
         This method handles a MySQL result, for example, after sending the query
@@ -460,7 +482,9 @@ class MySQLConnection(MySQLConnectionAbstract):
             return self._handle_ok(packet)
         if packet[4] == 251:
             filename = packet[5:].decode()
-            return await self._handle_load_data_infile(filename)
+            return await self._handle_load_data_infile(
+                filename, read_timeout, write_timeout
+            )
         if packet[4] == 254:
             return self._handle_eof(packet)
         if packet[4] == 255:
@@ -476,10 +500,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         ] * column_count
         for i in range(0, column_count):
             self._columns_desc[i] = self._protocol.parse_column(
-                await self._socket.read(), self.python_charset
+                await self._socket.read(read_timeout or self._read_timeout),
+                self.python_charset,
             )
 
-        eof = self._handle_eof(await self._socket.read())
+        eof = self._handle_eof(
+            await self._socket.read(read_timeout or self._read_timeout)
+        )
         self.unread_result = True
         return {"columns": self._columns_desc, "eof": eof}
 
@@ -499,6 +526,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             raise get_exception(packet)
         raise InterfaceError("Expected Binary OK packet")
 
+    @handle_read_write_timeout()
     async def _handle_binary_result(
         self, packet: bytes
     ) -> Union[OkPacketType, Tuple[int, List[DescriptionType], EofPacketType]]:
@@ -532,12 +560,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         columns: List[DescriptionType] = [None] * column_count
         for i in range(0, column_count):
             columns[i] = self._protocol.parse_column(
-                await self._socket.read(), self.python_charset
+                await self._socket.read(self._read_timeout), self.python_charset
             )
 
-        eof = self._handle_eof(await self._socket.read())
+        eof = self._handle_eof(await self._socket.read(self._read_timeout))
         return (column_count, columns, eof)
 
+    @handle_read_write_timeout()
     async def _send_cmd(
         self,
         command: int,
@@ -546,6 +575,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         packet: Optional[bytes] = None,
         expect_response: bool = True,
         compressed_packet_number: int = 0,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> Optional[bytearray]:
         """Send a command to the MySQL server.
 
@@ -565,16 +596,22 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self._protocol.make_command(command, packet or argument),
                 packet_number,
                 compressed_packet_number,
+                write_timeout or self._write_timeout,
             )
         except AttributeError as err:
             raise OperationalError("MySQL Connection not available") from err
 
         if not expect_response:
             return None
-        return await self._socket.read()
+        return await self._socket.read(read_timeout or self._read_timeout)
 
+    @handle_read_write_timeout()
     async def _send_data(
-        self, data_file: BinaryIO, send_empty_packet: bool = False
+        self,
+        data_file: BinaryIO,
+        send_empty_packet: bool = False,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> bytearray:
         """Send data to the MySQL server
 
@@ -594,18 +631,20 @@ class MySQLConnection(MySQLConnectionAbstract):
         try:
             buf = data_file.read(chunk_size - 16)
             while buf:
-                await self._socket.write(buf)
+                await self._socket.write(
+                    buf, write_timeout=write_timeout or self._write_timeout
+                )
                 buf = data_file.read(chunk_size - 16)
         except AttributeError as err:
             raise OperationalError("MySQL Connection not available") from err
 
         if send_empty_packet:
             try:
-                await self._socket.write(b"")
+                await self._socket.write(b"", write_timeout or self._write_timeout)
             except AttributeError as err:
                 raise OperationalError("MySQL Connection not available") from err
 
-        res = await self._socket.read()
+        res = await self._socket.read(read_timeout or self._read_timeout)
         return res
 
     def is_socket_connected(self) -> bool:
@@ -683,12 +722,12 @@ class MySQLConnection(MySQLConnectionAbstract):
         This method tries to send a `QUIT` command and close the socket. It raises
         no exceptions.
         """
-        for cursor in self._cursors:
-            await cursor.close()
-        self._cursors.clear()
+        with contextlib.suppress(Error):
+            for cursor in tuple(self._cursors):
+                await cursor.close()
+            self._cursors.clear()
 
-        if self._socket and self._socket.is_connected():
-            with contextlib.suppress(Error):
+            if self._socket and self._socket.is_connected():
                 await self.cmd_quit()
 
         if self._socket:
@@ -705,6 +744,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         cursor_class: Optional[Type[MySQLCursorAbstract]] = None,
         dictionary: Optional[bool] = None,
         named_tuple: Optional[bool] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> MySQLCursor:
         """Instantiate and return a cursor.
 
@@ -721,9 +762,19 @@ class MySQLConnection(MySQLConnectionAbstract):
             ProgrammingError: When cursor_class is not a subclass of
                               MySQLCursor.
             ValueError: When cursor is not available.
+            InterfaceError: When read or write timeout is not a positive integer.
         """
         if not self._socket or not self._socket.is_connected():
             raise OperationalError("MySQL Connection not available")
+
+        if read_timeout is not None and (
+            not isinstance(read_timeout, int) or read_timeout < 0
+        ):
+            raise InterfaceError("Option read_timeout must be a positive integer")
+        if write_timeout is not None and (
+            not isinstance(write_timeout, int) or write_timeout < 0
+        ):
+            raise InterfaceError("Option write_timeout must be a positive integer")
 
         await self.handle_unread_result()
 
@@ -732,7 +783,7 @@ class MySQLConnection(MySQLConnectionAbstract):
                 raise ProgrammingError(
                     "Cursor class needs be to subclass of MySQLCursorAbstract"
                 )
-            return (cursor_class)(self)
+            return (cursor_class)(self, read_timeout, write_timeout)
 
         buffered = buffered if buffered is not None else self._buffered
         raw = raw if raw is not None else self._raw
@@ -767,7 +818,7 @@ class MySQLConnection(MySQLConnectionAbstract):
             raise_warning_against_deprecated_cursor_class(
                 cursor_name=types[cursor_type].__name__
             )
-            return (types[cursor_type])(self)
+            return (types[cursor_type])(self, read_timeout, write_timeout)
         except KeyError:
             args = ("buffered", "raw", "dictionary", "named_tuple", "prepared")
             criteria = ", ".join(
@@ -777,11 +828,13 @@ class MySQLConnection(MySQLConnectionAbstract):
                 f"Cursor not available with given criteria: {criteria}"
             ) from None
 
+    @handle_read_write_timeout()
     async def get_row(
         self,
         binary: bool = False,
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
+        **kwargs: Any,
     ) -> Tuple[Optional[RowType], Optional[EofPacketType]]:
         """Get the next rows returned by the MySQL server.
 
@@ -790,12 +843,17 @@ class MySQLConnection(MySQLConnectionAbstract):
         If no row was available in the result set, the row data will be None.
         """
         rows, eof = await self.get_rows(
-            count=1, binary=binary, columns=columns, raw=raw
+            count=1,
+            binary=binary,
+            columns=columns,
+            raw=raw,
+            **kwargs,
         )
         if rows:
             return (rows[0], eof)
         return (None, eof)
 
+    @handle_read_write_timeout()
     async def get_rows(
         self,
         count: Optional[int] = None,
@@ -803,6 +861,7 @@ class MySQLConnection(MySQLConnectionAbstract):
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
         prep_stmt: Any = None,
+        **kwargs: Any,
     ) -> Tuple[List[RowType], Optional[EofPacketType]]:
         """Get all rows returned by the MySQL server.
 
@@ -818,16 +877,24 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         rows: Tuple[List[Tuple[Any, ...]], Optional[EofPacketType]] = ([], None)
         try:
+            read_timeout = kwargs.get("read_timeout", None)
             if binary:
                 charset = self.charset
                 if charset == "utf8mb4":
                     charset = "utf8"
                 rows = await self._protocol.read_binary_result(
-                    self._socket, columns, count, charset
+                    self._socket,
+                    columns,
+                    count,
+                    charset,
+                    read_timeout or self._read_timeout,
                 )
             else:
                 rows = await self._protocol.read_text_result(
-                    self._socket, self._server_info.version, count=count
+                    self._socket,
+                    self._server_info.version,
+                    count,
+                    read_timeout or self._read_timeout,
                 )
         except Error as err:
             self.unread_result = False
@@ -892,18 +959,8 @@ class MySQLConnection(MySQLConnectionAbstract):
         raw: bool = False,
         buffered: bool = False,
         raw_as_string: bool = False,
+        **kwargs: Any,
     ) -> ResultType:
-        """Send a query to the MySQL server.
-
-        This method send the query to the MySQL server and returns the result.
-
-        If there was a text result, a tuple will be returned consisting of the number
-        of columns and a list containing information about these columns.
-
-        When the query doesn't return a text result, the OK or EOF packet information
-        as dictionary will be returned. In case the result was an error, exception
-        Error will be raised.
-        """
         if not isinstance(query, bytearray):
             if isinstance(query, str):
                 query = query.encode()
@@ -989,8 +1046,17 @@ class MySQLConnection(MySQLConnectionAbstract):
         packet.extend(query)
         query = bytes(packet)
         try:
+            read_timeout = kwargs.get("read_timeout", None)
+            write_timeout = kwargs.get("write_timeout", None)
             result = await self._handle_result(
-                await self._send_cmd(ServerCmd.QUERY, query)
+                await self._send_cmd(
+                    ServerCmd.QUERY,
+                    query,
+                    read_timeout=read_timeout,
+                    write_timeout=write_timeout,
+                ),
+                read_timeout,
+                write_timeout,
             )
         except ProgrammingError as err:
             if err.errno == 3948 and "Loading local data is disabled" in err.msg:
@@ -1000,15 +1066,12 @@ class MySQLConnection(MySQLConnectionAbstract):
                 )
                 raise DatabaseError(err_msg) from err
             raise
-        if self._have_next_result:
-            raise InterfaceError(
-                "Use cmd_query_iter for statements with multiple queries."
-            )
-
         return result
 
     async def cmd_query_iter(  # type: ignore[override]
-        self, statements: StrOrBytes
+        self,
+        statements: StrOrBytes,
+        **kwargs: Any,
     ) -> AsyncGenerator[ResultType, None]:
         """Send one or more statements to the MySQL server.
 
@@ -1024,49 +1087,87 @@ class MySQLConnection(MySQLConnectionAbstract):
             else:
                 # do something useful with INSERT result
         """
-        packet = bytearray()
-        if not isinstance(statements, bytearray):
-            if isinstance(statements, str):
-                statements = statements.encode("utf8")
-            statements = bytearray(statements)
+        try:
+            read_timeout = kwargs.get("read_timeout", None)
+            write_timeout = kwargs.get("write_timeout", None)
+            packet = bytearray()
+            if not isinstance(statements, bytearray):
+                if isinstance(statements, str):
+                    statements = statements.encode("utf8")
+                statements = bytearray(statements)
 
-        if self._client_flags & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
-            # int<lenenc>    parameter_count    Number of parameters
-            packet.extend(lc_int(0))
-            # int<lenenc>    parameter_set_count    Number of parameter sets.
-            # Currently always 1
-            packet.extend(lc_int(1))
+            if self._client_flags & ClientFlag.CLIENT_QUERY_ATTRIBUTES:
+                # int<lenenc>    parameter_count    Number of parameters
+                packet.extend(lc_int(0))
+                # int<lenenc>    parameter_set_count    Number of parameter sets.
+                # Currently always 1
+                packet.extend(lc_int(1))
 
-        packet.extend(statements)
-        query = bytes(packet)
-        # Handle the first query result
-        yield await self._handle_result(await self._send_cmd(ServerCmd.QUERY, query))
+            packet.extend(statements)
+            query = bytes(packet)
+            # Handle the first query result
+            yield await self._handle_result(
+                await self._send_cmd(
+                    ServerCmd.QUERY,
+                    query,
+                    read_timeout=read_timeout,
+                    write_timeout=write_timeout,
+                ),
+                read_timeout,
+                write_timeout,
+            )
 
-        # Handle next results, if any
-        while self._have_next_result:
-            await self.handle_unread_result()
-            yield await self._handle_result(await self._socket.read())
+            # Handle next results, if any
+            while self._have_next_result:
+                await self.handle_unread_result()
+                yield await self._handle_result(
+                    await self._socket.read(read_timeout or self._read_timeout),
+                    read_timeout,
+                    write_timeout,
+                )
+        except (ReadTimeoutError, WriteTimeoutError) as err:
+            raise err
 
-    async def cmd_stmt_fetch(self, statement_id: int, rows: int = 1) -> None:
+    async def cmd_stmt_fetch(
+        self, statement_id: int, rows: int = 1, **kwargs: Any
+    ) -> None:
         """Fetch a MySQL statement Result Set.
 
         This method will send the FETCH command to MySQL together with the given
         statement id and the number of rows to fetch.
         """
+        read_timeout = kwargs.get("read_timeout", None)
+        write_timeout = kwargs.get("write_timeout", None)
         packet = self._protocol.make_stmt_fetch(statement_id, rows)
         self.unread_result = False
-        await self._send_cmd(ServerCmd.STMT_FETCH, packet, expect_response=False)
+        await self._send_cmd(
+            ServerCmd.STMT_FETCH,
+            packet,
+            expect_response=False,
+            read_timeout=read_timeout,
+            write_timeout=write_timeout,
+        )
         self.unread_result = True
 
+    @handle_read_write_timeout()
     async def cmd_stmt_prepare(
-        self, statement: bytes
+        self,
+        statement: bytes,
+        **kwargs: Any,
     ) -> Mapping[str, Union[int, List[DescriptionType]]]:
         """Prepare a MySQL statement.
 
         This method will send the PREPARE command to MySQL together with the given
         statement.
         """
-        packet = await self._send_cmd(ServerCmd.STMT_PREPARE, statement)
+        read_timeout = kwargs.get("read_timeout", None)
+        write_timeout = kwargs.get("write_timeout", None)
+        packet = await self._send_cmd(
+            ServerCmd.STMT_PREPARE,
+            statement,
+            read_timeout=read_timeout,
+            write_timeout=write_timeout,
+        )
         result = self._handle_binary_ok(packet)
 
         result["columns"] = []
@@ -1075,18 +1176,24 @@ class MySQLConnection(MySQLConnectionAbstract):
             for _ in range(0, result["num_params"]):
                 result["parameters"].append(
                     self._protocol.parse_column(
-                        await self._socket.read(), self.python_charset
+                        await self._socket.read(read_timeout or self._read_timeout),
+                        self.python_charset,
                     )
                 )
-            self._handle_eof(await self._socket.read())
+            self._handle_eof(
+                await self._socket.read(read_timeout or self._read_timeout)
+            )
         if result["num_columns"] > 0:
             for _ in range(0, result["num_columns"]):
                 result["columns"].append(
                     self._protocol.parse_column(
-                        await self._socket.read(), self.python_charset
+                        await self._socket.read(read_timeout or self._read_timeout),
+                        self.python_charset,
                     )
                 )
-            self._handle_eof(await self._socket.read())
+            self._handle_eof(
+                await self._socket.read(read_timeout or self._read_timeout)
+            )
 
         return result
 
@@ -1096,10 +1203,13 @@ class MySQLConnection(MySQLConnectionAbstract):
         data: Sequence[BinaryProtocolType] = (),
         parameters: Sequence[Any] = (),
         flags: int = 0,
+        **kwargs: Any,
     ) -> Union[OkPacketType, Tuple[int, List[DescriptionType], EofPacketType]]:
         """Execute a prepared MySQL statement."""
         parameters = list(parameters)
         long_data_used = {}
+        read_timeout = kwargs.get("read_timeout", None)
+        write_timeout = kwargs.get("write_timeout", None)
 
         if data:
             for param_id, _ in enumerate(parameters):
@@ -1110,7 +1220,11 @@ class MySQLConnection(MySQLConnectionAbstract):
                     except AttributeError:
                         pass
                     await self.cmd_stmt_send_long_data(
-                        statement_id, param_id, data[param_id]
+                        statement_id,
+                        param_id,
+                        data[param_id],
+                        read_timeout=read_timeout,
+                        write_timeout=write_timeout,
                     )
                     long_data_used[param_id] = (binary,)
         if not self._query_attrs_supported and self._query_attrs:
@@ -1139,20 +1253,30 @@ class MySQLConnection(MySQLConnectionAbstract):
                 self.charset,
                 converter_str_fallback=self._converter_str_fallback,
             )
-        packet = await self._send_cmd(ServerCmd.STMT_EXECUTE, packet=execute_packet)
+        packet = await self._send_cmd(
+            ServerCmd.STMT_EXECUTE,
+            packet=execute_packet,
+            read_timeout=read_timeout,
+            write_timeout=write_timeout,
+        )
         result = await self._handle_binary_result(packet)
         return result
 
-    async def cmd_stmt_reset(self, statement_id: int) -> None:
+    async def cmd_stmt_reset(self, statement_id: int, **kwargs: Any) -> None:
         """Reset data for prepared statement sent as long data.
 
         The result is a dictionary with OK packet information.
         """
         self._handle_ok(
-            await self._send_cmd(ServerCmd.STMT_RESET, int4store(statement_id)),
+            await self._send_cmd(
+                ServerCmd.STMT_RESET,
+                int4store(statement_id),
+                read_timeout=kwargs.get("read_timeout", None),
+                write_timeout=kwargs.get("write_timeout", None),
+            ),
         )
 
-    async def cmd_stmt_close(self, statement_id: int) -> None:
+    async def cmd_stmt_close(self, statement_id: int, **kwargs: Any) -> None:
         """Deallocate a prepared MySQL statement.
 
         This method deallocates the prepared statement using the statement_id.
@@ -1162,19 +1286,12 @@ class MySQLConnection(MySQLConnectionAbstract):
             ServerCmd.STMT_CLOSE,
             int4store(statement_id),
             expect_response=False,
+            read_timeout=kwargs.get("read_timeout", None),
+            write_timeout=kwargs.get("write_timeout", None),
         )
 
+    @cmd_refresh_verify_options()
     async def cmd_refresh(self, options: int) -> OkPacketType:
-        """Send the Refresh command to the MySQL server.
-
-        This method sends the Refresh command to the MySQL server. The options
-        argument should be a bitwise value using constants.RefreshOption.
-
-        Usage example:
-           RefreshOption = mysql.connector.RefreshOption
-           refresh = RefreshOption.LOG | RefreshOption.INFO
-           cnx.cmd_refresh(refresh)
-        """
         if not options & (
             RefreshOption.GRANT
             | RefreshOption.LOG
@@ -1206,7 +1323,11 @@ class MySQLConnection(MySQLConnectionAbstract):
         return res  # type: ignore[return-value]
 
     async def cmd_stmt_send_long_data(
-        self, statement_id: int, param_id: int, data: BinaryIO
+        self,
+        statement_id: int,
+        param_id: int,
+        data: BinaryIO,
+        **kwargs: Any,
     ) -> int:
         """Send data for a column.
 
@@ -1233,6 +1354,8 @@ class MySQLConnection(MySQLConnectionAbstract):
                     ServerCmd.STMT_SEND_LONG_DATA,
                     packet=packet,
                     expect_response=False,
+                    read_timeout=kwargs.get("read_timeout", None),
+                    write_timeout=kwargs.get("write_timeout", None),
                 )
                 total_sent += len(buf)
                 buf = data.read(chunk_size)
@@ -1248,7 +1371,10 @@ class MySQLConnection(MySQLConnectionAbstract):
         """
         await self.handle_unread_result()
         packet = self._protocol.make_command(ServerCmd.QUIT)
-        await self._socket.write(packet)
+        try:
+            await self._socket.write(packet, write_timeout=self._write_timeout)
+        except WriteTimeoutError as _:
+            pass
         return packet
 
     async def cmd_shutdown(self, shutdown_type: Optional[int] = None) -> None:
@@ -1268,8 +1394,10 @@ class MySQLConnection(MySQLConnectionAbstract):
         await self.handle_unread_result()
 
         packet = self._protocol.make_command(ServerCmd.STATISTICS)
-        await self._socket.write(packet, 0, 0)
-        return self._protocol.parse_statistics(await self._socket.read())
+        await self._socket.write(packet, 0, 0, self._write_timeout)
+        return self._protocol.parse_statistics(
+            await self._socket.read(self._read_timeout)
+        )
 
     async def cmd_process_kill(self, mysql_pid: int) -> OkPacketType:
         """Kill a MySQL process.
@@ -1371,6 +1499,8 @@ class MySQLConnection(MySQLConnectionAbstract):
             auth_plugin=self._auth_plugin,
             conn_attrs=self._connection_attrs,
             is_change_user_request=True,
+            read_timeout=self._read_timeout,
+            write_timeout=self._write_timeout,
         )
 
         if not (self._client_flags & ClientFlag.CONNECT_WITH_DB) and database:

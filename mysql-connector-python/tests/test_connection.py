@@ -518,7 +518,11 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
         packets[-1] = packets[-1][:-2] + b"\x08" + packets[-1][-1:]
         self.cnx._socket.sock.reset()
         self.cnx._socket.sock.add_packets(packets)
-        self.assertRaises(errors.InterfaceError, self.cnx.cmd_query, "SELECT 1")
+        # Verify `cmd_query()` does not raise an error when passing a multi statement.
+        try:
+            self.cnx.cmd_query("SELECT 1")
+        except errors.InterfaceError as e:
+            self.fail("An unexpected exception was raised: {}".format(e))
 
     def test_cmd_query_iter(self):
         """Send queries to MySQL"""
@@ -583,8 +587,20 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             constants.RefreshOption.STATUS,
             constants.RefreshOption.REPLICA,
         )
+
+        # test individual options
         for option in refresh_options:
-            self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(option))
+            if (
+                tests.MYSQL_VERSION >= (9, 2, 0)
+                and option == constants.RefreshOption.GRANT
+            ):
+                with self.assertWarns(DeprecationWarning):
+                    ok_packet = self.cnx.cmd_refresh(option)
+                self.assertEqual(
+                    {**OK_PACKET_RESULT, **{"warning_count": 1}}, ok_packet
+                )
+            else:
+                self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(option))
 
         # Test combined options
         options = constants.RefreshOption.LOG | constants.RefreshOption.STATUS
@@ -1362,7 +1378,7 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
             self.fail("Failed connecting to '{}': {}".format(config["host"], str(err)))
 
         config["host"] = tests.fake_hostname()
-        self.assertRaises(errors.InterfaceError, cnx.connect, **config)
+        self.assertRaises((errors.InterfaceError, errors.ConnectionTimeoutError), cnx.connect, **config)
 
     @unittest.skipUnless(os.name == "posix", "Platform does not support unix sockets")
     @unittest.skipUnless(tests.SSL_AVAILABLE, "Python has no SSL support")

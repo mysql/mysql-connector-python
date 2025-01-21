@@ -115,6 +115,7 @@ SSL_CERT = os.path.abspath(os.path.join(SSL_DIR, "tests_client_cert.pem"))
 SSL_KEY = os.path.abspath(os.path.join(SSL_DIR, "tests_client_key.pem"))
 TEST_BUILD_DIR = None
 MYSQL_CAPI = None
+TIMEOUT_TOLERANCE = 1
 
 DJANGO_VERSION = None
 
@@ -906,6 +907,14 @@ class MySQLConnectorAioTestCase(unittest.IsolatedAsyncioTestCase):
     async def _test_execute_cleanup(self, cnx, tbl="myconnpy_cursor"):
         async with await cnx.cursor() as cur:
             await cur.execute(f"DROP TABLE IF EXISTS {tbl}")
+
+
+def cmp_timeout_tolerance(actual_timeout_in_secs: float, exp_timeout_in_secs: float) -> bool:
+    """
+    Compares the read/write/connection timeout expected against a tolerance,
+    i.e., an expected margin of error between the 2 timeout values in seconds
+    """
+    return abs(exp_timeout_in_secs - actual_timeout_in_secs) <= TIMEOUT_TOLERANCE
 
 
 def printmsg(msg=None):

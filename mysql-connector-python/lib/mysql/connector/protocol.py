@@ -611,7 +611,11 @@ class MySQLProtocol:
         return res
 
     def read_text_result(
-        self, sock: MySQLSocket, version: Tuple[int, ...], count: int = 1
+        self,
+        sock: MySQLSocket,
+        version: Tuple[int, ...],
+        count: int = 1,
+        read_timeout: Optional[int] = None,
     ) -> Tuple[
         List[Tuple[Optional[bytes], ...]],
         Optional[EofPacketType],
@@ -632,13 +636,13 @@ class MySQLProtocol:
         while True:
             if eof or i == count:
                 break
-            packet = sock.recv()
+            packet = sock.recv(read_timeout)
             if packet.startswith(b"\xff\xff\xff"):
                 datas = [packet[4:]]
-                packet = sock.recv()
+                packet = sock.recv(read_timeout)
                 while packet.startswith(b"\xff\xff\xff"):
                     datas.append(packet[4:])
-                    packet = sock.recv()
+                    packet = sock.recv(read_timeout)
                 datas.append(packet[4:])
                 rowdata = utils.read_lc_string_list(b"".join(datas))
             elif packet[4] == 254 and packet[0] < 7:
@@ -821,6 +825,7 @@ class MySQLProtocol:
         columns: List[DescriptionType],
         count: int = 1,
         charset: str = "utf-8",
+        read_timeout: Optional[int] = None,
     ) -> Tuple[
         List[Tuple[BinaryProtocolType, ...]],
         Optional[EofPacketType],
@@ -838,7 +843,7 @@ class MySQLProtocol:
                 break
             if i == count:
                 break
-            packet = bytes(sock.recv())
+            packet = bytes(sock.recv(read_timeout))
             if packet[4] == 254:
                 eof = self.parse_eof(packet)
                 values = None

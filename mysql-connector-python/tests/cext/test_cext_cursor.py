@@ -37,9 +37,9 @@ import decimal
 import logging
 import sys
 import unittest
+import warnings
 
 from collections import namedtuple
-import warnings
 
 import tests
 
@@ -593,18 +593,25 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         )
         self.setup_table(self.cnx, tbl)
 
-        multi_cur = CMySQLCursor(self.cnx)
+        cur = CMySQLCursor(self.cnx)
         results = []
         exp = [
             ("SELECT 'result', 1", [("result", 1)]),
             ("INSERT INTO {0} () VALUES ()".format(tbl), 1, 1),
             ("SELECT * FROM {0}".format(tbl), [(1, None, 0)]),
         ]
-        for cur in multi_cur.execute(stmt, multi=True):
-            if cur.with_rows:
-                results.append((cur.statement, cur.fetchall()))
-            else:
-                results.append((cur.statement, cur._affected_rows, cur.lastrowid))
+        cur.execute(stmt, map_results=True)
+        results.append(
+            (cur.statement, cur.fetchall())
+            if cur.with_rows
+            else (cur.statement, cur._affected_rows, cur.lastrowid)
+        )
+        while cur.nextset():
+            results.append(
+                (cur.statement, cur.fetchall())
+                if cur.with_rows
+                else (cur.statement, cur._affected_rows, cur.lastrowid)
+            )
 
         self.assertEqual(exp, results)
 
@@ -617,13 +624,13 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
             "CREATE PROCEDURE multi_results () BEGIN SELECT 1; SELECT 'ham'; END"
         )
         cur.execute(procedure)
-        stmt = b"CALL multi_results()"
-        exp_result = [[(1,)], [("ham",)]]
+        exp_stmt = b"CALL multi_results()"
+        exp_result = [[(1,)], [("ham",)], []]
         results = []
-        for result in cur.execute(stmt, multi=True):
-            if result.with_rows:
-                self.assertEqual(stmt, result._executed)
-                results.append(result.fetchall())
+        cur.execute(exp_stmt)
+        for statement, result_set in cur.fetchsets():
+            self.assertEqual(exp_stmt.decode("utf-8"), statement)
+            results.append(result_set)
 
         self.assertEqual(exp_result, results)
         cur.execute("DROP PROCEDURE multi_results")
@@ -644,9 +651,9 @@ class CExtMySQLCursorTests(tests.CMySQLCursorTests):
         ]
         with self._get_cursor(self.cnx) as cur:
             for operation, exps in zip(operations, control):
-                for res_cur, exp in zip(cur.execute(operation, multi=True), exps):
-                    self.assertEqual(exp, res_cur.statement)
-                    _ = res_cur.fetchall()
+                cur.execute(operation, map_results=True)
+                for (statement, result_set), exp in zip(cur.fetchsets(), exps):
+                    self.assertEqual(exp, statement)
 
 
 class CExtMySQLCursorBufferedTests(tests.CMySQLCursorTests):

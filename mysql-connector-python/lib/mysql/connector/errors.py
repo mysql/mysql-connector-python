@@ -121,6 +121,51 @@ class PoolError(Error):
     """Exception for errors relating to connection pooling"""
 
 
+class ConnectionTimeoutError(Error):
+    """
+    Exception for errors related to the socket connection timing out while connecting with
+    the server
+    """
+
+
+class ReadTimeoutError(Error):
+    """Exception for errors relating to socket timing out while receiving data from the server"""
+
+    DEFAULT_READ_TIMEOUT_ERROR_MSG: str = """
+    The Read Operation timed out. As a consequence the current connection has been closed to avoid
+    any unstable behaviour, consider using the reconnect() option and continue with the current
+    session's workflow.
+    """
+
+    def __init__(
+        self,
+        msg: Optional[str] = None,
+        errno: Optional[int] = None,
+        values: Optional[Tuple[str, int]] = None,
+        sqlstate: Optional[str] = None,
+    ) -> None:
+        super().__init__(self.DEFAULT_READ_TIMEOUT_ERROR_MSG, errno, values, sqlstate)
+
+
+class WriteTimeoutError(Error):
+    """Exception for errors relating to socket timing out while sending data to the server"""
+
+    DEFAULT_WRITE_TIMEOUT_ERROR_MSG: str = """
+    The Write Operation timed out. As a consequence the current connection has been closed to avoid
+    any unstable behaviour, consider using the reconnect() option to continue with the current
+    session's workflow.
+    """
+
+    def __init__(
+        self,
+        msg: Optional[str] = None,
+        errno: Optional[int] = None,
+        values: Optional[Tuple[str, int]] = None,
+        sqlstate: Optional[str] = None,
+    ) -> None:
+        super().__init__(self.DEFAULT_WRITE_TIMEOUT_ERROR_MSG, errno, values, sqlstate)
+
+
 ErrorClassTypes = Union[
     Type[Error],
     Type[InterfaceError],
@@ -132,6 +177,9 @@ ErrorClassTypes = Union[
     Type[DataError],
     Type[NotSupportedError],
     Type[PoolError],
+    Type[ConnectionTimeoutError],
+    Type[ReadTimeoutError],
+    Type[WriteTimeoutError],
 ]
 ErrorTypes = Union[
     Error,
@@ -145,6 +193,9 @@ ErrorTypes = Union[
     NotSupportedError,
     PoolError,
     Warning,
+    ConnectionTimeoutError,
+    ReadTimeoutError,
+    WriteTimeoutError,
 ]
 # _CUSTOM_ERROR_EXCEPTIONS holds custom exceptions and is used by the
 # function custom_error_exception. _ERROR_EXCEPTIONS (at bottom of module)

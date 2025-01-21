@@ -245,6 +245,7 @@ class MySQLProtocol(_MySQLProtocol):
         columns: List[DescriptionType],
         count: int = 1,
         charset: str = "utf-8",
+        read_timeout: Optional[int] = None,
     ) -> Tuple[
         List[Tuple[BinaryProtocolType, ...]],
         Optional[EofPacketType],
@@ -260,7 +261,7 @@ class MySQLProtocol(_MySQLProtocol):
         while True:
             if eof or i == count:
                 break
-            packet = await sock.read()
+            packet = await sock.read(read_timeout)
             if packet[4] == 254:
                 eof = self.parse_eof(packet)
                 values = None
@@ -276,7 +277,11 @@ class MySQLProtocol(_MySQLProtocol):
 
     # pylint: disable=invalid-overridden-method
     async def read_text_result(  # type: ignore[override]
-        self, sock: MySQLSocket, version: Tuple[int, ...], count: int = 1
+        self,
+        sock: MySQLSocket,
+        version: Tuple[int, ...],
+        count: int = 1,
+        read_timeout: Optional[int] = None,
     ) -> Tuple[
         List[Tuple[Optional[bytes], ...]],
         Optional[EofPacketType],
@@ -297,13 +302,13 @@ class MySQLProtocol(_MySQLProtocol):
         while True:
             if eof or i == count:
                 break
-            packet = await sock.read()
+            packet = await sock.read(read_timeout)
             if packet.startswith(b"\xff\xff\xff"):
                 datas = [packet[4:]]
-                packet = await sock.read()
+                packet = await sock.read(read_timeout)
                 while packet.startswith(b"\xff\xff\xff"):
                     datas.append(packet[4:])
-                    packet = await sock.read()
+                    packet = await sock.read(read_timeout)
                 datas.append(packet[4:])
                 rowdata = read_lc_string_list(b"".join(datas))
             elif packet[4] == 254 and packet[0] < 7:

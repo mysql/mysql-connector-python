@@ -68,6 +68,7 @@ from .types import (
 # pylint: enable=import-error,no-name-in-module
 # isort: split
 
+from ._scripting import split_multi_statement
 from .abstracts import NAMED_TUPLE_CACHE, CMySQLPrepStmt, MySQLCursorAbstract
 from .cursor import (
     RE_PY_PARAM,
@@ -79,10 +80,7 @@ from .cursor import (
     RE_SQL_PYTHON_CAPTURE_PARAM_NAME,
     RE_SQL_PYTHON_REPLACE_PARAM,
     _bytestr_format_dict,
-    is_eol_comment,
-    parse_multi_statement_query,
 )
-from .errorcode import CR_NO_RESULT_SET
 from .errors import (
     Error,
     InterfaceError,
@@ -125,7 +123,10 @@ class _ParamSubstitutor:
 class CMySQLCursor(MySQLCursorAbstract):
     """Default cursor for interacting with MySQL using C Extension"""
 
-    def __init__(self, connection: CMySQLConnection) -> None:
+    def __init__(
+        self,
+        connection: CMySQLConnection,
+    ) -> None:
         """Initialize"""
         super().__init__(connection)
 
@@ -135,10 +136,6 @@ class CMySQLCursor(MySQLCursorAbstract):
         self._connection: CMySQLConnection = cast("CMySQLConnection", self._connection)
 
     def reset(self, free: bool = True) -> None:
-        """Reset the cursor
-
-        When free is True (default) the result will be freed.
-        """
         self._rowcount = -1
         self._nextrow = None
         self._affected_rows = -1
@@ -148,10 +145,70 @@ class CMySQLCursor(MySQLCursorAbstract):
         self._warnings = None
         self._warning_count = 0
         self._description: Optional[List[DescriptionType]] = None
-        self._executed_list: List[StrOrBytes] = []
         if free and self._connection:
             self._connection.free_result()
+
         super().reset()
+
+    def _reset_result(
+        self, free: bool = True, preserve_last_executed_stmt: bool = False
+    ) -> None:
+        """Resets the cursor to default.
+
+        This method is similar to `reset()`. Unlike `reset()`, this hidden method
+        allows to customize the reset.
+
+        Args:
+            free: If `True`, the result will be freed.
+            preserve_last_executed_stmt: If `False`, the last executed
+                                         statement value is reset. Otherwise,
+                                         such a value is preserved.
+        """
+        if not preserve_last_executed_stmt:
+            # reset inner state related to statement execution
+            self._executed = None
+            self._executed_list = []
+            self._stmt_partitions = None
+            self._stmt_partition = None
+            self._stmt_map_results = False
+
+        self.reset(free=free)
+
+    @property
+    def read_timeout(self) -> Optional[float]:
+        raise ProgrammingError(
+            """
+            The use of read_timeout after the connection has been established is unsupported
+            in the C-Extension
+            """
+        )
+
+    @read_timeout.setter
+    def read_timeout(self, timeout: int) -> None:
+        raise ProgrammingError(
+            """
+            Changes in read_timeout after the connection has been established is unsupported
+            in the C-Extension
+            """
+        )
+
+    @property
+    def write_timeout(self) -> Optional[float]:
+        raise ProgrammingError(
+            """
+            The use of write_timeout after the connection has been established is unsupported
+            in the C-Extension
+            """
+        )
+
+    @write_timeout.setter
+    def write_timeout(self, timeout: int) -> None:
+        raise ProgrammingError(
+            """
+            Changes in write_timeout after the connection has been established is unsupported
+            in the C-Extension
+            """
+        )
 
     def _check_executed(self) -> None:
         """Check if the statement has been executed.
@@ -178,7 +235,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             # force freeing result
             self._connection.consume_results()
             _ = self._connection.cmd_query("SHOW WARNINGS")
-            warns = self._connection.get_rows()[0]
+            warns = self._connection.get_rows(raw=self._raw)[0]
             self._connection.consume_results()
         except MySQLInterfaceError as err:
             raise get_mysql_exception(
@@ -238,88 +295,12 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not self._connection.more_results:
             self._connection.free_result()
 
-    def _execute_iter(self) -> Generator[CMySQLCursor, None, None]:
-        """Generator returns MySQLCursor objects for multiple statements.
-
-        This method is only used when multiple statements are executed
-        by the `cursor.execute(multi_stmt_query, multi=True)` method.
-
-        How does this method work? To properly map each statement (stmt) to a result,
-        the following facts must be considered:
-
-        1. Read operations such as `SELECT` produce a non-empty result
-            (calling `next(query_iter)` gets a result that includes at least one column).
-        2. Write operatios such as `INSERT` produce an empty result
-            (calling `next(query_iter)` gets a result with no columns - aka empty).
-        3. End-of-line (EOL) comments do not produce a result, unless is the last stmt
-            in which case produces an empty result.
-        4. Calling procedures such as `CALL my_proc` produce a sequence `(1)*0` which
-            means it may produce zero or more non-empty results followed by just one
-            empty result. In other words, a callproc stmt always terminates with an
-            empty result. E.g., `my_proc` includes an update + select + select + update,
-            then the result sequence will be `110` - note how the write ops results get
-            annulated, just the read ops results are produced. Other examples:
-                * insert + insert -> 0
-                * select + select + insert + select -> 1110
-                * select -> 10
-            Observe how 0 indicates the end of the result sequence. This property is
-            vital to know what result corresponds to what callproc stmt.
-
-        In this regard, the implementation is composed of:
-        1. Parsing: the multi-statement is broken down into single statements, and then
-            for each of these, leading white spaces are removed (including
-            jumping line, vertical line, tab, etc.). Also, EOL comments are removed from
-            the stream, except when the comment is the last statement of the
-            multi-statement string.
-        2. Mapping: the facts described above as used as "game rules" to properly match
-        statements and results. In case, if we run out of statements before running out
-        of results we use a sentinel named "stmt_overflow!" to indicate that the mapping
-        went wrong.
-
-        Acronyms
-            1: a non-empty result
-            2: an empty result
-        """
-        executed_list = parse_multi_statement_query(multi_stmt=self._executed)
-        self._executed = None
-        stmt = b""
-        result: bool = False
-        while True:
-            try:
-                if not stmt.upper().startswith(b"CALL") or not result:
-                    stmt = (
-                        executed_list.popleft() if executed_list else b"stmt_overflow!"
-                    )
-
-                # at this point the result has been fetched already
-                result = self._connection.result_set_available
-
-                if is_eol_comment(stmt):
-                    continue
-
-                self._executed = stmt.rstrip()
-                yield self
-
-                if not self.nextset():
-                    raise StopIteration
-            except InterfaceError as err:
-                # Result without result set
-                if err.errno != CR_NO_RESULT_SET:
-                    raise
-            except StopIteration:
-                return
-
     def execute(
         self,
-        operation: StrOrBytes,
+        operation: str,
         params: ParamsSequenceOrDictType = (),
-        multi: bool = False,
-    ) -> Optional[Generator[CMySQLCursor, None, None]]:
-        """Execute given statement using given parameters
-
-        Deprecated: The multi argument is not needed and nextset() should
-        be used to handle multiple result sets.
-        """
+        map_results: bool = False,
+    ) -> None:
         if not operation:
             return None
 
@@ -328,16 +309,16 @@ class CMySQLCursor(MySQLCursorAbstract):
                 raise ProgrammingError
         except (ProgrammingError, ReferenceError) as err:
             raise ProgrammingError("Cursor is not connected", 2055) from err
-        self._connection.handle_unread_result()
 
-        stmt = b""
+        self._connection.handle_unread_result()
         self.reset()
 
+        stmt = b""
         try:
             if isinstance(operation, str):
                 stmt = operation.encode(self._connection.python_charset)
             else:
-                stmt = operation
+                stmt = cast(bytes, operation)
         except (UnicodeDecodeError, UnicodeEncodeError) as err:
             raise ProgrammingError(str(err)) from err
 
@@ -353,24 +334,31 @@ class CMySQLCursor(MySQLCursorAbstract):
                         "Not all parameters were used in the SQL statement"
                     )
 
+        self._stmt_partitions = split_multi_statement(
+            sql_code=stmt, map_results=map_results
+        )
+        self._stmt_partition = next(self._stmt_partitions)
+        self._stmt_map_results = map_results
+        self._executed_list = self._stmt_partition["single_stmts"]
+        self._executed = (
+            self._stmt_partition["single_stmts"].popleft()
+            if map_results
+            else self._stmt_partition["mappable_stmt"]
+        )
+
         try:
-            result = self._connection.cmd_query(
-                stmt,
-                raw=self._raw,
-                buffered=self._buffered,
-                raw_as_string=self._raw_as_string,
+            self._handle_result(
+                self._connection.cmd_query(
+                    self._stmt_partition["mappable_stmt"],
+                    raw=self._raw,
+                    buffered=self._buffered,
+                    raw_as_string=self._raw_as_string,
+                )
             )
         except MySQLInterfaceError as err:
             raise get_mysql_exception(
                 msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
             ) from err
-
-        self._executed = stmt
-        self._handle_result(result)
-
-        if multi:
-            return self._execute_iter()
-
         return None
 
     def _batch_insert(
@@ -435,7 +423,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         self,
         operation: str,
         seq_params: Sequence[ParamsSequenceOrDictType],
-    ) -> Optional[Generator[CMySQLCursor, None, None]]:
+    ) -> None:
         """Execute the given operation multiple times
 
         The executemany() method will execute the operation iterating
@@ -478,7 +466,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             stmt = self._batch_insert(operation, seq_params)
             if stmt is not None:
                 self._executed = stmt
-                return self.execute(stmt)
+                return self.execute(cast(str, stmt))
 
         rowcnt = 0
         try:
@@ -612,19 +600,63 @@ class CMySQLCursor(MySQLCursorAbstract):
             raise InterfaceError(f"Failed calling stored routine; {err}") from None
 
     def nextset(self) -> Optional[bool]:
-        """Skip to the next available result set"""
-        if not self._connection.next_result():
-            self.reset(free=True)
-            return None
-        self.reset(free=False)
+        if self._connection.next_result():
+            # prepare cursor to load the next result set, and ultimately, load it.
+            self._reset_result(free=False, preserve_last_executed_stmt=True)
+            if not self._connection.result_set_available:
+                self._handle_result(self._connection.fetch_eof_status())
+            else:
+                self._handle_result(self._connection.fetch_eof_columns())
 
-        if not self._connection.result_set_available:
-            eof = self._connection.fetch_eof_status()
-            self._handle_result(eof)
-            raise InterfaceError(errno=CR_NO_RESULT_SET)
+            # if mapping is enabled, run the if-block, otherwise simply return `True`.
+            if self._stmt_partitions is not None and self._stmt_map_results:
+                if not self._stmt_partition["single_stmts"]:
+                    # It means there are still results to be consumed, but no more
+                    # statements to relate these results to.
+                    # In this case, we raise a no fatal error and don't clear
+                    # `_executed` so its current value is reported when users
+                    # access the property `statement`.
+                    # If this case ever happens, a bug report should be filed,
+                    # assuming it is happening on supported use cases.
+                    warnings.warn(
+                        "MappingWarning: Number of result sets greater than number "
+                        "of single statements."
+                    )
+                else:
+                    self._executed = self._stmt_partition["single_stmts"].popleft()
+            return True
+        if self._stmt_partitions is not None:
+            # Let's see if there are more mappable statements (partitions)
+            # to be executed.
+            # If there are no more partitions, we simply return `None`, otherwise
+            # we execute the correponding mappable multi statement and repeat the
+            # process all over again.
+            try:
+                self._stmt_partition = next(self._stmt_partitions)
+            except StopIteration:
+                pass
+            else:
+                # This block only happens when mapping is enabled because when it
+                # is disabled, only one partition is generated, and at this point,
+                # such partiton has already been processed.
+                self._executed = self._stmt_partition["single_stmts"].popleft()
+                try:
+                    self._handle_result(
+                        self._connection.cmd_query(
+                            self._stmt_partition["mappable_stmt"],
+                            raw=self._raw,
+                            buffered=self._buffered,
+                            raw_as_string=self._raw_as_string,
+                        )
+                    )
+                except MySQLInterfaceError as err:
+                    raise get_mysql_exception(
+                        msg=err.msg, errno=err.errno, sqlstate=err.sqlstate
+                    ) from err
+                return True
 
-        self._handle_result(self._connection.fetch_eof_columns())
-        return True
+        self._reset_result(free=True)
+        return None
 
     def fetchall(self) -> List[RowType]:
         """Return all rows of a query result set.
@@ -636,7 +668,7 @@ class CMySQLCursor(MySQLCursorAbstract):
         if not self._connection.unread_result:
             return []
 
-        rows = self._connection.get_rows()
+        rows = self._connection.get_rows(raw=self._raw)
         if self._nextrow and self._nextrow[0]:
             rows[0].insert(0, self._nextrow[0])
 
@@ -646,7 +678,6 @@ class CMySQLCursor(MySQLCursorAbstract):
 
         self._rowcount += len(rows[0])
         self._handle_eof()
-        # self._connection.handle_unread_result()
         return rows[0]
 
     def fetchmany(self, size: int = 1) -> List[RowType]:
@@ -667,7 +698,7 @@ class CMySQLCursor(MySQLCursorAbstract):
             rows = []
 
         if size and self._connection.unread_result:
-            rows.extend(self._connection.get_rows(size)[0])
+            rows.extend(self._connection.get_rows(size, raw=self._raw)[0])
 
         if size:
             if self._connection.unread_result:
@@ -759,19 +790,6 @@ class CMySQLCursor(MySQLCursorAbstract):
         return tuple(d[0] for d in self.description)
 
     @property
-    def statement(self) -> str:
-        """Returns the executed statement
-
-        This property returns the executed statement. When multiple
-        statements were executed, the current statement in the iterator
-        will be returned.
-        """
-        try:
-            return self._executed.strip().decode("utf8")
-        except AttributeError:
-            return self._executed.strip()  # type: ignore[return-value]
-
-    @property
     def with_rows(self) -> bool:
         """Returns whether the cursor could have rows returned
 
@@ -802,7 +820,10 @@ class CMySQLCursor(MySQLCursorAbstract):
 class CMySQLCursorBuffered(CMySQLCursor):
     """Cursor using C Extension buffering results"""
 
-    def __init__(self, connection: CMySQLConnection):
+    def __init__(
+        self,
+        connection: CMySQLConnection,
+    ):
         """Initialize"""
         super().__init__(connection)
 
@@ -811,13 +832,12 @@ class CMySQLCursorBuffered(CMySQLCursor):
 
     def _handle_resultset(self) -> None:
         """Handle a result set"""
-        self._rows = self._connection.get_rows()[0]
+        self._rows = self._connection.get_rows(raw=self._raw)[0]
         self._next_row = 0
         self._rowcount: int = len(self._rows)
         self._handle_eof()
 
     def reset(self, free: bool = True) -> None:
-        """Reset the cursor to default"""
         self._rows = None
         self._next_row = 0
         super().reset(free=free)
@@ -842,6 +862,8 @@ class CMySQLCursorBuffered(CMySQLCursor):
             list: A list of tuples with all rows of a query result set.
         """
         self._check_executed()
+        if self._rows is None:
+            return []
         res = self._rows[self._next_row :]
         self._next_row = len(self._rows)
         return res
@@ -892,7 +914,10 @@ class CMySQLCursorBuffered(CMySQLCursor):
 class CMySQLCursorRaw(CMySQLCursor):
     """Cursor using C Extension return raw results"""
 
-    def __init__(self, connection: CMySQLConnection) -> None:
+    def __init__(
+        self,
+        connection: CMySQLConnection,
+    ) -> None:
         super().__init__(connection)
         self._raw = True
 
@@ -900,7 +925,10 @@ class CMySQLCursorRaw(CMySQLCursor):
 class CMySQLCursorBufferedRaw(CMySQLCursorBuffered):
     """Cursor using C Extension buffering raw results"""
 
-    def __init__(self, connection: CMySQLConnection):
+    def __init__(
+        self,
+        connection: CMySQLConnection,
+    ):
         super().__init__(connection)
         self._raw = True
 
@@ -1040,7 +1068,10 @@ class CMySQLCursorBufferedNamedTuple(CMySQLCursorBuffered):
 class CMySQLCursorPrepared(CMySQLCursor):
     """Cursor using MySQL Prepared Statements"""
 
-    def __init__(self, connection: CMySQLConnection):
+    def __init__(
+        self,
+        connection: CMySQLConnection,
+    ):
         super().__init__(connection)
         self._rows: Optional[List[RowType]] = None
         self._rowcount: int = 0
@@ -1113,7 +1144,14 @@ class CMySQLCursorPrepared(CMySQLCursor):
         super().close()
 
     def reset(self, free: bool = True) -> None:
-        """Resets the prepared statement."""
+        """Resets the prepared statement.
+
+        Args:
+            free: If `True`, the result will be freed.
+            preserve_last_executed_stmt: If `False`, the last executed
+                                         statement value is reset. Otherwise,
+                                         such a value is preserved.
+        """
         if self._stmt:
             self._connection.cmd_stmt_reset(self._stmt)
         super().reset(free=free)
@@ -1122,8 +1160,8 @@ class CMySQLCursorPrepared(CMySQLCursor):
         self,
         operation: StrOrBytes,
         params: Optional[ParamsSequenceOrDictType] = None,
-        multi: bool = False,
-    ) -> None:  # multi is unused
+        map_results: bool = False,
+    ) -> None:
         """Prepare and execute a MySQL Prepared Statement
 
         This method will prepare the given operation and execute it using
@@ -1134,6 +1172,11 @@ class CMySQLCursorPrepared(CMySQLCursor):
 
         Note: argument "multi" is unused.
         """
+        if map_results:
+            raise ProgrammingError(
+                "Multi statement execution not supported for prepared statements."
+            )
+
         if not operation:
             return
 
@@ -1311,6 +1354,9 @@ class CMySQLCursorPreparedNamedTuple(CMySQLCursorNamedTuple, CMySQLCursorPrepare
 class CMySQLCursorPreparedRaw(CMySQLCursorPrepared):
     """This class is a blend of features from CMySQLCursorRaw and CMySQLCursorPrepared"""
 
-    def __init__(self, connection: CMySQLConnection):
+    def __init__(
+        self,
+        connection: CMySQLConnection,
+    ):
         super().__init__(connection)
         self._raw = True

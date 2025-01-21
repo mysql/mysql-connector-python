@@ -182,8 +182,17 @@ class CMySQLConnectionTests(tests.MySQLConnectorTests):
             RefreshOption.STATUS,
             RefreshOption.REPLICA,
         )
+
+        # test individual options
         for option in refresh_options:
-            self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(option))
+            if tests.MYSQL_VERSION >= (9, 2, 0) and option == RefreshOption.GRANT:
+                with self.assertWarns(DeprecationWarning):
+                    ok_packet = self.cnx.cmd_refresh(option)
+                self.assertEqual(
+                    {**OK_PACKET_RESULT, **{"warning_count": 1}}, ok_packet
+                )
+            else:
+                self.assertEqual(OK_PACKET_RESULT, self.cnx.cmd_refresh(option))
 
         # Test combined options
         options = RefreshOption.LOG | RefreshOption.STATUS

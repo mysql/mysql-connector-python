@@ -1,0 +1,27 @@
+[correct_config]
+user=root
+password=mypass
+database=cpydata
+port=10000
+failover=[{"host": "127.0.1.2", "port": 3306, "user": "root", "priority": 80},{"host": "127.0.1.5", "port": 2450, "user": "root_123", "priority": 10},]
+
+[correct_config_with_unix_socket]
+user=root
+password=mypass
+database=cpydata
+port=10000
+unix_socket=unix_socket_path_for_bug37145655
+
+[correct_config_with_socket]
+user=root
+password=mypass
+database=cpydata
+port=10000
+socket=unix_socket_path_for_bug37145655
+
+[incorrect_config]
+user=root
+password=mypass
+database=cpydata
+port=int(10000)
+allow_local_infile=__import__('os').system('whoami')

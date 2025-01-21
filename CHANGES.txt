@@ -8,6 +8,17 @@ Copyright (c) 2009, 2024, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v9.2.0
+======
+
+- WL#16381: Add support for read and write timeouts
+- WL#16285: Remake Multi Statement Execution
+- BUG#37145655: MySQL Connector/Python Configuration Files RCE
+- BUG#36702939: connection_cext has a memory leak in the python mysql-connector
+- BUG#36922645: Option `connection_timeout` is overwritten and works as "query" timeout instead
+- BUG#36126909: "Unread result found" exception/bad MySQLCursor.statement when query text contains code comments
+- BUG#35810050: Executing multiple statements fails when importing Sakila
+
 v9.1.0
 ======
 

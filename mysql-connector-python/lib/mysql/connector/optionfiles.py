@@ -30,6 +30,7 @@
 
 """Implements parser to parse MySQL option files."""
 
+import ast
 import codecs
 import io
 import os
@@ -69,14 +70,18 @@ def read_option_files(**config: Union[str, List[str]]) -> Dict[str, Any]:
         )
         del config["option_files"]
 
-        config_from_file = option_parser.get_groups_as_dict_with_priority(*groups)
-        config_options: Dict[str, Tuple[str, int]] = {}
+        config_from_file: Dict[str, Any] = (
+            option_parser.get_groups_as_dict_with_priority(*groups)
+        )
+        config_options: Dict[str, Tuple[str, int, str]] = {}
         for group in groups:
             try:
                 for option, value in config_from_file[group].items():
+                    value += (group,)
                     try:
                         if option == "socket":
                             option = "unix_socket"
+                            option_parser.set(group, "unix_socket", value[0])
 
                         if option not in CNX_POOL_ARGS and option != "failover":
                             _ = DEFAULT_CONFIGURATION[option]
@@ -94,17 +99,22 @@ def read_option_files(**config: Union[str, List[str]]) -> Dict[str, Any]:
             except KeyError:
                 continue
 
-        not_evaluate = ("password", "passwd")
-        for option, value in config_options.items():
-            if option not in config:
-                try:
-                    if option in not_evaluate:
-                        config[option] = value[0]
-                    else:
-                        config[option] = eval(value[0])  # pylint: disable=eval-used
-                except (NameError, SyntaxError):
-                    config[option] = value[0]
-
+        for option, values in config_options.items():
+            value, _, section = values
+            if (
+                option not in config
+                and option_parser.has_section(section)
+                and option_parser.has_option(section, option)
+            ):
+                if option in ("password", "passwd"):  # keep the value as string
+                    config[option] = str(value)
+                else:
+                    try:
+                        config[option] = ast.literal_eval(value)
+                    except (ValueError, TypeError, SyntaxError):
+                        config[option] = value
+        if "socket" in config:
+            config["unix_socket"] = config.pop("socket")
     return config
 
 

@@ -304,6 +304,8 @@ class MySQLAuthenticator:
         auth_plugin_class: Optional[str] = None,
         conn_attrs: Optional[Dict[str, str]] = None,
         is_change_user_request: bool = False,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> bytes:
         """Performs the authentication phase.
 
@@ -325,12 +327,19 @@ class MySQLAuthenticator:
                                than the authorization plugin name).
             conn_attrs: Connection attributes.
             is_change_user_request: Whether is a `change user request` operation or not.
-
+            read_timeout: Timeout in seconds upto which the connector should wait for
+                          the server to reply back before raising an ReadTimeoutError.
+            write_timeout: Timeout in seconds upto which the connector should spend to
+                           send data to the server before raising an WriteTimeoutError.
         Returns:
             ok_packet: OK packet.
 
         Raises:
             InterfaceError: If OK packet is NULL.
+            ReadTimeoutError: If the time taken for the server to reply back exceeds
+                              'read_timeout' (if set).
+            WriteTimeoutError: If the time taken to send data packets to the server
+                               exceeds 'write_timeout' (if set).
 
         References:
             [1]: https://dev.mysql.com/doc/dev/mysql-server/latest/\
@@ -359,11 +368,15 @@ class MySQLAuthenticator:
         )
 
         # client sends transaction response
-        send_args = (0, 0) if is_change_user_request else (None, None)
+        send_args = (
+            (0, 0, write_timeout)
+            if is_change_user_request
+            else (None, None, write_timeout)
+        )
         sock.send(response_payload, *send_args)
 
         # server replies back
-        pkt = bytes(sock.recv())
+        pkt = bytes(sock.recv(read_timeout))
 
         ok_pkt = self._handle_server_response(sock, pkt)
         if ok_pkt is None:

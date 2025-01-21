@@ -36,6 +36,7 @@ from decimal import Decimal
 from time import struct_time
 from typing import (
     TYPE_CHECKING,
+    Deque,
     Dict,
     List,
     Mapping,
@@ -43,11 +44,19 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    TypedDict,
     Union,
 )
 
 if TYPE_CHECKING:
     from .custom_types import HexLiteral
+
+
+class MySQLScriptPartition(TypedDict):
+    """Represents a partition or sub-script."""
+
+    mappable_stmt: bytes
+    single_stmts: Deque[bytes]
 
 
 StrOrBytes = Union[str, bytes]

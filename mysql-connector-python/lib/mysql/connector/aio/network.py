@@ -58,6 +58,8 @@ from ..errors import (
     NotSupportedError,
     OperationalError,
     ProgrammingError,
+    ReadTimeoutError,
+    WriteTimeoutError,
 )
 from ..network import (
     COMPRESSED_PACKET_HEADER_LENGTH,
@@ -108,6 +110,7 @@ class NetworkBroker(ABC):
         payload: bytes,
         packet_number: Optional[int] = None,
         compressed_packet_number: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> None:
         """Send `payload` to the MySQL server.
 
@@ -122,6 +125,9 @@ class NetworkBroker(ABC):
                            plain packets.
             compressed_packet_number: Same as `packet_number` but used when sending
                                       compressed packets.
+            write_timeout: Timeout in seconds before which sending a packet to the server
+                           should finish else WriteTimeoutError is raised.
+
 
         Raises:
             :class:`OperationalError`: If something goes wrong while sending packets to
@@ -129,12 +135,19 @@ class NetworkBroker(ABC):
         """
 
     @abstractmethod
-    async def read(self, reader: asyncio.StreamReader, address: str) -> bytearray:
+    async def read(
+        self,
+        reader: asyncio.StreamReader,
+        address: str,
+        read_timeout: Optional[int] = None,
+    ) -> bytearray:
         """Get the next available packet from the MySQL server.
 
         Args:
             sock: Object holding the socket connection.
             address: Socket's location.
+            read_timeout: Timeout in seconds before which reading a packet from the server
+                          should finish.
 
         Returns:
             packet: A packet from the MySQL server.
@@ -142,6 +155,8 @@ class NetworkBroker(ABC):
         Raises:
             :class:`OperationalError`: If something goes wrong while receiving packets
                                        from the MySQL server.
+            :class:`ReadTimeoutError`: If the time to receive a packet from the server takes
+                                       longer than `read_timeout`.
             :class:`InterfaceError`: If something goes wrong while receiving packets
                                      from the MySQL server.
         """
@@ -174,7 +189,12 @@ class NetworkBrokerPlain(NetworkBroker):
             self._pktnr = next_id
         self._pktnr %= 256
 
-    async def _write_pkt(self, writer: StreamWriter, address: str, pkt: bytes) -> None:
+    async def _write_pkt(
+        self,
+        writer: StreamWriter,
+        address: str,
+        pkt: bytes,
+    ) -> None:
         """Write packet to the comm channel."""
         try:
             writer.write(pkt)
@@ -187,16 +207,24 @@ class NetworkBrokerPlain(NetworkBroker):
             raise OperationalError(errno=2006) from err
 
     async def _read_chunk(
-        self, reader: asyncio.StreamReader, size: int = 0
+        self,
+        reader: asyncio.StreamReader,
+        size: int = 0,
+        read_timeout: Optional[int] = None,
     ) -> bytearray:
         """Read `size` bytes from the comm channel."""
-        pkt = bytearray(b"")
-        while len(pkt) < size:
-            chunk = await reader.read(size - len(pkt))
-            if not chunk:
-                raise InterfaceError(errno=2013)
-            pkt += chunk
-        return pkt
+        try:
+            pkt = bytearray(b"")
+            while len(pkt) < size:
+                chunk = await asyncio.wait_for(
+                    reader.read(size - len(pkt)), read_timeout
+                )
+                if not chunk:
+                    raise InterfaceError(errno=2013)
+                pkt += chunk
+            return pkt
+        except (asyncio.CancelledError, asyncio.TimeoutError) as err:
+            raise ReadTimeoutError(errno=3024) from err
 
     async def write(
         self,
@@ -205,6 +233,7 @@ class NetworkBrokerPlain(NetworkBroker):
         payload: bytes,
         packet_number: Optional[int] = None,
         compressed_packet_number: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> None:
         """Send payload to the MySQL server.
 
@@ -212,41 +241,54 @@ class NetworkBrokerPlain(NetworkBroker):
         broken down into packets.
         """
         self._set_next_pktnr(packet_number)
-
         # If the payload is larger than or equal to MAX_PAYLOAD_LENGTH the length is
         # set to 2^24 - 1 (ff ff ff) and additional packets are sent with the rest of
         # the payload until the payload of a packet is less than MAX_PAYLOAD_LENGTH.
         offset = 0
-        for _ in range(len(payload) // MAX_PAYLOAD_LENGTH):
-            # payload_len, sequence_id, payload
-            await self._write_pkt(
-                writer,
-                address,
-                b"\xff" * 3
-                + struct.pack("<B", self._pktnr)
-                + payload[offset : offset + MAX_PAYLOAD_LENGTH],
+        try:
+            for _ in range(len(payload) // MAX_PAYLOAD_LENGTH):
+                # payload_len, sequence_id, payload
+                await asyncio.wait_for(
+                    self._write_pkt(
+                        writer,
+                        address,
+                        b"\xff" * 3
+                        + struct.pack("<B", self._pktnr)
+                        + payload[offset : offset + MAX_PAYLOAD_LENGTH],
+                    ),
+                    write_timeout,
+                )
+                self._set_next_pktnr()
+                offset += MAX_PAYLOAD_LENGTH
+            await asyncio.wait_for(
+                self._write_pkt(
+                    writer,
+                    address,
+                    struct.pack("<I", len(payload) - offset)[0:3]
+                    + struct.pack("<B", self._pktnr)
+                    + payload[offset:],
+                ),
+                write_timeout,
             )
-            self._set_next_pktnr()
-            offset += MAX_PAYLOAD_LENGTH
-        await self._write_pkt(
-            writer,
-            address,
-            struct.pack("<I", len(payload) - offset)[0:3]
-            + struct.pack("<B", self._pktnr)
-            + payload[offset:],
-        )
+        except (asyncio.CancelledError, asyncio.TimeoutError) as err:
+            raise WriteTimeoutError(errno=3024) from err
 
-    async def read(self, reader: asyncio.StreamReader, address: str) -> bytearray:
+    async def read(
+        self,
+        reader: asyncio.StreamReader,
+        address: str,
+        read_timeout: Optional[int] = None,
+    ) -> bytearray:
         """Receive `one` packet from the MySQL server."""
         try:
             # Read the header of the MySQL packet.
-            header = await self._read_chunk(reader, size=PACKET_HEADER_LENGTH)
+            header = await self._read_chunk(reader, PACKET_HEADER_LENGTH, read_timeout)
 
             # Pull the payload length and sequence id.
             payload_len, self._pktnr = self.get_header(header)
 
             # Read the payload, and return packet.
-            return header + await self._read_chunk(reader, size=payload_len)
+            return header + await self._read_chunk(reader, payload_len, read_timeout)
         except IOError as err:
             raise OperationalError(
                 errno=2055, values=(address, _strioerror(err))
@@ -308,7 +350,12 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
             self._compressed_pktnr = next_id
         self._compressed_pktnr %= 256
 
-    async def _write_pkt(self, writer: StreamWriter, address: str, pkt: bytes) -> None:
+    async def _write_pkt(
+        self,
+        writer: StreamWriter,
+        address: str,
+        pkt: bytes,
+    ) -> None:
         """Compress packet and write it to the comm channel."""
         compressed_pkt = zlib.compress(pkt)
         pkt = (
@@ -326,6 +373,7 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
         payload: bytes,
         packet_number: Optional[int] = None,
         compressed_packet_number: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> None:
         """Send `payload` as compressed packets to the MySQL server.
 
@@ -335,52 +383,74 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
         # Get next packet numbers.
         self._set_next_pktnr(packet_number)
         self._set_next_compressed_pktnr(compressed_packet_number)
+        try:
+            payload_prep = bytearray(b"").join(
+                self._prepare_packets(payload, self._pktnr)
+            )
+            if len(payload) >= MAX_PAYLOAD_LENGTH - PACKET_HEADER_LENGTH:
+                # Sending a MySQL payload of the size greater or equal to 2^24 - 5 via
+                # compression leads to at least one extra compressed packet WHY? let's say
+                # len(payload) is MAX_PAYLOAD_LENGTH - 3; when preparing the payload, a
+                # header of size PACKET_HEADER_LENGTH is pre-appended to the payload.
+                # This means that len(payload_prep) is
+                # MAX_PAYLOAD_LENGTH - 3 + PACKET_HEADER_LENGTH = MAX_PAYLOAD_LENGTH + 1
+                # surpassing the maximum allowed payload size per packet.
+                offset = 0
 
-        payload_prep = bytearray(b"").join(self._prepare_packets(payload, self._pktnr))
-        if len(payload) >= MAX_PAYLOAD_LENGTH - PACKET_HEADER_LENGTH:
-            # Sending a MySQL payload of the size greater or equal to 2^24 - 5 via
-            # compression leads to at least one extra compressed packet WHY? let's say
-            # len(payload) is MAX_PAYLOAD_LENGTH - 3; when preparing the payload, a
-            # header of size PACKET_HEADER_LENGTH is pre-appended to the payload.
-            # This means that len(payload_prep) is
-            # MAX_PAYLOAD_LENGTH - 3 + PACKET_HEADER_LENGTH = MAX_PAYLOAD_LENGTH + 1
-            # surpassing the maximum allowed payload size per packet.
-            offset = 0
-
-            # Send several MySQL packets.
-            for _ in range(len(payload_prep) // MAX_PAYLOAD_LENGTH):
-                await self._write_pkt(
-                    writer, address, payload_prep[offset : offset + MAX_PAYLOAD_LENGTH]
+                # Send several MySQL packets.
+                for _ in range(len(payload_prep) // MAX_PAYLOAD_LENGTH):
+                    await asyncio.wait_for(
+                        self._write_pkt(
+                            writer,
+                            address,
+                            payload_prep[offset : offset + MAX_PAYLOAD_LENGTH],
+                        ),
+                        write_timeout,
+                    )
+                    self._set_next_compressed_pktnr()
+                    offset += MAX_PAYLOAD_LENGTH
+                await asyncio.wait_for(
+                    self._write_pkt(writer, address, payload_prep[offset:]),
+                    write_timeout,
                 )
-                self._set_next_compressed_pktnr()
-                offset += MAX_PAYLOAD_LENGTH
-            await self._write_pkt(writer, address, payload_prep[offset:])
-        else:
-            # Send one MySQL packet.
-            # For small packets it may be too costly to compress the packet.
-            # Usually payloads less than 50 bytes (MIN_COMPRESS_LENGTH) aren't
-            # compressed (see MySQL source code Documentation).
-            if len(payload) > MIN_COMPRESS_LENGTH:
-                # Perform compression.
-                await self._write_pkt(writer, address, payload_prep)
             else:
-                # Skip compression.
-                await super()._write_pkt(
-                    writer,
-                    address,
-                    struct.pack("<I", len(payload_prep))[0:3]
-                    + struct.pack("<B", self._compressed_pktnr)
-                    + struct.pack("<I", 0)[0:3]
-                    + payload_prep,
-                )
+                # Send one MySQL packet.
+                # For small packets it may be too costly to compress the packet.
+                # Usually payloads less than 50 bytes (MIN_COMPRESS_LENGTH) aren't
+                # compressed (see MySQL source code Documentation).
+                if len(payload) > MIN_COMPRESS_LENGTH:
+                    # Perform compression.
+                    await asyncio.wait_for(
+                        self._write_pkt(writer, address, payload_prep), write_timeout
+                    )
+                else:
+                    # Skip compression.
+                    await asyncio.wait_for(
+                        super()._write_pkt(
+                            writer,
+                            address,
+                            struct.pack("<I", len(payload_prep))[0:3]
+                            + struct.pack("<B", self._compressed_pktnr)
+                            + struct.pack("<I", 0)[0:3]
+                            + payload_prep,
+                        ),
+                        write_timeout,
+                    )
+        except (asyncio.CancelledError, asyncio.TimeoutError) as err:
+            raise WriteTimeoutError(errno=3024) from err
 
     async def _read_compressed_pkt(
-        self, reader: asyncio.StreamReader, compressed_pll: int
+        self,
+        reader: asyncio.StreamReader,
+        compressed_pll: int,
+        read_timeout: Optional[int] = None,
     ) -> None:
         """Handle reading of a compressed packet."""
         # compressed_pll stands for compressed payload length.
         pkt = bytearray(
-            zlib.decompress(await super()._read_chunk(reader, size=compressed_pll))
+            zlib.decompress(
+                await super()._read_chunk(reader, compressed_pll, read_timeout)
+            )
         )
         offset = 0
         while offset < len(pkt):
@@ -392,7 +462,7 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
                 # More bytes need to be consumed.
                 # Read the header of the next MySQL packet.
                 header = await super()._read_chunk(
-                    reader, size=COMPRESSED_PACKET_HEADER_LENGTH
+                    reader, COMPRESSED_PACKET_HEADER_LENGTH, read_timeout
                 )
 
                 # compressed payload length, sequence id, uncompressed payload length.
@@ -401,7 +471,9 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
                     self._compressed_pktnr,
                     uncompressed_pll,
                 ) = self.get_header(header)
-                compressed_pkt = await super()._read_chunk(reader, size=compressed_pll)
+                compressed_pkt = await super()._read_chunk(
+                    reader, compressed_pll, read_timeout
+                )
 
                 # Recalling that if uncompressed payload length == 0, the packet comes
                 # in uncompressed, so no decompression is needed.
@@ -414,15 +486,21 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
             self._queue_read.append(pkt[offset : offset + PACKET_HEADER_LENGTH + pll])
             offset += PACKET_HEADER_LENGTH + pll
 
-    async def read(self, reader: asyncio.StreamReader, address: str) -> bytearray:
+    async def read(
+        self,
+        reader: asyncio.StreamReader,
+        address: str,
+        read_timeout: Optional[int] = None,
+    ) -> bytearray:
         """Receive `one` or `several` packets from the MySQL server, enqueue them, and
         return the packet at the head.
         """
+
         if not self._queue_read:
             try:
                 # Read the header of the next MySQL packet.
                 header = await super()._read_chunk(
-                    reader, size=COMPRESSED_PACKET_HEADER_LENGTH
+                    reader, COMPRESSED_PACKET_HEADER_LENGTH, read_timeout
                 )
 
                 # compressed payload length, sequence id, uncompressed payload length
@@ -435,11 +513,13 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
                 if uncompressed_pll == 0:
                     # Packet is not compressed, so just store it.
                     self._queue_read.append(
-                        await super()._read_chunk(reader, size=compressed_pll)
+                        await super()._read_chunk(reader, compressed_pll, read_timeout)
                     )
                 else:
                     # Packet comes in compressed, further action is needed.
-                    await self._read_compressed_pkt(reader, compressed_pll)
+                    await self._read_compressed_pkt(
+                        reader, compressed_pll, read_timeout
+                    )
             except IOError as err:
                 raise OperationalError(
                     errno=2055, values=(address, _strioerror(err))
@@ -484,11 +564,16 @@ class MySQLSocket(ABC):
     async def close_connection(self) -> None:
         """Close the connection."""
         if self._writer:
-            self._writer.close()
-            # Without transport.abort(), an error is raised when using SSL
-            if self._writer.transport is not None:
-                self._writer.transport.abort()
-            await self._writer.wait_closed()
+            try:
+                self._writer.close()
+                # Without transport.abort(), an error is raised when using SSL
+                if self._writer.transport is not None:
+                    self._writer.transport.abort()
+                await self._writer.wait_closed()
+            except Exception as _:  # pylint: disable=broad-exception-caught)
+                # we can ignore issues like ConnectionRefused or ConnectionAborted
+                # as these instances might popup if the connection was closed due to timeout issues
+                pass
         self._is_connected = False
 
     def is_connected(self) -> bool:
@@ -537,6 +622,7 @@ class MySQLSocket(ABC):
         payload: bytes,
         packet_number: Optional[int] = None,
         compressed_packet_number: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> None:
         """Send packets to the MySQL server."""
         await self._netbroker.write(
@@ -545,11 +631,12 @@ class MySQLSocket(ABC):
             payload,
             packet_number=packet_number,
             compressed_packet_number=compressed_packet_number,
+            write_timeout=write_timeout,
         )
 
-    async def read(self) -> bytearray:
+    async def read(self, read_timeout: Optional[int] = None) -> bytearray:
         """Read packets from the MySQL server."""
-        return await self._netbroker.read(self._reader, self.address)
+        return await self._netbroker.read(self._reader, self.address, read_timeout)
 
     def build_ssl_context(
         self,

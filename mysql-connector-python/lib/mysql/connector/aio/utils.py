@@ -36,6 +36,9 @@ __all__ = ["to_thread", "open_connection"]
 import asyncio
 import contextvars
 import functools
+import warnings
+
+from mysql.connector.errors import ReadTimeoutError, WriteTimeoutError
 
 try:
     import ssl
@@ -45,6 +48,8 @@ except ImportError:
 from typing import TYPE_CHECKING, Any, Callable, Tuple
 
 if TYPE_CHECKING:
+    from mysql.connector.aio.abstracts import MySQLConnectionAbstract
+
     __all__.append("StreamWriter")
 
 
@@ -151,3 +156,44 @@ async def to_thread(func: Callable, *args: Any, **kwargs: Any) -> asyncio.Future
     ctx = contextvars.copy_context()
     func_call = functools.partial(ctx.run, func, *args, **kwargs)
     return await loop.run_in_executor(None, func_call)
+
+
+def deprecated(reason: str) -> Callable:
+    """Use it to decorate deprecated methods."""
+
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Callable:
+            warnings.warn(
+                f"Call to deprecated function {func.__name__}. Reason: {reason}",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def handle_read_write_timeout() -> Callable:
+    """
+    Decorator to close the current connection if a read or a write timeout
+    is raised by the method passed via the func parameter.
+    """
+
+    def decorator(cnx_method: Callable) -> Callable:
+        @functools.wraps(cnx_method)
+        async def handle_cnx_method(
+            cnx: "MySQLConnectionAbstract", *args: Any, **kwargs: Any
+        ) -> Any:
+            try:
+                return await cnx_method(cnx, *args, **kwargs)
+            except Exception as err:
+                if isinstance(err, (ReadTimeoutError, WriteTimeoutError)):
+                    await cnx.close()
+                raise err
+
+        return handle_cnx_method
+
+    return decorator

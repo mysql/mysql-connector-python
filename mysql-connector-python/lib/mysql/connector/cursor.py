@@ -32,17 +32,14 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 import warnings
 
-from collections import deque, namedtuple
+from collections import namedtuple
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Deque,
     Dict,
-    Generator,
     Iterator,
     List,
     NoReturn,
@@ -53,6 +50,7 @@ from typing import (
     cast,
 )
 
+from ._scripting import split_multi_statement
 from .abstracts import NAMED_TUPLE_CACHE, MySQLCursorAbstract
 from .constants import ServerFlag
 from .errors import (
@@ -60,6 +58,8 @@ from .errors import (
     InterfaceError,
     NotSupportedError,
     ProgrammingError,
+    ReadTimeoutError,
+    WriteTimeoutError,
     get_mysql_exception,
 )
 from .types import (
@@ -114,71 +114,6 @@ RE_SQL_PYTHON_CAPTURE_PARAM_NAME = re.compile(r"%\((.*?)\)s")
 ERR_NO_RESULT_TO_FETCH = "No result set to fetch from"
 
 MAX_RESULTS = 4294967295
-
-
-def is_eol_comment(stmt: bytes) -> bool:
-    """Checks if statement is an end-of-line comment.
-
-    Double-dash comment style requires the second dash to be
-    followed by at least one whitespace (Z) or control character (C) such
-    as a space, tab, newline, and so on.
-
-    Hash comment simply requires start from `#` and nothing else.
-
-    Args:
-        stmt: MySQL statement.
-
-    Returns:
-        Whether or not the statement is an end-of-line comment.
-
-    References:
-        [1]: https://dev.mysql.com/doc/refman/en/comments.html
-    """
-    is_double_dash_comment = (
-        len(stmt) >= 3
-        and stmt.startswith(b"--")
-        and unicodedata.category(chr(stmt[2]))[0] in {"Z", "C"}
-    )
-    is_hash_comment = len(stmt) >= 2 and stmt.startswith(b"#")
-
-    return is_double_dash_comment or is_hash_comment
-
-
-def parse_multi_statement_query(multi_stmt: bytes) -> Deque[bytes]:
-    """Parses a multi-statement query/operation.
-
-    Parsing consists of removing empty (which includes just whitespaces and/or control
-    characters) statements and EOL (end-of-line) comments.
-
-    However, there's a caveat, by rule, the last EOL comment found in the stream isn't
-    removed if and only if it's the last statement.
-
-    Why? EOL comments do not generate results, however, when the last statement is an
-    EOL comment the server returns an empty result. So, in other to match statements
-    and results correctly we need to keep the last EOL comment statement.
-
-    Args:
-        multi_stmt: Query representing multi-statement operations separated by semicolons.
-
-    Returns:
-        A list of statements that aren't empty and don't contain leading
-        ASCII whitespaces. Also, they aren't EOL comments except
-        perhaps for the last one.
-    """
-    executed_list: Deque[bytes] = deque(RE_SQL_SPLIT_STMTS.split(multi_stmt))
-    stmt, num_stms = b"", len(executed_list)
-    while num_stms > 0:
-        num_stms -= 1
-        stmt_next = executed_list.popleft().lstrip()
-        if stmt_next:
-            stmt = stmt_next
-            if not is_eol_comment(stmt):
-                executed_list.append(stmt)
-
-    if is_eol_comment(stmt):
-        executed_list.append(stmt)
-
-    return executed_list
 
 
 class _ParamSubstitutor:
@@ -251,9 +186,14 @@ class MySQLCursor(MySQLCursorAbstract):
     Implements the Python Database API Specification v2.0 (PEP-249)
     """
 
-    def __init__(self, connection: Optional[MySQLConnection] = None) -> None:
+    def __init__(
+        self,
+        connection: Optional[MySQLConnection] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> None:
         """Initialize"""
-        super().__init__(connection)
+        super().__init__(connection, read_timeout, write_timeout)
         self._connection: MySQLConnection = cast("MySQLConnection", self._connection)
 
     def __iter__(self) -> Iterator[RowType]:
@@ -263,16 +203,29 @@ class MySQLCursor(MySQLCursorAbstract):
         """
         return iter(self.fetchone, None)
 
-    def _reset_result(self) -> None:
-        """Reset the cursor to default"""
+    def _reset_result(self, preserve_last_executed_stmt: bool = False) -> None:
+        """Reset the cursor to default.
+
+        Args:
+            preserve_last_executed_stmt: If it is False, the last executed
+                                         statement value is reset. Otherwise,
+                                         such a value is preserved.
+        """
         self._rowcount: int = -1
         self._nextrow = (None, None)
         self._stored_results: List[MySQLCursor] = []
         self._warnings: Optional[List[WarningType]] = None
         self._warning_count: int = 0
         self._description: Optional[List[DescriptionType]] = None
-        self._executed: Optional[bytes] = None
-        self._executed_list: List[bytes] = []
+
+        if not preserve_last_executed_stmt:
+            # reset inner state related to statement execution
+            self._executed = None
+            self._executed_list = []
+            self._stmt_partitions = None
+            self._stmt_partition = None
+            self._stmt_map_results = False
+
         self.reset()
 
     def _have_unread_result(self) -> bool:
@@ -404,92 +357,12 @@ class MySQLCursor(MySQLCursorAbstract):
         else:
             raise InterfaceError("Invalid result")
 
-    def _execute_iter(
-        self, query_iter: Generator[ResultType, None, None]
-    ) -> Generator[MySQLCursor, None, None]:
-        """Generator returns MySQLCursor objects for multiple statements
-
-        This method is only used when multiple statements are executed
-        by the `cursor.execute(multi_stmt_query, multi=True)` method.
-
-        It matches the given `query_iter` (result of `MySQLConnection.cmd_query_iter()`)
-        and the list of statements that were executed.
-
-        How does this method work? To properly map each statement (stmt) to a result,
-        the following facts must be considered:
-
-        1. Read operations such as `SELECT` produce a non-empty result
-            (calling `next(query_iter)` gets a result that includes at least one column).
-        2. Write operatios such as `INSERT` produce an empty result
-            (calling `next(query_iter)` gets a result with no columns - aka empty).
-        3. End-of-line (EOL) comments do not produce a result, unless is the last stmt
-            in which case produces an empty result.
-        4. Calling procedures such as `CALL my_proc` produce a sequence `(1)*0` which
-            means it may produce zero or more non-empty results followed by just one
-            empty result. In other words, a callproc stmt always terminates with an
-            empty result. E.g., `my_proc` includes an update + select + select + update,
-            then the result sequence will be `110` - note how the write ops results get
-            annulated, just the read ops results are produced. Other examples:
-                * insert + insert -> 0
-                * select + select + insert + select -> 1110
-                * select -> 10
-            Observe how 0 indicates the end of the result sequence. This property is
-            vital to know what result corresponds to what callproc stmt.
-
-        In this regard, the implementation is composed of:
-        1. Parsing: the multi-statement is broken down into single statements, and then
-            for each of these, leading white spaces are removed (including
-            jumping line, vertical line, tab, etc.). Also, EOL comments are removed from
-            the stream, except when the comment is the last statement of the
-            multi-statement string.
-        2. Mapping: the facts described above as used as "game rules" to properly match
-        statements and results. In case, if we run out of statements before running out
-        of results we use a sentinel named "stmt_overflow!" to indicate that the mapping
-        went wrong.
-
-        Acronyms
-            1: a non-empty result
-            2: an empty result
-        """
-        executed_list = parse_multi_statement_query(multi_stmt=self._executed)
-        self._executed = None
-        stmt = executed_list.popleft() if executed_list else b"stmt_overflow!"
-        for result in query_iter:
-            self._reset_result()
-            self._handle_result(result)
-
-            if is_eol_comment(stmt):
-                continue
-
-            self._executed = stmt.rstrip()
-            yield self
-
-            if not stmt.upper().startswith(b"CALL") or "columns" not in result:
-                stmt = executed_list.popleft() if executed_list else b"stmt_overflow!"
-
     def execute(
         self,
-        operation: StrOrBytes,
+        operation: str,
         params: Optional[ParamsSequenceOrDictType] = None,
-        multi: bool = False,
-    ) -> Optional[Generator[MySQLCursor, None, None]]:
-        """Executes the given operation
-
-        Executes the given operation substituting any markers with
-        the given parameters.
-
-        For example, getting all rows where id is 5:
-          cursor.execute("SELECT * FROM t1 WHERE id = %s", (5,))
-
-        The multi argument should be set to True when executing multiple
-        statements in one operation. If not set and multiple results are
-        found, an InterfaceError will be raised.
-
-        If warnings where generated, and connection.get_warnings is True, then
-        self._warnings will be a list containing these warnings.
-
-        Returns an iterator when multi is True, otherwise None.
-        """
+        map_results: bool = False,
+    ) -> None:
         if not operation:
             return None
 
@@ -500,15 +373,14 @@ class MySQLCursor(MySQLCursorAbstract):
             raise ProgrammingError("Cursor is not connected") from err
 
         self._connection.handle_unread_result()
-
         self._reset_result()
-        stmt: StrOrBytes = ""
 
+        stmt = b""
         try:
-            if not isinstance(operation, (bytes, bytearray)):
+            if isinstance(operation, str):
                 stmt = operation.encode(self._connection.python_charset)
             else:
-                stmt = operation
+                stmt = cast(bytes, operation)
         except (UnicodeDecodeError, UnicodeEncodeError) as err:
             raise ProgrammingError(str(err)) from err
 
@@ -528,19 +400,26 @@ class MySQLCursor(MySQLCursorAbstract):
                     " it must be of type list, tuple or dict"
                 )
 
-        self._executed = stmt
-        if multi:
-            self._executed_list = []
-            return self._execute_iter(self._connection.cmd_query_iter(stmt))
+        self._stmt_partitions = split_multi_statement(
+            sql_code=stmt, map_results=map_results
+        )
+        self._stmt_partition = next(self._stmt_partitions)
+        self._stmt_map_results = map_results
+        self._executed_list = self._stmt_partition["single_stmts"]
+        self._executed = (
+            self._stmt_partition["single_stmts"].popleft()
+            if map_results
+            else self._stmt_partition["mappable_stmt"]
+        )
 
-        try:
-            self._handle_result(self._connection.cmd_query(stmt))
-        except InterfaceError as err:
-            if self._connection.have_next_result:
-                raise InterfaceError(
-                    "Use multi=True when executing multiple statements"
-                ) from err
-            raise
+        self._handle_result(
+            self._connection.cmd_query(
+                self._stmt_partition["mappable_stmt"],
+                read_timeout=self._read_timeout,
+                write_timeout=self._write_timeout,
+            )
+        )
+
         return None
 
     def _batch_insert(
@@ -601,7 +480,7 @@ class MySQLCursor(MySQLCursorAbstract):
 
     def executemany(
         self, operation: str, seq_params: Sequence[ParamsSequenceOrDictType]
-    ) -> Optional[Generator[MySQLCursor, None, None]]:
+    ) -> None:
         """Execute the given operation multiple times
 
         The executemany() method will execute the operation iterating
@@ -743,7 +622,9 @@ class MySQLCursor(MySQLCursorAbstract):
             # We disable consuming results temporary to make sure we
             # getting all results
             can_consume_results = self._connection.can_consume_results
-            for result in self._connection.cmd_query_iter(call):
+            for result in self._connection.cmd_query_iter(
+                call, read_timeout=self._read_timeout, write_timeout=self._write_timeout
+            ):
                 self._connection.can_consume_results = False
                 if isinstance(self, (MySQLCursorDict, MySQLCursorBufferedDict)):
                     cursor_class = MySQLCursorBufferedDict
@@ -807,7 +688,11 @@ class MySQLCursor(MySQLCursorAbstract):
         """
         res = []
         try:
-            cur = self._connection.cursor(raw=False)
+            cur = self._connection.cursor(
+                raw=False,
+                read_timeout=self._read_timeout,
+                write_timeout=self._write_timeout,
+            )
             cur.execute("SHOW WARNINGS")
             res = cur.fetchall()
             cur.close()
@@ -860,14 +745,20 @@ class MySQLCursor(MySQLCursorAbstract):
 
         if self._nextrow == (None, None):
             (row, eof) = self._connection.get_row(
-                binary=self._binary, columns=self.description, raw=raw
+                binary=self._binary,
+                columns=self.description,
+                raw=raw,
+                read_timeout=self._read_timeout,
             )
         else:
             (row, eof) = self._nextrow
 
         if row:
             self._nextrow = self._connection.get_row(
-                binary=self._binary, columns=self.description, raw=raw
+                binary=self._binary,
+                columns=self.description,
+                raw=raw,
+                read_timeout=self._read_timeout,
             )
             eof = self._nextrow[1]
             if eof is not None:
@@ -920,7 +811,7 @@ class MySQLCursor(MySQLCursorAbstract):
         if not self._have_unread_result():
             return []
 
-        (rows, eof) = self._connection.get_rows()
+        (rows, eof) = self._connection.get_rows(read_timeout=self._read_timeout)
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
 
@@ -930,6 +821,61 @@ class MySQLCursor(MySQLCursorAbstract):
             self._rowcount = 0
         self._rowcount += rowcount
         return rows
+
+    def nextset(self) -> Optional[bool]:
+        if self._connection._have_next_result:
+            # prepare cursor to load the next result set, and ultimately, load it.
+            self._connection.handle_unread_result()
+            self._reset_result(preserve_last_executed_stmt=True)
+            self._handle_result(
+                self._connection._handle_result(
+                    self._connection._socket.recv(read_timeout=self._read_timeout)
+                )
+            )
+
+            # if mapping is enabled, run the if-block, otherwise simply return `True`.
+            if self._stmt_partitions is not None and self._stmt_map_results:
+                if not self._stmt_partition["single_stmts"]:
+                    # It means there are still results to be consumed, but no more
+                    # statements to relate these results to.
+                    # In this case, we raise a no fatal error and don't clear
+                    # `_executed` so its current value is reported when users
+                    # access the property `statement`.
+                    # If this case ever happens, a bug report should be filed,
+                    # assuming it is happening on supported use cases.
+                    warnings.warn(
+                        "MappingWarning: Number of result sets greater than number "
+                        "of single statements."
+                    )
+                else:
+                    self._executed = self._stmt_partition["single_stmts"].popleft()
+            return True
+        if self._stmt_partitions is not None:
+            # Let's see if there are more mappable statements (partitions)
+            # to be executed.
+            # If there are no more partitions, we simply return `None`, otherwise
+            # we execute the correponding mappable multi statement and repeat the
+            # process all over again.
+            try:
+                self._stmt_partition = next(self._stmt_partitions)
+            except StopIteration:
+                pass
+            else:
+                # This block only happens when mapping is enabled because when it
+                # is disabled, only one partition is generated, and at this point,
+                # such partiton has already been processed.
+                self._executed = self._stmt_partition["single_stmts"].popleft()
+                self._handle_result(
+                    self._connection.cmd_query(
+                        self._stmt_partition["mappable_stmt"],
+                        read_timeout=self._read_timeout,
+                        write_timeout=self._write_timeout,
+                    )
+                )
+                return True
+
+        self._reset_result()
+        return None
 
     @property
     def column_names(self) -> Tuple[str, ...]:
@@ -942,21 +888,6 @@ class MySQLCursor(MySQLCursorAbstract):
         if not self.description:
             return tuple()
         return tuple(d[0] for d in self.description)
-
-    @property
-    def statement(self) -> Optional[str]:
-        """Returns the executed statement
-
-        This property returns the executed statement. When multiple
-        statements were executed, the current statement in the iterator
-        will be returned.
-        """
-        if self._executed is None:
-            return None
-        try:
-            return self._executed.strip().decode("utf-8")
-        except (AttributeError, UnicodeDecodeError):
-            return self._executed.strip()  # type: ignore[return-value]
 
     @property
     def with_rows(self) -> bool:
@@ -988,13 +919,18 @@ class MySQLCursor(MySQLCursorAbstract):
 class MySQLCursorBuffered(MySQLCursor):
     """Cursor which fetches rows within execute()"""
 
-    def __init__(self, connection: Optional[MySQLConnection] = None) -> None:
-        super().__init__(connection)
+    def __init__(
+        self,
+        connection: Optional[MySQLConnection] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> None:
+        super().__init__(connection, read_timeout, write_timeout)
         self._rows: Optional[List[RowType]] = None
         self._next_row: int = 0
 
     def _handle_resultset(self) -> None:
-        (self._rows, eof) = self._connection.get_rows()
+        (self._rows, eof) = self._connection.get_rows(read_timeout=self._read_timeout)
         self._rowcount = len(self._rows)
         self._handle_eof(eof)
         self._next_row = 0
@@ -1068,8 +1004,13 @@ class MySQLCursorRaw(MySQLCursor):
     Skips conversion from MySQL datatypes to Python types when fetching rows.
     """
 
-    def __init__(self, connection: Optional[MySQLConnection] = None) -> None:
-        super().__init__(connection)
+    def __init__(
+        self,
+        connection: Optional[MySQLConnection] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> None:
+        super().__init__(connection, read_timeout, write_timeout)
         self._raw: bool = True
 
     def fetchone(self) -> Optional[RowType]:
@@ -1090,7 +1031,9 @@ class MySQLCursorRaw(MySQLCursor):
         self._check_executed()
         if not self._have_unread_result():
             return []
-        (rows, eof) = self._connection.get_rows(raw=self._raw)
+        (rows, eof) = self._connection.get_rows(
+            raw=self._raw, read_timeout=self._read_timeout
+        )
         if self._nextrow[0]:
             rows.insert(0, self._nextrow[0])
         self._handle_eof(eof)
@@ -1107,12 +1050,19 @@ class MySQLCursorBufferedRaw(MySQLCursorBuffered):
     fetching rows and fetches rows within execute().
     """
 
-    def __init__(self, connection: Optional[MySQLConnection] = None) -> None:
-        super().__init__(connection)
+    def __init__(
+        self,
+        connection: Optional[MySQLConnection] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> None:
+        super().__init__(connection, read_timeout, write_timeout)
         self._raw: bool = True
 
     def _handle_resultset(self) -> None:
-        (self._rows, eof) = self._connection.get_rows(raw=self._raw)
+        (self._rows, eof) = self._connection.get_rows(
+            raw=self._raw, read_timeout=self._read_timeout
+        )
         self._rowcount = len(self._rows)
         self._handle_eof(eof)
         self._next_row = 0
@@ -1137,6 +1087,8 @@ class MySQLCursorBufferedRaw(MySQLCursorBuffered):
             list: A list of tuples with all rows of a query result set.
         """
         self._check_executed()
+        if self._rows is None:
+            return []
         return list(self._rows[self._next_row :])
 
     @property
@@ -1147,8 +1099,13 @@ class MySQLCursorBufferedRaw(MySQLCursorBuffered):
 class MySQLCursorPrepared(MySQLCursor):
     """Cursor using MySQL Prepared Statements"""
 
-    def __init__(self, connection: Optional[MySQLConnection] = None):
-        super().__init__(connection)
+    def __init__(
+        self,
+        connection: Optional[MySQLConnection] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ):
+        super().__init__(connection, read_timeout, write_timeout)
         self._rows: Optional[List[RowType]] = None
         self._next_row: int = 0
         self._prepared: Optional[Dict[str, Union[int, List[DescriptionType]]]] = None
@@ -1160,11 +1117,16 @@ class MySQLCursorPrepared(MySQLCursor):
     def reset(self, free: bool = True) -> None:
         if self._prepared:
             try:
-                self._connection.cmd_stmt_close(self._prepared["statement_id"])
+                self._connection.cmd_stmt_close(
+                    self._prepared["statement_id"],
+                    read_timeout=self._read_timeout,
+                    write_timeout=self._write_timeout,
+                )
             except Error:
                 # We tried to deallocate, but it's OK when we fail.
                 pass
             self._prepared = None
+        self._executed = None
         self._last_row_sent = False
         self._cursor_exists = False
 
@@ -1226,8 +1188,8 @@ class MySQLCursorPrepared(MySQLCursor):
         self,
         operation: StrOrBytes,
         params: Optional[ParamsSequenceOrDictType] = None,
-        multi: bool = False,
-    ) -> None:  # multi is unused
+        map_results: bool = False,
+    ) -> None:
         """Prepare and execute a MySQL Prepared Statement
 
         This method will prepare the given operation and execute it using
@@ -1236,8 +1198,18 @@ class MySQLCursorPrepared(MySQLCursor):
         If the cursor instance already had a prepared statement, it is
         first closed.
 
-        Note: argument "multi" is unused.
+        *Argument "map_results" is unused as multi statement execution
+        is not supported for prepared statements*.
+
+        Raises:
+            ProgrammingError: When providing a multi statement operation
+                              or setting *map_results* to True.
         """
+        if map_results:
+            raise ProgrammingError(
+                "Multi statement execution not supported for prepared statements."
+            )
+
         charset = self._connection.charset
         if charset == "utf8mb4":
             charset = "utf8"
@@ -1262,7 +1234,11 @@ class MySQLCursorPrepared(MySQLCursor):
 
         if operation is not self._executed:
             if self._prepared:
-                self._connection.cmd_stmt_close(self._prepared["statement_id"])
+                self._connection.cmd_stmt_close(
+                    self._prepared["statement_id"],
+                    read_timeout=self._read_timeout,
+                    write_timeout=self._write_timeout,
+                )
             self._executed = operation
 
             try:
@@ -1275,12 +1251,20 @@ class MySQLCursorPrepared(MySQLCursor):
                 operation = re.sub(RE_SQL_FIND_PARAM, b"?", operation)
 
             try:
-                self._prepared = self._connection.cmd_stmt_prepare(operation)
+                self._prepared = self._connection.cmd_stmt_prepare(
+                    operation,
+                    read_timeout=self._read_timeout,
+                    write_timeout=self._write_timeout,
+                )
             except Error:
                 self._executed = None
                 raise
 
-        self._connection.cmd_stmt_reset(self._prepared["statement_id"])
+        self._connection.cmd_stmt_reset(
+            self._prepared["statement_id"],
+            read_timeout=self._read_timeout,
+            write_timeout=self._write_timeout,
+        )
 
         if self._prepared["parameters"] and not params:
             return
@@ -1300,12 +1284,18 @@ class MySQLCursorPrepared(MySQLCursor):
 
         if params is None:
             params = ()
-        res = self._connection.cmd_stmt_execute(
-            self._prepared["statement_id"],
-            data=params,
-            parameters=self._prepared["parameters"],
-        )
-        self._handle_result(res)
+        try:
+            res = self._connection.cmd_stmt_execute(
+                self._prepared["statement_id"],
+                data=params,
+                parameters=self._prepared["parameters"],
+                read_timeout=self._read_timeout,
+                write_timeout=self._write_timeout,
+            )
+            self._handle_result(res)
+        except (ReadTimeoutError, WriteTimeoutError) as err:
+            self.reset()
+            raise err
 
     def executemany(
         self,
@@ -1341,7 +1331,11 @@ class MySQLCursorPrepared(MySQLCursor):
         """
         self._check_executed()
         if self._cursor_exists:
-            self._connection.cmd_stmt_fetch(self._prepared["statement_id"])
+            self._connection.cmd_stmt_fetch(
+                self._prepared["statement_id"],
+                read_timeout=self._read_timeout,
+                write_timeout=self._write_timeout,
+            )
         return self._fetch_row() or None
 
     def fetchmany(self, size: Optional[int] = None) -> List[RowType]:
@@ -1377,10 +1371,15 @@ class MySQLCursorPrepared(MySQLCursor):
         while self._have_unread_result():
             if self._cursor_exists:
                 self._connection.cmd_stmt_fetch(
-                    self._prepared["statement_id"], MAX_RESULTS
+                    self._prepared["statement_id"],
+                    MAX_RESULTS,
+                    read_timeout=self._read_timeout,
+                    write_timeout=self._write_timeout,
                 )
             (tmp, eof) = self._connection.get_rows(
-                binary=self._binary, columns=self.description
+                binary=self._binary,
+                columns=self.description,
+                read_timeout=self._read_timeout,
             )
             rows.extend(tmp)
             self._handle_eof(eof)
@@ -1619,8 +1618,13 @@ class MySQLCursorPreparedRaw(MySQLCursorPrepared):
     This class is a blend of features from MySQLCursorRaw and MySQLCursorPrepared
     """
 
-    def __init__(self, connection: Optional[MySQLConnection] = None) -> None:
-        super().__init__(connection)
+    def __init__(
+        self,
+        connection: Optional[MySQLConnection] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
+    ) -> None:
+        super().__init__(connection, read_timeout, write_timeout)
         self._raw: bool = True
 
     def fetchone(self) -> Optional[RowType]:
@@ -1631,7 +1635,11 @@ class MySQLCursorPreparedRaw(MySQLCursorPrepared):
         """
         self._check_executed()
         if self._cursor_exists:
-            self._connection.cmd_stmt_fetch(self._prepared["statement_id"])
+            self._connection.cmd_stmt_fetch(
+                self._prepared["statement_id"],
+                read_timeout=self._read_timeout,
+                write_timeout=self._write_timeout,
+            )
         return self._fetch_row(raw=self._raw) or None
 
     def fetchmany(self, size: Optional[int] = None) -> List[RowType]:
@@ -1667,10 +1675,16 @@ class MySQLCursorPreparedRaw(MySQLCursorPrepared):
         while self._have_unread_result():
             if self._cursor_exists:
                 self._connection.cmd_stmt_fetch(
-                    self._prepared["statement_id"], MAX_RESULTS
+                    self._prepared["statement_id"],
+                    MAX_RESULTS,
+                    read_timeout=self._read_timeout,
+                    write_timeout=self._write_timeout,
                 )
             (tmp, eof) = self._connection.get_rows(
-                raw=self._raw, binary=self._binary, columns=self.description
+                raw=self._raw,
+                binary=self._binary,
+                columns=self.description,
+                read_timeout=self._read_timeout,
             )
             rows.extend(tmp)
             self._handle_eof(eof)

@@ -28,6 +28,7 @@
 
 """Utilities."""
 
+import functools
 import importlib
 import os
 import platform
@@ -55,7 +56,20 @@ from stringprep import (
     in_table_d1,
     in_table_d2,
 )
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
+
+if TYPE_CHECKING:
+    from mysql.connector.abstracts import MySQLConnectionAbstract
 
 from .custom_types import HexLiteral
 from .tls_ciphers import DEPRECATED_TLS_CIPHERSUITES, DEPRECATED_TLS_VERSIONS
@@ -707,6 +721,29 @@ def warn_tls_version_deprecated(tls_version: str) -> None:
             "MySQL Connector/Python."
         )
         warnings.warn(warn_msg, DeprecationWarning)
+
+
+def handle_read_write_timeout() -> Callable:
+    """
+    Decorator to close the current connection if a read or a write timeout
+    is raised by the method passed via the func parameter.
+    """
+
+    def decorator(cnx_method: Callable) -> Callable:
+        @functools.wraps(cnx_method)
+        def handle_cnx_method(
+            cnx: "MySQLConnectionAbstract", *args: Any, **kwargs: Any
+        ) -> Any:
+            try:
+                return cnx_method(cnx, *args, **kwargs)
+            except Exception as err:
+                if isinstance(err, TimeoutError):
+                    cnx.close()
+                raise err
+
+        return handle_cnx_method
+
+    return decorator
 
 
 class GenericWrapper:

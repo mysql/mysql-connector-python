@@ -480,8 +480,11 @@ class MySQLConnectionAioTests(MySQLConnectorAioTestCase):
         packets[-1] = packets[-1][:-2] + b"\x08" + packets[-1][-1:]
         self.cnx._socket._writer.reset()
         self.cnx._socket._writer.add_packets(packets)
-        with self.assertRaises(InterfaceError):
+        # Verify `cmd_query()` does not raise an error when passing a multi statement.
+        try:
             await self.cnx.cmd_query("SELECT 1")
+        except InterfaceError as e:
+            self.fail("An unexpected exception was raised: {}".format(e))
 
     @foreach_cnx_aio()
     async def test_cmd_query_iter(self):
@@ -550,8 +553,17 @@ class MySQLConnectionAioTests(MySQLConnectorAioTestCase):
             RefreshOption.STATUS,
             RefreshOption.REPLICA,
         )
+
+        # test individual options
         for option in refresh_options:
-            self.assertEqual(OK_PACKET_RESULT, await self.cnx.cmd_refresh(option))
+            if tests.MYSQL_VERSION >= (9, 2, 0) and option == RefreshOption.GRANT:
+                with self.assertWarns(DeprecationWarning):
+                    ok_packet = await self.cnx.cmd_refresh(option)
+                self.assertEqual(
+                    {**OK_PACKET_RESULT, **{"warning_count": 1}}, ok_packet
+                )
+            else:
+                self.assertEqual(OK_PACKET_RESULT, await self.cnx.cmd_refresh(option))
 
         # Test combined options
         options = RefreshOption.LOG | RefreshOption.STATUS
@@ -1097,7 +1109,10 @@ class MySQLConnectionAioTests(MySQLConnectorAioTestCase):
     @foreach_cnx_aio()
     async def test_get_server_version(self):
         """Get the MySQL version"""
-        self.assertEqual(self.cnx._server_info.version, self.cnx.get_server_version())
+        self.assertIn(
+            ".".join([str(x) for x in self.cnx.get_server_version()]),
+            self.cnx._server_info.version,
+        )
 
     @foreach_cnx_aio()
     async def test_get_server_info(self):
@@ -1324,8 +1339,12 @@ class MySQLConnectionAioTests(MySQLConnectorAioTestCase):
             pass
 
         class TrueCursor(MySQLCursor):
-            def __init__(self, cnx=None):
-                super().__init__(connection=cnx)
+            def __init__(self, cnx=None, read_timeout=None, write_timeout=None):
+                super().__init__(
+                    connection=cnx,
+                    read_timeout=read_timeout,
+                    write_timeout=write_timeout
+                )
 
         with self.assertRaises(ProgrammingError):
             await self.cnx.cursor(cursor_class=FalseCursor)

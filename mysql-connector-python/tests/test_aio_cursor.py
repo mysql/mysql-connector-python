@@ -26,7 +26,9 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
+import collections
 import warnings
+
 import tests
 
 from tests import cmp_result, cnx_aio_config, foreach_cnx_aio
@@ -58,9 +60,64 @@ class MySQLCursorTestsMixin:
             with self.assertRaises(ProgrammingError):
                 await cur.execute("SELECT %s,%s,%s", ("foo", "bar"))
 
-            # `cursor.executemulti()` should be used to execute multiple statements
-            with self.assertRaises(ProgrammingError):
-                await cur.execute("SELECT 1; SELECT 2; SELECT 3;", multi=True)
+            if isinstance(cur, MySQLCursorPrepared):
+                with self.assertRaises(ProgrammingError):
+                    await cur.execute("SELECT 1 as res; SELECT 2; SELECT 3;")
+                with self.assertRaises(ProgrammingError):
+                    await cur.execute("SELECT 1", map_results=True)
+            else:
+                await cur.execute("DROP PROCEDURE IF EXISTS dummy")
+                await cur.execute("CREATE PROCEDURE dummy() SELECT 4 as res4;")
+
+                sql_code = "SELECT 1 as res1; SELECT 2 as res2; SELECT 3 as res3; CALL dummy();"
+                exp_statements = collections.deque(
+                    [x.strip() for x in sql_code.split(";") if x.strip()]
+                    + ["CALL dummy()"]
+                )
+                if issubclass(type(cur), MySQLCursorDict):
+                    exp_result_sets = collections.deque(
+                        [[{"res1": 1}], [{"res2": 2}], [{"res3": 3}], [{"res4": 4}], []]
+                    )
+                else:
+                    exp_result_sets = collections.deque(
+                        [[(1,)], [(2,)], [(3,)], [(4,)], []]
+                    )
+
+                if "raw" in cur.__class__.__name__.lower():
+                    if isinstance(exp_result_sets, dict):
+                        exp_result_sets = collections.deque(
+                            [
+                                [{"res1": b"1"}],
+                                [{"res2": b"2"}],
+                                [{"res3": b"3"}],
+                                [{"res4": b"4"}],
+                                [],
+                            ]
+                        )
+                    else:
+                        exp_result_sets = collections.deque(
+                            [[(b"1",)], [(b"2",)], [(b"3",)], [(b"4",)], []]
+                        )
+
+                # `cursor.execute()` can be used to execute multiple statements
+                # Checking with mapping disabled
+                i = 0
+                await cur.execute(sql_code)
+                async for statement, result_set in cur.fetchsets():
+                    self.assertEqual(sql_code, statement)
+                    self.assertEqual(exp_result_sets[i], result_set)
+                    i += 1
+
+                # `cursor.execute()` can be used to execute multiple statements
+                # Checking with mapping enabled
+                i = 0
+                await cur.execute(sql_code, map_results=True)
+                async for statement, result_set in cur.fetchsets():
+                    self.assertEqual(exp_statements[i], statement)
+                    self.assertEqual(exp_result_sets[i], result_set)
+                    i += 1
+
+                await cur.execute("DROP PROCEDURE IF EXISTS dummy")
 
             await cur.execute("SELECT 'a' + 'b' as res")
             await cur.fetchone()
@@ -110,7 +167,7 @@ class MySQLCursorTestsMixin:
                 "SELECT 1 AS res; SELECT 'ham'; END"
             )
 
-            exp_stmt = b"CALL multi_results()"
+            exp_stmt = "CALL multi_results()"
             if issubclass(type(cur), (MySQLCursorRaw, MySQLCursorBufferedRaw)):
                 exp_results = [[(bytearray(b"1"),)], [(bytearray(b"ham"),)]]
             elif issubclass(type(cur), MySQLCursorDict):
@@ -118,11 +175,12 @@ class MySQLCursorTestsMixin:
             else:
                 exp_results = [[(1,)], [("ham",)]]
 
+            await cur.executemulti(exp_stmt)
             results = []
-            async for res in cur.executemulti(exp_stmt):
-                if res.with_rows:
-                    self.assertEqual(exp_stmt, res._executed)
-                    results.append(await res.fetchall())
+            async for statement, res in cur.fetchsets():
+                if cur.with_rows:
+                    self.assertEqual(exp_stmt, statement)
+                    results.append(res)
 
             self.assertEqual(exp_results, results)
             await cur.execute("DROP PROCEDURE multi_results")
@@ -141,10 +199,10 @@ class MySQLCursorTestsMixin:
                 ["select \"'''''\" AS res9"],
             ]
             for operation, exps in zip(operations, control):
+                await cur.executemulti(operation, map_results=True)
                 i = 0
-                async for res in cur.executemulti(operation):
-                    self.assertEqual(exps[i], res.statement)
-                    await res.fetchall()
+                async for statement, _ in cur.fetchsets():
+                    self.assertEqual(exps[i], statement)
                     i += 1
 
     async def _test_executemany(self, cnx, cursor_class):

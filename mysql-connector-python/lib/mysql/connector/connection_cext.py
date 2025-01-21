@@ -34,6 +34,7 @@ import os
 import platform
 import socket
 import sys
+import warnings
 
 from typing import (
     Any,
@@ -49,6 +50,7 @@ from typing import (
 )
 
 from . import version
+from ._decorating import cmd_refresh_verify_options
 from .abstracts import CMySQLPrepStmt, MySQLConnectionAbstract
 from .constants import (
     ClientFlag,
@@ -232,6 +234,32 @@ class CMySQLConnection(MySQLConnectionAbstract):
             ) from err
 
     @property
+    def read_timeout(self) -> Optional[int]:
+        return self._read_timeout
+
+    @read_timeout.setter
+    def read_timeout(self, timeout: int) -> None:
+        raise ProgrammingError(
+            """
+            The use of read_timeout after the connection has been established is unsupported
+            in the C-Extension
+            """
+        )
+
+    @property
+    def write_timeout(self) -> Optional[int]:
+        return self._write_timeout
+
+    @write_timeout.setter
+    def write_timeout(self, timeout: int) -> None:
+        raise ProgrammingError(
+            """
+            Changes in write_timeout after the connection has been established is unsupported
+            in the C-Extension
+            """
+        )
+
+    @property
     def database(self) -> str:
         """Get the current database"""
         return self.info_query("SELECT DATABASE()")[0]  # type: ignore[return-value]
@@ -291,6 +319,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
                 else self._webauthn_callback
             ),
             "openid_token_file": self._openid_token_file,
+            "read_timeout": self._read_timeout if self._read_timeout else 0,
+            "write_timeout": self._write_timeout if self._write_timeout else 0,
         }
 
         tls_versions = self._ssl.get("tls_versions")
@@ -461,6 +491,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
         prep_stmt: Optional[CMySQLPrepStmt] = None,
+        **kwargs: Any,
     ) -> Tuple[List[RowType], Optional[CextEofPacketType]]:
         """Get all or a subset of rows returned by the MySQL server"""
         unread_result = prep_stmt.have_result_set if prep_stmt else self.unread_result
@@ -477,8 +508,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
         counter = 0
         try:
             fetch_row = prep_stmt.fetch_row if prep_stmt else self._cmysql.fetch_row
-            if self.converter:
-                # When using a converter class, the C extension should not
+            if self.converter or raw:
+                # When using a converter class or `raw`, the C extension should not
                 # convert the values. This can be accomplished by setting
                 # the raw option to True.
                 self._cmysql.raw(True)
@@ -541,6 +572,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         columns: Optional[List[DescriptionType]] = None,
         raw: Optional[bool] = None,
         prep_stmt: Optional[CMySQLPrepStmt] = None,
+        **kwargs: Any,
     ) -> Tuple[Optional[RowType], Optional[CextEofPacketType]]:
         """Get the next rows returned by the MySQL server"""
         try:
@@ -639,7 +671,11 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
         return None
 
-    def cmd_stmt_prepare(self, statement: bytes) -> CMySQLPrepStmt:
+    def cmd_stmt_prepare(
+        self,
+        statement: bytes,
+        **kwargs: Any,
+    ) -> CMySQLPrepStmt:
         """Prepares the SQL statement"""
         if not self._cmysql:
             raise OperationalError("MySQL Connection not available")
@@ -653,7 +689,10 @@ class CMySQLConnection(MySQLConnectionAbstract):
 
     @with_context_propagation
     def cmd_stmt_execute(
-        self, statement_id: CMySQLPrepStmt, *args: Any
+        self,
+        statement_id: CMySQLPrepStmt,
+        *args: Any,
+        **kwargs: Any,
     ) -> Optional[Union[CextEofPacketType, CextResultType]]:
         """Executes the prepared statement"""
         try:
@@ -673,20 +712,30 @@ class CMySQLConnection(MySQLConnectionAbstract):
     def cmd_stmt_close(
         self,
         statement_id: CMySQLPrepStmt,  # type: ignore[override]
+        **kwargs: Any,
     ) -> None:
         """Closes the prepared statement"""
         if self._unread_result:
             raise InternalError("Unread result found")
-        statement_id.stmt_close()
+        try:
+            statement_id.stmt_close()
+        except MySQLInterfaceError as err:
+            raise get_mysql_exception(
+                err.errno, msg=err.msg, sqlstate=err.sqlstate
+            ) from err
 
     def cmd_stmt_reset(
         self,
         statement_id: CMySQLPrepStmt,  # type: ignore[override]
+        **kwargs: Any,
     ) -> None:
         """Resets the prepared statement"""
         if self._unread_result:
             raise InternalError("Unread result found")
-        statement_id.stmt_reset()
+        try:
+            statement_id.stmt_reset()
+        except MySQLInterfaceError as err:
+            raise InterfaceError(str(err)) from err
 
     @with_context_propagation
     def cmd_query(
@@ -695,8 +744,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
         raw: Optional[bool] = None,
         buffered: bool = False,
         raw_as_string: bool = False,
+        **kwargs: Any,
     ) -> Optional[Union[CextEofPacketType, CextResultType]]:
-        """Send a query to the MySQL server"""
         self.handle_unread_result()
         if raw is None:
             raw = self._raw
@@ -739,6 +788,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
         cursor_class: Optional[Type[CMySQLCursor]] = None,  # type: ignore[override]
         dictionary: Optional[bool] = None,
         named_tuple: Optional[bool] = None,
+        read_timeout: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> CMySQLCursor:
         """Instantiates and returns a cursor using C Extension
 
@@ -771,6 +822,12 @@ class CMySQLConnection(MySQLConnectionAbstract):
         self.handle_unread_result(prepared)
         if not self.is_connected():
             raise OperationalError("MySQL Connection not available.")
+        if read_timeout or write_timeout:
+            warnings.warn(
+                """The use of read_timeout after the connection has been established is unsupported
+                in the C-Extension""",
+                category=Warning,
+            )
         if cursor_class is not None:
             if not issubclass(cursor_class, CMySQLCursor):
                 raise ProgrammingError(
@@ -959,8 +1016,8 @@ class CMySQLConnection(MySQLConnectionAbstract):
             self._post_connection()
         return res
 
+    @cmd_refresh_verify_options()
     def cmd_refresh(self, options: int) -> Optional[CextEofPacketType]:
-        """Send the Refresh command to the MySQL server"""
         try:
             self.handle_unread_result()
             self._cmysql.refresh(options)
@@ -1025,7 +1082,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         """Send the PING command"""
         raise NotImplementedError
 
-    def cmd_query_iter(self, statements: str) -> NoReturn:
+    def cmd_query_iter(self, statements: str, **kwargs: Any) -> NoReturn:
         """Send one or more statements to the MySQL server"""
         raise NotImplementedError
 
@@ -1034,6 +1091,7 @@ class CMySQLConnection(MySQLConnectionAbstract):
         statement_id: CMySQLPrepStmt,  # type: ignore[override]
         param_id: int,
         data: BinaryIO,
+        **kwargs: Any,
     ) -> NoReturn:
         """Send data for a column"""
         raise NotImplementedError

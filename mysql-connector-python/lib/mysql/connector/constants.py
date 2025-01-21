@@ -69,6 +69,8 @@ DEFAULT_CONFIGURATION: Dict[str, Optional[Union[str, bool, int]]] = {
     "get_warnings": False,
     "raise_on_warnings": False,
     "connection_timeout": None,
+    "read_timeout": None,
+    "write_timeout": None,
     "client_flags": 0,
     "compress": False,
     "buffered": False,

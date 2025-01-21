@@ -42,7 +42,7 @@
 %{?extra_link_args: %global extra_link_args %{extra_link_args}}
 
 # set version if not defined through 'rpmbuild'
-%{!?version: %global version 9.1.0}
+%{!?version: %global version 9.2.0}
 
 
 # if true set byte_code_only to --byte_code_only
@@ -174,6 +174,9 @@ sed -i -e '/protobuf/d' %{buildroot}%{python3_sitearch}/mysqlx_connector_python-
 %{python3_sitearch}/_mysqlxpb.cpython*.so
 
 %changelog
+* Mon Oct 28 2024 Souma Kanti Ghosh <souma.kanti.ghosh@oracle.com> - 9.2.0-1
+- Updated for 9.2.0
+
 * Wed Sep 11 2024 Oscar Pacheco <oscar.p.pacheco@oracle.com> - 9.1.0-1
 - Updated for 9.1.0
 

@@ -101,32 +101,40 @@ class CipherTests(tests.MySQLxTests):
             ),
             "2": (
                 DeprecationWarning,
-                DEPRECATED_TLS_CIPHERSUITES["TLSv1.2"][
-                    "TLS_RSA_WITH_AES_128_GCM_SHA256"
+                [
+                    DEPRECATED_TLS_CIPHERSUITES["TLSv1.2"][
+                        "TLS_RSA_WITH_AES_128_GCM_SHA256"
+                    ]
                 ],
                 ["TLSv1.2"],
                 ["TLS_RSA_WITH_AES_128_GCM_SHA256"],  # deprecated
             ),
             "3": (
                 None,
-                APPROVED_TLS_CIPHERSUITES["TLSv1.2"][
-                    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                [
+                    APPROVED_TLS_CIPHERSUITES["TLSv1.2"][
+                        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                    ]
                 ],
                 ["TLSv1.2"],
                 ["ECDHE-RSA-AES256-GCM-SHA384"],  # approved
             ),
             "4": (
                 None,
-                MANDATORY_TLS_CIPHERSUITES["TLSv1.2"][
-                    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                [
+                    MANDATORY_TLS_CIPHERSUITES["TLSv1.2"][
+                        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                    ]
                 ],
                 ["TLSv1.2"],
                 ["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],  # mandatory
             ),
             "5": (
                 None,
-                MANDATORY_TLS_CIPHERSUITES["TLSv1.2"][
-                    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                [
+                    MANDATORY_TLS_CIPHERSUITES["TLSv1.2"][
+                        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                    ]
                 ],
                 ["TLSv1.2"],
                 [
@@ -145,14 +153,29 @@ class CipherTests(tests.MySQLxTests):
             ),
             "7": (
                 None,
-                "TLS_AES_256_GCM_SHA384",
+                # the pure-python implementation does not support cipher selection for
+                # TLSv1.3. The ultimate cipher to be used will be determined by the
+                # MySQL Server during TLS negotiation. As of MySQL Server 9.2.0,
+                # `TLS_AES_128_GCM_SHA256` is used over `TLS_AES_256_GCM_SHA384` as
+                # default since it is more efficient.
+                # While AES-256 offers a higher theoretical security level due to its
+                # larger key size, for most practical applications, AES-128 is
+                # considered sufficiently secure and provides a good balance between
+                # security and performance. Hence, both are acceptable expected cipher
+                # OpenSSL name values.
+                [
+                    "TLS_AES_128_GCM_SHA256",
+                    "TLS_AES_256_GCM_SHA384",
+                ],  # expected cipher OpenSSL name
                 ["TLSv1.3"],
                 ["TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"],  # acceptable
             ),
             "8": (
                 DeprecationWarning,
-                DEPRECATED_TLS_CIPHERSUITES["TLSv1.2"][
-                    "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"
+                [
+                    DEPRECATED_TLS_CIPHERSUITES["TLSv1.2"][
+                        "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"
+                    ]
                 ],
                 ["TLSv1.2"],
                 ["TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"],  # deprecated
@@ -183,7 +206,7 @@ class CipherTests(tests.MySQLxTests):
                 self.assertEqual(res[-1], expected_res)
 
     def _test_tls_ciphersuites(self, test_case_id: str):
-        exp_event, exp_cipher, tls_versions, tls_ciphersuites = self.test_case_values[
+        exp_event, exp_ciphers, tls_versions, tls_ciphersuites = self.test_case_values[
             "tls_ciphersuites"
         ][test_case_id]
 
@@ -216,7 +239,7 @@ class CipherTests(tests.MySQLxTests):
                     .fetch_all()[0]
                 )
                 res = ast.literal_eval(repr(res))  # res[0] is mysqlx.result.Row
-                self.assertEqual(res[-1], exp_cipher)
+                self.assertIn(res[-1], exp_ciphers)
 
     @tests.foreach_session()
     def test_tls_versions_1(self):

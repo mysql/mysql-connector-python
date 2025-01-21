@@ -44,14 +44,15 @@ to be created first.
 import datetime
 import re
 import time
+import warnings
 
 from collections import namedtuple
 from decimal import Decimal
-import warnings
 
 import tests
 
 from mysql.connector import connection, cursor, errors
+from mysql.connector._scripting import MySQLScriptSplitter
 
 
 class CursorModule(tests.MySQLConnectorTests):
@@ -469,12 +470,12 @@ class MySQLCursorTests(tests.TestsCursor):
         )
         self.cur.execute(procedure)
         exp_stmt = b"CALL multi_results()"
-        exp_result = [[(1,)], [("ham",)]]
+        exp_result = [[(1,)], [("ham",)], []]
         results = []
-        for result in self.cur.execute(exp_stmt, multi=True):
-            if result.with_rows:
-                self.assertEqual(exp_stmt, result._executed)
-                results.append(result.fetchall())
+        self.cur.execute(exp_stmt)
+        for statement, result_set in self.cur.fetchsets():
+            self.assertEqual(exp_stmt.decode("utf-8"), statement)
+            results.append(result_set)
 
         self.assertEqual(exp_result, results)
         self.cur.execute("DROP PROCEDURE multi_results")
@@ -497,34 +498,41 @@ class MySQLCursorTests(tests.TestsCursor):
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
         with self.cnx.cursor() as cur:
             for operation, exps in zip(operations, control):
-                for res_cur, exp in zip(cur.execute(operation, multi=True), exps):
-                    self.assertEqual(exp, res_cur.statement)
-                    _ = res_cur.fetchall()
+                cur.execute(operation, map_results=True)
+                for (statement, result_set), exp in zip(cur.fetchsets(), exps):
+                    self.assertEqual(exp, statement)
 
         # Bug#35140271: Regex split hanging in cursor.execute(..., multi=True)
         # for complex queries
         operations.append("SELECT `';`; select 3; SELECT '`;`;`';")
         control.append(["SELECT `';`", "select 3", "SELECT '`;`;`'"])
-        for operation, exps in zip(operations, control):
-            executed_list = cursor.RE_SQL_SPLIT_STMTS.split(operation.encode())
-            self.assertEqual(len(executed_list), len(exps) + 1)
+        for operation, exp_single_stms in zip(operations, control):
+            tok = MySQLScriptSplitter(sql_script=operation.encode())
+            self.assertEqual(len(tok.split_script()), len(exp_single_stms))
 
-        # the bug reports that execution hangs with the following statement;
-        # let's run it and check it does not hang.
-        RE_SQL_SPLIT_STMTS_OLD = re.compile(
-            b""";(?=(?:[^"'`]*["'`][^"'`]*["'`])*[^"'`]*$)"""
-        )
+        # the bug reports that execution hangs with the following statement.
+        # Let's run it and check it does not hang.
         operation = """
-        create database test;\n create table
-        test.test(pk INT PRIMARY KEY AUTO_INCREMENT, t CHAR(6));\n INSERT INTO
-        test.test(t) VALUES ('h'), ('e'), ('l'), ('l'), ('o'), (' '), ('w'), ('o'),
-        ('r'), ('l'), ('d'), ('!'), (' '), ('h'), ('e'), ('l'), ('l'), ('o'), (' '),
-        ('w'), ('o'), ('r'), ('l'), ('d'), ('!'); \n -- insert db's elements
+            create database test;
+            create table test.test(pk INT PRIMARY KEY AUTO_INCREMENT, t CHAR(6));
+            INSERT INTO test.test(t) VALUES ('h'), ('e'), ('l'), ('l'), ('o'), (' '),
+            ('w'), ('o'), ('r'), ('l'), ('d'), ('!'), (' '), ('h'), ('e'), ('l'),
+            ('l'), ('o'), (' '),
+            ('w'), ('o'), ('r'), ('l'), ('d'), ('!');
+            -- insert db's elements
         """
-        self.assertListEqual(
-            cursor.RE_SQL_SPLIT_STMTS.split(operation.encode()),
-            RE_SQL_SPLIT_STMTS_OLD.split(operation.encode()),
-        )
+        exp_single_stms = [
+            "create database test",
+            "create table test.test(pk INT PRIMARY KEY AUTO_INCREMENT, t CHAR(6))",
+            """INSERT INTO test.test(t) VALUES ('h'), ('e'), ('l'), ('l'), ('o'), (' '),
+            ('w'), ('o'), ('r'), ('l'), ('d'), ('!'), (' '), ('h'), ('e'), ('l'),
+            ('l'), ('o'), (' '),
+            ('w'), ('o'), ('r'), ('l'), ('d'), ('!')""",
+        ]
+        tok = MySQLScriptSplitter(sql_script=operation.encode())
+        stmts = tok.split_script()
+        self.assertEqual(len(stmts), len(exp_single_stms))
+        self.assertListEqual([s.decode() for s in stmts], exp_single_stms)
 
     def test_executemany(self):
         """MySQLCursor object executemany()-method"""
@@ -1093,7 +1101,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
         cur._description = [("c1", 5, None, None, None, None, 1, 128)]
 
         # Monkey patch the get_row method of the connection for testing
-        def _get_row(binary, columns, raw):  # pylint: disable=W0613
+        def _get_row(binary, columns, raw, **kwargs):  # pylint: disable=W0613
             try:
                 row = self.cnx._test_fetch_row[0]
                 self.cnx._test_fetch_row = self.cnx._test_fetch_row[1:]
@@ -1310,7 +1318,7 @@ class MySQLCursorPreparedTests(tests.TestsCursor):
     def test_fetchall(self):
         cur = self.cnx.cursor(cursor_class=cursor.MySQLCursorPrepared)
 
-        def _get_rows(binary, columns):  # pylint: disable=W0613
+        def _get_rows(binary, columns, **kwargs):  # pylint: disable=W0613
             self.unread_result = False  # pylint: disable=W0201
             return (
                 self.cnx._test_fetch_row,

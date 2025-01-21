@@ -29,6 +29,8 @@
 """Module implementing low-level socket communication with MySQL servers.
 """
 
+# pylint: disable=overlapping-except
+
 import socket
 import struct
 import warnings
@@ -54,10 +56,13 @@ except ImportError:
     ssl = None
 
 from .errors import (
+    ConnectionTimeoutError,
     InterfaceError,
     NotSupportedError,
     OperationalError,
     ProgrammingError,
+    ReadTimeoutError,
+    WriteTimeoutError,
 )
 
 MIN_COMPRESS_LENGTH = 50
@@ -159,6 +164,8 @@ class NetworkBrokerPlain(NetworkBroker):
         """Write packet to the comm channel."""
         try:
             sock.sendall(pkt)
+        except (socket.timeout, TimeoutError) as err:
+            raise WriteTimeoutError(errno=3024) from err
         except IOError as err:
             raise OperationalError(
                 errno=2055, values=(address, _strioerror(err))
@@ -236,6 +243,8 @@ class NetworkBrokerPlain(NetworkBroker):
 
             # Read the payload, and return packet
             return header + self._recv_chunk(sock, size=payload_len)
+        except (socket.timeout, TimeoutError) as err:
+            raise ReadTimeoutError(errno=3024, msg=err.strerror) from err
         except IOError as err:
             raise OperationalError(
                 errno=2055, values=(address, _strioerror(err))
@@ -420,6 +429,8 @@ class NetworkBrokerCompressed(NetworkBrokerPlain):
                     struct.unpack("<I", header[4:7] + b"\x00")[0],
                 )
                 self._recv_compressed_pkt(sock, compressed_pll, uncompressed_pll)
+            except (socket.timeout, TimeoutError) as err:
+                raise ReadTimeoutError(errno=3024) from err
             except IOError as err:
                 raise OperationalError(
                     errno=2055, values=(address, _strioerror(err))
@@ -618,6 +629,7 @@ class MySQLSocket(ABC):
         payload: bytes,
         packet_number: Optional[int] = None,
         compressed_packet_number: Optional[int] = None,
+        write_timeout: Optional[int] = None,
     ) -> None:
         """Send `payload` to the MySQL server.
 
@@ -628,7 +640,15 @@ class MySQLSocket(ABC):
         If you're sure you won't read `payload` after invoking `send()`,
         then you can use `bytearray.` Otherwise, you must use `bytes`.
         """
-        return self._netbroker.send(
+        try:
+            if (
+                not self._connection_timeout and self.sock is not None
+            ):  # can't update the timeout during connection phase
+                self.sock.settimeout(float(write_timeout) if write_timeout else None)
+        except OSError as _:
+            # Ignore the OSError as the socket might not be setup properly
+            pass
+        self._netbroker.send(
             self.sock,
             self.address,
             payload,
@@ -636,8 +656,16 @@ class MySQLSocket(ABC):
             compressed_packet_number=compressed_packet_number,
         )
 
-    def recv(self) -> bytearray:
+    def recv(self, read_timeout: Optional[int] = None) -> bytearray:
         """Get packet from the MySQL server comm channel."""
+        try:
+            if (
+                not self._connection_timeout and self.sock is not None
+            ):  # can't update the timeout during connection phase
+                self.sock.settimeout(float(read_timeout) if read_timeout else None)
+        except OSError as _:
+            # Ignore the OSError as the socket might not be setup properly
+            pass
         return self._netbroker.recv(self.sock, self.address)
 
     @abstractmethod
@@ -674,6 +702,14 @@ class MySQLUnixSocket(MySQLSocket):
             )
             self.sock.settimeout(self._connection_timeout)
             self.sock.connect(self.unix_socket)
+        except (socket.timeout, TimeoutError) as err:
+            raise ConnectionTimeoutError(
+                errno=2002,
+                values=(
+                    self.address,
+                    _strioerror(err),
+                ),
+            ) from err
         except IOError as err:
             raise InterfaceError(
                 errno=2002, values=(self.address, _strioerror(err))
@@ -761,9 +797,18 @@ class MySQLTCPSocket(MySQLSocket):
             self.sock = socket.socket(self._family, socktype, proto)
             self.sock.settimeout(self._connection_timeout)
             self.sock.connect(sockaddr)
+        except (socket.timeout, TimeoutError) as err:
+            raise ConnectionTimeoutError(
+                errno=2003,
+                values=(
+                    self.server_host,
+                    self.server_port,
+                    _strioerror(err),
+                ),
+            ) from err
         except IOError as err:
             raise InterfaceError(
-                errno=2003,
+                errno=2002,
                 values=(
                     self.server_host,
                     self.server_port,

@@ -1139,6 +1139,7 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
              *key = NULL, *value = NULL, *use_kerberos_gssapi = Py_False;
     const char *auth_plugin, *plugin_dir;
     unsigned long client_flags = 0;
+    unsigned int read_timeout = 0, write_timeout = 0;
     unsigned int port = 3306, tmp_uint;
     int local_infile = -1;
     unsigned int protocol = 0;
@@ -1185,16 +1186,19 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
                              "webauthn_callback",
                              "use_kerberos_gssapi",
                              "openid_token_file",
+                             "read_timeout",
+                             "write_timeout",
                              NULL};
 
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzzOOz", kwlist, &host, &user, &password,
+            args, kwds, "|zzzzzzzkzkzzzzzzO!O!O!O!O!izzzOOzII", kwlist, &host, &user, &password,
             &password1, &password2, &password3, &database, &port, &unix_socket, &client_flags,
             &ssl_ca, &ssl_cert, &ssl_key, &ssl_cipher_suites, &tls_versions,
             &tls_cipher_suites, &PyBool_Type, &ssl_verify_cert, &PyBool_Type,
             &ssl_verify_identity, &PyBool_Type, &ssl_disabled, &PyBool_Type, &compress,
             &PyDict_Type, &conn_attrs, &local_infile, &load_data_local_dir, &oci_config_file,
-            &oci_config_profile, &webauthn_callback, &use_kerberos_gssapi, &openid_token_file)) {
+            &oci_config_profile, &webauthn_callback, &use_kerberos_gssapi, &openid_token_file,
+            &read_timeout, &write_timeout)) {
         return NULL;
     }
 
@@ -1228,6 +1232,17 @@ MySQL_connect(MySQL *self, PyObject *args, PyObject *kwds)
     if (compress != NULL && (PyBool_Check(compress) && compress == Py_True)) {
         client_flags |= CLIENT_COMPRESS;
     }
+
+    if (read_timeout != 0) {
+        mysql_options(&self->session, MYSQL_OPT_READ_TIMEOUT, &read_timeout);
+    }
+
+    if (write_timeout != 0) {
+        mysql_options(&self->session, MYSQL_OPT_WRITE_TIMEOUT, &write_timeout);
+    }
+
+    unsigned int read_write_retry_count = 0;
+    mysql_options(&self->session, MYSQL_OPT_RETRY_COUNT, &read_write_retry_count);
 
 #ifdef MS_WINDOWS
     if (NULL == host) {
@@ -2782,11 +2797,18 @@ MySQL_fetch_row(MySQL *self)
             else {
                 if (field_flags & SET_FLAG) {
                     if (!strlen(row[i])) {
+                        Py_XDECREF(value);
                         value = PySet_New(NULL);
                     }
                     else {
-                        value =
-                            PySet_New(PyUnicode_Split(value, PyUnicode_FromString(","), -1));
+                        PyObject *sep = PyUnicode_FromString(",");
+                        PyObject *iterable = PyUnicode_Split(value, sep, -1);
+
+                        Py_XDECREF(value);
+                        value = PySet_New(iterable);
+
+                        Py_XDECREF(sep);
+                        Py_XDECREF(iterable);
                     }
                     if (!value) {
                         goto error;
@@ -3749,6 +3771,7 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                     }
                     Py_XDECREF(mod_decimal);
                 }
+                Py_XDECREF(obj);
                 break;
             /* MYSQL_TYPE_CHAR, MYSQL_TYPE_VARCHAR, MYSQL_TYPE_STRING, */
             /* MYSQL_TYPE_VAR_STRING, MYSQL_TYPE_GEOMETRY, MYSQL_TYPE_BLOB */
@@ -3773,7 +3796,7 @@ MySQLPrepStmt_fetch_row(MySQLPrepStmt *self)
                     }
 
                     for (token = strtok_r(PyBytes_AsString(obj), ",", &rest); token != NULL;
-                         token = strtok_r(NULL, ",", &rest)) {
+                        token = strtok_r(NULL, ",", &rest)) {
                         PyObject *us = PyUnicode_FromString(token);
                         PySet_Add(set, us);
                         Py_DECREF(us);

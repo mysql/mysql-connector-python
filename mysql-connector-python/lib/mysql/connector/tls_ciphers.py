@@ -34,7 +34,6 @@
 
 from typing import Dict, List
 
-
 APPROVED_TLS_VERSIONS: List[str] = ["TLSv1.2", "TLSv1.3"]
 """Approved TLS versions."""
 
