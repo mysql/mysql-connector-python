@@ -1,4 +1,4 @@
-protobuf==5.29.4
+protobuf==5.29.5
 dnspython==2.6.1
 lz4==4.4.4
 zstandard>=0.12.0,<=0.19.0
