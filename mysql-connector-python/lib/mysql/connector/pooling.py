@@ -439,6 +439,7 @@ class MySQLConnectionPool:
         pool_size: int = 5,
         pool_name: Optional[str] = None,
         pool_reset_session: bool = True,
+        pool_timeout: int = 5,
         **kwargs: Any,
     ) -> None:
         """Constructor.
@@ -456,6 +457,10 @@ class MySQLConnectionPool:
             pool_size:  The pool size. If this argument is not given, the default is 5.
             pool_reset_session: Whether to reset session variables when the connection
                                 is returned to the pool.
+            pool_timeout: The maximum number of seconds to wait when attempting to retrieve 
+                          a connection from the pool. If no connection becomes available 
+                          before the timeout expires, a `PoolError` is raised indicating 
+                          that the pool is exhausted.
             **kwargs: Optional additional connection arguments, as described in [1].
 
         Examples:
@@ -475,6 +480,7 @@ class MySQLConnectionPool:
         self._pool_size: Optional[int] = None
         self._pool_name: Optional[str] = None
         self._reset_session = pool_reset_session
+        self._pool_timeout: int = pool_timeout
         self._set_pool_size(pool_size)
         self._set_pool_name(pool_name or generate_pool_name(**kwargs))
         self._cnx_config: Dict[str, Any] = {}
@@ -649,12 +655,12 @@ class MySQLConnectionPool:
         Raises:
             PoolError: On errors.
         """
+        try:
+            cnx = self._cnx_queue.get(block=True, timeout=self._pool_timeout)
+        except queue.Empty as err:
+            raise PoolError("Failed getting connection; pool exhausted") from err
+        
         with CONNECTION_POOL_LOCK:
-            try:
-                cnx = self._cnx_queue.get(block=False)
-            except queue.Empty as err:
-                raise PoolError("Failed getting connection; pool exhausted") from err
-
             if (
                 not cnx.is_connected()
                 or self._config_version != cnx.pool_config_version
