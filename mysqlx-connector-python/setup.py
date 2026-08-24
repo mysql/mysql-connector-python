@@ -162,7 +162,7 @@ def main() -> None:
         extras_require={
             "dns-srv": ["dnspython==2.6.1"],
             "compression": (
-                ["lz4==4.4.4"] + ["zstandard==0.23.0"]
+                ["lz4==4.4.4"] + ["zstandard==0.25.0"]
                 if not (sys.version_info.major >= 3 and sys.version_info.minor >= 14)
                 else []
             ),
