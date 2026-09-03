@@ -299,7 +299,7 @@ class MySQLServerBase:
 
         prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         verstr = str(prc.communicate()[0])
-        matches = re.match(r".*Ver (\d)\.(\d).(\d{1,2})-*(\S*).*", verstr)
+        matches = re.match(r".*Ver (\d+)\.(\d+)\.(\d+)-*(\S*).*", verstr)
         if matches:
             matches_groups = matches.groups()
             ver = tuple([int(v) for v in matches_groups[0:-1]])
