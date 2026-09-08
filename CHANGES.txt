@@ -8,6 +8,9 @@ Copyright (c) 2009, 2026, Oracle and/or its affiliates.
 Full release notes:
  http://dev.mysql.com/doc/relnotes/connector-python/en/
 
+v26.10.0
+=======
+
 v26.7.0
 =======
 

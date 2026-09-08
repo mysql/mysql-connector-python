@@ -34,8 +34,8 @@
 #include <windows.h>
 #include <winver.h>
 
-#define CONPY_VERSION "26.7.0"
-#define CONPY_VERSION_RAW 26,7,0,0
+#define CONPY_VERSION "26.10.0"
+#define CONPY_VERSION_RAW 26,10,0,0
 
 // Set up debug information
 #if DBG
