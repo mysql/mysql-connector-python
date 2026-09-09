@@ -2145,7 +2145,7 @@ class Session:
                     "module. Please refer to documentation"
                 )
             try:
-                srv_records = dns.resolver.query(settings["host"], "SRV")
+                srv_records = dns.resolver.resolve(settings["host"], "SRV")
             except dns.exception.DNSException as err:
                 raise InterfaceError(
                     f"Unable to locate any hosts for '{settings['host']}'"

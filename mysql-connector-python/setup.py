@@ -152,8 +152,8 @@ def main() -> None:
         cmdclass=COMMAND_CLASSES,
         python_requires=">=3.10",
         extras_require={
-            "dns-srv": ["dnspython==2.6.1"],
-            "gssapi": ["gssapi==1.8.3"],
+            "dns-srv": ["dnspython==2.8.0"],
+            "gssapi": ["gssapi==1.12.0"],
             "webauthn": ["fido2==1.1.2"],
             "telemetry": [
                 "opentelemetry-api==1.33.1",

@@ -160,7 +160,7 @@ def main() -> None:
         python_requires=">=3.10",
         install_requires=["protobuf==5.29.4"],
         extras_require={
-            "dns-srv": ["dnspython==2.6.1"],
+            "dns-srv": ["dnspython==2.8.0"],
             "compression": (
                 ["lz4==4.4.4"] + ["zstandard==0.25.0"]
                 if not (sys.version_info.major >= 3 and sys.version_info.minor >= 14)

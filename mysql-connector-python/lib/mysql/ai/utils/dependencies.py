@@ -58,13 +58,13 @@ def check_dependencies(tasks: List[str]) -> None:
 
     # Requirements: (import_name, min_version)
     task_to_requirement = {
-        "BASE": [("pandas", "1.5.0")],
+        "BASE": [("pandas", "2.3.3")],
         "GENAI": [
-            ("langchain", "0.1.11"),
-            ("langchain_core", "0.1.11"),
-            ("pydantic", "1.10.0"),
+            ("langchain", "0.3.25"),
+            ("langchain_core", "0.3.58"),
+            ("pydantic", "2.7.4"),
         ],
-        "ML": [("scikit-learn", "1.3.0")],
+        "ML": [("scikit-learn", "1.7.2")],
     }
     requirements = []
     for task in task_set:

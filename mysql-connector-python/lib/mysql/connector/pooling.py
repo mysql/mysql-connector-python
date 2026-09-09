@@ -268,7 +268,7 @@ def connect(
             kwargs["host"] = DEFAULT_CONFIGURATION["host"]
 
         try:
-            srv_records = dns.resolver.query(kwargs["host"], "SRV")
+            srv_records = dns.resolver.resolve(kwargs["host"], "SRV")
         except dns.exception.DNSException:
             raise InterfaceError(
                 f"Unable to locate any hosts for '{kwargs['host']}'"

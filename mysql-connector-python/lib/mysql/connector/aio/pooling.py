@@ -257,7 +257,7 @@ async def connect(
             kwargs["host"] = DEFAULT_CONFIGURATION["host"]
 
         try:
-            srv_records = await dns.asyncresolver.query(kwargs["host"], "SRV")
+            srv_records = await dns.asyncresolver.resolve(kwargs["host"], "SRV")
         except dns.exception.DNSException:
             raise InterfaceError(
                 f"Unable to locate any hosts for '{kwargs['host']}'"

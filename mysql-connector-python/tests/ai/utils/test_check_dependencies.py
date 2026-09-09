@@ -79,7 +79,7 @@ class TestCheckDependencies(unittest.TestCase):
             def side_effect(name):
                 # Only scikit-learn is too old
                 if name == "scikit-learn":
-                    return "1.2.0"  # below REQUIRED 1.3.0
+                    return "1.7.1"  # below REQUIRED 1.7.2
                 return "999.0.0"
 
             mock_version.side_effect = side_effect
@@ -98,11 +98,11 @@ class TestCheckDependencies(unittest.TestCase):
         """Should union all task requirements and check each only once."""
         with patch("importlib.metadata.version") as mock_version:
             versions = {
-                "pandas": "1.5.0",
-                "langchain": "0.1.12",
-                "langchain_core": "0.1.15",
-                "pydantic": "1.10.2",
-                "scikit-learn": "1.3.1",
+                "pandas": "2.3.3",
+                "langchain": "0.3.25",
+                "langchain_core": "0.3.58",
+                "pydantic": "2.7.4",
+                "scikit-learn": "1.7.2",
             }
             mock_version.side_effect = lambda name: versions[name]
             # Should not raise (all versions adequate)

@@ -27,6 +27,6 @@
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 protobuf==5.29.4
-dnspython==2.6.1
+dnspython==2.8.0
 lz4==4.4.4
 zstandard>=0.12.0,<=0.25.0 ; python_version < "3.14"

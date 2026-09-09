@@ -11,6 +11,8 @@ Full release notes:
 v26.10.0
 =======
 
+- WL#17362: Upgrade third-party dependencies
+
 v26.7.0
 =======
 
