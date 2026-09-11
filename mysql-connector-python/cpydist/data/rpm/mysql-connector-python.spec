@@ -176,6 +176,9 @@ cd mysql-connector-python
 * Tue Sep 8 2026 Jose Ramirez <jose.m.ramirez@oracle.com> - 26.10.0-1
 - Updated for 26.10.0
 
+* Tue Jun 23 2026 Filipe Silva <filipe.silva@oracle.com> - 26.7.0-1
+- Updated for 26.7.0
+
 * Fri Jan 9 2026 Filipe Silva <filipe.silva@oracle.com> - 9.7.0-1
 - Updated for 9.7.0
 
