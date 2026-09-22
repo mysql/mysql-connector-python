@@ -55,7 +55,7 @@ files, available in this repository, for further details.
 Contributing
 ------------
 
-We greatly appreciate feedback from our users, including bug reports and code contributions. Your input helps us improve, and we thank you for any issues you report or code you contribute. Please refer to the `CONTRIBUTING.md <CONTRIBUTING.md>`__ document for additional information.
+We greatly appreciate feedback from our users, including bug reports and code contributions. Your input helps us improve, and we thank you for any issues you report or code you contribute. Please refer to the `contributing <CONTRIBUTING.md>`__ document for additional information.
 
 Installation
 ------------
