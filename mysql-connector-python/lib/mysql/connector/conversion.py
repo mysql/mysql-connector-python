@@ -338,15 +338,15 @@ class MySQLConverter(MySQLConverterBase):
                 return HexLiteral(value, charset)
         return encoded
 
-    @staticmethod
-    def _bytes_to_mysql(value: bytes) -> bytes:
-        """Convert value to bytes"""
+    def _bytes_to_mysql(self, value: bytes) -> Union[bytes, HexLiteral]:
+        """Return bytes, or a hex literal for nonempty values in slash charsets."""
+        if value and self.charset_id in self._character_set.slash_charsets:
+            return HexLiteral(value)
         return value
 
-    @staticmethod
-    def _bytearray_to_mysql(value: bytearray) -> bytes:
-        """Convert value to bytes"""
-        return bytes(value)
+    def _bytearray_to_mysql(self, value: bytearray) -> Union[bytes, HexLiteral]:
+        """Convert bytearray to bytes or a hex literal for the current charset."""
+        return self._bytes_to_mysql(bytes(value))
 
     @staticmethod
     def _bool_to_mysql(value: bool) -> int:

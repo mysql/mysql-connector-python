@@ -12,6 +12,9 @@ v26.10.0
 =======
 
 - WL#17362: Upgrade third-party dependencies
+- BUG#40010859: Correct parameter serialization for selected character sets
+- BUG#39923843: Test certificates have expired
+- BUG#39912002: Upgrade zstandard to latest version (0.25.0)
 
 v26.7.0
 =======

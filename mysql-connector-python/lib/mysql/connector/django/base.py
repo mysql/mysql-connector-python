@@ -650,5 +650,5 @@ class DjangoMySQLConverter(MySQLConverter):
     def _safetext_to_mysql(self, value: str) -> Union[bytes, HexLiteral]:
         return self._str_to_mysql(value)
 
-    def _safebytes_to_mysql(self, value: bytes) -> bytes:
+    def _safebytes_to_mysql(self, value: bytes) -> Union[bytes, HexLiteral]:
         return self._bytes_to_mysql(value)

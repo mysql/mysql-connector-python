@@ -970,7 +970,7 @@ class CharacterSet:
     """
 
     # Multi-byte character sets which use 5c (backslash) in characters
-    slash_charsets: Tuple[int, ...] = (1, 13, 28, 84, 87, 88)
+    slash_charsets: Tuple[int, ...] = (1, 13, 28, 84, 87, 88, 95, 96, 248, 249, 250)
 
     def __init__(self) -> None:
         # Use LTS character set as default

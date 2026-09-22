@@ -29,20 +29,25 @@
 """Custom Python types used by MySQL Connector/Python"""
 from __future__ import annotations
 
-from typing import Type
+from typing import Type, Union
 
 
 class HexLiteral(str):
     """Class holding MySQL hex literals"""
 
     charset: str = ""
-    original: str = ""
+    original: Union[str, bytes] = ""
 
-    def __new__(cls: Type[HexLiteral], str_: str, charset: str = "utf8") -> HexLiteral:
-        hexed = [f"{i:02x}" for i in str_.encode(charset)]
-        obj = str.__new__(cls, "".join(hexed))
+    def __new__(
+        cls: Type[HexLiteral], value: Union[str, bytes], charset: str = "utf8"
+    ) -> HexLiteral:
+        if isinstance(value, bytes):
+            hexed = value.hex()
+        else:
+            hexed = value.encode(charset).hex()
+        obj = str.__new__(cls, hexed)
         obj.charset = charset
-        obj.original = str_
+        obj.original = value
         return obj
 
     def __str__(self) -> str:
