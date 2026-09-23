@@ -9,6 +9,7 @@
 *_output.txt
 .DS_Store
 .coverage
+.envrc
 .idea/
 .python-version
 .vscode/
