@@ -491,3 +491,57 @@ class MySQLTCPSocketTests(tests.MySQLConnectorTests):
         sock.settimeout(4)
         sock.connect(sockaddr)
         self.cnx.sock = sock
+
+    @unittest.skipIf(
+        not tests.SSL_AVAILABLE,
+        "Could not test SSL context. Make sure Python supports SSL.",
+    )
+    def test_build_ssl_context_tls_versions(self):
+        """Restrict the SSL context to the requested TLS versions"""
+        import ssl
+
+        self.cnx.open_connection()
+        # The platform default range only matters if it is stricter.
+        default = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        scenarios = [
+            (["TLSv1.2"], ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_2),
+            (["TLSv1.3"], ssl.TLSVersion.TLSv1_3, default.maximum_version),
+            (["TLSv1.2", "TLSv1.3"], ssl.TLSVersion.TLSv1_2, default.maximum_version),
+        ]
+        for tls_versions, min_version, max_version in scenarios:
+            context = self.cnx.build_ssl_context(tls_versions=tls_versions)
+            self.assertEqual(
+                max(min_version, default.minimum_version),
+                context.minimum_version,
+                tls_versions,
+            )
+            self.assertEqual(max_version, context.maximum_version, tls_versions)
+
+    @unittest.skipIf(
+        not tests.SSL_AVAILABLE,
+        "Could not test SSL context. Make sure Python supports SSL.",
+    )
+    def test_build_ssl_context_keeps_stricter_default(self):
+        """Do not weaken a stricter default TLS version range"""
+        import ssl
+        import types
+
+        from unittest import mock
+
+        def strict_context(protocol):
+            """SSLContext with a system policy like MinProtocol = TLSv1.3"""
+            context = ssl.SSLContext(protocol)
+            context.minimum_version = ssl.TLSVersion.TLSv1_3
+            return context
+
+        strict_ssl = types.ModuleType("ssl")
+        strict_ssl.__dict__.update(ssl.__dict__)
+        strict_ssl.SSLContext = strict_context
+
+        self.cnx.open_connection()
+        with mock.patch.object(network, "ssl", strict_ssl):
+            for tls_versions in (["TLSv1.2"], ["TLSv1.2", "TLSv1.3"]):
+                context = self.cnx.build_ssl_context(tls_versions=tls_versions)
+                self.assertEqual(
+                    ssl.TLSVersion.TLSv1_3, context.minimum_version, tls_versions
+                )

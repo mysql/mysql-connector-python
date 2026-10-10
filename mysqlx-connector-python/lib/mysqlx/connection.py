@@ -38,15 +38,13 @@ try:
     import ssl
 
     SSL_AVAILABLE = True
+    # The version-specific ssl.PROTOCOL_TLSv1* constants are deprecated and are
+    # not defined when Python is linked against OpenSSL 4, so the accepted TLS
+    # versions are mapped to ssl.TLSVersion and applied as a version range.
     TLS_VERSIONS = {
-        "TLSv1.2": ssl.PROTOCOL_TLSv1_2,
+        "TLSv1.2": ssl.TLSVersion.TLSv1_2,
+        "TLSv1.3": ssl.TLSVersion.TLSv1_3,
     }
-    # TLSv1.3 included in PROTOCOL_TLS, but PROTOCOL_TLS is not included on 3.4
-    TLS_VERSIONS["TLSv1.3"] = (
-        ssl.PROTOCOL_TLS
-        if hasattr(ssl, "PROTOCOL_TLS")
-        else ssl.PROTOCOL_SSLv23  # Alias of PROTOCOL_TLS
-    )
     TLS_V1_3_SUPPORTED = hasattr(ssl, "HAS_TLSv1_3") and ssl.HAS_TLSv1_3
 except ImportError:
     SSL_AVAILABLE = False
@@ -392,18 +390,25 @@ class SocketStream:
                 and len(ssl_protos) > 1
             ):
                 tls_version = ssl_protos[1]
-            ssl_protocol = TLS_VERSIONS[tls_version]
-            context = ssl.SSLContext(ssl_protocol)
-
-            if tls_version == "TLSv1.3":
-                if "TLSv1.2" not in ssl_protos:
-                    context.options |= ssl.OP_NO_TLSv1_2
-                if "TLSv1.1" not in ssl_protos:
-                    context.options |= ssl.OP_NO_TLSv1_1
-                if "TLSv1" not in ssl_protos:
-                    context.options |= ssl.OP_NO_TLSv1
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            # Only narrow the default version range, so a stricter
+            # system-wide policy (e.g. OpenSSL MinProtocol) is kept.
+            min_version = TLS_VERSIONS[ssl_protos[-1]]
+            if context.minimum_version < min_version:
+                context.minimum_version = min_version
+            if tls_version != "TLSv1.3":
+                max_version = TLS_VERSIONS[tls_version]
+                if (
+                    context.maximum_version == ssl.TLSVersion.MAXIMUM_SUPPORTED
+                    or context.maximum_version > max_version
+                ):
+                    context.maximum_version = max_version
 
             context.check_hostname = ssl_mode == SSLMode.VERIFY_IDENTITY
+            if not context.check_hostname:
+                # Without VERIFY_IDENTITY the server certificate is only
+                # verified when `ssl_ca` is given (see below).
+                context.verify_mode = ssl.CERT_NONE
 
         if ssl_ca:
             try:

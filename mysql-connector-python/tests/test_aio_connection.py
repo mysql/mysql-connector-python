@@ -2077,6 +2077,27 @@ class MySQLConnectionAioTests(MySQLConnectorAioTestCase):
                         f"Unexpected TLS version found: {res}",
                     )
 
+    @unittest.skipIf(not TLS_V1_3_SUPPORTED, "TLSv1.3 is not supported by Python")
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "TLSv1.3 is not supported")
+    @foreach_cnx_aio()
+    async def test_tls_versions_negotiated(self):
+        """Negotiate the newest TLS version allowed by tls_versions"""
+        connector_class = self.cnx.__class__
+
+        settings = tests.get_mysql_config()
+        settings.pop("unix_socket", None)
+        for tls_versions, expected in (
+            (["TLSv1.2"], "TLSv1.2"),
+            (["TLSv1.3"], "TLSv1.3"),
+            (["TLSv1.2", "TLSv1.3"], "TLSv1.3"),
+        ):
+            settings["tls_versions"] = tls_versions
+            async with connector_class(**settings) as cnx:
+                async with await cnx.cursor() as cur:
+                    await cur.execute("SHOW STATUS LIKE 'Ssl_version'")
+                    res = await cur.fetchone()
+            self.assertEqual(expected, res[1], tls_versions)
+
     async def test_connection_attributes_user_defined(self):
         """Tests defined connection attributes"""
         config = tests.get_mysql_config()

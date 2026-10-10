@@ -2481,6 +2481,30 @@ class MySQLConnectionTests(tests.MySQLConnectorTests):
                 "Unexpected TLS version found: {}".format(res),
             )
 
+    @unittest.skipIf(not TLS_V1_3_SUPPORTED, "TLSv1.3 is not supported by Python")
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "TLSv1.3 is not supported")
+    @tests.foreach_cnx()
+    def test_tls_versions_negotiated(self):
+        """Negotiate the newest TLS version allowed by tls_versions"""
+        if isinstance(self.cnx, connection.MySQLConnection):
+            connector_class = connection.MySQLConnection
+        else:
+            connector_class = CMySQLConnection
+
+        settings = tests.get_mysql_config()
+        settings.pop("unix_socket", None)
+        for tls_versions, expected in (
+            (["TLSv1.2"], "TLSv1.2"),
+            (["TLSv1.3"], "TLSv1.3"),
+            (["TLSv1.2", "TLSv1.3"], "TLSv1.3"),
+        ):
+            settings["tls_versions"] = tls_versions
+            cnx = connector_class(**settings)
+            cur = cnx.cursor()
+            cur.execute("SHOW STATUS LIKE 'Ssl_version'")
+            self.assertEqual(expected, cur.fetchone()[1], tls_versions)
+            cnx.close()
+
     def test_connection_attributes_user_defined(self):
         """Tests defined connection attributes"""
         config = tests.get_mysql_config()
