@@ -41,10 +41,10 @@ try:
     import ssl
 
     TLS_VERSIONS = {
-        "TLSv1": ssl.PROTOCOL_TLSv1,
-        "TLSv1.1": ssl.PROTOCOL_TLSv1_1,
-        "TLSv1.2": ssl.PROTOCOL_TLSv1_2,
-        "TLSv1.3": ssl.PROTOCOL_TLS,
+        "TLSv1": ssl.TLSVersion.TLSv1,
+        "TLSv1.1": ssl.TLSVersion.TLSv1_1,
+        "TLSv1.2": ssl.TLSVersion.TLSv1_2,
+        "TLSv1.3": ssl.TLSVersion.TLSv1_3,
     }
 except ImportError:
     ssl = None
@@ -665,16 +665,9 @@ class MySQLSocket(ABC):
             if tls_versions:
                 tls_versions.sort(reverse=True)
                 tls_version = tls_versions[0]
-                ssl_protocol = TLS_VERSIONS[tls_version]
-                context = ssl.SSLContext(ssl_protocol)
-
-                if tls_version == "TLSv1.3":
-                    if "TLSv1.2" not in tls_versions:
-                        context.options |= ssl.OP_NO_TLSv1_2
-                    if "TLSv1.1" not in tls_versions:
-                        context.options |= ssl.OP_NO_TLSv1_1
-                    if "TLSv1" not in tls_versions:
-                        context.options |= ssl.OP_NO_TLSv1
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                context.minimum_version = TLS_VERSIONS[tls_versions[-1]]
+                context.maximum_version = TLS_VERSIONS[tls_version]
             else:
                 context = ssl.create_default_context()
 
