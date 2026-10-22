@@ -1773,6 +1773,28 @@ class MySQLxSessionTests(tests.MySQLxTests):
                 with self.assertRaises(NotSupportedError) as context:
                     _ = mysqlx.get_session(settings_case)
 
+    @unittest.skipIf(not TLS_V1_3_SUPPORTED, "TLSv1.3 is not supported by Python")
+    @unittest.skipIf(tests.MYSQL_VERSION < (8, 0, 16), "TLSv1.3 is not supported")
+    def test_tls_versions_negotiated(self):
+        """Negotiate the newest TLS version allowed by tls-versions"""
+        settings = self.connect_kwargs.copy()
+        settings.pop("schema")
+        settings.pop("socket")
+        for tls_versions, expected in (
+            (["TLSv1.2"], "TLSv1.2"),
+            (["TLSv1.3"], "TLSv1.3"),
+            (["TLSv1.2", "TLSv1.3"], "TLSv1.3"),
+        ):
+            settings["tls-versions"] = tls_versions
+            session = mysqlx.get_session(settings)
+            res = (
+                session.sql("SHOW STATUS LIKE 'Mysqlx_ssl_version'")
+                .execute()
+                .fetch_all()
+            )
+            self.assertEqual(expected, res[0].get_string("Value"), tls_versions)
+            session.close()
+
     def test_disabled_x_protocol(self):
         session = mysqlx.get_session(self.connect_kwargs)
         res = (
