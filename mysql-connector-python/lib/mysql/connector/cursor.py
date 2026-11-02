@@ -296,19 +296,43 @@ class MySQLCursor(MySQLCursorAbstract):
     def _process_params(
         self, params: ParamsSequenceType
     ) -> Tuple[Union[bytes, Decimal], ...]:
-        """Process query parameters."""
-        res = params[:]
+        """Process query parameters.
+
+        A ``list`` or ``tuple`` given as a single parameter is expanded into a
+        parenthesized, comma-separated group of its (individually escaped)
+        elements, so that a single ``%s`` placeholder can be used with an
+        ``IN`` clause, e.g. ``WHERE id IN %s`` with ``([1, 2, 3],)``. An empty
+        sequence expands to ``(NULL)`` to keep the statement valid while
+        matching no rows. ``str``, ``bytes`` and ``bytearray`` values are
+        always treated as single scalar parameters, never expanded.
+        """
         try:
             sql_mode = self._connection.sql_mode
             to_mysql = self._connection.converter.to_mysql
             escape = self._connection.converter.escape
             quote = self._connection.converter.quote
-            res = [to_mysql(value) for value in res]
-            res = [escape(value, sql_mode) for value in res]
-            res = [
-                quote(value) if not isinstance(params[i], Decimal) else value
-                for i, value in enumerate(res)
-            ]
+
+            def convert(value: Any) -> Any:
+                """Convert a single scalar parameter to its MySQL literal."""
+                conv = escape(to_mysql(value), sql_mode)
+                # Keep the behaviour of leaving Decimal values unquoted.
+                if not isinstance(value, Decimal):
+                    conv = quote(conv)
+                return conv
+
+            def process(value: Any) -> Any:
+                """Convert a parameter, expanding list/tuple for IN clauses."""
+                if isinstance(value, (list, tuple)):
+                    if not value:
+                        return b"(NULL)"
+                    return (
+                        b"("
+                        + b",".join(bytes(convert(element)) for element in value)
+                        + b")"
+                    )
+                return convert(value)
+
+            res = [process(value) for value in params]
         except Exception as err:
             raise ProgrammingError(
                 f"Failed processing format-parameters; {err}"

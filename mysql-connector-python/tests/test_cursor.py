@@ -236,6 +236,10 @@ class MySQLCursorTests(tests.TestsCursor):
             datetime.timedelta(hours=40, minutes=30, seconds=12),
             "foo %(t)s",
             "foo %(s)s",
+            [14, 23, 27, 50],
+            (1, 2, 3),
+            ["a", "'quoted'"],
+            [],
         )
         exp = (
             b"NULL",
@@ -258,6 +262,10 @@ class MySQLCursorTests(tests.TestsCursor):
             b"'40:30:12'",
             b"'foo %(t)s'",
             b"'foo %(s)s'",
+            b"(14,23,27,50)",
+            b"(1,2,3)",
+            b"('a','\\'quoted\\'')",
+            b"(NULL)",
         )
 
         self.cnx = connection.MySQLConnection(**tests.get_mysql_config())
