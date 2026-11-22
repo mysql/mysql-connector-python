@@ -28,6 +28,7 @@
 
 """Local Infile Tests."""
 
+import asyncio
 import os
 import unittest
 import tests
@@ -459,6 +460,25 @@ class LocalInfileAioTests(tests.MySQLConnectorAioTestCase):
             ]
             self.assertEqual(exp, await cur.fetchall())
             cur.execute("DROP TABLE IF EXISTS local_data")
+
+    @unittest.skipIf(
+        tests.MYSQL_EXTERNAL_SERVER,
+        "Test not available for external MySQL servers",
+    )
+    @tests.foreach_cnx_aio(allow_local_infile=True, write_timeout=10)
+    async def test_allow_local_infile_with_write_timeout(self):
+        """LOAD DATA LOCAL INFILE must not hang when write_timeout is set."""
+        async with await self.cnx.cursor() as cur:
+            await cur.execute("DROP TABLE IF EXISTS local_data")
+            await cur.execute(
+                "CREATE TABLE local_data (id int, c1 VARCHAR(6), c2 VARCHAR(6))"
+            )
+            data_file = os.path.join("tests", "data", "local_data.csv")
+            sql = "LOAD DATA LOCAL INFILE %s INTO TABLE local_data"
+            await asyncio.wait_for(cur.execute(sql, (data_file,)), 30)
+            await cur.execute("SELECT COUNT(*) FROM local_data")
+            self.assertEqual((6,), await cur.fetchone())
+            await cur.execute("DROP TABLE IF EXISTS local_data")
 
     @unittest.skipIf(
         tests.MYSQL_EXTERNAL_SERVER,

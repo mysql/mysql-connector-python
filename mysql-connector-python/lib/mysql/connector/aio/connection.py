@@ -677,7 +677,9 @@ class MySQLConnection(MySQLConnectionAbstract):
 
         if send_empty_packet:
             try:
-                await self._socket.write(b"", write_timeout or self._write_timeout)
+                await self._socket.write(
+                    b"", write_timeout=write_timeout or self._write_timeout
+                )
             except AttributeError as err:
                 raise OperationalError("MySQL Connection not available") from err
 
